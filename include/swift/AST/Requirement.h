@@ -192,7 +192,7 @@ public:
   CheckRequirementResult checkRequirement(
       SmallVectorImpl<Requirement> &subReqs,
       bool allowMissing = false,
-      SmallVectorImpl<ProtocolConformance *> *isolatedConformances = nullptr
+      SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances = nullptr
   ) const;
 
   /// Determines if this substituted requirement can ever be satisfied,

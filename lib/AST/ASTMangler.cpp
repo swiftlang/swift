@@ -4533,7 +4533,7 @@ void ASTMangler::appendAnyProtocolConformance(
       return;
 
     auto path = genericSig->getConformancePath(conformingType,
-                                               conformance.getAbstract());
+                                               conformance.getRequirement());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     if (forInvertible)
@@ -4544,7 +4544,7 @@ void ASTMangler::appendAnyProtocolConformance(
     ConformancePath conformancePath =
         opaqueSignature->getConformancePath(
           opaqueType->getInterfaceType(),
-          conformance.getAbstract());
+          conformance.getRequirement());
 
     // Append the conformance path with the signature of the opaque type.
     appendDependentProtocolConformance(conformancePath, opaqueSignature);

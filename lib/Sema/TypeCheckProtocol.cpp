@@ -5379,7 +5379,11 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
 
       auto outerIsolation = conformance->getIsolation();
       ProtocolConformanceRef(assocConf).forEachIsolatedConformance(
-          [&](ProtocolConformance *isolatedConformance) {
+          [&](ProtocolConformanceRef isolatedConformanceRef) {
+            if (!isolatedConformanceRef.isConcrete())
+              return false;
+
+            auto isolatedConformance = isolatedConformanceRef.getConcrete();
             auto innerIsolation = isolatedConformance->getIsolation();
 
             // If the isolation doesn't match, record an error.

@@ -1986,7 +1986,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
     assert(associatedConformance.isAbstract());
     auto wtable =
       emitArchetypeWitnessTableRef(IGF, cast<ArchetypeType>(associatedType),
-                                   associatedConformance.getAbstract());
+                                   associatedConformance.getRequirement());
     IGF.Builder.CreateRet(wtable);
     return;
   }

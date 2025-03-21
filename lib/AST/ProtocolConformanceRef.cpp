@@ -1,4 +1,4 @@
-//===--- ProtocolConformance.cpp - AST Protocol Conformance Reference -----===//
+//===--- ProtocolConformanceRef.cpp - AST Protocol Conformance Reference --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "AbstractConformance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -32,12 +33,6 @@
 
 using namespace swift;
 
-ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
-    Type subjectType, ProtocolDecl *proto) {
-  // Temporary implementation:
-  return ProtocolConformanceRef(proto);
-}
-
 bool ProtocolConformanceRef::isInvalid() const {
   if (!Union)
     return true;
@@ -48,13 +43,26 @@ bool ProtocolConformanceRef::isInvalid() const {
   return false;
 }
 
+Type ProtocolConformanceRef::getConformingType() const {
+  if (isInvalid())
+    return Type();
+
+  if (isConcrete())
+    return getConcrete()->getType();
+
+  if (isPack())
+    return Type(getPack()->getType());
+
+  return getAbstract()->getConformingType();
+}
+
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
   if (isConcrete()) {
     return getConcrete()->getProtocol();
   } else if (isPack()) {
     return getPack()->getProtocol();
   } else {
-    return getAbstract();
+    return getAbstract()->getRequirement();
   }
 }
 
@@ -293,25 +301,40 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
                      conformingType->is<UnresolvedType>() ||
                      conformingType->is<PlaceholderType>());
 
-  return ProtocolConformanceRef(protocol);
+  return ProtocolConformanceRef::forAbstract(conformingType, protocol);
 }
 
 /// Check of all types used by the conformance are canonical.
 bool ProtocolConformanceRef::isCanonical() const {
-  if (isAbstract() || isInvalid())
+  if (isInvalid())
     return true;
+
   if (isPack())
     return getPack()->isCanonical();
-  return getConcrete()->isCanonical();
 
+  if (isAbstract()) {
+    Type conformingType = getConformingType();
+    return !conformingType || conformingType->isCanonical();
+  }
+
+  return getConcrete()->isCanonical();
 }
 
 ProtocolConformanceRef
 ProtocolConformanceRef::getCanonicalConformanceRef() const {
-  if (isAbstract() || isInvalid())
+  if (isInvalid())
     return *this;
+
   if (isPack())
     return ProtocolConformanceRef(getPack()->getCanonicalConformance());
+
+  if (isAbstract()) {
+    Type conformingType = getConformingType();
+    if (conformingType)
+      conformingType = conformingType->getCanonicalType();
+    return forAbstract(conformingType, getRequirement());
+  }
+
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }
 
@@ -385,7 +408,7 @@ bool ProtocolConformanceRef::forEachMissingConformance(
 }
 
 bool ProtocolConformanceRef::forEachIsolatedConformance(
-    llvm::function_ref<bool(ProtocolConformance*)> body
+    llvm::function_ref<bool(ProtocolConformanceRef)> body
 ) const {
   if (isInvalid() || isAbstract())
     return false;
@@ -405,7 +428,7 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
   if (auto normal =
           dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
     if (normal->isIsolated()) {
-      if (body(concrete))
+      if (body(*this))
         return true;
     }
   }
@@ -422,7 +445,7 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
 
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
-    simple_display(out, conformanceRef.getAbstract());
+    simple_display(out, conformanceRef.getRequirement());
   } else if (conformanceRef.isConcrete()) {
     simple_display(out, conformanceRef.getConcrete());
   } else if (conformanceRef.isPack()) {
@@ -432,7 +455,7 @@ void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef confor
 
 SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
-    return extractNearestSourceLoc(conformanceRef.getAbstract());
+    return extractNearestSourceLoc(conformanceRef.getRequirement());
   } else if (conformanceRef.isConcrete()) {
     return extractNearestSourceLoc(conformanceRef.getConcrete());
   }
