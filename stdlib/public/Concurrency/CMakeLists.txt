@@ -79,6 +79,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorBridge.cpp
   ExecutorChecks.cpp
   Setup.cpp
   Task.cpp
@@ -92,33 +93,13 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   linker-support/magic-symbols-for-install-name.c
 )
 
-if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    DispatchGlobalExecutor.cpp
-  )
-elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    CooperativeGlobalExecutor.cpp
-  )
-elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked" OR
-    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    NonDispatchGlobalExecutor.cpp
-  )
-endif()
-
-set(LLVM_OPTIONAL_SOURCES
-  CooperativeGlobalExecutor.cpp
-  DispatchGlobalExecutor.cpp
-  NonDispatchGlobalExecutor.cpp
-)
-
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
   AsyncLet.swift
   CheckedContinuation.swift
   Errors.swift
   Executor.swift
+  ExecutorBridge.swift
   ExecutorAssertions.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -136,10 +117,11 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  PartialAsyncTask.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
-  PartialAsyncTask.swift
+  PriorityQueue.swift
   SourceCompatibilityShims.swift
   Task.swift
   Task+PriorityEscalation.swift
@@ -176,12 +158,51 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
+  DummyExecutor.swift
+  CooperativeExecutor.swift
+  PlatformExecutorDarwin.swift
+  PlatformExecutorLinux.swift
+  PlatformExecutorWindows.swift
+)
+
+set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
+set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES)
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    DispatchGlobalExecutor.cpp
+  )
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    DispatchExecutor.swift
+    CFExecutor.swift
+    ExecutorImpl.swift
+  )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorCooperative.swift
+    )
+else()
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorNone.swift
+  )
+endif()
+
+set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+  PlatformExecutorNone.swift
+  )
+
+set(LLVM_OPTIONAL_SOURCES
+  DispatchGlobalExecutor.cpp
+  CooperativeGlobalExecutor.cpp
+  DispatchGlobalExecutor.cpp
 )
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+  ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES}
 
   GYB_SOURCES
     TaskGroup+addTask.swift.gyb
@@ -279,6 +300,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
@@ -358,4 +380,3 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
   add_dependencies(embedded-concurrency "copy_executor_impl_header")
 endif()
-
