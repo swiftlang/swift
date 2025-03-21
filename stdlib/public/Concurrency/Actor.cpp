@@ -25,7 +25,6 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
-#include "ExecutorBridge.h"
 #include "TaskPrivate.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
@@ -289,40 +288,6 @@ static SerialExecutorRef swift_task_getCurrentExecutorImpl() {
   SWIFT_TASK_DEBUG_LOG("getting current executor %p", result.getIdentity());
   return result;
 }
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
-
-extern "C" SWIFT_CC(swift)
-SerialExecutorRef _swift_getActiveExecutor() {
-  auto currentTracking = ExecutorTrackingInfo::current();
-  if (currentTracking) {
-    SerialExecutorRef executor = currentTracking->getActiveExecutor();
-    // This might be an actor, in which case return nil ("generic")
-    if (executor.isDefaultActor())
-      return SerialExecutorRef::generic();
-    return executor;
-  }
-  return swift_getMainExecutor();
-}
-
-extern "C" SWIFT_CC(swift)
-TaskExecutorRef _swift_getCurrentTaskExecutor() {
-  auto currentTracking = ExecutorTrackingInfo::current();
-  if (currentTracking)
-    return currentTracking->getTaskExecutor();
-  return TaskExecutorRef::undefined();
-}
-
-extern "C" SWIFT_CC(swift)
-TaskExecutorRef _swift_getPreferredTaskExecutor() {
-  AsyncTask *task = swift_task_getCurrent();
-  if (!task)
-    return TaskExecutorRef::undefined();
-  return task->getPreferredTaskExecutor();
-}
-
-#pragma clang diagnostic pop
 
 /// Determine whether we are currently executing on the main thread
 /// independently of whether we know that we are on the main actor.

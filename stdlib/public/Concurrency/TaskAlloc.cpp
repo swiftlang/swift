@@ -117,17 +117,3 @@ void swift::swift_coro_dealloc(CoroAllocator *allocator, void *ptr) {
   }
   allocator->deallocate(ptr);
 }
-
-void *swift::swift_job_allocate(Job *job, size_t size) {
-  if (!job->isAsyncTask())
-    return nullptr;
-
-  return allocator(static_cast<AsyncTask *>(job)).alloc(size);
-}
-
-void swift::swift_job_deallocate(Job *job, void *ptr) {
-  if (!job->isAsyncTask())
-    return;
-
-  allocator(static_cast<AsyncTask *>(job)).dealloc(ptr);
-}

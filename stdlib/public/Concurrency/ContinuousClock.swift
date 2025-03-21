@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-/// A clock that measures time that always increments and does not stop
-/// incrementing while the system is asleep.
+#if !$Embedded
+/// A clock that measures time that always increments and does not stop 
+/// incrementing while the system is asleep. 
 ///
 /// `ContinuousClock` can be considered as a stopwatch style time. The frame of
 /// reference of the `Instant` may be bound to process launch, machine boot or
@@ -21,10 +22,9 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 public struct ContinuousClock: Sendable {
   /// A continuous point in time used for `ContinuousClock`.
-  public struct Instant: Sendable {
+  public struct Instant: Codable, Sendable {
     internal var _value: Swift.Duration
 
     internal init(_value: Swift.Duration) {
@@ -33,11 +33,6 @@ public struct ContinuousClock: Sendable {
   }
 
   public init() { }
-}
-
-#if !$Embedded
-@available(SwiftStdlib 5.7, *)
-extension ContinuousClock.Instant: Codable {
 }
 #endif
 
@@ -56,11 +51,12 @@ extension Duration {
   }
 }
 
+#if !$Embedded
+
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension Clock where Self == ContinuousClock {
-  /// A clock that measures time that always increments but does not stop
-  /// incrementing while the system is asleep.
+  /// A clock that measures time that always increments but does not stop 
+  /// incrementing while the system is asleep. 
   ///
   ///       try await Task.sleep(until: .now + .seconds(3), clock: .continuous)
   ///
@@ -69,7 +65,6 @@ extension Clock where Self == ContinuousClock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock: Clock {
   /// The current continuous instant.
   public var now: ContinuousClock.Instant {
@@ -100,33 +95,24 @@ extension ContinuousClock: Clock {
     )
   }
 
-  /// The continuous clock is continuous and monotonic
-  @available(SwiftStdlib 6.2, *)
-  public var traits: ClockTraits {
-    return [.continuous, .monotonic]
-  }
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
   /// to coalesce CPU wake-ups to more efficiently process the wake-ups in
   /// a more power efficient manner.
   ///
-  /// If the task is canceled before the time ends, this function throws
+  /// If the task is canceled before the time ends, this function throws 
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(SwiftStdlib 6.2, *) {
-      try await Task._sleep(until: deadline,
-                            tolerance: tolerance,
-                            clock: self)
-    } else {
-      // Should never see this
-      Builtin.unreachable()
-    }
+    let (seconds, attoseconds) = deadline._value.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    try await Task._sleep(until:seconds, nanoseconds,
+      tolerance: tolerance,
+      clock: .continuous)
   }
 #else
   @available(SwiftStdlib 5.7, *)
@@ -140,7 +126,6 @@ extension ContinuousClock: Clock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 
@@ -208,3 +193,5 @@ extension ContinuousClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#endif

@@ -22,34 +22,10 @@ import Darwin
 // This test specifically checks that our reference counting accounts for existence of
 // objective-c types as TaskExecutors -- which was a bug where we'd swift_release
 // obj-c excecutors by accident (rdar://131151645).
-final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulableExecutor, @unchecked Sendable {
+final class NSQueueTaskExecutor: NSData, TaskExecutor, @unchecked Sendable {
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
     DispatchQueue.main.async {
-      job.runSynchronously(on: self.asUnownedTaskExecutor())
-    }
-  }
-
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    // Convert to `Swift.Duration`
-    let duration = clock.convert(from: delay)!
-
-    // Now turn that into nanoseconds
-    let (seconds, attoseconds) = duration.components
-    let nanoseconds = attoseconds / 1_000_000_000
-
-    // Get a Dispatch time
-    let deadline = DispatchTime.now().advanced(
-      by: .seconds(Int(seconds))
-    ).advanced(
-      by: .nanoseconds(Int(nanoseconds))
-    )
-
-    let job = UnownedJob(_job)
-    DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }

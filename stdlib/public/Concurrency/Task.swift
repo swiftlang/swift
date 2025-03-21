@@ -227,7 +227,7 @@ extension Task {
   /// recommended that callers release any locks they might be
   /// holding before they call cancel.
   ///
-  /// If the task has already run past the last point where it could have
+  /// If the task has already run past the last point where it could have 
   /// performed a cancellation check, cancelling it may have no observable effects.
   ///
   /// - SeeAlso: `Task.checkCancellation()`
@@ -1253,18 +1253,7 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
-
-      #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      if #available(SwiftStdlib 6.2, *) {
-        let executor = Task.currentExecutor
-
-        executor.enqueue(ExecutorJob(context: job))
-      } else {
-        _enqueueJobGlobal(job)
-      }
-      #else
       _enqueueJobGlobal(job)
-      #endif
     }
   }
 }
@@ -1425,27 +1414,17 @@ func getJobFlags(_ task: Builtin.NativeObject) -> JobFlags
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
 
-@available(SwiftStdlib 5.9, *)
-func _enqueueJobGlobal(_ task: UnownedJob) {
-  _enqueueJobGlobal(task._context)
-}
-
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelay")
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
-
-@available(SwiftStdlib 5.9, *)
-func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: UnownedJob) {
-  return _enqueueJobGlobalWithDelay(delay, task._context)
-}
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadline")
 @usableFromInline
 func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
                                    _ toleranceSec: Int64, _ toleranceNSec: Int64,
-                                   _ clock: Int32, _ task: UnownedJob)
+                                   _ clock: Int32, _ task: Builtin.Job)
 
 @usableFromInline
 @available(SwiftStdlib 6.2, *)
