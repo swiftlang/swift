@@ -7098,8 +7098,9 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
 }
 
 AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  if (auto domain = AvailabilityDomain::forTargetPlatform(*this))
-    return *domain;
+  auto platform = swift::targetPlatform(LangOpts);
+  if (platform != PlatformKind::none)
+    return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();

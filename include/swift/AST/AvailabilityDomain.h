@@ -152,16 +152,6 @@ public:
     return AvailabilityDomain(domain);
   }
 
-  /// Returns the most specific platform domain for the target of the
-  /// compilation context.
-  static std::optional<AvailabilityDomain>
-  forTargetPlatform(const ASTContext &ctx);
-
-  /// Returns the most specific platform domain for the target variant of the
-  /// compilation context.
-  static std::optional<AvailabilityDomain>
-  forTargetVariantPlatform(const ASTContext &ctx);
-
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
   builtinDomainForString(StringRef string, const DeclContext *declContext);
@@ -226,10 +216,6 @@ public:
   /// Returns true if this domain is considered active in the current
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
-
-  /// Returns true if this domain is a platform domain that is contained by the
-  /// set of active platform-specific domains.
-  bool isActiveForTargetPlatform(const ASTContext &ctx) const;
 
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
