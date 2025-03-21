@@ -2149,7 +2149,7 @@ ERROR(attr_only_at_non_local_scope, none,
 ERROR(attr_only_at_non_generic_scope, none,
       "attribute '%0' cannot be used in a generic context", (StringRef))
 ERROR(attr_only_on_static_properties, none,
-      "properties with attribute '_section' must be static", (StringRef))
+      "properties with attribute '%0' must be static", (StringRef))
 
 ERROR(weak_unowned_in_embedded_swift, none,
       "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
@@ -4045,6 +4045,10 @@ ERROR(attr_incompatible_with_override,none,
 ERROR(attr_incompatible_with_objc,none,
       "'%0' must not be used on an '@objc' %1",
       (DeclAttribute, DescriptiveDeclKind))
+
+ERROR(attr_unusable_in_protocol,none,
+      "'%0' cannot be used inside a protocol declaration",
+      (DeclAttribute))
 
 ERROR(final_not_on_accessors,none,
       "only the %select{property|subscript}0 itself can be marked as 'final'"
