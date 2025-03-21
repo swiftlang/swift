@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded && os(Linux)
+#if !$Embedded && (os(Linux) || os(Android))
 
 import Swift
 
