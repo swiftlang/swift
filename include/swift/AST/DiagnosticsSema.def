@@ -8512,6 +8512,9 @@ ERROR(attr_abi_no_default_arguments,none,
 ERROR(attr_abi_no_macros,none,
       "%kind0 cannot be expanded in '@abi' attribute",
       (Decl *))
+ERROR(attr_abi_no_lazy,none,
+      "'lazy' is not compatible with '@abi' attribute",
+      ())
 
 // These macros insert 'final', 'non-final', or nothing depending on both the
 // current decl and its counterpart, such that 'non-final' is used if the
