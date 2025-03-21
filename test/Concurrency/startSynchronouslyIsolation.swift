@@ -26,15 +26,15 @@ func async() async throws {
     group.startTaskSynchronouslyUnlessCancelled { 2 }
   }
   await withThrowingTaskGroup(of: Int.self) { group in
-    group.startTaskSynchronously { 1 }
-    group.startTaskSynchronouslyUnlessCancelled { 2 }
+    group.startTaskSynchronously { () async throws -> Int in 1 }
+    group.startTaskSynchronouslyUnlessCancelled { () async throws -> Int in 2 }
   }
   await withDiscardingTaskGroup { group in
     group.startTaskSynchronously { }
     group.startTaskSynchronouslyUnlessCancelled { }
   }
   try await withThrowingDiscardingTaskGroup { group in
-    group.startTaskSynchronously { }
-    group.startTaskSynchronouslyUnlessCancelled { }
+    group.startTaskSynchronously { () async throws -> Void in }
+    group.startTaskSynchronouslyUnlessCancelled { () async throws -> Void in }
   }
 }
