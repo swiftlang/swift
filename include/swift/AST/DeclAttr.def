@@ -456,7 +456,7 @@ DECL_ATTR(_dynamicReplacement, DynamicReplacement,
 
 SIMPLE_DECL_ATTR(_borrowed, Borrowed,
   OnVar | OnSubscript,
-  UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | InferredInABIAttr,
+  UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   81)
 
 DECL_ATTR(_private, PrivateImport,
