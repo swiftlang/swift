@@ -262,6 +262,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Abstract conformances referenced by this module.
+  MutableArrayRef<Serialized<AbstractConformance *>> AbstractConformances;
+
   /// Pack conformances referenced by this module.
   MutableArrayRef<Serialized<PackConformance *>> PackConformances;
 

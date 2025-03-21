@@ -2123,6 +2123,12 @@ namespace decls_block {
     BCFixed<2>  // the builtin conformance kind
   >;
 
+  using AbstractConformanceLayout = BCRecordLayout<
+    ABSTRACT_CONFORMANCE,
+    TypeIDField,                         // conforming type
+    DeclIDField                         // the protocol
+  >;
+
   using PackConformanceLayout = BCRecordLayout<
     PACK_CONFORMANCE,
     TypeIDField,                         // pattern type
@@ -2648,6 +2654,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    ABSTRACT_CONFORMANCE_OFFSETS,
     PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

@@ -8712,16 +8712,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (kind == ConstraintKind::NonisolatedConformsTo &&
         !conformance.getRequirement()->isMarkerProtocol()) {
       // Grab the first isolated conformance, if there is one.
-      ProtocolConformance *isolatedConformance = nullptr;
-      conformance.forEachIsolatedConformance([&](ProtocolConformance *conf) {
+      ProtocolConformanceRef isolatedConformance;
+      conformance.forEachIsolatedConformance([&](ProtocolConformanceRef conf) {
         if (!isolatedConformance)
           isolatedConformance = conf;
         return true;
       });
 
-      if (isolatedConformance) {
+      if (isolatedConformance && isolatedConformance.isConcrete()) {
         auto fix = IgnoreIsolatedConformance::create(
-            *this, getConstraintLocator(locator), isolatedConformance);
+            *this, getConstraintLocator(locator),
+            isolatedConformance.getConcrete());
         if (recordFix(fix)) {
           return SolutionKind::Error;
         }
