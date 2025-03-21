@@ -1428,14 +1428,9 @@ llvm::Module *IRGenModule::getModule() const {
 }
 
 bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
-  static const CanType kStructural[] = {
-    Context.TheEmptyTupleType, Context.TheNativeObjectType,
-    Context.TheBridgeObjectType, Context.TheRawPointerType,
-    Context.getAnyObjectType()
-  };
-
-  if (std::any_of(std::begin(kStructural), std::end(kStructural),
-                  [T](const CanType &ST) { return T == ST; }))
+  if (T == Context.TheEmptyTupleType || T == Context.TheNativeObjectType ||
+      T == Context.TheBridgeObjectType || T == Context.TheRawPointerType ||
+      T == Context.getAnyObjectType())
     return true;
 
   if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
