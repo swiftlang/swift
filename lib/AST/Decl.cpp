@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -5348,9 +5349,39 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 
   // Prefer module names earlier in the alphabet.
   if (dc1->isModuleScopeContext() && dc2->isModuleScopeContext()) {
-    auto module1 = dc1->getParentModule();
-    auto module2 = dc2->getParentModule();
-    if (int result = module1->getName().str().compare(module2->getName().str()))
+    // For protocol declarations specifically, the order here is part
+    // of the ABI, and so we must take care to get the correct module
+    // name for the comparison.
+    auto getModuleNameForOrder = [&](const TypeDecl *decl) -> StringRef {
+      // This used to just call getName(), which caused accidental ABI breaks
+      // when a module is imported under different aliases.
+      //
+      // The new behavior matches the behavior in the mangler:
+      //
+      // - getName() returns the name of the module as its imported by the
+      //   client, which might be an alias different from the real name.
+      // - getRealName() returns the real name after desugaring aliases.
+      // - getABIName() returns the name set with the -module-abi-name flag, or
+      //   **getName()** if the flag is not set.
+      //
+      // Thus, the correct module name to use for mangling and ordering is
+      // getRealName(), unless getABIName() is distinct from getName(), in
+      // which case we use getABIName().
+      //
+      // FIXME: This should be fixed after auditing callers of getABIName().
+      //
+      // However, to maintain ABI compatibility, we ignore the ABI name for the
+      // _Concurrency module, which is "Swift", and still use the real name in
+      // this case.
+      auto *module = decl->getDeclContext()->getParentModule();
+      if (module->getRealName().str() == SWIFT_CONCURRENCY_NAME ||
+          module->getName() == module->getABIName()) {
+        return module->getRealName().str();
+      }
+      return module->getABIName().str();
+    };
+
+    if (int result = getModuleNameForOrder(type1).compare(getModuleNameForOrder(type2)))
       return result;
   }
 
