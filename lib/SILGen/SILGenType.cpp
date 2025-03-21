@@ -261,8 +261,11 @@ public:
   // Map a base SILDeclRef to the corresponding element in vtableMethods.
   llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
 
+  // A base method and a corresponding override.
+  using VTableMethod = std::pair<SILDeclRef, SILDeclRef>;
+
   // For each base method, store the corresponding override.
-  SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> vtableMethods;
+  SmallVector<VTableMethod, 8> vtableMethods;
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
     : SGM(SGM), theClass(theClass) {
