@@ -72,6 +72,10 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
                                            unsigned long encoding);
 
 SWIFT_RUNTIME_STDLIB_API
+const __swift_uint8_t * _Nullable
+_swift_stdlib_NSStringUTF8StringTrampoline(id _Nonnull obj);
+
+SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void * _Nonnull addr);
   

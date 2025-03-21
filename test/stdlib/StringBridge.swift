@@ -56,8 +56,10 @@ StringBridgeTests.test("Tagged NSString") {
 #endif // not 32bit
 }
 
-StringBridgeTests.test("Constant NSString New SPI") {
-  if #available(SwiftStdlib 6.1, *) {
+StringBridgeTests.test("Constant NSString New SPI")
+  .require(.stdlib_6_1)
+  .code {
+    guard #available(SwiftStdlib 6.1, *) else { return }
     //21 characters long so avoids _SmallString
     let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
     let regularBridged = constantString as String
@@ -74,7 +76,45 @@ StringBridgeTests.test("Constant NSString New SPI") {
       ObjectIdentifier(reverseBridged)
     )
     expectEqual(bridged, regularBridged)
-  }
+}
+
+StringBridgeTests.test("Shared String SPI")
+  .require(.stdlib_6_2)
+  .code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+    func test(literal: String, isASCII: Bool) {
+      let baseCount = literal.utf8.count
+      literal.withCString { intptr in
+        intptr.withMemoryRebound(to: UInt8.self, capacity: baseCount) { ptr in
+          let fullBuffer = UnsafeBufferPointer(start: ptr, count: baseCount)
+          let fullString = _SwiftCreateImmortalString_ForFoundation(
+            buffer: fullBuffer,
+            isASCII: isASCII
+          )
+          expectNotNil(fullString)
+          let bridgedFullString = (fullString! as NSString)
+          let fullCString = bridgedFullString.utf8String!
+          expectEqual(baseCount, strlen(fullCString))
+          expectEqual(strcmp(ptr, fullCString), 0)
+          let fullCString2 = bridgedFullString.utf8String!
+          expectEqual(fullCString, fullCString2) //if we're already terminated, we can return the contents pointer as-is
+          
+          let partialBuffer = UnsafeBufferPointer(start: ptr, count: 16) //make sure it's not a smol string
+          let partialString = _SwiftCreateNonTerminatedImmortalString_ForFoundation(
+            buffer: partialBuffer,
+            isASCII: isASCII
+          )
+          expectNotNil(partialString)
+          let partialCString = (partialString! as NSString).utf8String!
+          expectEqual(16, strlen(partialCString))
+          expectEqual(strncmp(ptr, fullCString, 16), 0)
+          withExtendedLifetime(partialString) {}
+          withExtendedLifetime(fullString) {}
+        }
+      }
+    }
+    test(literal: "abcdefghijklmnopqrstuvwxyz", isASCII: true)
+    test(literal: "abcdëfghijklmnopqrstuvwxyz", isASCII: false)
 }
 
 StringBridgeTests.test("Bridging") {

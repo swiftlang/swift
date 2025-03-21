@@ -280,6 +280,12 @@ internal func _cocoaCStringUsingEncodingTrampoline(
   return unsafe _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
+@_effects(readonly)
+internal func _cocoaUTF8StringTrampoline(_ string: _CocoaString)
+  -> UnsafePointer<UInt8>? {
+  return unsafe _swift_stdlib_NSStringUTF8StringTrampoline(string)
+}
+
 @_effects(releasenone)
 internal func _cocoaGetCStringTrampoline(
   _ string: _CocoaString,
@@ -626,10 +632,14 @@ extension String {
       // TODO: We'd rather emit a valid ObjC object statically than create a
       // shared string class instance.
       let gutsCountAndFlags = _guts._object._countAndFlags
+      let newCountAndFlags = _StringObject.CountAndFlags(
+        sharedCount: _guts.count,
+        isASCII: gutsCountAndFlags.isASCII,
+        isNullTerminated: gutsCountAndFlags.isNullTerminated
+      )
       return unsafe __SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,
-        countAndFlags: _StringObject.CountAndFlags(
-          sharedCount: _guts.count, isASCII: gutsCountAndFlags.isASCII))
+        countAndFlags: newCountAndFlags)
     }
 
     _internalInvariant(_guts._object.hasObjCBridgeableObject,
@@ -664,6 +674,21 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 
 @available(SwiftStdlib 6.1, *)
 @_spi(Foundation) public func _SwiftCreateImmortalString_ForFoundation(
+  buffer: UnsafeBufferPointer<UInt8>,
+  isASCII: Bool
+) -> String? {
+  switch unsafe validateUTF8(buffer) {
+  case .success(let extraInfo):
+    return unsafe String(
+      _StringGuts(nullTerminatedImmortal: buffer, isASCII: extraInfo.isASCII)
+    )
+  default:
+    return nil
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+@_spi(Foundation) public func _SwiftCreateNonTerminatedImmortalString_ForFoundation(
   buffer: UnsafeBufferPointer<UInt8>,
   isASCII: Bool
 ) -> String? {

@@ -719,6 +719,9 @@ extension _StringObject {
      bit-position of isSmall on the BridgeObject. This allows us to check for
      native storage without an extra branch guarding against smallness. See
      `_StringObject.hasNativeStorage` for this usage.
+   - `isNativelyStored` implies `isNullTerminated` in processes rebuilt since
+     `isNullTerminated` was introduced
+
 
  b60: isTailAllocated. contiguous UTF-8 code units starts at address + `nativeBias`
    - `isNativelyStored` always implies `isTailAllocated`, but not vice versa
@@ -736,8 +739,16 @@ extension _StringObject {
       at any time, but we cannot reuse it for something else -- we need to
       preserve its current meaning to keep inlined index validation code
       working.
+ 
+ b58: isNullTerminated. Set if the contents of the String are known to have
+      a terminating 0 byte. If not set, no assumptions should be made about the
+      String's compatibility with e.g. `strlen`. Exception: `isNativelyStored`
+      implies this flag, but predates it, so it may not be set by older binaries
+      on ABI-stable platforms. To avoid being tripped up by this subtlety,
+      always use the `isFastZeroTerminated` accessor rather than checking the
+      flag directly.
 
- b48-58: Reserved for future usage.
+ b48-57: Reserved for future usage.
    - Because Swift is ABI stable (on some platforms at least), these bits can
      only be assigned semantics that don't affect interoperability with code
      built with previous releases of the Standard Library, from 5.0 onward.
@@ -786,8 +797,13 @@ extension _StringObject.CountAndFlags {
   internal static var isForeignUTF8Mask: UInt64 {
     return 0x0800_0000_0000_0000
   }
-
-  // General purpose bottom initializer
+  
+  @_alwaysEmitIntoClient // Swift 6.2
+  @inline(__always)
+  internal static var isNullTerminatedMask: UInt64 {
+    return 0x0400_0000_0000_0000
+  }
+  
   @inlinable @inline(__always)
   internal init(
     count: Int,
@@ -795,6 +811,26 @@ extension _StringObject.CountAndFlags {
     isNFC: Bool,
     isNativelyStored: Bool,
     isTailAllocated: Bool
+  ) {
+    self.init(
+      count: count,
+      isASCII: isASCII,
+      isNFC: isNFC,
+      isNativelyStored: isNativelyStored,
+      isTailAllocated: isTailAllocated,
+      isNullTerminated: false
+    )
+  }
+
+  // General purpose bottom initializer
+  @_alwaysEmitIntoClient @inline(__always)
+  internal init(
+    count: Int,
+    isASCII: Bool,
+    isNFC: Bool,
+    isNativelyStored: Bool,
+    isTailAllocated: Bool,
+    isNullTerminated: Bool
   ) {
     var rawBits = UInt64(truncatingIfNeeded: count)
     _internalInvariant(rawBits <= _StringObject.CountAndFlags.countMask)
@@ -816,6 +852,11 @@ extension _StringObject.CountAndFlags {
     if isTailAllocated {
       rawBits |= _StringObject.CountAndFlags.isTailAllocatedMask
     }
+    
+    // Tail allocated strings are always terminated, others may or may not be
+    if isNullTerminated || isNativelyStored {
+      rawBits |= _StringObject.CountAndFlags.isNullTerminatedMask
+    }
 
     self.init(raw: rawBits)
     _internalInvariant(count == self.count)
@@ -823,6 +864,9 @@ extension _StringObject.CountAndFlags {
     _internalInvariant(isNFC == self.isNFC)
     _internalInvariant(isNativelyStored == self.isNativelyStored)
     _internalInvariant(isTailAllocated == self.isTailAllocated)
+    _internalInvariant(
+      isNullTerminated == self.isNullTerminated ||
+      isNativelyStored == self.isNullTerminated)
   }
 
   @inlinable @inline(__always)
@@ -846,7 +890,18 @@ extension _StringObject.CountAndFlags {
       isASCII: isASCII,
       isNFC: isASCII,
       isNativelyStored: false,
-      isTailAllocated: true)
+      isTailAllocated: true,
+      isNullTerminated: false)
+  }
+  @_alwaysEmitIntoClient @inline(__always)
+  internal init(nullTerminatedImmortalCount immortalCount: Int, isASCII: Bool) {
+    self.init(
+      count: immortalCount,
+      isASCII: isASCII,
+      isNFC: isASCII,
+      isNativelyStored: false,
+      isTailAllocated: true,
+      isNullTerminated: true)
   }
   @inline(__always)
   internal init(mortalCount: Int, isASCII: Bool) {
@@ -855,7 +910,18 @@ extension _StringObject.CountAndFlags {
       isASCII: isASCII,
       isNFC: isASCII,
       isNativelyStored: true,
-      isTailAllocated: true)
+      isTailAllocated: true,
+      isNullTerminated: true)
+  }
+  @inline(__always)
+  internal init(sharedCount: Int, isASCII: Bool, isNullTerminated: Bool) {
+    self.init(
+      count: sharedCount,
+      isASCII: isASCII,
+      isNFC: isASCII,
+      isNativelyStored: false,
+      isTailAllocated: false,
+      isNullTerminated: isNullTerminated)
   }
   @inline(__always)
   internal init(sharedCount: Int, isASCII: Bool) {
@@ -864,7 +930,8 @@ extension _StringObject.CountAndFlags {
       isASCII: isASCII,
       isNFC: isASCII,
       isNativelyStored: false,
-      isTailAllocated: false)
+      isTailAllocated: false,
+      isNullTerminated: false)
   }
 
   //
@@ -908,6 +975,12 @@ extension _StringObject.CountAndFlags {
   @inline(__always) // Swift 5.7
   internal var isForeignUTF8: Bool {
     (_storage & Self.isForeignUTF8Mask) != 0
+  }
+  
+  @_alwaysEmitIntoClient
+  @inline(__always) // Swift 6.2
+  internal var isNullTerminated: Bool {
+    return 0 != _storage & _StringObject.CountAndFlags.isNullTerminatedMask
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -1219,16 +1292,40 @@ extension _StringObject {
     // Small strings nul-terminate when spilling for contiguous access
     if isSmall { return true }
 
-    // TODO(String performance): Use performance flag, which could be more
-    // inclusive. For now, we only know native strings and small strings (when
-    // accessed) are. We could also know about some shared strings.
-
-    return largeFastIsTailAllocated
+    return largeFastIsTailAllocated || _countAndFlags.isNullTerminated
   }
 }
 
 // Object creation
 extension _StringObject {
+  @_alwaysEmitIntoClient @inline(__always)
+  internal init(
+    nullTerminatedImmortal bufPtr: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool
+  ) {
+    let countAndFlags = CountAndFlags(
+      nullTerminatedImmortalCount: bufPtr.count, isASCII: isASCII)
+#if _pointerBitWidth(_64)
+    // We bias to align code paths for mortal and immortal strings
+    let biasedAddress = unsafe UInt(
+      bitPattern: bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    ) &- _StringObject.nativeBias
+
+    self.init(
+      pointerBits: UInt64(truncatingIfNeeded: biasedAddress),
+      discriminator: Nibbles.largeImmortal(),
+      countAndFlags: countAndFlags)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
+    self.init(
+      variant: .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
+      discriminator: Nibbles.largeImmortal(),
+      countAndFlags: countAndFlags)
+#else
+#error("Unknown platform")
+#endif
+  }
+
+  
   @inlinable @inline(__always)
   internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
     let countAndFlags = CountAndFlags(
@@ -1300,7 +1397,11 @@ extension _StringObject {
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
-    let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
+    let countAndFlags = CountAndFlags(
+      sharedCount: length,
+      isASCII: isASCII,
+      isNullTerminated: providesFastUTF8
+    )
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
 #if $Embedded
     fatalError("unreachable in embedded Swift")
@@ -1327,7 +1428,11 @@ extension _StringObject {
     isASCII: Bool,
     length: Int
   ) {
-    let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
+    let countAndFlags = CountAndFlags(
+      sharedCount: length,
+      isASCII: isASCII,
+      isNullTerminated: providesFastUTF8
+    )
     let discriminator = Nibbles.largeFastImmortalCocoa()
 #if $Embedded
     fatalError("unreachable in embedded Swift")
