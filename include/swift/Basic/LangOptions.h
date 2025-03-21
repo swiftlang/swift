@@ -982,6 +982,9 @@ namespace swift {
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Disable some experimental optimizations.
+    bool DisableOptimizedRestrictions = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

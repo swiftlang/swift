@@ -1825,7 +1825,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   auto result = cs.matchTypes(elementType, paramType, ConstraintKind::Subtype,
                               options, builder);
 
-  if (result.isFailure())
+  if (result == ConstraintSystem::SolutionKind::Error)
     return nullptr;
 
   return new (cs.getAllocator())
@@ -2121,7 +2121,7 @@ UnwrapOptionalBaseKeyPathApplication::attempt(ConstraintSystem &cs, Type baseTy,
   auto result =
       cs.matchTypes(nonOptionalTy, rootTy, ConstraintKind::Subtype,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
-  if (result.isFailure())
+  if (result == ConstraintSystem::SolutionKind::Error)
     return nullptr;
 
   return new (cs.getAllocator())

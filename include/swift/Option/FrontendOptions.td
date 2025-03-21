@@ -859,6 +859,9 @@ def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
 def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
   HelpText<"Disable all the hacks in the constraint solver">;
 
+def disable_optimized_restrictions : Flag<["-"], "disable-optimized-restrictions">,
+  HelpText<"Disable an experimental constraint solver optimization">;
+
 def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
   HelpText<"Enable operator designated types">;
