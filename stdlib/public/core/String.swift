@@ -801,7 +801,9 @@ extension String: _ExpressibleByBuiltinStringLiteral {
       self = String(_StringGuts(smol))
       return
     }
-    unsafe self.init(_StringGuts(bufPtr, isASCII: Bool(isASCII)))
+    unsafe self.init(
+      _StringGuts(nullTerminatedImmortal: bufPtr, isASCII: Bool(isASCII))
+    )
   }
 }
 

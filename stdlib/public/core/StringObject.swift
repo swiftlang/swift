@@ -904,6 +904,16 @@ extension _StringObject.CountAndFlags {
       isNullTerminated: false)
   }
   @inline(__always)
+  internal init(sharedCount: Int, isASCII: Bool, isNullTerminated: Bool) {
+    self.init(
+      count: sharedCount,
+      isASCII: isASCII,
+      isNFC: isASCII,
+      isNativelyStored: false,
+      isTailAllocated: false,
+      isNullTerminated: isNullTerminated)
+  }
+  @inline(__always)
   internal init(sharedCount: Int, isASCII: Bool) {
     self.init(
       count: sharedCount,

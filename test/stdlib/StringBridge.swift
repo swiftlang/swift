@@ -83,7 +83,7 @@ StringBridgeTests.test("Shared String SPI")
   .code {
     guard #available(SwiftStdlib 6.2, *) else { return }
     func test(literal: String, isASCII: Bool) {
-      let baseCount = literal.count
+      let baseCount = literal.utf8.count
       literal.withCString { intptr in
         intptr.withMemoryRebound(to: UInt8.self, capacity: baseCount) { ptr in
           let fullBuffer = UnsafeBufferPointer(start: ptr, count: baseCount)
