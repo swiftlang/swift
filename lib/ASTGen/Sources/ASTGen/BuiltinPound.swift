@@ -70,11 +70,11 @@ extension ASTGenVisitor {
     switch keyword {
     case .selector:
       let selectorExpr = self.generateObjCSelectorExpr(freestandingMacroExpansion: node)
-      return .generated(.expr(selectorExpr.asExpr))
+      return .generated(.expr(selectorExpr))
 
     case .keyPath:
       let keypathExpr = self.generateObjCKeyPathExpr(freestandingMacroExpansion: node)
-      return .generated(.expr(keypathExpr.asExpr))
+      return .generated(.expr(keypathExpr))
 
     case .assert where ctx.langOptsHasFeature(.StaticAssert):
       let assertStmtOpt = self.generatePoundAssertStmt(freestandingMacroExpansion: node)
@@ -117,6 +117,15 @@ extension ASTGenVisitor {
       // TODO: Diagnose.
       fatalError("#error/#warning must be declaration level")
       // return
+    }
+
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("#error/#warning with generic specialization")
     }
 
     guard node.arguments.count == 1,
@@ -194,11 +203,115 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedObjCSelectorExpr {
-    fatalError("unimplemented (objc selector)")
+  func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedExpr {
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("#selector with generic specialization")
+    }
+
+    var args = node.arguments[...]
+    guard let arg = args.popFirst() else {
+      // TODO: Diagnose
+      fatalError("expected an argument for #selector")
+      // return ErrorExpr
+    }
+    let kind: BridgedObjCSelectorKind
+    switch arg.label?.rawText {
+    case nil: kind = .method
+    case "getter": kind = .getter
+    case "setter": kind = .setter
+    case _?:
+      // TODO: Diagnose
+      fatalError("unexpected argument label in #selector")
+      // return ErrorExpr
+    }
+    let expr = self.generate(expr: arg.expression)
+    guard args.isEmpty else {
+      // TODO: Diagnose
+      fatalError("unexpected argument in #selector")
+      // return ErrorExpr
+    }
+    return BridgedObjCSelectorExpr.createParsed(
+      self.ctx,
+      kind: kind,
+      keywordLoc: self.generateSourceLoc(node.pound),
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      modifierLoc: self.generateSourceLoc(arg.label),
+      subExpr: expr,
+      rParenLoc: self.generateSourceLoc(node.rightParen)
+    ).asExpr
   }
 
-  func generateObjCKeyPathExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedKeyPathExpr {
-    fatalError("unimplemented (objc keypath)")
+  func generateObjCKeyPathExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedExpr {
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("#keyPath with generic specialization")
+    }
+
+    var names: [BridgedDeclNameRef] = []
+    var nameLocs: [BridgedDeclNameLoc] = []
+
+    func collectNames(expr node: ExprSyntax) -> Bool {
+      if let declRefExpr = node.as(DeclReferenceExprSyntax.self) {
+        let nameAndLoc = self.generateDeclNameRef(declReferenceExpr: declRefExpr)
+        names.append(nameAndLoc.name)
+        nameLocs.append(nameAndLoc.loc)
+        return false
+      }
+      if let memberExpr = node.as(MemberAccessExprSyntax.self) {
+        guard let base = memberExpr.base else {
+          // TODO: Diagnose
+          fatalError("unexpected expression in #keyPath")
+        }
+        if collectNames(expr: base) {
+          return true
+        }
+        let nameAndLoc = self.generateDeclNameRef(declReferenceExpr: memberExpr.declName)
+        names.append(nameAndLoc.name)
+        nameLocs.append(nameAndLoc.loc)
+        return false
+      }
+      // TODO: Diagnose
+      fatalError("unexpected expression in #keyPath")
+      // return true
+    }
+
+    var args = node.arguments[...]
+    guard let arg = args.popFirst() else {
+      // TODO: Diagnose
+      fatalError("expected an argument for #keyPath")
+      // return ErrorExpr
+    }
+    guard arg.label == nil else {
+      // TODO: Diagnose
+      fatalError("unexpected argument label  #keyPath")
+
+    }
+    if /*hadError=*/collectNames(expr: arg.expression) {
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr;
+    }
+
+    guard args.isEmpty else {
+      // TODO: Diagnose
+      fatalError("unexpected argument in #keyPath")
+      // return ErrorExpr
+    }
+
+    return BridgedKeyPathExpr.createParsedPoundKeyPath(
+      self.ctx,
+      poundLoc: self.generateSourceLoc(node.pound),
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      names: names.lazy.bridgedArray(in: self),
+      nameLocs: nameLocs.lazy.bridgedArray(in: self),
+      rParenLoc: self.generateSourceLoc(node.rightParen)
+    ).asExpr
   }
 }
