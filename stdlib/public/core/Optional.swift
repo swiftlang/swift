@@ -180,7 +180,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
   @_alwaysEmitIntoClient
-  @lifetime(value)
+  @lifetime(copy value)
   public init(_ value: consuming Wrapped) {
     // FIXME: Merge this into the original entry above.
     self = .some(value)
@@ -445,7 +445,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public mutating func take() -> Self {
     let result = consume self
     self = nil
