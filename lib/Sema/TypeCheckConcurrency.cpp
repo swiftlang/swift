@@ -4113,7 +4113,8 @@ namespace {
       }
 
       if (auto *macro = dyn_cast<MacroExpansionExpr>(expr)) {
-        expr = macro->getRewritten();
+        if (auto rewritten = macro->getRewritten())
+          expr = rewritten;
       }
 
       if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expr)) {
