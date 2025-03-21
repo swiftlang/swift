@@ -3300,6 +3300,8 @@ if (-not $IsCrossCompiling) {
     Invoke-BuildStep Build-Compilers $HostPlatform $Tests
   }
 
+  # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
+  # functions hardcode their platform needs.
   if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
   if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
   if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
