@@ -466,12 +466,6 @@ static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureExecutionAttribute(Decl *decl) {
-  if (auto *ASD = dyn_cast<AbstractStorageDecl>(decl)) {
-    if (auto *getter = ASD->getAccessor(AccessorKind::Get))
-      return usesFeatureExecutionAttribute(getter);
-    return false;
-  }
-
   if (decl->getAttrs().hasAttribute<ExecutionAttr>())
     return true;
 

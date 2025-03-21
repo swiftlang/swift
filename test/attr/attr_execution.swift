@@ -20,6 +20,8 @@ struct Test {
   @execution(concurrent) init() {}
   // expected-error@-1 {{cannot use '@execution' on non-async initializer 'init()'}}
 
+  @execution(concurrent) init(async: Void) async {}
+
   @execution(concurrent) func member() {}
   // expected-error@-1 {{cannot use '@execution' on non-async instance method 'member()'}}
 
@@ -27,13 +29,21 @@ struct Test {
 
   // expected-error@+1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
   @execution(caller) subscript(a: Int) -> Bool {
-    get { false }
+    @execution(concurrent) get { false }
+    // expected-error@-1 {{@execution(concurrent)' attribute cannot be applied to this declaration}}
     @execution(concurrent) set { }
-    // expected-error@-1 {{cannot use '@execution' on non-async setter for subscript 'subscript(_:)'}}
+    // expected-error@-1 {{@execution(concurrent)' attribute cannot be applied to this declaration}}
   }
 
   @execution(caller) var x: Int
   // expected-error@-1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
+}
+
+do {
+  class C {
+    @execution(caller) deinit {}
+    // expected-error@-1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
+  }
 }
 
 do {
@@ -92,22 +102,4 @@ _ = { @execution(concurrent) () -> Int in
 
 _ = { @execution(caller) (x: isolated (any Actor)?) in
   // expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
-}
-
-struct TestDifferentPositions {
-  @execution(caller)
-  init() async {
-  }
-
-  var x: Int {
-    @execution(concurrent)
-    get async {
-    }
-  }
-
-  subscript(x: Int) -> Bool {
-    @execution(concurrent)
-    get async {
-    }
-  }
 }
