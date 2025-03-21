@@ -377,16 +377,10 @@ static SerialExecutorRef executorForEnqueuedJob(Job *job) {
     return SerialExecutorRef::generic();
   }
 
-  if (jobQueue == (void *)dispatch_get_main_queue()) {
-    return swift_task_getMainExecutor();
+  if (auto identity = reinterpret_cast<HeapObject *>(jobQueue)) {
+    return SerialExecutorRef::forOrdinary(
+        identity, _swift_task_getDispatchQueueSerialExecutorWitnessTable());
   }
-
-  // It is no longer valid to return a Dispatch Queue as the "identity" here.
-  //
-  //if (auto identity = reinterpret_cast<HeapObject *>(jobQueue)) {
-  //  return SerialExecutorRef::forOrdinary(
-  //      identity, _swift_task_getDispatchQueueSerialExecutorWitnessTable());
-  //}
 
   return SerialExecutorRef::generic();
 #endif
