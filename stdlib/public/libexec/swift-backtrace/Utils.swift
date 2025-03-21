@@ -159,18 +159,6 @@ internal func exists(_ path: String) -> Bool {
   return true
 }
 
-extension Sequence {
-  /// Return the first element in a Sequence.
-  ///
-  /// This is not, in general, a safe thing to do, because the sequence might
-  /// not be restartable.  For the cases where we're using it here, it's OK
-  /// though.
-  public var unsafeFirst: Element? {
-    var iterator = makeIterator()
-    return iterator.next()
-  }
-}
-
 struct CFileStream: TextOutputStream {
   var fp: UnsafeMutablePointer<FILE>
 
