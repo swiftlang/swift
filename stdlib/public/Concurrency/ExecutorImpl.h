@@ -92,9 +92,9 @@ static inline int swift_priority_getBucketIndex(SwiftJobPriority priority) {
 /// Used by the Concurrency runtime to represent a job.  The `schedulerPrivate`
 /// field may be freely used by the executor implementation.
 typedef struct {
-  SwiftHeapMetadata const *__ptrauth_objc_isa_pointer _Nonnull metadata;
+  SwiftHeapMetadata const *__ptrauth_objc_isa_pointer metadata;
   uintptr_t refCounts;
-  void * _Nullable schedulerPrivate[2];
+  void *schedulerPrivate[2];
   SwiftJobFlags flags;
 } __attribute__((aligned(2 * sizeof(void *)))) SwiftJob;
 
@@ -109,35 +109,30 @@ enum {
 };
 
 /// Get the kind of a job, by directly accessing the flags field.
-static inline SwiftJobKind swift_job_getKind(SwiftJob * _Nonnull job) {
+static inline SwiftJobKind swift_job_getKind(SwiftJob *job) {
   return (SwiftJobKind)(job->flags & 0xff);
 }
 
 /// Get the priority of a job, by directly accessing the flags field.
-static inline SwiftJobPriority swift_job_getPriority(SwiftJob * _Nonnull job) {
+static inline SwiftJobPriority swift_job_getPriority(SwiftJob *job) {
   return (SwiftJobPriority)((job->flags >> 8) & 0xff);
 }
 
-/// Get a pointer to the scheduler private data.
-static inline void * _Nonnull * _Nonnull swift_job_getPrivateData(SwiftJob * _Nonnull job) {
-  return &job->schedulerPrivate[0];
-}
-
 /// Allocate memory associated with a job.
-void * _Nullable swift_job_alloc(SwiftJob * _Nonnull job, size_t size);
+void *swift_job_alloc(SwiftJob *job, size_t size);
 
 /// Release memory allocated using `swift_job_alloc()`.
-void swift_job_dealloc(SwiftJob * _Nonnull job, void * _Nonnull ptr);
+void swift_job_dealloc(SwiftJob *job, void *ptr);
 
 /// Swift's refcounted objects start with this header
 typedef struct {
-  SwiftHeapMetadata const *__ptrauth_objc_isa_pointer _Nonnull metadata;
+  SwiftHeapMetadata const *__ptrauth_objc_isa_pointer metadata;
 } SwiftHeapObject;
 
 /// A reference to an executor consists of two words; the first is a pointer
 /// which may or may not be to a Swift heap object.
 typedef struct {
-  SwiftHeapObject * _Nullable identity;
+  SwiftHeapObject *identity;
   uintptr_t implementation;
 } SwiftExecutorRef;
 
@@ -158,8 +153,8 @@ static inline SwiftExecutorRef swift_executor_generic(void) {
 
 /// Return an ordinary executor with the specified identity and witness table.
 static inline SwiftExecutorRef
-swift_executor_ordinary(SwiftHeapObject * _Nullable identity,
-                        SwiftExecutorWitnessTable * _Nullable witnessTable) {
+swift_executor_ordinary(SwiftHeapObject *identity,
+                        SwiftExecutorWitnessTable *witnessTable) {
   return (SwiftExecutorRef){ identity,
                              (uintptr_t)witnessTable
                              | SwiftExecutorOrdinaryKind };
@@ -168,8 +163,8 @@ swift_executor_ordinary(SwiftHeapObject * _Nullable identity,
 /// Return a complex equality executor with the specified identity and
 /// witness table.
 static inline SwiftExecutorRef
-swift_executor_complexEquality(SwiftHeapObject * _Nullable identity,
-                               SwiftExecutorWitnessTable * _Nullable witnessTable) {
+swift_executor_complexEquality(SwiftHeapObject *identity,
+                               SwiftExecutorWitnessTable *witnessTable) {
   return (SwiftExecutorRef){ identity,
                              (uintptr_t)witnessTable
                              | SwiftExecutorComplexEqualityKind };
@@ -193,7 +188,7 @@ static inline bool swift_executor_isDefaultActor(SwiftExecutorRef executor) {
 }
 
 /// Retrieve the identity of an executor.
-static inline SwiftHeapObject * _Nullable
+static inline SwiftHeapObject *
 swift_executor_getIdentity(SwiftExecutorRef executor) {
   return executor.identity;
 }
@@ -205,7 +200,7 @@ static inline bool swift_executor_hasWitnessTable(SwiftExecutorRef executor) {
 }
 
 /// Retrieve the witness table of an executor.
-static inline const SwiftExecutorWitnessTable * _Nullable
+static inline const SwiftExecutorWitnessTable *
 swift_executor_getWitnessTable(SwiftExecutorRef executor) {
   const uintptr_t mask = ~(uintptr_t)(sizeof(void *) - 1);
   return (const SwiftExecutorWitnessTable *)(executor.implementation & mask);
@@ -235,10 +230,8 @@ swift_executor_invokeSwiftIsIsolatingCurrentContext(SwiftExecutorRef executor) {
 }
 
 /// Execute the specified job while running on the specified executor.
-static inline void swift_job_run(SwiftJob * _Nonnull job,
-                                 SwiftExecutorRef executor) {
-  extern void _swift_job_run_c(SwiftJob * _Nonnull job,
-                               SwiftExecutorRef executor);
+static inline void swift_job_run(SwiftJob *job, SwiftExecutorRef executor) {
+  extern void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor);
 
   _swift_job_run_c(job, executor);
 }
@@ -268,12 +261,12 @@ extern SwiftTime swift_time_getResolution(SwiftClockId clock);
 // -- Functions that executors must implement ----------------------------------
 
 /// Enqueue a job on the global executor.
-SWIFT_CC(swift) void swift_task_enqueueGlobalImpl(SwiftJob * _Nonnull job);
+SWIFT_CC(swift) void swift_task_enqueueGlobalImpl(SwiftJob *job);
 
 /// Enqueue a job on the global executor, with a specific delay before it
 /// should execute.
 SWIFT_CC(swift) void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
-                                                           SwiftJob * _Nonnull job);
+                                                           SwiftJob *job);
 
 /// Enqueue a job on the global executor, with a specific deadline before
 /// which it must execute.
@@ -282,11 +275,11 @@ SWIFT_CC(swift) void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                               long long tsec,
                                                               long long tnsec,
                                                               int clock,
-                                                              SwiftJob * _Nonnull job);
+                                                              SwiftJob *job);
 
 /// Enqueue a job on the main executor (which may or may not be the same as
 /// the global executor).
-SWIFT_CC(swift) void swift_task_enqueueMainExecutorImpl(SwiftJob * _Nonnull job);
+SWIFT_CC(swift) void swift_task_enqueueMainExecutorImpl(SwiftJob *job);
 
 /// Assert that the specified executor is the current executor.
 SWIFT_CC(swift) void swift_task_checkIsolatedImpl(SwiftExecutorRef executor);
@@ -310,8 +303,8 @@ SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift) void
 /// but you should assert or provide a dummy implementation if your executor
 /// does not support it.
 SWIFT_CC(swift) void
-  swift_task_donateThreadToGlobalExecutorUntilImpl(bool (* _Nonnull condition)(void * _Nullable),
-                                                   void * _Nullable conditionContext);
+  swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
+                                                   void *conditionContext);
 
 #ifdef __cplusplus
 } // extern "C"
