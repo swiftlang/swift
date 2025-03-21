@@ -1868,45 +1868,48 @@ func section2() {}
 @abi(func section3())
 @_section("fnord") func section3() {}
 
-// @inlinable -- automatically cloned into @abi
-@abi(@inlinable func inlinable1())
+// @inlinable -- banned in @abi
+// Although the inlining *does* occasionally get mangled, it's only done in the
+// SpecializationManglers, which shouldn't get their serialization from an ABI
+// attribute.
+@abi(@inlinable func inlinable1()) // expected-error {{unused 'inlinable' attribute in '@abi'}} {{6-16=}}
 @inlinable func inlinable1() {}
 
-@abi(@inlinable func inlinable2()) // expected-error {{extra 'inlinable' attribute in '@abi'}} {{6-16=}}
+@abi(@inlinable func inlinable2()) // expected-error {{unused 'inlinable' attribute in '@abi'}} {{6-16=}}
 func inlinable2() {}
 
-@abi(func inlinable3()) // expected-remark {{inferred '@inlinable' in '@abi' to match attribute on API}}
-@inlinable func inlinable3() {} // expected-note {{matches attribute here}}
+@abi(func inlinable3())
+@inlinable func inlinable3() {}
 
-// @inline -- automatically cloned into @abi
-@abi(@inline(never) func inline1())
+// @inlinable -- banned in @abi
+@abi(@inline(never) func inline1()) // expected-error {{unused 'inline(never)' attribute in '@abi'}} {{6-20=}}
 @inline(never) func inline1() {}
 
-@abi(@inline(never) func inline2()) // expected-error {{extra 'inline(never)' attribute in '@abi'}} {{6-20=}}
+@abi(@inline(never) func inline2()) // expected-error {{unused 'inline(never)' attribute in '@abi'}} {{6-20=}}
 func inline2() {}
 
-@abi(func inline3()) // expected-remark {{inferred '@inline(never)' in '@abi' to match attribute on API}}
-@inline(never) func inline3() {} // expected-note {{matches attribute here}}
+@abi(func inline3())
+@inline(never) func inline3() {}
 
-// @_transparent -- automatically cloned into @abi
-@abi(@_transparent func transparent1())
+// @_transparent -- banned in @abi
+@abi(@_transparent func transparent1()) // expected-error {{unused '_transparent' attribute in '@abi'}} {{6-19=}}
 @_transparent func transparent1() {}
 
-@abi(@_transparent func transparent2()) // expected-error {{extra '_transparent' attribute in '@abi'}} {{6-19=}}
+@abi(@_transparent func transparent2()) // expected-error {{unused '_transparent' attribute in '@abi'}} {{6-19=}}
 func transparent2() {}
 
-@abi(func transparent3()) // expected-remark {{inferred '@_transparent' in '@abi' to match attribute on API}}
-@_transparent func transparent3() {} // expected-note {{matches attribute here}}
+@abi(func transparent3())
+@_transparent func transparent3() {}
 
-// @_alwaysEmitIntoClient -- automatically cloned into @abi
-@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient1())
+// @_alwaysEmitIntoClient -- banned in @abi
+@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient1()) // expected-error {{unused '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
 @_alwaysEmitIntoClient func alwaysEmitIntoClient1() {}
 
-@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient2()) // expected-error {{extra '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
+@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient2()) // expected-error {{unused '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
 func alwaysEmitIntoClient2() {}
 
-@abi(func alwaysEmitIntoClient3()) // expected-remark {{inferred '@_alwaysEmitIntoClient' in '@abi' to match attribute on API}}
-@_alwaysEmitIntoClient func alwaysEmitIntoClient3() {} // expected-note {{matches attribute here}}
+@abi(func alwaysEmitIntoClient3())
+@_alwaysEmitIntoClient func alwaysEmitIntoClient3() {}
 
 // @_optimize(none) -- banned in @abi
 @abi(@_optimize(none) func optimize1()) // expected-error {{unused '_optimize(none)' attribute in '@abi'}} {{6-22=}}
