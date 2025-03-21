@@ -252,7 +252,10 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
 namespace {
 
 /// An ASTVisitor for populating SILVTable entries from ClassDecl members.
-class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
+template <typename T>
+class SILGenVTableBase : public SILVTableVisitor<T> {
+  T &asDerived() { return *static_cast<T *>(this); }
+
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
@@ -267,13 +270,60 @@ public:
   // For each base method, store the corresponding override.
   SmallVector<VTableMethod, 8> vtableMethods;
 
-  SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
-    : SGM(SGM), theClass(theClass) {
+  SILGenVTableBase(SILGenModule &SGM, ClassDecl *theClass)
+      : SGM(SGM), theClass(theClass) {
     isResilient = theClass->isResilient();
   }
 
   /// Populate our list of base methods and overrides.
   void collectMethods() { visitAncestor(theClass); }
+
+  void visitAncestor(ClassDecl *ancestor) {
+    // Imported types don't have vtables right now.
+    if (ancestor->hasClangNode())
+      return;
+
+    auto *superDecl = ancestor->getSuperclassDecl();
+    if (superDecl)
+      visitAncestor(superDecl);
+
+    asDerived().addVTableEntries(ancestor);
+  }
+
+  // Try to find an overridden entry.
+  void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
+    auto found = baseToIndexMap.find(baseRef);
+    assert(found != baseToIndexMap.end());
+    auto &method = vtableMethods[found->second];
+    assert(method.first == baseRef);
+    method.second = declRef;
+  }
+
+  // Add an entry to the vtable.
+  void addMethod(SILDeclRef member) {
+    unsigned index = vtableMethods.size();
+    vtableMethods.push_back(std::make_pair(member, member));
+    auto result = baseToIndexMap.insert(std::make_pair(member, index));
+    assert(result.second);
+    (void)result;
+  }
+
+  void addPlaceholder(MissingMemberDecl *m) {
+#ifndef NDEBUG
+    auto *classDecl = cast<ClassDecl>(m->getDeclContext());
+    bool isResilient = classDecl->isResilient(SGM.M.getSwiftModule(),
+                                              ResilienceExpansion::Maximal);
+    assert(isResilient ||
+           m->getNumberOfVTableEntries() == 0 &&
+               "Should not be emitting fragile class with missing members");
+#endif
+  }
+};
+
+class SILGenVTable : public SILGenVTableBase<SILGenVTable> {
+public:
+  SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
+      : SILGenVTableBase(SGM, theClass) {}
 
   void emitVTable() {
     PrettyStackTraceDecl("silgen emitVTable", theClass);
@@ -326,49 +376,7 @@ public:
     // Finally, create the vtable.
     SILVTable::create(SGM.M, theClass, serialized, vtableEntries);
   }
-
-  void visitAncestor(ClassDecl *ancestor) {
-    // Imported types don't have vtables right now.
-    if (ancestor->hasClangNode())
-      return;
-
-    auto *superDecl = ancestor->getSuperclassDecl();
-    if (superDecl)
-      visitAncestor(superDecl);
-
-    addVTableEntries(ancestor);
-  }
-
-  // Try to find an overridden entry.
-  void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
-    auto found = baseToIndexMap.find(baseRef);
-    assert(found != baseToIndexMap.end());
-    auto &method = vtableMethods[found->second];
-    assert(method.first == baseRef);
-    method.second = declRef;
-  }
-
-  // Add an entry to the vtable.
-  void addMethod(SILDeclRef member) {
-    unsigned index = vtableMethods.size();
-    vtableMethods.push_back(std::make_pair(member, member));
-    auto result = baseToIndexMap.insert(std::make_pair(member, index));
-    assert(result.second);
-    (void) result;
-  }
-
-  void addPlaceholder(MissingMemberDecl *m) {
-#ifndef NDEBUG
-    auto *classDecl = cast<ClassDecl>(m->getDeclContext());
-    bool isResilient =
-        classDecl->isResilient(SGM.M.getSwiftModule(),
-                               ResilienceExpansion::Maximal);
-    assert(isResilient || m->getNumberOfVTableEntries() == 0 &&
-           "Should not be emitting fragile class with missing members");
-#endif
-  }
 };
-
 } // end anonymous namespace
 
 static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
