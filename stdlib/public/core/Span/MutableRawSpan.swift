@@ -102,7 +102,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(elements)
+  @lifetime(copy elements)
   public init<Element: BitwiseCopyable>(
     _elements elements: consuming MutableSpan<Element>
   ) {
@@ -143,6 +143,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -315,6 +316,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -328,6 +330,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toUncheckedByteOffset offset: Int, as type: T.Type
   ) {
@@ -340,6 +343,7 @@ extension MutableRawSpan {
 extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update<S: Sequence>(
     from source: S
   ) -> (unwritten: S.Iterator, byteOffset: Int) where S.Element: BitwiseCopyable {
@@ -349,6 +353,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update<Element: BitwiseCopyable>(
     from elements: inout some IteratorProtocol<Element>
   ) -> Int {
@@ -364,6 +369,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update<C: Collection>(
     fromContentsOf source: C
   ) -> Int where C.Element: BitwiseCopyable {
@@ -382,6 +388,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update<Element: BitwiseCopyable>(
     fromContentsOf source: Span<Element>
   ) -> Int {
@@ -392,6 +399,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update<Element: BitwiseCopyable>(
     fromContentsOf source: borrowing MutableSpan<Element>
   ) -> Int {
@@ -402,6 +410,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: RawSpan
   ) -> Int {
@@ -413,6 +422,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: borrowing MutableRawSpan
   ) -> Int {
