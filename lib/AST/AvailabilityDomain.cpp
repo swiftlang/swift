@@ -22,24 +22,6 @@
 using namespace swift;
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
-    return std::nullopt;
-
-  return forPlatform(platform);
-}
-
-std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetVariantPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetVariantPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
-    return std::nullopt;
-
-  return forPlatform(platform);
-}
-
-std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
                                            const DeclContext *declContext) {
   // This parameter is used in downstream forks, do not remove.
@@ -116,15 +98,6 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
     // the future someone might want to define a domain but leave it inactive.
     return true;
   }
-}
-
-bool AvailabilityDomain::isActiveForTargetPlatform(
-    const ASTContext &ctx) const {
-  if (isPlatform()) {
-    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
-      return targetDomain->getRootDomain().contains(*this);
-  }
-  return false;
 }
 
 static std::optional<llvm::VersionTuple>
