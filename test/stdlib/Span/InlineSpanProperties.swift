@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature ValueGenerics)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature AddressableTypes -enable-experimental-feature LifetimeDependence -enable-experimental-feature ValueGenerics)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_AddressableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_ValueGenerics
 
 import StdlibUnittest
