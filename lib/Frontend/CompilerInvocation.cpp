@@ -1820,6 +1820,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
 
+  if (const Arg *A = Args.getLastArg(options::OPT_default_isolation)) {
+    auto behavior =
+        llvm::StringSwitch<std::optional<DefaultIsolation>>(A->getValue())
+            .Case("MainActor", DefaultIsolation::MainActor)
+            .Case("nonisolated", DefaultIsolation::Nonisolated)
+            .Default(std::nullopt);
+
+    if (behavior) {
+      Opts.DefaultIsolationBehavior = *behavior;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    }
+  } else {
+    Opts.DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
+  }
+
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
   /// explicitly. The new Swift parser can have mismatches with C++ parser -
