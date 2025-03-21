@@ -2302,6 +2302,7 @@ function Build-ExperimentalRuntime {
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
+        SwiftCore_ENABLE_CONCURRENCY = "YES";
       }
   }
 }
