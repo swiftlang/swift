@@ -9,10 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if STANDALONE
 import Observation
-#endif
-import Synchronization
 import _Concurrency
 
 /// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
@@ -20,22 +17,8 @@ import _Concurrency
 /// `Observed` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
 /// types that are marked as `@Observable` by using Swift Concurrency to indicate transactional boundaries
 /// starting from the willSet of the first mutation to the next suspension point of the safe access.
-#if !STANDALONE
 @available(SwiftStdlib 9999, *)
-#endif
 public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendable {
-  final class SharedState<State>: Sendable {
-    let criticalRegion: Mutex<State>
-    
-    init(_ state: consuming sending State) {
-      criticalRegion = Mutex(state)
-    }
-    
-    internal func withCriticalRegion<R, F: Error>(body: (inout sending State) throws(F) -> sending R) throws(F) -> R {
-      try criticalRegion.withLock(body)
-    }
-  }
-  
   struct State {
     enum Continuation {
       case cancelled
@@ -56,7 +39,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     // Most likely, there wont be more than a handful of active iterations
     // so this only needs to be unique for those active iterations
     // that are in the process of calling next.
-    static func generation(_ state: SharedState<State>) -> Int {
+    static func generation(_ state: _ManagedCriticalState<State>) -> Int {
       state.withCriticalRegion { state in
         defer { state.id &+= 1 }
         return state.id
@@ -66,7 +49,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     // the cancellation of awaiting on willSet only ferries in resuming early
     // it is the responsability of the caller to check if the task is actually
     // cancelled after awaiting the willSet to act accordingly.
-    static func cancel(_ state: SharedState<State>, id: Int) {
+    static func cancel(_ state: _ManagedCriticalState<State>, id: Int) {
       state.withCriticalRegion { state in
         guard let continuation = state.continuations.removeValue(forKey: id) else {
           // if there was no continuation yet active (e.g. it was cancelled at
@@ -81,7 +64,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     
     // this atomically transitions the observation from a not yet tracked state
     // to a tracked state. No backwards transitions exist.
-    static func startTracking(_ state: SharedState<State>) -> Bool {
+    static func startTracking(_ state: _ManagedCriticalState<State>) -> Bool {
       state.withCriticalRegion { state in
         if !state.tracking {
           state.tracking = true
@@ -94,7 +77,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     
     // fire off ALL awaiting willChange continuations such that they are no
     // longer pending.
-    static func emitWillChange(_ state: SharedState<State>) {
+    static func emitWillChange(_ state: _ManagedCriticalState<State>) {
       let continuations = state.withCriticalRegion { state in
         defer {
           state.continuations.removeAll()
@@ -108,7 +91,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     
     // install a willChange continuation into the set of continuations
     // this must take a locally unique id (to the active calls of next)
-    static func willChange(_ state: SharedState<State>, id: Int) async {
+    static func willChange(_ state: _ManagedCriticalState<State>, id: Int) async {
       return await withUnsafeContinuation { continuation in
         state.withCriticalRegion { state in
           // first check if a cancelled tombstone exists, remove it,
@@ -126,7 +109,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     }
   }
   
-  let state: SharedState<State>
+  let state: _ManagedCriticalState<State>
   let emit: @isolated(any) @Sendable () throws(Failure) -> Element?
   
   /// Constructs an asynchronous sequence for a given closure by tracking changes of `@Observable` types.
@@ -147,19 +130,19 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     @_inheritActorContext _ emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Element?
   ) {
     self.emit = emit
-    self.state = SharedState(State())
+    self.state = _ManagedCriticalState(State())
   }
   
   public struct Iterator: AsyncIteratorProtocol {
     // the state ivar serves two purposes:
     // 1) to store a critical region of state of the mutations
     // 2) to idenitify the termination of _this_ sequence
-    var state: SharedState<State>?
+    var state: _ManagedCriticalState<State>?
     let emit: @isolated(any) @Sendable () throws(Failure) -> Element?
     
     // this is the primary implementation of the tracking
     // it is bound to be called on the specified isolation of the construction
-    fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: SharedState<State>, emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Element?) throws(Failure) -> Element? {
+    fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>, emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Element?) throws(Failure) -> Element? {
       // this ferries in an intermediate form with Result to skip over `withObservationTracking` not handling errors being thrown
       // particularly this case is that the error is also an iteration state transition data point (it terminates the sequence)
       // so we need to hold that to get a chance to catch and clean-up
@@ -186,7 +169,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       }
     }
     
-    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: SharedState<State>, id: Int) async throws(Failure) -> Element? {
+    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>, id: Int) async throws(Failure) -> Element? {
       guard !Task.isCancelled else {
         // the task was cancelled while awaiting a willChange so ensure a proper termination
         return try terminate(id: id)
