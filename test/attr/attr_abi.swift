@@ -1946,16 +1946,17 @@ class Required {
   required init(i3: Void) { fatalError() } // expected-note {{should match modifier here}}
 }
 
-// lazy -- automatically cloned into @abi
+// lazy -- banned both in and with @abi
+// This introduces auxiliary decls whose ABI could not be controlled.
 class Lazy {
-  @abi(lazy var v1: Int)
-  lazy var v1: Int = 0
+  @abi(lazy var v1: Int) // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{8-12=}}
+  lazy var v1: Int = 0 // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{3-8=}}
 
-  @abi(lazy var v2: Int) // expected-error {{extra 'lazy' modifier in '@abi'}} {{8-12=}}
+  @abi(lazy var v2: Int) // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{8-12=}}
   var v2: Int = 0
 
-  @abi(var v3: Int) // expected-remark {{inferred 'lazy' in '@abi' to match modifier on API}}
-  lazy var v3: Int = 0 // expected-note {{matches modifier here}}
+  @abi(var v3: Int)
+  lazy var v3: Int = 0 // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{3-8=}}
 }
 
 // @_fixed_layout -- banned in @abi
