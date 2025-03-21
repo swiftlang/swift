@@ -315,7 +315,7 @@ extension __SharedStringStorage {
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     if asString._guts._object.isFastZeroTerminated {
-      return unsafe start
+      return start
     }
     return unsafe _cocoaUTF8StringTrampoline(self)
   }
