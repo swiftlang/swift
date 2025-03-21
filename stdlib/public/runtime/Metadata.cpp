@@ -3700,15 +3700,16 @@ static void initClassVTable(ClassMetadata *self) {
     }
   }
 
-  if (description->hasOverrideTable()) {
-    auto *overrideTable = description->getOverrideTable();
-    auto overrideDescriptors = description->getMethodOverrideDescriptors();
-    for (auto &descriptor : overrideDescriptors) {
-      seenDescriptors.insert(descriptor.Method);
+  if (!description->hasOverrideTable()) {
+    // The class didn't override anything, so we're done.
+    return;
+  }
 
-      installOverrideInVTable(descriptor.Class.get(), descriptor.Method.get(),
-                              descriptor.getImpl(), overrideTable, classWords);
-    }
+  auto *overrideTable = description->getOverrideTable();
+  auto overrideDescriptors = description->getMethodOverrideDescriptors();
+  for (auto &descriptor : overrideDescriptors) {
+    installOverrideInVTable(descriptor.Class.get(), descriptor.Method.get(),
+                            descriptor.getImpl(), overrideTable, classWords);
   }
 }
 
