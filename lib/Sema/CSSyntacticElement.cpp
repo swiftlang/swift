@@ -321,8 +321,8 @@ static bool isViableElement(ASTNode element,
   return true;
 }
 
-using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
-                               /*isDiscarded=*/bool, ConstraintLocator *>;
+using ElementInfo =
+    std::tuple<ASTNode, ContextualTypeInfo, ConstraintLocator *>;
 
 static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ArrayRef<ElementInfo> elements,
@@ -388,8 +388,7 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
     ContextualTypeInfo context = std::get<1>(entry);
-    bool isDiscarded = std::get<2>(entry);
-    ConstraintLocator *elementLoc = std::get<3>(entry);
+    ConstraintLocator *elementLoc = std::get<2>(entry);
 
     if (!isViableElement(element, isForSingleValueStmtCompletion, cs))
       continue;
@@ -400,8 +399,8 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
     if (isIsolated)
       element.walk(paramCollector);
 
-    constraints.push_back(Constraint::createSyntacticElement(
-        cs, element, context, elementLoc, isDiscarded));
+    constraints.push_back(
+        Constraint::createSyntacticElement(cs, element, context, elementLoc));
   }
 
   // It's possible that there are no viable elements in the body,
@@ -419,9 +418,8 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
 }
 
 ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
-                        ContextualTypeInfo context = ContextualTypeInfo(),
-                        bool isDiscarded = false) {
-  return std::make_tuple(node, context, isDiscarded, locator);
+                        ContextualTypeInfo context = ContextualTypeInfo()) {
+  return std::make_tuple(node, context, locator);
 }
 
 ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
@@ -678,8 +676,8 @@ public:
 
     // Generate constraints for `where` clause (if any).
     if (guardExpr) {
-      SyntacticElementTarget guardTarget(
-          guardExpr, DC, CTP_Condition, ctx.getBoolType(), /*discarded*/ false);
+      SyntacticElementTarget guardTarget(guardExpr, DC, CTP_Condition,
+                                         ctx.getBoolType());
 
       if (cs.generateConstraints(guardTarget)) {
         hadError = true;
@@ -1035,8 +1033,7 @@ private:
       }
 
       ContextualTypeInfo context(boolType, CTP_Condition);
-      elements.push_back(
-          makeElement(where, stmtLoc, context, /*isDiscarded=*/false));
+      elements.push_back(makeElement(where, stmtLoc, context));
     }
 
     // Body of the `for-in` loop.
@@ -1053,8 +1050,7 @@ private:
         elements.push_back(makeElement(subjectExpr, locator));
 
         SyntacticElementTarget target(subjectExpr, context.getAsDeclContext(),
-                                      CTP_Unused, Type(),
-                                      /*isDiscarded=*/false);
+                                      CTP_Unused, Type());
 
         cs.setTargetFor(switchStmt, target);
       }
@@ -1250,16 +1246,11 @@ private:
         }
       }
 
-      auto contextInfo = cs.getContextualTypeInfo(element);
-
-      auto isDiscarded = element.is<Expr *>() && !ctx.LangOpts.Playground &&
-                         !ctx.LangOpts.DebuggerSupport;
-
       elements.push_back(makeElement(
           element,
           cs.getConstraintLocator(locator,
                                   LocatorPathElt::SyntacticElement(element)),
-          contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
+          cs.getContextualTypeInfo(element).value_or(ContextualTypeInfo())));
     }
 
     createConjunction(elements, locator);
@@ -1289,7 +1280,7 @@ private:
     auto contextualResultInfo = getContextualResultInfoFor(returnStmt);
 
     SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                  contextualResultInfo, /*isDiscarded=*/false);
+                                  contextualResultInfo);
 
     if (cs.generateConstraints(target)) {
       hadError = true;
@@ -1329,8 +1320,7 @@ private:
     // gets taken out of the active type vars (assuming we dropped it) before we
     // produce a solution.
     auto resultElt = makeElement(resultExpr, locator,
-                                 contextInfo.value_or(ContextualTypeInfo()),
-                                 /*isDiscarded=*/false);
+                                 contextInfo.value_or(ContextualTypeInfo()));
     createConjunction({resultElt}, locator);
   }
 
@@ -1655,8 +1645,8 @@ getSyntacticElementContext(ASTNode element, ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifySyntacticElementConstraint(
-    ASTNode element, ContextualTypeInfo contextInfo, bool isDiscarded,
-    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+    ASTNode element, ContextualTypeInfo contextInfo, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
 
   auto context = getSyntacticElementContext(element, locator);
   if (!context)
@@ -1667,7 +1657,7 @@ ConstraintSystem::simplifySyntacticElementConstraint(
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
     SyntacticElementTarget target(expr, context->getAsDeclContext(),
-                                  contextInfo, isDiscarded);
+                                  contextInfo);
 
     if (generateConstraints(target))
       return SolutionKind::Error;
@@ -2109,8 +2099,7 @@ private:
     // number of times.
     {
       SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                    CTP_ReturnStmt, contextualResultTy,
-                                    /*isDiscarded=*/false);
+                                    CTP_ReturnStmt, contextualResultTy);
       cs.setTargetFor(returnStmt, target);
 
       visitReturnStmt(returnStmt);
@@ -2426,7 +2415,7 @@ private:
 
       CS.setTargetFor({assignment},
                       {assignment, context.getAsDeclContext(), CTP_Unused,
-                       /*contextualType=*/Type(), /*isDiscarded=*/false});
+                       /*contextualType=*/Type()});
     }
 
     return assignment;
