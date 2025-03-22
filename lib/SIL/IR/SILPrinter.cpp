@@ -3337,6 +3337,12 @@ void SILInstruction::dump() const {
   print(llvm::errs());
 }
 
+void SILInstruction::dump(bool DebugInfo) const {
+  SILPrintContext Ctx(llvm::errs(), /*Verbose*/ false, /*SortedSIL*/ false,
+                      DebugInfo, /*PrintFullConvention*/ false);
+  SILPrinter(Ctx).print(this);
+}
+
 void SingleValueInstruction::dump() const {
   SILInstruction::dump();
 }
@@ -3353,6 +3359,13 @@ void NonSingleValueInstruction::dump() const {
 /// Pretty-print the SILBasicBlock to errs.
 void SILBasicBlock::dump() const {
   print(llvm::errs());
+}
+
+/// Pretty-print the SILBasicBlock to errs with Debug Info.
+void SILBasicBlock::dump(bool DebugInfo) const {
+  SILPrintContext Ctx(llvm::errs(), /*Verbose*/ false, /*SortedSIL*/ false,
+                      DebugInfo, /*PrintFullConvention*/ false);
+  SILPrinter(Ctx).print(this);
 }
 
 /// Pretty-print the SILBasicBlock to the designated stream.
@@ -3407,6 +3420,13 @@ void SILFunction::dump(bool Verbose) const {
 // This is out of line so the debugger can find it.
 void SILFunction::dump() const {
   dump(false);
+}
+
+/// Pretty-print the SILFunction to errs.
+void SILFunction::dump(bool DebugInfo, bool Verbose) const {
+  SILPrintContext Ctx(llvm::errs(), Verbose, /*SortedSIL*/ false, DebugInfo,
+                      /*PrintFullConvention*/ false);
+  print(Ctx);
 }
 
 void SILFunction::dump(const char *FileName) const {
@@ -3730,6 +3750,13 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
 /// Pretty-print the SILModule to errs.
 void SILModule::dump(bool Verbose) const {
   SILPrintContext Ctx(llvm::errs(), Verbose);
+  print(Ctx);
+}
+
+/// Pretty-print the SILModule to errs with DebugInfo.
+void SILModule::dump(bool DebugInfo, bool Verbose) const {
+  SILPrintContext Ctx(llvm::errs(), Verbose, /*SortedSIL*/ false, DebugInfo,
+                      /*PrintFullConvention*/ false);
   print(Ctx);
 }
 
