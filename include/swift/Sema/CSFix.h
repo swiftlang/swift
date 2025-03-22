@@ -2469,6 +2469,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
   static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
                                        Type paramType,
                                        ConstraintLocator *locator);
