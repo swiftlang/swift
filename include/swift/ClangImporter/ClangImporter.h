@@ -199,11 +199,14 @@ public:
          bool ignoreFileMapping = false);
 
   static std::vector<std::string>
-  getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
+  getClangDriverArguments(ASTContext &ctx,
+                          bool requiresBuiltinHeadersInSystemModules = false,
+                          bool ignoreClangTarget = false);
 
   static std::optional<std::vector<std::string>>
   getClangCC1Arguments(ClangImporter *importer, ASTContext &ctx,
                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+                       bool requiresBuiltinHeadersInSystemModules = false,
                        bool ignoreClangTarget = false);
 
   static std::unique_ptr<clang::CompilerInvocation>
