@@ -156,6 +156,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::CoroFunctionPointer:
+    case Node::Kind::DefaultOverride:
       return true;
     default:
       return false;
@@ -3142,6 +3143,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       case 'B': return createNode(Node::Kind::BackDeploymentFallback);
       case 'c':
         return createNode(Node::Kind::CoroFunctionPointer);
+      case 'd':
+        return createNode(Node::Kind::DefaultOverride);
       case 'S': return createNode(Node::Kind::HasSymbolQuery);
       default:
         return nullptr;

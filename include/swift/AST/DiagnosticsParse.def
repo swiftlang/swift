@@ -763,6 +763,14 @@ ERROR(sil_witness_assoc_conf_not_found,none,
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
+// SIL default override table
+ERROR(sil_default_override_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_default_override_class_not_found,none,
+      "sil class not found %0", (Identifier))
+ERROR(sil_default_override_decl_not_class,none,
+      "sil decl found for %0 is not a class", (Identifier))
+
 // SIL differentiability witnesses
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))

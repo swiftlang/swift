@@ -32,6 +32,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
@@ -3156,4 +3157,13 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   }
 
   return emitVirtualMethodValue(IGF, metadata, method, methodType);
+}
+
+void IRGenerator::ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot) {
+  if (!CurrentIGM)
+    return;
+
+  for (auto &entry : ot.getEntries()) {
+    forceLocalEmitOfLazyFunction(entry.impl);
+  }
 }
