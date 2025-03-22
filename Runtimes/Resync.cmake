@@ -98,6 +98,12 @@ copy_files("" "Core" FILES "Info.plist.in")
 
 # Platform Overlays
 
+# Copy magic linker symbols
+copy_library_sources("linker-support" "" "Overlay")
+
+message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
+copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)

@@ -47,6 +47,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
 
+add_subdirectory(clang)
 if(WIN32)
   add_subdirectory(Windows)
 endif()
