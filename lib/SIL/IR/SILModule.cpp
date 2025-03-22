@@ -49,11 +49,16 @@ class SILModule::SerializationCallback final
 
   void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
     updateLinkage(var);
-    
-    // For globals we currently do not support available_externally.
-    // In the interpreter it would result in two instances for a single global:
-    // one in the imported module and one in the main module.
-    var->setDeclaration(true);
+
+    if (!M->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // For globals we currently do not support available_externally.
+      // In the interpreter it would result in two instances for a single
+      // global: one in the imported module and one in the main module.
+      //
+      // We avoid that in Embedded Swift where we do actually link globals from
+      // other modules into the client module.
+      var->setDeclaration(true);
+    }
   }
 
   void didDeserialize(ModuleDecl *M, SILVTable *vtable) override {

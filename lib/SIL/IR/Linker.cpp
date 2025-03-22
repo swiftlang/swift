@@ -470,8 +470,9 @@ void SILLinkerVisitor::visitGlobalAddrInst(GlobalAddrInst *GAI) {
   if (!Mod.getOptions().EmbeddedSwift)
     return;
 
+  // In Embedded Swift, we want to actually link globals from other modules too,
+  // so strip "external" from the linkage.
   SILGlobalVariable *G = GAI->getReferencedGlobal();
-  G->setDeclaration(false);
   G->setLinkage(stripExternalFromLinkage(G->getLinkage()));
 }
 
