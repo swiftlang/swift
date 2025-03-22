@@ -3682,9 +3682,11 @@ static void installOverrideInVTable(ContextDescriptor const *baseContext,
 }
 
 /// Using the information in the class context descriptor, fill in in the
-/// immediate vtable entries for the class and install overrides of any
-/// superclass vtable entries.
-static void initClassVTable(ClassMetadata *self) {
+/// immediate vtable entries for the class install overrides of any
+/// superclass vtable entries, and install any default overrides if appropriate.
+static void initClassVTable(ClassMetadata *self,
+                            llvm::SmallVectorImpl<const ClassDescriptor *>
+                                &superclassesWithDefaultOverrides) {
   const auto *description = self->getDescription();
   auto *classWords = reinterpret_cast<void **>(self);
 
@@ -3706,13 +3708,45 @@ static void initClassVTable(ClassMetadata *self) {
     return;
   }
 
+  auto hasSuperclassWithDefaultOverride =
+      superclassesWithDefaultOverrides.size() > 0;
+  std::unordered_set<const MethodDescriptor *> seenDescriptors;
+
+  // Install our overrides.
   auto *overrideTable = description->getOverrideTable();
   auto overrideDescriptors = description->getMethodOverrideDescriptors();
   for (auto &descriptor : overrideDescriptors) {
+    if (hasSuperclassWithDefaultOverride)
+      seenDescriptors.insert(descriptor.Method);
+
     installOverrideInVTable(
         descriptor.Class.get(), descriptor.Method.get(),
         [&descriptor]() { return descriptor.getImpl(); }, overrideTable,
         classWords);
+  }
+
+  if (!hasSuperclassWithDefaultOverride) {
+    // No ancestor had default overrides to consider, so we're done.
+    return;
+  }
+
+  // Install any necessary default overrides.
+  for (auto *description : superclassesWithDefaultOverrides) {
+    assert(description->hasDefaultOverrideTable());
+    auto *header = description->getDefaultOverrideTable();
+    assert(header->NumEntries > 0 && "default override table with 0 entries");
+    auto entries = description->getDefaultOverrideDescriptors();
+    for (auto &entry : entries) {
+      auto *original = entry.Original.get();
+      if (!seenDescriptors.count(original))
+        continue;
+      auto *replacement = entry.Replacement.get();
+      if (seenDescriptors.count(replacement))
+        continue;
+      installOverrideInVTable(
+          description, replacement, [&entry]() { return entry.getImpl(); },
+          header, classWords);
+    }
   }
 }
 
@@ -4059,6 +4093,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   auto superDependencyAndSuper = getSuperclassMetadata(self, allowDependency);
   if (superDependencyAndSuper.first)
     return superDependencyAndSuper.first;
+
   auto super = superDependencyAndSuper.second;
 
   self->Superclass = super;
@@ -4079,6 +4114,28 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
       nullptr);
 #endif
 
+  // To populate the vtable, we must check our ancestors for default overloads.
+  // We may obstructed by dependencies, however, so do it now before doing any
+  // setup.
+  llvm::SmallVector<const ClassDescriptor *, 16>
+      superclassesWithDefaultOverrides;
+  if (self->getDescription()->hasOverrideTable()) {
+    const ClassMetadata *super = superDependencyAndSuper.second;
+    while (super && !super->isPureObjC()) {
+      const auto *description = super->getDescription();
+      if (description->hasDefaultOverrideTable()) {
+        // This superclass has default overrides.  Record it for later
+        // traversal.
+        superclassesWithDefaultOverrides.push_back(description);
+      }
+      auto superDependencyAndSuper =
+          getSuperclassMetadata(super, allowDependency);
+      if (superDependencyAndSuper.first)
+        return superDependencyAndSuper.first;
+      super = superDependencyAndSuper.second;
+    }
+  }
+
   // Copy field offsets, generic arguments and (if necessary) vtable entries
   // from our superclass.
   copySuperclassMetadataToSubclass(self, layoutFlags);
@@ -4086,7 +4143,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
   if (!hasStaticVTable(layoutFlags))
-    initClassVTable(self);
+    initClassVTable(self, superclassesWithDefaultOverrides);
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
