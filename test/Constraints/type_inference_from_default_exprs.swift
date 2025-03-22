@@ -269,3 +269,31 @@ do {
 
 func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x }()) {}
 // expected-error@-1 {{cannot convert value of type 'String' to type 'Int' in coercion}}
+
+// https://github.com/swiftlang/swift/issues/72199
+enum S72199_1 {
+  func testInferFromOtherPos<T>(_: T = 42, _: [T]) {}
+  // expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
+}
+
+protocol S72199_DurationProtocol {
+  
+}
+
+protocol S72199_InstantProtocol {
+  associatedtype Duration: S72199_DurationProtocol
+}
+
+protocol S72199_ClockProtocol {
+  associatedtype Instant: S72199_InstantProtocol
+}
+
+struct S72199_Duration: S72199_DurationProtocol {}
+struct S72199_Instant: S72199_InstantProtocol {
+  typealias Duration = S72199_Duration
+}
+struct S72199_Clock: S72199_ClockProtocol {
+  typealias Instant = S72199_Instant
+}
+
+func testS72199_2<T: S72199_ClockProtocol>(_: T.Instant, _: T.Instant.Duration, _: T = S72199_Clock()) {} // Ok
