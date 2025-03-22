@@ -1903,10 +1903,10 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
         if (bufferID)
           return;
 
-        // '@StartTask' is gated behind the 'ConcurrencySyntaxSugar'
+        // '@Task' is gated behind the 'ConcurrencySyntaxSugar'
         // experimental feature.
         if (macro->getParentModule()->getName().is("_Concurrency") &&
-            macro->getBaseIdentifier().is("StartTask") &&
+            macro->getBaseIdentifier().is("Task") &&
             !ctx.LangOpts.hasFeature(Feature::ConcurrencySyntaxSugar)) {
           ctx.Diags.diagnose(
               customAttr->getLocation(),
