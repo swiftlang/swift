@@ -985,16 +985,6 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
            "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
-def executor_factory : JoinedOrSeparate<["-"], "executor-factory">,
-  Flags<[FrontendOption]>,
-  HelpText<"Specify the factory to use to create the default executors for "
-           "Swift Concurrency.  This must be a type conforming to the "
-           "'ExecutorFactory' protocol.">,
-  MetaVarName<"<factory-type>">;
-def executor_factory_EQ : Joined<["-"], "executor-factory=">,
-  Flags<[FrontendOption]>,
-  Alias<executor_factory>;
-
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
