@@ -918,15 +918,20 @@ bool SwiftLangSupport::printAccessorUSR(const AbstractStorageDecl *D,
 void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
                                                   swift::Type baseTy,
                                                   bool usePlaceholder,
-                                                  llvm::raw_ostream &OS) {
+                                                  llvm::raw_ostream &OS,
+                                                  llvm::function_ref<void(swift::ParamDecl *)> beforePrintParam,
+                                                  llvm::function_ref<void(swift::ParamDecl *)> afterPrintParam) {
   // Base name.
   OS << VD->getBaseName().userFacingName();
 
   // Parameters.
   auto substMap = baseTy->getMemberSubstitutionMap(VD);
   auto printSingleParam = [&](ParamDecl *param) {
+    beforePrintParam(param);
+
     auto paramTy = param->getInterfaceType();
 
+    // TODO(a7medev): add _: in place of an argument with no name for signature help
     // Label.
     if (!param->getArgumentName().empty())
       OS << param->getArgumentName() << ": ";
@@ -951,6 +956,8 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
 
     if (usePlaceholder)
       OS << "#>";
+    
+    afterPrintParam(param);
   };
   auto printParams = [&](const ParameterList *params) {
     OS << '(';

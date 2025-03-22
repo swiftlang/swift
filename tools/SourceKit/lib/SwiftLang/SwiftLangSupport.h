@@ -48,6 +48,7 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class ParamDecl;
   class GenericSignature;
   enum class AccessorKind;
 
@@ -495,7 +496,9 @@ public:
   /// a typed editor placeholders which is suitable for 'sourcetext'.
   static void
   printMemberDeclDescription(const swift::ValueDecl *VD, swift::Type baseTy,
-                             bool usePlaceholder, llvm::raw_ostream &OS);
+                             bool usePlaceholder, llvm::raw_ostream &OS,
+                             llvm::function_ref<void(swift::ParamDecl *)> beforePrintParam = {},
+                             llvm::function_ref<void(swift::ParamDecl *)> afterPrintParam = {});
 
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
@@ -755,6 +758,12 @@ public:
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                std::optional<VFSOptions> vfsOptions) override;
+  
+  void getSignatureHelp(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                     ArrayRef<const char *> Args,
+                     SourceKitCancellationToken CancellationToken,
+                     SignatureHelpConsumer &Consumer,
+                     std::optional<VFSOptions> vfsOptions) override;
 
   void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                 ArrayRef<const char *> args,
