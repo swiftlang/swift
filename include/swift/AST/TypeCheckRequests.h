@@ -3994,25 +3994,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Retrieve the file being used for code completion in the main module.
-// FIXME: This isn't really a type-checking request, if we ever split off a
-// zone for more basic AST requests, this should be moved there.
-class IDEInspectionFileRequest
-    : public SimpleRequest<IDEInspectionFileRequest,
-                           SourceFile *(ModuleDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  SourceFile *evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
-
-public:
-  // Cached.
-  bool isCached() const { return true; }
-};
-
 /// Kinds of types for CustomAttr.
 enum class CustomAttrTypeKind {
   /// The type is required to not be expressed in terms of
