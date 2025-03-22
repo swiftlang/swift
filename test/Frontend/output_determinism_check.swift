@@ -37,4 +37,31 @@
 // PCM_OUTPUT: remark: produced matching output file '{{.*}}{{/|\\}}test.pcm'
 
 public var x = 1
-public func test() {}
+public func test() {
+  precondition(x == 1, "dummy check")
+}
+
+class A {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
+class B {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
+class C {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
+class D {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
