@@ -152,6 +152,8 @@ add_library(swiftCore
   Sort.swift
   Span/Span.swift
   Span/RawSpan.swift
+  Span/MutableSpan.swift
+  Span/MutableRawSpan.swift
   StaticString.swift
   StaticPrint.swift
   Stride.swift
