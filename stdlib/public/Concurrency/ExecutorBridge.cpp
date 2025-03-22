@@ -27,6 +27,13 @@ void _swift_exit(int result) {
   exit(result);
 }
 
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+extern "C" SWIFT_CC(swift)
+SerialExecutorRef swift_getMainExecutor() {
+  return SerialExecutorRef::generic();
+}
+#endif
+
 extern "C" SWIFT_CC(swift)
 void _swift_task_checkIsolatedSwift(
   HeapObject *executor,

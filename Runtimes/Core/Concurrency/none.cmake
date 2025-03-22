@@ -1,2 +1,3 @@
 target_sources(swift_Concurrency PRIVATE
-  NonDispatchGlobalExecutor.cpp)
+  ExecutorImpl.swift
+  PlatformExecutorNone.swift)

@@ -36,12 +36,7 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  // The functions below could have been added to a separate protocol,
-  // but doing that would then mean doing an `as?` cast in e.g.
-  // enqueueOnGlobalExecutor (in ExecutorBridge.swift), which is
-  // undesirable from a performance perspective.
-
+  #if !$Embedded
   /// `true` if this is the main executor.
   @available(SwiftStdlib 6.2, *)
   var isMainExecutor: Bool { get }
@@ -125,7 +120,7 @@ extension Executor where Self: Equatable {
 
 extension Executor {
 
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
   @available(SwiftStdlib 6.2, *)
