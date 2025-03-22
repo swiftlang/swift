@@ -1136,7 +1136,6 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
         break;
       case LifetimeDescriptor::IsConditionallyAddressable:
         conditionallyAddressableLifetimeParamIndices.set(index);
-        addressableLifetimeParamIndices.set(index);
         break;
       case LifetimeDescriptor::IsAddressable:
         addressableLifetimeParamIndices.set(index);
