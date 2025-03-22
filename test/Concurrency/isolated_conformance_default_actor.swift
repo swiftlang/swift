@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-experimental-feature IsolatedConformances -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-experimental-feature IsolatedConformances -default-isolation MainActor %s
 
 // REQUIRES: swift_feature_IsolatedConformances
-// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 // REQUIRES: concurrency
 
 nonisolated

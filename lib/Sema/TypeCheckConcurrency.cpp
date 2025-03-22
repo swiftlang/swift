@@ -5798,7 +5798,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
 
     // If we are required to use main actor... just use that.
     if (!ignoreUnspecifiedMeansMainActorIsolated &&
-        ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated))
+        ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;
