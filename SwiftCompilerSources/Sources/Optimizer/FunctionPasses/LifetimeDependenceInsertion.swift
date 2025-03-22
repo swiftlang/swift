@@ -138,7 +138,8 @@ extension LifetimeDependentApply {
       // for consistency, we use yieldAddress if any yielded value is an address.
       let targetKind = beginApply.yieldedValues.contains(where: { $0.type.isAddress })
         ? TargetKind.yieldAddress : TargetKind.yield
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: .scope(addressable: false),
+      info.sources.push(LifetimeSource(targetKind: targetKind,
+                                       convention: .scope(addressable: false, addressableForDeps: false),
                                        value: beginApply.token))
     }
     for operand in applySite.parameterOperands {
@@ -218,7 +219,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
       // addressable dependencies directly depend on the incoming address.
-      if context.options.enableAddressDependencies() && source.convention.isAddressable {
+      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value) {
         bases.append(source.value)
         return
       }

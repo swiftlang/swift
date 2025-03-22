@@ -393,7 +393,7 @@ bool BridgedType::isMarkedAsImmortal() const {
 }
 
 bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
-  return unbridged().isAddressableForDeps();
+  return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
