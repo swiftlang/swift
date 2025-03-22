@@ -494,7 +494,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Be strict about the Sendable conformance of metatypes.
 EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
-
 /// Allow public enumerations to be extensible by default
 /// regardless of whether the module they are declared in
 /// is resilient or not.
@@ -502,6 +501,9 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
+
+/// Infer conformance isolation on global-actor-conforming types.
+EXPERIMENTAL_FEATURE(InferIsolatedConformances, true)
 
 /// Allow SwiftSettings
 EXPERIMENTAL_FEATURE(SwiftSettings, false)
