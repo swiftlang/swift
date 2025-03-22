@@ -155,6 +155,7 @@ extension ASTGenVisitor {
     let cTypeNameLoc: BridgedSourceLoc?
     if let ctypeString = args.cTypeString {
       cTypeName = self.generateStringLiteralTextIfNotInterpolated(expr: ctypeString)
+      // TODO: Diagnose if nil.
       cTypeNameLoc = cTypeName != nil ? self.generateSourceLoc(ctypeString) : nil
     } else {
       cTypeName = nil
