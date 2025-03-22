@@ -836,12 +836,20 @@ class ModuleInterfaceLoaderImpl {
 
       // Don't use the adjacent swiftmodule for frameworks from the public
       // Frameworks folder of the SDK.
-      if (isInSystemFrameworks(modulePath, /*publicFramework*/true) ||
-          isInSystemSubFrameworks(modulePath)) {
+      bool blocklistSwiftmodule =
+        ctx.blockListConfig.hasBlockListAction(moduleName,
+                                     BlockListKeyKind::ModuleName,
+                                     BlockListAction::ShouldUseBinaryModule);
+
+      if ((isInSystemFrameworks(modulePath, /*publicFramework*/true) ||
+           isInSystemSubFrameworks(modulePath)) &&
+          !blocklistSwiftmodule) {
         shouldLoadAdjacentModule = false;
         rebuildInfo.addIgnoredModule(modulePath,
                                      ReasonIgnored::PublicFramework);
-      } else if (isInSystemLibraries(modulePath) && moduleName != STDLIB_NAME) {
+      } else if (isInSystemLibraries(modulePath) &&
+                 moduleName != STDLIB_NAME &&
+                 !blocklistSwiftmodule) {
         shouldLoadAdjacentModule = false;
         rebuildInfo.addIgnoredModule(modulePath,
                                      ReasonIgnored::PublicLibrary);
