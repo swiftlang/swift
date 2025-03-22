@@ -16,6 +16,7 @@
 #include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/PossibleParamInfo.h"
+#include "swift/IDE/SignatureHelp.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 
 namespace swift {
@@ -120,6 +121,10 @@ public:
   void collectResults(bool IsLabeledTrailingClosure,
                       SourceLoc Loc, DeclContext *DC,
                       CodeCompletionContext &CompletionCtx);
+  
+  // TODO(a7medev): add doc comment
+  void getSignatures(SourceLoc Loc, DeclContext *DC,
+                     SmallVectorImpl<Signature> &Signatures);
 };
 
 } // end namespace ide
