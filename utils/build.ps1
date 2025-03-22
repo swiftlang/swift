@@ -2362,12 +2362,16 @@ function Build-Foundation {
 }
 
 function Test-Foundation {
+  $ScratchPath = "$BinaryCache\$($Arch.LLVMTarget)\FoundationTests"
+
   # Foundation tests build via swiftpm rather than CMake
   Build-SPMProject `
     -Action Test `
     -Src $SourceCache\swift-foundation `
-    -Bin "$BinaryCache\$($BuildArch.LLVMTarget)\CoreFoundationTests" `
-    -Arch $BuildArch
+    -Bin "$ScratchPath" `
+    -Arch $BuildArch `
+    --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
+    --test-product swift-foundationPackageTests
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK Windows)/usr/include"
@@ -2379,9 +2383,10 @@ function Test-Foundation {
     Build-SPMProject `
       -Action Test `
       -Src $SourceCache\swift-corelibs-foundation `
-      -Bin "$BinaryCache\$($BuildArch.LLVMTarget)\FoundationTests" `
+      -Bin "$ScratchPath" `
       -Arch $BuildArch `
-      -Configuration $FoundationTestConfiguration
+      --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
+      --test-product swift-corelibs-foundationPackageTests
   }
 }
 
