@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxModule -I %t/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportSymbolicCXXDecls | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxModule -I %t/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportSymbolicCXXDecls 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_ImportSymbolicCXXDecls
 
@@ -60,6 +60,11 @@ public:
     };
 };
 
+template <class T>
+struct __attribute__((swift_attr("import_owned"))) AnnotatedTemplate {
+    T t;
+};
+
 #define IMMORTAL_FRT                                                         \
     __attribute__((swift_attr("import_reference")))                              \
     __attribute__((swift_attr("retain:immortal")))                               \
@@ -72,6 +77,8 @@ struct IMMORTAL_FRT MyImmortal {
 struct NonCopyable {
     NonCopyable(const NonCopyable& other) = delete;
 };
+
+// CHECK-NOT: warning: 'import_owned' Swift attribute ignored on type
 
 // CHECK:     enum ns {
 // CHECK-NEXT: struct B {

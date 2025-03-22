@@ -7953,7 +7953,7 @@ static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
   return false;
 }
 
-static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
+bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "import_owned");
 }
 
@@ -7961,7 +7961,7 @@ bool importer::hasUnsafeAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_unsafe");
 }
 
-static bool hasIteratorAPIAttr(const clang::Decl *decl) {
+bool importer::hasIteratorAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_iterator");
 }
 
@@ -8197,18 +8197,6 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   if (!hasDestroyTypeOperations(cxxDecl) ||
       (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
-    if (desc.shouldDiagnoseLifetimeOperations) {
-      HeaderLoc loc(decl->getLocation());
-      if (hasUnsafeAPIAttr(cxxDecl))
-        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
-                               "import_unsafe", decl->getNameAsString());
-      if (hasOwnedValueAttr(cxxDecl))
-        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
-                               "import_owned", decl->getNameAsString());
-      if (hasIteratorAPIAttr(cxxDecl))
-        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
-                               "import_iterator", decl->getNameAsString());
-    }
 
     if (hasConstructorWithUnsupportedDefaultArgs(cxxDecl))
       return CxxRecordSemanticsKind::UnavailableConstructors;

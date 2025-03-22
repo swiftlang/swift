@@ -173,14 +173,9 @@ bool importer::recordHasReferenceSemantics(
   // return MissingLifetimeOperation if the type is not a foreign reference
   // type. Note that this doesn't affect the correctness of this function, since
   // those implicit members aren't required for foreign reference types.
-
-  // To avoid emitting spurious diagnostics, let's disable them here. Types with
-  // missing lifetime operations would get diagnosed later, once their members
-  // are fully instantiated.
   auto semanticsKind = evaluateOrDefault(
       importerImpl->SwiftContext.evaluator,
-      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl,
-                          /* shouldDiagnoseLifetimeOperations */ false}),
+      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl}),
       {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
@@ -2977,6 +2972,17 @@ namespace {
           // Let un-specialized class templates through. We'll sort out their
           // members once they're instantiated.
           !Impl.importSymbolicCXXDecls) {
+
+        HeaderLoc loc(decl->getLocation());
+        if (hasUnsafeAPIAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_unsafe",
+                        decl->getNameAsString());
+        if (hasOwnedValueAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_owned",
+                        decl->getNameAsString());
+        if (hasIteratorAPIAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_iterator",
+                        decl->getNameAsString());
 
         if (semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
           Impl.addImportDiagnostic(
