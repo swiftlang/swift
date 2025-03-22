@@ -311,6 +311,13 @@ SourceLoc DeclRefTypeRepr::getEndLocImpl() const {
   return getNameLoc().getEndLoc();
 }
 
+InlineArrayTypeRepr *InlineArrayTypeRepr::create(ASTContext &ctx,
+                                                 TypeRepr *count,
+                                                 TypeRepr *element,
+                                                 SourceRange brackets) {
+  return new (ctx) InlineArrayTypeRepr(count, element, brackets);
+}
+
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
                           const PrintOptions &Opts) {
   if (TyR == nullptr)
@@ -471,6 +478,15 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
 
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   Printer.printStructurePost(PrintStructureKind::FunctionType);
+}
+
+void InlineArrayTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  Printer << "[";
+  printTypeRepr(getCount(), Printer, Opts);
+  Printer << " x ";
+  printTypeRepr(getElement(), Printer, Opts);
+  Printer << "]";
 }
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,

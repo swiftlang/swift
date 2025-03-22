@@ -894,6 +894,25 @@ case TypeKind::Id:
       return ArraySliceType::get(baseTy);
     }
 
+    case TypeKind::InlineArray: {
+      auto ty = cast<InlineArrayType>(base);
+      auto countTy = doIt(ty->getCountType(), TypePosition::Invariant);
+      if (!countTy)
+        return Type();
+
+      // Currently the element type is invariant for InlineArray.
+      // FIXME: Should we allow covariance?
+      auto eltTy = doIt(ty->getElementType(), TypePosition::Invariant);
+      if (!eltTy)
+        return Type();
+
+      if (countTy.getPointer() == ty->getCountType().getPointer() &&
+          eltTy.getPointer() == ty->getElementType().getPointer())
+        return t;
+
+      return InlineArrayType::get(countTy, eltTy);
+    }
+
     case TypeKind::Optional: {
       auto optional = cast<OptionalType>(base);
       auto baseTy = doIt(optional->getBaseType(), pos);

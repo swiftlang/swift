@@ -2444,6 +2444,12 @@ public:
     return BuiltType();
   }
 
+  TypeLookupErrorOr<BuiltType> createInlineArrayType(BuiltType count,
+                                                     BuiltType element) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDictionaryType(BuiltType key,
                                                     BuiltType value) {
     // Mangled types for building metadata don't contain sugared types

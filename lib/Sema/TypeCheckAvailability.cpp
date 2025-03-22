@@ -3145,7 +3145,26 @@ public:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
+  bool checkInlineArrayTypeRepr(InlineArrayTypeRepr *T) {
+    // Has the same availability as InlineArray.
+    auto &ctx = where.getDeclContext()->getASTContext();
+    auto *D = ctx.getInlineArrayDecl();
+    if (!D) {
+      // If we have a broken stdlib we will have already diagnosed.
+      return false;
+    }
+    return diagnoseDeclAvailability(D, T->getSourceRange(), /*call*/ nullptr,
+                                    where, flags);
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    if (auto *IAT = dyn_cast<InlineArrayTypeRepr>(T)) {
+      if (checkInlineArrayTypeRepr(IAT)) {
+        foundAnyIssues = true;
+      }
+      return Action::Continue();
+    }
+
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR)
       return Action::Continue();

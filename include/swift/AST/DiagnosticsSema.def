@@ -6069,7 +6069,7 @@ NOTE(note_recursive_enum_case_here,none,
 
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
-      "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
+      "%select{Array|Optional|InlineArray|Dictionary|"
       "Error}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
@@ -8333,6 +8333,9 @@ ERROR(invalid_value_for_type_same_type,none,
 
 ERROR(inlinearray_literal_incorrect_count,none,
       "expected %0 elements in inline array literal, but got %1", (Type, Type))
+
+ERROR(inline_array_type_backwards,none,
+      "element count must precede inline array element type", ())
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute

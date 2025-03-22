@@ -3927,6 +3927,12 @@ NodePointer Demangler::demangleSpecialType() {
       case 'a':
         return createType(createWithChild(Node::Kind::SugaredArray,
                                           popNode(Node::Kind::Type)));
+      case 'A': {
+        NodePointer element = popNode(Node::Kind::Type);
+        NodePointer count = popNode(Node::Kind::Type);
+        return createType(createWithChildren(Node::Kind::SugaredInlineArray,
+                                             count, element));
+      }
       case 'D': {
         NodePointer value = popNode(Node::Kind::Type);
         NodePointer key = popNode(Node::Kind::Type);

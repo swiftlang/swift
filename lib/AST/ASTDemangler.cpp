@@ -1054,6 +1054,10 @@ Type ASTBuilder::createArrayType(Type base) {
   return ArraySliceType::get(base);
 }
 
+Type ASTBuilder::createInlineArrayType(Type count, Type element) {
+  return InlineArrayType::get(count, element);
+}
+
 Type ASTBuilder::createDictionaryType(Type key, Type value) {
   return DictionaryType::get(key, value);
 }

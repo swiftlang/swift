@@ -2291,6 +2291,7 @@ private:
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
+    case TypeKind::InlineArray:
     case TypeKind::Optional:
     case TypeKind::VariadicSequence: {
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);

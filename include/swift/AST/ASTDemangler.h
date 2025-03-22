@@ -248,6 +248,8 @@ public:
 
   Type createArrayType(Type base);
 
+  Type createInlineArrayType(Type count, Type element);
+
   Type createDictionaryType(Type key, Type value);
 
   Type createIntegerType(intptr_t value);

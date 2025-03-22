@@ -7961,6 +7961,22 @@ Expected<Type> DESERIALIZE_TYPE(ARRAY_SLICE_TYPE)(
   return ArraySliceType::get(baseTy.get());
 }
 
+Expected<Type> DESERIALIZE_TYPE(INLINE_ARRAY_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID countID, elementID;
+  decls_block::InlineArrayTypeLayout::readRecord(scratch, countID, elementID);
+
+  auto countTy = MF.getTypeChecked(countID);
+  if (!countTy)
+    return countTy.takeError();
+
+  auto elementTy = MF.getTypeChecked(elementID);
+  if (!elementTy)
+    return elementTy.takeError();
+
+  return InlineArrayType::get(countTy.get(), elementTy.get());
+}
+
 Expected<Type> DESERIALIZE_TYPE(DICTIONARY_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   TypeID keyID, valueID;

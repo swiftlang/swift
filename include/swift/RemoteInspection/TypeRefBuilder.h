@@ -917,6 +917,12 @@ public:
     return nullptr;
   }
 
+  const TypeRef *createInlineArrayType(const TypeRef *count,
+                                       const TypeRef *element) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
   const TypeRef *createDictionaryType(const TypeRef *key,
                                       const TypeRef *value) {
     // TypeRefs don't contain sugared types

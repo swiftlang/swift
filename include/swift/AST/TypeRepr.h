@@ -641,6 +641,35 @@ private:
   friend class TypeRepr;
 };
 
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayTypeRepr : public TypeRepr {
+  TypeRepr *Count;
+  TypeRepr *Element;
+  SourceRange Brackets;
+
+  InlineArrayTypeRepr(TypeRepr *count, TypeRepr *element, SourceRange brackets)
+      : TypeRepr(TypeReprKind::InlineArray), Count(count), Element(element),
+        Brackets(brackets) {}
+
+public:
+  static InlineArrayTypeRepr *create(ASTContext &ctx, TypeRepr *count,
+                                     TypeRepr *element, SourceRange brackets);
+
+  TypeRepr *getCount() const { return Count; }
+  TypeRepr *getElement() const { return Element; }
+  SourceRange getBrackets() const { return Brackets; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InlineArray;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A dictionary type.
 /// \code
 ///   [K : V]
@@ -1626,6 +1655,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Fixed:
   case TypeReprKind::Self:
   case TypeReprKind::Array:
+  case TypeReprKind::InlineArray:
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
   case TypeReprKind::Sending:

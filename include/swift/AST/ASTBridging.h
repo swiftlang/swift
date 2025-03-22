@@ -2702,6 +2702,11 @@ BridgedImplicitlyUnwrappedOptionalTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cExclamationLoc);
 
+SWIFT_NAME("BridgedInlineArrayTypeRepr.createParsed(_:count:element:brackets:)")
+BridgedInlineArrayTypeRepr BridgedInlineArrayTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr cCountType,
+    BridgedTypeRepr cElementType, BridgedSourceRange cBracketsRange);
+
 SWIFT_NAME("BridgedInverseTypeRepr.createParsed(_:tildeLoc:constraint:)")
 BridgedInverseTypeRepr
 BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,

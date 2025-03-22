@@ -7066,6 +7066,18 @@ public:
     }
   }
 
+  void visitInlineArrayType(InlineArrayType *T) {
+    if (Options.AlwaysDesugarInlineArrayTypes) {
+      visit(T->getDesugaredType());
+    } else {
+      Printer << "[";
+      visit(T->getCountType());
+      Printer << " x ";
+      visit(T->getElementType());
+      Printer << "]";
+    }
+  }
+
   void visitDictionaryType(DictionaryType *T) {
     if (Options.AlwaysDesugarDictionaryTypes) {
       visit(T->getDesugaredType());
