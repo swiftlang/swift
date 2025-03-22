@@ -12,6 +12,8 @@
 
 import os
 
+from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
+
 from . import cmark
 from . import foundation
 from . import libcxx
@@ -34,6 +36,10 @@ class SwiftFoundationTests(product.Product):
     @classmethod
     def is_before_build_script_impl_product(cls):
         return False
+
+    @classmethod
+    def swiftpm_unified_build_product_arena(cls):
+        return 'foundationtests'
 
     @classmethod
     def is_ignore_install_all_product(cls):
@@ -63,13 +69,20 @@ class SwiftFoundationTests(product.Product):
         )
         package_path = os.path.join(self.source_dir, '..', 'swift-foundation')
         package_path = os.path.abspath(package_path)
+        include_path = os.path.join(
+            self.install_toolchain_path(host_target),
+            'lib',
+            'swift'
+        )
         cmd = [
             swift_exec,
             'test',
             '--toolchain', self.install_toolchain_path(host_target),
             '--configuration', self.configuration(),
             '--scratch-path', self.build_dir,
-            '--package-path', package_path
+            '--package-path', package_path,
+            '--test-product', 'swift-foundationPackageTests',
+            '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH
         ]
         if self.args.verbose_build:
             cmd.append('--verbose')
@@ -80,7 +93,10 @@ class SwiftFoundationTests(product.Product):
         if host_target.startswith('linux'):
             cmd += ['-Xswiftc', '-gnone']
 
-        shell.call(cmd, env={'SWIFTCI_USE_LOCAL_DEPS': '1'})
+        shell.call(cmd, env={
+            'SWIFTCI_USE_LOCAL_DEPS': '1',
+            'DISPATCH_INCLUDE_PATH': include_path
+        })
 
     @classmethod
     def get_dependencies(cls):
