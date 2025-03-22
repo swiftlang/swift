@@ -176,4 +176,19 @@ private:
   int x;
 };
 
+namespace DefaultCtor {
+// TODO: Do not synthesize static factories of C++ foreign ref types if a user
+// provided static factory already exists with `swift_name("init")` annotation
+// rdar://147532991
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retain")))
+__attribute__((swift_attr("release:release"))) CxxRefTy {
+public:
+  int val = 2;
+};
+} // namespace DefaultCtor
+
+void retain(DefaultCtor::CxxRefTy *_Nonnull v) {};
+void release(DefaultCtor::CxxRefTy *_Nonnull v) {};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H

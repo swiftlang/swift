@@ -2052,6 +2052,105 @@ namespace {
       return;
     }
 
+    void generateStaticFactoryForCXXForeignRef(
+        clang::ASTContext &clangCtx, ClassDecl *result,
+        clang::CXXRecordDecl *cxxRecordDecl, clang::Sema &clangSema) {
+
+      clang::IdentifierTable &idents = clangCtx.Idents;
+      clang::IdentifierInfo *generatedFuncName = &idents.get(
+          ("__returns_" + cxxRecordDecl->getNameAsString()).c_str());
+
+      // TODO/DOUBT: How to add `_Nonnull` as a qualifier on cxxRecordPtrTy
+      // return type ??
+      clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
+      clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
+      clang::FunctionProtoType::ExtProtoInfo EPI;
+      clang::QualType generatedFuncTy =
+          clangCtx.getFunctionType(cxxRecordPtrTy, {}, EPI);
+
+      // TODO: Use operatorNew directly instead of calling BuildCXXNew
+      clang::FunctionDecl *operatorNew = nullptr;
+      clang::FunctionDecl *operatorDelete = nullptr;
+      bool passAlignment = false;
+      bool allocationFound = clangSema.FindAllocationFunctions(
+          cxxRecordDecl->getLocation(), clang::SourceRange(),
+          clang::Sema::AFS_Both, clang::Sema::AFS_Both, cxxRecordTy,
+          /*IsArray*/ false, passAlignment, clang::MultiExprArg(), operatorNew,
+          operatorDelete);
+
+      llvm::errs() << "allocationFound: " << allocationFound << "\n";
+      if (!operatorNew || operatorNew->isDeleted() ||
+          operatorNew->getAccess() == clang::AS_private ||
+          operatorNew->getAccess() == clang::AS_protected) {
+        return;
+      }
+
+      clang::CXXConstructorDecl *defaultCtorDecl = nullptr;
+      for (clang::CXXConstructorDecl *ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isDefaultConstructor() && !ctor->isDeleted()) {
+          defaultCtorDecl = ctor;
+          break;
+        }
+      }
+
+      if (!defaultCtorDecl)
+        return;
+
+      clang::CXXMethodDecl *generatedCxxMethodDecl =
+          clang::CXXMethodDecl::Create(
+              clangCtx, cxxRecordDecl, cxxRecordDecl->getLocation(),
+              clang::DeclarationNameInfo(generatedFuncName,
+                                         cxxRecordDecl->getLocation()),
+              generatedFuncTy, nullptr, clang::SC_Static,
+              /*UsesFPIntrin*/ false, /*isInline=*/true,
+              clang::ConstexprSpecKind::Unspecified,
+              cxxRecordDecl->getLocation());
+
+      generatedCxxMethodDecl->setAccess(clang::AccessSpecifier::AS_public);
+
+      clang::SwiftAttrAttr *generatedReturnsRetainedAttr =
+          clang::SwiftAttrAttr::Create(clangCtx, "returns_retained");
+      generatedCxxMethodDecl->addAttr(generatedReturnsRetainedAttr);
+
+      clang::SwiftNameAttr *generatedSwiftNameInitAttr =
+          clang::SwiftNameAttr::Create(clangCtx, "init()");
+      generatedCxxMethodDecl->addAttr(generatedSwiftNameInitAttr);
+
+      clang::ExprResult generatedConstructExpr =
+          clangSema.BuildCXXConstructExpr(
+              clang::SourceLocation(), cxxRecordTy, defaultCtorDecl,
+              /*Elidable*/ false, clang::MultiExprArg(),
+              /*HadMultipleCandidates,*/ false,
+              /*IsListInitialization*/ false,
+              /*IsStdInitListInitialization*/ false,
+              /*RequiresZeroInit*/ true, // TODO: fix the propagation of this
+                                         // zeroinit flag to BuildCXXNew
+              clang::CXXConstructionKind::Complete, clang::SourceRange());
+
+      if (generatedConstructExpr.isInvalid())
+        return;
+      clang::ExprResult generatedNewExprResult = clangSema.BuildCXXNew(
+          clang::SourceRange(), /*UseGlobal*/ false, clang::SourceLocation(),
+          {}, clang::SourceLocation(), clang::SourceRange(), cxxRecordTy,
+          clangCtx.getTrivialTypeSourceInfo(cxxRecordTy), std::nullopt,
+          clang::SourceRange(), generatedConstructExpr.get());
+
+      if (generatedNewExprResult.isInvalid())
+        return;
+      clang::CXXNewExpr *generatedNewExpr =
+          cast<clang::CXXNewExpr>(generatedNewExprResult.get());
+      clang::ReturnStmt *generatedRetStmt = clang::ReturnStmt::Create(
+          clangCtx, clang::SourceLocation(), generatedNewExpr, nullptr);
+      clang::CompoundStmt *generatedFuncBody = clang::CompoundStmt::Create(
+          clangCtx, {generatedRetStmt}, clang::FPOptionsOverride(),
+          clang::SourceLocation(), clang::SourceLocation());
+      generatedCxxMethodDecl->setBody(generatedFuncBody);
+      generatedCxxMethodDecl->addAttr(
+          clang::NoDebugAttr::CreateImplicit(clangCtx));
+      if (Decl *importedInitDecl = VisitCXXMethodDecl(generatedCxxMethodDecl))
+        result->addMember(importedInitDecl);
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2483,13 +2582,27 @@ namespace {
         ctors.push_back(valueCtor);
       }
 
-      // Do not allow Swift to construct foreign reference types (at least, not
-      // yet).
       if (isa<StructDecl>(result)) {
         for (auto ctor : ctors) {
           // Add ctors directly as they cannot always be looked up from the
           // clang decl (some are synthesized by Swift).
           result->addMember(ctor);
+        }
+      } else {
+        // TODO: Make the feature flag GenerateCxxRefTypeInit actually work
+        if (result->getASTContext().LangOpts.hasFeature(
+                Feature::GenerateCxxRefTypeInit)) {
+          assert(isa<ClassDecl>(result) && "Expected result to be a ClassDecl "
+                                           "for C/C++ foreign reference types");
+          if (auto *cxxRecordDecl = const_cast<clang::CXXRecordDecl *>(
+                  dyn_cast<clang::CXXRecordDecl>(decl))) {
+            generateStaticFactoryForCXXForeignRef(
+                cxxRecordDecl->getASTContext(), cast<ClassDecl>(result),
+                cxxRecordDecl, Impl.getClangSema());
+          } else {
+            // TODO: Synthesize the static factory for C foreign reference types
+            // rdar://147532507
+          }
         }
       }
 

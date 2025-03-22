@@ -397,6 +397,7 @@ UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(GenerateCxxRefTypeInit)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 
 static bool usesFeatureSwiftSettings(const Decl *decl) {
