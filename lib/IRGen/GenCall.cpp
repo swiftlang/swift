@@ -5085,7 +5085,7 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
 void irgen::emitYieldOnceCoroutineEntry(
     IRGenFunction &IGF, CanSILFunctionType fnType,
     NativeCCEntryPointArgumentEmission &emission) {
-  // Use malloc and free as our allocator.
+  // Use free as our deallocator.
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
   auto *buffer = emission.getCoroutineBuffer();
   llvm::SmallVector<llvm::Value *, 2> finalArgs;
@@ -5093,15 +5093,20 @@ void irgen::emitYieldOnceCoroutineEntry(
   if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
-    allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocFn());
+    // Use swift_coroFrameAllocStub to emit our allocator.
+    allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
   } else {
+    // Use malloc as our allocator.
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
   }
+
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(), IGF.Builder);
   emitRetconCoroutineEntry(IGF, fnType, buffer,
                            llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM), {},
                            allocFn, deallocFn, finalArgs);
+
 }
 
 void irgen::emitYieldManyCoroutineEntry(

@@ -2102,7 +2102,13 @@ FUNCTION(Free, c, free, C_CC, AlwaysAvailable,
 FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(SizeTy, Int64Ty),
-         NO_ATTRS,
+         ATTRS(NoUnwind),
+         EFFECT(Allocating),
+         UNKNOWN_MEMEFFECTS)
+FUNCTION(coroFrameAllocStub, Swift, swift_coroFrameAllocStub, C_CC,
+         AlwaysAvailable, RETURNS(Int8PtrTy),
+         ARGS(SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
          EFFECT(Allocating),
          UNKNOWN_MEMEFFECTS)
 
