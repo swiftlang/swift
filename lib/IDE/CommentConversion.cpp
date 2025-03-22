@@ -502,6 +502,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
     if (auto *CD = MaybeClangNode.getAsDecl()) {
       std::string S;
       llvm::raw_string_ostream SS(S);
+      // TODO(refaey): respect IncludeParameters for Clang.
       if (getClangDocumentationCommentAsXML(CD, SS)) {
         replaceObjcDeclarationsWithSwiftOnes(D, SS.str(), OS,
                                              SynthesizedTarget);

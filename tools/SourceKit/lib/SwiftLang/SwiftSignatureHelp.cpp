@@ -46,7 +46,7 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
     struct SignatureInfo {
       size_t LabelBegin;
       size_t LabelLength;
-      StringRef Doc;
+      StringRef DocComment;
       std::optional<unsigned> ActiveParam;
       SmallVector<SourceKit::SignatureHelpResult::Parameter, 0> Params;
       
@@ -61,7 +61,10 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
 
       // Label.
       signatureElem.LabelBegin = SS.size();
+      // TODO(a7medev): Add parameter documentation.
       auto &Params = signatureElem.Params;
+      // TODO(a7medev): Replace `printMemberDeclDescription` with logic similar to code completion.
+      //                for benefits like: handling subscripts, implicit subscripts (e.g. [keyPath:]), generics, etc.
       SwiftLangSupport::printMemberDeclDescription(
           signature.FuncD, signature.ExprType, /*usePlaceholder=*/false, OS,
           /*beforePrintParam=*/[&](ParamDecl *Param) {
@@ -75,15 +78,14 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
       signatureElem.LabelLength = SS.size() - signatureElem.LabelBegin;
       signatureElem.ActiveParam = signature.ParamIdx;
 
-      // TODO(a7medev):  use full documentation instead WITHOUT parameters.
       // Documentation.
-      unsigned DocBegin = SS.size();
+      unsigned DocCommentBegin = SS.size();
       ide::getDocumentationCommentAsXML(signature.FuncD, OS,
                                         /*IncludeParameters=*/false);
-      unsigned DocLength = SS.size() - DocBegin;
+      unsigned DocCommentLength = SS.size() - DocCommentBegin;
       
-      StringRef DocComment(SS.begin() + DocBegin, DocLength);
-      signatureElem.Doc = DocComment;
+      StringRef DocComment(SS.begin() + DocCommentBegin, DocCommentLength);
+      signatureElem.DocComment = DocComment;
     }
 
     SourceKit::SignatureHelpResult SKResult;
@@ -91,7 +93,7 @@ deliverResults(SourceKit::SignatureHelpConsumer &SKConsumer,
 
     for (auto &info : Signatures) {
       StringRef Label(SS.begin() + info.LabelBegin, info.LabelLength);
-      SKSignatures.push_back({Label, info.Doc, info.ActiveParam, info.Params});
+      SKSignatures.push_back({Label, info.DocComment, info.ActiveParam, info.Params});
     }
 
     SKResult.Signatures = SKSignatures;
