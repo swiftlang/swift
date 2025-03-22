@@ -311,6 +311,11 @@ static sourcekitd_response_t conformingMethodList(
     ArrayRef<const char *> ExpectedTypes, std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken);
 
+static sourcekitd_response_t signatureHelp(
+    llvm::MemoryBuffer *InputBuf, int64_t Offset, ArrayRef<const char *> Args,
+    std::optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken);
+
 static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                         SKEditorConsumerOptions Opts,
                                         ArrayRef<const char *> Args,
@@ -1472,6 +1477,27 @@ handleRequestConformingMethodList(const RequestDict &Req,
   });
 }
 
+static void
+handleRequestSignatureHelp(const RequestDict &Req,
+                           SourceKitCancellationToken CancellationToken,
+                           ResponseReceiver Rec) {
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    std::optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
+        getInputBufForRequestOrEmitError(Req, vfsOptions, Rec);
+    if (!InputBuf)
+      return;
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
+    return Rec(signatureHelp(InputBuf.get(), Offset, Args, std::move(vfsOptions),
+                          CancellationToken));
+  });
+}
+
 static void handleRequestIndex(const RequestDict &Req,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec) {
@@ -2236,6 +2262,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestCodeCompleteUpdate, handleRequestCodeCompleteUpdate)
   HANDLE_REQUEST(RequestTypeContextInfo, handleRequestTypeContextInfo)
   HANDLE_REQUEST(RequestConformingMethodList, handleRequestConformingMethodList)
+  HANDLE_REQUEST(RequestSignatureHelp, handleRequestSignatureHelp)
 
   HANDLE_REQUEST(RequestIndex, handleRequestIndex)
   HANDLE_REQUEST(RequestIndexToStore, handleRequestIndexToStore)
@@ -3583,6 +3610,85 @@ static sourcekitd_response_t conformingMethodList(
                                ExpectedTypes, CancellationToken, Consumer,
                                std::move(vfsOptions));
 
+  if (Consumer.wasCancelled()) {
+    return createErrorRequestCancelled();
+  } else if (Consumer.isError()) {
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  } else {
+    return RespBuilder.createResponse();
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Signature Help
+//===----------------------------------------------------------------------===//
+
+static sourcekitd_response_t signatureHelp(
+    llvm::MemoryBuffer *InputBuf, int64_t Offset, ArrayRef<const char *> Args,
+    std::optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
+  ResponseBuilder RespBuilder;
+
+  class Consumer : public SignatureHelpConsumer {
+    ResponseBuilder::Dictionary SKResult;
+    std::optional<std::string> ErrorDescription;
+    bool WasCancelled = false;
+
+  public:
+    Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
+
+    void handleResult(const SignatureHelpResult &Result) override {
+      SKResult.set(KeyActiveSignature, Result.ActiveSignature);
+
+      auto Signatures = SKResult.setArray(KeyMembers);
+
+      for (auto Signature : Result.Signatures) {
+        auto SignatureElem = Signatures.appendDictionary();
+
+        SignatureElem.set(KeyName, Signature.Label);
+
+        if (auto ActiveParam = Signature.ActiveParam)
+          SignatureElem.set(KeyActiveParameter, ActiveParam.value());
+
+        if (!Signature.Doc.empty())
+          SignatureElem.set(KeyDocComment, Signature.Doc);
+
+        auto Params = SignatureElem.setArray(KeyParameters);
+
+        for (auto Param : Signature.Params) {
+          auto ParamElem = Params.appendDictionary();
+          
+          ParamElem.set(KeyNameOffset, Param.LabelBegin);
+          ParamElem.set(KeyNameLength, Param.LabelLength);
+          
+          if (!Param.DocComment.empty())
+            ParamElem.set(KeyDocComment, Param.DocComment);
+        }
+      }
+    }
+
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        SKResult.setBool(KeyReusingASTContext, flag);
+    }
+
+    void failed(StringRef ErrDescription) override {
+      ErrorDescription = ErrDescription.str();
+    }
+
+    void cancelled() override { WasCancelled = true; }
+
+    bool wasCancelled() const { return WasCancelled; }
+    bool isError() const { return ErrorDescription.has_value(); }
+    const char *getErrorDescription() const {
+      return ErrorDescription->c_str();
+    }
+  } Consumer(RespBuilder);
+
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.getSignatureHelp(InputBuf, Offset, Args,  CancellationToken, Consumer,
+                        std::move(vfsOptions));
+  
   if (Consumer.wasCancelled()) {
     return createErrorRequestCancelled();
   } else if (Consumer.isError()) {
