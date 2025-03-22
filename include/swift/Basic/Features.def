@@ -465,9 +465,6 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
-// When a parameter has unspecified isolation, infer it as main actor isolated.
-EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
-
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 

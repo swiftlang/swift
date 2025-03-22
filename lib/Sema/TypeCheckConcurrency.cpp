@@ -5797,7 +5797,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
 
     // If we are required to use main actor... just use that.
     if (!ignoreUnspecifiedMeansMainActorIsolated &&
-        ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated))
+        ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;
@@ -7936,7 +7936,7 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   // In a context where we are inferring @MainActor, if the conforming type
   // is on the main actor, then the conformance is, too.
   auto nominal = dc->getSelfNominalTypeDecl();
-  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+  if (ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor &&
       nominal) {
     auto nominalIsolation = getActorIsolation(nominal);
     if (nominalIsolation.isMainActor()) {

@@ -1,11 +1,10 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SwiftSettings -c -verify -swift-version 6 -verify-additional-prefix nonisolated- -disable-availability-checking %s
 // RUN: %target-swift-frontend -enable-experimental-feature SwiftSettings -c -verify -swift-version 6 -verify-additional-prefix main-actor- -disable-availability-checking -DSWIFT_SETTINGS_MAIN_ACTOR %s
-// RUN: %target-swift-frontend -enable-experimental-feature UnspecifiedMeansMainActorIsolated -enable-experimental-feature SwiftSettings -c -verify -swift-version 6 -disable-availability-checking -verify-additional-prefix main-actor- %s
-// RUN: %target-swift-frontend -enable-experimental-feature UnspecifiedMeansMainActorIsolated -enable-experimental-feature SwiftSettings -c -verify -swift-version 6 -disable-availability-checking -verify-additional-prefix nonisolated- -DSWIFT_SETTINGS_NONISOLATED %s
+// RUN: %target-swift-frontend -default-isolation MainActor -enable-experimental-feature SwiftSettings -c -verify -swift-version 6 -disable-availability-checking -verify-additional-prefix main-actor- %s
+// RUN: %target-swift-frontend -default-isolation MainActor -enable-experimental-feature SwiftSettings -c -verify -swift-version 6 -disable-availability-checking -verify-additional-prefix nonisolated- -DSWIFT_SETTINGS_NONISOLATED %s
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 // REQUIRES: swift_feature_SwiftSettings
 
 #if SWIFT_SETTINGS_MAIN_ACTOR
