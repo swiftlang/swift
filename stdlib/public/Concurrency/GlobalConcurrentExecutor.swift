@@ -31,16 +31,13 @@ import Swift
 ///
 /// Customizing the global concurrent executor is currently not supported.
 @available(SwiftStdlib 6.0, *)
-@available(*, deprecated, renamed: "Task.defaultExecutor")
 @_unavailableInEmbedded
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
-    if #available(SwiftStdlib 6.2, *) {
-      return Task.defaultExecutor
-    } else {
-      return _DefaultGlobalConcurrentExecutor.shared
-    }
+    _DefaultGlobalConcurrentExecutor.shared
   }
+  // TODO: introduce a set {} once we are ready to allow customizing the
+  //       default global executor. This should be done the same for main actor
 }
 
 /// A task executor which enqueues all work on the default global concurrent
@@ -54,7 +51,7 @@ internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
   private init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
-    _enqueueJobGlobal(UnownedJob(job)._context)
+    _enqueueJobGlobal(job.context)
   }
 
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
@@ -62,7 +59,7 @@ internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
     // We represent it as the `(0, 0)` ExecutorRef and it is handled properly
     // by the runtime, without having to call through to the
     // `_DefaultGlobalConcurrentExecutor` declared in Swift.
-    unsafe UnownedTaskExecutor(_getUndefinedTaskExecutor())
+    UnownedTaskExecutor(_getUndefinedTaskExecutor())
   }
 }
 

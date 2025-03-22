@@ -11,19 +11,20 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-/// A clock that measures time that always increments but stops incrementing
-/// while the system is asleep.
+#if !$Embedded
+
+/// A clock that measures time that always increments but stops incrementing 
+/// while the system is asleep. 
 ///
-/// `SuspendingClock` can be considered as a system awake time clock. The frame
-/// of reference of the `Instant` may be bound machine boot or some other
+/// `SuspendingClock` can be considered as a system awake time clock. The frame 
+/// of reference of the `Instant` may be bound machine boot or some other 
 /// locally defined reference point. This means that the instants are
 /// only comparable on the same machine in the same booted session.
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 public struct SuspendingClock: Sendable {
-  public struct Instant: Sendable {
+  public struct Instant: Codable, Sendable {
     internal var _value: Swift.Duration
 
     internal init(_value: Swift.Duration) {
@@ -34,17 +35,10 @@ public struct SuspendingClock: Sendable {
   public init() { }
 }
 
-#if !$Embedded
 @available(SwiftStdlib 5.7, *)
-extension SuspendingClock.Instant: Codable {
-}
-#endif
-
-@available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension Clock where Self == SuspendingClock {
-  /// A clock that measures time that always increments but stops incrementing
-  /// while the system is asleep.
+  /// A clock that measures time that always increments but stops incrementing 
+  /// while the system is asleep. 
   ///
   ///       try await Task.sleep(until: .now + .seconds(3), clock: .suspending)
   ///
@@ -53,7 +47,6 @@ extension Clock where Self == SuspendingClock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock: Clock {
   /// The current instant accounting for machine suspension.
   @available(SwiftStdlib 5.7, *)
@@ -87,19 +80,13 @@ extension SuspendingClock: Clock {
     return Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
-  /// The suspending clock is monotonic
-  @available(SwiftStdlib 6.2, *)
-  public var traits: ClockTraits {
-    return [.monotonic]
-  }
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
   /// to coalesce CPU wake-ups to more efficiently process the wake-ups in
   /// a more power efficient manner.
   ///
-  /// If the task is canceled before the time ends, this function throws
+  /// If the task is canceled before the time ends, this function throws 
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
@@ -107,14 +94,11 @@ extension SuspendingClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(SwiftStdlib 6.2, *) {
-      try await Task._sleep(until: deadline,
-                            tolerance: tolerance,
-                            clock: self)
-    } else {
-      // Should never see this
-      Builtin.unreachable()
-    }
+    let (seconds, attoseconds) = deadline._value.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    try await Task._sleep(until:seconds, nanoseconds,
+      tolerance: tolerance,
+      clock: .suspending)
   }
 #else
   @available(SwiftStdlib 5.7, *)
@@ -128,7 +112,6 @@ extension SuspendingClock: Clock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock.Instant: InstantProtocol {
   @available(SwiftStdlib 5.7, *)
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
@@ -197,3 +180,5 @@ extension SuspendingClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#endif
