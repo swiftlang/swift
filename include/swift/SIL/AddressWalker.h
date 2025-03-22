@@ -64,10 +64,6 @@ protected:
   /// just for subclasses to override.
   bool visitUse(Operand *use) { return true; }
 
-  /// Customization point for visiting operands that we were unable to
-  /// understand. These cause us to return AddressUseKind::Unknown.
-  void onError(Operand *use) {}
-
   using TransitiveUseVisitation =
       TransitiveAddressWalkerTransitiveUseVisitation;
 
@@ -94,7 +90,7 @@ private:
   void callVisitUse(Operand *use) {
     assert(!didInvalidate);
     if (!asImpl().visitUse(use))
-      result = AddressUseKind::Unknown;
+      result = AddressUseKind::PointerEscape;
   }
 
 public:
@@ -145,9 +141,6 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
   };
 
   while (!worklist.empty()) {
-    if (result == AddressUseKind::Unknown)
-      return AddressUseKind::Unknown;
-
     auto *op = worklist.pop_back_val();
 
     // Skip type dependent operands.
@@ -229,7 +222,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
-        isa<MergeIsolationRegionInst>(user)) {
+        isa<MergeIsolationRegionInst>(user) ||
+        isa<DeallocPackMetadataInst>(user)) {
       callVisitUse(op);
       continue;
     }
@@ -320,10 +314,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       continue;
     }
 
-    // We were unable to recognize this user, so set AddressUseKind to unknown
-    // and call onError with the specific user that caused the problem.
-    asImpl().onError(op);
-    return AddressUseKind::Unknown;
+    // We were unable to recognize this user, fatal error.
+    llvm_unreachable("Unrecognized address use!");
   }
 
   return result;

@@ -905,7 +905,6 @@ static SILValue tryRewriteToPartialApplyStack(
       // Dependent uses are ignored because they cannot modify the original.
       break;
     case AddressUseKind::PointerEscape:
-    case AddressUseKind::Unknown:
       continue;
     }
     if (!origIsUnmodifiedDuringClosureLifetime) {

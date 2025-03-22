@@ -430,8 +430,6 @@ static FunctionTest SSALivenessTest("ssa_liveness", [](auto &function,
 
   if (summary.addressUseKind == AddressUseKind::PointerEscape)
     llvm::outs() << "Incomplete liveness: Escaping address\n";
-  else if (summary.addressUseKind == AddressUseKind::Unknown)
-    llvm::outs() << "Incomplete liveness: Unknown address use\n";
 
   liveness.print(llvm::outs());
 
