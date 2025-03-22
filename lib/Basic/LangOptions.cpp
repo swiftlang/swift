@@ -146,13 +146,20 @@ static const SupportedConditionalValue SupportedConditionalCompilationHasAtomicB
   "_128"
 };
 
+static const SupportedConditionalValue SupportedConditionalCompilationObjectFileFormats[] = {
+  "MachO",
+  "ELF",
+  "COFF",
+  "Wasm",
+};
+
 static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
 #define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
-ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+static ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
   switch (Kind) {
   case PlatformConditionKind::OS:
     return SupportedConditionalCompilationOSs;
@@ -172,12 +179,14 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationPtrAuthSchemes;
   case PlatformConditionKind::HasAtomicBitWidth:
     return SupportedConditionalCompilationHasAtomicBitWidths;
+  case PlatformConditionKind::ObjectFileFormat:
+    return SupportedConditionalCompilationObjectFileFormats;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
-PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
-                                                     std::vector<StringRef> &suggestedValues) {
+static PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
+                                                            std::vector<StringRef> &suggestedValues) {
   std::string lower = V.lower();
   for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
@@ -196,8 +205,8 @@ PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind,
   return Kind;
 }
 
-bool isMatching(PlatformConditionKind Kind, const StringRef &V,
-                PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
+static bool isMatching(PlatformConditionKind Kind, const StringRef &V,
+                       PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
   // Compare against known values, ignoring case to avoid penalizing
   // characters with incorrect case.
   unsigned minDistance = std::numeric_limits<unsigned>::max();
@@ -236,6 +245,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::TargetEnvironment:
   case PlatformConditionKind::PtrAuth:
   case PlatformConditionKind::HasAtomicBitWidth:
+  case PlatformConditionKind::ObjectFileFormat:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -639,6 +649,17 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
   } else if (Target.isArch64Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+  }
+
+  // Set the "_objectFileFormat" platform condition.
+  if (Target.isOSBinFormatMachO()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "MachO");
+  } else if (Target.isOSBinFormatELF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "ELF");
+  } else if (Target.isOSBinFormatCOFF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "COFF");
+  } else if (Target.isOSBinFormatWasm()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "Wasm");
   }
 
   // Set the "runtime" platform condition.
