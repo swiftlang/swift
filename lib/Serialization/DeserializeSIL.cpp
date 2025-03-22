@@ -3977,6 +3977,10 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
   return maybeFunc.get();
 }
 
+SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name) {
+  return getGlobalForReference(name);
+}
+
 SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;

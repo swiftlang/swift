@@ -85,6 +85,15 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
   return nullptr;
 }
 
+SILGlobalVariable *SerializedSILLoader::lookupSILGlobalVariable(StringRef Name) {
+  for (auto &Des : LoadedSILSections) {
+    if (auto *G = Des->lookupSILGlobalVariable(Name)) {
+      return G;
+    }
+  }
+  return nullptr;
+}
+
 bool SerializedSILLoader::hasSILFunction(StringRef Name,
                                          std::optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while

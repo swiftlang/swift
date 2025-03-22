@@ -197,6 +197,7 @@ namespace swift {
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
+    SILGlobalVariable *lookupSILGlobalVariable(StringRef Name);
     bool hasSILFunction(StringRef Name,
                         std::optional<SILLinkage> Linkage = std::nullopt);
     SILVTable *lookupVTable(StringRef MangledClassName);
