@@ -506,6 +506,7 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
+void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
 

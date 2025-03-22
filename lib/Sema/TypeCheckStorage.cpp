@@ -3733,6 +3733,11 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
 
 bool HasStorageRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  // ABI decl inherits this from API.
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->hasStorage();
+
   // Parameters are always stored.
   if (isa<ParamDecl>(storage))
     return true;
@@ -3818,7 +3823,11 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
     return;
   
   if (auto varDecl = dyn_cast<VarDecl>(decl)) {
-    if (hasStorage && !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
+    auto abiRole = ABIRoleInfo(varDecl);
+    bool abiOnly = !abiRole.providesAPI() && abiRole.getCounterpart();
+
+    if (hasStorage && !abiOnly &&
+          !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
       varDecl->getAttrs().add(new (varDecl->getASTContext())
                               HasStorageAttr(/*isImplicit=*/true));
   }
