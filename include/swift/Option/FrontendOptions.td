@@ -1401,6 +1401,10 @@ def disable_split_cold_code :
   Flag<["-"], "disable-split-cold-code">,
   HelpText<"Disable splitting of cold code when optimizing">;
 
+def mergeable_traps :
+  Flag<["-"], "mergeable-traps">,
+  HelpText<"Emit mergeable traps even in optimized builds">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
