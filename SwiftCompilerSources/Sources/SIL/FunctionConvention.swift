@@ -313,6 +313,7 @@ extension FunctionConvention {
       }
       if scope {
         let addressable = bridged.checkAddressable(bridgedIndex(parameterIndex: index))
+          || bridged.checkConditionallyAddressable(bridgedIndex(parameterIndex: index))
         return .scope(addressable: addressable)
       }
       return nil
