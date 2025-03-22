@@ -13,7 +13,7 @@
 // This file implements semantic analysis for declarations.
 //
 //===----------------------------------------------------------------------===//
-
+#include <type_traits>
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
@@ -3046,6 +3046,80 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   return false;
 }
 
+bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
+                                         NominalTypeDecl *nominal) {
+  // Pass-through only makes sense when the typealias refers to a nominal
+  // type.
+  if (!nominal) return false;
+
+  // Check that the nominal type and the typealias are either both generic
+  // at this level or neither are.
+  if (nominal->isGeneric() != typealias->isGeneric())
+    return false;
+
+  // Make sure either both have generic signatures or neither do.
+  auto nominalSig = nominal->getGenericSignature();
+  auto typealiasSig = typealias->getGenericSignature();
+  if (static_cast<bool>(nominalSig) != static_cast<bool>(typealiasSig))
+    return false;
+
+  // If neither is generic, we're done: it's a pass-through alias.
+  if (!nominalSig) return true;
+
+  // Check that the type parameters are the same the whole way through.
+//  auto nominalGenericParams = nominalSig.getGenericParams();
+//  auto typealiasGenericParams = typealiasSig.getGenericParams();
+//  if (nominalGenericParams.size() != typealiasGenericParams.size())
+//    return false;
+//  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
+//                  typealiasGenericParams.begin(),
+//                  [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+//                    return gp1->isEqual(gp2);
+//                  }))
+//    return false;
+
+  // If neither is generic at this level, we have a pass-through typealias.
+  if (!typealias->isGeneric()) return true;
+
+//  if (typealias->getUnderlyingType()->isEqual(
+//        nominal->getSelfInterfaceType())) {
+//    return true;
+//  }
+//
+
+  // here is my implementation
+  //
+  auto nominalGenericArguments = ((nominal->getDeclaredInterfaceType().getPointer())->getAs<BoundGenericType>())->getGenericArgs();
+  auto typealiasGenericArguments = ((typealias->getUnderlyingType().getPointer())->getAs<BoundGenericType>())->getGenericArgs();
+
+  if (nominalGenericArguments.size() !=typealiasGenericArguments.size()) {
+    //std::cerr << "Error: ArrayRefs must have the same size.\n";
+    return false;
+  }
+
+  bool supportedInferredType = false;
+  for (size_t i=0; i<nominalGenericArguments.size(); i++){
+    auto nominalBoundGenericType = nominalGenericArguments[i];
+    auto typealiasBoundGenericType = typealiasGenericArguments[i];
+  if(nominalBoundGenericType.getPointer()->getKind() == typealiasBoundGenericType.getPointer()->getKind() )
+    {
+     continue;
+    }
+
+    if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr && dyn_cast<StructType>(typealiasBoundGenericType) != nullptr)
+    {
+      supportedInferredType = true;
+    }
+    else
+    {
+      supportedInferredType = false;
+      break;
+    }
+  }
+
+  return supportedInferredType;
+}
+
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
@@ -3079,10 +3153,12 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto underlyingType = aliasDecl->getUnderlyingType();
       if (auto extendedNominal = underlyingType->getAnyNominal()) {
-        return TypeChecker::isPassThroughTypealias(
-                   aliasDecl, extendedNominal)
-                   ? extendedType
-                   : extendedNominal->getDeclaredType();
+        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal) || TypeChecker::isTypeInferredByTypealias(aliasDecl, extendedNominal)){
+          return extendedType;
+        }
+        else{
+          return extendedNominal->getDeclaredType();
+        }
       }
 
       if (underlyingType->is<TupleType>()) {
