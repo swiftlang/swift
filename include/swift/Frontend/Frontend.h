@@ -34,6 +34,7 @@
 #include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CachedDiagnostics.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/Frontend/DiagnosticVerifierOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IRGen/TBDGen.h"
@@ -97,6 +98,7 @@ class CompilerInvocation {
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
+  std::optional<DiagnosticVerifierOptions> DiagnosticVerifierOpts;
   MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
@@ -323,6 +325,14 @@ public:
   SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }
   const SearchPathOptions &getSearchPathOptions() const {
     return SearchPathOpts;
+  }
+
+  std::optional<DiagnosticVerifierOptions> &getDiagnosticVerifierOptions() {
+    return DiagnosticVerifierOpts;
+  }
+  const std::optional<DiagnosticVerifierOptions> &
+  getDiagnosticVerifierOptions() const {
+    return DiagnosticVerifierOpts;
   }
 
   DiagnosticOptions &getDiagnosticOptions() { return DiagnosticOpts; }

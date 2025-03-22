@@ -408,20 +408,18 @@ void CompilerInstance::setupStatsReporter() {
 }
 
 bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
-  auto &diagOpts = Invocation.getDiagnosticOptions();
-  bool hadError = false;
-
-  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    DiagVerifier = std::make_unique<DiagnosticVerifier>(
-        SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
-        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor,
-        diagOpts.AdditionalDiagnosticVerifierPrefixes);
-
-    addDiagnosticConsumer(DiagVerifier.get());
+  auto &diagVerifierOpts = Invocation.getDiagnosticVerifierOptions();
+  if (!diagVerifierOpts) {
+    return false;
   }
 
-  return hadError;
+  DiagVerifier = std::make_unique<DiagnosticVerifier>(
+      SourceMgr, InputSourceCodeBufferIDs, diagVerifierOpts.value(),
+      Invocation.getDiagnosticOptions().UseColor);
+
+  addDiagnosticConsumer(DiagVerifier.get());
+
+  return false;
 }
 
 void CompilerInstance::setupDependencyTrackerIfNeeded() {

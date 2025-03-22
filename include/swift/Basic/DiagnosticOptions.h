@@ -26,27 +26,10 @@ public:
   /// Indicates whether textual diagnostics should use color.
   bool UseColor = false;
 
-  /// Indicates whether the diagnostics produced during compilation should be
-  /// checked against expected diagnostics, indicated by markers in the
-  /// input source file.
-  enum {
-    NoVerify,
-    Verify,
-    VerifyAndApplyFixes
-  } VerifyMode = NoVerify;
-
   enum FormattingStyle { LLVM, Swift };
-
-  /// Indicates whether to allow diagnostics for \c <unknown> locations if
-  /// \c VerifyMode is not \c NoVerify.
-  bool VerifyIgnoreUnknown = false;
 
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
-
-  /// Additional non-source files which will have diagnostics emitted in them,
-  /// and which should be scanned for expectations by the diagnostic verifier.
-  std::vector<std::string> AdditionalVerifierFiles;
 
   /// Keep emitting subsequent diagnostics after a fatal error.
   bool ShowDiagnosticsAfterFatalError = false;
@@ -86,14 +69,6 @@ public:
 
   /// Path to a directory of diagnostic localization tables.
   std::string LocalizationPath = "";
-
-  /// A list of prefixes that are appended to expected- that the diagnostic
-  /// verifier should check for diagnostics.
-  ///
-  /// For example, if one placed the phrase "NAME", the verifier will check for:
-  /// expected-$NAME{error,note,warning,remark} as well as the normal expected-
-  /// prefixes.
-  std::vector<std::string> AdditionalDiagnosticVerifierPrefixes;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

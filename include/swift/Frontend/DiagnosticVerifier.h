@@ -18,9 +18,10 @@
 #ifndef SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
-#include "llvm/ADT/SmallString.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Frontend/DiagnosticVerifierOptions.h"
+#include "llvm/ADT/SmallString.h"
 
 namespace swift {
 class DependencyTracker;
@@ -92,22 +93,14 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   SourceManager &SM;
   std::vector<CapturedDiagnosticInfo> CapturedDiagnostics;
   ArrayRef<unsigned> BufferIDs;
-  ArrayRef<std::string> AdditionalFilePaths;
-  bool AutoApplyFixes;
-  bool IgnoreUnknown;
+  const DiagnosticVerifierOptions &Opts;
   bool UseColor;
-  ArrayRef<std::string> AdditionalExpectedPrefixes;
 
 public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                              ArrayRef<std::string> AdditionalFilePaths,
-                              bool AutoApplyFixes, bool IgnoreUnknown,
-                              bool UseColor,
-                              ArrayRef<std::string> AdditionalExpectedPrefixes)
-      : SM(SM), BufferIDs(BufferIDs), AdditionalFilePaths(AdditionalFilePaths),
-        AutoApplyFixes(AutoApplyFixes), IgnoreUnknown(IgnoreUnknown),
-        UseColor(UseColor),
-        AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
+                              const DiagnosticVerifierOptions &Opts,
+                              bool UseColor)
+      : SM(SM), BufferIDs(BufferIDs), Opts(Opts), UseColor(UseColor) {}
 
   virtual void handleDiagnostic(SourceManager &SM,
                                 const DiagnosticInfo &Info) override;
