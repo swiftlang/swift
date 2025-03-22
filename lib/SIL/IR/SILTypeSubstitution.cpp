@@ -250,6 +250,11 @@ public:
     if (!IFS.shouldSubstituteOpaqueArchetypes())
       extInfo = extInfo.intoBuilder().withIsPseudogeneric(false).build();
 
+    if (origType->hasLifetimeDependencies()) {
+      extInfo = substAddressableParams(origType, substParams,
+                                       extInfo.intoBuilder()).build();
+    }
+
     auto genericSig = IFS.shouldSubstituteOpaqueArchetypes()
                         ? origType->getInvocationGenericSignature()
                         : nullptr;
@@ -470,6 +475,58 @@ public:
     newSubs = substOpaqueTypes(newSubs);
 
     return newSubs;
+  }
+
+  SILExtInfoBuilder
+  substAddressableParams(CanSILFunctionType origType,
+                         ArrayRef<SILParameterInfo> substParams,
+                         SILExtInfoBuilder info) {
+    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+    auto origDeps = origType->getLifetimeDependencies();
+    for (unsigned targetIdx = 0; targetIdx < origDeps.size(); ++targetIdx) {
+      auto *scopedParams = origDeps[targetIdx].getScopeIndices();
+      if (!scopedParams) {
+        continue;
+      }
+      SmallBitVector condAddressableDeps;
+      unsigned numParams = substParams.size();
+      for (unsigned paramIdx = 0; paramIdx < numParams; ++paramIdx) {
+        if (!scopedParams->contains(paramIdx))
+          continue;
+        
+        //!!! no idea if this it is correct to use the interface type and ask
+        //!!! for a lowered type without an abstraction pattern or generic
+        //!!! signature.
+        CanType substTy = substParams[paramIdx].getInterfaceType();
+        auto &substTL = TC.getTypeLowering(substTy, typeExpansionContext);
+        if (substTL.getRecursiveProperties().isAddressableForDependencies()) {
+          condAddressableDeps.resize(numParams);
+          condAddressableDeps.set(paramIdx);
+        }
+      }
+      IndexSubset *origCondAddressable =
+        origDeps[targetIdx].getConditionallyAddressableIndices();
+      if (origCondAddressable) {
+        if (origCondAddressable->getBitVector() == condAddressableDeps)
+          continue;
+      } else if (condAddressableDeps.empty()) {
+        continue;
+      }
+      IndexSubset *condAddressableSet = condAddressableDeps.any()
+        ? IndexSubset::get(TC.Context, condAddressableDeps)
+        : nullptr;
+      if (lifetimeDependencies.empty()) {
+        lifetimeDependencies.append(origDeps.begin(), origDeps.end());
+      }
+      lifetimeDependencies[targetIdx] =
+        origDeps[targetIdx].withConditionallyAddressableIndices(
+          condAddressableSet);
+    }
+    if (lifetimeDependencies.empty())
+      return info;
+        
+    return info.withLifetimeDependencies(
+      TC.Context.AllocateCopy(lifetimeDependencies));
   }
 };
 
