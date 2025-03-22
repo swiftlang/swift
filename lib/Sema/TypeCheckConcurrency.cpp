@@ -3484,14 +3484,16 @@ namespace {
           }
         }
 
-        // Check for an 'async let' autoclosure.
         if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
           switch (autoclosure->getThunkKind()) {
           case AutoClosureExpr::Kind::AsyncLet:
+            // Check for an 'async let' autoclosure.
             return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::AsyncLet);
-
           case AutoClosureExpr::Kind::DoubleCurryThunk:
           case AutoClosureExpr::Kind::SingleCurryThunk:
+            // Curried thunks inherit actor isolation but referencing the thunked 
+            // fn shouldn't cause a data race until the fn is actually applied
+            return ReferencedActor(var, isPotentiallyIsolated, specificNonIsoClosureKind(dc));
           case AutoClosureExpr::Kind::None:
             break;
           }
