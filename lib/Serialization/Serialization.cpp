@@ -3093,7 +3093,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::Available: {
       auto theAttr = D->getSemanticAvailableAttr(cast<AvailableAttr>(DA));
-      assert(theAttr);
+
+      // In lazy typechecking mode, it's possible that we just discovered that
+      // the attribute is invalid.
+      if (!theAttr)
+        return;
 
       ENCODE_VER_TUPLE(Introduced, theAttr->getIntroduced())
       ENCODE_VER_TUPLE(Deprecated, theAttr->getDeprecated())
