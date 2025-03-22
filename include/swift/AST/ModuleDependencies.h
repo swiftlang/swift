@@ -1149,8 +1149,10 @@ private:
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
   std::string scannerContextHash;
-  /// The location of where the built modules will be output to
+  /// The location of where the explicitly-built modules will be output to
   std::string moduleOutputPath;
+  /// The location of where the explicitly-built SDK modules will be output to
+  std::string sdkModuleOutputPath;
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
@@ -1164,9 +1166,10 @@ private:
 
 public:
   ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
-                          std::string mainScanModuleName,
-                          std::string moduleOutputPath,
-                          std::string scanningContextHash);
+                          const std::string &mainScanModuleName,
+                          const std::string &moduleOutputPath,
+                          const std::string &sdkModuleOutputPath,
+                          const std::string &scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
 
@@ -1199,7 +1202,8 @@ public:
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  std::string getModuleOutputPath() const { return moduleOutputPath; }
+  StringRef getModuleOutputPath() const { return moduleOutputPath; }
+  StringRef getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
 
   /// Query all dependencies
   ModuleDependencyIDSetVector

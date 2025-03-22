@@ -866,7 +866,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         std::make_unique<PlaceholderSwiftModuleScanner>(
             *Context, MLM, mainModuleName,
             Context->SearchPathOpts.PlaceholderDependencyModuleMap, ASTDelegate,
-            getInvocation().getFrontendOptions().ExplicitModulesOutputPath);
+            getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+            getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath);
     Context->addModuleLoader(std::move(PSMS));
   }
 

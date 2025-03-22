@@ -156,7 +156,7 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
 
 ModuleDependencyVector
 SourceLoader::getModuleDependencies(Identifier moduleName,
-                                    StringRef moduleOutputPath,
+                                    StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                                     const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                                     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                     InterfaceSubContextDelegate &delegate,

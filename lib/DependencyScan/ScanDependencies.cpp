@@ -1168,6 +1168,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
   ModuleDependenciesCache cache(
       *service, CI.getMainModule()->getNameStr().str(),
       CI.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      CI.getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       CI.getInvocation().getModuleScanningHash());
 
   if (service->setupCachingDependencyScanningService(CI))
@@ -1203,6 +1204,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   ModuleDependenciesCache cache(
       *singleUseService, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
   // Execute import prescan, and write JSON output to the output stream
