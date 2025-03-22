@@ -8249,8 +8249,11 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 
   llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  Builder.CreateCondBr(expectedCond, failBB, contBB);
-    
+  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
+
+  if (IGM.getOptions().AnnotateCondFailMessage && !i->getMessage().empty())
+    br->addAnnotationMetadata(i->getMessage());
+
   Builder.SetInsertPoint(&CurFn->back());
   Builder.emitBlock(failBB);
   if (IGM.DebugInfo)
