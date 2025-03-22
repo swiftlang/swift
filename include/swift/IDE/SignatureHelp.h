@@ -58,27 +58,6 @@ struct SignatureHelpResult {
   SignatureHelpResult(DeclContext *DC) : DC(DC) {}
 };
 
-class SignatureHelpCallback : public TypeCheckCompletionCallback {
-  using Result = SignatureHelpResult::Signature;
-  
-  CodeCompletionExpr *CompletionExpr;
-
-  SmallVector<Result, 4> Results;
-
-  void sawSolutionImpl(const constraints::Solution &solution) override;
-
-  /// Populates \p ShadowedDecls with all \c FuncD in \p Results that are
-  /// defined in protocol extensions but redeclared on a nominal type and thus
-  /// cannot be accessed
-  void computeShadowedDecls(SmallPtrSetImpl<ValueDecl *> &ShadowedDecls);
-
-public:
-  SignatureHelpCallback(CodeCompletionExpr *CompletionExpr)
-      : CompletionExpr(CompletionExpr) {}
-
-  SignatureHelpResult collectResults(SourceLoc Loc, DeclContext *DC);
-};
-
 /// An abstract base class for consumers of signatures results.
 class SignatureHelpConsumer {
 public:
