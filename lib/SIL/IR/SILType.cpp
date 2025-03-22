@@ -1148,6 +1148,13 @@ bool SILType::isMarkedAsImmortal() const {
   return false;
 }
 
+bool SILType::isAddressableForDeps(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto &tl = function.getTypeLowering(contextType);
+  return tl.getRecursiveProperties().isAddressableForDependencies();
+}
+
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
   auto *nominal = getNominalOrBoundGenericNominal();
   if (!nominal)
