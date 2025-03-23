@@ -5982,6 +5982,14 @@ public:
     serializeSimpleWrapper<ArraySliceTypeLayout>(sliceTy->getBaseType());
   }
 
+  void visitInlineArrayType(const InlineArrayType *T) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[InlineArrayTypeLayout::Code];
+    InlineArrayTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(T->getCountType()),
+                                      S.addTypeRef(T->getElementType()));
+  }
+
   void visitDictionaryType(const DictionaryType *dictTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[DictionaryTypeLayout::Code];

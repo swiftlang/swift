@@ -590,6 +590,10 @@ struct PrintOptions {
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
 
+  /// Whether to always desugar inline array types from
+  /// `[<count> x <element>]` to `InlineArray<count, element>`
+  bool AlwaysDesugarInlineArrayTypes = false;
+
   /// Whether to always desugar dictionary types
   /// from `[key_type:value_type]` to `Dictionary<key_type,value_type>`
   bool AlwaysDesugarDictionaryTypes = false;

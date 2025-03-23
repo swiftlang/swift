@@ -878,6 +878,10 @@ NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
 NOTE(subscript_array_element_fix_it_remove_space, none,
      "remove the space between the elements to silence this warning", ())
 
+// Inline Array
+ERROR(expected_rsquare_inline_array,none,
+      "expected ']' in inline array type", ())
+
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
       "expected ')' at end of tuple list", ())

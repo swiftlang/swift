@@ -79,6 +79,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.ABIAttribute, to: .abiAttribute)
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
     mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
+    mapFeature(.InlineArrayTypeSugar, to: .inlineArrayTypeSugar)
   }
 }
 

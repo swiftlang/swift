@@ -38,6 +38,8 @@ extension ASTGenVisitor {
       return self.generate(functionType: node).asTypeRepr
     case .identifierType(let node):
       return self.generate(identifierType: node)
+    case .inlineArrayType(let node):
+      return self.generate(inlineArrayType: node).asTypeRepr
     case .implicitlyUnwrappedOptionalType(let node):
       return self.generate(implicitlyUnwrappedOptionalType: node).asTypeRepr
     case .memberType(let node):
@@ -100,6 +102,18 @@ extension ASTGenVisitor {
       leftAngleLoc: self.generateSourceLoc(generics.leftAngle),
       rightAngleLoc: self.generateSourceLoc(generics.rightAngle)
     ).asTypeRepr
+  }
+
+  func generate(inlineArrayType node: InlineArrayTypeSyntax) -> BridgedInlineArrayTypeRepr {
+    .createParsed(
+      self.ctx,
+      count: self.generate(genericArgument: node.count.argument),
+      element: self.generate(genericArgument: node.element.argument),
+      brackets: BridgedSourceRange(
+        start: self.generateSourceLoc(node.leftSquare),
+        end: self.generateSourceLoc(node.rightSquare)
+      )
+    )
   }
 
   func generate(memberType node: MemberTypeSyntax) -> BridgedDeclRefTypeRepr {

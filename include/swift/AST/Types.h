@@ -6197,6 +6197,27 @@ public:
   }
 };
 
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayType : public SyntaxSugarType {
+  Type Count;
+  Type Elt;
+
+  InlineArrayType(const ASTContext &ctx, Type count, Type elt,
+                  RecursiveTypeProperties properties)
+      : SyntaxSugarType(TypeKind::InlineArray, ctx, properties), Count(count),
+        Elt(elt) {}
+
+public:
+  static InlineArrayType *get(Type count, Type elt);
+
+  Type getCountType() const { return Count; }
+  Type getElementType() const { return Elt; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::InlineArray;
+  }
+};
+
 /// The type T?, which is always sugar for a library type.
 class OptionalType : public UnarySyntaxSugarType {
   OptionalType(const ASTContext &ctx,Type base,
