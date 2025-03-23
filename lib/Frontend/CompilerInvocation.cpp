@@ -969,6 +969,9 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_strict_memory_safety))
     Opts.enableFeature(Feature::StrictMemorySafety);
 
+  if (Opts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated))
+    Opts.enableFeature(Feature::InferIsolatedConformances);
+
   return HadError;
 }
 
