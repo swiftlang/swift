@@ -7934,15 +7934,14 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
     return ActorIsolation::forNonisolated(false);
 
-  // In a context where we are inferring @MainActor, if the conforming type
-  // is on the main actor, then the conformance is, too.
+  // If we are inferring isolated conformances and the conforming type is
+  // isolated to a global actor,
   auto nominal = dc->getSelfNominalTypeDecl();
-  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+  if (ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances) &&
       nominal) {
     auto nominalIsolation = getActorIsolation(nominal);
-    if (nominalIsolation.isMainActor()) {
+    if (nominalIsolation.isGlobalActor())
       return nominalIsolation;
-    }
   }
 
   return ActorIsolation::forNonisolated(false);
