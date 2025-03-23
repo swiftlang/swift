@@ -770,7 +770,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // generic parameter representing Self, so the generic parameters of the
   // class will all be shifted down by one.
   if (reqtSubMap) {
-    auto requirement = conformance.getRequirement();
+    auto requirement = conformance.getProtocol();
     auto self = requirement->getSelfInterfaceType()->getCanonicalType();
 
     conformance = reqtSubMap.lookupConformance(self, requirement);

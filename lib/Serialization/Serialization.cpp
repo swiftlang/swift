@@ -2087,8 +2087,8 @@ Serializer::writeASTBlockEntity(AbstractConformance *conformance) {
   AbstractConformanceLayout::emitRecord(
       Out, ScratchRecord,
       abbrCode,
-      addTypeRef(conformanceRef.getConformingType()),
-      addDeclRef(conformanceRef.getRequirement()));
+      addTypeRef(conformanceRef.getType()),
+      addDeclRef(conformanceRef.getProtocol()));
 }
 
 void

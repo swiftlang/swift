@@ -43,7 +43,7 @@ bool ProtocolConformanceRef::isInvalid() const {
   return false;
 }
 
-Type ProtocolConformanceRef::getConformingType() const {
+Type ProtocolConformanceRef::getType() const {
   if (isInvalid())
     return Type();
 
@@ -53,16 +53,16 @@ Type ProtocolConformanceRef::getConformingType() const {
   if (isPack())
     return Type(getPack()->getType());
 
-  return getAbstract()->getConformingType();
+  return getAbstract()->getType();
 }
 
-ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
+ProtocolDecl *ProtocolConformanceRef::getProtocol() const {
   if (isConcrete()) {
     return getConcrete()->getProtocol();
   } else if (isPack()) {
     return getPack()->getProtocol();
   } else {
-    return getAbstract()->getRequirement();
+    return getAbstract()->getProtocol();
   }
 }
 
@@ -107,7 +107,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(IFS);
 
-  auto *proto = getRequirement();
+  auto *proto = getProtocol();
 
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
@@ -156,7 +156,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   assert(!isInvalid());
 
   // Find the named requirement.
-  ProtocolDecl *proto = getRequirement();
+  ProtocolDecl *proto = getProtocol();
   auto *assocType = proto->getAssociatedType(name);
 
   // FIXME: Shouldn't this be a hard error?
@@ -169,7 +169,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
 ConcreteDeclRef
 ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   // Find the named requirement.
-  auto *proto = getRequirement();
+  auto *proto = getProtocol();
   auto *requirement = proto->getSingleRequirement(name);
   if (requirement == nullptr)
     return ConcreteDeclRef();
@@ -210,7 +210,7 @@ Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
   if (isInvalid())
     return failed();
 
-  auto proto = getRequirement();
+  auto proto = getProtocol();
   ASSERT(assocType->getProtocol() == proto);
 
   if (isConcrete()) {
@@ -239,7 +239,7 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
   if (isInvalid())
     return ErrorType::get(assocType->getASTContext());
 
-  auto proto = getRequirement();
+  auto proto = getProtocol();
 
   auto substMap =
     SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
@@ -313,7 +313,7 @@ bool ProtocolConformanceRef::isCanonical() const {
     return getPack()->isCanonical();
 
   if (isAbstract()) {
-    Type conformingType = getConformingType();
+    Type conformingType = getType();
     return !conformingType || conformingType->isCanonical();
   }
 
@@ -329,10 +329,10 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
     return ProtocolConformanceRef(getPack()->getCanonicalConformance());
 
   if (isAbstract()) {
-    Type conformingType = getConformingType();
+    Type conformingType = getType();
     if (conformingType)
       conformingType = conformingType->getCanonicalType();
-    return forAbstract(conformingType, getRequirement());
+    return forAbstract(conformingType, getProtocol());
   }
 
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
@@ -445,7 +445,7 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
 
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
-    simple_display(out, conformanceRef.getRequirement());
+    simple_display(out, conformanceRef.getProtocol());
   } else if (conformanceRef.isConcrete()) {
     simple_display(out, conformanceRef.getConcrete());
   } else if (conformanceRef.isPack()) {
@@ -455,7 +455,7 @@ void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef confor
 
 SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
-    return extractNearestSourceLoc(conformanceRef.getRequirement());
+    return extractNearestSourceLoc(conformanceRef.getProtocol());
   } else if (conformanceRef.isConcrete()) {
     return extractNearestSourceLoc(conformanceRef.getConcrete());
   }

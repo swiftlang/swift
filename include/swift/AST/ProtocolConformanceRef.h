@@ -179,10 +179,10 @@ public:
   }
 
   /// Retrieve the conforming type.
-  Type getConformingType() const;
+  Type getType() const;
 
   /// Return the protocol requirement.
-  ProtocolDecl *getRequirement() const;
+  ProtocolDecl *getProtocol() const;
   
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,

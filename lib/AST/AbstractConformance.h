@@ -29,11 +29,11 @@ public:
   AbstractConformance(Type conformingType, ProtocolDecl *requirement)
     : conformingType(conformingType), requirement(requirement) { }
 
-  Type getConformingType() const { return conformingType; }
-  ProtocolDecl *getRequirement() const { return requirement; }
+  Type getType() const { return conformingType; }
+  ProtocolDecl *getProtocol() const { return requirement; }
 
   void Profile(llvm::FoldingSetNodeID &id) const {
-    Profile(id, getConformingType(), getRequirement());
+    Profile(id, getType(), getProtocol());
   }
 
   /// Profile the substitution map storage, for use with LLVM's FoldingSet.

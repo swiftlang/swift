@@ -273,7 +273,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         auto iter =
             llvm::find_if(ExistentialConformances,
                           [&](const ProtocolConformanceRef &conformance) {
-                            return conformance.getRequirement() == proto;
+                            return conformance.getProtocol() == proto;
                           });
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;

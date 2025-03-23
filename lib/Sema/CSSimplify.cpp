@@ -8710,7 +8710,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If we aren't allowed to have an isolated conformance, check for any
     // isolated conformances here.
     if (kind == ConstraintKind::NonisolatedConformsTo &&
-        !conformance.getRequirement()->isMarkerProtocol()) {
+        !conformance.getProtocol()->isMarkerProtocol()) {
       // Grab the first isolated conformance, if there is one.
       ProtocolConformanceRef isolatedConformance;
       conformance.forEachIsolatedConformance([&](ProtocolConformanceRef conf) {

@@ -1019,7 +1019,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::WitnessMethod: {
       auto conformance =
           as.getOrigCalleeType()->getWitnessMethodConformanceOrInvalid();
-      if (conformance.getRequirement()->requiresClass()) {
+      if (conformance.getProtocol()->requiresClass()) {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
       } else {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
