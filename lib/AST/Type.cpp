@@ -1997,6 +1997,9 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
     break;
+  case TypeKind::InlineArray:
+    implDecl = Context->getInlineArrayDecl();
+    break;
   case TypeKind::Optional:
     implDecl = Context->getOptionalDecl();
     break;
@@ -2012,8 +2015,11 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
     UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
   } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
-    UnderlyingType = BoundGenericType::get(implDecl, Type(),
-                                      { Ty->getKeyType(), Ty->getValueType() });
+    UnderlyingType = BoundGenericType::get(
+        implDecl, Type(), {Ty->getKeyType(), Ty->getValueType()});
+  } else if (auto Ty = dyn_cast<InlineArrayType>(this)) {
+    UnderlyingType = BoundGenericType::get(
+        implDecl, Type(), {Ty->getCountType(), Ty->getElementType()});
   } else {
     llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }

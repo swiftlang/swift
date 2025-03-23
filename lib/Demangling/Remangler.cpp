@@ -3808,6 +3808,14 @@ ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleSugaredInlineArray(Node *node, unsigned int depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
+  Buffer << "XSA";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleSugaredDictionary(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
   RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));

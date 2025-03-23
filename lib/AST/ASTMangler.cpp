@@ -1574,6 +1574,18 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendOperator("XSa");
       return;
 
+    case TypeKind::InlineArray: {
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      auto *T = cast<InlineArrayType>(tybase);
+      appendType(T->getCountType(), sig, forDecl);
+      appendType(T->getElementType(), sig, forDecl);
+      // Note we don't have a known-type mangling for InlineArray, we can
+      // use 'A' since it's incredibly unlikely
+      // AutoreleasingUnsafeMutablePointer will ever receive type sugar.
+      appendOperator("XSA");
+      return;
+    }
+
     case TypeKind::VariadicSequence:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<VariadicSequenceType>(tybase)->getBaseType(), sig, forDecl);

@@ -746,8 +746,29 @@ namespace {
   /// to see if it's a valid parameter for integer arguments or other value
   /// generic parameters.
   class ValueMatchVisitor : public TypeMatcher<ValueMatchVisitor> {
-  public:
     ValueMatchVisitor() {}
+
+  public:
+    static bool check(ASTContext &ctx, Type paramTy, Type argTy,
+                      SourceLoc loc) {
+      auto matcher = ValueMatchVisitor();
+      if (argTy->hasError() || matcher.match(paramTy, argTy))
+        return false;
+
+      // If the parameter is a value, then we're trying to substitute a
+      // non-value type like 'Int' or 'T' to our value.
+      if (paramTy->isValueParameter()) {
+        ctx.Diags.diagnose(loc, diag::cannot_pass_type_for_value_generic,
+                           argTy, paramTy);
+      } else {
+        // Otherwise, we're trying to use a value type (either an integer
+        // directly or another generic value parameter) for a non-value
+        // parameter.
+        ctx.Diags.diagnose(loc, diag::value_type_used_in_type_parameter,
+                           argTy, paramTy);
+      }
+      return true;
+    }
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
@@ -763,8 +784,17 @@ namespace {
         if (secondType->is<PlaceholderType>())
           return true;
 
+        // For type variable substitutions, the constraint system should
+        // handle any mismatches (currently this only happens for unbound
+        // opening though).
+        if (secondType->isTypeVariableOrMember())
+          return true;
+
         return false;
       }
+
+      if (secondType->is<IntegerType>())
+        return false;
 
       return true;
     }
@@ -1019,11 +1049,6 @@ static Type applyGenericArguments(Type type,
       return ErrorType::get(ctx);
 
     args.push_back(substTy);
-
-    // The type we're binding to may not have value parameters, but one of the
-    // arguments may be a value parameter so diagnose this situation as well.
-    if (substTy->isValueParameter())
-      hasValueParam = true;
   }
 
   // Make sure we have the right number of generic arguments.
@@ -1093,31 +1118,6 @@ static Type applyGenericArguments(Type type,
     }
   }
 
-  if (hasValueParam) {
-    ValueMatchVisitor matcher;
-
-    for (auto i : indices(genericParams->getParams())) {
-      auto param = genericParams->getParams()[i]->getDeclaredInterfaceType();
-      auto arg = args[i];
-
-      if (!matcher.match(param, arg)) {
-        // If the parameter is a value, then we're trying to substitute a
-        // non-value type like 'Int' or 'T' to our value.
-        if (param->isValueParameter()) {
-          diags.diagnose(loc, diag::cannot_pass_type_for_value_generic, arg, param);
-          return ErrorType::get(ctx);
-
-        // Otherwise, we're trying to use a value type (either an integer
-        // directly or another generic value parameter) for a non-value
-        // parameter.
-        } else {
-          diags.diagnose(loc, diag::value_type_used_in_type_parameter, arg, param);
-          return ErrorType::get(ctx);
-        }
-      }
-    }
-  }
-
   // Construct the substituted type.
   const auto result = resolution.applyUnboundGenericArguments(
       decl, unboundType->getParent(), loc, args);
@@ -1183,6 +1183,7 @@ Type TypeResolution::applyUnboundGenericArguments(
          "invalid arguments, use applyGenericArguments to emit diagnostics "
          "and collect arguments to pack generic parameters");
 
+  auto &ctx = getASTContext();
   TypeSubstitutionMap subs;
 
   // Get the interface type for the declaration. We will be substituting
@@ -1241,12 +1242,16 @@ Type TypeResolution::applyUnboundGenericArguments(
   auto innerParams = decl->getGenericParams()->getParams();
   for (unsigned i : indices(innerParams)) {
     auto origTy = innerParams[i]->getDeclaredInterfaceType();
-    auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
+    auto paramTy = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
     auto substTy = genericArgs[i];
 
-    // Enter a substitution.
-    subs[origGP] = substTy;
+    // Ensure the value-ness of the argument matches the parameter.
+    if (ValueMatchVisitor::check(ctx, origTy, substTy, loc))
+      substTy = ErrorType::get(ctx);
+
+    // Enter the substitution.
+    subs[paramTy] = substTy;
 
     skipRequirementsCheck |=
         substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
@@ -1289,13 +1294,13 @@ Type TypeResolution::applyUnboundGenericArguments(
       if (loc.isValid()) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), loc, noteLoc,
-            UnboundGenericType::get(decl, parentTy, getASTContext()),
+            UnboundGenericType::get(decl, parentTy, ctx),
             genericSig.getGenericParams(), substitutions);
       }
 
       LLVM_FALLTHROUGH;
     case CheckRequirementsResult::SubstitutionFailure:
-      return ErrorType::get(getASTContext());
+      return ErrorType::get(ctx);
     case CheckRequirementsResult::Success:
       break;
     }
@@ -2332,6 +2337,8 @@ namespace {
                                          TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
+    NeverNullType resolveInlineArrayType(InlineArrayTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
                                         TypeResolutionOptions options);
     NeverNullType resolveOptionalType(OptionalTypeRepr *repr,
@@ -2769,6 +2776,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), options);
+
+  case TypeReprKind::InlineArray:
+    return resolveInlineArrayType(cast<InlineArrayTypeRepr>(repr), options);
 
   case TypeReprKind::Dictionary:
     return resolveDictionaryType(cast<DictionaryTypeRepr>(repr), options);
@@ -5259,6 +5269,53 @@ TypeResolver::resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr
   return resolveType(repr->getBase(), options);
 }
 
+NeverNullType
+TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  ASTContext &ctx = getASTContext();
+  auto argOptions = options.withoutContext().withContext(
+      TypeResolverContext::ValueGenericArgument);
+
+  // It's possible the user accidentally wrote '[Int x 4]', correct that here.
+  auto *countRepr = repr->getCount();
+  auto *eltRepr = repr->getElement();
+  if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
+    std::swap(countRepr, eltRepr);
+    ctx.Diags
+        .diagnose(countRepr->getStartLoc(), diag::inline_array_type_backwards)
+        .fixItExchange(countRepr->getSourceRange(), eltRepr->getSourceRange());
+  }
+
+  auto countTy = resolveType(countRepr, argOptions);
+  if (countTy->hasError())
+    return ErrorType::get(getASTContext());
+
+  auto eltTy = resolveType(eltRepr, argOptions);
+  if (eltTy->hasError())
+    return ErrorType::get(getASTContext());
+
+  {
+    // If the standard library isn't loaded, we ought to let the user know
+    // something has gone terribly wrong, since it will otherwise break
+    // type canonicalization.
+    auto *inlineArrayDecl = ctx.getInlineArrayDecl();
+    if (!inlineArrayDecl) {
+      ctx.Diags.diagnose(repr->getBrackets().Start, diag::sugar_type_not_found,
+                         2);
+      return ErrorType::get(ctx);
+    }
+
+    // Make sure we can substitute the generic args.
+    auto ty = resolution.applyUnboundGenericArguments(
+        inlineArrayDecl,
+        /*parentTy=*/nullptr, repr->getStartLoc(), {countTy, eltTy});
+    if (ty->hasError())
+      return ErrorType::get(ctx);
+  }
+
+  return InlineArrayType::get(countTy, eltTy);
+}
+
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                              TypeResolutionOptions options) {
   auto baseTy = resolveType(repr->getBase(), options.withoutContext());
@@ -6306,6 +6363,7 @@ private:
     case TypeReprKind::Fixed:
     case TypeReprKind::Self:
     case TypeReprKind::Array:
+    case TypeReprKind::InlineArray:
     case TypeReprKind::SILBox:
     case TypeReprKind::Isolated:
     case TypeReprKind::Sending:

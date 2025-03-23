@@ -92,6 +92,7 @@ std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
   Options.FullyQualifiedTypes = true;
   Options.PreferTypeRepr = true;
   Options.AlwaysDesugarArraySliceTypes = true;
+  Options.AlwaysDesugarInlineArrayTypes = true;
   Options.AlwaysDesugarDictionaryTypes = true;
   Options.AlwaysDesugarOptionalTypes = true;
   Options.PrintTypeAliasUnderlyingType = true;

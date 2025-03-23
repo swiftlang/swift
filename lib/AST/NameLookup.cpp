@@ -3167,6 +3167,10 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     result.first.push_back(ctx.getArrayDecl());
     return result;
 
+  case TypeReprKind::InlineArray:
+    result.first.push_back(ctx.getInlineArrayDecl());
+    return result;
+
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
