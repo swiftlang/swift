@@ -897,9 +897,16 @@ std::optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
 }
 
 SourceFile *CompilerInstance::getIDEInspectionFile() const {
+  ASSERT(SourceMgr.hasIDEInspectionTargetBuffer() &&
+         "Not in IDE inspection mode?");
+
   auto *mod = getMainModule();
-  auto &eval = mod->getASTContext().evaluator;
-  return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
+  auto bufferID = SourceMgr.getIDEInspectionTargetBufferID();
+  for (auto *SF : SourceMgr.getSourceFilesForBufferID(bufferID)) {
+    if (SF->getParentModule() == mod)
+      return SF;
+  }
+  llvm_unreachable("Couldn't find IDE inspection file?");
 }
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
