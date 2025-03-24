@@ -348,13 +348,22 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  // Need a conditional branch that guards the entry into the loop.
-  auto *loopEntryBranch = dyn_cast<CondBranchInst>(header->getTerminator());
-  if (!loopEntryBranch)
+  SILBasicBlock *newHeader = nullptr;
+  SILBasicBlock *exit = nullptr;
+  auto *loopEntryBranch = dyn_cast<TermInst>(header->getTerminator());
+  if (auto *switchEnum = dyn_cast<SwitchEnumInst>(loopEntryBranch)) {
+    if (switchEnum->getNumCases() != 2) {
+      return false;
+    }
+    newHeader = switchEnum->getCase(0).second;
+    exit = switchEnum->getCase(1).second;
+  } else if (auto *condBranch = dyn_cast<CondBranchInst>(loopEntryBranch)) {
+    newHeader = condBranch->getTrueBB();
+    exit = condBranch->getFalseBB();
+  } else {
     return false;
+  }
 
-  auto *newHeader = loopEntryBranch->getTrueBB();
-  auto *exit = loopEntryBranch->getFalseBB();
   if (loop->contains(exit)) {
     std::swap(newHeader, exit);
   }
@@ -447,7 +456,6 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // If there were any uses of instructions in the duplicated loop entry check
   // block rewrite them using the ssa updater.
-  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
 
   loop->moveToHeader(newHeader);
 
@@ -467,14 +475,18 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // the latch.
   header->getParent()->moveBlockAfter(header, latch);
 
-  // Merge the old latch with the old header if possible.
-  if (mergeBasicBlockWithSuccessor(latch, domInfo, loopInfo))
-    newHeader = latch; // The old Header is gone. Latch is now the Header.
-
   // Cloning the header into the preheader created critical edges from the
   // preheader and original header to both the new header and loop exit.
   splitCriticalEdgesFrom(preheader, domInfo, loopInfo);
   splitCriticalEdgesFrom(newHeader, domInfo, loopInfo);
+  splitCriticalEdgesFrom(header, domInfo, loopInfo);
+
+  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
+
+  // Merge the old latch with the old header if possible.
+  if (mergeBasicBlockWithSuccessor(latch, domInfo, loopInfo)) {
+    newHeader = latch; // The old Header is gone. Latch is now the Header.
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "  to " << *loop);
   LLVM_DEBUG(loop->getHeader()->getParent()->dump());
