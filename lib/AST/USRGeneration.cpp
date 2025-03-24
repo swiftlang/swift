@@ -20,7 +20,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -192,8 +191,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
     return std::string(); // Ignore.
 
   auto interpretAsClangNode = [&options](const ValueDecl *D) -> ClangNode {
-    auto &ctx = D->getASTContext();
-    auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+    auto *importer = D->getASTContext().getClangModuleLoader();
     ClangNode ClangN = importer->getEffectiveClangNode(D);
     if (auto ClangD = ClangN.getAsDecl()) {
       // NSErrorDomain causes the clang enum to be imported like this:

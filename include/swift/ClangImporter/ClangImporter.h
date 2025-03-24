@@ -330,7 +330,7 @@ public:
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
-  ClangNode getEffectiveClangNode(const Decl *decl) const;
+  ClangNode getEffectiveClangNode(const Decl *decl) const override;
 
   /// Look for textually included declarations from the bridging header.
   ///
