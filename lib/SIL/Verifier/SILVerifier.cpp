@@ -35,6 +35,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -918,6 +919,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
   std::unique_ptr<DominanceInfo> Dominance;
+  std::unique_ptr<SILLoopInfo> loopInfo;
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
@@ -1193,13 +1195,11 @@ public:
 
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
               bool SingleFunction, bool checkLinearLifetime)
-      : M(F.getModule().getSwiftModule()), F(F),
-        calleeCache(calleeCache),
+      : M(F.getModule().getSwiftModule()), F(F), calleeCache(calleeCache),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
         SingleFunction(SingleFunction),
-        checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)) {
+        checkLinearLifetime(checkLinearLifetime), Dominance(nullptr),
+        loopInfo(nullptr), InstNumbers(numInstsInFunction(F)) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1215,6 +1215,9 @@ public:
     }
 
     Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
+
+    loopInfo.reset(
+        new SILLoopInfo(const_cast<SILFunction *>(&F), Dominance.get()));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
@@ -7364,6 +7367,8 @@ public:
         !mod.getASTContext().hadError()) {
       F->verifyMemoryLifetime(calleeCache);
     }
+
+    verifyReducibleLoops(F);
   }
 
   void verify(bool isCompleteOSSA) {
@@ -7371,6 +7376,19 @@ public:
       DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
+  }
+
+  void verifyReducibleLoops(SILFunction *func) {
+    SmallPtrSet<SILBasicBlock *, 4> loopHeaders;
+    findLoopHeaders(loopHeaders, func);
+
+    for (auto *loopHeader : loopHeaders) {
+      auto *loop = loopInfo->getLoopFor(loopHeader);
+      if (!loop) {
+        loopHeader->dump();
+        require(false, "irreducible loop?");
+      }
+    }
   }
 };
 } // end anonymous namespace

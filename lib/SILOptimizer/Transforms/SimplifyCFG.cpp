@@ -821,45 +821,6 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget,
   return false;
 }
 
-void SimplifyCFG::findLoopHeaders() {
-  /// Find back edges in the CFG. This performs a dfs search and identifies
-  /// back edges as edges going to an ancestor in the dfs search. If a basic
-  /// block is the target of such a back edge we will identify it as a header.
-  LoopHeaders.clear();
-
-  BasicBlockSet Visited(&Fn);
-  BasicBlockSet InDFSStack(&Fn);
-  SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::succ_iterator>, 16>
-      DFSStack;
-
-  auto EntryBB = &Fn.front();
-  DFSStack.push_back(std::make_pair(EntryBB, EntryBB->succ_begin()));
-  Visited.insert(EntryBB);
-  InDFSStack.insert(EntryBB);
-
-  while (!DFSStack.empty()) {
-    auto &D = DFSStack.back();
-    // No successors.
-    if (D.second == D.first->succ_end()) {
-      // Retreat the dfs search.
-      DFSStack.pop_back();
-      InDFSStack.erase(D.first);
-    } else {
-      // Visit the next successor.
-      SILBasicBlock *NextSucc = *(D.second);
-      ++D.second;
-      if (Visited.insert(NextSucc)) {
-        InDFSStack.insert(NextSucc);
-        DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
-      } else if (InDFSStack.contains(NextSucc)) {
-        // We have already visited this node and it is in our dfs search. This
-        // is a back-edge.
-        LoopHeaders.insert(NextSucc);
-      }
-    }
-  }
-}
-
 static bool couldRemoveRelease(SILBasicBlock *SrcBB, SILValue SrcV,
                                SILBasicBlock *DestBB, SILValue DestV) {
   bool IsRetainOfSrc = false;
@@ -1062,7 +1023,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // avoid infinite loop peeling.
   if (DestIsLoopHeader) {
     ClonedLoopHeaders.insert(Cloner.getNewBB());
-    findLoopHeaders();
+    findLoopHeaders(LoopHeaders, &Fn);
   }
 
   ++NumJumpThreads;
@@ -3335,7 +3296,7 @@ bool SimplifyCFG::run() {
   deBlocks = deBlocksAnalysis->get(&Fn);
 
   // Find the set of loop headers. We don't want to jump-thread through headers.
-  findLoopHeaders();
+  findLoopHeaders(LoopHeaders, &Fn);
 
   DT = nullptr;
   if (!transform.continueWithNextSubpassRun())

@@ -593,3 +593,43 @@ swift::checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock) {
   return reaches;
 }
 #endif
+
+void swift::findLoopHeaders(SmallPtrSetImpl<SILBasicBlock *> &loopHeaders,
+                            SILFunction *func) {
+  /// Find back edges in the CFG. This performs a dfs search and identifies
+  /// back edges as edges going to an ancestor in the dfs search. If a basic
+  /// block is the target of such a back edge we will identify it as a header.
+  loopHeaders.clear();
+
+  BasicBlockSet visited(func);
+  BasicBlockSet inDFSStack(func);
+  SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::succ_iterator>, 16>
+      dfsStack;
+
+  auto entryBB = &func->front();
+  dfsStack.push_back(std::make_pair(entryBB, entryBB->succ_begin()));
+  visited.insert(entryBB);
+  inDFSStack.insert(entryBB);
+
+  while (!dfsStack.empty()) {
+    auto &d = dfsStack.back();
+    // No successors.
+    if (d.second == d.first->succ_end()) {
+      // Retreat the dfs search.
+      dfsStack.pop_back();
+      inDFSStack.erase(d.first);
+    } else {
+      // Visit the next successor.
+      SILBasicBlock *nextSucc = *(d.second);
+      ++d.second;
+      if (visited.insert(nextSucc)) {
+        inDFSStack.insert(nextSucc);
+        dfsStack.push_back(std::make_pair(nextSucc, nextSucc->succ_begin()));
+      } else if (inDFSStack.contains(nextSucc)) {
+        // We have already visited this node and it is in our dfs search. This
+        // is a back-edge.
+        loopHeaders.insert(nextSucc);
+      }
+    }
+  }
+}
