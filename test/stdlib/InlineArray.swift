@@ -37,6 +37,7 @@ enum InlineArrayTests {
     testSuite.test("Noncopyable", testNoncopyable)
     testSuite.test("Uninhabited", testUninhabited)
     testSuite.test("Throws",      testThrows)
+    testSuite.test("Closures",    testClosures)
     runAllTests()
   }
 
@@ -195,6 +196,25 @@ enum InlineArrayTests {
         }
       }
     }
+  }
+
+  /// Test the handling of closure values in InlineArray literals
+  @available(SwiftStdlib 6.2, *)
+  static func testClosures() {
+    let ia: InlineArray<_, (Int) -> Int> = [{$0 * 2}]
+
+    for i in 0 ..< 10 {
+      expectEqual(i * 2, ia[0](i))
+    }
+
+    var x = 0
+    let ia2: InlineArray<_, () -> ()> = [{ x += 1 }]
+
+    for _ in 0 ..< 10 {
+      ia2[0]()
+    }
+
+    expectEqual(x, 10)
   }
 }
 

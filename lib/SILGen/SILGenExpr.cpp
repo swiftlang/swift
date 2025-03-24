@@ -4834,12 +4834,11 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   }
 
   auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
-  auto loweredElementType = SGF.getLoweredType(elementType);
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
 
   SILValue alloc = SGF.emitTemporaryAllocation(E, loweredIAType);
   SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
-                                            loweredElementType.getAddressType());
+                                            eltTL.getLoweredType().getAddressType());
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
