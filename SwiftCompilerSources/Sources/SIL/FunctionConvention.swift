@@ -237,7 +237,7 @@ extension FunctionConvention {
 
 public enum LifetimeDependenceConvention : CustomStringConvertible {
   case inherit
-  case scope(addressable: Bool)
+  case scope(addressable: Bool, addressableForDeps: Bool)
 
   public var isScoped: Bool {
     switch self {
@@ -248,12 +248,12 @@ public enum LifetimeDependenceConvention : CustomStringConvertible {
     }
   }
 
-  public var isAddressable: Bool {
+  public func isAddressable(for value: Value) -> Bool {
     switch self {
     case .inherit:
       return false
-    case let .scope(addressable):
-      return addressable
+    case let .scope(addressable, addressableForDeps):
+      return addressable || (addressableForDeps && value.type.isAddressableForDeps(in: value.parentFunction))
     }
   }
 
@@ -313,7 +313,8 @@ extension FunctionConvention {
       }
       if scope {
         let addressable = bridged.checkAddressable(bridgedIndex(parameterIndex: index))
-        return .scope(addressable: addressable)
+        let addressableForDeps = bridged.checkConditionallyAddressable(bridgedIndex(parameterIndex: index))
+        return .scope(addressable: addressable, addressableForDeps: addressableForDeps)
       }
       return nil
     }

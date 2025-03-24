@@ -63,11 +63,9 @@ std::string LifetimeDependenceInfo::getString() const {
         }
         result += kind;
         if (addressable && addressable->contains(i)) {
-          if (condAddressable && condAddressable->contains(i)) {
-            result += "address_for_deps ";
-          } else {
-            result += "address ";
-          }
+          result += "address ";
+        } else if (condAddressable && condAddressable->contains(i)) {
+          result += "address_for_deps ";
         }
         result += std::to_string(i);
         isFirstSetBit = false;
@@ -1136,7 +1134,6 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
         break;
       case LifetimeDescriptor::IsConditionallyAddressable:
         conditionallyAddressableLifetimeParamIndices.set(index);
-        addressableLifetimeParamIndices.set(index);
         break;
       case LifetimeDescriptor::IsAddressable:
         addressableLifetimeParamIndices.set(index);
