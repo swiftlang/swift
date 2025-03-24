@@ -26,6 +26,7 @@
 #include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -2100,6 +2101,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // Setup a verfication instance to run.
     std::unique_ptr<CompilerInstance> VerifyInstance =
         std::make_unique<CompilerInstance>();
+    // Add a null diagnostic consumer to the diagnostic engine so the
+    // compilation will exercise all the diagnose code path but not emitting
+    // anything.
+    NullDiagnosticConsumer DC;
+    VerifyInstance->getDiags().addConsumer(DC);
     std::string InstanceSetupError;
     // This should not fail because it passed already.
     (void)VerifyInstance->setup(Invocation, InstanceSetupError, Args);
