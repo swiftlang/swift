@@ -470,8 +470,7 @@ extension ExecutorJob {
   /// runtime.
   ///
   /// N.B. Because this allocator is stack disciplined, explicitly
-  /// deallocating memory will also deallocate all memory allocated
-  /// after the block being deallocated.
+  /// deallocating memory out-of-order will cause your program to abort.
   public struct LocalAllocator {
     internal var context: Builtin.Job
 

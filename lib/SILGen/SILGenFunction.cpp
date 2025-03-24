@@ -1400,8 +1400,8 @@ static bool isCreateExecutorsFunctionAvailable(SILGenModule &SGM) {
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
     auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
     auto runtimeAvailability = AvailabilityRange::forRuntimeTarget(ctx);
-    auto declAvailability = ctx.getCustomExecutorsAvailability();
-    auto declRtAvailability = ctx.getCustomExecutorsRuntimeAvailability();
+    auto declAvailability = ctx.getCustomGlobalExecutorsAvailability();
+    auto declRtAvailability = ctx.getCustomGlobalExecutorsRuntimeAvailability();
     return deploymentAvailability.isContainedIn(declAvailability)
       && runtimeAvailability.isContainedIn(declRtAvailability);
   }
@@ -1429,21 +1429,23 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
     if (!isCreateExecutorsFunctionAvailable(SGM)) {
       ctx.Diags.diagnose(SourceLoc(), diag::executor_factory_not_supported);
     } else {
-      CanType factoryTy = SGM.getExecutorFactory()->getCanonicalType();
+      CanType factoryTy = SGM.getConfiguredExecutorFactory()->getCanonicalType();
 
       if (!factoryTy) {
         ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_executor_factory_type,
                            *ctx.LangOpts.ExecutorFactory);
       }
 
-      ProtocolDecl *executorFactoryProtocol = SGM.getExecutorFactoryProtocol();
+      ProtocolDecl *executorFactoryProtocol
+        = ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
       auto conformance = lookupConformance(factoryTy, executorFactoryProtocol);
 
       if (conformance.isInvalid()) {
         // If this type doesn't conform, ignore it and use the default factory
         SourceLoc loc = extractNearestSourceLoc(factoryTy);
 
-        ctx.Diags.diagnose(loc, diag::executor_factory_must_conform, factoryTy);
+        ctx.Diags.diagnose(loc, diag::executor_factory_must_conform,
+                           *ctx.LangOpts.ExecutorFactory);
 
         factoryTy = SGM.getDefaultExecutorFactory()->getCanonicalType();
         conformance = lookupConformance(factoryTy, executorFactoryProtocol);
@@ -1464,7 +1466,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
       SILValue factorySILMetaTy
         = B.createMetatype(moduleLoc, getLoweredType(factoryThickMetaTy));
       auto ceSubs = SubstitutionMap::getProtocolSubstitutions(
-        conformance.getRequirement(), factoryTy, conformance);
+        conformance.getProtocol(), factoryTy, conformance);
       B.createApply(moduleLoc, createExecutorsFunc, ceSubs, { factorySILMetaTy });
     }
   }

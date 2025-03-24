@@ -290,6 +290,16 @@ static SerialExecutorRef swift_task_getCurrentExecutorImpl() {
   return result;
 }
 
+/// Determine whether we are currently executing on the main thread
+/// independently of whether we know that we are on the main actor.
+static bool isExecutingOnMainThread() {
+#if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+  return true;
+#else
+  return Thread::onMainThread();
+#endif
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
@@ -303,7 +313,13 @@ SerialExecutorRef _swift_getActiveExecutor() {
       return SerialExecutorRef::generic();
     return executor;
   }
-  return swift_getMainExecutor();
+
+  // If there's no tracking and we're on the main thread, then the main
+  // executor is notionally active.
+  if (isExecutingOnMainThread())
+    return swift_getMainExecutor();
+
+  return SerialExecutorRef::generic();
 }
 
 extern "C" SWIFT_CC(swift)
@@ -323,16 +339,6 @@ TaskExecutorRef _swift_getPreferredTaskExecutor() {
 }
 
 #pragma clang diagnostic pop
-
-/// Determine whether we are currently executing on the main thread
-/// independently of whether we know that we are on the main actor.
-static bool isExecutingOnMainThread() {
-#if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
-  return true;
-#else
-  return Thread::onMainThread();
-#endif
-}
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY

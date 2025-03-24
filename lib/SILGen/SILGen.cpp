@@ -511,7 +511,7 @@ FuncDecl *SILGenModule::getExit() {
   return exitFunction;
 }
 
-Type SILGenModule::getExecutorFactory() {
+Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
   ModuleDecl *module;
@@ -543,12 +543,6 @@ Type SILGenModule::getDefaultExecutorFactory() {
     return Type();
 
   return ctx.getNamedSwiftType(module, "DefaultExecutorFactory");
-}
-
-ProtocolDecl *SILGenModule::getExecutorFactoryProtocol() {
-  auto &ctx = getASTContext();
-
-  return ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
