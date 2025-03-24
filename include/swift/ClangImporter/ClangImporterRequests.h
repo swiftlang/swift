@@ -360,16 +360,9 @@ struct CxxRecordSemanticsDescriptor final {
   ASTContext &ctx;
   ClangImporter::Implementation *importerImpl;
 
-  /// Whether to emit warnings for missing destructor or copy constructor
-  /// whenever the classification of the type assumes that they exist (e.g. for
-  /// a value type).
-  bool shouldDiagnoseLifetimeOperations;
-
   CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
-                               ClangImporter::Implementation *importerImpl,
-                               bool shouldDiagnoseLifetimeOperations = true)
-      : decl(decl), ctx(ctx), importerImpl(importerImpl),
-        shouldDiagnoseLifetimeOperations(shouldDiagnoseLifetimeOperations) {}
+                               ClangImporter::Implementation *importerImpl)
+      : decl(decl), ctx(ctx), importerImpl(importerImpl) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
