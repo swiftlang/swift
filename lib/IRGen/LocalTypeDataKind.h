@@ -140,7 +140,7 @@ public:
     } else if (conformance.isPack()) {
       return forProtocolWitnessTablePack(conformance.getPack());
     } else {
-      return forAbstractProtocolWitnessTable(conformance.getAbstract());
+      return forAbstractProtocolWitnessTable(conformance.getProtocol());
     }
   }
 

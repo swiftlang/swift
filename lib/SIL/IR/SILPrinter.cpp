@@ -4273,7 +4273,7 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
     out << "associated_conformance (";
     (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
     auto conformance = assocProtoWitness.Witness;
-    out << ": " << conformance.getRequirement()->getName() << "): ";
+    out << ": " << conformance.getProtocol()->getName() << "): ";
     if (conformance.isConcrete())
       conformance.getConcrete()->printName(out, options);
     else {
@@ -4325,7 +4325,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
     OS << "  conditional_conformance (";
     conditionalConformance.Requirement.print(OS, Options);
-    OS << ": " << conditionalConformance.Conformance.getRequirement()->getName()
+    OS << ": " << conditionalConformance.Conformance.getProtocol()->getName()
        << "): ";
     if (conditionalConformance.Conformance.isConcrete())
       conditionalConformance.Conformance.getConcrete()->printName(OS, Options);

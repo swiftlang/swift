@@ -906,6 +906,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, OPAQUE_RETURN_TYPE_DECLS);
+  BLOCK_RECORD(index_block, ABSTRACT_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
@@ -1976,9 +1977,8 @@ Serializer::addConformanceRef(ProtocolConformanceRef ref) {
   }
 
   if (ref.isAbstract()) {
-    auto protocolID = addDeclRef(ref.getAbstract());
-    assert(protocolID != 0);
-    return ((protocolID << SerializedProtocolConformanceKind::Shift) |
+    auto rawID = AbstractConformancesToSerialize.addRef(ref.getAbstract());
+    return ((rawID << SerializedProtocolConformanceKind::Shift) |
             SerializedProtocolConformanceKind::Abstract);
   }
 
@@ -2075,6 +2075,20 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
         static_cast<unsigned>(builtin->getBuiltinConformanceKind()));
     break;
   }
+}
+
+void
+Serializer::writeASTBlockEntity(AbstractConformance *conformance) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[AbstractConformanceLayout::Code];
+
+  auto conformanceRef = ProtocolConformanceRef(conformance);
+  AbstractConformanceLayout::emitRecord(
+      Out, ScratchRecord,
+      abbrCode,
+      addTypeRef(conformanceRef.getType()),
+      addDeclRef(conformanceRef.getProtocol()));
 }
 
 void
@@ -6372,6 +6386,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
+  registerDeclTypeAbbr<AbstractConformanceLayout>();
   registerDeclTypeAbbr<PackConformanceLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
@@ -6414,6 +6429,8 @@ void Serializer::writeAllDeclsAndTypes() {
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(ConformancesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(AbstractConformancesToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
@@ -7030,6 +7047,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, GenericEnvironmentsToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, ConformancesToSerialize);
+    writeOffsets(Offsets, AbstractConformancesToSerialize);
     writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
 

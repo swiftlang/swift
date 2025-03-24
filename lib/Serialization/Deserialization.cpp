@@ -787,6 +787,9 @@ public:
 
   Expected<PackConformance *>
   read(ModuleFile::Serialized<PackConformance *> &entry);
+
+  Expected<AbstractConformance *>
+  read(ModuleFile::Serialized<AbstractConformance *> &entry);
 };
 } // end namespace swift
 
@@ -876,7 +879,7 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
   SET_OR_RETURN_ERROR(genericConformance,
                       MF.getConformanceChecked(conformanceID));
 
-  PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
+  PrettyStackTraceDecl traceTo("... to", genericConformance.getProtocol());
   ++NumNormalProtocolConformancesLoaded;
 
   auto *rootConformance = cast<NormalProtocolConformance>(
@@ -910,7 +913,7 @@ ProtocolConformanceDeserializer::readInheritedProtocolConformance(
   SET_OR_RETURN_ERROR(inheritedConformance,
                       MF.getConformanceChecked(conformanceID));
   PrettyStackTraceDecl traceTo("... to",
-                               inheritedConformance.getRequirement());
+                               inheritedConformance.getProtocol());
 
   assert(inheritedConformance.isConcrete() &&
          "Abstract inherited conformance?");
@@ -1105,6 +1108,47 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   return conformance;
 }
 
+Expected<AbstractConformance *>
+ProtocolConformanceDeserializer::read(
+    ModuleFile::Serialized<AbstractConformance *> &conformanceEntry) {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 16> scratch;
+
+  llvm::BitstreamEntry entry =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    // We don't know how to serialize types represented by sub-blocks.
+    return MF.diagnoseFatal();
+  }
+
+  StringRef blobData;
+  unsigned kind = MF.fatalIfUnexpected(
+      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+  assert(blobData.empty());
+
+  if (kind != decls_block::ABSTRACT_CONFORMANCE)
+    return MF.diagnoseFatal(llvm::make_error<InvalidRecordKindError>(kind));
+
+  TypeID conformingTypeID;
+  DeclID protocolID;
+  AbstractConformanceLayout::readRecord(scratch, conformingTypeID, protocolID);
+
+  auto conformingTypeOrError = MF.getTypeChecked(conformingTypeID);
+  if (!conformingTypeOrError)
+    return conformingTypeOrError.takeError();
+  auto conformingType = conformingTypeOrError.get();
+
+  auto protocolOrError = MF.getDeclChecked(protocolID);
+  if (!protocolOrError)
+    return protocolOrError.takeError();
+  auto *protocol = cast<ProtocolDecl>(protocolOrError.get());
+
+  return ProtocolConformanceRef::forAbstract(conformingType, protocol)
+      .getAbstract();
+}
+
 Expected<PackConformance*>
 ProtocolConformanceDeserializer::read(
           ModuleFile::Serialized<PackConformance *> &conformanceEntry) {
@@ -1180,13 +1224,25 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
 
   switch (conformanceID & SerializedProtocolConformanceKind::Mask) {
   case SerializedProtocolConformanceKind::Abstract: {
-    auto protocolID = conformanceID >> SerializedProtocolConformanceKind::Shift;
-    auto maybeProtocol = getDeclChecked(protocolID);
-    if (!maybeProtocol)
-      return maybeProtocol.takeError();
-    auto proto = cast<ProtocolDecl>(maybeProtocol.get());
-    // FIXME: Passing an empty Type() here temporarily.
-    return ProtocolConformanceRef::forAbstract(Type(), proto);
+    auto conformanceIndex = (conformanceID >> SerializedProtocolConformanceKind::Shift) - 1;
+    assert(conformanceIndex < AbstractConformances.size() &&
+           "invalid abstract conformance ID");
+    auto &conformanceOrOffset = AbstractConformances[conformanceIndex];
+    if (!conformanceOrOffset.isComplete()) {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      if (auto error = diagnoseFatalIfNotSuccess(
+              DeclTypeCursor.JumpToBit(conformanceOrOffset)))
+        return std::move(error);
+
+      auto result =
+        ProtocolConformanceDeserializer(*this).read(conformanceOrOffset);
+      if (!result)
+        return result.takeError();
+
+      conformanceOrOffset = result.get();
+    }
+    auto conformance = conformanceOrOffset.get();
+    return ProtocolConformanceRef(conformance);
   }
 
   case SerializedProtocolConformanceKind::Concrete: {
@@ -8755,7 +8811,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     llvm::SmallDenseMap<ProtocolDecl *, ProtocolConformanceRef, 16>
         conformancesForProtocols;
     for (auto nextConformance : reqConformances) {
-      ProtocolDecl *confProto = nextConformance.getRequirement();
+      ProtocolDecl *confProto = nextConformance.getProtocol();
       conformancesForProtocols[confProto] = nextConformance;
     }
 

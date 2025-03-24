@@ -83,7 +83,7 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
 CheckRequirementResult Requirement::checkRequirement(
     SmallVectorImpl<Requirement> &subReqs,
     bool allowMissing,
-    SmallVectorImpl<ProtocolConformance *> *isolatedConformances
+    SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances
 ) const {
   if (hasError())
     return CheckRequirementResult::SubstitutionFailure;
@@ -127,7 +127,7 @@ CheckRequirementResult Requirement::checkRequirement(
     // Collect isolated conformances.
     if (isolatedConformances) {
       conformance.forEachIsolatedConformance(
-          [&](ProtocolConformance *isolatedConformance) {
+          [&](ProtocolConformanceRef isolatedConformance) {
             isolatedConformances->push_back(isolatedConformance);
             return false;
           });

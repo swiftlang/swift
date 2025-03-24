@@ -427,7 +427,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
     auto conf = substitutionMap.lookupConformance(
         wmi->getLookupType()->mapTypeOutOfContext()->getCanonicalType(),
-        wmi->getConformance().getRequirement());
+        wmi->getConformance().getProtocol());
     if (conf.isInvalid())
       return getUnknown(evaluator, value,
                         UnknownReason::UnknownWitnessMethodConformance);
@@ -1282,7 +1282,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     if (calleeFnType->getRepresentation() ==
         SILFunctionType::Representation::WitnessMethod) {
       auto protocol =
-          calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
+          calleeFnType->getWitnessMethodConformanceOrInvalid().getProtocol();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
       SubstitutionMap applySubstMap = apply->getSubstitutionMap();

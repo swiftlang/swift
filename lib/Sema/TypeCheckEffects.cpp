@@ -1353,7 +1353,7 @@ public:
     if (conformanceRef.isInvalid())
       return Classification::forInvalidCode();
 
-    auto proto = conformanceRef.getRequirement();
+    auto proto = conformanceRef.getProtocol();
     if (kind == EffectKind::Throws &&
         (proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence) ||
          proto->isSpecificProtocol(
@@ -1379,7 +1379,7 @@ public:
 
     if (conformanceRef.hasEffect(kind)) {
       assert(kind == EffectKind::Throws); // there is no async
-      ASTContext &ctx = conformanceRef.getRequirement()->getASTContext();
+      ASTContext &ctx = conformanceRef.getProtocol()->getASTContext();
       // FIXME: typed throws, if it becomes a thing for conformances
       return Classification::forThrows(
           ctx.getErrorExistentialType(),
@@ -1612,7 +1612,7 @@ public:
     const bool hasAnyConformances =
         llvm::any_of(substitutions.getConformances(),
                      [](const ProtocolConformanceRef conformance) {
-                       auto *requirement = conformance.getRequirement();
+                       auto *requirement = conformance.getProtocol();
                        return !requirement->getInvertibleProtocolKind();
                      });
 

@@ -4807,7 +4807,7 @@ public:
     }
 
     for (auto i : indices(conformances)) {
-      require(conformances[i].getRequirement() == protocols[i]->getDecl(),
+      require(conformances[i].getProtocol() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
     }

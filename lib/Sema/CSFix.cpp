@@ -2777,7 +2777,6 @@ IgnoreIsolatedConformance *
 IgnoreIsolatedConformance::create(ConstraintSystem &cs,
                                   ConstraintLocator *locator,
                                   ProtocolConformance *conformance) {
-  assert(conformance && "Must have an isolated conformance");
   return new (cs.getAllocator())
       IgnoreIsolatedConformance(cs, locator, conformance);
 }

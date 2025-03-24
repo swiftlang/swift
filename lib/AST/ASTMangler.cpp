@@ -2170,7 +2170,7 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
     if (conformance.isInvalid())
       continue;
 
-    if (conformance.getRequirement()->isMarkerProtocol())
+    if (conformance.getProtocol()->isMarkerProtocol())
       continue;
 
     SWIFT_DEFER {
@@ -4528,7 +4528,7 @@ void ASTMangler::appendAnyProtocolConformance(
   // If we have a conformance to a marker protocol but we aren't allowed to
   // emit marker protocols, skip it.
   if (!AllowMarkerProtocols &&
-      conformance.getRequirement()->isMarkerProtocol())
+      conformance.getProtocol()->isMarkerProtocol())
     return;
 
   // While all invertible protocols are marker protocols, do not mangle them
@@ -4537,15 +4537,17 @@ void ASTMangler::appendAnyProtocolConformance(
   // but we *might* have let that slip by for the other cases below, so the
   // early-exits are highly conservative.
   const bool forInvertible =
-      conformance.getRequirement()->getInvertibleProtocolKind().has_value();
+      conformance.getProtocol()->getInvertibleProtocolKind().has_value();
 
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
     if (forInvertible)
       return;
 
+    // FIXME: conformingType parameter should no longer be needed, because
+    // its in conformance.
     auto path = genericSig->getConformancePath(conformingType,
-                                               conformance.getAbstract());
+                                               conformance.getProtocol());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     if (forInvertible)
@@ -4556,7 +4558,7 @@ void ASTMangler::appendAnyProtocolConformance(
     ConformancePath conformancePath =
         opaqueSignature->getConformancePath(
           opaqueType->getInterfaceType(),
-          conformance.getAbstract());
+          conformance.getProtocol());
 
     // Append the conformance path with the signature of the opaque type.
     appendDependentProtocolConformance(conformancePath, opaqueSignature);
