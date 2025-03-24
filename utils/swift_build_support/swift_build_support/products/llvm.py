@@ -292,7 +292,7 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('LLVM_ENABLE_LTO:STRING', self.args.lto_type)
         llvm_cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
         # Swift expects the old layout for the runtime directory
-        llvm_cmake_options.define('LLVM_ENABLE_PER_TARGET_RUNTIME_DIR:BOOL', 'OFF')
+        llvm_cmake_options.define('LLVM_ENABLE_PER_TARGET_RUNTIME_DIR', 'OFF')
         if host_target.startswith('linux'):
             # This preserves the behaviour we had when using
             # LLVM_BUILD_EXTERNAL COMPILER_RT --
@@ -319,7 +319,7 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define(
                 'BUILTINS_arm64-apple-darwin_'
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
-                'STRING=armv6 armv6m armv7 armv7m armv7em')
+                'STRING', 'armv6 armv6m armv7 armv7m armv7em')
 
         llvm_enable_projects = ['clang']
         llvm_enable_runtimes = []
