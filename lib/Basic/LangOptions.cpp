@@ -17,6 +17,7 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FileTypes.h"
@@ -489,7 +490,8 @@ static bool isMultiThreadedRuntime(llvm::Triple triple) {
   return true;
 }
 
-std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
+void LangOptions::setTarget(llvm::Triple triple,
+                            swift::DiagnosticEngine *Diags) {
   clearAllPlatformConditionValues();
   clearAtomicBitWidths();
 
@@ -574,6 +576,11 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   }
 
+  if (UnsupportedOS && Diags) {
+    Diags->diagnose(SourceLoc(), diag::error_unsupported_target_os,
+                    Target.getOSName());
+  }
+
   bool UnsupportedArch = false;
 
   // Set the "arch" platform condition.
@@ -632,8 +639,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     }
   }
 
-  if (UnsupportedOS || UnsupportedArch)
-    return { UnsupportedOS, UnsupportedArch };
+  if (UnsupportedArch && Diags) {
+    Diags->diagnose(SourceLoc(), diag::error_unsupported_target_arch,
+                    Target.getArchName());
+  }
 
   // Set the "_endian" platform condition.
   if (Target.isLittleEndian()) {
@@ -660,6 +669,11 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "COFF");
   } else if (Target.isOSBinFormatWasm()) {
     addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "Wasm");
+  } else {
+    if (Diags) {
+      Diags->diagnose(SourceLoc(), diag::error_unsupported_object_file_format,
+                      Target.getObjectFormatTypeName(Target.getObjectFormat()));
+    }
   }
 
   // Set the "runtime" platform condition.
@@ -695,8 +709,6 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // If you add anything to this list, change the default size of
   // PlatformConditionValues to not require an extra allocation
   // in the common case.
-
-  return { false, false };
 }
 
 llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
