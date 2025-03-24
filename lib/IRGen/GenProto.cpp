@@ -472,7 +472,7 @@ void PolymorphicConvention::addSelfMetadataFulfillment(CanType arg) {
 
 void PolymorphicConvention::addSelfWitnessTableFulfillment(
     CanType arg, ProtocolConformanceRef conformance) {
-  auto proto = conformance.getRequirement();
+  auto proto = conformance.getProtocol();
   unsigned source = Sources.size() - 1;
   Fulfillments.addFulfillment(GenericRequirement::forWitnessTable(arg, proto),
                               source, MetadataPath(), MetadataState::Complete);
@@ -638,7 +638,7 @@ void EmitPolymorphicParameters::bindExtraSource(
 
       // Mark this as the cached witness table for Self.
       auto conformance = FnType->getWitnessMethodConformanceOrInvalid();
-      auto selfProto = conformance.getRequirement();
+      auto selfProto = conformance.getProtocol();
 
       auto selfTy = FnType->getSelfInstanceType(
           IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
@@ -1986,7 +1986,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
     assert(associatedConformance.isAbstract());
     auto wtable =
       emitArchetypeWitnessTableRef(IGF, cast<ArchetypeType>(associatedType),
-                                   associatedConformance.getAbstract());
+                                   associatedConformance.getProtocol());
     IGF.Builder.CreateRet(wtable);
     return;
   }
@@ -2029,11 +2029,11 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
 
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(witness.Requirement,
-                                                      witness.Witness.getRequirement());
+                                                      witness.Witness.getProtocol());
 
       AssociatedConformance requirement(SILWT->getProtocol(),
                                         witness.Requirement,
-                                        witness.Witness.getRequirement());
+                                        witness.Witness.getProtocol());
 
       llvm::Constant *witnessEntry =
         getAssociatedConformanceWitness(requirement, associate,
@@ -2129,7 +2129,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
         ->mapTypeIntoContext(condConformance.Requirement)
         ->getCanonicalType();
     if (auto archetype = dyn_cast<ArchetypeType>(reqTypeInContext)) {
-      auto condProto = condConformance.Conformance.getRequirement();
+      auto condProto = condConformance.Conformance.getProtocol();
       IGF.setUnscopedLocalTypeData(
              archetype,
              LocalTypeDataKind::forAbstractProtocolWitnessTable(condProto),
@@ -2353,7 +2353,7 @@ namespace {
 
           AssociatedConformance requirement(SILWT->getProtocol(),
                                             witness.Requirement,
-                                            witness.Witness.getRequirement());
+                                            witness.Witness.getProtocol());
           auto assocConformanceDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
               LinkEntity::forAssociatedConformanceDescriptor(requirement));
@@ -3283,13 +3283,13 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       assert(requirement.isAnyWitnessTable() && "index mismatch!");
       auto conformance = subs.lookupConformance(requirement.getTypeParameter(),
                                                 requirement.getProtocol());
-      assert(conformance.getRequirement() == requirement.getProtocol());
+      assert(conformance.getProtocol() == requirement.getProtocol());
       sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
       if (!source) return MetadataResponse();
 
       auto sourceMetadata = source.getMetadata();
-      auto protocol = conformance.getRequirement();
+      auto protocol = conformance.getProtocol();
       auto wtable = requirement.isWitnessTablePack()
         ? emitArgumentWitnessTablePackRef(IGF, nominal, requirements,
                                           reqtIndex, sourceMetadata)
@@ -3777,7 +3777,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
-  auto proto = conformance.getRequirement();
+  auto proto = conformance.getProtocol();
 
   // In Embedded Swift, only class-bound wtables are allowed.
   if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {

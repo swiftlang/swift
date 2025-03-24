@@ -602,7 +602,7 @@ BridgedASTType BridgedConformance::getType() const {
 }
 
 BridgedDeclObj BridgedConformance::getRequirement() const {
-  return {unbridged().getRequirement()};
+  return {unbridged().getProtocol()};
 }
 
 BridgedConformance BridgedConformance::getGenericConformance() const {

@@ -2189,7 +2189,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getRequirement(), type, conformance);
+      conformance.getProtocol(), type, conformance);
 
   return emitApplyOfLibraryIntrinsic(loc, convertFn, subMap, value, C);
 }

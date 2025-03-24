@@ -136,7 +136,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 bool ProtocolConformanceRef::hasEffect(EffectKind kind) const {
   if (!isConcrete()) { return kind != EffectKind::Unsafe; }
-  return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
+  return evaluateOrDefault(getProtocol()->getASTContext().evaluator,
      ConformanceHasEffectRequest{kind, getConcrete()},
      true);
 }

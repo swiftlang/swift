@@ -5519,7 +5519,7 @@ public:
       assert(conformance.isAbstract());
 
       printHead("abstract_conformance", ASTNodeColor, label);
-      printReferencedDeclField(conformance.getAbstract(),
+      printReferencedDeclField(conformance.getProtocol(),
                                Label::always("protocol"));
       printFoot();
     }

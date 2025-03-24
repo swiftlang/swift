@@ -69,12 +69,12 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 
   case UnsafeUse::UnsafeConformance: {
     auto conformance = use.getConformance();
-    ASTContext &ctx = conformance.getRequirement()->getASTContext();
+    ASTContext &ctx = conformance.getProtocol()->getASTContext();
     ctx.Diags.diagnose(
         use.getLocation(),
         diag::note_use_of_unsafe_conformance_is_unsafe,
         use.getType(),
-        conformance.getRequirement());
+        conformance.getProtocol());
     return;
   }
 
@@ -302,7 +302,7 @@ bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
     if (conformance.isInvalid())
       continue;
 
-    ASTContext &ctx = conformance.getRequirement()->getASTContext();
+    ASTContext &ctx = conformance.getProtocol()->getASTContext();
     if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
       return false;
 

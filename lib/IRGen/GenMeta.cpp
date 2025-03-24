@@ -1187,7 +1187,7 @@ namespace {
 
         auto assocConf = entry.getAssociatedConformanceWitness();
         if (assocConf.Requirement != association ||
-            assocConf.Witness.getRequirement() != requirement)
+            assocConf.Witness.getProtocol() != requirement)
           continue;
 
         AssociatedConformance conformance(Proto, association, requirement);

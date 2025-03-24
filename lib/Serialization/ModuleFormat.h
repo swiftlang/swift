@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 927; // InlineArray type
+const uint16_t SWIFTMODULE_VERSION_MINOR = 928; // abstract conforming type
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2123,6 +2123,12 @@ namespace decls_block {
     BCFixed<2>  // the builtin conformance kind
   >;
 
+  using AbstractConformanceLayout = BCRecordLayout<
+    ABSTRACT_CONFORMANCE,
+    TypeIDField,                         // conforming type
+    DeclIDField                         // the protocol
+  >;
+
   using PackConformanceLayout = BCRecordLayout<
     PACK_CONFORMANCE,
     TypeIDField,                         // pattern type
@@ -2648,6 +2654,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    ABSTRACT_CONFORMANCE_OFFSETS,
     PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

@@ -244,7 +244,7 @@ public:
     SmallVector<ParentConditionalConformance, 2> ReqPath;
 
     /// The isolated conformances that caused the requirement failure.
-    llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances = {};
+    llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances = {};
 
     /// The protocol (Sendable or SendableMetatype) to which the type
     /// parameter conforms, causing a conflict with the isolated conformances
@@ -282,7 +282,7 @@ public:
 
   static CheckGenericArgumentsResult createIsolatedConformanceFailure(
       Requirement Req, Requirement SubstReq,
-      llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances,
+      llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances,
       ProtocolDecl *IsolatedConformanceProto) {
     return CheckGenericArgumentsResult(
         CheckRequirementsResult::RequirementFailure,
