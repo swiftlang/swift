@@ -1997,9 +1997,9 @@ struct Lifetime: ~Escapable {
   @lifetime(borrow i1) init(i1: UnsafeRawPointer) {}
 
   @abi(@lifetime(borrow i2) init(i2: UnsafeRawPointer)) // expected-error {{extra 'lifetime' attribute in '@abi'}} {{8-28=}}
-  init(i2: UnsafeRawPointer) {} // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+  init(i2: UnsafeRawPointer) {}
 
-  @abi(init(i3: UnsafeRawPointer)) // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}} expected-error {{missing 'lifetime' attribute in '@abi'}} {{8-8=@lifetime(borrow i3) }}
+  @abi(init(i3: UnsafeRawPointer)) // expected-error {{missing 'lifetime' attribute in '@abi'}} {{8-8=@lifetime(borrow i3) }}
   @lifetime(borrow i3) init(i3: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
 
   @abi(@lifetime(borrow i4) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer)) // expected-error {{'lifetime' attribute in '@abi' should match '@lifetime(borrow i4a)'}} {{8-28=@lifetime(borrow i4a)}}
@@ -2013,9 +2013,9 @@ struct UnsafeNonescapableResult: ~Escapable {
   @_unsafeNonescapableResult init(i1: UnsafeRawPointer) {}
 
   @abi(@_unsafeNonescapableResult init(i2: UnsafeRawPointer)) // expected-error {{extra '_unsafeNonescapableResult' attribute in '@abi'}} {{8-34=}}
-  init(i2: UnsafeRawPointer) {} // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+  init(i2: UnsafeRawPointer) {}
 
-  @abi(init(i3: UnsafeRawPointer)) // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}} expected-error {{missing '_unsafeNonescapableResult' attribute in '@abi'}} {{8-8=@_unsafeNonescapableResult }}
+  @abi(init(i3: UnsafeRawPointer)) // expected-error {{missing '_unsafeNonescapableResult' attribute in '@abi'}} {{8-8=@_unsafeNonescapableResult }}
   @_unsafeNonescapableResult init(i3: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
 }
 
