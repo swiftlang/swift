@@ -3782,10 +3782,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     return true;
   }
 
-  Opts.MergeableTraps = Opts.shouldOptimize();
-  if (Args.hasArg(OPT_mergeable_traps)) {
-    Opts.MergeableTraps = true;
-  }
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,
