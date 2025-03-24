@@ -33,7 +33,7 @@ internal func drainMainQueue() {
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_donateThreadToGlobalExecutorUntilImpl")
-internal func dontateToGlobalExecutor(
+internal func donateToGlobalExecutor(
   condition: @convention(c) (_ ctx: UnsafeMutableRawPointer) -> CBool,
   context: UnsafeMutableRawPointer
 ) {

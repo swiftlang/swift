@@ -144,7 +144,7 @@ struct TockingClock: Clock {
 
   // These are a bit of a lie, since this clock is weird and doesn't
   // actually tell the time; for the purposes of this test, we pretend
-  // that the tocks are 20ms.
+  // that the tocks are 10ms.
   func convert(from duration: Duration) -> Swift.Duration? {
     return .seconds(Double(duration.tocks) / 100)
   }

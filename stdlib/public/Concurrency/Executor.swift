@@ -592,7 +592,7 @@ extension Task where Success == Never, Failure == Never {
   ///   2. The preferred executor for the currently executing `Task`, or
   ///   3. The task executor for the current thread
   ///
-  ///  If none of these exist, this property will be `nil`.
+  ///  If none of these exist, returns the default executor.
   @available(SwiftStdlib 6.2, *)
   @_unavailableInEmbedded
   public static var currentExecutor: any Executor {
