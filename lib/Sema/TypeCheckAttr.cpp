@@ -2847,6 +2847,8 @@ void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
 void AttributeChecker::visitConstValAttr(ConstValAttr *attr) {
   auto *VD = dyn_cast<VarDecl>(D);
   if (VD) {
+    // FIXME: Do not allow 'var' on @const protocol requirements, only allow
+    // 'let' (once that's implemented to be allowed at all).
     if (!VD->isLet() && !isa<ProtocolDecl>(D->getDeclContext())) {
       diagnose(D->getStartLoc(), diag::attr_only_one_decl_kind,
                attr, "let");
