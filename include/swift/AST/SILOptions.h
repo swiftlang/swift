@@ -333,7 +333,7 @@ public:
 
   /// Enable enforcement of lifetime dependencies on addressable arguments.
   /// Temporarily used to bootstrap the AddressableParameters feature.
-  bool EnableAddressDependencies = false;
+  bool EnableAddressDependencies = true;
 
   SILOptions() {}
 

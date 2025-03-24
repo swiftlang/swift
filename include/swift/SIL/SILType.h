@@ -927,6 +927,10 @@ public:
 
   bool isMarkedAsImmortal() const;
 
+  /// True if a value of this type can have its address taken by a
+  /// lifetime-dependent value.
+  bool isAddressableForDeps(const SILFunction &function) const;
+
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed
   /// actors and actors, use isAnyActor().

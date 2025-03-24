@@ -1505,6 +1505,9 @@ def platform_availability_inheritance_map_path
 def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
   HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
 
+def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
+  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 
 def disable_experimental_parser_round_trip : Flag<["-"],

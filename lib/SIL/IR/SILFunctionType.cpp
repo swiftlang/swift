@@ -1823,14 +1823,12 @@ private:
       // is addressable-for-dependencies, then lower it with maximal abstraction
       // as well.
       auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
-      if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
+      if (initialSubstTL.getRecursiveProperties()
+          .isAddressableForDependencies()) {
         origType = AbstractionPattern::getOpaque();
 
-        // Remember that this lowered parameter is conditionally addressable in
-        // the addressable parameters vector.
-        AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
-        AddressableLoweredParameters[ParameterMap.size()] = true;
-
+        // Remember that this lowered parameter is conditionally
+        // addressable. Specialization may clear this flag.
         ConditionallyAddressableLoweredParameters
           .resize(ParameterMap.size() + 1, false);
         ConditionallyAddressableLoweredParameters[ParameterMap.size()] = true;

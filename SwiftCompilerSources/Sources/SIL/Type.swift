@@ -92,6 +92,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }
 
+  /// True if a value of this type can have its address taken by a lifetime-dependent value.
+  public func isAddressableForDeps(in function: Function) -> Bool {
+    bridged.isAddressableForDeps(function.bridged)
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//

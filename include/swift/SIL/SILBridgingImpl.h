@@ -147,6 +147,8 @@ BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDepe
     : inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
       addressableParamIndices(info.getAddressableIndices()),
+      conditionallyAddressableParamIndices(
+        info.getConditionallyAddressableIndices()),
       targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
@@ -175,6 +177,12 @@ bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
 
 bool BridgedLifetimeDependenceInfo::checkAddressable(SwiftInt index) const {
   return addressableParamIndices && addressableParamIndices->contains(index);
+}
+
+bool BridgedLifetimeDependenceInfo::
+checkConditionallyAddressable(SwiftInt index) const {
+  return conditionallyAddressableParamIndices
+    && conditionallyAddressableParamIndices->contains(index);
 }
 
 SwiftInt BridgedLifetimeDependenceInfo::getTargetIndex() const {
@@ -382,6 +390,10 @@ bool BridgedType::isCalleeConsumedFunction() const {
 
 bool BridgedType::isMarkedAsImmortal() const {
   return unbridged().isMarkedAsImmortal();
+}
+
+bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
+  return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {

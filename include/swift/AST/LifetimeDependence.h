@@ -250,11 +250,10 @@ public:
     assert(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
     assert(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
-    assert((!conditionallyAddressableParamIndices
-            || (addressableParamIndices
-                && conditionallyAddressableParamIndices
-                    ->isSubsetOf(addressableParamIndices)))
-     && "conditionally-addressable params not a subset of addressable params?");
+    assert((!addressableParamIndices
+            || !conditionallyAddressableParamIndices
+            || conditionallyAddressableParamIndices->isDisjointWith(
+              addressableParamIndices)));
   }
 
   operator bool() const { return !empty(); }

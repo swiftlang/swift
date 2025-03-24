@@ -3110,7 +3110,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
   
-  Opts.EnableAddressDependencies = Args.hasArg(OPT_enable_address_dependencies);
+  Opts.EnableAddressDependencies =
+    Args.hasFlag(OPT_enable_address_dependencies,
+                 OPT_disable_address_dependencies,
+                 Opts.EnableAddressDependencies);
 
   return false;
 }

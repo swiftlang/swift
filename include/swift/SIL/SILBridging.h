@@ -159,6 +159,7 @@ struct BridgedLifetimeDependenceInfo {
   swift::IndexSubset *_Nullable inheritLifetimeParamIndices;
   swift::IndexSubset *_Nullable scopeLifetimeParamIndices;
   swift::IndexSubset *_Nullable addressableParamIndices;
+  swift::IndexSubset *_Nullable conditionallyAddressableParamIndices;
   SwiftUInt targetIndex;
   bool immortal;
 
@@ -168,6 +169,7 @@ struct BridgedLifetimeDependenceInfo {
   BRIDGED_INLINE bool checkInherit(SwiftInt index) const;
   BRIDGED_INLINE bool checkScope(SwiftInt index) const;
   BRIDGED_INLINE bool checkAddressable(SwiftInt index) const;
+  BRIDGED_INLINE bool checkConditionallyAddressable(SwiftInt index) const;
   BRIDGED_INLINE SwiftInt getTargetIndex() const;
 
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
@@ -259,6 +261,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isExactSuperclassOf(BridgedType t) const;
   BRIDGED_INLINE bool isCalleeConsumedFunction() const;
   BRIDGED_INLINE bool isMarkedAsImmortal() const;
+  BRIDGED_INLINE bool isAddressableForDeps(BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
   BRIDGED_INLINE SwiftInt getNumNominalFields() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFieldType(SwiftInt idx, BridgedFunction f) const;
