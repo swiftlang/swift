@@ -333,11 +333,6 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   assert(rotateSingleBlockLoops || loop->getBlocks().size() != 1);
 
-  // Need a conditional branch that guards the entry into the loop.
-  auto *loopEntryBranch = dyn_cast<CondBranchInst>(header->getTerminator());
-  if (!loopEntryBranch)
-    return false;
-
   // The header needs to exit the loop.
   if (!loop->isLoopExiting(header)) {
     LLVM_DEBUG(llvm::dbgs() << *loop << " not an exiting header\n");
@@ -353,20 +348,16 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  // Make sure we can duplicate the header.
-  SmallVector<SILInstruction *, 8> moveToPreheader;
-  SinkAddressProjections sinkProj;
-  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
-                                     sinkProj)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << *loop << " instructions in header preventing rotating\n");
+  // Need a conditional branch that guards the entry into the loop.
+  auto *loopEntryBranch = dyn_cast<CondBranchInst>(header->getTerminator());
+  if (!loopEntryBranch)
     return false;
-  }
 
   auto *newHeader = loopEntryBranch->getTrueBB();
   auto *exit = loopEntryBranch->getFalseBB();
-  if (loop->contains(exit))
+  if (loop->contains(exit)) {
     std::swap(newHeader, exit);
+  }
   assert(loop->contains(newHeader) && !loop->contains(exit)
          && "Could not find loop header and exit block");
 
@@ -390,6 +381,16 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // preheader insertions.
   if (!newHeader->getSinglePredecessorBlock() && header != latch)
     return false;
+
+  // Make sure we can duplicate the header.
+  SmallVector<SILInstruction *, 8> moveToPreheader;
+  SinkAddressProjections sinkProj;
+  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
+                                     sinkProj)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << *loop << " instructions in header preventing rotating\n");
+    return false;
+  }
 
   // Now that we know we can perform the rotation - move the instructions that
   // need moving.
