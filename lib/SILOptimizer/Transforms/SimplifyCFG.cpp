@@ -1015,11 +1015,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // control flow and lead to infinite loop peeling.
   bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
   if (DestIsLoopHeader) {
-    // Make an exception for switch_enum, but only if it's block was not already
-    // peeled out of it's original loop. In that case, further jump threading
-    // can accomplish nothing, and the loop will be infinitely peeled.
-    if (!isa<SwitchEnumInst>(destTerminator) || ClonedLoopHeaders.count(DestBB))
-      return false;
+    return false;
   }
 
   // If it looks potentially interesting, decide whether we *can* do the
