@@ -713,7 +713,7 @@ extension InteriorUseWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value)
     -> WalkResult {
     // For Escapable values, simply continue the walk.
     if value.mayEscape {
@@ -726,6 +726,11 @@ extension InteriorUseWalker: AddressUseVisitor {
     // for that special case and continue to bailout here.
     return escapingAddressUse(of: operand)
   }
+
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+    // TODO: consider data flow that finds reachable uses of `dependentAddress`.
+    return escapingAddressUse(of: operand)
+  }    
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
     pointerStatus.setEscaping(operand: operand)

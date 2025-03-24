@@ -1916,3 +1916,28 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
   %5 = mark_dependence %1 on %0
   return %4
 }
+
+// CHECK-LABEL: @test_mark_dependence_addr
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   mark_dependence_addr %1 : $*C on %2 : $C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #1.
+// CHECK-NEXT:   mark_dependence_addr %1 : $*C on %2 : $C
+// CHECK-NEXT:   %1 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     mark_dependence_addr %1 : $*C on %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:  r=1,w=0
+// CHECK:      PAIR #3.
+// CHECK-NEXT:    mark_dependence_addr %1 : $*C on %0 : $*C
+// CHECK-NEXT:  %1 = argument of bb0 : $*C
+// CHECK-NEXT:  r=0,w=0
+sil [ossa] @test_mark_dependence_addr : $@convention(thin) (@in_guaranteed C, @in_guaranteed C, @guaranteed C) -> () {
+bb0(%0 : $*C, %1 : $*C, %2 : @guaranteed $C):
+  mark_dependence_addr %1 on %2
+  mark_dependence_addr %1 on %0
+  %99 = tuple ()
+  return %99 : $()
+}

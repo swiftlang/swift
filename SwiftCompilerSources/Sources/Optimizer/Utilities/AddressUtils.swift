@@ -68,10 +68,14 @@ protocol AddressUseVisitor {
   /// only if its type is escapable.
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult
 
-  /// A non-address owned `value` whose ownership depends on the in-memory
-  /// value at `address`, such as `mark_dependence %value on %address`.
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
-    -> WalkResult
+  /// A forwarded `value` whose ownership depends on the in-memory value at the address `operand`.
+  /// `%value` may be an address type, but only uses of this address value are dependent.
+  /// e.g. `%value = mark_dependence %_ on %operand`
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult
+
+  /// A dependent `address` whose lifetime depends on the in-memory value at `address`.
+  /// e.g. `mark_dependence_addr %address on %operand`
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult
 
   /// A pointer escape may propagate the address beyond the current instruction.
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult
@@ -91,34 +95,11 @@ extension AddressUseVisitor {
     case is EndAccessInst, is EndApplyInst, is AbortApplyInst, is EndBorrowInst:
       return scopeEndingAddressUse(of: operand)
 
-    case let markDep as MarkDependenceInst:
-      if markDep.valueOperand == operand {
-        return projectedAddressUse(of: operand, into: markDep)
-      }
-      assert(markDep.baseOperand == operand)
-      // If another address depends on the current address,
-      // handle it like a projection.
-      if markDep.type.isAddress {
-        return projectedAddressUse(of: operand, into: markDep)
-      }
-      switch markDep.dependenceKind {
-      case .Unresolved:
-        if LifetimeDependence(markDep, context) == nil {
-          break
-        }
-        fallthrough
-      case .NonEscaping:
-        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
-        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
-        return dependentAddressUse(of: operand, into: markDep)
-      case .Escaping:
-        break
-      }
-      // A potentially escaping value depends on this address.
-      return escapingAddressUse(of: operand)
+    case is MarkDependenceInstruction:
+      return classifyMarkDependence(operand: operand)
 
     case let pai as PartialApplyInst where !pai.mayEscape:
-      return dependentAddressUse(of: operand, into: pai)
+      return dependentAddressUse(of: operand, dependentValue: pai)
 
     case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
@@ -196,6 +177,57 @@ extension AddressUseVisitor {
       }
       // Unknown instruction.
       return unknownAddressUse(of: operand)
+    }
+  }
+
+  private mutating func classifyMarkDependence(operand: Operand) -> WalkResult {
+    switch operand.instruction {
+    case let markDep as MarkDependenceInst:
+      if markDep.valueOperand == operand {
+        return projectedAddressUse(of: operand, into: markDep)
+      }
+      assert(markDep.baseOperand == operand)
+      // If another address depends on the current address,
+      // handle it like a projection.
+      if markDep.type.isAddress {
+        return projectedAddressUse(of: operand, into: markDep)
+      }
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
+        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
+        return dependentAddressUse(of: operand, dependentValue: markDep)
+      case .Escaping:
+        break
+      }
+      // A potentially escaping value depends on this address.
+      return escapingAddressUse(of: operand)
+      
+    case let markDep as MarkDependenceAddrInst:
+      if markDep.addressOperand == operand {
+        return leafAddressUse(of: operand)
+      }
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        return dependentAddressUse(of: operand, dependentAddress: markDep.address)
+      case .Escaping:
+        break
+      }
+      // A potentially escaping value depends on this address.
+      return escapingAddressUse(of: operand)
+
+    default:
+      fatalError("Unexpected MarkDependenceInstruction")
     }
   }
 }
@@ -385,8 +417,11 @@ extension AddressInitializationWalker {
     return .continueWalk
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
-    -> WalkResult {
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
+    return .continueWalk
+  }
+
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
     return .continueWalk
   }
 
