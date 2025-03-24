@@ -41,11 +41,16 @@ public enum FakeOptional<T> {
 
 struct MOS: ~Copyable {}
 
+protocol P {
+  func foo()
+}
+
 sil [ossa] @getKlass : $@convention(thin) () -> @owned Klass
 sil [ossa] @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
 sil [ossa] @getMOS : $@convention(thin) () -> @owned MOS
 
 sil @unknown : $@convention(thin) () -> ()
+sil [readonly] [ossa] @read_only_coroutine : $@yield_once @convention(thin) () -> @yields @in_guaranteed P
 
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @guaranteed_user_with_result : $@convention(thin) (@guaranteed Klass) -> @out Klass
@@ -632,10 +637,6 @@ bb0(%0 : $*Klass):
   dealloc_stack %1 : $*Klass
   %12 = tuple ()
   return %12 : $()
-}
-
-protocol P {
-  func foo()
 }
 
 sil [ossa] @getP : $@convention(thin) () -> @out Optional<P>
@@ -1876,3 +1877,19 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>):
   return %10 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_read_only_coroutine :
+// CHECK:         copy_addr
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'test_read_only_coroutine'
+sil [ossa] @test_read_only_coroutine : $@convention(thin) () -> @out P {
+bb0(%0 : $*P):
+  %5 = function_ref @read_only_coroutine : $@yield_once @convention(thin) () -> @yields @in_guaranteed P
+  (%6, %7) = begin_apply %5() : $@yield_once @convention(thin) () -> @yields @in_guaranteed P
+  %8 = alloc_stack $P
+  copy_addr %6 to [init] %8
+  %10 = end_apply %7 as $()
+  copy_addr [take] %8 to [init] %0
+  dealloc_stack %8
+  %15 = tuple ()
+  return %15
+}

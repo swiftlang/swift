@@ -32,6 +32,7 @@ sil @unknown_func : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
 sil @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
 sil @single_indirect_arg_and_error : $@convention(thin) (@in Int32) -> (Int32, @error Error)
 sil @single_indirect_arg_coroutine : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
+sil [readnone] @read_none_coroutine : $@yield_once @convention(thin) () -> @yields @inout Int32
 sil @indirect_arg_and_ptr : $@convention(thin) (@in_guaranteed Int32, Builtin.RawPointer) -> Int32
 sil @single_reference : $@convention(thin) (@guaranteed X) -> Int32
 sil @indirect_yield_coroutine : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
@@ -405,6 +406,41 @@ bb0(%0 : $Int32):
   dealloc_stack %1 : $*Int32
   %9 = tuple ()
   return %9 : $()
+}
+
+// CHECK-LABEL:  @read_none_end_apply
+// CHECK:        PAIR #0.
+// CHECK-NEXT:       (%2, %3) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int32 // users: %8, %5
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=0,w=0
+// CHECK:        PAIR #1.
+// CHECK-NEXT:       %5 = end_apply %3 as $()
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=0,w=0
+// CHECK:        PAIR #2.
+// CHECK-NEXT:       %5 = end_apply %3 as $()
+// CHECK-NEXT:     (**%2**, %3) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int32
+// CHECK-NEXT:     r=1,w=1
+// CHECK:        PAIR #3.
+// CHECK-NEXT:       abort_apply %3
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=0,w=0
+// CHECK:        PAIR #4.
+// CHECK-NEXT:       abort_apply %3
+// CHECK-NEXT:     (**%2**, %3) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @inout Int32
+// CHECK-NEXT:     r=1,w=1
+sil [ossa] @read_none_end_apply : $@convention(thin) (@in Int32) -> () {
+bb0(%0 : $*Int32):
+  %3 = function_ref @read_none_coroutine : $@yield_once @convention(thin) () -> @yields @inout Int32
+  (%4, %5) = begin_apply %3() : $@yield_once @convention(thin) () -> @yields @inout Int32
+  cond_br undef, bb1, bb2
+bb1:
+  end_apply %5 as $()
+  %r = tuple ()
+  return %r
+bb2:
+  abort_apply %5
+  unreachable
 }
 
 // CHECK-LABEL: @refelementaddr_and_reference
