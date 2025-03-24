@@ -4819,6 +4819,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
   TRIVIAL_ATTR_PRINTER(CompileTimeLiteral, compile_time_literal)
   TRIVIAL_ATTR_PRINTER(ConstVal, compile_time_value)
+  TRIVIAL_ATTR_PRINTER(ConstInitialized, const_initialized)
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)

@@ -1726,6 +1726,7 @@ namespace  {
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeLiteral)
     UNINTERESTING_ATTR(ConstVal)
+    UNINTERESTING_ATTR(ConstInitialized)
 
     UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
