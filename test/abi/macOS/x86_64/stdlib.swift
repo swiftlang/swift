@@ -966,3 +966,38 @@ Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
 
 // Indirect tagged string creation
 Added: __swift_stdlib_CreateIndirectTaggedPointerString
+
+
+// Span backward deployment
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE5countSivpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE6_countSivpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE7indicesSnySiGvpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE7isEmptySbvpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV11byteOffsetsSnySiGvpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV6_countSivpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV7isEmptySbvpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV8_pointerSVSgvpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV9byteCountSivpMV$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
+
