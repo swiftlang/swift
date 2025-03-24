@@ -376,6 +376,7 @@ struct BridgedPassContext {
 
   BRIDGED_INLINE bool useAggressiveReg2MemForCodeSize() const;
   BRIDGED_INLINE bool enableStackProtection() const;
+  BRIDGED_INLINE bool enableMergeableTraps() const;
   BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
