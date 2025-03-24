@@ -832,8 +832,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
                                      {
                                          Int32Ty, // CoroAllocator.Flags
-                                         CoroAllocateFnTy,
-                                         CoroDeallocateFnTy,
+                                         CoroAllocateFnTy->getPointerTo(),
+                                         CoroDeallocateFnTy->getPointerTo(),
                                      });
   CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }

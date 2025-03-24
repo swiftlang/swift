@@ -577,6 +577,16 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     Result.append("Twc");
     return Result;
   }
+  case Kind::CoroAllocator: {
+    switch (getCoroAllocatorKind()) {
+    case CoroAllocatorKind::Stack:
+      llvm::report_fatal_error("attempting to mangle the coro stack allocator");
+    case CoroAllocatorKind::Async:
+      return "_swift_coro_async_allocator";
+    case CoroAllocatorKind::Malloc:
+      return "_swift_coro_malloc_allocator";
+    }
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -948,6 +958,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getUnderlyingEntityForCoroFunctionPointer().getLinkage(
         forDefinition);
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+  case Kind::CoroAllocator:
+    return SILLinkage::Shared;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -1051,6 +1063,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::CoroFunctionPointerAST:
   case Kind::DistributedThunkCoroFunctionPointer:
   case Kind::KnownCoroFunctionPointer:
+  case Kind::CoroAllocator:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1188,6 +1201,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::DistributedThunkCoroFunctionPointer:
   case Kind::KnownCoroFunctionPointer:
     return IGM.CoroFunctionPointerPtrTy;
+  case Kind::CoroAllocator:
+    return IGM.CoroAllocatorTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -1220,6 +1235,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::OpaqueTypeDescriptorRecord:
   case Kind::AccessibleFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::CoroAllocator:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:
@@ -1359,6 +1375,7 @@ bool LinkEntity::isText() const {
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::CoroAllocator:
     return true;
   case Kind::ObjCClass:
   case Kind::ObjCClassRef:
@@ -1520,6 +1537,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DifferentiabilityWitness:
   case Kind::AccessibleFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::CoroAllocator:
     return false;
 
   case Kind::AsyncFunctionPointer:
@@ -1656,6 +1674,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::TypeMetadataDemanglingCacheVariable:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+  case Kind::CoroAllocator:
     assert(isAlwaysSharedLinkage() && "kind should always be shared linkage");
     return nullptr;
 
@@ -1708,6 +1727,7 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
   case Kind::TypeMetadataDemanglingCacheVariable:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+  case Kind::CoroAllocator:
     return true;
 
   default:

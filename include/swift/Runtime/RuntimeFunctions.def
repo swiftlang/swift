@@ -3028,16 +3028,6 @@ FUNCTION(CoroDealloc,
          EFFECT(RuntimeEffect::Deallocating, RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// const CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
-FUNCTION(CoroGetGlobalAllocator, 
-         _Concurrency, swift_coro_getGlobalAllocator, SwiftCC, 
-         CoroutineAccessorsAvailability, 
-         RETURNS(CoroAllocatorPtrTy), 
-         ARGS(CoroAllocatorFlagsTy), 
-         ATTRS(NoUnwind, WillReturn), 
-         EFFECT(RuntimeEffect::Allocating),
-         UNKNOWN_MEMEFFECTS)
-
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
