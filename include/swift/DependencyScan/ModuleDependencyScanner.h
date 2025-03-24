@@ -37,17 +37,18 @@ public:
 
 private:
   /// Retrieve the module dependencies for the Clang module with the given name.
-  ModuleDependencyVector
-  scanFilesystemForClangModuleDependency(Identifier moduleName,
-                                         StringRef moduleOutputPath,
-                                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenModules,
-                                         llvm::PrefixMapper *prefixMapper);
+  ModuleDependencyVector scanFilesystemForClangModuleDependency(
+      Identifier moduleName, StringRef moduleOutputPath,
+      StringRef sdkModuleOutputPath,
+      const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+          &alreadySeenModules,
+      llvm::PrefixMapper *prefixMapper);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  ModuleDependencyVector
-  scanFilesystemForSwiftModuleDependency(Identifier moduleName, StringRef moduleOutputPath,
-                                         llvm::PrefixMapper *prefixMapper,
-                                         bool isTestableImport = false);
+  ModuleDependencyVector scanFilesystemForSwiftModuleDependency(
+      Identifier moduleName, StringRef moduleOutputPath,
+      StringRef sdkModuleOutputPath, llvm::PrefixMapper *prefixMapper,
+      bool isTestableImport = false);
 
   /// Store cache entry for include tree.
   llvm::Error
