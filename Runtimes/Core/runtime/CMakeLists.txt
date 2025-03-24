@@ -167,6 +167,10 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
+
+  install(TARGETS swiftrt
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrtT OBJECT SwiftRT-COFF.cpp)
   target_compile_definitions(swiftrtT PRIVATE
@@ -183,6 +187,10 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
     COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
+
+  install(TARGETS swiftrtT swiftrt
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
   message(SEND_ERROR "Unknown object format '${SwiftCore_OBJECT_FORMAT}'")
 endif()
