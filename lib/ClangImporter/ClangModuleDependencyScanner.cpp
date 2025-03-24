@@ -38,10 +38,25 @@ using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
 
 static std::string
-moduleCacheRelativeLookupModuleOutput(const ModuleID &MID, ModuleOutputKind MOK,
-                                      const StringRef moduleCachePath) {
+moduleCacheRelativeLookupModuleOutput(const ModuleDeps &MD, ModuleOutputKind MOK,
+                                      const StringRef moduleCachePath,
+                                      const StringRef stableModuleCachePath,
+                                      const StringRef runtimeResourcePath) {
   llvm::SmallString<128> outputPath(moduleCachePath);
-  llvm::sys::path::append(outputPath, MID.ModuleName + "-" + MID.ContextHash);
+  if (MD.IsInStableDirectories)
+    outputPath = stableModuleCachePath;
+
+  // FIXME: This is a hack to treat Clang modules defined in the compiler's
+  // own resource directory as stable, when they are not reported as such
+  // by the Clang scanner.
+  if (!runtimeResourcePath.empty() &&
+      hasPrefix(llvm::sys::path::begin(MD.ClangModuleMapFile),
+                llvm::sys::path::end(MD.ClangModuleMapFile),
+                llvm::sys::path::begin(runtimeResourcePath),
+                llvm::sys::path::end(runtimeResourcePath)))
+    outputPath = stableModuleCachePath;
+
+  llvm::sys::path::append(outputPath, MD.ID.ModuleName + "-" + MD.ID.ContextHash);
   switch (MOK) {
   case ModuleOutputKind::ModuleFile:
     llvm::sys::path::replace_extension(
@@ -52,7 +67,7 @@ moduleCacheRelativeLookupModuleOutput(const ModuleID &MID, ModuleOutputKind MOK,
         outputPath, getExtension(swift::file_types::TY_Dependencies));
     break;
   case ModuleOutputKind::DependencyTargets:
-    return MID.ModuleName + "-" + MID.ContextHash;
+    return MD.ID.ModuleName + "-" + MD.ID.ContextHash;
   case ModuleOutputKind::DiagnosticSerializationFile:
     llvm::sys::path::replace_extension(
         outputPath, getExtension(swift::file_types::TY_SerializedDiagnostics));
@@ -137,7 +152,8 @@ getClangPrefixMapper(DependencyScanningTool &clangScanningTool,
 ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-    StringRef moduleOutputPath, RemapPathCallback callback) {
+    StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+    RemapPathCallback callback) {
   const auto &ctx = Impl.SwiftContext;
   ModuleDependencyVector result;
 
@@ -168,7 +184,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
 
     auto pcmPath = moduleCacheRelativeLookupModuleOutput(
-        clangModuleDep.ID, ModuleOutputKind::ModuleFile, moduleOutputPath);
+        clangModuleDep, ModuleOutputKind::ModuleFile, moduleOutputPath,
+        stableModuleOutputPath, ctx.SearchPathOpts.RuntimeResourcePath);
     swiftArgs.push_back("-o");
     swiftArgs.push_back(pcmPath);
 
@@ -403,6 +420,7 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
 ModuleDependencyVector
 ClangImporter::getModuleDependencies(Identifier moduleName,
                                      StringRef moduleOutputPath,
+                                     StringRef sdkModuleOutputPath,
                                      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                                      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                      InterfaceSubContextDelegate &delegate,
@@ -419,11 +437,12 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
     return {};
   }
   std::string workingDir = *optionalWorkingDir;
-
   auto lookupModuleOutput =
-      [moduleOutputPath](const ModuleDeps &MD,
-                         ModuleOutputKind MOK) -> std::string {
-    return moduleCacheRelativeLookupModuleOutput(MD.ID, MOK, moduleOutputPath);
+      [moduleOutputPath, sdkModuleOutputPath, &ctx]
+      (const ModuleDeps &MD, ModuleOutputKind MOK) -> std::string {
+    return moduleCacheRelativeLookupModuleOutput(MD, MOK, moduleOutputPath,
+                                                 sdkModuleOutputPath,
+                                                 ctx.SearchPathOpts.RuntimeResourcePath);
   };
 
   auto clangModuleDependencies =
@@ -444,7 +463,8 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
 
   return bridgeClangModuleDependencies(clangScanningTool,
                                        *clangModuleDependencies,
-                                       moduleOutputPath, [&](StringRef path) {
+                                       moduleOutputPath, sdkModuleOutputPath,
+                                       [&](StringRef path) {
                                          if (mapper)
                                            return mapper->mapToString(path);
                                          return path.str();
@@ -475,11 +495,14 @@ bool ClangImporter::getHeaderDependencies(
     }
     std::string workingDir = *optionalWorkingDir;
     auto moduleOutputPath = cache.getModuleOutputPath();
+    auto sdkModuleOutputPath = cache.getSDKModuleOutputPath();
     auto lookupModuleOutput =
-        [moduleOutputPath](const ModuleDeps &MD,
-                           ModuleOutputKind MOK) -> std::string {
-      return moduleCacheRelativeLookupModuleOutput(MD.ID, MOK,
-                                                   moduleOutputPath);
+        [moduleOutputPath, sdkModuleOutputPath, &ctx]
+        (const ModuleDeps &MD, ModuleOutputKind MOK) -> std::string {
+      return moduleCacheRelativeLookupModuleOutput(MD, MOK,
+                                                   moduleOutputPath,
+                                                   sdkModuleOutputPath,
+                                                   ctx.SearchPathOpts.RuntimeResourcePath);
     };
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
         commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
@@ -490,7 +513,7 @@ bool ClangImporter::getHeaderDependencies(
     // Record module dependencies for each new module we found.
     auto bridgedDeps = bridgeClangModuleDependencies(
         clangScanningTool, dependencies->ModuleGraph,
-        cache.getModuleOutputPath(),
+        moduleOutputPath, sdkModuleOutputPath,
         [&cache](StringRef path) {
           return cache.getScanService().remapPath(path);
         });

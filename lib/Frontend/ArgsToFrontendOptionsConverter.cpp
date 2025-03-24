@@ -81,6 +81,11 @@ bool ArgsToFrontendOptionsConverter::convert(
     clang::driver::Driver::getDefaultModuleCachePath(defaultPath);
     Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
+  if (const Arg *A = Args.getLastArg(OPT_sdk_module_cache_path)) {
+    Opts.ExplicitSDKModulesOutputPath = A->getValue();
+  } else {
+    Opts.ExplicitSDKModulesOutputPath = Opts.ExplicitModulesOutputPath;
+  }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
   }
