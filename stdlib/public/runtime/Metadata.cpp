@@ -3549,10 +3549,12 @@ static bool installLazyClassNameHook() {
   return false;
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor)) SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static bool
 supportsLazyObjcClassNames() {
   return SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 static void setUpGenericClassObjCName(ClassMetadata *theClass) {
   if (supportsLazyObjcClassNames()) {
