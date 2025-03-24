@@ -1243,14 +1243,12 @@ private:
       auto *member = createMemberType(Member.DIType, Member.Name,
                                          OffsetInBits, Member.AlignInBits,
                                       Scope, File, Flags);
-      member->dump();
       Members.push_back(member);
     }
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
         DBuilder.getOrCreateArray(Members), RuntimeLang, nullptr, UniqueID);
-      DITy->dump();
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
