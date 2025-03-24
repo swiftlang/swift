@@ -21,7 +21,6 @@ from build_swift.build_swift import cache_utils
 
 from . import product
 from .. import shell
-from ..utils import log_time_in_scope
 
 
 class Ninja(product.Product):
@@ -54,18 +53,15 @@ class NinjaBuilder(product.ProductBuilder):
     def build(self):
         if os.path.exists(self.ninja_bin_path):
             return
-
-        print("--- Local Ninja Build ---")
-        with log_time_in_scope('local ninja'):
-            shell.call([
-                self.toolchain.cmake,
-                "-S", self.source_dir,
-                "-B", self.build_dir,
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DBUILD_TESTING=OFF",
-                f"-DCMAKE_C_COMPILER={self.toolchain.cc}",
-                f"-DCMAKE_CXX_COMPILER={self.toolchain.cxx}"])
-            shell.call([self.toolchain.cmake, "--build", self.build_dir])
+        shell.call([
+            self.toolchain.cmake,
+            "-S", self.source_dir,
+            "-B", self.build_dir,
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DBUILD_TESTING=OFF",
+            f"-DCMAKE_C_COMPILER={self.toolchain.cc}",
+            f"-DCMAKE_CXX_COMPILER={self.toolchain.cxx}"])
+        shell.call([self.toolchain.cmake, "--build", self.build_dir])
 
 
 def get_ninja_version(ninja_bin_path):

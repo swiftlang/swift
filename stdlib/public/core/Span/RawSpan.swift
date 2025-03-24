@@ -32,6 +32,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 
+  @unsafe
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
@@ -307,14 +308,17 @@ extension RawSpan {
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
-  @lifetime(borrow span)
+  @lifetime(copy span)
   public init<Element: BitwiseCopyable>(
-    _elements span: borrowing Span<Element>
+    _elements span: Span<Element>
   ) {
-    unsafe self.init(
-      _unchecked: span._pointer,
-      byteCount: span.count &* MemoryLayout<Element>.stride
+    let pointer = span._pointer
+    let rawSpan = unsafe RawSpan(
+      _unchecked: pointer,
+      byteCount: span.count == 1 ? MemoryLayout<Element>.size
+                 : span.count &* MemoryLayout<Element>.stride
     )
+    self = unsafe _overrideLifetime(rawSpan, copying: span)
   }
 }
 
@@ -661,7 +665,7 @@ extension RawSpan {
     guard let spanStart = other._pointer, _count > 0 else {
       return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
-    let start = _start()
+    let start = unsafe _start()
     let spanEnd = unsafe spanStart + other._count
     if unsafe spanStart < start || (start + _count) < spanEnd { return nil }
     let lower = unsafe start.distance(to: spanStart)

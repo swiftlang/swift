@@ -361,5 +361,8 @@ Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature ch
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
 
+// Adoption of @_addressableForDependencies
+Struct CollectionOfOne is now with @_addressableForDependencies
+
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype

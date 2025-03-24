@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -563,6 +563,17 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @safe
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
+  }
+
+  @unsafe
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      let span = unsafe Span(_unsafeElements: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 
