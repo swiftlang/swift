@@ -643,6 +643,14 @@ class DeadFunctionAndGlobalElimination {
         }
       }
     }
+
+    // Check default override tables.
+    for (auto &table : Module->getDefaultOverrideTableList()) {
+      for (auto &entry : table.getEntries()) {
+        ensureAlive(entry.impl);
+      }
+    }
+
     // Check property descriptor implementations.
     for (SILProperty &P : Module->getPropertyList()) {
       if (auto component = P.getComponent()) {
