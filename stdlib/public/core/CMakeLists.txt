@@ -347,6 +347,19 @@ if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
 endif()
 
+# Backward deployment of Span on Apple platforms is implemented via the
+# libswiftCompatibilitySpan.dylib shim.
+#
+# This flag ensures we emit the correct $ld$previous$ symbols in the standard
+# library. When building a binary for an older deployment target, we
+# pretend certain symbols are actually in libswiftCompatibilitySpan.dylib.
+#
+# Further discussion of libswiftCompatibilitySpan.dylib appears below.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-previous-module-installname-map-file" "-Xfrontend" "${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json")
+endif()
+
 set(swiftCore_common_options
                   IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
@@ -424,9 +437,6 @@ add_swift_target_library(swiftCore
                     zippered
                  )
 
-# Backward deployment of Span on Apple platforms is implemented via the
-# libswiftCompatibilitySpan.dylib shim.
-#
 # When a binary built with an older deployment target is run with a new
 # standard library, the symbols that were previously in the backward
 # compatibility shim are now in the standard library. To ensure the
