@@ -194,7 +194,7 @@ private:
   );
 
   // Record identifier for the category.
-  unsigned getEmitCategory(StringRef Category);
+  unsigned getEmitCategory(StringRef Category, StringRef CategoryURL);
 
   /// Emit a flag record that contains a semi-colon separated
   /// list of all of the educational notes associated with the
@@ -308,7 +308,9 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   return entry;
 }
 
-unsigned SerializedDiagnosticConsumer::getEmitCategory(StringRef Category) {
+unsigned SerializedDiagnosticConsumer::getEmitCategory(
+    StringRef Category, StringRef CategoryURL
+) {
   unsigned &entry = State->Categories[Category.data()];
   if (entry)
     return entry;
@@ -319,8 +321,15 @@ unsigned SerializedDiagnosticConsumer::getEmitCategory(StringRef Category) {
   Record.push_back(RECORD_CATEGORY);
   Record.push_back(entry);
   Record.push_back(Category.size());
-  State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_CATEGORY), Record,
-                                   Category);
+
+  if (CategoryURL.empty()) {
+    State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_CATEGORY),
+                                     Record, Category);
+  } else {
+    std::string encodedCategory = (Category + "@" + CategoryURL).str();
+    State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_CATEGORY),
+                                     Record, encodedCategory);
+  }
 
   return entry;
 }
@@ -601,7 +610,11 @@ emitDiagnosticMessage(SourceManager &SM,
 
   // Emit the category.
   if (!Info.Category.empty()) {
-    Record.push_back(getEmitCategory(Info.Category));
+    std::string categoryURL;
+    if (!Info.EducationalNotePaths.empty()) {
+      categoryURL = Info.EducationalNotePaths[0];
+    }
+    Record.push_back(getEmitCategory(Info.Category, categoryURL));
   } else {
     Record.push_back(0);
   }
@@ -609,6 +622,8 @@ emitDiagnosticMessage(SourceManager &SM,
   // Use "flags" slot to emit a semi-colon separated list of
   // educational notes. If there are no notes associated with
   // this diagnostic `0` placeholder would be emitted instead.
+  // FIXME: This is a bit of a kludge. We're moving toward putting the
+  // educational note into the category field instead.
   Record.push_back(emitEducationalNotes(Info));
 
   // Emit the message.
