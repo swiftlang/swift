@@ -715,9 +715,9 @@ public:
 
 struct USRGenerationOptions {
   /// @brief Whether to emit USRs using the Swift declaration when it is
-  // synthesized from a Clang based declaration. Useful in cases where Swift
-  // declarations are synthesized from Clang nodes but the caller actually
-  // wants the USR of the Swift declaration.
+  /// synthesized from a Clang based declaration. Useful in cases where Swift
+  /// declarations are synthesized from Clang nodes but the caller actually
+  /// wants the USR of the Swift declaration.
   bool distinguishSynthesizedDecls;
 
   friend llvm::hash_code hash_value(const USRGenerationOptions &options) {
