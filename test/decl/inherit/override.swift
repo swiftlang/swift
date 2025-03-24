@@ -86,3 +86,20 @@ class ObjCSub : ObjCSuper {
 
   @objc(method3:withInt:) func method3(_ x: Sub, with y: Int) { } // expected-error{{method3(_:with:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
 }
+
+class C {
+  var v1: Bool {
+    return false
+  }
+
+  func f1() -> Int { }
+}
+
+class D: C {
+  override func v1() -> Bool { } // expected-error{{method does not override any method from its superclass}}
+  // expected-note@-1{{did you mean to override the property 'v1'}} {{12-16=var}} {{19-29=: Bool}}
+
+  override var f1: Int { // expected-error{{property does not override any property from its superclass}}
+    return 0 // expected-note@-1{{did you mean to override the method 'f1'}} {{12-15=func}}
+  }
+}
