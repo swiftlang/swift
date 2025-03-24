@@ -125,3 +125,55 @@ TEST(TestSwiftRemangler, DependentGenericConformanceRequirement) {
     ASSERT_FALSE(b.remangleSuccess(n));
   }
 }
+
+TEST(TestSwiftRemangler, InvalidUTF8) {
+  using namespace swift::Demangle;
+  using Kind = swift::Demangle::Node::Kind;
+  Demangler dem;
+  NodeBuilder b(dem);
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xb0");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xc0");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xe0");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xf0");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xf8");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xff");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xc0\xff");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xe0\x80\xff");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xf0\x80\xff");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    NodePointer n = b.Node(Kind::Identifier, "\xf0\x80\x80\xff");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+  {
+    // Valid UTF-8 sequence, but decoding to an invalid code point.
+    NodePointer n = b.Node(Kind::Identifier, "\xed\xa2\x80");
+    ASSERT_TRUE(b.remangleSuccess(n));
+  }
+}
