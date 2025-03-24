@@ -62,9 +62,6 @@ enum {
   /// in a non-default distributed actor.
   NumWords_NonDefaultDistributedActor = 12,
 
-  /// The number of words in a task.
-  NumWords_AsyncTask = 24,
-
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
 
