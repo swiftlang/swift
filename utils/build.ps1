@@ -391,7 +391,9 @@ $KnownNDKs = @{
 }
 
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+# TODO: Support other cross-compilation scenarios.
 $BuildOS = [OS]::Windows
+$HostOS = [OS]::Windows
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -property installationPath
@@ -414,8 +416,8 @@ if (-not $PinnedBuild) {
 $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
 
 $HostPlatform = switch ($HostArchName) {
-  "AMD64" { $KnownPlatforms[$BuildOS.ToString() + "X64"] }
-  "ARM64" { $KnownPlatforms[$BuildOS.ToString() + "ARM64"] }
+  "AMD64" { $KnownPlatforms[$HostOS.ToString() + "X64"] }
+  "ARM64" { $KnownPlatforms[$HostOS.ToString() + "ARM64"] }
   default { throw "Unsupported processor architecture" }
 }
 
