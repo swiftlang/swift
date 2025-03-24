@@ -217,22 +217,6 @@ class LLVM(cmake_product.CMakeProduct):
         # LLVM will always be built in part
         return True
 
-    @classmethod
-    def compute_cmake_args_for_runtimes(cls, host_target):
-        # Swift expects the old layout for the runtime directory
-        args_for_runtime = '-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR:BOOL=OFF'
-
-        if host_target.startswith('linux'):
-            # This preserves the behaviour we had when using
-            # LLVM_BUILD_EXTERNAL COMPILER_RT --
-            # that is, having the linker not complaing if symbols used
-            # by TSan are undefined (namely the ones for Blocks Runtime)
-            # In the long term, we want to remove this and
-            # build Blocks Runtime before LLVM
-            args_for_runtime += ';-DSANITIZER_COMMON_LINK_FLAGS:STRING=-Wl,-z,undefs'
-
-        return args_for_runtime
-
     def build(self, host_target):
         """build() -> void
 
@@ -307,9 +291,17 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('LLVM_INCLUDE_DOCS:BOOL', 'TRUE')
         llvm_cmake_options.define('LLVM_ENABLE_LTO:STRING', self.args.lto_type)
         llvm_cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
-        llvm_cmake_options.define(
-            'RUNTIMES_CMAKE_ARGS',
-            LLVM.compute_cmake_args_for_runtimes(host_target))
+        # Swift expects the old layout for the runtime directory
+        llvm_cmake_options.define('LLVM_ENABLE_PER_TARGET_RUNTIME_DIR:BOOL', 'OFF')
+        if host_target.startswith('linux'):
+            # This preserves the behaviour we had when using
+            # LLVM_BUILD_EXTERNAL COMPILER_RT --
+            # that is, having the linker not complaing if symbols used
+            # by TSan are undefined (namely the ones for Blocks Runtime)
+            # In the long term, we want to remove this and
+            # build Blocks Runtime before LLVM
+            llvm_cmake_options.define(
+                'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
         if system() == "Darwin":
             llvm_cmake_options.define('LLVM_BUILTIN_TARGETS', 'arm64-apple-darwin')
             llvm_cmake_options.define('LLVM_RUNTIME_TARGETS', 'arm64-apple-darwin')
