@@ -103,7 +103,7 @@
 /include/swift/Parse/                              @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /include/swift/PrintAsClang                        @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
 /include/swift/Refactoring                         @ahoppen @bnbarham @hamishknight @rintaro
-/include/swift/Runtime/                            @rjmccall
+/include/swift/Runtime/                            @rjmccall @compnerd
 /include/swift/SIL/                                @jckarter
 /include/swift/SIL/*Coverage*                      @ahoppen @bnbarham @hamishknight @rintaro
 /include/swift/SIL/*DebugInfo*                     @adrian-prantl
