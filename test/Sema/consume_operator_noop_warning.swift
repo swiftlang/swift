@@ -43,6 +43,7 @@ func proofOfUseAfterConsume() -> Int {
 func moreProofs(_ share: __shared Int,
                 _ own: __owned Int,
                 _ snd: sending Int, // expected-error {{'snd' used after consume}}
+                // expected-warning @-1 {{'sending' has no effect on Sendable parameter}}
                 _ ino: inout Int, // expected-error {{'ino' used after consume}}
                 _ brw: borrowing Int, // expected-error {{'brw' is borrowed and cannot be consumed}}
                 _ csm: consuming Int // expected-error {{'csm' consumed more than once}}
