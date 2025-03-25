@@ -335,7 +335,6 @@ class LLVM(cmake_product.CMakeProduct):
                 not self.is_cross_compile_target(host_target):
             if self.args.llvm_build_compiler_rt_with_use_runtimes:
                 llvm_enable_runtimes.append('compiler-rt')
-                build_targets.append("runtimes")
                 # This accounts for previous incremental runs that may have set
                 # those in the LLVM CMakeCache.txt
                 llvm_cmake_options.undefine('LLVM_TOOL_COMPILER_RT_BUILD')
