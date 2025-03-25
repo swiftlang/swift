@@ -3127,11 +3127,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-  
-  Opts.EnableAddressDependencies =
+    Opts.EnableAddressDependencies =
     Args.hasFlag(OPT_enable_address_dependencies,
                  OPT_disable_address_dependencies,
                  Opts.EnableAddressDependencies);
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   return false;
 }
@@ -3799,6 +3799,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::layout_string_instantiation_without_layout_strings);
     return true;
   }
+
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,

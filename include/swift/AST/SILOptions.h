@@ -335,6 +335,9 @@ public:
   /// Temporarily used to bootstrap the AddressableParameters feature.
   bool EnableAddressDependencies = true;
 
+  // Whether to allow merging traps and cond_fails.
+  bool MergeableTraps = false;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should
