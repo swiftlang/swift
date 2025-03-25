@@ -1396,21 +1396,21 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
   /// Dump solutions for debugging purposes.
   auto dumpSolutions = [&](const SolutionResult &result) {
     // Debug-print the set of solutions.
-    if (isDebugMode()) {
-      auto &log = llvm::errs();
-      auto indent = solverState ? solverState->getCurrentIndent() : 0;
-      if (result.getKind() == SolutionResult::Success) {
+    // if (isDebugMode()) {
+    auto &log = llvm::errs();
+    auto indent = solverState ? solverState->getCurrentIndent() : 0;
+    if (result.getKind() == SolutionResult::Success) {
+      log << "\n";
+      log.indent(indent) << "---Solution---\n";
+      result.getSolution().dump(llvm::errs(), indent);
+    } else if (result.getKind() == SolutionResult::Ambiguous) {
+      auto solutions = result.getAmbiguousSolutions();
+      for (unsigned i : indices(solutions)) {
         log << "\n";
-        log.indent(indent) << "---Solution---\n";
-        result.getSolution().dump(llvm::errs(), indent);
-      } else if (result.getKind() == SolutionResult::Ambiguous) {
-        auto solutions = result.getAmbiguousSolutions();
-        for (unsigned i : indices(solutions)) {
-          log << "\n";
-          log.indent(indent) << "--- Solution #" << i << " ---\n";
-          solutions[i].dump(llvm::errs(), indent);
-        }
+        log.indent(indent) << "--- Solution #" << i << " ---\n";
+        solutions[i].dump(llvm::errs(), indent);
       }
+      // }
     }
   };
 
@@ -1436,12 +1436,13 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
   // solve a system that is expected to be well-formed, the second kicks in
   // when there is an error and attempts to salvage an ill-formed program.
   for (unsigned stage = 0; stage != 2; ++stage) {
+    // DEBUG the problem is in this "solution"
     auto solution = (stage == 0)
         ? solveImpl(target, allowFreeTypeVariables)
         : salvage();
 
     switch (solution.getKind()) {
-    case SolutionResult::Success: {
+    case SolutionResult::Success: { // DEBUG probably should land here
       // Return the successful solution.
       dumpSolutions(solution);
       reportSolutionsToSolutionCallback(solution);
@@ -1471,6 +1472,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
     }
 
     case SolutionResult::Ambiguous:
+      // DEBUG this is where we are falling. Why?
       // If salvaging produced an ambiguous result, it has already been
       // diagnosed.
       // If we have found an ambiguous solution in the first stage, salvaging
