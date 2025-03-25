@@ -163,6 +163,20 @@ extension TypeProperties {
   }
 
   //===--------------------------------------------------------------------===//
+  //                Properties of lowered `SILFunctionType`s
+  //===--------------------------------------------------------------------===//
+
+  public var isLoweredFunction: Bool { rawType.bridged.isLoweredFunction() }
+  public var isNoEscapeFunction: Bool { rawType.bridged.isNoEscapeFunction() }
+  public var isCalleeConsumedFunction: Bool { rawType.bridged.isCalleeConsumedFunction() }
+  public var isThickFunction: Bool { rawType.bridged.isThickFunction() }
+  public var isAsyncFunction: Bool { rawType.bridged.isAsyncFunction() }
+
+  public var invocationGenericSignatureOfFunction: GenericSignature {
+    GenericSignature(bridged: rawType.bridged.getInvocationGenericSignatureOfFunctionType())
+  }
+
+  //===--------------------------------------------------------------------===//
   //                             Type properties
   //===--------------------------------------------------------------------===//
 

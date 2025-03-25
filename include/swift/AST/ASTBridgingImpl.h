@@ -459,6 +459,36 @@ bool BridgedASTType::isFunction() const {
   return unbridged()->is<swift::FunctionType>();
 }
 
+bool BridgedASTType::isLoweredFunction() const {
+  return unbridged()->is<swift::SILFunctionType>();
+}
+
+bool BridgedASTType::isNoEscapeFunction() const {
+  if (auto *fTy = unbridged()->getAs<swift::SILFunctionType>()) {
+    return fTy->isNoEscape();
+  }
+  return false;
+}
+
+bool BridgedASTType::isThickFunction() const {
+  if (auto *fTy = unbridged()->getAs<swift::SILFunctionType>()) {
+    return fTy->getRepresentation() == swift::SILFunctionType::Representation::Thick;
+  }
+  return false;
+}
+
+bool BridgedASTType::isAsyncFunction() const {
+  if (auto *fTy = unbridged()->getAs<swift::SILFunctionType>()) {
+    return fTy->isAsync();
+  }
+  return false;
+}
+
+bool BridgedASTType::isCalleeConsumedFunction() const {
+  auto *funcTy = unbridged()->castTo<swift::SILFunctionType>();
+  return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
+}
+
 bool BridgedASTType::isBuiltinInteger() const {
   return unbridged()->is<swift::BuiltinIntegerType>();
 }
@@ -515,6 +545,10 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
   return unbridged()->getContextSubstitutionMap();
+}
+
+BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionType() const {
+  return {unbridged()->castTo<swift::SILFunctionType>()->getInvocationGenericSignature().getPointer()};
 }
 
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {

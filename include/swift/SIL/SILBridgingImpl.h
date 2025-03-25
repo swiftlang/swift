@@ -348,24 +348,8 @@ bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
 
-bool BridgedType::isFunction() const {
-  return unbridged().isFunction();
-}
-
-bool BridgedType::isNoEscapeFunction() const {
-  return unbridged().isNoEscapeFunction();
-}
-
 bool BridgedType::containsNoEscapeFunction() const {
   return unbridged().containsNoEscapeFunction();
-}
-
-bool BridgedType::isThickFunction() const {
-  return unbridged().isThickFunction();
-}
-
-bool BridgedType::isAsyncFunction() const {
-  return unbridged().isAsyncFunction();
 }
 
 bool BridgedType::isEmpty(BridgedFunction f) const {
@@ -382,10 +366,6 @@ bool BridgedType::isEscapable(BridgedFunction f) const {
 
 bool BridgedType::isExactSuperclassOf(BridgedType t) const {
   return unbridged().isExactSuperclassOf(t.unbridged());
-}
-
-bool BridgedType::isCalleeConsumedFunction() const {
-  return unbridged().isCalleeConsumedFunction();
 }
 
 bool BridgedType::isMarkedAsImmortal() const {
@@ -446,10 +426,6 @@ BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
   auto newTy = fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(true));
   return swift::SILType::getPrimitiveObjectType(newTy);
-}
-
-BridgedGenericSignature BridgedType::getInvocationGenericSignatureOfFunctionType() const {
-  return {unbridged().castTo<swift::SILFunctionType>()->getInvocationGenericSignature().getPointer()};
 }
 
 BridgedArgumentConvention BridgedType::getCalleeConvention() const {
