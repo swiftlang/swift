@@ -360,7 +360,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     defer { _fixLifetime(self) }
 
     var stop: UInt8 = 0
-    for bucket in unsafe native.hashTable {
+    for unsafe bucket in unsafe native.hashTable {
       let key = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
       let value = unsafe _value(at: bucket, bridgedValues: bridgedValues)
       unsafe block(
