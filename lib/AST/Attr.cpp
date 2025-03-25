@@ -1078,6 +1078,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+  case DeclAttrKind::OriginallyDefinedIn: {
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    auto Name = D->getDeclContext()->getParentModule()->getName().str();
+    if (Options.IsForSwiftInterface && Attr->ManglingModuleName == Name)
+      return false;
+    break;
+  }
   default:
     break;
   }
@@ -1175,8 +1182,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_originallyDefinedIn");
     Printer << "(module: ";
     auto Attr = cast<OriginallyDefinedInAttr>(this);
-    Printer << "\"" << Attr->OriginalModuleName << "\", ";
-    Printer << platformString(Attr->Platform) << " " <<
+    Printer << "\"" << Attr->ManglingModuleName;
+    ASSERT(!Attr->ManglingModuleName.empty());
+    ASSERT(!Attr->LinkerModuleName.empty());
+    if (Attr->LinkerModuleName != Attr->ManglingModuleName)
+      Printer << ";" << Attr->LinkerModuleName;
+    Printer << "\", " << platformString(Attr->Platform) << " " <<
       Attr->MovedVersion.getAsString();
     Printer << ")";
     break;
@@ -2235,12 +2246,39 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
 }
 
+static StringRef getManglingModuleName(StringRef OriginalModuleName) {
+  auto index = OriginalModuleName.find(";");
+  return index == StringRef::npos
+      ? OriginalModuleName
+      : OriginalModuleName.slice(0, index);
+}
+
+static StringRef getLinkerModuleName(StringRef OriginalModuleName) {
+  auto index = OriginalModuleName.find(";");
+  return index == StringRef::npos
+      ? OriginalModuleName
+      : OriginalModuleName.slice(index + 1, OriginalModuleName.size());
+}
+
+OriginallyDefinedInAttr::OriginallyDefinedInAttr(
+    SourceLoc AtLoc, SourceRange Range,
+    StringRef OriginalModuleName,
+    PlatformKind Platform,
+    const llvm::VersionTuple MovedVersion, bool Implicit)
+  : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
+                  Implicit),
+    ManglingModuleName(getManglingModuleName(OriginalModuleName)),
+    LinkerModuleName(getLinkerModuleName(OriginalModuleName)),
+    Platform(Platform),
+    MovedVersion(MovedVersion) {}
+
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
   Result.Version = MovedVersion;
-  Result.ModuleName = OriginalModuleName;
+  Result.ManglingModuleName = ManglingModuleName;
+  Result.LinkerModuleName = LinkerModuleName;
   if (isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/false)) {
     return Result;
   }
@@ -2260,7 +2298,7 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
                                                         bool implicit) const {
   return new (C) OriginallyDefinedInAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
-      OriginalModuleName, Platform, MovedVersion, implicit);
+      ManglingModuleName, LinkerModuleName, Platform, MovedVersion, implicit);
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {

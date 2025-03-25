@@ -347,6 +347,19 @@ if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
 endif()
 
+# Backward deployment of Span on Apple platforms is implemented via the
+# libswiftCompatibilitySpan.dylib shim.
+#
+# This flag ensures we emit the correct $ld$previous$ symbols in the standard
+# library. When building a binary for an older deployment target, we
+# pretend certain symbols are actually in libswiftCompatibilitySpan.dylib.
+#
+# Further discussion of libswiftCompatibilitySpan.dylib appears below.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-previous-module-installname-map-file" "-Xfrontend" "${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json")
+endif()
+
 set(swiftCore_common_options
                   IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
@@ -423,6 +436,44 @@ add_swift_target_library(swiftCore
                   MACCATALYST_BUILD_FLAVOR
                     zippered
                  )
+
+# When a binary built with an older deployment target is run with a new
+# standard library, the symbols that were previously in the backward
+# compatibility shim are now in the standard library. To ensure the
+# dynamic linker continues to find these symbols, the compatibility
+# shim must be replaced by a symlink to the standard library.
+#
+# Since we're building the "new" standard library here, we create this
+# symlink in the same directory, from libswiftCompatibilitySpan.dylib to
+# libswiftCore.dylib.
+#
+# The sources for the real libswiftCompatibilitySpan.dylib are found in
+# stdlib/toolchain/CompatibilitySpan. When running a binary with an old
+# standard library, this dynamic library must be present at run time.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  foreach(sdk ${SWIFT_SDKS})
+    set(lib_dir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(lib_path "${SWIFTLIB_DIR}/${lib_dir}")
+    set(compat_lib_name "${lib_path}/libswiftCompatibilitySpan.dylib")
+
+    # This doesn't depend on libswiftCore.dylib because we don't actually need
+    # for it to exist to create the symlink, nor is there any need to recreate
+    # the symlink if the dylib changes.
+    add_custom_command_target(unused_var
+                              CUSTOM_TARGET_NAME "swiftCompatibilitySpan-symlink-${lib_dir}"
+                              OUTPUT "${compat_lib_name}"
+                              COMMAND ${CMAKE_COMMAND} "-E" "create_symlink" "${lib_path}/libswiftCore.dylib" "${compat_lib_name}")
+    foreach(ARCH ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      add_dependencies("swiftCore-${lib_dir}-${ARCH}" "swiftCompatibilitySpan-symlink-${lib_dir}")
+    endforeach()
+
+    swift_install_symlink_component(stdlib
+      LINK_NAME libswiftCompatibilitySpan.dylib
+      TARGET libswiftCore.dylib
+      DESTINATION "lib/swift/${lib_dir}")
+  endforeach()
+endif()
 
 # Embedded standard library - embedded libraries are built as .swiftmodule only,
 # i.e. there is no .o or .a file produced (no binary code is actually produced)

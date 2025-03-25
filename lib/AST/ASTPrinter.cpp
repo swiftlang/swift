@@ -5986,7 +5986,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
         Name = Mod->getASTContext()
           .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
-                         ->OriginalModuleName);
+                         ->ManglingModuleName);
         break;
       }
     }
