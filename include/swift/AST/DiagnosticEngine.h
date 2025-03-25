@@ -706,6 +706,9 @@ namespace swift {
     /// diagnostic.
     SourceManager &getSourceManager();
 
+    /// Returns whether this diagnostic is set to behave as an error.
+    bool isError() const;
+
     /// Prevent the diagnostic from behaving more severely than \p limit. For
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
