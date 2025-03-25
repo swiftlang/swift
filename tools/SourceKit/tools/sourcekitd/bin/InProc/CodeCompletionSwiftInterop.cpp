@@ -661,6 +661,17 @@ void swiftide_completion_item_get_doc_brief(
   handler(item.getBriefDocComment().data());
 }
 
+// TODO(a7medev): Is this function required?
+void swiftide_completion_item_get_doc_full(
+    swiftide_completion_response_t _response, swiftide_completion_item_t _item,
+    void (^handler)(const char *)) {
+  auto &item = *static_cast<CodeCompletionResult *>(_item);
+  if (item.getFullDocComment().empty()) {
+    return handler(nullptr);
+  }
+  handler(item.getFullDocComment().data());
+}
+
 void swiftide_completion_item_get_associated_usrs(
     swiftide_completion_response_t _response, swiftide_completion_item_t _item,
     void (^handler)(const char **, uint64_t)) {

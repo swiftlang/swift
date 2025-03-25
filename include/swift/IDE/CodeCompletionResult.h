@@ -377,6 +377,7 @@ class ContextFreeCodeCompletionResult {
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
+  NullTerminatedStringRef FullDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
   CodeCompletionResultType ResultType;
 
@@ -409,6 +410,7 @@ public:
       bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
+      NullTerminatedStringRef FullDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
@@ -420,9 +422,9 @@ public:
         MacroRoles(MacroRoles), IsSystem(IsSystem),
         HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
+        BriefDocComment(BriefDocComment), FullDocComment(FullDocComment),
+        AssociatedUSRs(AssociatedUSRs), ResultType(ResultType),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
         NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
@@ -452,6 +454,7 @@ public:
       CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKin,
       NullTerminatedStringRef BriefDocComment,
+      NullTerminatedStringRef FullDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -459,14 +462,15 @@ public:
 
   /// Constructs a \c Keyword result.
   ///
-  /// \note The caller must ensure that the \p CompletionString and
-  /// \p BriefDocComment outlive this result, typically by storing them in
-  /// the same \c CodeCompletionResultSink as the result itself.
+  /// \note The caller must ensure that the \p CompletionString, \p BriefDocComment,
+  /// and \p FullDocComment outlive this result, typically by storing them in the same
+  /// \c CodeCompletionResultSink as the result itself.
   static ContextFreeCodeCompletionResult *
   createKeywordResult(CodeCompletionResultSink &Sink,
                       CodeCompletionKeywordKind Kind,
                       CodeCompletionString *CompletionString,
                       NullTerminatedStringRef BriefDocComment,
+                      NullTerminatedStringRef FullDocComment,
                       CodeCompletionResultType ResultType);
 
   /// Constructs a \c Literal result.
@@ -491,6 +495,7 @@ public:
                    const Decl *AssociatedDecl,
                    bool HasAsyncAlternative, NullTerminatedStringRef ModuleName,
                    NullTerminatedStringRef BriefDocComment,
+                   NullTerminatedStringRef FullDocComment,
                    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
                    CodeCompletionResultType ResultType,
                    ContextFreeNotRecommendedReason NotRecommended,
@@ -534,6 +539,8 @@ public:
   NullTerminatedStringRef getModuleName() const { return ModuleName; }
 
   NullTerminatedStringRef getBriefDocComment() const { return BriefDocComment; }
+
+  NullTerminatedStringRef getFullDocComment() const { return FullDocComment; }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return AssociatedUSRs;
@@ -738,6 +745,10 @@ public:
 
   NullTerminatedStringRef getBriefDocComment() const {
     return getContextFreeResult().getBriefDocComment();
+  }
+
+  NullTerminatedStringRef getFullDocComment() const {
+    return getContextFreeResult().getFullDocComment();
   }
 
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {

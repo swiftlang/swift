@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDE/CommentConversion.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/Basic/Module.h"
@@ -136,6 +137,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
         Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
+        NullTerminatedStringRef(FullDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
@@ -145,14 +147,16 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Keyword:
     ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
         Sink, KeywordKind, CCS,
-        NullTerminatedStringRef(BriefDocComment, Allocator), ResultType);
+        NullTerminatedStringRef(BriefDocComment, Allocator),
+        NullTerminatedStringRef(FullDocComment, Allocator), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             Sink, Kind, CCS, CodeCompletionOperatorKind::None,
-            NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
+            NullTerminatedStringRef(BriefDocComment, Allocator),
+            NullTerminatedStringRef(FullDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
     break;
@@ -224,6 +228,12 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     setContextFreeNotRecommended(
         ContextFreeNotRecommendedReason::SoftDeprecated);
 
+  SmallString<256> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  ide::getDocumentationCommentAsXML(D, OS, /*IncludeParameters=*/true);
+
+  setFullDocComment(StringRef(Buffer).copy(Sink.getAllocator()));
+  
   if (D->getClangNode()) {
     if (auto *ClangD = D->getClangDecl()) {
       const auto &ClangContext = ClangD->getASTContext();
