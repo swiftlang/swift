@@ -1727,7 +1727,10 @@ void Serializer::writeRequirementSignature(
 
   for (const auto &typeAlias : requirementSig.getTypeAliases()) {
     rawData.push_back(addDeclBaseNameRef(typeAlias.getName()));
-    rawData.push_back(addTypeRef(typeAlias.getUnderlyingType()));
+
+    auto underlyingType = typeAlias.getUnderlyingType();
+    ASSERT(!underlyingType->findUnresolvedDependentMemberType());
+    rawData.push_back(addTypeRef(underlyingType));
   }
 
   RequirementSignatureLayout::emitRecord(
