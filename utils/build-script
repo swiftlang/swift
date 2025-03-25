@@ -698,13 +698,13 @@ def main_normal():
     # Preprocess the arguments to apply defaults.
     apply_default_arguments(toolchain, args)
 
-    # Create the build script invocation.
-    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
-
     cmake = CMake(args=args, toolchain=toolchain)
     toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
                                            build_root=SWIFT_BUILD_ROOT)
     args.cmake = toolchain.cmake
+
+    # Create the build script invocation.
+    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
 
     # Validate the arguments.
     validate_arguments(toolchain, args)
