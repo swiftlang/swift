@@ -1101,7 +1101,7 @@ StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
       if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
-        return OD->OriginalModuleName;
+        return OD->ManglingModuleName;
       }
     }
   }

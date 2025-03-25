@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 /// `Span<Element>` represents a contiguous region of memory
 /// which contains initialized instances of `Element`.
 ///
