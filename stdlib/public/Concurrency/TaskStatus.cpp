@@ -793,9 +793,11 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
       this, sizeof(class TaskNameStatusRecord));
 
   // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
+  auto taskNameLen = strlen(_taskName);
   char* taskNameCopy = reinterpret_cast<char*>(
-      _swift_task_alloc_specific(this, strlen(_taskName) + 1/*null terminator*/));
-  (void) strcpy(/*dst=*/taskNameCopy, /*src=*/_taskName);
+      _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
+  (void) strncpy(/*dst=*/taskNameCopy, /*src=*/_taskName, taskNameLen);
+  taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
 
   auto record =
       ::new (allocation) TaskNameStatusRecord(taskNameCopy);
@@ -941,6 +943,35 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   });
 }
 
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
+void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
+  // Because only the owning task of the task group can modify the
+  // child list of a task group status record, and it can only do so
+  // while holding the owning task's status record lock, we do not need
+  // any additional synchronization within this function.
+  for (auto childTask : group->getTaskRecord()->children())
+    swift_task_cancel(childTask);
+}
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called from the owning task.
+void swift::_swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
+                                                        AsyncTask *owningTask) {
+  // Early out. If there are no children, there's nothing to do. We can safely
+  // check this without locking, since this can only be concurrently mutated
+  // from a child task. If there are no children then no more can be added.
+  if (!group->getTaskRecord()->getFirstChild())
+    return;
+
+  withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
+    _swift_taskGroup_cancelAllChildren(group);
+  });
+}
+
 /**************************************************************************/
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
@@ -1045,6 +1076,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 
 /// Perform any escalation actions required by the given record.
 static void performEscalationAction(TaskStatusRecord *record,
+                                    JobPriority oldPriority,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
   // Child tasks need to be recursively escalated.
@@ -1065,15 +1097,17 @@ static void performEscalationAction(TaskStatusRecord *record,
   case TaskStatusRecordKind::EscalationNotification:  {
     auto notification =
       cast<EscalationNotificationStatusRecord>(record);
-    notification->run(newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] Trigger task escalation handler record %p, escalate from %#x to %#x",
+                         record, oldPriority, newPriority);
+    notification->run(oldPriority, newPriority);
     return;
   }
 
   case TaskStatusRecordKind::TaskDependency: {
     auto dependencyRecord = cast<TaskDependencyStatusRecord>(record);
-    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p to %#x",
-                    record, newPriority);
-    dependencyRecord->performEscalationAction(newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p from %#x to %#x",
+                    record, oldPriority, newPriority);
+    dependencyRecord->performEscalationAction(oldPriority, newPriority);
     return;
   }
 
@@ -1099,17 +1133,17 @@ static void performEscalationAction(TaskStatusRecord *record,
 SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
-
   SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto oldPriority = oldStatus.getStoredPriority();
   auto newStatus = oldStatus;
 
   while (true) {
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
-    if (oldStatus.getStoredPriority() >= newPriority) {
-      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldStatus.getStoredPriority());
-      return oldStatus.getStoredPriority();
+    if (oldPriority >= newPriority) {
+      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldPriority);
+      return oldPriority;
     }
 
     if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
@@ -1143,8 +1177,11 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     taskStatus = (ActiveTaskStatus *) &task->_private()._status();
     executionLock = (dispatch_lock_t *) ((char*)taskStatus + ActiveTaskStatus::executionLockOffset());
 
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
-    swift_dispatch_lock_override_start_with_debounce(executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x from %#x to %#x",
+                         task, newStatus.currentExecutionLockOwner(),
+                         oldPriority, newPriority);
+    swift_dispatch_lock_override_start_with_debounce(
+        executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
 #endif
   } else if (newStatus.isEnqueued()) {
     //  Task is not running, it's enqueued somewhere waiting to be run
@@ -1163,7 +1200,8 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     return newStatus.getStoredPriority();
   }
 
-  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended from %#x to %#x",
+                       task, oldPriority, newPriority);
   // We must have at least one record - the task dependency one.
   assert(newStatus.getInnermostRecord() != NULL);
 
@@ -1171,14 +1209,15 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
     for (auto cur: status.records()) {
-      performEscalationAction(cur, newPriority);
+      performEscalationAction(cur, oldPriority, newPriority);
     }
   });
 
   return newStatus.getStoredPriority();
 }
 
-void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority) {
+void TaskDependencyStatusRecord::performEscalationAction(
+    JobPriority oldPriority, JobPriority newPriority) {
   switch (this->DependencyKind) {
     case WaitingOnTask:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent task %p noted in %p record",
@@ -1200,8 +1239,8 @@ void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority
         this->DependentOn.TaskGroup, this);
       break;
     case EnqueuedOnExecutor:
-      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record",
-        this->DependentOn.Executor, this);
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record from %#x to %#x",
+        this->DependentOn.Executor, this, oldPriority, newPriority);
       swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
   }

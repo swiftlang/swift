@@ -129,7 +129,8 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       params, voidTy, importedDecl, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
-  setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+  if (!isa<ClassDecl>(importedDecl))
+    setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   setterDecl->setAccess(importedFieldDecl->getFormalAccess());
 
   return setterDecl;
@@ -2106,6 +2107,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   newMethod->setImplicit();
   newMethod->setImplicitlyInline();
   newMethod->setAccess(clang::AccessSpecifier::AS_public);
+  newMethod->addAttr(clang::NoDebugAttr::CreateImplicit(clangCtx));
   if (method->hasAttr<clang::CFReturnsRetainedAttr>()) {
     // Return an FRT field at +1 if the base method also follows this
     // convention.

@@ -99,8 +99,8 @@ const View* usedToCrash(const View* p) {
 import Test
 import CxxStdlib
 
-// CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-// CHECK-NO-LIFETIMES: test.swift:6:32: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK: error: a function with a ~Escapable result needs a parameter to depend on
+// CHECK-NO-LIFETIMES: test.swift:6:32: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
 public func noAnnotations() -> View {
     // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
     // CHECK-NO-LIFETIMES: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
@@ -111,16 +111,13 @@ public func noAnnotations() -> View {
     // CHECK-NOT: nonescapable.h:20
     f2(nil, nil)
     // CHECK: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
-    // CHECK: nonescapable.h:24:6: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
     // CHECK-NO-LIFETIMES: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
-    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     g(nil)
     h1(nil)
-    // CHECK: nonescapable.h:34:21: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:34:21: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:34:21: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     h2(nil)
-    // CHECK: nonescapable.h:35:21: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:35:21: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:35:21: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     h3(nil)
     i1()
     // CHECK: nonescapable.h:39:39: error: template parameter 'Missing' does not exist
@@ -129,22 +126,18 @@ public func noAnnotations() -> View {
     // CHECK: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
     // CHECK-NO-LIFETIMES: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
     j1()
-    // CHECK: nonescapable.h:63:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:63:41: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:63:41: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     j2()
-    // CHECK: nonescapable.h:64:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:64:41: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:64:41: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     j3()
     k1();
-    // CHECK: nonescapable.h:70:15: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:70:15: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:70:15: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     k2();
-    // CHECK: nonescapable.h:71:22: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:71:22: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:71:22: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     k3();
     l1();
-    // CHECK: nonescapable.h:77:12: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK: nonescapable.h:77:12: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
     l2();
     return View()
 }

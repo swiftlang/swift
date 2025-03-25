@@ -161,6 +161,8 @@ NODE(NonIsolatedCallerFunctionType)
 NODE(SendingResultFunctionType)
 NODE(KeyPathGetterThunkHelper)
 NODE(KeyPathSetterThunkHelper)
+NODE(KeyPathUnappliedMethodThunkHelper)
+NODE(KeyPathAppliedMethodThunkHelper)
 NODE(KeyPathEqualsThunkHelper)
 NODE(KeyPathHashThunkHelper)
 NODE(LazyProtocolWitnessTableAccessor)
@@ -328,6 +330,7 @@ NODE(AssociatedTypeGenericParamRef)
 NODE(SugaredOptional)
 NODE(SugaredArray)
 NODE(SugaredDictionary)
+NODE(SugaredInlineArray)
 NODE(SugaredParen) // Removed in Swift 6.TBD
 
 // Added in Swift 5.1

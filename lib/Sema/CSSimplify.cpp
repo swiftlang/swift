@@ -4675,6 +4675,12 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    return resolveKeyPath(typeVar, type, flags, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -8704,18 +8710,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If we aren't allowed to have an isolated conformance, check for any
     // isolated conformances here.
     if (kind == ConstraintKind::NonisolatedConformsTo &&
-        !conformance.getRequirement()->isMarkerProtocol()) {
+        !conformance.getProtocol()->isMarkerProtocol()) {
       // Grab the first isolated conformance, if there is one.
-      ProtocolConformance *isolatedConformance = nullptr;
-      conformance.forEachIsolatedConformance([&](ProtocolConformance *conf) {
+      ProtocolConformanceRef isolatedConformance;
+      conformance.forEachIsolatedConformance([&](ProtocolConformanceRef conf) {
         if (!isolatedConformance)
           isolatedConformance = conf;
         return true;
       });
 
-      if (isolatedConformance) {
+      if (isolatedConformance && isolatedConformance.isConcrete()) {
         auto fix = IgnoreIsolatedConformance::create(
-            *this, getConstraintLocator(locator), isolatedConformance);
+            *this, getConstraintLocator(locator),
+            isolatedConformance.getConcrete());
         if (recordFix(fix)) {
           return SolutionKind::Error;
         }
@@ -8747,11 +8754,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::Subtype: {
-    auto conformance = TypeChecker::containsProtocol(
+    auto pair = TypeChecker::containsProtocol(
         type, protocol, /*allowMissing=*/true);
-    if (conformance) {
-      return recordConformance(conformance);
-    }
+    if (pair.first)
+      return SolutionKind::Solved;
+    if (pair.second)
+      return recordConformance(pair.second);
   } break;
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
@@ -9073,8 +9081,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
-        loc->isKeyPathSubscriptComponent()) {
+    if ((loc->isResultOfKeyPathDynamicMemberLookup() ||
+         loc->isKeyPathSubscriptComponent()) ||
+        loc->isKeyPathMemberComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
         auto *fix =
@@ -10825,7 +10834,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
-  } else if (isExpr<KeyPathExpr>(anchor)) {
+  } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
     return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
@@ -12039,8 +12048,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (!shouldAttemptFixes())
       return false;
 
-    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar),
-                    closureLocator);
+    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar));
     recordTypeVariablesAsHoles(inferredClosureType);
 
     return !recordFix(
@@ -12208,7 +12216,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
                         closureExtInfo);
-  assignFixedType(typeVar, closureType, closureLocator);
+  assignFixedType(typeVar, closureType);
 
   // If there is a result builder to apply, do so now.
   if (resultBuilderType) {
@@ -12236,7 +12244,7 @@ bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
       locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
           .getOpenedType();
 
-  assignFixedType(typeVar, openedExpansionType, locator);
+  assignFixedType(typeVar, openedExpansionType);
   return true;
 }
 
@@ -12247,7 +12255,7 @@ bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
   auto *tapExpr = castToExpr<TapExpr>(tapLoc->getAnchor());
 
   // Assign a type to tap expression itself.
-  assignFixedType(typeVar, contextualType, getConstraintLocator(locator));
+  assignFixedType(typeVar, contextualType);
   // Set type to `$interpolation` variable declared in the body of tap
   // expression.
   setType(tapExpr->getVar(), contextualType);
@@ -12255,6 +12263,30 @@ bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
   // With all of the contextual information recorded in the constraint system,
   // it's time to generate constraints for the body of this tap expression.
   return !generateConstraints(tapExpr);
+}
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator) {
+  // Key path types recently gained Copyable, Escapable requirements.
+  // The solver cannot account for that during inference because Root
+  // and Value types are required to be only resolved enough to infer
+  // a capability of a key path itself.
+  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
+    auto keyPathTy = openUnboundGenericType(
+        BGT->getDecl(), BGT->getParent(), locator, /*isTypeResolution=*/false);
+
+    assignFixedType(
+        typeVar, keyPathTy, /*updateState=*/true,
+        /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+    addConstraint(ConstraintKind::Equal, keyPathTy, contextualType, locator);
+    return true;
+  }
+
+  assignFixedType(typeVar, contextualType, /*updateState=*/true,
+                  /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+  return true;
 }
 
 ConstraintSystem::SolutionKind

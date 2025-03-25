@@ -475,6 +475,28 @@ public:
   bool isCached() const { return true; }
 };
 
+class ConformanceIsolationRequest :
+    public SimpleRequest<ConformanceIsolationRequest,
+                         ActorIsolation(ProtocolConformance *),
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ActorIsolation
+  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<ActorIsolation> getCachedResult() const;
+  void cacheResult(ActorIsolation result) const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
@@ -713,12 +735,36 @@ public:
   bool isCached() const;
 };
 
+struct USRGenerationOptions {
+  /// @brief Whether to emit USRs using the Swift declaration when it is
+  /// synthesized from a Clang based declaration. Useful in cases where Swift
+  /// declarations are synthesized from Clang nodes but the caller actually
+  /// wants the USR of the Swift declaration.
+  bool distinguishSynthesizedDecls;
+
+  friend llvm::hash_code hash_value(const USRGenerationOptions &options) {
+    return llvm::hash_value(options.distinguishSynthesizedDecls);
+  }
+
+  friend bool operator==(const USRGenerationOptions &lhs,
+                         const USRGenerationOptions &rhs) {
+    return lhs.distinguishSynthesizedDecls == rhs.distinguishSynthesizedDecls;
+  }
+
+  friend bool operator!=(const USRGenerationOptions &lhs,
+                         const USRGenerationOptions &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const USRGenerationOptions &options);
+
 /// Generate the USR for the given declaration.
-class USRGenerationRequest :
-    public SimpleRequest<USRGenerationRequest,
-                         std::string(const ValueDecl*),
-                         RequestFlags::Cached>
-{
+class USRGenerationRequest
+    : public SimpleRequest<USRGenerationRequest,
+                           std::string(const ValueDecl *, USRGenerationOptions),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -726,7 +772,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  std::string evaluate(Evaluator &eval, const ValueDecl *d) const;
+  std::string evaluate(Evaluator &eval, const ValueDecl *d,
+                       USRGenerationOptions options) const;
 
 public:
   // Caching
@@ -3972,25 +4019,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Retrieve the file being used for code completion in the main module.
-// FIXME: This isn't really a type-checking request, if we ever split off a
-// zone for more basic AST requests, this should be moved there.
-class IDEInspectionFileRequest
-    : public SimpleRequest<IDEInspectionFileRequest,
-                           SourceFile *(ModuleDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  SourceFile *evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
-
-public:
-  // Cached.
-  bool isCached() const { return true; }
-};
-
 /// Kinds of types for CustomAttr.
 enum class CustomAttrTypeKind {
   /// The type is required to not be expressed in terms of
@@ -4106,26 +4134,40 @@ public:
   void cacheResult(ValueDecl *value) const;
 };
 
-enum class SemanticDeclAvailability : uint8_t {
-  /// The decl is potentially available in some contexts and/or under certain
-  /// deployment conditions.
+/// Describes the runtime availability of a declaration, which is a
+/// classification of whether a decl can be used at runtime (as opposed to
+/// compile time).
+///
+/// The elements of this enumeration must be ordered from most available to
+/// least available.
+enum class DeclRuntimeAvailability : uint8_t {
+  /// The decl is potentially available at runtime. If it is unavailable at
+  /// compile time in the current module, it may still be considered available
+  /// at compile time by other modules with different settings. For example, a
+  /// decl that is obsolete in Swift 5 is still available to other modules that
+  /// are compiled for an earlier language mode.
   PotentiallyAvailable,
 
-  /// The decl is always unavailable in the current compilation context.
-  /// However, it may still be used at runtime by other modules with different
-  /// settings. For example a decl that is obsolete in Swift 5 is still
-  /// available to other modules compiled for an earlier language mode.
-  ConditionallyUnavailable,
+  /// The decl is always unavailable at compile time in the current module and
+  /// all other modules, but it is still required to be present at load time to
+  /// maintain ABI compatibility. For example, when compiling for macOS a decl
+  /// with an `@available(macOS, unavailable)` attribute can never be invoked,
+  /// except in contexts that are also completely unavailable on macOS. This
+  /// means the declaration is unreachable by execution at runtime, but the
+  /// decl's symbols may still have been strongly linked by other binaries built
+  /// by older versions of the compiler which may have emitted unavailable code
+  /// with strong references. To preserve ABI stability, the decl must still be
+  /// emitted.
+  AlwaysUnavailableABICompatible,
 
-  /// The decl is universally unavailable. For example, when compiling for macOS
-  /// a decl with `@available(macOS, unavailable)` can never be used (except in
-  /// contexts that are also completely unavailable on macOS).
-  CompletelyUnavailable,
+  /// The decl is always unavailable and should never be reachable at runtime
+  /// nor be required at load time.
+  AlwaysUnavailable,
 };
 
-class SemanticDeclAvailabilityRequest
-    : public SimpleRequest<SemanticDeclAvailabilityRequest,
-                           SemanticDeclAvailability(const Decl *decl),
+class DeclRuntimeAvailabilityRequest
+    : public SimpleRequest<DeclRuntimeAvailabilityRequest,
+                           DeclRuntimeAvailability(const Decl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4133,8 +4175,8 @@ public:
 private:
   friend SimpleRequest;
 
-  SemanticDeclAvailability evaluate(Evaluator &evaluator,
-                                    const Decl *decl) const;
+  DeclRuntimeAvailability evaluate(Evaluator &evaluator,
+                                   const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -4672,7 +4714,7 @@ public:
 
 class ExpandBodyMacroRequest
     : public SimpleRequest<ExpandBodyMacroRequest,
-                           std::optional<unsigned>(AbstractFunctionDecl *),
+                           std::optional<unsigned>(AnyFunctionRef),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4681,7 +4723,7 @@ private:
   friend SimpleRequest;
 
   std::optional<unsigned> evaluate(Evaluator &evaluator,
-                                   AbstractFunctionDecl *fn) const;
+                                   AnyFunctionRef fn) const;
 
 public:
   bool isCached() const { return true; }

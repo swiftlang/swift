@@ -100,6 +100,14 @@ BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
   return ErrorTypeRepr::create(cContext.unbridged(), cRange.unbridged());
 }
 
+BridgedInlineArrayTypeRepr BridgedInlineArrayTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr cCountType,
+    BridgedTypeRepr cElementType, BridgedSourceRange cBracketsRange) {
+  return InlineArrayTypeRepr::create(
+      cContext.unbridged(), cCountType.unbridged(), cElementType.unbridged(),
+      cBracketsRange.unbridged());
+}
+
 BridgedInverseTypeRepr
 BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cTildeLoc,
@@ -139,6 +147,12 @@ BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
     BridgedParamSpecifier cSpecifier, BridgedSourceLoc cSpecifierLoc) {
   return new (cContext.unbridged()) OwnershipTypeRepr(
       base.unbridged(), unbridge(cSpecifier), cSpecifierLoc.unbridged());
+}
+
+BridgedPlaceholderTypeRepr
+BridgedPlaceholderTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged()) PlaceholderTypeRepr(cLoc.unbridged());
 }
 
 BridgedProtocolTypeRepr
@@ -287,11 +301,12 @@ BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
       resultType.unbridged());
 }
 
-BridgedNamedOpaqueReturnTypeRepr
-BridgedNamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
-                                              BridgedTypeRepr baseTy) {
+BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr baseTy,
+    BridgedGenericParamList genericParams) {
   ASTContext &context = cContext.unbridged();
-  return new (context) NamedOpaqueReturnTypeRepr(baseTy.unbridged(), nullptr);
+  return new (context)
+      NamedOpaqueReturnTypeRepr(baseTy.unbridged(), genericParams.unbridged());
 }
 
 BridgedOpaqueReturnTypeRepr

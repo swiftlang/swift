@@ -147,6 +147,8 @@ BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDepe
     : inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
       addressableParamIndices(info.getAddressableIndices()),
+      conditionallyAddressableParamIndices(
+        info.getConditionallyAddressableIndices()),
       targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
@@ -175,6 +177,12 @@ bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
 
 bool BridgedLifetimeDependenceInfo::checkAddressable(SwiftInt index) const {
   return addressableParamIndices && addressableParamIndices->contains(index);
+}
+
+bool BridgedLifetimeDependenceInfo::
+checkConditionallyAddressable(SwiftInt index) const {
+  return conditionallyAddressableParamIndices
+    && conditionallyAddressableParamIndices->contains(index);
 }
 
 SwiftInt BridgedLifetimeDependenceInfo::getTargetIndex() const {
@@ -320,10 +328,6 @@ BridgedType BridgedType::getObjectType() const {
   return unbridged().getObjectType();
 }
 
-BridgedASTType BridgedType::getASTType() const {
-  return {unbridged().getASTType().getPointer()};
-}
-
 BridgedDiagnosticArgument BridgedType::asDiagnosticArgument() const {
   return swift::DiagnosticArgument(unbridged().getASTType());
 }
@@ -336,10 +340,6 @@ bool BridgedType::isNonTrivialOrContainsRawPointer(BridgedFunction f) const {
   return unbridged().isNonTrivialOrContainsRawPointer(f.getFunction());
 }
 
-bool BridgedType::isValueTypeWithDeinit() const {
-  return unbridged().isValueTypeWithDeinit();
-}
-
 bool BridgedType::isLoadable(BridgedFunction f) const {
   return unbridged().isLoadable(f.getFunction());
 }
@@ -348,63 +348,8 @@ bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
 
-bool BridgedType::isUnownedStorageType() const {
-  return unbridged().isUnownedStorageType();
-}
-
-bool BridgedType::hasArchetype() const {
-  return unbridged().hasArchetype();
-}
-
-bool BridgedType::isNominalOrBoundGenericNominal() const {
-  return unbridged().getNominalOrBoundGenericNominal() != nullptr;
-}
-
-BridgedSubstitutionMap BridgedType::getContextSubstitutionMap() const {
-  swift::CanType astType = unbridged().getASTType();
-  return astType->getContextSubstitutionMap();
-}
-
-bool BridgedType::isGenericAtAnyLevel() const {
-  swift::CanType astType = unbridged().getASTType();
-  return astType->isSpecialized();
-}
-
-OptionalBridgedDeclObj BridgedType::getNominalOrBoundGenericNominal() const {
-  return {unbridged().getNominalOrBoundGenericNominal()};
-}
-
-bool BridgedType::isClassOrBoundGenericClass() const {
-  return unbridged().getClassOrBoundGenericClass() != 0;
-}
-
-bool BridgedType::isStructOrBoundGenericStruct() const {
-  return unbridged().getStructOrBoundGenericStruct() != nullptr;
-}
-
-bool BridgedType::isTuple() const {
-  return unbridged().isTuple();
-}
-
-bool BridgedType::isEnumOrBoundGenericEnum() const {
-  return unbridged().getEnumOrBoundGenericEnum() != nullptr;
-}
-
 bool BridgedType::isFunction() const {
   return unbridged().isFunction();
-}
-
-bool BridgedType::isMetatype() const {
-  return unbridged().isMetatype();
-}
-
-bool BridgedType::isClassExistential() const {
-  return unbridged().isClassExistentialType();
-}
-
-bool BridgedType::isOptional() const {
-  swift::CanType astType = unbridged().getASTType();
-  return astType->isOptional();
 }
 
 bool BridgedType::isNoEscapeFunction() const {
@@ -423,10 +368,6 @@ bool BridgedType::isAsyncFunction() const {
   return unbridged().isAsyncFunction();
 }
 
-bool BridgedType::isVoid() const {
-  return unbridged().isVoid();
-}
-
 bool BridgedType::isEmpty(BridgedFunction f) const {
   return unbridged().isEmpty(*f.getFunction());
 }
@@ -439,42 +380,8 @@ bool BridgedType::isEscapable(BridgedFunction f) const {
   return unbridged().isEscapable(*f.getFunction());
 }
 
-bool BridgedType::isOrContainsObjectiveCClass() const {
-  return unbridged().isOrContainsObjectiveCClass();
-}
-
-bool BridgedType::isBuiltinInteger() const {
-  return unbridged().isBuiltinInteger();
-}
-
-bool BridgedType::isBuiltinFloat() const {
-  return unbridged().isBuiltinFloat();
-}
-
-bool BridgedType::isBuiltinVector() const {
-  return unbridged().isBuiltinVector();
-}
-
-BridgedType BridgedType::getBuiltinVectorElementType() const {
-  return unbridged().getBuiltinVectorElementType();
-}
-
-bool BridgedType::isBuiltinFixedWidthInteger(SwiftInt width) const {
-  return unbridged().isBuiltinFixedWidthInteger((unsigned)width);
-}
-
 bool BridgedType::isExactSuperclassOf(BridgedType t) const {
   return unbridged().isExactSuperclassOf(t.unbridged());
-}
-
-BridgedType BridgedType::getLoweredInstanceTypeOfMetatype(BridgedFunction f) const {
-  return unbridged().getLoweredInstanceTypeOfMetatype(f.getFunction());
-}
-
-bool BridgedType::isDynamicSelfMetatype() const {
-  auto metaType = unbridged().castTo<swift::MetatypeType>();
-  swift::Type instTy = metaType->getInstanceType();
-  return instTy->is<swift::DynamicSelfType>();
 }
 
 bool BridgedType::isCalleeConsumedFunction() const {
@@ -483,6 +390,10 @@ bool BridgedType::isCalleeConsumedFunction() const {
 
 bool BridgedType::isMarkedAsImmortal() const {
   return unbridged().isMarkedAsImmortal();
+}
+
+bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
+  return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
@@ -537,13 +448,13 @@ BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
   return swift::SILType::getPrimitiveObjectType(newTy);
 }
 
+BridgedGenericSignature BridgedType::getInvocationGenericSignatureOfFunctionType() const {
+  return {unbridged().castTo<swift::SILFunctionType>()->getInvocationGenericSignature().getPointer()};
+}
+
 BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
   return getArgumentConvention(fnType->getCalleeConvention());
-}
-
-BridgedType BridgedType::getSuperClassType() const {
-  return unbridged().getSuperclass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1933,8 +1844,8 @@ BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceRequirement() c
   return unbridged().getAssociatedConformanceWitness().Requirement;
 }
 
-BridgedDeclObj BridgedWitnessTableEntry::getAssociatedConformanceDecl() const {
-  return {unbridged().getAssociatedConformanceWitness().Protocol};
+BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceSubstType() const {
+  return {unbridged().getAssociatedConformanceWitness().SubstType};
 }
 
 BridgedConformance BridgedWitnessTableEntry::getAssociatedConformanceWitness() const {
@@ -1968,11 +1879,11 @@ BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedType(BridgedD
 }
 
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedConformance(BridgedCanType requirement,
-                                                                               BridgedDeclObj protocolDecl,
+                                                                               BridgedCanType substType,
                                                                                BridgedConformance witness) {
   return bridge(swift::SILWitnessTable::Entry(
     swift::SILWitnessTable::AssociatedConformanceWitness{requirement.unbridged(),
-                                                         protocolDecl.getAs<swift::ProtocolDecl>(),
+                                                         substType.unbridged(),
                                                          witness.unbridged()}));
 }
 

@@ -63,7 +63,7 @@ struct _S {
   @#^ON_INIT^# init()
 // ON_INIT:              Begin completions
 // ON_INIT_ENABLED-DAG:  Keyword/None:              abi[#Constructor Attribute#]; name=abi
-// ON_INIT_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
+// ON_INIT_ENABLED-DAG:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_INIT_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // ON_INIT_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_INIT:              End completions

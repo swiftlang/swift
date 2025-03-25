@@ -487,6 +487,18 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
                  NLKind::UnqualifiedLookup, resolutionKind, dc,
                  Loc, nlOptions);
 
+  if (dc->isInSwiftinterface() &&
+      !dc->getASTContext().LangOpts.FormalCxxInteropMode) {
+    // It's possible that the textual interface was originally compiled without
+    // C++ interop enabled, but is now being imported in another compilation
+    // instance with C++ interop enabled. In that case, we filter out any decls
+    // that only exist due to C++ interop, e.g., namespace.
+    CurModuleResults.erase(std::remove_if(CurModuleResults.begin(),
+                                          CurModuleResults.end(),
+                                          importer::declIsCxxOnly),
+                           CurModuleResults.end());
+  }
+
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
     removeShadowedDecls(CurModuleResults, dc);

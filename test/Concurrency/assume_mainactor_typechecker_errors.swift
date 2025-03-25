@@ -1,9 +1,7 @@
-// RUN: %target-swift-frontend -swift-version 6 -emit-sil -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s -verify
-
-// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
+// RUN: %target-swift-frontend -swift-version 6 -emit-sil -default-isolation MainActor %s -verify
 
 // READ THIS! This test is meant to check the specific isolation when
-// UnspecifiedMeansMainActorIsolated is enabled in combination with validating
+// `-default-isolation` is set to `MainActor` in combination with validating
 // behavior around explicitly non-Sendable types that trigger type checker
 // specific errors. Please do not put other types of tests in here.
 

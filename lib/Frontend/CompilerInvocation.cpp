@@ -644,7 +644,8 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
   auto validVers = {llvm::StringRef("off"), llvm::StringRef("default"),
                     llvm::StringRef("swift-6"), llvm::StringRef("swift-5.9")};
   auto versStr = "'" + llvm::join(validVers, "', '") + "'";
-  diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
+  diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes,
+                 verArg->getSpelling(), versStr);
 }
 
 void LangOptions::setCxxInteropFromArgs(ArgList &Args,
@@ -679,6 +680,54 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
       cxxInteropCompatVersion =
           validateCxxInteropCompatibilityMode("swift-5.9").second;
   }
+
+  if (Arg *A = Args.getLastArg(options::OPT_formal_cxx_interoperability_mode)) {
+    // Take formal version from explicitly specified formal version flag
+    StringRef version = A->getValue();
+
+    // FIXME: the only valid modes are 'off' and 'swift-6'; see below.
+    if (version == "off") {
+      FormalCxxInteropMode = std::nullopt;
+    } else if (version == "swift-6") {
+      FormalCxxInteropMode = {6};
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      Diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes,
+                     A->getSpelling(), "'off', 'swift-6'");
+    }
+  } else {
+    // In the absence of a formal mode flag, we capture it from the current
+    // C++ compat version (if C++ interop is enabled).
+    //
+    // FIXME: cxxInteropCompatVersion is computed based on the Swift language
+    // version, and is either 4, 5, 6, or 7 (even though only 5.9 and 6.* make
+    // any sense). For now, we don't actually care about the version, so we'll
+    // just use version 6 (i.e., 'swift-6') to mean that C++ interop mode is on.
+    if (EnableCXXInterop)
+      FormalCxxInteropMode = {6};
+    else
+      FormalCxxInteropMode = std::nullopt;
+  }
+}
+
+static std::string printFormalCxxInteropVersion(const LangOptions &Opts) {
+  std::string str;
+  llvm::raw_string_ostream OS(str);
+
+  OS << "-formal-cxx-interoperability-mode=";
+
+  // We must print a 'stable' C++ interop version here, which cannot be
+  // 'default' and 'upcoming-swift' (since those are relative to the current
+  // version, which may change in the future).
+  if (!Opts.FormalCxxInteropMode) {
+    OS << "off";
+  } else {
+    // FIXME: FormalCxxInteropMode will always be 6 (or nullopt); see above
+    OS << "swift-6";
+  }
+
+  return str;
 }
 
 static std::optional<swift::StrictConcurrency>
@@ -925,6 +974,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
+                          ModuleInterfaceOptions &ModuleInterfaceOpts,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
   bool buildingFromInterface =
@@ -1478,6 +1528,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.ClangTargetVariant = llvm::Triple(A->getValue());
 
   Opts.setCxxInteropFromArgs(Args, Diags);
+  if (!Args.hasArg(options::OPT_formal_cxx_interoperability_mode))
+    ModuleInterfaceOpts.PublicFlags.IgnorableFlags +=
+        " " + printFormalCxxInteropVersion(Opts);
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -1760,6 +1813,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
+
+  if (const Arg *A = Args.getLastArg(options::OPT_default_isolation)) {
+    auto behavior =
+        llvm::StringSwitch<std::optional<DefaultIsolation>>(A->getValue())
+            .Case("MainActor", DefaultIsolation::MainActor)
+            .Case("nonisolated", DefaultIsolation::Nonisolated)
+            .Default(std::nullopt);
+
+    if (behavior) {
+      Opts.DefaultIsolationBehavior = *behavior;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    }
+  } else {
+    Opts.DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
+  }
+
+  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    Opts.enableFeature(Feature::InferIsolatedConformances);
 
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -3053,8 +3127,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-  
-  Opts.EnableAddressDependencies = Args.hasArg(OPT_enable_address_dependencies);
+    Opts.EnableAddressDependencies =
+    Args.hasFlag(OPT_enable_address_dependencies,
+                 OPT_disable_address_dependencies,
+                 Opts.EnableAddressDependencies);
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   return false;
 }
@@ -3277,6 +3354,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_disable_swift_specific_llvm_optzns);
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
+
+  Opts.VerifyEach = Args.hasFlag(OPT_enable_llvm_verify_each,
+                                 OPT_disable_llvm_verify_each, Opts.VerifyEach);
 
   Opts.EmitStackPromotionChecks |= Args.hasArg(OPT_stack_promotion_checks);
   if (const Arg *A = Args.getLastArg(OPT_stack_promotion_limit)) {
@@ -3708,12 +3788,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableLayoutStringValueWitnessesInstantiation = Args.hasFlag(OPT_enable_layout_string_value_witnesses_instantiation,
                                       OPT_disable_layout_string_value_witnesses_instantiation,
                                       Opts.EnableLayoutStringValueWitnessesInstantiation);
+  Opts.AnnotateCondFailMessage =
+      Args.hasFlag(OPT_enable_cond_fail_message_annotation,
+                   OPT_disable_cond_fail_message_annotation,
+                   Opts.AnnotateCondFailMessage);
+
 
   if (Opts.EnableLayoutStringValueWitnessesInstantiation &&
       !Opts.EnableLayoutStringValueWitnesses) {
     Diags.diagnose(SourceLoc(), diag::layout_string_instantiation_without_layout_strings);
     return true;
   }
+
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,
@@ -3893,7 +3980,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
+                    FrontendOpts)) {
     return true;
   }
 

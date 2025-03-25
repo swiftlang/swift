@@ -10,25 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/USRGeneration.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/PreprocessingRecord.h"
 #include "clang/Lex/Preprocessor.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace ide;
@@ -170,9 +170,15 @@ static bool shouldUseObjCUSR(const Decl *D) {
   return false;
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const USRGenerationOptions &options) {
+  out << "USRGenerationOptions (distinguishSynthesizedDecls: "
+      << options.distinguishSynthesizedDecls << ")";
+}
+
 std::string
-swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
-                                      const ValueDecl *D) const {
+swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl *D,
+                                      USRGenerationOptions options) const {
   if (auto *VD = dyn_cast<VarDecl>(D))
     D = VD->getCanonicalVarDecl();
 
@@ -184,8 +190,9 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   if (isa<ModuleDecl>(D))
     return std::string(); // Ignore.
 
-  auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
-    ClangNode ClangN = D->getClangNode();
+  auto interpretAsClangNode = [&options](const ValueDecl *D) -> ClangNode {
+    auto *importer = D->getASTContext().getClangModuleLoader();
+    ClangNode ClangN = importer->getEffectiveClangNode(D);
     if (auto ClangD = ClangN.getAsDecl()) {
       // NSErrorDomain causes the clang enum to be imported like this:
       //
@@ -203,11 +210,18 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
       // But we want unique USRs for the above symbols, so use the clang USR
       // for the enum cases, and the Swift USR for the vars.
       //
+      if (!options.distinguishSynthesizedDecls) {
+        return ClangN;
+      }
       if (auto *ClangEnumConst = dyn_cast<clang::EnumConstantDecl>(ClangD)) {
-        if (auto *ClangEnum = dyn_cast<clang::EnumDecl>(ClangEnumConst->getDeclContext())) {
+        if (auto *ClangEnum =
+                dyn_cast<clang::EnumDecl>(ClangEnumConst->getDeclContext())) {
           if (ClangEnum->hasAttr<clang::NSErrorDomainAttr>() && isa<VarDecl>(D))
             return ClangNode();
         }
+      }
+      if (D->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        return ClangNode();
       }
     }
     return ClangN;
@@ -292,10 +306,11 @@ bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
   }
 }
 
-bool ide::printValueDeclUSR(const ValueDecl *D, raw_ostream &OS) {
-  auto result = evaluateOrDefault(D->getASTContext().evaluator,
-                                  USRGenerationRequest { D },
-                                  std::string());
+bool ide::printValueDeclUSR(const ValueDecl *D, raw_ostream &OS,
+                            bool distinguishSynthesizedDecls) {
+  auto result = evaluateOrDefault(
+      D->getASTContext().evaluator,
+      USRGenerationRequest{D, {distinguishSynthesizedDecls}}, std::string());
   if (result.empty())
     return true;
   OS << result;
@@ -354,9 +369,10 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   return true;
 }
 
-bool ide::printDeclUSR(const Decl *D, raw_ostream &OS) {
+bool ide::printDeclUSR(const Decl *D, raw_ostream &OS,
+                       bool distinguishSynthesizedDecls) {
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (ide::printValueDeclUSR(VD, OS)) {
+    if (ide::printValueDeclUSR(VD, OS, distinguishSynthesizedDecls)) {
       return true;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {

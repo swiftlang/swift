@@ -1215,6 +1215,7 @@ class ModuleInterfaceLoaderImpl {
         ctx.SourceMgr, diagsToUse,
         astDelegate, interfacePath,
         ctx.SearchPathOpts.getSDKPath(),
+        ctx.SearchPathOpts.getSysRoot(),
         realName.str(), cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock,
@@ -1250,6 +1251,7 @@ class ModuleInterfaceLoaderImpl {
       ImplicitModuleInterfaceBuilder fallbackBuilder(
         ctx.SourceMgr, &ctx.Diags, astDelegate, backupPath,
         ctx.SearchPathOpts.getSDKPath(),
+        ctx.SearchPathOpts.getSysRoot(),
         moduleName, cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock,
@@ -1475,6 +1477,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       RequireOSSAModules);
   ImplicitModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                          SearchPathOpts.getSDKPath(),
+                                         SearchPathOpts.getSysRoot(),
                                          ModuleName, CacheDir, PrebuiltCacheDir,
                                          BackupInterfaceDir, ABIOutputPath,
                                          LoaderOpts.disableInterfaceLock,
@@ -1495,6 +1498,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   assert(!backInPath.empty());
   ImplicitModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
                                                SearchPathOpts.getSDKPath(),
+                                               SearchPathOpts.getSysRoot(),
                                                ModuleName, CacheDir, PrebuiltCacheDir,
                                                BackupInterfaceDir, ABIOutputPath,
                                                LoaderOpts.disableInterfaceLock,
@@ -2058,12 +2062,13 @@ std::error_code
 InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  StringRef interfacePath,
                                                  StringRef sdkPath,
+                                                 std::optional<StringRef> sysroot,
                                                  StringRef outputPath,
                                                  SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
                           StringRef, StringRef)> action) {
-  return runInSubCompilerInstance(moduleName, interfacePath, sdkPath, outputPath,
-                                  diagLoc, /*silenceErrors=*/false,
+  return runInSubCompilerInstance(moduleName, interfacePath, sdkPath, sysroot,
+                                  outputPath, diagLoc, /*silenceErrors=*/false,
                                   [&](SubCompilerInstanceInfo &info){
     std::string UserModuleVer = info.Instance->getInvocation().getFrontendOptions()
       .UserModuleVersion.getAsString();
@@ -2079,6 +2084,7 @@ std::error_code
 InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
                                                           StringRef interfacePath,
                                                           StringRef sdkPath,
+                                                          std::optional<StringRef> sysroot,
                                                           StringRef outputPath,
                                                           SourceLoc diagLoc,
                                                           bool silenceErrors,
@@ -2110,6 +2116,9 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.setModuleName(moduleName);
   BuildArgs.push_back("-module-name");
   BuildArgs.push_back(moduleName);
+  if (sysroot) {
+    subInvocation.setSysRoot(sysroot.value());
+  }
 
   // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
   // of a CF_OPTIONS bug (rdar://142762174).
@@ -2881,6 +2890,23 @@ void setOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
                    const CompilerInvocation &CI, const ArgListTy &extraArgs) {
   auto &outputPath = resolvedOutputPath.outputPath;
   outputPath = CI.getClangModuleCachePath();
+  auto isPrefixedWith = [interfacePath](StringRef path) {
+    return !path.empty() &&
+        hasPrefix(llvm::sys::path::begin(interfacePath.str()),
+                  llvm::sys::path::end(interfacePath.str()),
+                  llvm::sys::path::begin(path), llvm::sys::path::end(path));
+  };
+ 
+  // Dependency-scanner-specific module output path handling
+  if ((CI.getFrontendOptions().RequestedAction ==
+       FrontendOptions::ActionType::ScanDependencies)) {
+    auto runtimeResourcePath = CI.getSearchPathOptions().RuntimeResourcePath;
+    if (isPrefixedWith(sdkPath) || isPrefixedWith(runtimeResourcePath))
+      outputPath = CI.getFrontendOptions().ExplicitSDKModulesOutputPath;
+    else
+      outputPath = CI.getFrontendOptions().ExplicitModulesOutputPath;
+  }
+
   llvm::sys::path::append(outputPath, moduleName);
   outputPath.append("-");
   auto hashStart = outputPath.size();

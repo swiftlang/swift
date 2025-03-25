@@ -290,15 +290,18 @@ BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
-    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition) {
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
   auto *params = cParams.unbridged();
   DeclName fullName = DeclName(context, cName.unbridged(), params);
-  return new (context)
+  auto *decl = new (context)
       MacroDecl(cMacroLoc.unbridged(), fullName, cNameLoc.unbridged(),
                 cGenericParams.unbridged(), params, cArrowLoc.unbridged(),
                 cResultType.unbridged(), cDefinition.unbridged(),
                 cDeclContext.unbridged());
+  decl->setTrailingWhereClause(genericWhereClause.unbridged());
+  return decl;
 }
 
 BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(

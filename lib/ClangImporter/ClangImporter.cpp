@@ -94,6 +94,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Casting.h"
@@ -4102,6 +4103,39 @@ void ClangModuleUnit::lookupObjCMethods(
   }
 }
 
+void ClangModuleUnit::lookupAvailabilityDomains(
+    Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
+  auto lookupTable = owner.findLookupTable(clangModule);
+  if (!lookupTable)
+    return;
+
+  auto varDecl = lookupTable->lookupAvailabilityDomainDecl(identifier.str());
+  if (!varDecl)
+    return;
+
+  auto featureInfo = getClangASTContext().getFeatureAvailInfo(varDecl);
+  if (featureInfo.first.empty())
+    return;
+
+  auto getDomainKind = [](clang::FeatureAvailKind featureAvailKind) {
+    switch (featureAvailKind) {
+    case clang::FeatureAvailKind::None:
+      llvm_unreachable("unexpected kind");
+    case clang::FeatureAvailKind::Available:
+      return CustomAvailabilityDomain::Kind::Enabled;
+    case clang::FeatureAvailKind::Unavailable:
+      return CustomAvailabilityDomain::Kind::Disabled;
+    case clang::FeatureAvailKind::Dynamic:
+      return CustomAvailabilityDomain::Kind::Dynamic;
+    }
+  };
+
+  auto domain = AvailabilityDomain::forCustom(CustomAvailabilityDomain::get(
+      featureInfo.first, getParentModule(),
+      getDomainKind(featureInfo.second.Kind), getASTContext()));
+  results.push_back(domain);
+}
+
 void ClangModuleUnit::collectLinkLibraries(
     ModuleDecl::LinkLibraryCallback callback) const {
   if (!clangModule)
@@ -5083,6 +5117,42 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
   return filteredDecls;
 }
 
+namespace {
+  /// Collects name lookup results into the given tiny vector, for use in the
+  /// various Clang importer lookup routines.
+  class CollectLookupResults {
+    DeclName name;
+    TinyPtrVector<ValueDecl *> &result;
+
+  public:
+    CollectLookupResults(DeclName name, TinyPtrVector<ValueDecl *> &result)
+      : name(name), result(result) { }
+
+    void add(ValueDecl *imported) {
+      result.push_back(imported);
+
+      // Expand any macros introduced by the Clang importer.
+      imported->visitAuxiliaryDecls([&](Decl *decl) {
+        auto valueDecl = dyn_cast<ValueDecl>(decl);
+        if (!valueDecl)
+          return;
+
+        // Bail out if the auxiliary decl was not produced by a macro.
+        auto module = decl->getDeclContext()->getParentModule();
+        auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+        if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+          return;
+
+        // Only produce results that match the requested name.
+        if (!valueDecl->getName().matchesRef(name))
+          return;
+
+        result.push_back(valueDecl);
+      });
+    }
+  };
+}
+
 TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
   EnumDecl *namespaceDecl = desc.namespaceDecl;
@@ -5092,6 +5162,8 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   auto &ctx = namespaceDecl->getASTContext();
 
   TinyPtrVector<ValueDecl *> result;
+  CollectLookupResults collector(name, result);
+
   llvm::SmallPtrSet<clang::NamedDecl *, 8> importedDecls;
   for (auto redecl : clangNamespaceDecl->redecls()) {
     auto allResults = evaluateOrDefault(
@@ -5107,7 +5179,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
         continue;
       if (auto import =
               ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
-        result.push_back(cast<ValueDecl>(import));
+        collector.add(cast<ValueDecl>(import));
     }
   }
 
@@ -6205,8 +6277,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
       {});
 
-  // Find the results that are actually a member of "recordDecl".
+  // The set of declarations we found.
   TinyPtrVector<ValueDecl *> result;
+  CollectLookupResults collector(name, result);
+
+  // Find the results that are actually a member of "recordDecl".
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto foundEntry : directResults) {
     auto found = foundEntry.get<clang::NamedDecl *>();
@@ -6241,7 +6316,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       if (!imported)
         continue;
     }
-    result.push_back(cast<ValueDecl>(imported));
+
+    collector.add(cast<ValueDecl>(imported));
   }
 
   if (inheritance) {
@@ -6260,7 +6336,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       if (!imported)
         continue;
 
-      result.push_back(cast<ValueDecl>(imported));
+      collector.add(imported);
     }
   }
 
@@ -6309,7 +6385,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
 
-          result.push_back(foundInBase);
+          collector.add(foundInBase);
         }
       }
     }
@@ -7877,7 +7953,7 @@ static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
   return false;
 }
 
-static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
+bool importer::hasOwnedValueAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "import_owned");
 }
 
@@ -7885,7 +7961,7 @@ bool importer::hasUnsafeAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_unsafe");
 }
 
-static bool hasIteratorAPIAttr(const clang::Decl *decl) {
+bool importer::hasIteratorAPIAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, "import_iterator");
 }
 
@@ -8121,18 +8197,6 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   if (!hasDestroyTypeOperations(cxxDecl) ||
       (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
-    if (desc.shouldDiagnoseLifetimeOperations) {
-      HeaderLoc loc(decl->getLocation());
-      if (hasUnsafeAPIAttr(cxxDecl))
-        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
-                               "import_unsafe", decl->getNameAsString());
-      if (hasOwnedValueAttr(cxxDecl))
-        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
-                               "import_owned", decl->getNameAsString());
-      if (hasIteratorAPIAttr(cxxDecl))
-        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
-                               "import_iterator", decl->getNameAsString());
-    }
 
     if (hasConstructorWithUnsupportedDefaultArgs(cxxDecl))
       return CxxRecordSemanticsKind::UnavailableConstructors;
@@ -8669,4 +8733,23 @@ importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
   }
 
   return files;
+}
+
+bool importer::declIsCxxOnly(const Decl *decl) {
+  if (auto *clangDecl = decl->getClangDecl()) {
+    return llvm::TypeSwitch<const clang::Decl *, bool>(clangDecl)
+        .template Case<const clang::NamespaceAliasDecl>(
+            [](auto) { return true; })
+        .template Case<const clang::NamespaceDecl>([](auto) { return true; })
+        // For the issues this filter function was trying to resolve at its
+        // time of writing, it suffices to only filter out namespaces. But
+        // there are many other kinds of clang::Decls that only appear in C++.
+        // This is obvious for some decls, e.g., templates, using directives,
+        // non-trivial structs, and scoped enums; but it is not obvious for
+        // other kinds of decls, e.g., an enum member or some variable.
+        //
+        // TODO: enumerate those kinds in a more precise and robust way
+        .Default([](auto) { return false; });
+  }
+  return false;
 }

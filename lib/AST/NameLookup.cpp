@@ -2893,6 +2893,21 @@ void DeclContext::lookupAllObjCMethods(
     results.end());
 }
 
+void DeclContext::lookupAvailabilityDomains(
+    Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
+  if (auto builtinDomain =
+          AvailabilityDomain::builtinDomainForString(identifier.str(), this)) {
+    results.push_back(*builtinDomain);
+    return;
+  }
+
+  // FIXME: [availability] Find the file/module scope decl context and look up
+  // the domain in that context using a request to cache the results.
+  for (auto import : namelookup::getAllImports(this)) {
+    import.importedModule->lookupAvailabilityDomains(identifier, results);
+  }
+}
+
 /// Given a set of type declarations, find all of the nominal type declarations
 /// that they reference, looking through typealiases as appropriate.
 static TinyPtrVector<NominalTypeDecl *>
@@ -3150,6 +3165,10 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   switch (typeRepr->getKind()) {
   case TypeReprKind::Array:
     result.first.push_back(ctx.getArrayDecl());
+    return result;
+
+  case TypeReprKind::InlineArray:
+    result.first.push_back(ctx.getInlineArrayDecl());
     return result;
 
   case TypeReprKind::Attributed: {
@@ -3952,21 +3971,6 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-/// Find the location of 'isolated' within this type representation.
-static SourceLoc findIsolatedLoc(TypeRepr *typeRepr) {
-  do {
-    if (auto isolatedTypeRepr = dyn_cast<IsolatedTypeRepr>(typeRepr))
-      return isolatedTypeRepr->getLoc();
-
-    if (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-      typeRepr = attrTypeRepr->getTypeRepr();
-      continue;
-    }
-        
-    return SourceLoc();
-  } while (true);
-}
-
 /// Decompose the ith inheritance clause entry to a list of type declarations,
 /// inverses, and optional AnyObject member.
 void swift::getDirectlyInheritedNominalTypeDecls(
@@ -4005,9 +4009,17 @@ void swift::getDirectlyInheritedNominalTypeDecls(
     attributes.uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
     attributes.preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
     attributes.unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
-    
-    // Look for an IsolatedTypeRepr.
-    attributes.isolatedLoc = findIsolatedLoc(typeRepr);
+    attributes.nonisolatedLoc = typeRepr->findAttrLoc(TypeAttrKind::Nonisolated);
+
+    // Dig out the custom attribute that should be the global actor isolation.
+    if (auto customAttr = typeRepr->findCustomAttr()) {
+      if (!customAttr->hasArgs()) {
+        if (auto customAttrTypeExpr = customAttr->getTypeExpr()) {
+          attributes.globalActorAtLoc = customAttr->AtLoc;
+          attributes.globalActorType = customAttrTypeExpr;
+        }
+      }
+    }
   }
 
   // Form the result.

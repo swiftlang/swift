@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -608,11 +608,10 @@ extension _ArrayBuffer {
       1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
   }
-  
-  @_alwaysEmitIntoClient @inline(never)
-  internal func withUnsafeBufferPointer_nonNative<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
-  ) throws(E) -> R {
+
+  @_alwaysEmitIntoClient
+  internal func getOrAllocateAssociatedObjectBuffer(
+  ) -> _ContiguousArrayBuffer<Element> {
     let unwrapped: _ContiguousArrayBuffer<Element>
     // libobjc already provides the necessary memory barriers for
     // double checked locking to be safe, per comments on
@@ -633,12 +632,16 @@ extension _ArrayBuffer {
       defer { _fixLifetime(unwrapped) }
       objc_sync_exit(lock)
     }
-    return try unsafe body(
-      UnsafeBufferPointer(
-        start: unwrapped.firstElementAddress,
-        count: unwrapped.count
-      )
-    )
+    return unwrapped
+  }
+
+  @_alwaysEmitIntoClient @inline(never)
+  internal func withUnsafeBufferPointer_nonNative<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let buffer = getOrAllocateAssociatedObjectBuffer()
+    let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
+    return try unsafe body(UnsafeBufferPointer(start: pointer,  count: count))
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the

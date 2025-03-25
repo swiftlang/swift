@@ -1785,7 +1785,7 @@ public:
         for (auto proto : erasedLayout.getProtocols()) {
           if (std::find_if(conformances.begin(), conformances.end(),
                            [&](ProtocolConformanceRef ref) -> bool {
-                             return ref.getRequirement() == proto->getDecl();
+                             return ref.getProtocol() == proto->getDecl();
                            })
               == conformances.end()) {
             Out << "ErasureExpr is missing conformance for required protocol\n";
@@ -1819,7 +1819,7 @@ public:
                     anyHashableDecl->getDeclaredInterfaceType(),
                     "AnyHashableErasureExpr and the standard AnyHashable type");
 
-      if (E->getConformance().getRequirement() != hashableDecl) {
+      if (E->getConformance().getProtocol() != hashableDecl) {
         Out << "conformance on AnyHashableErasureExpr was not for Hashable\n";
         E->getConformance().dump(Out);
         abort();
@@ -2811,7 +2811,7 @@ public:
         if (!type->is<ArchetypeType>() && !type->isAnyExistentialType()) {
           Out << "type " << type
               << " should not have an abstract conformance to "
-              << conformance.getRequirement()->getName();
+              << conformance.getProtocol()->getName();
           abort();
         }
 

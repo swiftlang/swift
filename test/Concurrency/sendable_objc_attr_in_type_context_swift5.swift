@@ -172,8 +172,7 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
   @objc public required init(callback: @escaping () -> Void) {}
   // expected-error@-1 {{initializer 'init(callback:)' should not be 'required' to match initializer declared by the header}}
   
-  @objc func compute(completionHandler: @escaping () -> Void) {}
-  // expected-warning@-1 {{sendability of function types in instance method 'compute(completionHandler:)' of type '(@escaping () -> Void) -> ()' does not match type '(@escaping @Sendable () -> Void) -> Void' declared by the header}}
+  @objc func compute(completionHandler: @escaping () -> Void) {} // Ok (no warnings with minimal checking)
 }
 
 // Methods deliberately has no `@Sendable` to make sure that

@@ -281,7 +281,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
     // Build the availability scope tree for the primary file before type
     // checking.
-    TypeChecker::buildAvailabilityScopes(*SF);
+    (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
     // Before we type check any of the top level code decls, generate the per
     // file language options.

@@ -3100,10 +3100,15 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case SILInstructionKind::BranchInst:
               case SILInstructionKind::StructInst:
               case SILInstructionKind::DebugValueInst:
                 break;
               default:
+#ifndef NDEBUG
+                currInstr->dump();
+                currInstr->getFunction()->dump();
+#endif
                 llvm_unreachable("Unhandled use of FunctionRefInst");
               }
             }

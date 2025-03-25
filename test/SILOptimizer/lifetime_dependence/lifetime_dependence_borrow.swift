@@ -45,7 +45,7 @@ struct MBV : ~Escapable, ~Copyable {
   }
 
   // Requires a borrow.
-  @lifetime(self)
+  @lifetime(copy self)
   borrowing func getBV() -> BV {
     BV(p, i)
   }
@@ -55,25 +55,26 @@ struct MBV : ~Escapable, ~Copyable {
 struct NEBV : ~Escapable {
   var bv: BV
 
+  @lifetime(copy bv)
   init(_ bv: consuming BV) {
     self.bv = bv
   }
 }
 
 // Propagate a borrow.
-@lifetime(container)
+@lifetime(copy container)
 func bv_get_borrow(container: borrowing MBV) -> BV {
   container.getBV()
 }
 
 // Copy a borrow.
-@lifetime(container)
+@lifetime(copy container)
 func bv_get_copy(container: borrowing MBV) -> BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-@lifetime(container)
+@lifetime(copy container)
 func bv_get_mutate(container: inout MBV) -> BV {
   container.getBV()
 }

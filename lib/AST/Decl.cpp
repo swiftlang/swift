@@ -427,6 +427,19 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
   for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
     recordABIAttr(attr);
 
+  // @implementation requires an explicit @objc attribute, but
+  // @_objcImplementation didn't. Insert one if necessary.
+  auto implAttr = attrs.getAttribute<ObjCImplementationAttr>();
+  if (implAttr && isa<ExtensionDecl>(this) && implAttr->isEarlyAdopter() &&
+      !attrs.hasAttribute<ObjCAttr>()) {
+    ObjCAttr *objcAttr =
+        implAttr->CategoryName.empty()
+            ? ObjCAttr::createUnnamedImplicit(getASTContext())
+            : ObjCAttr::createNullary(getASTContext(), implAttr->CategoryName,
+                                      /*isNameImplicit=*/false);
+    attrs.add(objcAttr);
+  }
+
   getAttrs() = attrs;
 }
 
@@ -632,6 +645,54 @@ bool Decl::hasBackDeployedAttr() const {
     return AD->getStorage()->hasBackDeployedAttr();
 
   return false;
+}
+
+const Decl *Decl::getConcreteSyntaxDeclForAttributes() const {
+  // This function needs to be kept in sync with its counterpart,
+  // getAbstractSyntaxDeclForAttributes().
+
+  // The source range for VarDecls does not include 'var ' (and, in any
+  // event, multiple variables can be introduced with a single 'var'),
+  // so suggest adding an attribute to the PatterningBindingDecl instead.
+  if (auto *vd = dyn_cast<VarDecl>(this)) {
+    if (auto *pbd = vd->getParentPatternBinding())
+      return pbd;
+  }
+
+  // Similarly suggest applying the Fix-It to the parent enum case rather than
+  // the enum element.
+  if (auto *ee = dyn_cast<EnumElementDecl>(this)) {
+    return ee->getParentCase();
+  }
+
+  return this;
+}
+
+const Decl *Decl::getAbstractSyntaxDeclForAttributes() const {
+  // This function needs to be kept in sync with its counterpart,
+  // getConcreteSyntaxDeclForAttributes().
+
+  if (auto *pbd = dyn_cast<PatternBindingDecl>(this)) {
+    // @available attributes in the AST are attached to VarDecls
+    // rather than PatternBindingDecls, so we return the first VarDecl for
+    // the pattern binding declaration.
+    // This is safe, even though there may be multiple VarDecls, because
+    // all parsed attribute that appear in the concrete syntax upon on the
+    // PatternBindingDecl are added to all of the VarDecls for the pattern
+    // binding.
+    for (auto index : range(pbd->getNumPatternEntries())) {
+      if (auto vd = pbd->getAnchoringVarDecl(index))
+        return vd;
+    }
+  } else if (auto *ecd = dyn_cast<EnumCaseDecl>(this)) {
+    // Similar to the PatternBindingDecl case above, we return the
+    // first EnumElementDecl.
+    if (auto *element = ecd->getFirstElement()) {
+      return element;
+    }
+  }
+
+  return this;
 }
 
 void Decl::forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const {
@@ -855,6 +916,10 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
   if (!clangModule)
     return nullptr;
 
+  // Swift groups all submodules of a Clang module together, and imports them as
+  // a single top-level module.
+  clangModule = clangModule->getTopLevelModule();
+
   return ctx.getClangModuleLoader()->getWrapperForModule(clangModule);
 }
 
@@ -1036,7 +1101,7 @@ StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
       if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
-        return OD->OriginalModuleName;
+        return OD->ManglingModuleName;
       }
     }
   }
@@ -1766,8 +1831,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
-    : InheritedEntry(typeLoc, ProtocolConformanceOptions(),
-                     /*isPreconcurrency=*/false) {
+    : InheritedEntry(typeLoc, ProtocolConformanceOptions()) {
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     if (typeRepr->findAttrLoc(TypeAttrKind::Unchecked).isValid())
       setOption(ProtocolConformanceFlags::Unchecked);
@@ -1777,8 +1841,19 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Unsafe);
     if (typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid())
       setOption(ProtocolConformanceFlags::Preconcurrency);
-    if (typeRepr->findAttrLoc(TypeAttrKind::Isolated).isValid())
-      setOption(ProtocolConformanceFlags::Isolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
+      setOption(ProtocolConformanceFlags::Nonisolated);
+
+    // Dig out the custom attribute that should be the global actor isolation.
+    if (auto customAttr = typeRepr->findCustomAttr()) {
+      if (!customAttr->hasArgs()) {
+        if (auto customAttrTypeExpr = customAttr->getTypeExpr()) {
+          globalActorIsolationType = customAttrTypeExpr;
+          RawOptions |= static_cast<unsigned>(
+                ProtocolConformanceFlags::GlobalActorIsolated);
+        }
+      }
+    }
   }
 }
 
@@ -10317,6 +10392,50 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 
   Params = BodyParams;
   BodyParams->setDeclContextOfParamDecls(this);
+}
+
+bool AbstractFunctionDecl::isValidKeyPathComponent() const {
+  // Check whether we're an ABI compatible override of another method. If we
+  // are, then the key path should refer to the base decl instead.
+  auto &ctx = getASTContext();
+  auto isABICompatibleOverride = evaluateOrDefault(
+      ctx.evaluator,
+      IsABICompatibleOverrideRequest{const_cast<AbstractFunctionDecl *>(this)},
+      false);
+  return !isABICompatibleOverride;
+}
+
+bool AbstractFunctionDecl::isResilient() const {
+  // Check for attributes that makes functions non-resilient.
+  if (getAttrs().hasAttribute<InlinableAttr>() &&
+      getAttrs().hasAttribute<UsableFromInlineAttr>())
+    return false;
+
+  // If this is a function of a type, check that type's resilience.
+  if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
+    return nominalDecl->isResilient();
+
+  // Functions in non-public access scopes are not resilient.
+  auto accessScope =
+      getFormalAccessScope(/*useDC=*/nullptr,
+                           /*treatUsableFromInlineAsPublic=*/true);
+  if (!accessScope.isPublicOrPackage())
+    return false;
+
+  return getModuleContext()->isResilient();
+}
+
+bool AbstractFunctionDecl::isResilient(ModuleDecl *M,
+                                       ResilienceExpansion expansion) const {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return isResilient();
+  case ResilienceExpansion::Maximal:
+    if (M == getModuleContext())
+      return false;
+    return isResilient();
+  }
+  llvm_unreachable("bad resilience expansion");
 }
 
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,

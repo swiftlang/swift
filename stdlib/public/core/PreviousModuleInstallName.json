@@ -1,0 +1,6 @@
+[
+  {
+    "module": "CompatibilitySpan",
+    "install_name": "/usr/lib/swift/libswiftCompatibilitySpan.dylib"
+  }
+]

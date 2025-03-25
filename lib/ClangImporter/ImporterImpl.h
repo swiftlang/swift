@@ -2051,7 +2051,9 @@ inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
   return "None";
 }
 
+bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
+bool hasIteratorAPIAttr(const clang::Decl *decl);
 
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 

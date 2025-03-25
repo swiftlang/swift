@@ -167,6 +167,7 @@ public:
           bridgingHeaderBuildCmd.push_back(clangDep->moduleCacheKey);
         }
       }
+      addDeterministicCheckFlags(bridgingHeaderBuildCmd);
     }
 
     SwiftInterfaceModuleOutputPathResolution::ResultTy swiftInterfaceOutputPath;
@@ -183,6 +184,7 @@ public:
             remapPathsFromCommandLine(commandline, [&](StringRef path) {
               return cache.getScanService().remapPath(path);
             });
+      addDeterministicCheckFlags(commandline);
     }
 
     auto dependencyInfoCopy = resolvingDepInfo;
@@ -581,6 +583,17 @@ private:
             instance.getActionCache().put(CAS.getID(**Ref), CAS.getID(*Result)))
       return E;
     return llvm::Error::success();
+  }
+
+  void addDeterministicCheckFlags(std::vector<std::string> &cmd) {
+    // Propagate the deterministic check to explicit built module command.
+    if (!instance.getInvocation().getFrontendOptions().DeterministicCheck)
+      return;
+    cmd.push_back("-enable-deterministic-check");
+    cmd.push_back("-always-compile-output-files");
+    // disable cache replay because that defeat the purpose of the check.
+    if (instance.getInvocation().getCASOptions().EnableCaching)
+      cmd.push_back("-cache-disable-replay");
   }
 
 private:
@@ -1155,6 +1168,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
   ModuleDependenciesCache cache(
       *service, CI.getMainModule()->getNameStr().str(),
       CI.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      CI.getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       CI.getInvocation().getModuleScanningHash());
 
   if (service->setupCachingDependencyScanningService(CI))
@@ -1190,6 +1204,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   ModuleDependenciesCache cache(
       *singleUseService, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
   // Execute import prescan, and write JSON output to the output stream

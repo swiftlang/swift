@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILProfiler.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -117,7 +118,7 @@ static bool shouldProfile(SILDeclRef Constant) {
 
   if (auto *D = DC->getInnermostDeclarationDeclContext()) {
     // Do not profile AST nodes in unavailable contexts.
-    if (D->isSemanticallyUnavailable()) {
+    if (AvailabilityContext::forDeclSignature(D).isUnavailable()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: unavailable context\n");
       return false;
     }

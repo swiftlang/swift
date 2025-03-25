@@ -21,3 +21,5 @@ func test() {
   beCareful()
 // CHECK: [[@LINE-1]]:3: warning: expression uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety] [-W{{.*}}strict-memory-safety.md] [StrictMemorySafety]
 }
+
+// CHECK: [StrictMemorySafety]: <{{.*}}strict-memory-safety.md>

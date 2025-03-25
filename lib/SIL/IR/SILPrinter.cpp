@@ -3099,7 +3099,8 @@ public:
       break;
     }
     case KeyPathPatternComponent::Kind::GettableProperty:
-    case KeyPathPatternComponent::Kind::SettableProperty: {
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
       *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
                   ? "gettable_property $" : "settable_property $")
             << component.getComponentType() << ", "
@@ -3124,29 +3125,27 @@ public:
       }
       }
       *this << ", getter ";
-      component.getComputedPropertyGetter()->printName(PrintState.OS);
+      component.getComputedPropertyForGettable()->printName(PrintState.OS);
       *this << " : "
-            << component.getComputedPropertyGetter()->getLoweredType();
+            << component.getComputedPropertyForGettable()->getLoweredType();
       if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
         *this << ", setter ";
-        component.getComputedPropertySetter()->printName(PrintState.OS);
+        component.getComputedPropertyForSettable()->printName(PrintState.OS);
         *this << " : "
-              << component.getComputedPropertySetter()->getLoweredType();
+              << component.getComputedPropertyForSettable()->getLoweredType();
       }
-      
-      if (!component.getSubscriptIndices().empty()) {
+
+      if (!component.getArguments().empty()) {
         *this << ", indices ";
-        printComponentIndices(component.getSubscriptIndices());
+        printComponentIndices(component.getArguments());
         *this << ", indices_equals ";
-        component.getSubscriptIndexEquals()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexEquals()->getLoweredType();
+        component.getIndexEquals()->printName(PrintState.OS);
+        *this << " : " << component.getIndexEquals()->getLoweredType();
         *this << ", indices_hash ";
-        component.getSubscriptIndexHash()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexHash()->getLoweredType();
+        component.getIndexHash()->printName(PrintState.OS);
+        *this << " : " << component.getIndexHash()->getLoweredType();
       }
-      
+
       if (auto external = component.getExternalDecl()) {
         *this << ", external #";
         printValueDecl(external, PrintState.OS);
@@ -4269,13 +4268,18 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
   case WitnessKind::AssociatedConformance: {
     // associated_conformance (AssociatedTypeName: Protocol): <conformance>
     auto &assocProtoWitness = getAssociatedConformanceWitness();
+    if (assocProtoWitness.Witness.isInvalid())
+      return;
     out << "associated_conformance (";
     (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
-    out << ": " << assocProtoWitness.Protocol->getName() << "): ";
-    if (assocProtoWitness.Witness.isConcrete())
-      assocProtoWitness.Witness.getConcrete()->printName(out, options);
-    else
-      out << "dependent";
+    auto conformance = assocProtoWitness.Witness;
+    out << ": " << conformance.getProtocol()->getName() << "): ";
+    if (conformance.isConcrete())
+      conformance.getConcrete()->printName(out, options);
+    else {
+      out << "dependent ";
+      assocProtoWitness.SubstType->print(out, options);
+    }
     break;
   }
   case WitnessKind::BaseProtocol: {
@@ -4316,14 +4320,19 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto conditionalConformance : getConditionalConformances()) {
     // conditional_conformance (TypeName: Protocol):
     // <conformance>
+    if (conditionalConformance.Conformance.isInvalid())
+      continue;
+
     OS << "  conditional_conformance (";
     conditionalConformance.Requirement.print(OS, Options);
-    OS << ": " << conditionalConformance.Conformance.getRequirement()->getName()
+    OS << ": " << conditionalConformance.Conformance.getProtocol()->getName()
        << "): ";
     if (conditionalConformance.Conformance.isConcrete())
       conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
-    else
-      OS << "dependent";
+    else {
+      OS << "dependent ";
+      conditionalConformance.Requirement->print(OS, Options);
+    }
 
     OS << '\n';
   }

@@ -699,10 +699,6 @@ void introduceUnsafeInheritExecutorReplacements(
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
 
-/// Determine the isolation of the given conformance. This only applies to
-/// the immediate conformance, not any conformances on which it depends.
-ActorIsolation getConformanceIsolation(ProtocolConformance *conformance);
-
 /// Check for correct use of isolated conformances in the given reference.
 ///
 /// This checks that any isolated conformances that occur in the given

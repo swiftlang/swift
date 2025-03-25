@@ -589,3 +589,20 @@ suite.test("initialize from raw memory")
   let first = test(span)
   expectEqual(first, 0x07060504)
 }
+
+private func send(_: some Sendable & ~Escapable) {}
+
+private struct NCSendable: ~Copyable, Sendable {}
+
+suite.test("Span Sendability")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
+  defer { buffer.deallocate() }
+  buffer.initializeElement(at: 0, to: NCSendable())
+  defer { buffer.deinitialize() }
+
+  let span = Span(_unsafeElements: buffer)
+  send(span)
+}

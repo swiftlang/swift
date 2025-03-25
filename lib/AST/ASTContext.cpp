@@ -15,9 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "AbstractConformance.h"
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -269,6 +271,9 @@ struct ASTContext::Implementation {
   ~Implementation();
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
+
+  /// The global cache of side tables for random things.
+  GlobalCache globalCache;
 
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
@@ -543,6 +548,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
+    llvm::DenseMap<std::pair<Type, Type>, InlineArrayType *> InlineArrayTypes;
     llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
@@ -590,6 +596,9 @@ struct ASTContext::Implementation {
 
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
+
+    /// The set of abstract conformances (uniqued by their storage).
+    llvm::FoldingSet<AbstractConformance> AbstractConformances;
 
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
@@ -748,6 +757,10 @@ inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto offset = llvm::alignAddr((void *)sizeof(*this),
                                 llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
+}
+
+ASTContext::GlobalCache &ASTContext::getGlobalCache() const {
+  return getImpl().globalCache;
 }
 
 void ASTContext::operator delete(void *Data) throw() {
@@ -3370,6 +3383,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(BuiltinConformances);
     SIZE(PackConformances);
     SIZE(SubstitutionMaps);
+    SIZE(AbstractConformances);
 
 #undef SIZE
 #undef SIZE_AND_BYTES
@@ -5095,7 +5109,7 @@ void SILFunctionType::Profile(
   invocationSubs.profile(id);
   id.AddBoolean((bool)conformance);
   if (conformance)
-    id.AddPointer(conformance.getRequirement());
+    id.AddPointer(conformance.getProtocol());
 }
 
 SILFunctionType::SILFunctionType(
@@ -5418,6 +5432,21 @@ ArraySliceType *ArraySliceType::get(Type base) {
   return entry = new (C, arena) ArraySliceType(C, base, properties);
 }
 
+InlineArrayType *InlineArrayType::get(Type count, Type elt) {
+  auto properties =
+      count->getRecursiveProperties() | elt->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  const ASTContext &C = count->getASTContext();
+
+  auto *&entry = C.getImpl().getArena(arena).InlineArrayTypes[{count, elt}];
+  if (entry)
+    return entry;
+
+  entry = new (C, arena) InlineArrayType(C, count, elt, properties);
+  return entry;
+}
+
 VariadicSequenceType *VariadicSequenceType::get(Type base) {
   auto properties = base->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -5713,6 +5742,35 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
   auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
   substitutionMaps.InsertNode(result, insertPos);
   return result;
+}
+
+ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
+    Type conformingType, ProtocolDecl *proto) {
+  ASTContext &ctx = proto->getASTContext();
+
+  // Figure out which arena this should go in.
+  RecursiveTypeProperties properties;
+  if (conformingType)
+    properties |= conformingType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  // Profile the substitution map.
+  llvm::FoldingSetNodeID id;
+  AbstractConformance::Profile(id, conformingType, proto);
+
+  // Did we already record this abstract conformance?
+  void *insertPos;
+  auto &abstractConformances =
+      ctx.getImpl().getArena(arena).AbstractConformances;
+  if (auto result = abstractConformances.FindNodeOrInsertPos(id, insertPos))
+    return ProtocolConformanceRef(result);
+
+  // Allocate and record this abstract conformance.
+  auto mem = ctx.Allocate(sizeof(AbstractConformance),
+                          alignof(AbstractConformance), arena);
+  auto result = new (mem) AbstractConformance(conformingType, proto);
+  abstractConformances.InsertNode(result, insertPos);
+  return ProtocolConformanceRef(result);
 }
 
 const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
@@ -7089,8 +7147,9 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
 }
 
 AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  if (auto domain = AvailabilityDomain::forTargetPlatform(*this))
-    return *domain;
+  auto platform = swift::targetPlatform(LangOpts);
+  if (platform != PlatformKind::none)
+    return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();

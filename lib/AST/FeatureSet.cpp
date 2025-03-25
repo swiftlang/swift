@@ -125,6 +125,7 @@ UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(AsyncCallerExecution)
 UNINTERESTING_FEATURE(ExtensibleEnums)
+UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -194,11 +195,16 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
+  return usesTypeMatching(D, [&](Type ty) {
+    return isa<InlineArrayType>(ty.getPointer());
+  });
+}
+
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
-UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -331,6 +337,7 @@ UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 UNINTERESTING_FEATURE(RawIdentifiers)
+UNINTERESTING_FEATURE(InferIsolatedConformances)
 
 static ABIAttr *getABIAttr(Decl *decl) {
   if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
@@ -357,6 +364,10 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>();
+}
+
+static bool usesFeatureClosureBodyMacro(Decl *decl) {
+  return false;
 }
 
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
@@ -466,6 +477,12 @@ static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureExecutionAttribute(Decl *decl) {
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (auto *getter = ASD->getAccessor(AccessorKind::Get))
+      return usesFeatureExecutionAttribute(getter);
+    return false;
+  }
+
   if (decl->getAttrs().hasAttribute<ExecutionAttr>())
     return true;
 

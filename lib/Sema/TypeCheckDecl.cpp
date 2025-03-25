@@ -1688,8 +1688,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
 
-  AvailabilityContext contextForConformingDecl =
-      availabilityForDeclSignature(dc->getAsDecl());
+  auto contextForConformingDecl =
+      AvailabilityContext::forDeclSignature(dc->getAsDecl());
 
   // If the conformance is unavailable then it's irrelevant whether the witness
   // is potentially unavailable.
@@ -1732,7 +1732,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   requirementInfo.constrainWith(infoForConformingDecl);
 
   AvailabilityRange infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
+      AvailabilityContext::forDeclSignature(proto).getPlatformRange();
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);

@@ -535,6 +535,37 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
   
+  // Represents an addressable buffer that has been allocated but not yet used.
+  struct PreparedAddressableBuffer {
+    SILInstruction *insertPoint = nullptr;
+    
+    PreparedAddressableBuffer() = default;
+    
+    PreparedAddressableBuffer(SILInstruction *insertPoint)
+      : insertPoint(insertPoint)
+    {}
+    
+    PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
+      : insertPoint(other.insertPoint)
+    {
+      other.insertPoint = nullptr;
+    }
+    
+    PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
+      insertPoint = other.insertPoint;
+      other.insertPoint = nullptr;
+      return *this;
+    }
+    
+    ~PreparedAddressableBuffer() {
+      if (insertPoint) {
+        // Remove the insertion point if it went unused.
+        insertPoint->eraseFromParent();
+      }
+    }
+  };
+  llvm::DenseMap<VarDecl *, PreparedAddressableBuffer> AddressableBuffers;
+  
   /// Establish the scope for the addressable buffer that might be allocated
   /// for a local variable binding.
   ///
@@ -1138,18 +1169,21 @@ public:
                            bool isSelfConformance, bool isPreconcurrency,
                            std::optional<ActorIsolation> enterIsolation);
 
-  /// Generates subscript arguments for keypath. This function handles lowering
-  /// of all index expressions including default arguments.
+  /// Generates subscript or method arguments for keypath. This function handles
+  /// lowering of all arguments or index expressions including default
+  /// arguments.
   ///
   /// \returns Lowered index arguments.
-  /// \param subscript - The subscript decl who's arguments are being lowered.
-  /// \param subs - Used to get subscript function type and to substitute generic args.
-  /// \param argList - The argument list of the subscript.
-  SmallVector<ManagedValue, 4>
-  emitKeyPathSubscriptOperands(SILLocation loc,
-                               SubscriptDecl *subscript,
-                               SubstitutionMap subs,
-                               ArgumentList *argList);
+  /// \param decl - The subscript or method decl whose arguments are being
+  /// lowered.
+  /// \param subs - Used to get subscript or method function type and to
+  /// substitute generic args.
+  /// \param argList - The argument list of the
+  /// subscript or method.
+  SmallVector<ManagedValue, 4> emitKeyPathOperands(SILLocation loc,
+                                                   ValueDecl *decl,
+                                                   SubstitutionMap subs,
+                                                   ArgumentList *argList);
 
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
@@ -1930,11 +1964,14 @@ public:
                                 const FunctionTypeInfo &typeContext,
                                 SubstitutionMap subs);
 
-  PreparedArguments prepareSubscriptIndices(SILLocation loc,
-                                            SubscriptDecl *subscript,
-                                            SubstitutionMap subs,
-                                            AccessStrategy strategy,
-                                            ArgumentList *argList);
+  /// Get substituted type for a given interface type, optionally apply a
+  /// substitution map if provided.
+  CanFunctionType prepareStorageType(ValueDecl *decl, SubstitutionMap subs);
+
+  /// Evaluate and associate arguments with their expressions.
+  PreparedArguments prepareIndices(SILLocation loc, CanFunctionType substFnType,
+                                   AccessStrategy strategy,
+                                   ArgumentList *argList);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
@@ -1954,6 +1991,18 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
+
+  RValue emitRValueForKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseFormalType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
+
+  RValue emitUnappliedKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
@@ -3001,7 +3050,7 @@ public:
 
   /// Returns the SILDeclRef to use for references to the given accessor.
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
-    return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
+    return SGM.getFuncDeclRef(accessor, F.getResilienceExpansion());
   }
 
   /// Given a lowered pack expansion type, produce a generic environment

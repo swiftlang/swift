@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 924; // ExtensibleEnums feature
+const uint16_t SWIFTMODULE_VERSION_MINOR = 929; // OriginallyDefinedInAttr::LinkerModuleName
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1485,6 +1485,12 @@ namespace decls_block {
   SYNTAX_SUGAR_TYPE_LAYOUT(VariadicSequenceTypeLayout, VARIADIC_SEQUENCE_TYPE);
   SYNTAX_SUGAR_TYPE_LAYOUT(ExistentialTypeLayout, EXISTENTIAL_TYPE);
 
+  TYPE_LAYOUT(InlineArrayTypeLayout,
+    INLINE_ARRAY_TYPE,
+    TypeIDField, // count type
+    TypeIDField  // element type
+  );
+
   TYPE_LAYOUT(DictionaryTypeLayout,
     DICTIONARY_TYPE,
     TypeIDField, // key type
@@ -2086,6 +2092,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCVBR<5>, // options
+    TypeIDField, // global actor isolation of conformance
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.
@@ -2114,6 +2121,12 @@ namespace decls_block {
     TypeIDField, // the conforming type
     DeclIDField, // the protocol
     BCFixed<2>  // the builtin conformance kind
+  >;
+
+  using AbstractConformanceLayout = BCRecordLayout<
+    ABSTRACT_CONFORMANCE,
+    TypeIDField,                         // conforming type
+    DeclIDField                         // the protocol
   >;
 
   using PackConformanceLayout = BCRecordLayout<
@@ -2641,6 +2654,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    ABSTRACT_CONFORMANCE_OFFSETS,
     PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

@@ -4,30 +4,31 @@
 // REQUIRES: concurrency
 
 protocol P {
-  func f() // expected-note 2{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
+  func f()
 }
 
 // ----------------------------------------------------------------------------
 // Definition of isolated conformances
 // ----------------------------------------------------------------------------
 
-// expected-note@+3{{add '@preconcurrency' to the 'P' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
-// expected-note@+2{{add 'isolated' to the 'P' conformance to restrict it to main actor-isolated code}}{{25-25=isolated }}
+// expected-error@+4{{conformance of 'CWithNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3{{mark all declarations used in the conformance 'nonisolated'}}
+// expected-note@+2{{isolate this conformance to the main actor with '@MainActor'}}{{25-25=@MainActor }}
 @MainActor
 class CWithNonIsolated: P {
-  func f() { } // expected-error{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
-  // expected-note@-1{{add 'nonisolated' to 'f()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
 }
 
 actor SomeActor { }
 
 // Isolated conformances need a global-actor-constrained type.
-class CNonIsolated: isolated P { // expected-error{{isolated conformance is only permitted on global-actor-isolated types}}
+class CNonIsolated: @MainActor P {
   func f() { }
 }
 
-extension SomeActor: isolated P { // expected-error{{isolated conformance is only permitted on global-actor-isolated types}}
-  nonisolated func f() { }
+extension SomeActor: @MainActor P {
+  @MainActor func f() { }
 }
 
 @globalActor
@@ -35,14 +36,15 @@ struct SomeGlobalActor {
   static let shared = SomeActor()
 }
 
-// Isolation of the function needs to match that of the enclosing type.
+// Isolation of the conformance can be different from that of the enclosing
+// type, so long as the witnesses match up.
 @MainActor
-class CMismatchedIsolation: isolated P {
-  @SomeGlobalActor func f() { } // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
+class CMismatchedIsolation: @SomeGlobalActor P {
+  @SomeGlobalActor func f() { }
 }
 
 @MainActor
-class C: isolated P {
+class C: @MainActor P {
   func f() { } // okay
 }
 
@@ -52,9 +54,11 @@ protocol Q {
   associatedtype A: P
 }
 
-// expected-error@+2{{conformance of 'SMissingIsolation' to 'Q' depends on main actor-isolated conformance of 'C' to 'P'; mark it as 'isolated'}}{{27-27=isolated }}
+// expected-error@+2{{conformance of 'SMissingIsolation' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 struct SMissingIsolation: Q {
+  // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   typealias A = C
 }
 
@@ -62,25 +66,28 @@ struct PWrapper<T: P>: P {
   func f() { }
 }
 
-// expected-error@+2{{conformance of 'SMissingIsolationViaWrapper' to 'Q' depends on main actor-isolated conformance of 'C' to 'P'; mark it as 'isolated'}}
+// expected-error@+2{{conformance of 'SMissingIsolationViaWrapper' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 struct SMissingIsolationViaWrapper: Q {
+  // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}{{37-37=@MainActor }}
   typealias A = PWrapper<C>
 }
 
 @SomeGlobalActor
-class C2: isolated P {
+class C2: @SomeGlobalActor P {
   func f() { }
 }
 
 @MainActor
-struct S: isolated Q {
+struct S: @MainActor Q {
   typealias A = C
 }
 
-// expected-error@+2{{main actor-isolated conformance of 'SMismatchedActors' to 'Q' cannot depend on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to 'P'}}
+// expected-error@+3{{conformance of 'SMismatchedActors' to protocol 'Q' crosses into global actor 'SomeGlobalActor'-isolated code and can cause data races}}
+// expected-note@+2{{conformance depends on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to protocol 'P'}}
 @MainActor
-struct SMismatchedActors: isolated Q {
+struct SMismatchedActors: @MainActor Q {
   typealias A = C2
 }
 
@@ -101,8 +108,8 @@ struct PSendableMetaWrapper<T: P & SendableMetatype>: P {
 @MainActor
 func testIsolationConformancesInTypes() {
   typealias A1 = PWrapper<C>
-  typealias A2 = PSendableWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter 'T'}}
-  typealias A3 = PSendableMetaWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `SendableMetatype` type parameter 'T'}}
+  typealias A2 = PSendableWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter 'T'}}
+  typealias A3 = PSendableMetaWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `SendableMetatype` type parameter 'T'}}
 }
 
 func acceptP<T: P>(_: T) { }
@@ -111,18 +118,30 @@ func acceptSendableP<T: Sendable & P>(_: T) { }
 // expected-note@-1{{'acceptSendableP' declared here}}
 
 func acceptSendableMetaP<T: SendableMetatype & P>(_: T) { }
-// expected-note@-1{{'acceptSendableMetaP' declared here}}
+// expected-note@-1 3{{'acceptSendableMetaP' declared here}}
 
 @MainActor
 func testIsolationConformancesInCall(c: C) {
   acceptP(c) // okay
 
-  acceptSendableP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
-  acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableP(c) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
+}
+
+@MainActor
+func testIsolatedConformancesOfActor(a: SomeActor) {
+  acceptP(a)
+  acceptSendableMetaP(a) // expected-error{{main actor-isolated conformance of 'SomeActor' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
+}
+
+@SomeGlobalActor
+func testIsolatedConformancesOfOtherGlobalActor(c: CMismatchedIsolation) {
+  acceptP(c)
+  acceptSendableMetaP(c)  // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
 }
 
 func testIsolationConformancesFromOutside(c: C) {
-  acceptP(c) // expected-error{{main actor-isolated isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
-  let _: any P = c // expected-error{{main actor-isolated isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
-  let _ = PWrapper<C>() // expected-error{{main actor-isolated isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  acceptP(c) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  let _: any P = c // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  let _ = PWrapper<C>() // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
 }

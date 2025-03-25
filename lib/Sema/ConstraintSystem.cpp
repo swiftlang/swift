@@ -511,7 +511,7 @@ void ConstraintSystem::recordPotentialThrowSite(
   recordPotentialThrowSite(catchNode, site);
 }
 
-Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
+Type ConstraintSystem::getExplicitCaughtErrorType(CatchNode catchNode) {
   ASTContext &ctx = getASTContext();
 
   // If there is an explicit caught type for this node, use it.
@@ -521,6 +521,16 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
 
     return explicitCaughtType;
   }
+
+  return Type();
+}
+
+Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
+  ASTContext &ctx = getASTContext();
+
+  // If we have an explicit caught error type for this node, use it.
+  if (auto explicitCaughtType = getExplicitCaughtErrorType(catchNode))
+    return explicitCaughtType;
 
   // Retrieve the thrown error type of a closure.
   // FIXME: This will need to change when we do inference of thrown error
@@ -724,7 +734,8 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   // If we have a locator that starts with a key path component element, we
-  // may have a callee given by a property or subscript component.
+  // may have a callee given by a property, subscript, initializer, or method
+  // component.
   if (auto componentElt =
       locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>()) {
     auto *kpExpr = castToExpr<KeyPathExpr>(anchor);
@@ -737,13 +748,16 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       // For a subscript the callee is given by 'component -> subscript member'.
       return getConstraintLocator(
                                   anchor, {*componentElt, ConstraintLocator::SubscriptMember});
-    case ComponentKind::UnresolvedProperty:
-    case ComponentKind::Property:
+    case ComponentKind::UnresolvedMember:
+    case ComponentKind::Member:
       // For a property, the choice is just given by the component.
       return getConstraintLocator(anchor, *componentElt);
     case ComponentKind::TupleElement:
       llvm_unreachable("Not implemented by CSGen");
       break;
+    case ComponentKind::UnresolvedApply:
+    case ComponentKind::Apply:
+      return getConstraintLocator(anchor, *componentElt);
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -3601,7 +3615,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       auto argIdx = applyArgElt->getArgIdx();
       if (auto *kpe = getAsExpr<KeyPathExpr>(anchor)) {
         auto component = kpe->getComponents()[elt.getIndex()];
-        auto *args = component.getSubscriptArgs();
+        auto *args = component.getArgs();
         assert(args && "Trying to apply a component without args?");
         if (argIdx < args->size()) {
           anchor = args->getExpr(argIdx);
@@ -4290,7 +4304,7 @@ ConstraintLocator *ConstraintSystem::getArgumentLocator(Expr *expr) {
     if (!idx)
       return nullptr;
     loc = getConstraintLocator(KP, {LocatorPathElt::KeyPathComponent(*idx)});
-    argList = KP->getComponents()[*idx].getSubscriptArgs();
+    argList = KP->getComponents()[*idx].getArgs();
   } else {
     loc = getConstraintLocator(application);
   }
@@ -4588,7 +4602,7 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
   auto *PD = protocols.front();
 
   auto contextAvailability =
-      TypeChecker::availabilityAtLocation(expr->getLoc(), dc);
+      AvailabilityContext::forLocation(expr->getLoc(), dc);
   auto refinedAvailability =
       AvailabilityContext::forPlatformRange(
         AvailabilityRange::alwaysAvailable(), ctx);
@@ -4600,8 +4614,7 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
     assert(eraser && "Failed to resolve eraser type!");
 
     auto *nominal = eraser->getAnyNominal();
-    auto nominalAvailability =
-        TypeChecker::availabilityForDeclSignature(nominal);
+    auto nominalAvailability = AvailabilityContext::forDeclSignature(nominal);
 
     if (contextAvailability.isContainedIn(nominalAvailability) &&
         nominalAvailability.isContainedIn(refinedAvailability)) {
@@ -5062,6 +5075,36 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   if (rootTy->isPlaceholder())
     return fail();
 
+  auto isKnownSendability =
+      [&](const KeyPathExpr::Component &component) -> bool {
+    if (!Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures))
+      return true;
+
+    // Key path is sendable only when all of its captures are sendable.
+    if (auto *args = component.getArgs()) {
+      auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
+
+      for (const auto &arg : *args) {
+        // No need to check more or delay since we already know
+        // that the type is not Sendable.
+        if (!isSendable)
+          break;
+
+        auto argTy = simplifyType(getType(arg.getExpr()));
+
+        // Sendability cannot be determined until the argument
+        // is fully resolved.
+        if (argTy->hasTypeVariable())
+          return false;
+
+        auto conformance = lookupConformance(argTy, sendable);
+        isSendable &= bool(conformance) && !conformance.hasMissingConformance();
+      }
+    }
+
+    return true;
+  };
+
   auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -5075,37 +5118,20 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       return fail();
     }
 
+    case KeyPathExpr::Component::Kind::Apply:
+    case KeyPathExpr::Component::Kind::UnresolvedApply: {
+      if (!isKnownSendability(component))
+        return delay();
+      break;
+    }
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
     case KeyPathExpr::Component::Kind::Subscript: {
-      if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-        // Key path is sendable only when all of its captures are sendable.
-        if (auto *args = component.getSubscriptArgs()) {
-          auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
-
-          for (const auto &arg : *args) {
-            // No need to check more or delay since we already known
-            // that the type is not Sendable.
-            if (!isSendable)
-              break;
-
-            auto argTy = simplifyType(getType(arg.getExpr()));
-
-            // Sendability cannot be determined until the argument
-            // is fully resolved.
-            if (argTy->hasTypeVariable())
-              return delay();
-
-            auto conformance = lookupConformance(argTy, sendable);
-            isSendable &=
-                bool(conformance) &&
-                !conformance.hasMissingConformance();
-          }
-        }
-      }
+      if (!isKnownSendability(component))
+        return delay();
       LLVM_FALLTHROUGH;
     }
-    case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::UnresolvedProperty: {
+    case KeyPathExpr::Component::Kind::Member:
+    case KeyPathExpr::Component::Kind::UnresolvedMember: {
       auto *componentLoc =
           getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
       auto *calleeLoc = getCalleeLocator(componentLoc);
@@ -5129,18 +5155,19 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!choice.isDecl())
         return fail();
 
-      auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
-
       if (hasFixFor(componentLoc, FixKind::AllowInvalidRefInKeyPath) ||
           hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
           hasFixFor(componentLoc,
                     FixKind::UnwrapOptionalBaseWithOptionalResult))
         return fail();
 
-      if (!storage)
+      auto *storageDecl = dyn_cast<AbstractStorageDecl>(choice.getDecl());
+      if (!isa<AbstractFunctionDecl>(choice.getDecl()) && !storageDecl) {
         return fail();
+      }
 
-      switch (getActorIsolation(storage)) {
+      // Shared switch logic for actor isolation.
+      switch (getActorIsolation(choice.getDecl())) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::CallerIsolationInheriting:
@@ -5150,22 +5177,24 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       case ActorIsolation::Erased:
         llvm_unreachable("storage cannot have opaque isolation");
 
-      // A reference to an actor isolated state make key path non-Sendable.
+      // A reference to an actor isolated state makes key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:
         isSendable = false;
         break;
       }
 
-      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
-        mutability = KeyPathMutability::ReadOnly;
-        continue;
-      }
+      if (storageDecl) {
+        if (isReadOnlyKeyPathComponent(storageDecl, component.getLoc())) {
+          mutability = KeyPathMutability::ReadOnly;
+          continue;
+        }
 
-      // A nonmutating setter indicates a reference-writable base.
-      if (!storage->isSetterMutating()) {
-        mutability = KeyPathMutability::ReferenceWritable;
-        continue;
+        // A nonmutating setter indicates a reference-writable base.
+        if (!storageDecl->isSetterMutating()) {
+          mutability = KeyPathMutability::ReferenceWritable;
+          continue;
+        }
       }
 
       // Otherwise, the key path maintains its current capability.

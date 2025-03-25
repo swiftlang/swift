@@ -852,7 +852,7 @@ void Symbol::printPath(llvm::raw_ostream &OS) const {
 
 void Symbol::getUSR(SmallVectorImpl<char> &USR) const {
   llvm::raw_svector_ostream OS(USR);
-  ide::printDeclUSR(D, OS);
+  ide::printDeclUSR(D, OS, /*distinguishSynthesizedDecls*/ true);
   if (SynthesizedBaseTypeDecl) {
     OS << "::SYNTHESIZED::";
     ide::printDeclUSR(SynthesizedBaseTypeDecl, OS);

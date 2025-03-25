@@ -752,6 +752,10 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  /// True if this type is an existential or an archetype which may be an
+  /// existential.
+  bool canBeExistential();
+
   /// Determine whether the type involves an opened element archetype.
   bool hasElementArchetype() const {
     return getRecursiveProperties().hasElementArchetype();
@@ -5574,6 +5578,8 @@ public:
     return NumLifetimeDependencies != 0;
   }
 
+  // Return lowered lifetime dependencies, which has remapped parameter indices
+  // relative to the original FunctionType.
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
       return std::nullopt;
@@ -6188,6 +6194,27 @@ public:
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ArraySlice;
+  }
+};
+
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayType : public SyntaxSugarType {
+  Type Count;
+  Type Elt;
+
+  InlineArrayType(const ASTContext &ctx, Type count, Type elt,
+                  RecursiveTypeProperties properties)
+      : SyntaxSugarType(TypeKind::InlineArray, ctx, properties), Count(count),
+        Elt(elt) {}
+
+public:
+  static InlineArrayType *get(Type count, Type elt);
+
+  Type getCountType() const { return Count; }
+  Type getElementType() const { return Elt; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::InlineArray;
   }
 };
 

@@ -76,7 +76,7 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(CanType target) {
   auto bridgedProto =
       target->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto conf = lookupConformance(target, bridgedProto);
-  return SubstitutionMap::getProtocolSubstitutions(conf.getRequirement(),
+  return SubstitutionMap::getProtocolSubstitutions(conf.getProtocol(),
                                                    target, conf);
 }
 
@@ -1450,7 +1450,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
   auto &Mod = Inst->getModule();
 
   if (TargetType->isAnyExistentialType() &&
-      !SourceType->isAnyExistentialType()) {
+      !SourceType->canBeExistential()) {
     auto &Ctx = Mod.getASTContext();
 
     auto *Proto = dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal());

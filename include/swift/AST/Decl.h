@@ -1475,11 +1475,6 @@ public:
   /// extension) that makes it unavailable.
   std::optional<SemanticAvailableAttr> getUnavailableAttr() const;
 
-  /// Returns true if the decl is effectively always unavailable in the current
-  /// compilation context. This query differs from \c isUnavailable() because it
-  /// takes the availability of parent declarations into account.
-  bool isSemanticallyUnavailable() const;
-
   /// Returns true if code associated with this declaration should be considerd
   /// unreachable at runtime because the declaration is unavailable in all
   /// execution contexts in which the code may run. This result takes the
@@ -1509,6 +1504,16 @@ public:
 
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
+
+  /// Return the declaration upon which the attributes for this declaration
+  /// would appear in concrete syntax. This function is necessary because for
+  /// semantic analysis, the parser attaches attributes to declarations other
+  /// than those on which they, concretely, appear.
+  const Decl *getConcreteSyntaxDeclForAttributes() const;
+
+  /// Return the declaration to which the parser actually attaches attributes in
+  /// the abstract syntax tree (see `getConcreteSyntaxDeclForAttributes()`).
+  const Decl *getAbstractSyntaxDeclForAttributes() const;
 
   /// Apply the specified function to decls that should be placed _next_ to
   /// this decl when constructing AST.
@@ -1806,16 +1811,20 @@ private:
   /// This is true in cases like ~Copyable but not (P & ~Copyable).
   bool IsSuppressed : 1;
 
+  /// The global actor isolation provided (for a conformance).
+  TypeExpr *globalActorIsolationType = nullptr;
+
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, ProtocolConformanceOptions options,
                  bool isSuppressed = false)
       : TypeLoc(typeLoc), RawOptions(options.toRaw()),
-        IsSuppressed(isSuppressed) {}
+        IsSuppressed(isSuppressed),
+        globalActorIsolationType(options.getGlobalActorIsolationType()) {}
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(RawOptions);
+    return ProtocolConformanceOptions(RawOptions, globalActorIsolationType);
   }
 
   bool isUnchecked() const {
@@ -1827,8 +1836,12 @@ public:
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
-  bool isIsolated() const {
-    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  bool isNonisolated() const {
+    return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
+  }
+
+  TypeExpr *getGlobalActorIsolationType() const {
+    return globalActorIsolationType;
   }
 
   ExplicitSafety getExplicitSafety() const {
@@ -8157,6 +8170,18 @@ public:
 
   /// The async function marked as the alternative to this function, if any.
   AbstractFunctionDecl *getAsyncAlternative() const;
+
+  /// True if the storage can be referenced by a keypath directly.
+  /// Otherwise, its override must be referenced.
+  bool isValidKeyPathComponent() const;
+
+  /// Do we need to use resilient access patterns outside of this
+  /// method's resilience domain?
+  bool isResilient() const;
+
+  /// Do we need to use resilient access patterns when accessing this
+  /// method from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the

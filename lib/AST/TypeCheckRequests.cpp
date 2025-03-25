@@ -1369,6 +1369,43 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// ConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<ActorIsolation>
+ConformanceIsolationRequest::getCachedResult() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return ActorIsolation::forNonisolated(false);
+
+  // Was actor isolation non-isolated?
+  if (rootNormal->isComputedNonisolated())
+    return ActorIsolation::forNonisolated(false);
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      cast<NormalProtocolConformance>(conformance->getRootConformance());
+
+  // Common case: conformance is nonisolated.
+  if (result.isNonisolated()) {
+    rootNormal->setComputedNonnisolated();
+    return;
+  }
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -2644,19 +2681,17 @@ void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed,
+                 "body");
 }
 
 void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity_through,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed_through,
+                 "body");
 }
 
 //----------------------------------------------------------------------------//

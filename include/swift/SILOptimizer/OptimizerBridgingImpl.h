@@ -543,6 +543,11 @@ bool BridgedPassContext::enableStackProtection() const {
   return mod->getOptions().EnableStackProtection;
 }
 
+bool BridgedPassContext::enableMergeableTraps() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().MergeableTraps;
+}
+
 bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getASTContext().LangOpts.hasFeature((swift::Feature)feature);

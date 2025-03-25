@@ -96,6 +96,11 @@ namespace swift {
     TaskToThread,
   };
 
+  enum class DefaultIsolation : uint8_t {
+    MainActor,
+    Nonisolated
+  };
+
   /// Describes the code size optimization behavior for code associated with
   /// declarations that are marked unavailable.
   enum class UnavailableDeclOptimization : uint8_t {
@@ -328,6 +333,10 @@ namespace swift {
     /// The C++ interoperability source compatibility version. Defaults
     /// to the Swift language version.
     version::Version cxxInteropCompatVersion;
+
+    /// What version of C++ interoperability a textual interface was originally
+    /// generated with (if at all).
+    std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
                                swift::DiagnosticEngine &Diags);
@@ -594,7 +603,7 @@ namespace swift {
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = true;
+    bool EnableExperimentalLifetimeDependenceInference = false;
 
     /// Skips decls that cannot be referenced externally.
     bool SkipNonExportableDecls = false;
@@ -627,6 +636,9 @@ namespace swift {
 
     /// Disables `DynamicActorIsolation` feature.
     bool DisableDynamicActorIsolation = false;
+
+    /// Defines the default actor isolation.
+    DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
     /// Whether or not to allow experimental features that are only available
     /// in "production".
@@ -812,8 +824,9 @@ namespace swift {
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
 
   public:
+    //==========================================================================
     // MARK: Features
-    // =========================================================================
+    //==========================================================================
 
     /// A wrapper around the feature state enumeration.
     struct FeatureState {

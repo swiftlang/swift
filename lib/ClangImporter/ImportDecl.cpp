@@ -173,14 +173,9 @@ bool importer::recordHasReferenceSemantics(
   // return MissingLifetimeOperation if the type is not a foreign reference
   // type. Note that this doesn't affect the correctness of this function, since
   // those implicit members aren't required for foreign reference types.
-
-  // To avoid emitting spurious diagnostics, let's disable them here. Types with
-  // missing lifetime operations would get diagnosed later, once their members
-  // are fully instantiated.
   auto semanticsKind = evaluateOrDefault(
       importerImpl->SwiftContext.evaluator,
-      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl,
-                          /* shouldDiagnoseLifetimeOperations */ false}),
+      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl}),
       {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
@@ -2036,9 +2031,20 @@ namespace {
     }
 
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
-      fd->getAttrs().add(new (Impl.SwiftContext)
-                             UnsafeNonEscapableResultAttr(/*Implicit=*/true));
       fd->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
+
+      unsigned resultIndex = fd->getParameters()->size();
+      if (fd->hasImplicitSelfDecl()) {
+        ++resultIndex;
+      }
+      SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, resultIndex,
+                                              /*isImmortal*/ true);
+      lifetimeDependencies.push_back(immortalLifetime);
+      Impl.SwiftContext.evaluator.cacheOutput(
+        LifetimeDependenceInfoRequest{fd},
+        Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+      return;
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
@@ -2967,6 +2973,17 @@ namespace {
           // members once they're instantiated.
           !Impl.importSymbolicCXXDecls) {
 
+        HeaderLoc loc(decl->getLocation());
+        if (hasUnsafeAPIAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_unsafe",
+                        decl->getNameAsString());
+        if (hasOwnedValueAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_owned",
+                        decl->getNameAsString());
+        if (hasIteratorAPIAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_iterator",
+                        decl->getNameAsString());
+
         if (semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
           Impl.addImportDiagnostic(
               decl, Diagnostic(diag::record_unsupported_default_args),
@@ -3017,6 +3034,10 @@ namespace {
               /*Obsoleted=*/{});
           classDecl->getAttrs().add(AvAttr);
         }
+
+        if (decl->isEffectivelyFinal())
+          classDecl->getAttrs().add(new (Impl.SwiftContext)
+                                    FinalAttr(/*IsImplicit=*/true));
       }
 
       // If this module is declared as a C++ module, try to synthesize
@@ -4060,6 +4081,9 @@ namespace {
                    CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
       };
 
+      // FIXME: this uses '0' as the result index. That only works for
+      // standalone functions with no parameters.
+      // See markReturnsUnsafeNonescapable() for a general approach.
       auto &ASTContext = result->getASTContext();
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
@@ -9184,6 +9208,34 @@ void ClangImporter::Implementation::importAttributes(
           /*Implicit=*/false, EnableClangSPI && IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
+    }
+
+    // __attribute__((availability(domain:)))
+    //
+    if (auto avail = dyn_cast<clang::DomainAvailabilityAttr>(*AI)) {
+      auto *declContext = MappedDecl->getInnermostDeclContext();
+
+      // FIXME: [availability] Don't look up the availability domain. Clang
+      // should be serializing the resolved VarDecl for the availability domain
+      // it found when type checking the attribute.
+      auto domainIdentifier = SwiftContext.getIdentifier(avail->getDomain());
+      llvm::SmallVector<AvailabilityDomain, 4> results;
+      declContext->lookupAvailabilityDomains(domainIdentifier, results);
+
+      if (results.size() > 0) {
+        // FIXME: [availability] Diagnose ambiguous availabilty domain name?
+        auto AttrKind = avail->getUnavailable()
+                            ? AvailableAttr::Kind::Unavailable
+                            : AvailableAttr::Kind::Default;
+
+        auto avAttr = new (C) AvailableAttr(
+            SourceLoc(), SourceRange(), results.front(), SourceLoc(), AttrKind,
+            /*Message=*/"", /*Rename=*/"", /*Introduced=*/{}, SourceRange(),
+            /*Deprecated=*/{}, SourceRange(), /*Obsoleted=*/{}, SourceRange(),
+            /*Implicit=*/false, /*IsSPI=*/false);
+
+        MappedDecl->getAttrs().add(avAttr);
+      }
     }
 
     // __attribute__((swift_attr("attribute"))) are handled by

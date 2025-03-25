@@ -36,6 +36,8 @@ enum InlineArrayTests {
     testSuite.test("Copyable",    testCopyable)
     testSuite.test("Noncopyable", testNoncopyable)
     testSuite.test("Uninhabited", testUninhabited)
+    testSuite.test("Throws",      testThrows)
+    testSuite.test("Closures",    testClosures)
     runAllTests()
   }
 
@@ -72,16 +74,21 @@ enum InlineArrayTests {
       let b: InlineArray<_, Int> = [1, 2, 4, 8]
       let c: InlineArray<4, _>   = [1, 2, 4, 8]
       let d: InlineArray         = [1, 2, 4, 8]
+      let e: InlineArray<0, Int> = []
+      let f: InlineArray<_, Int> = []
       _checkInlineArray(a, oracle: [1, 2, 4, 8])
       _checkInlineArray(b, oracle: [1, 2, 4, 8])
       _checkInlineArray(c, oracle: [1, 2, 4, 8])
       _checkInlineArray(d, oracle: [1, 2, 4, 8])
+      _checkInlineArray(e, oracle: [])
+      _checkInlineArray(f, oracle: [])
     }
     do {
       let a = InlineArray<4, Int> { 1 << $0 }
       let b = InlineArray<4, Int>(first: 1) { $0 << 1 }
       var c = InlineArray<4, Int>(repeating: 9)
       var d = InlineArray<4, Int>(repeating: 9)
+      let e = InlineArray<0, Int>(repeating: 9)
       _checkInlineArray(c, oracle: [9, 9, 9, 9])
       _checkInlineArray(d, oracle: [9, 9, 9, 9])
       c[0] = 1
@@ -96,6 +103,7 @@ enum InlineArrayTests {
       _checkInlineArray(b, oracle: [1, 2, 4, 8])
       _checkInlineArray(c, oracle: [1, 2, 4, 8])
       _checkInlineArray(d, oracle: [1, 2, 4, 8])
+      _checkInlineArray(e, oracle: [])
     }
   }
 
@@ -135,20 +143,78 @@ enum InlineArrayTests {
   /// An *empty* array's elements can be of *uninhabited* type.
   @available(SwiftStdlib 6.2, *)
   static func testUninhabited() {
-#if false // FIXME: Empty array literals aren't supported.
     do {
       let e: InlineArray<0, Never> = []
       let f: InlineArray<_, Never> = []
       _checkInlineArray(e, oracle: [])
       _checkInlineArray(f, oracle: [])
     }
-#endif
     do {
       let e = InlineArray<0, Never> { _ in fatalError() }
       let f = InlineArray<0, _>     { _ in fatalError() }
       _checkInlineArray(e, oracle: [])
       _checkInlineArray(f, oracle: [])
     }
+  }
+
+  /// The closure is allowed to throw an error at any point during
+  /// initialization at which point the array will stop initialization,
+  /// deinitialize every currently initialized element, and throw the given
+  /// error back out to the caller.
+  @available(SwiftStdlib 6.2, *)
+  static func testThrows() {
+    let error = CancellationError()
+    do {
+      expectDoesNotThrow {
+        let a = try InlineArray<0, String> { _ in throw error }
+        _checkInlineArray(a, oracle: [])
+      }
+      _expectThrows {
+        let _ = try InlineArray<1, String> { _ in throw error }
+      }
+      _expectThrows {
+        let _ = try InlineArray<2, String> { index in
+          if index == 0 { "first" } else { throw error }
+        }
+      }
+    }
+    do {
+      expectDoesNotThrow {
+        let a = try InlineArray<0, String>(first: "first") { _ in throw error }
+        _checkInlineArray(a, oracle: [])
+      }
+      expectDoesNotThrow {
+        let a = try InlineArray<1, String>(first: "first") { _ in throw error }
+        _checkInlineArray(a, oracle: ["first"])
+      }
+      _expectThrows {
+        let _ = try InlineArray<2, String>(first: "first") { _ in throw error }
+      }
+      _expectThrows {
+        let _ = try InlineArray<3, String>(first: "first") { element in
+          if element == "first" { "second" } else { throw error }
+        }
+      }
+    }
+  }
+
+  /// Test the handling of closure values in InlineArray literals
+  @available(SwiftStdlib 6.2, *)
+  static func testClosures() {
+    let ia: InlineArray<_, (Int) -> Int> = [{$0 * 2}]
+
+    for i in 0 ..< 10 {
+      expectEqual(i * 2, ia[0](i))
+    }
+
+    var x = 0
+    let ia2: InlineArray<_, () -> ()> = [{ x += 1 }]
+
+    for _ in 0 ..< 10 {
+      ia2[0]()
+    }
+
+    expectEqual(x, 10)
   }
 }
 
@@ -178,6 +244,24 @@ extension InlineArray where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 // MARK: - StdlibUnittest Additions
 //===----------------------------------------------------------------------===//
+
+/// Tests that the given closure always throws an error.
+func _expectThrows<Failure: Error>(
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file,
+  line: UInt = #line,
+  _ body: () throws(Failure) -> Void
+) {
+  do throws(Failure) {
+    try body()
+    expectUnreachable(
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
+    )
+  } catch {
+    return
+  }
+}
 
 /// Tests the properties and subscripts of an `InlineArray` instance, by
 /// comparing them against an `Array` oracle with the expected elements.

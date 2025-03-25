@@ -1079,7 +1079,9 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
       decl, ctx.getIdentifier("value_type"));
   auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("const_iterator"));
-  if (!valueType || !iterType)
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+  if (!valueType || !iterType || !sizeType)
     return;
 
   ProtocolDecl *cxxRandomAccessIteratorProto =
@@ -1097,6 +1099,8 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
                                valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});

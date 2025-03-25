@@ -17,10 +17,14 @@ public protocol CxxVector<Element>: ExpressibleByArrayLiteral {
   associatedtype Element
   associatedtype RawIterator: UnsafeCxxRandomAccessIterator
     where RawIterator.Pointee == Element
+  associatedtype Size: BinaryInteger
 
   init()
 
   mutating func push_back(_ element: Element)
+
+  func size() -> Size
+  func __dataUnsafe() -> UnsafePointer<Element>?
 }
 
 extension CxxVector {
@@ -43,5 +47,18 @@ extension CxxVector {
   @inlinable
   public init(arrayLiteral elements: Element...) {
     self.init(elements)
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension CxxVector {
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _cxxOverrideLifetime(span, borrowing: self)
+    }
   }
 }

@@ -8123,7 +8123,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   assert(member.requiresNewWitnessTableEntry());
 
   bool shouldUseDispatchThunk = false;
-  if (IGM.isResilient(conformance.getRequirement(), ResilienceExpansion::Maximal)) {
+  if (IGM.isResilient(conformance.getProtocol(), ResilienceExpansion::Maximal)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().WitnessMethodElimination) {
     // For WME, use a thunk if the target protocol is defined in another module.
@@ -8249,8 +8249,11 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 
   llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  Builder.CreateCondBr(expectedCond, failBB, contBB);
-    
+  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
+
+  if (IGM.getOptions().AnnotateCondFailMessage && !i->getMessage().empty())
+    br->addAnnotationMetadata(i->getMessage());
+
   Builder.SetInsertPoint(&CurFn->back());
   Builder.emitBlock(failBB);
   if (IGM.DebugInfo)

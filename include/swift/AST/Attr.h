@@ -534,6 +534,12 @@ public:
   ///
   static std::optional<DeclAttrKind> getAttrKindFromString(StringRef Str);
 
+  SWIFT_DEBUG_DUMPER(dump(const ASTContext &ctx));
+  void dump(llvm::raw_ostream &out, const ASTContext &ctx) const;
+
+  SWIFT_DEBUG_DUMPER(dump(const DeclContext *dc));
+  void dump(llvm::raw_ostream &out, const DeclContext *dc) const;
+
   static DeclAttribute *createSimple(const ASTContext &context,
                                      DeclAttrKind kind, SourceLoc atLoc,
                                      SourceLoc attrLoc);
@@ -2044,17 +2050,29 @@ public:
 class OriginallyDefinedInAttr: public DeclAttribute {
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
-                          StringRef OriginalModuleName, PlatformKind Platform,
+                          StringRef OriginalModuleName,
+                          PlatformKind Platform,
+                          const llvm::VersionTuple MovedVersion, bool Implicit);
+
+  OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
+                          StringRef ManglingModuleName,
+                          StringRef LinkerModuleName,
+                          PlatformKind Platform,
                           const llvm::VersionTuple MovedVersion, bool Implicit)
       : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
                       Implicit),
-        OriginalModuleName(OriginalModuleName), Platform(Platform),
+        ManglingModuleName(ManglingModuleName),
+        LinkerModuleName(LinkerModuleName),
+        Platform(Platform),
         MovedVersion(MovedVersion) {}
 
   OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
-  // The original module name.
-  const StringRef OriginalModuleName;
+  // The original module name for mangling.
+  const StringRef ManglingModuleName;
+
+  // The original module name for linker directives.
+  const StringRef LinkerModuleName;
 
   /// The platform of the symbol.
   const PlatformKind Platform;
@@ -2063,7 +2081,8 @@ public:
   const llvm::VersionTuple MovedVersion;
 
   struct ActiveVersion {
-    StringRef ModuleName;
+    StringRef ManglingModuleName;
+    StringRef LinkerModuleName;
     PlatformKind Platform;
     llvm::VersionTuple Version;
     bool ForTargetVariant = false;
@@ -2079,7 +2098,8 @@ public:
   /// Create a copy of this attribute.
   OriginallyDefinedInAttr *clone(ASTContext &ctx) const {
     return new (ctx) OriginallyDefinedInAttr(
-        AtLoc, Range, OriginalModuleName, Platform, MovedVersion, isImplicit());
+        AtLoc, Range, ManglingModuleName, LinkerModuleName,
+        Platform, MovedVersion, isImplicit());
   }
 };
 
@@ -3058,7 +3078,10 @@ public:
   const BackDeployedAttr *getBackDeployed(const ASTContext &ctx,
                                           bool forTargetVariant) const;
 
-  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
+  SWIFT_DEBUG_DUMPER(dump(const ASTContext &ctx));
+  SWIFT_DEBUG_DUMPER(dump(const DeclContext *dc));
+
+  SWIFT_DEBUG_DUMPER(print(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
   static void print(ASTPrinter &Printer, const PrintOptions &Options,

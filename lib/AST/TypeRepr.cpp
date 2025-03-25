@@ -151,14 +151,33 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
     for (auto attr : attrTypeRepr->getAttrs()) {
       if (auto typeAttr = attr.dyn_cast<TypeAttribute*>())
-        if (typeAttr->getKind() == kind)
-          return typeAttr->getStartLoc();
+        if (typeAttr->getKind() == kind) {
+          auto startLoc = typeAttr->getStartLoc();
+          if (startLoc.isValid())
+            return startLoc;
+
+          return typeAttr->getAttrLoc();
+        }
     }
 
     typeRepr = attrTypeRepr->getTypeRepr();
   }
 
   return SourceLoc();
+}
+
+CustomAttr *TypeRepr::findCustomAttr() const {
+  auto typeRepr = this;
+  while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    for (auto attr : attrTypeRepr->getAttrs()) {
+      if (auto typeAttr = attr.dyn_cast<CustomAttr*>())
+        return typeAttr;
+    }
+
+    typeRepr = attrTypeRepr->getTypeRepr();
+  }
+
+  return nullptr;
 }
 
 DeclRefTypeRepr::DeclRefTypeRepr(TypeReprKind K, DeclNameRef Name,
@@ -290,6 +309,13 @@ SourceLoc DeclRefTypeRepr::getEndLocImpl() const {
   }
 
   return getNameLoc().getEndLoc();
+}
+
+InlineArrayTypeRepr *InlineArrayTypeRepr::create(ASTContext &ctx,
+                                                 TypeRepr *count,
+                                                 TypeRepr *element,
+                                                 SourceRange brackets) {
+  return new (ctx) InlineArrayTypeRepr(count, element, brackets);
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
@@ -452,6 +478,15 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
 
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   Printer.printStructurePost(PrintStructureKind::FunctionType);
+}
+
+void InlineArrayTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  Printer << "[";
+  printTypeRepr(getCount(), Printer, Opts);
+  Printer << " x ";
+  printTypeRepr(getElement(), Printer, Opts);
+  Printer << "]";
 }
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,

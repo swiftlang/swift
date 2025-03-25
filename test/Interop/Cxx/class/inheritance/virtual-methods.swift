@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-5.9)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-g -I %S/Inputs -cxx-interoperability-mode=default)
 
 // REQUIRES: executable_test
 
@@ -52,5 +53,15 @@ if #available(SwiftStdlib 5.8, *) {
     expectEqual(321, base2.getIntValue())
   }
 }
+
+#if !os(Windows) 
+// FIXME in Windows, non-trivial C++ class with trivial ABI is not yet available in Swift
+VirtualMethodsTestSuite.test("C++ virtual method with complex parameter") {
+  @available(SwiftStdlib 5.8, *)
+  func f(simpleClass: HasDestructor, immortalClass: Immortal2) {
+    immortalClass.virtualMethod(simpleClass)
+  }
+}
+#endif
 
 runAllTests()

@@ -97,56 +97,48 @@ extension Task where Failure == ${FAILURE_TYPE} {
 }
 %end
 
-% OPERATION_PARAM = 'operation: sending @escaping () async throws -> ChildTaskResult'
-% for (GROUP_TYPE, METHOD_NAMES) in [
-%   (
-%     'TaskGroup',
-%     [
-%       'startTaskSynchronously',
-%       'startTaskSynchronouslyUnlessCancelled'
-%     ]
-%   ),
-%   (
-%     'ThrowingTaskGroup',
-%     [
-%       'startTaskSynchronously',
-%       'startTaskSynchronouslyUnlessCancelled'
-%     ]
-%   ),
-%   (
-%     'DiscardingTaskGroup',
-%     [
-%       'startTaskSynchronously',
-%       'startTaskSynchronouslyUnlessCancelled'
-%     ]
-%   ),
-%   (
-%     'ThrowingDiscardingTaskGroup',
-%     [
-%       'startTaskSynchronously',
-%       'startTaskSynchronouslyUnlessCancelled'
-%     ]
-%   ),
-% ]:
-% for METHOD_NAME in METHOD_NAMES:
-
-% IS_DISCARDING = 'Discarding' in GROUP_TYPE
-% IS_THROWING = 'Throwing' in GROUP_TYPE
-
-% if not IS_THROWING:
-% OPERATION_PARAM = OPERATION_PARAM.replace('throws', '')
-% end
-
-% if IS_DISCARDING:
-% OPERATION_PARAM = OPERATION_PARAM.replace('ChildTaskResult', 'Void')
-% end
-
-% if IS_THROWING:
-%   FAILURE_TYPE = 'Error'
-% else:
-%   FAILURE_TYPE = 'Never'
-% end
-
+%{
+GROUP_AND_OP_INFO = [
+   (
+     'TaskGroup',
+     [
+       'startTaskSynchronously',
+       'startTaskSynchronouslyUnlessCancelled'
+     ],
+     '',
+     'ChildTaskResult'
+   ),
+   (
+     'ThrowingTaskGroup',
+     [
+       'startTaskSynchronously',
+       'startTaskSynchronouslyUnlessCancelled'
+     ],
+     'throws ',
+     'ChildTaskResult'
+   ),
+   (
+     'DiscardingTaskGroup',
+     [
+       'startTaskSynchronously',
+       'startTaskSynchronouslyUnlessCancelled'
+     ],
+     '',
+     'Void'
+   ),
+   (
+     'ThrowingDiscardingTaskGroup',
+     [
+       'startTaskSynchronously',
+       'startTaskSynchronouslyUnlessCancelled'
+     ],
+     'throws ',
+     'Void'
+   ),
+ ]
+}%
+% for (GROUP_TYPE, METHOD_NAMES, THROWS, RESULT_TYPE) in GROUP_AND_OP_INFO:
+%   for METHOD_NAME in METHOD_NAMES:
 @available(SwiftStdlib 6.2, *)
 extension ${GROUP_TYPE} {
 
@@ -169,7 +161,7 @@ extension ${GROUP_TYPE} {
   public func ${METHOD_NAME}( // in ${GROUP_TYPE}
     name: String? = nil,
     priority: TaskPriority? = nil,
-    ${OPERATION_PARAM}
+    operation: sending @escaping () async ${THROWS}-> ${RESULT_TYPE}
   ) {
     let flags = taskCreateFlags(
       priority: priority,
@@ -191,7 +183,7 @@ extension ${GROUP_TYPE} {
     _startTaskSynchronously(task)
   }
 }
-%end # METHOD_NAMES
+%   end # METHOD_NAMES
 %end # GROUP_TYPES
 
 // ==== Legacy SPI -------------------------------------------------------------

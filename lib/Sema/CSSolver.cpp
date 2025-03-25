@@ -124,6 +124,15 @@ Solution ConstraintSystem::finalize() {
 
       CanType first = simplifyType(types.first)->getCanonicalType();
       CanType second = simplifyType(types.second)->getCanonicalType();
+
+      // Pick the restriction with the highest value to avoid depending on
+      // iteration order.
+      auto found = solution.ConstraintRestrictions.find({first, second});
+      if (found != solution.ConstraintRestrictions.end() &&
+          (unsigned) restriction <= (unsigned) found->second) {
+        continue;
+      }
+
       solution.ConstraintRestrictions[{first, second}] = restriction;
     }
   }
@@ -1171,6 +1180,11 @@ void ConstraintSystem::shrink(Expr *expr) {
       if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
         if (boundGeneric->hasUnresolvedType())
           return boundGeneric;
+
+        // Avoid handling InlineArray, building a tuple would be wrong, and
+        // we want to eliminate shrink.
+        if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
+          return Type();
 
         llvm::SmallVector<TupleTypeElt, 2> params;
         for (auto &type : boundGeneric->getGenericArgs()) {

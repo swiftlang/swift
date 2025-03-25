@@ -173,6 +173,7 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
     SWIFT_STATIC_STDLIB)
   target_link_libraries(swiftrtT PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrtT>
+    COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrtT.obj)
 

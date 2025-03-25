@@ -866,7 +866,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         std::make_unique<PlaceholderSwiftModuleScanner>(
             *Context, MLM, mainModuleName,
             Context->SearchPathOpts.PlaceholderDependencyModuleMap, ASTDelegate,
-            getInvocation().getFrontendOptions().ExplicitModulesOutputPath);
+            getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+            getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath);
     Context->addModuleLoader(std::move(PSMS));
   }
 
@@ -897,9 +898,16 @@ std::optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
 }
 
 SourceFile *CompilerInstance::getIDEInspectionFile() const {
+  ASSERT(SourceMgr.hasIDEInspectionTargetBuffer() &&
+         "Not in IDE inspection mode?");
+
   auto *mod = getMainModule();
-  auto &eval = mod->getASTContext().evaluator;
-  return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
+  auto bufferID = SourceMgr.getIDEInspectionTargetBufferID();
+  for (auto *SF : SourceMgr.getSourceFilesForBufferID(bufferID)) {
+    if (SF->getParentModule() == mod)
+      return SF;
+  }
+  llvm_unreachable("Couldn't find IDE inspection file?");
 }
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
@@ -1398,8 +1406,7 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::get(
-        name, mainModule, CustomAvailabilityDomain::Kind::Enabled, ctx);
+    auto *domain = CustomAvailabilityDomain::get(name, mainModule, kind, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };

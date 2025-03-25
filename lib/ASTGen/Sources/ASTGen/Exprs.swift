@@ -74,8 +74,8 @@ extension ASTGenVisitor {
       return self.generate(macroExpansionExpr: node)
     case .memberAccessExpr(let node):
       return self.generate(memberAccessExpr: node)
-    case .missingExpr:
-      fatalError("unimplemented")
+    case .missingExpr(let node):
+      return self.generate(missingExpr: node)
     case .nilLiteralExpr(let node):
       return self.generate(nilLiteralExpr: node).asExpr
     case .optionalChainingExpr(let node):
@@ -388,7 +388,7 @@ extension ASTGenVisitor {
       BridgedBraceStmt.createParsed(
         self.ctx,
         lBraceLoc: self.generateSourceLoc(node.leftBrace),
-        elements: self.generate(codeBlockItemList: node.statements),
+        elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
         rBraceLoc: self.generateSourceLoc(node.rightBrace)
       )
     }
@@ -736,9 +736,29 @@ extension ASTGenVisitor {
           additionalTrailingClosures: nil
         )
       ).asExpr
+      
+    case .method(let method):
+      let dotLoc = self.generateSourceLoc(node.period)
+      let declNameRef = self.generateDeclNameRef(declReferenceExpr: method.declName)
+      let unresolvedDotExpr = BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: baseExpr,
+          dotLoc: dotLoc,
+          name: declNameRef.name,
+          nameLoc: declNameRef.loc
+      ).asExpr
 
-    case .method(_):
-      fatalError("unimplemented")
+      let args = self.generateArgumentList(
+          leftParen: method.leftParen,
+          labeledExprList: method.arguments,
+          rightParen: method.rightParen,
+          trailingClosure: nil,
+          additionalTrailingClosures: nil)
+      return BridgedCallExpr.createParsed(
+          self.ctx,
+          fn: unresolvedDotExpr,
+          args: args
+      ).asExpr
     }
   }
 
@@ -847,83 +867,24 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateMagicIdentifierExpr(macroExpansionExpr node: MacroExpansionExprSyntax, kind: BridgedMagicIdentifierLiteralKind) -> BridgedMagicIdentifierLiteralExpr {
-    guard node.lastToken(viewMode: .sourceAccurate) == node.macroName else {
-      // TODO: Diagnose.
-      fatalError("magic identifier token with arguments")
-    }
-
-    return BridgedMagicIdentifierLiteralExpr.createParsed(
-      self.ctx,
-      kind: kind,
-      loc: self.generateSourceLoc(node.macroName)
-    )
-
-  }
-
-  func generateObjectLiteralExpr(macroExpansionExpr node: MacroExpansionExprSyntax, kind: BridgedObjectLiteralKind) -> BridgedObjectLiteralExpr {
-    guard
-      node.genericArgumentClause == nil,
-      node.trailingClosure == nil,
-      node.additionalTrailingClosures.isEmpty
-    else {
-      // TODO: Diagnose.
-      fatalError("object identifier with generic specialization")
-    }
-
-    return BridgedObjectLiteralExpr.createParsed(
-      self.ctx,
-      poundLoc: self.generateSourceLoc(node.pound),
-      kind: kind,
-      args: self.generateArgumentList(
-        leftParen: node.leftParen,
-        labeledExprList: node.arguments,
-        rightParen: node.rightParen,
-        trailingClosure: nil,
-        additionalTrailingClosures: nil
-      )
-    )
-  }
-
-  func generateObjCSelectorExpr(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedObjCSelectorExpr {
-    fatalError("unimplemented")
-  }
-
-  func generateObjCKeyPathExpr(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedKeyPathExpr {
-    fatalError("unimplemented")
-  }
-
   func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedExpr {
-    let macroNameText = node.macroName.rawText;
-
-    // '#file', '#line' etc.
-    let magicIdentifierKind = BridgedMagicIdentifierLiteralKind(from: macroNameText.bridged)
-    if magicIdentifierKind != .none {
-      return self.generateMagicIdentifierExpr(
-        macroExpansionExpr: node,
-        kind: magicIdentifierKind
-      ).asExpr
-    }
-
-    // '#colorLiteral' et al.
-    let objectLiteralKind = BridgedObjectLiteralKind(from: macroNameText.bridged)
-    if objectLiteralKind != .none {
-      return self.generateObjectLiteralExpr(
-        macroExpansionExpr: node,
-        kind: objectLiteralKind
-      ).asExpr
-    }
-
-    // Other built-in pound expressions.
-    switch macroNameText {
-    case "selector":
-      return self.generateObjCSelectorExpr(macroExpansionExpr: node).asExpr
-    case "keyPath":  
-      return self.generateObjCKeyPathExpr(macroExpansionExpr: node).asExpr
-    case "assert" where ctx.langOptsHasFeature(.StaticAssert), "error", "warning":
-      // TODO: Diagnose.
-      fatalError("Directives in expression position");
-    default:
+    switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+    case .generated(let astNode):
+      guard let astNode else {
+        return BridgedErrorExpr.create(
+          self.ctx,
+          loc: self.generateSourceRange(node)
+        ).asExpr
+      }
+      switch astNode.kind {
+      case .expr:
+        return astNode.castToExpr()
+      case .stmt, .decl:
+        // TODO: Diagnose
+        fatalError("builtin pound directive in expression position")
+        // return BridgedErrorExpr.create(...)
+      }
+    case .ignored:
       // Fallback to MacroExpansionExpr.
       break
     }
@@ -988,6 +949,14 @@ extension ASTGenVisitor {
         nameLoc: nameAndLoc.loc
       ).asExpr
     }
+  }
+
+  func generate(missingExpr node: MissingExprSyntax) -> BridgedExpr {
+    let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
+    return BridgedErrorExpr.create(
+      self.ctx,
+      loc: BridgedSourceRange(start: loc, end: loc)
+    ).asExpr
   }
 
   func generate(genericSpecializationExpr node: GenericSpecializationExprSyntax) -> BridgedUnresolvedSpecializeExpr {
@@ -1157,6 +1126,18 @@ extension ASTGenVisitor {
     var elements: [BridgedExpr] = []
     elements.reserveCapacity(node.elements.count)
 
+    // If the left-most sequence expr is a 'try', hoist it up to turn
+    // '(try x) + y' into 'try (x + y)'. This is necessary to do in the
+    // ASTGen because 'try' nodes are represented in the ASTScope tree
+    // to look up catch nodes. The scope tree must be syntactic because
+    // it's constructed before sequence folding happens during preCheckExpr.
+    // Otherwise, catch node lookup would find the incorrect catch node for
+    // 'try x + y' at the source location for 'y'.
+    //
+    // 'try' has restrictions for where it can appear within a sequence
+    // expr. This is still diagnosed in TypeChecker::foldSequence.
+    let firstTryExprSyntax = node.elements.first?.as(TryExprSyntax.self)
+
     var iter = node.elements.makeIterator()
     while let node = iter.next() {
       switch node.as(ExprSyntaxEnum.self) {
@@ -1183,15 +1164,24 @@ extension ASTGenVisitor {
       case .unresolvedTernaryExpr(let node):
         elements.append(self.generate(unresolvedTernaryExpr: node).asExpr)
       default:
-        // Operand.
-        elements.append(self.generate(expr: node))
+        if let firstTryExprSyntax, node.id == firstTryExprSyntax.id {
+          elements.append(self.generate(expr: firstTryExprSyntax.expression))
+        } else {
+          elements.append(self.generate(expr: node))
+        }
       }
     }
 
-    return BridgedSequenceExpr.createParsed(
+    let seqExpr = BridgedSequenceExpr.createParsed(
       self.ctx,
       exprs: elements.lazy.bridgedArray(in: self)
     ).asExpr
+
+    if let firstTryExprSyntax {
+      return self.generate(tryExpr: firstTryExprSyntax, overridingSubExpr: seqExpr)
+    } else {
+      return seqExpr
+    }
   }
 
   func generate(subscriptCallExpr node: SubscriptCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedSubscriptExpr {
@@ -1223,9 +1213,9 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {
+  func generate(tryExpr node: TryExprSyntax, overridingSubExpr: BridgedExpr? = nil) -> BridgedExpr {
     let tryLoc = self.generateSourceLoc(node.tryKeyword)
-    let subExpr = self.generate(expr: node.expression)
+    let subExpr = overridingSubExpr ?? self.generate(expr: node.expression)
 
     switch node.questionOrExclamationMark {
     case nil:

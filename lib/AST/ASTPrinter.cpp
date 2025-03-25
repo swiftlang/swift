@@ -2750,8 +2750,24 @@ static void addNamespaceMembers(Decl *decl,
           auto clangMember = found.get<clang::NamedDecl *>();
           if (auto importedDecl =
                   ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-            if (addedMembers.insert(importedDecl).second)
+            if (addedMembers.insert(importedDecl).second) {
               members.push_back(importedDecl);
+
+              // Handle macro-expanded declarations.
+              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
+                auto valueDecl = dyn_cast<ValueDecl>(decl);
+                if (!valueDecl)
+                  return;
+
+                // Bail out if the auxiliary decl was not produced by a macro.
+                auto module = decl->getDeclContext()->getParentModule();
+                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+                  return;
+
+                members.push_back(valueDecl);
+              });
+            }
           }
         }
       };
@@ -2924,6 +2940,18 @@ void PrintAST::printInherited(const Decl *decl) {
           Printer << "@unsafe ";
         break;
       }
+
+      if (auto globalActor = inherited.getGlobalActorIsolationType()) {
+        TypeLoc globalActorTL(globalActor->getTypeRepr(),
+                              globalActor->getInstanceType());
+        Printer << "@";
+        printTypeLoc(globalActorTL);
+        Printer << " ";
+      }
+
+      if (inherited.isNonisolated())
+        Printer << "nonisolated ";
+
       if (inherited.isSuppressed())
         Printer << "~";
     });
@@ -5046,21 +5074,21 @@ void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::C
         case ComponentKind::Invalid: {
           break;
         }
-        case ComponentKind::UnresolvedProperty: {
+        case ComponentKind::UnresolvedMember: {
           Printer << component.getUnresolvedDeclName();
           break;
         }
         case ComponentKind::UnresolvedSubscript: {
-          auto args = component.getSubscriptArgs();
+          auto args = component.getArgs();
           printArgumentList(args, /*forSubscript*/ true);
           break;
         }
-        case ComponentKind::Property: {
+        case ComponentKind::Member: {
           Printer << component.getUnresolvedDeclName();
           break;
         }
         case ComponentKind::Subscript: {
-          auto args = component.getSubscriptArgs();
+          auto args = component.getArgs();
           printArgumentList(args, /*forSubscript*/ true);
           break;
         }
@@ -5088,6 +5116,12 @@ void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::C
           break;
         }
         case ComponentKind::CodeCompletion: {
+          break;
+        }
+        case ComponentKind::UnresolvedApply:
+        case ComponentKind::Apply: {
+          auto args = component.getArgs();
+          printArgumentList(args, /*forSubscript*/ false);
           break;
         }
       }
@@ -5952,7 +5986,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
         Name = Mod->getASTContext()
           .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
-                         ->OriginalModuleName);
+                         ->ManglingModuleName);
         break;
       }
     }
@@ -6600,7 +6634,7 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance.getRequirement()->getDeclaredType()
+            witnessMethodConformance.getProtocol()->getDeclaredType()
                 ->castTo<ProtocolType>());
         break;
       case SILFunctionType::Representation::Closure:
@@ -7028,6 +7062,18 @@ public:
     } else {
       Printer << "[";
       visit(T->getBaseType());
+      Printer << "]";
+    }
+  }
+
+  void visitInlineArrayType(InlineArrayType *T) {
+    if (Options.AlwaysDesugarInlineArrayTypes) {
+      visit(T->getDesugaredType());
+    } else {
+      Printer << "[";
+      visit(T->getCountType());
+      Printer << " x ";
+      visit(T->getElementType());
       Printer << "]";
     }
   }
@@ -7915,8 +7961,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   if (auto superclassTy = genericSig->getSuperclassBound(
         proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
-                         ProtocolConformanceOptions(),
-                         /*isPreconcurrency=*/false);
+                         ProtocolConformanceOptions());
   }
 
   InvertibleProtocolSet inverses = InvertibleProtocolSet::allKnown();

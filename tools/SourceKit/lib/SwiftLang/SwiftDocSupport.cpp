@@ -431,7 +431,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
       llvm::raw_svector_ostream OS(Info.USR);
-      SwiftLangSupport::printUSR(VD, OS);
+      SwiftLangSupport::printUSR(VD, OS, /*distinguishSynthesizedDecls*/ true);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);

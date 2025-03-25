@@ -36,3 +36,33 @@ struct S {
 
 struct ExpansionRequirementTest<each T> {}
 extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-element requirements are not yet supported}}
+
+
+#warning("this is a warning") // expected-warning {{this is a warning}}
+
+func testDiagnosticInFunc() {
+  #error("this is an error") // expected-error {{this is an error}}
+}
+
+class TestDiagnosticInNominalTy {
+  #error("this is an error member") // expected-error {{this is an error member}}
+}
+
+#if FLAG_NOT_ENABLED
+  #error("error in inactive") // no diagnostis
+#endif
+
+func misisngExprTest() {
+  func fn(x: Int, y: Int) {}
+  fn(x: 1, y:) // expected-error {{expected value in function call}}
+               // expected-note@-1 {{insert value}} {{14-14= <#expression#>}}
+}
+
+func misisngTypeTest() {
+  func fn() -> {} // expected-error {{expected return type in function signature}}
+                  // expected-note@-1 {{insert return type}} {{16-16=<#type#> }}
+}
+func misisngPatternTest(arr: [Int]) {
+  for {} // expected-error {{expected pattern, 'in', and expression in 'for' statement}}
+         // expected-note@-1 {{insert pattern, 'in', and expression}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
+}

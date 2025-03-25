@@ -776,7 +776,7 @@ public:
 
   /// Get the root availability scope for the file. The root scope may be
   /// null if the scope tree has not been built yet. Use
-  /// TypeChecker::getOrBuildAvailabilityScope() to get a built
+  /// `AvailabilityScope::getOrBuildForSourceFile()` to get a built
   /// root of the tree.
   AvailabilityScope *getAvailabilityScope() const;
 

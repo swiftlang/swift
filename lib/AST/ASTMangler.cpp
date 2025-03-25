@@ -377,19 +377,16 @@ std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
 }
 
 std::string ASTMangler::mangleKeyPathGetterThunkHelper(
-                                            const AbstractStorageDecl *property,
-                                            GenericSignature signature,
-                                            CanType baseType,
-                                            SubstitutionMap subs,
-                                            ResilienceExpansion expansion) {
+    const AbstractStorageDecl *property, GenericSignature signature,
+    CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion) {
   beginMangling();
   appendEntity(property);
   if (signature)
     appendGenericSignature(signature);
   appendType(baseType, signature);
   if (isa<SubscriptDecl>(property)) {
-    // Subscripts can be generic, and different key paths could capture the same
-    // subscript at different generic arguments.
+    // Subscripts can be generic, and different key paths could
+    // capture the same subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
       sub = sub->mapTypeOutOfContext();
 
@@ -443,6 +440,74 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
     }
   }
   appendOperator("Tk");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
+  return finalize();
+}
+
+std::string ASTMangler::mangleKeyPathAppliedMethodThunkHelper(
+    const AbstractFunctionDecl *method, GenericSignature signature,
+    CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion) {
+  beginMangling();
+  isa<ConstructorDecl>(method)
+      ? appendConstructorEntity(cast<ConstructorDecl>(method), false)
+      : appendEntity(method);
+
+  if (signature)
+    appendGenericSignature(signature);
+  appendType(baseType, signature);
+  if (isa<FuncDecl>(method) || isa<ConstructorDecl>(method)) {
+    // Methods can be generic, and different key paths could capture the same
+    // method at different generic arguments.
+    for (auto sub : subs.getReplacementTypes()) {
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> std::optional<Type> {
+        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return std::nullopt;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
+    }
+  }
+  appendOperator("TkMA");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
+  return finalize();
+}
+
+std::string ASTMangler::mangleKeyPathUnappliedMethodThunkHelper(
+    const AbstractFunctionDecl *method, GenericSignature signature,
+    CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion) {
+  beginMangling();
+  isa<ConstructorDecl>(method)
+      ? appendConstructorEntity(cast<ConstructorDecl>(method), false)
+      : appendEntity(method);
+
+  if (signature)
+    appendGenericSignature(signature);
+  appendType(baseType, signature);
+  if (isa<FuncDecl>(method) || isa<ConstructorDecl>(method)) {
+    // Methods can be generic, and different key paths could capture the same
+    // method at different generic arguments.
+    for (auto sub : subs.getReplacementTypes()) {
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> std::optional<Type> {
+        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return std::nullopt;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
+    }
+  }
+  appendOperator("Tkmu");
   if (expansion == ResilienceExpansion::Minimal)
     appendOperator("q");
   return finalize();
@@ -1509,6 +1574,18 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendOperator("XSa");
       return;
 
+    case TypeKind::InlineArray: {
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      auto *T = cast<InlineArrayType>(tybase);
+      appendType(T->getCountType(), sig, forDecl);
+      appendType(T->getElementType(), sig, forDecl);
+      // Note we don't have a known-type mangling for InlineArray, we can
+      // use 'A' since it's incredibly unlikely
+      // AutoreleasingUnsafeMutablePointer will ever receive type sugar.
+      appendOperator("XSA");
+      return;
+    }
+
     case TypeKind::VariadicSequence:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<VariadicSequenceType>(tybase)->getBaseType(), sig, forDecl);
@@ -2093,7 +2170,7 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
     if (conformance.isInvalid())
       continue;
 
-    if (conformance.getRequirement()->isMarkerProtocol())
+    if (conformance.getProtocol()->isMarkerProtocol())
       continue;
 
     SWIFT_DEFER {
@@ -2704,7 +2781,7 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
-    if (useModuleName.empty()) {
+    if (useModuleName.empty() || useModuleName == STDLIB_NAME) {
       appendOperator("s");
     } else if (!RespectOriginallyDefinedIn) {
       appendOperator("s");
@@ -4451,7 +4528,7 @@ void ASTMangler::appendAnyProtocolConformance(
   // If we have a conformance to a marker protocol but we aren't allowed to
   // emit marker protocols, skip it.
   if (!AllowMarkerProtocols &&
-      conformance.getRequirement()->isMarkerProtocol())
+      conformance.getProtocol()->isMarkerProtocol())
     return;
 
   // While all invertible protocols are marker protocols, do not mangle them
@@ -4460,15 +4537,17 @@ void ASTMangler::appendAnyProtocolConformance(
   // but we *might* have let that slip by for the other cases below, so the
   // early-exits are highly conservative.
   const bool forInvertible =
-      conformance.getRequirement()->getInvertibleProtocolKind().has_value();
+      conformance.getProtocol()->getInvertibleProtocolKind().has_value();
 
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
     if (forInvertible)
       return;
 
+    // FIXME: conformingType parameter should no longer be needed, because
+    // its in conformance.
     auto path = genericSig->getConformancePath(conformingType,
-                                               conformance.getAbstract());
+                                               conformance.getProtocol());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     if (forInvertible)
@@ -4479,7 +4558,7 @@ void ASTMangler::appendAnyProtocolConformance(
     ConformancePath conformancePath =
         opaqueSignature->getConformancePath(
           opaqueType->getInterfaceType(),
-          conformance.getAbstract());
+          conformance.getProtocol());
 
     // Append the conformance path with the signature of the opaque type.
     appendDependentProtocolConformance(conformancePath, opaqueSignature);
@@ -4759,7 +4838,8 @@ static Identifier encodeLocalPrecheckedDiscriminator(
 
 void ASTMangler::appendMacroExpansionContext(
     SourceLoc loc, DeclContext *origDC,
-    const FreestandingMacroExpansion *expansion
+    Identifier macroName,
+    unsigned macroDiscriminator
 ) {
   origDC = MacroDiscriminatorContext::getInnermostMacroContext(origDC);
   BaseEntitySignature nullBase(nullptr);
@@ -4768,9 +4848,9 @@ void ASTMangler::appendMacroExpansionContext(
     if (auto outermostLocalDC = getOutermostLocalContext(origDC)) {
       auto innermostNonlocalDC = outermostLocalDC->getParent();
       appendContext(innermostNonlocalDC, nullBase, StringRef());
-      Identifier name = expansion->getMacroName().getBaseIdentifier();
+      Identifier name = macroName;
       ASTContext &ctx = origDC->getASTContext();
-      unsigned discriminator = expansion->getDiscriminator();
+      unsigned discriminator = macroDiscriminator;
       name = encodeLocalPrecheckedDiscriminator(ctx, name, discriminator);
       appendIdentifier(name.str());
     } else {
@@ -4875,7 +4955,10 @@ void ASTMangler::appendMacroExpansionContext(
     return appendMacroExpansionLoc();
 
   // Append our own context and discriminator.
-  appendMacroExpansionContext(outerExpansionLoc, origDC, expansion);
+  appendMacroExpansionContext(
+      outerExpansionLoc, origDC,
+      macroName,
+      macroDiscriminator);
   appendMacroExpansionOperator(
       baseName.userFacingName(), role, discriminator);
 }
@@ -4902,16 +4985,14 @@ void ASTMangler::appendMacroExpansionOperator(
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(
-      const MacroExpansionExpr *expansion) {
-  auto dc = MacroDiscriminatorContext::getInnermostMacroContext(
-      expansion->getDeclContext());
-  auto decl = dc->getAsDecl();
+      const DeclContext *macroDC) {
+  auto decl = macroDC->getAsDecl();
   if (decl && !decl->isOutermostPrivateOrFilePrivateScope())
     return StringRef();
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
-  auto topLevelSubcontext = dc->getModuleScopeContext();
+  auto topLevelSubcontext = macroDC->getModuleScopeContext();
   SourceFile *sf = dyn_cast<SourceFile>(topLevelSubcontext);
   if (!sf)
     return StringRef();
@@ -4925,6 +5006,13 @@ static StringRef getPrivateDiscriminatorIfNecessary(
   assert(!clang::isDigit(discriminator.str().front()) &&
          "not a valid identifier");
   return discriminator.str();
+}
+
+static StringRef getPrivateDiscriminatorIfNecessary(
+    const MacroExpansionExpr *expansion) {
+  auto dc = MacroDiscriminatorContext::getInnermostMacroContext(
+      expansion->getDeclContext());
+  return getPrivateDiscriminatorIfNecessary(dc);
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(
@@ -4943,7 +5031,8 @@ void
 ASTMangler::appendMacroExpansion(const FreestandingMacroExpansion *expansion) {
   appendMacroExpansionContext(expansion->getPoundLoc(),
                               expansion->getDeclContext(),
-                              expansion);
+                              expansion->getMacroName().getBaseIdentifier(),
+                              expansion->getDiscriminator());
   auto privateDiscriminator = getPrivateDiscriminatorIfNecessary(expansion);
   if (!privateDiscriminator.empty()) {
     appendIdentifier(privateDiscriminator);
@@ -4953,6 +5042,42 @@ ASTMangler::appendMacroExpansion(const FreestandingMacroExpansion *expansion) {
       expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Declaration,
       expansion->getDiscriminator());
+}
+
+void ASTMangler::appendMacroExpansion(ClosureExpr *attachedTo,
+                                      CustomAttr *attr,
+                                      MacroDecl *macro) {
+  auto &ctx = attachedTo->getASTContext();
+  auto discriminator =
+      ctx.getNextMacroDiscriminator(attachedTo,
+                                    macro->getBaseName());
+
+  appendMacroExpansionContext(
+      attr->getLocation(),
+      attachedTo,
+      macro->getBaseName().getIdentifier(),
+      discriminator);
+
+  auto privateDiscriminator =
+      getPrivateDiscriminatorIfNecessary(attachedTo);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator);
+    appendOperator("Ll");
+  }
+
+  appendMacroExpansionOperator(
+      macro->getBaseName().userFacingName(),
+      MacroRole::Body,
+      discriminator);
+}
+
+std::string
+ASTMangler::mangleAttachedMacroExpansion(ClosureExpr *attachedTo,
+                                         CustomAttr *attr,
+                                         MacroDecl *macro) {
+  beginMangling();
+  appendMacroExpansion(attachedTo, attr, macro);
+  return finalize();
 }
 
 std::string

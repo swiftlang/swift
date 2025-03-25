@@ -33,6 +33,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -257,7 +258,7 @@ private:
 
 public:
   void visitExecutionAttr(ExecutionAttr *attr) {
-    auto *F = dyn_cast<FuncDecl>(D);
+    auto *F = dyn_cast<AbstractFunctionDecl>(D);
     if (!F)
       return;
 
@@ -4638,7 +4639,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
     // Complain if this isn't the primary result-builder attribute.
     auto attached = decl->getAttachedResultBuilder();
-    if (attached != attr) {
+    if (attached && attached != attr) {
       diagnose(attr->getLocation(), diag::result_builder_multiple,
                isa<ParamDecl>(decl));
       diagnose(attached->getLocation(), diag::previous_result_builder_here);
@@ -5089,7 +5090,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
   if (auto parent =
           AvailabilityInference::parentDeclForInferredAvailability(D)) {
-    auto parentAvailability = TypeChecker::availabilityForDeclSignature(parent);
+    auto parentAvailability = AvailabilityContext::forDeclSignature(parent);
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
@@ -5235,7 +5236,7 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
 
-    auto availability = TypeChecker::availabilityAtLocation(
+    auto availability = AvailabilityContext::forLocation(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
@@ -5455,7 +5456,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
-      return parent->isSemanticallyUnavailable();
+      return AvailabilityContext::forDeclSignature(parent).isUnavailable();
     }
     return false;
   };
@@ -8308,6 +8309,25 @@ public:
       }
 
       return; // it's OK
+    }
+
+    auto declRef = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveMacroRequest{attr, closure},
+      ConcreteDeclRef());
+
+    auto *decl = declRef.getDecl();
+    if (auto *macro = dyn_cast_or_null<MacroDecl>(decl)) {
+      if (macro->getMacroRoles().contains(MacroRole::Body)) {
+        if (!ctx.LangOpts.hasFeature(Feature::ClosureBodyMacro)) {
+          ctx.Diags.diagnose(
+              attr->getLocation(),
+              diag::experimental_closure_body_macro);
+        }
+
+        // Function body macros are allowed on closures.
+        return;
+      }
     }
 
     // Otherwise, it's an error.

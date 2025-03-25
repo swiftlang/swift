@@ -26,6 +26,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -1431,7 +1432,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance.getRequirement()->getMembers()) {
+  for (auto member : conformance.getProtocol()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getName() == copyWithZoneName) {
         copyMethod = func;
@@ -2693,7 +2694,7 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
   if (!ctx.supportsVersionedAvailability())
     return true;
 
-  auto modifyAvailability = TypeChecker::availabilityAtLocation({}, accessor);
+  auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
   auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.

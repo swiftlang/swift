@@ -850,8 +850,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     }
 
     // Record the name we parsed.
-    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
-                                                      nameLoc.getBaseNameLoc());
+    auto component = KeyPathExpr::Component::forUnresolvedMember(
+        name, FunctionRefInfo::unappliedBaseName(), nameLoc.getBaseNameLoc());
     components.push_back(component);
 
     // After the first component, we can start parsing keywords.
@@ -3520,6 +3520,15 @@ ParserResult<Expr> Parser::parseExprCollection() {
   Parser::StructureMarkerRAII ParsingCollection(
                                 *this, LSquareLoc,
                                 StructureMarkerKind::OpenSquare);
+
+  // Check to see if we can parse an InlineArray type.
+  if (isStartOfInlineArrayTypeBody()) {
+    auto result = parseTypeInlineArray(LSquareLoc);
+    if (result.isNull() || result.isParseErrorOrHasCompletion())
+      return ParserStatus(result);
+
+    return makeParserResult(new (Context) TypeExpr(result.get()));
+  }
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {

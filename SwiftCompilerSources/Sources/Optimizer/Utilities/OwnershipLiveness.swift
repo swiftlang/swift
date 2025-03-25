@@ -715,8 +715,17 @@ extension InteriorUseWalker: AddressUseVisitor {
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
-    walkDownUses(of: value)
-  }    
+    // For Escapable values, simply continue the walk.
+    if value.mayEscape {
+      return walkDownUses(of: value)
+    }
+    // TODO: Handle non-escapable values by walking through copies as done by LifetimeDependenceDefUseWalker or
+    // NonEscapingClosureDefUseWalker. But this code path also handles non-escaping closures that have not been promoted
+    // to [on_stack] (and still have an escapable function type). Such closures may be incorrectly destroyed after their
+    // captures. To avoid this problem, either rewrite ClosureLifetimeFixup to produce correct OSSA lifetimes, or check
+    // for that special case and continue to bailout here.
+    return escapingAddressUse(of: operand)
+  }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
     pointerStatus.setEscaping(operand: operand)
@@ -830,12 +839,14 @@ let linearLivenessTest = FunctionTest("linear_liveness_swift") {
 let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   function, arguments, context in
   let value = arguments.takeValue()
-  print("Interior liveness: \(value)")
+  let visitInnerUses = arguments.hasUntaken ? arguments.takeBool() : false
+
+  print("Interior liveness\(visitInnerUses ? " with inner uses" : ""): \(value)")
 
   var range = InstructionRange(for: value, context)
   defer { range.deinitialize() }
 
-  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: false, context) {
+  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: visitInnerUses, context) {
     range.insert($0.instruction)
     return .continueWalk
   }

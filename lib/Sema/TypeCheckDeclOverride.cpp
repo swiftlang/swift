@@ -1824,7 +1824,7 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
 
   // Allow overrides that are not as available as the base decl as long as the
   // override is as available as its context.
-  auto availabilityContext = TypeChecker::availabilityForDeclSignature(
+  auto availabilityContext = AvailabilityContext::forDeclSignature(
       override->getDeclContext()->getSelfNominalTypeDecl());
 
   return availabilityContext.getPlatformRange().isContainedIn(overrideInfo);
@@ -1933,7 +1933,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
     // If the parent of the override is unavailable, then the unavailability of
     // the override decl is irrelevant.
-    if (overrideParent->isSemanticallyUnavailable())
+    if (AvailabilityContext::forDeclSignature(overrideParent).isUnavailable())
       return {OverrideUnavailabilityStatus::Ignored, std::nullopt};
   }
 

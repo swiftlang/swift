@@ -815,6 +815,18 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
+// Span-providing properties
+Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSW5bytess7RawSpanVvpMV
+Added: _$sSa4spans4SpanVyxGvpMV
+Added: _$sSrsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSw5bytess7RawSpanVvpMV
+Added: _$ss10ArraySliceV4spans4SpanVyxGvpMV
+Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
+Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
+Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
@@ -910,3 +922,23 @@ Added: _$ss12SwiftSettingVABycfC
 Added: _$ss12SwiftSettingVMa
 Added: _$ss12SwiftSettingVMn
 Added: _$ss12SwiftSettingVN
+
+// EnumeratedSequence Collection conformances
+Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
+Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE10startIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMa
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMn
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5countSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
+Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc

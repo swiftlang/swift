@@ -3362,6 +3362,10 @@ public:
   /// Undo the above change.
   void removePotentialThrowSite(CatchNode catchNode);
 
+  /// Retrieve the explicit caught error type for the given catch node, without
+  /// attempting any inference.
+  Type getExplicitCaughtErrorType(CatchNode catchNode);
+
   /// Determine the caught error type for the given catch node.
   Type getCaughtErrorType(CatchNode node);
 
@@ -3625,16 +3629,6 @@ public:
           }
           return false;
         });
-  }
-
-  bool
-  hasConversionRestriction(Type type1, Type type2,
-                           ConversionRestrictionKind restrictionKind) const {
-    auto restriction =
-        ConstraintRestrictions.find({type1.getPointer(), type2.getPointer()});
-    return restriction == ConstraintRestrictions.end()
-               ? false
-               : restriction->second == restrictionKind;
   }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
@@ -4186,6 +4180,21 @@ public:
   bool resolveTapBody(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
+  /// Bind key path expression to the given contextual type and generate
+  /// constraints for its requirements.
+  ///
+  /// \param typeVar The type variable representing the key path expression.
+  /// \param contextualType The contextual type this key path expression
+  /// would be bound to.
+  /// \param flags The flags associated with this assignment.
+  /// \param locator The locator associated with contextual type.
+  ///
+  /// \returns `true` if it was possible to generate constraints for
+  /// the requirements and assign fixed type to the key path expression,
+  /// `false` otherwise.
+  bool resolveKeyPath(TypeVariableType *typeVar, Type contextualType,
+                      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+
   /// Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
@@ -4459,11 +4468,8 @@ public:
 
 private:
   /// Add the constraints needed to bind an overload's type variable.
-  void bindOverloadType(
-      const SelectedOverload &overload, Type boundType,
-      ConstraintLocator *locator, DeclContext *useDC,
-      llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
-          verifyThatArgumentIsHashable);
+  void bindOverloadType(const SelectedOverload &overload, Type boundType,
+                        ConstraintLocator *locator, DeclContext *useDC);
 
   /// Describes a direction of optional wrapping, either increasing optionality
   /// or decreasing optionality.
@@ -4939,6 +4945,12 @@ public:
   /// no type erasure is needed.
   Expr *buildTypeErasedExpr(Expr *expr, DeclContext *dc, Type contextualType,
                             ContextualTypePurpose purpose);
+
+  /// Ensures that the given argument type conforms to the `Hashable` protocol
+  /// and adds a conformance constraint if it does not. This is required for
+  /// arguments used as key path components, as they serve as lookup keys.
+  void verifyThatArgumentIsHashable(unsigned index, Type argType,
+                                    ConstraintLocator *locator, SourceLoc loc);
 
 private:
   /// Determines whether or not a given conversion at a given locator requires

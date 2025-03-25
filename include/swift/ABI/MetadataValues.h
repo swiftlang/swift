@@ -748,6 +748,14 @@ private:
     IsConformanceOfProtocolMask = 0x01u << 18,
     HasGlobalActorIsolation = 0x01u << 19,
 
+    // Used to detect if this is a conformance to SerialExecutor that has
+    // an user defined implementation of 'isIsolatingCurrentContext'. This
+    // requirement is special in the sense that if a non-default impl is present
+    // we will avoid calling the `checkIsolated` method which would lead to a
+    // crash. In other words, this API "soft replaces" 'checkIsolated' so we
+    // must at runtime the presence of a non-default implementation.
+    HasNonDefaultSerialExecutorIsIsolatingCurrentContext = 0x01u << 20,
+
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
   };
@@ -813,7 +821,15 @@ public:
                                  ? HasGlobalActorIsolation
                                  : 0));
   }
-  
+
+  ConformanceFlags withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
+                                           bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext) const {
+    return ConformanceFlags((Value & ~HasNonDefaultSerialExecutorIsIsolatingCurrentContext)
+                            | (hasNonDefaultSerialExecutorIsIsolatingCurrentContext
+                                 ? HasNonDefaultSerialExecutorIsIsolatingCurrentContext
+                                 : 0));
+  }
+
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -856,6 +872,10 @@ public:
   /// Does this conformance have a global actor to which it is isolated?
   bool hasGlobalActorIsolation() const {
     return Value & HasGlobalActorIsolation;
+  }
+
+  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
+    return Value & HasNonDefaultSerialExecutorIsIsolatingCurrentContext;
   }
 
   /// Retrieve the # of conditional requirements.
@@ -1740,7 +1760,7 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
-  const uint16_t EscalationNotificationFunction = 0xf59d; // = 62877
+  const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 

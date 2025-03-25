@@ -25,6 +25,9 @@ extension ApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
     if context.tryDevirtualize(apply: self, isMandatory: false) != nil {
       return
     }
+    if tryRemoveArrayCast(apply: self, context) {
+      return
+    }
     if !context.preserveDebugInfo {
       _ = tryReplaceExistentialArchetype(of: self, context)
     }
@@ -71,6 +74,40 @@ private func tryTransformThickToThinCallee(of apply: ApplyInst, _ context: Simpl
     return true
   }
   return false
+}
+
+/// Removes casts between arrays of the same type.
+///
+///   %1 = function_ref @_arrayConditionalCast : (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+///   %2 = apply %1(%0) : (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+/// ->
+///   %1 = copy_value %0
+///   %2 = enum $Optional<Array<Int>>, #Optional.some!enumelt, %1
+///
+private func tryRemoveArrayCast(apply: ApplyInst, _ context: SimplifyContext) -> Bool {
+  guard let callee = apply.referencedFunction,
+        callee.hasSemanticsAttribute("array.conditional_cast"),
+        apply.parentFunction.hasOwnership,
+
+          // Check if the cast function has the expected calling convention
+        apply.arguments.count == 1,
+        apply.convention(of: apply.argumentOperands[0]) == .directGuaranteed,
+        apply.functionConvention.results[0].convention == .owned,
+        apply.type.isOptional,
+
+        // Check if the source and target type of the cast is identical.
+        // Note that we are checking the _formal_ element types and not the lowered types, because
+        // the element types are replacement type in the Array's substitution map and this is a formal type.
+        apply.arguments[0].type == apply.type.optionalPayloadType(in: apply.parentFunction)
+  else {
+    return false
+  }
+
+  let builder = Builder(after: apply, context)
+  let copiedArray = builder.createCopyValue(operand: apply.arguments[0])
+  let optional = builder.createEnum(caseIndex: 1, payload: copiedArray, enumType: apply.type)
+  apply.replace(with: optional, context)
+  return true
 }
 
 /// If the apply uses an existential archetype (`@opened("...")`) and the concrete type is known,
@@ -143,22 +180,22 @@ private extension FullApplySite {
     // Note that an opened existential value is address only, so it cannot be a direct result anyway
     // (but it can be once we have opaque values).
     // Also don't support things like direct `Array<@opened("...")>` return values.
-    if let singleDirectResult, singleDirectResult.type.astType.hasLocalArchetype {
+    if let singleDirectResult, singleDirectResult.type.hasLocalArchetype {
       return false
     }
-    if let singleDirectErrorResult, singleDirectErrorResult.type.astType.hasLocalArchetype {
+    if let singleDirectErrorResult, singleDirectErrorResult.type.hasLocalArchetype {
       return false
     }
 
     return arguments.allSatisfy { value in
-      let astTy = value.type.astType
+      let type = value.type
       // Allow three cases:
              // case 1. the argument _is_ the existential archetype
-      return astTy.isExistentialArchetype ||
+      return type.isExistentialArchetype ||
              // case 2. the argument _is_ a metatype of the existential archetype
-             (astTy.isMetatypeType && astTy.instanceTypeOfMetatype.isExistentialArchetype) ||
+             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype) ||
              // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
-             !astTy.hasLocalArchetype
+             !type.hasLocalArchetype
     }
   }
 
@@ -167,19 +204,18 @@ private extension FullApplySite {
     _ context: SimplifyContext
   ) -> [Value] {
     let newArgs = arguments.map { (arg) -> Value in
-      let argTy = arg.type.astType
-      if argTy.isExistentialArchetype {
+      if arg.type.isExistentialArchetype {
         // case 1. the argument _is_ the existential archetype:
         //         just insert an address cast to satisfy type equivalence.
         let builder = Builder(before: self, context)
         let concreteSILType = concreteType.loweredType(in: self.parentFunction)
         return builder.createUncheckedAddrCast(from: arg, to: concreteSILType.addressType)
       }
-      if argTy.isMetatypeType, argTy.instanceTypeOfMetatype.isExistentialArchetype {
+      if arg.type.isMetatype, arg.type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype {
         // case 2. the argument _is_ a metatype of the existential archetype:
         //         re-create the metatype with the concrete type.
         let builder = Builder(before: self, context)
-        return builder.createMetatype(ofInstanceType: concreteType, representation: argTy.representationOfMetatype)
+        return builder.createMetatype(ofInstanceType: concreteType, representation: arg.type.representationOfMetatype)
       }
       // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
       return arg
@@ -194,9 +230,16 @@ private extension FullApplySite {
     let openedArcheType = substitutionMap.replacementTypes.first(where: { $0.isExistentialArchetype })!
 
     let newReplacementTypes = substitutionMap.replacementTypes.map {
-      return $0 == openedArcheType ? concreteType.type : $0
+      return $0 == openedArcheType ? concreteType.rawType : $0
     }
-    let genSig = callee.type.astType.invocationGenericSignatureOfFunctionType
+    let genSig = callee.type.invocationGenericSignatureOfFunction
     return SubstitutionMap(genericSignature: genSig, replacementTypes: newReplacementTypes)
+  }
+}
+
+private extension Type {
+  func optionalPayloadType(in function: Function) -> Type {
+    let subs = contextSubstitutionMap
+    return subs.replacementTypes[0].loweredType(in: function)
   }
 }

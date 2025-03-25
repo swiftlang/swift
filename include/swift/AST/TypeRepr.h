@@ -154,6 +154,10 @@ public:
   /// or return an invalid source location if there is no such attribute.
   SourceLoc findAttrLoc(TypeAttrKind kind) const;
 
+  /// Find a custom attribute within this type, or return NULL if there is
+  /// no such attribute.
+  CustomAttr *findCustomAttr() const;
+
   /// Is this type grammatically a type-simple?
   inline bool isSimple() const; // bottom of this file
 
@@ -629,6 +633,35 @@ public:
     return T->getKind() == TypeReprKind::Array;
   }
   static bool classof(const ArrayTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayTypeRepr : public TypeRepr {
+  TypeRepr *Count;
+  TypeRepr *Element;
+  SourceRange Brackets;
+
+  InlineArrayTypeRepr(TypeRepr *count, TypeRepr *element, SourceRange brackets)
+      : TypeRepr(TypeReprKind::InlineArray), Count(count), Element(element),
+        Brackets(brackets) {}
+
+public:
+  static InlineArrayTypeRepr *create(ASTContext &ctx, TypeRepr *count,
+                                     TypeRepr *element, SourceRange brackets);
+
+  TypeRepr *getCount() const { return Count; }
+  TypeRepr *getElement() const { return Element; }
+  SourceRange getBrackets() const { return Brackets; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InlineArray;
+  }
 
 private:
   SourceLoc getStartLocImpl() const { return Brackets.Start; }
@@ -1622,6 +1655,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Fixed:
   case TypeReprKind::Self:
   case TypeReprKind::Array:
+  case TypeReprKind::InlineArray:
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
   case TypeReprKind::Sending:

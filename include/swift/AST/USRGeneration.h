@@ -43,8 +43,11 @@ bool printTypeUSR(Type Ty, raw_ostream &OS);
 bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
 
 /// Prints out the USR for the given ValueDecl.
+/// @param distinguishSynthesizedDecls Whether to use the USR of the
+/// synthesized declaration instead of the USR of the underlying Clang USR.
 /// \returns true if it failed, false on success.
-bool printValueDeclUSR(const ValueDecl *D, raw_ostream &OS);
+bool printValueDeclUSR(const ValueDecl *D, raw_ostream &OS,
+                       bool distinguishSynthesizedDecls = false);
 
 /// Prints out the USR for the given ModuleEntity.
 /// In case module aliasing is used, it prints the real module name. For example,
@@ -64,8 +67,11 @@ bool printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 bool printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS);
 
 /// Prints out the USR for the given Decl.
+/// @param distinguishSynthesizedDecls Whether to use the USR of the
+/// synthesized declaration instead of the USR of the underlying Clang USR.
 /// \returns true if it failed, false on success.
-bool printDeclUSR(const Decl *D, raw_ostream &OS);
+bool printDeclUSR(const Decl *D, raw_ostream &OS,
+                  bool distinguishSynthesizedDecls = false);
 
 /// Demangle a mangle-name-based USR to a human readable name.
 std::string demangleUSR(StringRef mangled);

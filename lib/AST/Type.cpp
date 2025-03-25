@@ -616,6 +616,29 @@ bool TypeBase::isTypeVariableOrMember() {
   return getDependentMemberRoot()->is<TypeVariableType>();
 }
 
+bool TypeBase::canBeExistential() {
+  if (isAnyExistentialType())
+    return true;
+
+  Type ty(this);
+  // Unwrap (potentially multiple levels of) metatypes.
+  while (auto *mt = ty->getAs<MetatypeType>())
+    ty = mt->getInstanceType();
+
+  if (auto *archeTy = ty->getAs<ArchetypeType>()) {
+    // Only if all conformances are self-conforming protocols, the archetype
+    // may be an existential.
+    for (auto *proto : archeTy->getConformsTo()) {
+      if (!proto->existentialConformsToSelf())
+        return false;
+    }
+    // If there are no requirements on the archetype at all (`getConformsTo`
+    // is empty), the archetype can still be `Any` and we have to return true.
+    return true;
+  }
+  return false;
+}
+
 bool TypeBase::isTypeParameter() {
   return getDependentMemberRoot()->is<GenericTypeParamType>();
 }
@@ -1974,6 +1997,9 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
     break;
+  case TypeKind::InlineArray:
+    implDecl = Context->getInlineArrayDecl();
+    break;
   case TypeKind::Optional:
     implDecl = Context->getOptionalDecl();
     break;
@@ -1989,8 +2015,11 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
     UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
   } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
-    UnderlyingType = BoundGenericType::get(implDecl, Type(),
-                                      { Ty->getKeyType(), Ty->getValueType() });
+    UnderlyingType = BoundGenericType::get(
+        implDecl, Type(), {Ty->getKeyType(), Ty->getValueType()});
+  } else if (auto Ty = dyn_cast<InlineArrayType>(this)) {
+    UnderlyingType = BoundGenericType::get(
+        implDecl, Type(), {Ty->getCountType(), Ty->getElementType()});
   } else {
     llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }

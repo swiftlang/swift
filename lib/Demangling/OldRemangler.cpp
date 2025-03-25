@@ -2709,6 +2709,18 @@ ManglingError Remangler::mangleKeyPathSetterThunkHelper(Node *node,
   return mangleChildNodes(node, depth + 1);
 }
 
+ManglingError
+Remangler::mangleKeyPathUnappliedMethodThunkHelper(Node *node, unsigned depth) {
+  Buffer << "Tkmu";
+  return mangleChildNodes(node, depth + 1);
+}
+
+ManglingError Remangler::mangleKeyPathAppliedMethodThunkHelper(Node *node,
+                                                               unsigned depth) {
+  Buffer << "TkMA";
+  return mangleChildNodes(node, depth + 1);
+}
+
 ManglingError Remangler::mangleKeyPathEqualsThunkHelper(Node *node,
                                                         unsigned depth) {
   Buffer << "TH";
@@ -2851,6 +2863,10 @@ ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleSugaredInlineArray(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
