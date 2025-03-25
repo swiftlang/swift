@@ -294,13 +294,16 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
-
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   # Using these in MinSizeRel would result in a 15% increase in the binary size
   target_compile_options(swiftCore PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
 endif()
+
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftCore INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
 target_link_libraries(swiftCore
   PRIVATE
