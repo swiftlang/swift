@@ -364,7 +364,8 @@ SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
+SWIFT_REQUEST(TypeChecker, USRGenerationRequest,
+              std::string(const ValueDecl *, USRGenerationOptions),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsABICompatibleOverrideRequest,
               bool(ValueDecl *), Cached, NoLocationInfo)

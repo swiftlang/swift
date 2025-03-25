@@ -898,8 +898,9 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   return false;
 }
 
-bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printValueDeclUSR(D, OS);
+bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS,
+                                bool distinguishSynthesizedDecls) {
+  return ide::printValueDeclUSR(D, OS, distinguishSynthesizedDecls);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
