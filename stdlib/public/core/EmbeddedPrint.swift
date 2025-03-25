@@ -64,13 +64,13 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
 }
 
 func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
-  for c in buf {
+  for unsafe c in unsafe buf {
     putchar(CInt(c))
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
     unsafe putchar(CInt(p.pointee))
-    p += 1
+    unsafe p += 1
   }
 }
 
