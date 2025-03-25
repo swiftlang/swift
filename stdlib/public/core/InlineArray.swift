@@ -468,7 +468,9 @@ extension InlineArray where Element: ~Copyable {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
-      fatalError("Span over InlineArray is not supported yet.")
+      let pointer = _address
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }
