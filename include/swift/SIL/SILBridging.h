@@ -749,6 +749,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSpecializationInformation ApplyInst_getSpecializationInfo() const;
   BRIDGED_INLINE bool TryApplyInst_getNonAsync() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSpecializationInformation TryApplyInst_getSpecializationInfo() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef ClassMethodInst_getMember() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef WitnessMethodInst_getMember() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType WitnessMethodInst_getLookupType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj WitnessMethodInst_getLookupProtocol() const;

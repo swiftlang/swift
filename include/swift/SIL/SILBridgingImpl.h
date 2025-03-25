@@ -1243,6 +1243,10 @@ BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpec
   return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
 }
 
+BridgedDeclRef BridgedInstruction::ClassMethodInst_getMember() const {
+  return getAs<swift::ClassMethodInst>()->getMember();
+}
+
 BridgedDeclRef BridgedInstruction::WitnessMethodInst_getMember() const {
   return getAs<swift::WitnessMethodInst>()->getMember();
 }
