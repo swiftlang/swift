@@ -590,7 +590,7 @@ class LinkEntity {
     /// The pointer is a const char* of the name.
     KnownCoroFunctionPointer,
 
-    /// An coro function pointer for a distributed accessor (method or
+    /// A coro function pointer for a distributed accessor (method or
     /// property).
     /// The pointer is a SILFunction*.
     DistributedAccessorCoroFunctionPointer,
