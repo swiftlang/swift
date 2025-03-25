@@ -6313,6 +6313,22 @@ namespace {
             break;
           }
         }
+        auto isolation = T->getIsolation();
+        switch (isolation.getKind()) {
+        case FunctionTypeIsolation::Kind::NonIsolated:
+        case FunctionTypeIsolation::Kind::Parameter:
+          break;
+        case FunctionTypeIsolation::Kind::GlobalActor:
+          printRec(isolation.getGlobalActorType(),
+                   Label::always("global_actor"));
+          break;
+        case FunctionTypeIsolation::Kind::Erased:
+          printFlag("@isolated(any)");
+          break;
+        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+          printFlag("@execution(caller)");
+          break;
+        }
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));

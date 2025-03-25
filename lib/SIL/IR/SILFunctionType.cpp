@@ -1665,8 +1665,7 @@ private:
 
     // If we are an async function that is unspecified or nonisolated, insert an
     // isolated parameter if AsyncCallerExecution is enabled.
-    if (IsolationInfo &&
-        IsolationInfo->getKind() == ActorIsolation::CallerIsolationInheriting &&
+    if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
         extInfoBuilder.isAsync()) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
@@ -2592,6 +2591,13 @@ static CanSILFunctionType getSILFunctionType(
         actorIsolation =
             getActorIsolationOfContext(constant->getInnermostDeclContext());
       }
+    } else if (substFnInterfaceType->hasExtInfo() &&
+               substFnInterfaceType->getExtInfo()
+                   .getIsolation()
+                   .isNonIsolatedCaller()) {
+      // If our function type is a nonisolated caller and we can not infer from
+      // our constant, we must be caller isolation inheriting.
+      actorIsolation = ActorIsolation::forCallerIsolationInheriting();
     }
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,
