@@ -5646,12 +5646,6 @@ void ConformanceChecker::resolveValueWitnesses() {
     Conformance->setPreconcurrencyEffectful();
   }
 
-  // TODO: make sure this new we don't include this new requirement as we do lowering
-  //       but we do dynamic lookup in IR so we dont need to keep that requirement
-  //       since we dont have a source for that; since there is not WT to pass in, since we'll look it up
-  //       metadata source for that new requirement -- may already work
-
-  // TODO: maybe we dont need this here after we fix signature
   // Finally, check some ad-hoc protocol requirements.
   //
   // These protocol requirements are not expressible in Swift today, but as

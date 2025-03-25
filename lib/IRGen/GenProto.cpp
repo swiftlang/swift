@@ -794,10 +794,6 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
         IGM.getConformsToProtocolFunctionPointer(),
         {metadata, IGM.getAddrOfProtocolDescriptor(proto)});
 
-    // TODO: insufficient for lookup conformance
-
-    // TODO: dynamic is fine, but also put the requiremtn in the witness thunk
-
     IGF.setUnscopedLocalTypeData(
         archetypeTy,
         LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),

@@ -752,7 +752,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // thunk's generic signature.
   auto reqtSubMap = witness.getRequirementToWitnessThunkSubs();
 
-  // TODO: maybe fix those signature here
   // The generic environment for the witness thunk.
   auto *genericEnv = witness.getWitnessThunkSignature().getGenericEnvironment();
   auto genericSig = witness.getWitnessThunkSignature().getCanonicalSignature();
