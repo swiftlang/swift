@@ -473,7 +473,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
     if (shouldRequireStatic && !hasStatic) {
-      binding->diagnose(diag::require_static_for_const);
+      binding->diagnose(diag::require_static_for_literal);
       continue;
     }
     if (isReq) {
@@ -485,15 +485,15 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     }
     // var is only allowed in a protocol.
     if (!sv->isLet()) {
-      binding->diagnose(diag::require_let_for_const);
+      binding->diagnose(diag::require_let_for_literal);
     }
     // Diagnose when an init isn't given and it's not a compile-time constant
     if (auto *init = binding->getInit(entryNumber)) {
       if (!init->isSemanticallyConstExpr()) {
-        binding->diagnose(diag::require_const_initializer_for_const);
+        binding->diagnose(diag::require_literal_initializer_for_literal);
       }
     } else {
-      binding->diagnose(diag::require_const_initializer_for_const);
+      binding->diagnose(diag::require_literal_initializer_for_literal);
     }
   }
 

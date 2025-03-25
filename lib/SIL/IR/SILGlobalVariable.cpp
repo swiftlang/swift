@@ -106,8 +106,14 @@ bool SILGlobalVariable::mustBeInitializedStatically() const {
   if (getSectionAttr())
     return true;
 
-  auto *decl = getDecl();
+  auto *decl = getDecl();  
   if (decl && isDefinition() && decl->getAttrs().hasAttribute<SILGenNameAttr>())
+    return true;
+
+  if (decl && isDefinition() && decl->getAttrs().hasAttribute<ConstValAttr>())
+    return true;
+
+  if (decl && isDefinition() && decl->getAttrs().hasAttribute<ConstInitializedAttr>())
     return true;
 
   return false;

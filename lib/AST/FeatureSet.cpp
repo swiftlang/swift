@@ -363,7 +363,8 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
 }
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
-  return decl->getAttrs().hasAttribute<ConstValAttr>();
+  return decl->getAttrs().hasAttribute<ConstValAttr>() ||
+         decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {

@@ -872,8 +872,13 @@ SIMPLE_DECL_ATTR(const, ConstVal,
   ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   167)
 DECL_ATTR_FEATURE_REQUIREMENT(ConstVal, CompileTimeValues)
+SIMPLE_DECL_ATTR(constInitialized, ConstInitialized,
+  OnVar,
+  ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  168)
+DECL_ATTR_FEATURE_REQUIREMENT(ConstInitialized, CompileTimeValues)
 
-LAST_DECL_ATTR(ConstVal)
+LAST_DECL_ATTR(ConstInitialized)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
