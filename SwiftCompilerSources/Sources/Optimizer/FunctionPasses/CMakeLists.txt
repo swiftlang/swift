@@ -18,6 +18,7 @@ swift_compiler_sources(Optimizer
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
+  DiagnoseInfiniteRecursion.swift
   InitializeStaticGlobals.swift
   LetPropertyLowering.swift
   LifetimeDependenceDiagnostics.swift

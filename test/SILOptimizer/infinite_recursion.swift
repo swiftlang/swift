@@ -312,3 +312,43 @@ class Node {
 class RootNode: Node {
   override var rootNode: RootNode { return self }
 }
+
+protocol P {
+  associatedtype E: P
+}
+
+func noRecursionMismatchingTypeArgs1<T: P>(_ t: T.Type) {
+  if T.self == Int.self {
+    return
+  }
+  noRecursionMismatchingTypeArgs1(T.E.self)
+}
+
+func noRecursionMismatchingTypeArgs2<T: P>(_ t: T.Type) {
+  if MemoryLayout<T>.size == 1 {
+    return
+  }
+  noRecursionMismatchingTypeArgs2(T.E.self)
+}
+
+func recursionMatchingTypeArgs1<T: P>(_ t: T.Type) {
+  if MemoryLayout<T>.size == 1 {
+    return
+  }
+  recursionMatchingTypeArgs1(T.self) // expected-warning {{function call causes an infinite recursion}}
+}
+
+func noRecursionMismatchingTypeArgs3<T: P, V: P>(_ t: T.Type, _ v: V.Type) {
+  if MemoryLayout<T>.size == 1 {
+    return
+  }
+  noRecursionMismatchingTypeArgs3(V.self, T.self)
+}
+
+func recursionMatchingTypeArgs2<T: P, V: P>(_ t: T.Type, _ v: V.Type) {
+  if MemoryLayout<T>.size == 1 {
+    return
+  }
+  recursionMatchingTypeArgs2(T.self, V.self) // expected-warning {{function call causes an infinite recursion}}
+}
+
