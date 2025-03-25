@@ -71,6 +71,10 @@ namespace swift {
     MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultWitnessTable *>>
     DefaultWitnessTables;
 
+    std::unique_ptr<SerializedFuncTable> DefaultOverrideTableList;
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultOverrideTable *>>
+        DefaultOverrideTables;
+
     MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
 
@@ -181,6 +185,12 @@ namespace swift {
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
+    void readDefaultOverrideTableEntries(
+        llvm::BitstreamEntry &entry,
+        std::vector<SILDefaultOverrideTable::Entry> &entries);
+    SILDefaultOverrideTable *
+    readDefaultOverrideTable(serialization::DeclID,
+                             SILDefaultOverrideTable *existingOt);
     SILDifferentiabilityWitness *
         readDifferentiabilityWitness(serialization::DeclID);
 
@@ -205,6 +215,8 @@ namespace swift {
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    SILDefaultOverrideTable *
+    lookupDefaultOverrideTable(SILDefaultOverrideTable *ot);
     SILDifferentiabilityWitness *
     lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
 
@@ -277,6 +289,7 @@ namespace swift {
       getAllVTables();
       getAllWitnessTables();
       getAllDefaultWitnessTables();
+      getAllDefaultOverrideTables();
       getAllProperties();
       getAllDifferentiabilityWitnesses();
       getAllMoveOnlyDeinits();
@@ -302,6 +315,10 @@ namespace swift {
     /// Deserialize all DefaultWitnessTables inside the module and add them
     /// to SILMod.
     void getAllDefaultWitnessTables();
+
+    /// Deserialize all DefaultOverrideTables inside the module and add them to
+    /// SILMod.
+    void getAllDefaultOverrideTables();
 
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.

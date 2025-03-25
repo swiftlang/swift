@@ -112,6 +112,7 @@ namespace swift {
   class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
+  class SILDefaultOverrideTable;
   class SILProperty;
   class SILType;
   class SILVTable;
@@ -464,6 +465,8 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  void ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot);
+
   llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
   metadataPrespecializationsForType(NominalTypeDecl *type) {
     return MetadataPrespecializationsForGenericTypes.lookup(type);
@@ -789,6 +792,7 @@ public:
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
+  llvm::StructType *MethodDefaultOverrideDescriptorStructTy; /// %swift.method_default_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;

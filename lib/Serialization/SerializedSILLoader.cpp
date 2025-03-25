@@ -144,6 +144,14 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   return nullptr;
 }
 
+SILDefaultOverrideTable *
+SerializedSILLoader::lookupDefaultOverrideTable(SILDefaultOverrideTable *OT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto oT = Des->lookupDefaultOverrideTable(OT))
+      return oT;
+  return nullptr;
+}
+
 SILDifferentiabilityWitness *
 SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
@@ -250,6 +258,12 @@ void SerializedSILLoader::getAllWitnessTables() {
 void SerializedSILLoader::getAllDefaultWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllDefaultWitnessTables();
+}
+
+/// Deserialize all DefaultOverrideTables in all SILModules.
+void SerializedSILLoader::getAllDefaultOverrideTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultOverrideTables();
 }
 
 /// Deserialize all Properties in all SILModules.

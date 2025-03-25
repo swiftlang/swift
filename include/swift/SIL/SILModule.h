@@ -29,6 +29,7 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -160,6 +161,7 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DefaultOverrideTableListType = llvm::ilist<SILDefaultOverrideTable>;
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
   using SILMoveOnlyDeinitListType = llvm::ArrayRef<SILMoveOnlyDeinit *>;
@@ -184,6 +186,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDefaultOverrideTable;
   friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
@@ -264,6 +267,12 @@ private:
 
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
+
+  /// Lookup table for SIL default override tables from classes.
+  llvm::DenseMap<const ClassDecl *, SILDefaultOverrideTable *>
+      DefaultOverrideTableMap;
+
+  DefaultOverrideTableListType defaultOverrideTables;
 
   /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
   llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
@@ -717,6 +726,22 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
+  using default_override_table_iterator = DefaultOverrideTableListType::iterator;
+  using default_override_table_const_iterator = DefaultOverrideTableListType::const_iterator;
+  DefaultOverrideTableListType &getDefaultOverrideTableList() { return defaultOverrideTables; }
+  const DefaultOverrideTableListType &getDefaultOverrideTableList() const { return defaultOverrideTables; }
+  default_override_table_iterator default_override_table_begin() { return defaultOverrideTables.begin(); }
+  default_override_table_iterator default_override_table_end() { return defaultOverrideTables.end(); }
+  default_override_table_const_iterator default_override_table_begin() const { return defaultOverrideTables.begin(); }
+  default_override_table_const_iterator default_override_table_end() const { return defaultOverrideTables.end(); }
+  iterator_range<default_override_table_iterator> getDefaultOverrideTables() {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
+  }
+  iterator_range<default_override_table_const_iterator>
+  getDefaultOverrideTables() const {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
+  }
+
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
   using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
   DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
@@ -871,6 +896,12 @@ public:
                                       SILDeclRef Requirement,
                                       bool deserializeLazily=true);
 
+  /// Look up the SILDefaultOverrideTable containing the default overrides to be
+  /// applied to subclasses of a resilient class.
+  SILDefaultOverrideTable *
+  lookUpDefaultOverrideTable(const ClassDecl *decl,
+                             bool deserializeLazily = true);
+
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
 
@@ -913,6 +944,12 @@ public:
 
   /// Deletes a dead witness table.
   void deleteWitnessTable(SILWitnessTable *Wt);
+
+  /// Define a default override table for the indicated resilient class \p decl
+  /// consisting of the specified \p entries.
+  SILDefaultOverrideTable *createDefaultOverrideTableDefinition(
+      const ClassDecl *decl, SILLinkage linkage,
+      ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
   /// Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }

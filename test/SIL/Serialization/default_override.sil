@@ -1,0 +1,46 @@
+// sil (this file) -> sib -> sib -> sil | FileCheck
+
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name default_override -enable-library-evolution -enable-experimental-feature CoroutineAccessors
+// RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name default_override -enable-library-evolution -enable-experimental-feature CoroutineAccessors
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name default_override -emit-sorted-sil -enable-library-evolution -enable-experimental-feature CoroutineAccessors | %FileCheck %s
+
+// REQUIRES: swift_feature_CoroutineAccessors
+
+sil_stage canonical
+
+import Builtin
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+open class B {
+  open var i: Int { read set }
+}
+
+sil @B_i_read : $@yield_once @convention(method) (@guaranteed B) -> @yields Int
+sil @B_i_read2 : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields Int
+sil @B_i_set : $@convention(method) (Int, @guaranteed B) -> ()
+sil @B_i_modify : $@yield_once @convention(method) (@guaranteed B) -> @yields @inout Int
+sil @B_i_modify2 : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields @inout Int
+
+sil_vtable B {
+  #B.i!read: (B) -> () -> () : @B_i_read
+  #B.i!read2: (B) -> () -> () : @B_i_read2
+  #B.i!setter: (B) -> (Int) -> () : @B_i_set
+  #B.i!modify: (B) -> () -> () : @B_i_modify
+  #B.i!modify2: (B) -> () -> () : @B_i_modify2
+}
+
+sil @B_i_read2_default_override : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields Int
+sil @B_i_modify2_default_override : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields @inout Int
+
+// CHECK-LABEL: sil_default_override_table B {
+// CHECK-NEXT:    #B.i!read2: #B.i!read: (B) -> () -> () : @B_i_read2_default_override
+// CHECK-NEXT:    #B.i!modify2: #B.i!modify: (B) -> () -> () : @B_i_modify2_default_override
+// CHECK-NEXT:  }
+sil_default_override_table B {
+  #B.i!read2: #B.i!read: (B) -> () -> () : @B_i_read2_default_override
+  #B.i!modify2: #B.i!modify: (B) -> () -> () : @B_i_modify2_default_override
+}
