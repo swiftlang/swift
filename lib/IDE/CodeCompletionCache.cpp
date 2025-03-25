@@ -241,6 +241,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
+    auto fullDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
     auto filterNameIndex = read32le(cursor);
     auto nameForDiagnosticsIndex = read32le(cursor);
@@ -261,6 +262,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
     auto briefDocComment = getString(briefDocIndex);
+    auto fullDocComment = getString(fullDocIndex);
     auto diagMessage = getString(diagMessageIndex);
     auto filterName = getString(filterNameIndex);
     auto nameForDiagnostics = getString(nameForDiagnosticsIndex);
@@ -268,8 +270,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
             kind, associatedKind, opKind, roles, isSystem,
-                                                           hasAsyncAlternative, string, moduleName, briefDocComment,
-            llvm::ArrayRef(assocUSRs).copy(*V.Allocator),
+            hasAsyncAlternative, string, moduleName, briefDocComment,
+            fullDocComment, llvm::ArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
             diagMessage, filterName, nameForDiagnostics);
 
@@ -432,6 +434,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
+      LE.write(addString(R->getFullDocComment()));  // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
       LE.write(addString(R->getFilterName())); // index into strings
       LE.write(addString(R->getNameForDiagnostics())); // index into strings

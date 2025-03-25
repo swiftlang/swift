@@ -166,6 +166,10 @@ public:
     return getSwiftResult().getBriefDocComment();
   }
 
+  StringRef getFullDocComment() const {
+    return getSwiftResult().getFullDocComment();
+  }
+
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return getSwiftResult().getAssociatedUSRs();
   }

@@ -1351,9 +1351,14 @@ static void printCodeCompletionResultsImpl(
       OS.write_escaped(buf);
     }
 
-    StringRef comment = Result->getBriefDocComment();
-    if (IncludeComments && !comment.empty()) {
-      OS << "; comment=" << comment;
+    StringRef BriefComment = Result->getBriefDocComment();
+    if (IncludeComments && !BriefComment.empty()) {
+      OS << "; briefComment=" << BriefComment;
+    }
+    
+    StringRef FullComment = Result->getFullDocComment();
+    if (IncludeComments && !FullComment.empty()) {
+      OS << "; fullComment=" << FullComment;
     }
 
     if (Ctx) {
@@ -1363,7 +1368,7 @@ static void printCodeCompletionResultsImpl(
           Result->getDiagnosticSeverityAndMessage(Scratch, *Ctx);
       if (DiagSeverityAndMessage.first !=
           CodeCompletionDiagnosticSeverity::None) {
-        OS << "; diagnostics=" << comment;
+        OS << "; diagnostics=" << BriefComment;
         switch (DiagSeverityAndMessage.first) {
         case CodeCompletionDiagnosticSeverity::Error:
           OS << "error";

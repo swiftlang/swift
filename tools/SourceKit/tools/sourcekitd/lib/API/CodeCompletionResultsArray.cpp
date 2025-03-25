@@ -24,8 +24,8 @@ using namespace sourcekitd;
 struct CodeCompletionResultsArrayBuilder::Implementation {
   CompactArrayBuilder<UIdent, StringRef, StringRef, StringRef, StringRef,
                       std::optional<StringRef>, std::optional<StringRef>,
-                      std::optional<StringRef>, UIdent, UIdent, uint8_t,
-                      uint8_t>
+                      std::optional<StringRef>, std::optional<StringRef>,
+                      UIdent, UIdent, uint8_t, uint8_t>
       Builder;
 };
 
@@ -41,9 +41,10 @@ CodeCompletionResultsArrayBuilder::~CodeCompletionResultsArrayBuilder() {
 void CodeCompletionResultsArrayBuilder::add(
     UIdent Kind, StringRef Name, StringRef Description, StringRef SourceText,
     StringRef TypeName, std::optional<StringRef> ModuleName,
-    std::optional<StringRef> DocBrief, std::optional<StringRef> AssocUSRs,
-    UIdent SemanticContext, UIdent TypeRelation, bool NotRecommended,
-    bool IsSystem, unsigned NumBytesToErase) {
+    std::optional<StringRef> DocBrief, std::optional<StringRef> DocFull,
+    std::optional<StringRef> AssocUSRs, UIdent SemanticContext,
+    UIdent TypeRelation, bool NotRecommended, bool IsSystem,
+    unsigned NumBytesToErase) {
 
   uint8_t Flags = 0;
   Flags |= NotRecommended << 1;
@@ -58,6 +59,7 @@ void CodeCompletionResultsArrayBuilder::add(
                         TypeName,
                         ModuleName,
                         DocBrief,
+                        DocFull,
                         AssocUSRs,
                         SemanticContext,
                         TypeRelation,
@@ -83,6 +85,7 @@ public:
                              const char *,
                              const char *,
                              const char *,
+                             const char *,
                              sourcekitd_uid_t,
                              sourcekitd_uid_t,
                              uint8_t,
@@ -101,6 +104,7 @@ public:
     const char *TypeName;
     const char *ModuleName;
     const char *DocBrief;
+    const char *DocFull;
     const char *AssocUSRs;
     sourcekitd_uid_t SemanticContext;
     sourcekitd_uid_t TypeRelation;
@@ -115,6 +119,7 @@ public:
                   TypeName,
                   ModuleName,
                   DocBrief,
+                  DocFull,
                   AssocUSRs,
                   SemanticContext,
                   TypeRelation,
@@ -142,6 +147,9 @@ public:
     }
     if (DocBrief) {
       APPLY(KeyDocBrief, String, DocBrief);
+    }
+    if (DocFull) {
+      APPLY(KeyDocFullAsXML, String, DocFull);
     }
     if (AssocUSRs) {
       APPLY(KeyAssociatedUSRs, String, AssocUSRs);

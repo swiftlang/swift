@@ -28,6 +28,7 @@ public:
            llvm::StringRef Description, llvm::StringRef SourceText,
            llvm::StringRef TypeName, std::optional<llvm::StringRef> ModuleName,
            std::optional<llvm::StringRef> DocBrief,
+           std::optional<llvm::StringRef> DocFull,
            std::optional<llvm::StringRef> AssocUSRs,
            SourceKit::UIdent SemanticContext, SourceKit::UIdent TypeRelation,
            bool NotRecommended, bool IsSystem, unsigned NumBytesToErase);
