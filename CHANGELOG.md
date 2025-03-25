@@ -5,6 +5,27 @@
 
 ## Swift 6.2
 
+* [SE-0419][]:
+  Introduced the new `Runtime` module, which contains a public API that can
+  generate backtraces, presently supported on macOS and Linux.  Capturing a
+  backtrace is as simple as
+
+  ```swift
+  import Runtime
+
+  func foo() {
+    // Without symbols
+    let backtrace = try! Backtrace.capture()
+
+    print(backtrace)
+
+    // With symbol lookup
+    let symbolicated = backtrace.symbolicated()!
+
+    print(symbolicated)
+  }
+  ```
+
 * [SE-0458][]:
   Introduced an opt-in mode for strict checking of memory safety, which can be
   enabled with the compiler flag `-strict-memory-safety`. In this mode,
