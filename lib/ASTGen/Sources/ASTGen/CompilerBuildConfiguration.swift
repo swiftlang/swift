@@ -550,11 +550,13 @@ public func extractInlinableText(
 /// a syntax tree.
 fileprivate class RemoveUnsafeExprSyntaxRewriter: SyntaxRewriter {
   override func visit(_ node: UnsafeExprSyntax) -> ExprSyntax {
-    return node.expression.with(\.leadingTrivia, node.leadingTrivia)
+    let rewritten = super.visit(node).cast(UnsafeExprSyntax.self)
+    return rewritten.expression.with(\.leadingTrivia, node.leadingTrivia)
   }
 
   override func visit(_ node: ForStmtSyntax) -> StmtSyntax {
-    return StmtSyntax(node.with(\.unsafeKeyword, nil))
+    let rewritten = super.visit(node).cast(ForStmtSyntax.self)
+    return StmtSyntax(rewritten.with(\.unsafeKeyword, nil))
   }
 }
 
