@@ -927,8 +927,10 @@ struct BridgedDeclRef {
   BRIDGED_INLINE BridgedDeclRef(swift::SILDeclRef declRef);
   BRIDGED_INLINE swift::SILDeclRef unbridged() const;
 
+  BRIDGED_INLINE bool isEqualTo(BridgedDeclRef rhs) const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
 };
 

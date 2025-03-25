@@ -1726,8 +1726,16 @@ swift::SILDeclRef BridgedDeclRef::unbridged() const {
   return *reinterpret_cast<const swift::SILDeclRef *>(&storage);
 }
 
+bool BridgedDeclRef::isEqualTo(BridgedDeclRef rhs) const {
+  return unbridged() == rhs.unbridged();
+}
+
 BridgedLocation BridgedDeclRef::getLocation() const {
   return swift::SILDebugLocation(unbridged().getDecl(), nullptr);
+}
+
+BridgedDeclObj BridgedDeclRef::getDecl() const {
+  return {unbridged().getDecl()};
 }
 
 BridgedDiagnosticArgument BridgedDeclRef::asDiagnosticArgument() const {

@@ -791,3 +791,9 @@ extension Function {
     return context._bridged.appendBlock(bridged).block
   }
 }
+
+extension DeclRef {
+  func calleesAreStaticallyKnowable(_ context: some Context) -> Bool {
+    context._bridged.calleesAreStaticallyKnowable(bridged)
+  }
+}

@@ -488,6 +488,11 @@ BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
   return swift::SILType::getBuiltinIntegerType(bitWidth, ctxt);
 }
 
+bool BridgedPassContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return swift::calleesAreStaticallyKnowable(*mod, method.unbridged());
+}
+
 void BridgedPassContext::beginTransformFunction(BridgedFunction function) const {
   invocation->beginTransformFunction(function.getFunction());
 }
