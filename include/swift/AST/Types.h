@@ -3800,6 +3800,12 @@ public:
   /// Return the function type without the throwing.
   AnyFunctionType *getWithoutThrowing() const;
 
+  /// Return the function type with the given \p isolation.
+  AnyFunctionType *withIsolation(FunctionTypeIsolation isolation) const;
+
+  /// Return the function type setting sendable to \p newValue.
+  AnyFunctionType *withSendable(bool newValue) const;
+
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
@@ -5767,6 +5773,10 @@ public:
                    getLifetimeDependencies());
   }
 
+  /// Return a new SILFunctionType that is the same as this but has \p
+  /// newExtInfo as its ext info.
+  CanSILFunctionType withExtInfo(ExtInfo newExtInfo) const;
+
   /// Returns the language-level calling convention of the function.
   Language getLanguage() const {
     return getExtInfo().getLanguage();
@@ -5815,6 +5825,10 @@ public:
   /// must have the same signature as the new substitutions.
   CanSILFunctionType
   withPatternSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a new SILFunctionType that is the same as this one with its
+  /// sendable bit changed to \p newValue.
+  CanSILFunctionType withSendable(bool newValue) const;
 
   /// Create a SILFunctionType with the same structure as this one,
   /// but replacing the invocation generic signature and pattern
