@@ -320,10 +320,15 @@ extension Function {
 
   public var hasSelfArgument: Bool { argumentConventions.selfIndex != nil }
 
-  public var selfArgumentIndex: Int { argumentConventions.selfIndex! }
+  public var selfArgumentIndex: Int? { argumentConventions.selfIndex }
 
-  public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
-  
+  public var selfArgument: FunctionArgument? {
+    if let selfArgIdx = selfArgumentIndex {
+      return arguments[selfArgIdx]
+    }
+    return nil
+  }
+
   public var dynamicSelfMetadata: FunctionArgument? {
     if bridged.hasDynamicSelfMetadata() {
       return arguments.last!
