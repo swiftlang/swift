@@ -144,19 +144,7 @@ extension ASTGenDiagnostic {
 // MARK: Type diagnostics
 //===----------------------------------------------------------------------===//
 
-extension ASTGenDiagnostic {
-  static func classKeywordInheritanceDeprecated(_ node: ClassRestrictionTypeSyntax) -> Self {
-    Self(
-      node: node,
-      message: "using 'class' keyword to define a class-constrained protocol is deprecated",
-      severity: .warning
-    )
-    .withFixIt(
-      message: "use 'AnyObject' instead",
-      changes: .replaceTokenText(node.classKeyword, with: .identifier("AnyObject"))
-    )
-  }
-}
+// TODO
 
 //===----------------------------------------------------------------------===//
 // MARK: Misc diagnostics

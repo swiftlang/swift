@@ -12,6 +12,7 @@
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen \
+// RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature NamedOpaqueTypes \
 // RUN:   -enable-experimental-feature InlineArrayTypeSugar
 
@@ -68,8 +69,7 @@ struct FileDescriptor: ~Copyable {
 }
 
 protocol ClassOnly: class {}
-// expected-warning@-1 {{using 'class' keyword to define a class-constrained protocol is deprecated}}
-// expected-note@-2 {{use 'AnyObject' instead}} {{21-26=AnyObject}}
+// expected-warning@-1 {{using 'class' keyword to define a class-constrained protocol is deprecated}} {{21-26=AnyObject}}
 
 actor SomeActor { }
 @globalActor

@@ -314,9 +314,6 @@ extension ASTGenVisitor {
   }
 
   func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedUnqualifiedIdentTypeRepr {
-    // Diagnose to replace 'class' with 'AnyObject'
-    self.diagnose(.classKeywordInheritanceDeprecated(node))
-
     return .createParsed(
       self.ctx,
       loc: self.generateSourceLoc(node.classKeyword),
