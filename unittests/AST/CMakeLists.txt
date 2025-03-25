@@ -8,6 +8,7 @@ add_swift_unittest(SwiftASTTests
   DiagnosticBehaviorTests.cpp
   DiagnosticConsumerTests.cpp
   DiagnosticGroupsTests.cpp
+  DiagnosticInfoTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
