@@ -378,6 +378,7 @@ struct BridgedDeclObj {
   BridgedDeclObj(SwiftObject obj) : obj(obj) {}
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE BridgedSourceLoc getLoc() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc Value_getNameLoc() const;
@@ -389,6 +390,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
 };
 

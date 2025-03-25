@@ -176,6 +176,10 @@ BridgedSourceLoc BridgedDeclObj::getLoc() const {
   return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
 }
 
+BridgedDeclObj BridgedDeclObj::getModuleContext() const {
+  return {unbridged()->getModuleContext()};
+}
+
 BridgedStringRef BridgedDeclObj::Type_getName() const {
   return getAs<swift::TypeDecl>()->getName().str();
 }
@@ -218,6 +222,10 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
 
 BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::AbstractFunction_isOverridden() const {
+  return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }
 
 bool BridgedDeclObj::Destructor_isIsolated() const {
