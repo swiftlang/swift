@@ -2,7 +2,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 
   set(library_name "swiftCompatibilitySpan")
 
-  add_swift_target_library("${library_name}" ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  if(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
+    set(COMPATIBILITY_SPAN_BUILD_TYPES "${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}")
+  else()
+    # This is not set when building build tools for the toolchain build.
+    set(COMPATIBILITY_SPAN_BUILD_TYPES "STATIC")
+  endif()
+
+  add_swift_target_library("${library_name}" ${COMPATIBILITY_SPAN_BUILD_TYPES} IS_STDLIB
     FakeStdlib.swift
     ../../public/core/Span/RawSpan.swift
     ../../public/core/Span/Span.swift
