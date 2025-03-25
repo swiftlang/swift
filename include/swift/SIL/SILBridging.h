@@ -948,6 +948,7 @@ struct BridgedVTableEntry {
     Override
   };
 
+  BridgedVTableEntry() : storage{0, 0, 0, 0, 0} {};
   BRIDGED_INLINE BridgedVTableEntry(const swift::SILVTableEntry &entry);
   BRIDGED_INLINE const swift::SILVTableEntry &unbridged() const;
 
@@ -959,6 +960,14 @@ struct BridgedVTableEntry {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedVTableEntry create(Kind kind, bool nonOverridden,
                                    BridgedDeclRef methodDecl, BridgedFunction implementation);
+};
+
+struct OptionalBridgedVTableEntry {
+  BridgedVTableEntry entry;
+  bool hasEntry = false;
+
+  OptionalBridgedVTableEntry() {}
+  OptionalBridgedVTableEntry(BridgedVTableEntry e) : entry(e), hasEntry(true) {}
 };
 
 struct BridgedVTableEntryArray {
@@ -973,6 +982,7 @@ struct BridgedVTable {
   BRIDGED_INLINE SwiftInt getNumEntries() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedVTableEntry getEntry(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getClass() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVTableEntry lookupMethod(BridgedDeclRef member) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSpecializedClassType() const;
   BRIDGED_INLINE void replaceEntries(BridgedArrayRef bridgedEntries) const;
 };

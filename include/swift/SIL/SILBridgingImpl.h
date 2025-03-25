@@ -1808,6 +1808,18 @@ BridgedDeclObj BridgedVTable::getClass() const {
   return vTable->getClass();
 }
 
+OptionalBridgedVTableEntry BridgedVTable::lookupMethod(BridgedDeclRef member) const {
+  if (vTable->getEntries().empty()) {
+    return OptionalBridgedVTableEntry();
+  }
+  swift::SILModule &mod = vTable->getEntries()[0].getImplementation()->getModule();
+  if (auto entry = vTable->getEntry(mod, member.unbridged()))
+    return BridgedVTableEntry(entry.value());
+
+  return OptionalBridgedVTableEntry();
+}
+
+
 BridgedType BridgedVTable::getSpecializedClassType() const {
   return {vTable->getClassType()};
 }
