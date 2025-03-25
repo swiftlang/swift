@@ -540,6 +540,9 @@ public:
   // variants.
   unsigned UseCoroCCArm64 : 1;
 
+  // Whether to emit mergeable or non-mergeable traps.
+  unsigned MergeableTraps : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -646,6 +649,7 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false),
+        MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
