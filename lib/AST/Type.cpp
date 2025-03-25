@@ -4486,6 +4486,17 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
+AnyFunctionType *
+AnyFunctionType::getWithIsolation(FunctionTypeIsolation isolation) const {
+  auto info = getExtInfo().intoBuilder().withIsolation(isolation).build();
+  return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::getWithSendable(bool newValue) const {
+  auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
+  return withExtInfo(info);
+}
+
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())

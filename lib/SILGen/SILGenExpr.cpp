@@ -487,6 +487,11 @@ namespace {
     }
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
+
+    /// Helper method for handling function conversion expr to
+    /// @execution(caller). Returns an empty RValue on failure.
+    RValue emitExecutionCallerFunctionConversionExpr(FunctionConversionExpr *E,
+                                                     SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
     RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
@@ -1942,9 +1947,58 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
+RValue RValueEmitter::emitExecutionCallerFunctionConversionExpr(
+    FunctionConversionExpr *e, SGFContext C) {
+  CanAnyFunctionType srcType =
+      cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
+  CanAnyFunctionType destType =
+      cast<FunctionType>(e->getType()->getCanonicalType());
+  assert(destType->getIsolation().isNonIsolatedCaller() &&
+         "Should only call this if destType is non isolated caller");
+
+  auto *subExpr = e->getSubExpr();
+
+  // Check if we have a subExpr and if this conversion is just stripping off
+  // @Sendable. In such a case, we can look through.
+  if (auto *fce = dyn_cast<FunctionConversionExpr>(subExpr)) {
+    if (srcType->hasExtInfo() && srcType->getExtInfo().isSendable() &&
+        destType->hasExtInfo() && !destType->getExtInfo().isSendable() &&
+        destType->getWithSendable(true) == srcType) {
+      subExpr = fce->getSubExpr();
+
+      // We changed our subExpr... so recompute our srcType.
+      srcType = cast<FunctionType>(subExpr->getType()->getCanonicalType());
+    }
+  }
+
+  // Check if the only difference in between our destType and srcType is our
+  // isolation.
+  if (!srcType->hasExtInfo() || !destType->hasExtInfo() ||
+      destType->getWithIsolation(srcType->getIsolation()) != srcType) {
+    return RValue();
+  }
+
+  // Ok, we know that our underlying types are the same. Lets try to emit.
+  auto *declRef = dyn_cast<DeclRefExpr>(subExpr);
+  if (!declRef)
+    return RValue();
+
+  auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
+  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+    return RValue();
+
+  // Ok, we found our target.
+  SILDeclRef silDeclRef(decl);
+  assert(silDeclRef.getParameterListCount() == 1);
+  auto substType = cast<AnyFunctionType>(destType);
+  auto typeContext = SGF.getFunctionTypeInfo(substType);
+  ManagedValue result = SGF.emitClosureValue(
+      e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
+  return RValue(SGF, e, destType, result);
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
-                                                  SGFContext C)
-{
+                                                  SGFContext C) {
   CanAnyFunctionType srcType =
       cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
   CanAnyFunctionType destType =
@@ -2039,6 +2093,19 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       }
       return RValue(SGF, e, value);
     }
+  }
+
+  // Check if we are converting a function to an @execution(caller) from a
+  // declref that is also @execution(caller). In such a case, this was a case
+  // that was put in by Sema. We do not need a thunk, but just need to recognize
+  // this case and elide the conversion. The reason why we need to do this is
+  // that otherwise, we put in extra thunks that convert @execution(caller) to
+  // @execution(concurrent) back to @execution(caller). This is done b/c we do
+  // not represent @execution(caller) in interface types, so the actual decl ref
+  // will be viewed as @async () -> ().
+  if (destType->getIsolation().isNonIsolatedCaller()) {
+    if (RValue rv = emitExecutionCallerFunctionConversionExpr(e, C))
+      return rv;
   }
 
   // Break the conversion into three stages:
