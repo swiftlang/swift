@@ -578,6 +578,10 @@ bool BridgedPassContext::shouldExpand(BridgedType ty) const {
   return swift::shouldExpand(mod, ty.unbridged());
 }
 
+BridgedDeclObj BridgedPassContext::getCurrentModuleContext() const {
+  return {invocation->getPassManager()->getModule()->getSwiftModule()};
+}
+
 bool BridgedPassContext::enableWMORequiredDiagnostics() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getOptions().EnableWMORequiredDiagnostics;
