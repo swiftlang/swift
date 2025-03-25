@@ -407,11 +407,17 @@ extension String {
   /// Simple check to determine whether the string looks like the start of a
   /// URL.
   fileprivate var looksLikeURL: Bool {
+    var sawColon: Bool = false
     var forwardSlashes: Int = 0
     for c in self {
-      if c == "/" {
+      if c == ":" {
+        sawColon = true
+        continue
+      }
+
+      if c == "/" && sawColon {
         forwardSlashes += 1
-        if forwardSlashes > 2 {
+        if forwardSlashes >= 2 {
           return true
         }
 
@@ -420,6 +426,7 @@ extension String {
 
       if c.isLetter || c.isNumber {
         forwardSlashes = 0
+        sawColon = false
         continue
       }
 
