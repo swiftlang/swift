@@ -175,7 +175,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     # Don't attempt to build any other Embedded Swift stdlib triples
     # when building for WASI.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "wasm32    wasm32-unknown-wasip1-wasm  wasm32-unknown-wasip1-wasm"
+      "wasm32    wasm32-unknown-wasip1  wasm32-unknown-wasip1"
     )
   else()
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
