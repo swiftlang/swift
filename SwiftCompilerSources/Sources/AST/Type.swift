@@ -40,7 +40,7 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     self.bridged = bridgedOrNil
   }
 
-  init(bridged: BridgedASTType) {
+  public init(bridged: BridgedASTType) {
     self.bridged = bridged
   }
 

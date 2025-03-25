@@ -655,6 +655,18 @@ BridgedCanType BridgedFunction::getLoweredFunctionTypeInContext() const {
   return getFunction()->getLoweredFunctionTypeInContext(expansion);
 }
 
+BridgedGenericSignature BridgedFunction::getGenericSignature() const {
+  return {getFunction()->getGenericSignature().getPointer()};
+}
+
+BridgedSubstitutionMap BridgedFunction::getForwardingSubstitutionMap() const {
+  return {getFunction()->getForwardingSubstitutionMap()};
+}
+
+BridgedASTType BridgedFunction::mapTypeIntoContext(BridgedASTType ty) const {
+  return {getFunction()->mapTypeIntoContext(ty.unbridged()).getPointer()};
+}
+
 OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
   return {getFunction()->empty() ? nullptr : getFunction()->getEntryBlock()};
 }
@@ -779,6 +791,10 @@ bool BridgedFunction::hasValidLinkageForFragileRef(SerializedKind kind) const {
 
 bool BridgedFunction::needsStackProtection() const {
   return getFunction()->needsStackProtection();
+}
+
+bool BridgedFunction::wasDeserializedCanonical() const {
+  return getFunction()->wasDeserializedCanonical();
 }
 
 void BridgedFunction::setNeedStackProtection(bool needSP) const {
