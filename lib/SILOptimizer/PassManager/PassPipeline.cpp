@@ -365,10 +365,18 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addMem2Reg();
   P.addDCE();
   P.addSILCombine();
-  addSimplifyCFGSILCombinePasses(P);
+
+  P.addSimplifyCFG();
+  P.addLoopRotate();
+  P.addSimplifyCFG();
+  P.addConditionForwarding();
+  // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
+  // cond_br).
+  P.addSILCombine();
+  // Which can expose opportunity for simplifycfg.
+  P.addSimplifyCFG();
 
   // Run high-level loop opts.
-  P.addLoopRotate();
 
   // Cleanup.
   P.addDCE();
