@@ -49,8 +49,9 @@ private:
       ArrayRef<StringRef> moduleNames, StringRef moduleOutputPath,
       const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
           &alreadySeenModules,
-      llvm::PrefixMapper *prefixMapper, llvm::StringSet<> &successModules,
-      llvm::StringSet<> &notFoundModules, llvm::StringSet<> &errorModules);
+      llvm::PrefixMapper *prefixMapper, std::vector<StringRef> &successModules,
+      std::vector<StringRef> &notFoundModules,
+      std::vector<StringRef> &errorModules);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector

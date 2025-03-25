@@ -457,8 +457,9 @@ ModuleDependencyVector ClangImporter::getModuleDependencies(
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
-    llvm::StringSet<> &successModules, llvm::StringSet<> &notFoundModules,
-    llvm::StringSet<> &errorModules, bool isTestableImport) {
+    std::vector<StringRef> &successModules,
+    std::vector<StringRef> &notFoundModules,
+    std::vector<StringRef> &errorModules, bool isTestableImport) {
   auto &ctx = Impl.SwiftContext;
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
@@ -495,18 +496,19 @@ ModuleDependencyVector ClangImporter::getModuleDependencies(
           std::string::npos) {
         if (errorStr.find("'" + N.str() + "'") != std::string::npos) {
           showError = true;
-          errorModules.insert(N);
+          errorModules.push_back(N);
         } else
-          successModules.insert(N);
+          successModules.push_back(N);
       } else
-        notFoundModules.insert(N);
+        notFoundModules.push_back(N);
     }
 
     if (showError)
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          errorStr);
   } else
-    successModules.insert(moduleNames.begin(), moduleNames.end());
+    successModules.insert(successModules.end(), moduleNames.begin(),
+                          moduleNames.end());
 
   if (!clangModuleDependencies.size())
     return {};

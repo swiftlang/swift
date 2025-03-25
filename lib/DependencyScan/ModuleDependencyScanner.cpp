@@ -264,8 +264,9 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     ArrayRef<StringRef> moduleNames, StringRef moduleOutputPath,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules,
-    llvm::PrefixMapper *prefixMapper, llvm::StringSet<> &successModules,
-    llvm::StringSet<> &notFoundModules, llvm::StringSet<> &errorModules) {
+    llvm::PrefixMapper *prefixMapper, std::vector<StringRef> &successModules,
+    std::vector<StringRef> &notFoundModules,
+    std::vector<StringRef> &errorModules) {
   return clangScannerModuleLoader->getModuleDependencies(
       moduleNames, moduleOutputPath, alreadySeenModules, clangScanningTool,
       *scanningASTDelegate, prefixMapper, successModules, notFoundModules,
@@ -880,9 +881,9 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
             return;
         }
 
-        llvm::StringSet<> successModules;
-        llvm::StringSet<> notFoundModules;
-        llvm::StringSet<> errorModules;
+        std::vector<StringRef> successModules;
+        std::vector<StringRef> notFoundModules;
+        std::vector<StringRef> errorModules;
         auto moduleDependencies = withDependencyScanningWorker(
             [&cache, &seenClangModules, &unresolvedModules, &successModules,
              &notFoundModules,
@@ -895,7 +896,7 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
 
         {
           std::lock_guard<std::mutex> guard(cacheAccessLock);
-          for (const auto &N : successModules.keys()) {
+          for (const auto &N : successModules) {
             moduleLookupResult.insert_or_assign(N, moduleDependencies);
             if (!moduleDependencies.empty())
               cache.recordDependencies(moduleDependencies);
@@ -903,11 +904,11 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
 
           // FIXME: document the reason why we use an empty dependency
           // vector as a placeholder for modules not found.
-          for (const auto &N : notFoundModules.keys()) {
+          for (const auto &N : notFoundModules) {
             moduleLookupResult.insert_or_assign(N, ModuleDependencyVector());
           }
 
-          for (const auto &N : errorModules.keys()) {
+          for (const auto &N : errorModules) {
             moduleLookupResult.insert_or_assign(N, ModuleDependencyVector());
           }
         }

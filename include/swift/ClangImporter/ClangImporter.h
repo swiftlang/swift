@@ -504,8 +504,9 @@ public:
           &alreadySeenClangModules,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
-      llvm::StringSet<> &successModules, llvm::StringSet<> &notFoundModules,
-      llvm::StringSet<> &errorModules, bool isTestableImport = false);
+      std::vector<StringRef> &successModules,
+      std::vector<StringRef> &notFoundModules,
+      std::vector<StringRef> &errorModules, bool isTestableImport = false);
 
   void recordBridgingHeaderOptions(
       ModuleDependencyInfo &MDI,
