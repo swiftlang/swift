@@ -117,7 +117,8 @@ target_link_libraries(swift_Concurrency PRIVATE
   # Link to the runtime that we are just building.
   swiftCore)
 set_target_properties(swift_Concurrency PROPERTIES
-  Swift_MODULE_NAME _Concurrency)
+  Swift_MODULE_NAME _Concurrency
+  LINKER_LANGUAGE CXX)
 
 install(TARGETS swift_Concurrency
   EXPORT SwiftCoreTargets
