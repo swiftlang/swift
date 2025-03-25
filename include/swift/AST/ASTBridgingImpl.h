@@ -783,6 +783,10 @@ swift::GenericSignature BridgedGenericSignature::unbridged() const {
   return swift::GenericSignature(impl);
 }
 
+BridgedASTTypeArray BridgedGenericSignature::getGenericParams() const {
+  return {unbridged().getGenericParams()};
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedFingerprint
 //===----------------------------------------------------------------------===//
