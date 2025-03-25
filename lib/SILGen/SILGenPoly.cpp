@@ -95,6 +95,7 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -5400,6 +5401,11 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
                                          &SGF.F);
   auto thunkType = SGF.F.getLoweredFunctionType();
+  SWIFT_DEFER {
+    // If verify all is enabled, verify thunk bodies.
+    if (SGF.getASTContext().SILOpts.VerifyAll)
+      SGF.F.verify();
+  };
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
