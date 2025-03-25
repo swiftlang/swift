@@ -197,7 +197,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     let bridged = unsafe __BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
-    for bucket in unsafe native.hashTable {
+    for unsafe bucket in unsafe native.hashTable {
       let object = _bridgeAnythingToObjectiveC(
         native.uncheckedElement(at: bucket))
       unsafe bridged.initialize(at: bucket, to: object)

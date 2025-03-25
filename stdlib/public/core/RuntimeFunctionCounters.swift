@@ -521,7 +521,7 @@ func _measureRuntimeFunctionCountersDiffs(
       _RuntimeFunctionCounters.disableRuntimeFunctionCountersUpdates()
     let globalCountersBefore = _GlobalRuntimeFunctionCountersState()
     var objectsCountersBefore: [_ObjectRuntimeFunctionCountersState] = []
-    for object in unsafe objects {
+    for unsafe object in unsafe objects {
       unsafe objectsCountersBefore.append(_ObjectRuntimeFunctionCountersState(object))
     }
     // Enable counters updates.
@@ -535,7 +535,7 @@ func _measureRuntimeFunctionCountersDiffs(
 
     let globalCountersAfter = _GlobalRuntimeFunctionCountersState()
     var objectsCountersDiff: [_ObjectRuntimeFunctionCountersState] = []
-    for (idx, object) in unsafe objects.enumerated() {
+    for unsafe (idx, object) in unsafe objects.enumerated() {
       let objectCountersAfter = unsafe _ObjectRuntimeFunctionCountersState(object)
       objectsCountersDiff.append(
         objectsCountersBefore[idx].diff(objectCountersAfter))

@@ -657,7 +657,7 @@ extension _NativeDictionary where Value: Equatable {
     if self.count != other.count { return false }
 
     defer { _fixLifetime(self) }
-    for bucket in unsafe self.hashTable {
+    for unsafe bucket in unsafe self.hashTable {
       let key = self.uncheckedKey(at: bucket)
       let value = self.uncheckedValue(at: bucket)
       guard
