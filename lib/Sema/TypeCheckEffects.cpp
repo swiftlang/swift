@@ -1731,8 +1731,12 @@ public:
         }
 
         // Use the most significant result from the arguments.
-        auto *fnSubstType = fnInterfaceType.subst(fnRef.getSubstitutions())
-            ->getAs<AnyFunctionType>();
+        FunctionType *fnSubstType = nullptr;
+        if (auto *fnGenericType = fnInterfaceType->getAs<GenericFunctionType>())
+          fnSubstType = fnGenericType->substGenericArgs(fnRef.getSubstitutions());
+        else
+          fnSubstType = fnInterfaceType->getAs<FunctionType>();
+
         if (!fnSubstType)  {
           result.merge(Classification::forInvalidCode());
           return;
