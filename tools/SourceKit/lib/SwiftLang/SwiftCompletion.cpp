@@ -536,6 +536,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
 
   Info.ModuleName = Result->getModuleName();
   Info.DocBrief = Result->getBriefDocComment();
+  Info.DocFull = Result->getFullDocComment();
   Info.NotRecommended = Result->isNotRecommended();
   Info.IsSystem = Result->isSystem();
 
@@ -912,7 +913,8 @@ static void transformAndForwardResults(
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             innerSink.swiftSink, CodeCompletionResultKind::BuiltinOperator,
             completionString, CodeCompletionOperatorKind::None,
-            /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
+            /*BriefDocComment=*/"", /*FullDocComment=*/"",
+            CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,
             /*DiagnosticMessage=*/"");
