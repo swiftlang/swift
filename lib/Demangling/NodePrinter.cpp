@@ -660,6 +660,7 @@ private:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
     case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::CoroFunctionPointer:
+    case Node::Kind::DefaultOverride:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3493,6 +3494,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::CoroFunctionPointer:
     Printer << "coro function pointer to ";
+    return nullptr;
+  case Node::Kind::DefaultOverride:
+    Printer << "default override of ";
     return nullptr;
   }
 

@@ -19,6 +19,8 @@
 #ifndef SWIFT_SIL_SILDECLREF_H
 #define SWIFT_SIL_SILDECLREF_H
 
+#include "swift/AST/Attr.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/GenericSignature.h"
@@ -36,7 +38,6 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
-  class AutoDiffDerivativeFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -53,7 +54,6 @@ namespace swift {
   enum class SILLinkage : uint8_t;
   class AnyFunctionRef;
   class GenericSignature;
-  class CustomAttr;
 
 /// How a method is dispatched.
 enum class MethodDispatch {

@@ -411,6 +411,7 @@ NODE(Integer)
 NODE(NegativeInteger)
 NODE(DependentGenericParamValueMarker)
 NODE(CoroFunctionPointer)
+NODE(DefaultOverride)
 
 #undef CONTEXT_NODE
 #undef NODE

@@ -34,6 +34,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
@@ -252,7 +253,10 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
 namespace {
 
 /// An ASTVisitor for populating SILVTable entries from ClassDecl members.
-class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
+template <typename T>
+class SILGenVTableBase : public SILVTableVisitor<T> {
+  T &asDerived() { return *static_cast<T *>(this); }
+
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
@@ -261,19 +265,71 @@ public:
   // Map a base SILDeclRef to the corresponding element in vtableMethods.
   llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
 
-  // For each base method, store the corresponding override.
-  SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> vtableMethods;
+  // A base method and a corresponding override.
+  using VTableMethod = std::pair<SILDeclRef, SILDeclRef>;
 
-  SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
-    : SGM(SGM), theClass(theClass) {
+  // For each base method, store the corresponding override.
+  SmallVector<VTableMethod, 8> vtableMethods;
+
+  SILGenVTableBase(SILGenModule &SGM, ClassDecl *theClass)
+      : SGM(SGM), theClass(theClass) {
     isResilient = theClass->isResilient();
   }
+
+  /// Populate our list of base methods and overrides.
+  void collectMethods() { visitAncestor(theClass); }
+
+  void visitAncestor(ClassDecl *ancestor) {
+    // Imported types don't have vtables right now.
+    if (ancestor->hasClangNode())
+      return;
+
+    auto *superDecl = ancestor->getSuperclassDecl();
+    if (superDecl)
+      visitAncestor(superDecl);
+
+    asDerived().addVTableEntries(ancestor);
+  }
+
+  // Try to find an overridden entry.
+  void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
+    auto found = baseToIndexMap.find(baseRef);
+    assert(found != baseToIndexMap.end());
+    auto &method = vtableMethods[found->second];
+    assert(method.first == baseRef);
+    method.second = declRef;
+  }
+
+  // Add an entry to the vtable.
+  void addMethod(SILDeclRef member) {
+    unsigned index = vtableMethods.size();
+    vtableMethods.push_back(std::make_pair(member, member));
+    auto result = baseToIndexMap.insert(std::make_pair(member, index));
+    assert(result.second);
+    (void)result;
+  }
+
+  void addPlaceholder(MissingMemberDecl *m) {
+#ifndef NDEBUG
+    auto *classDecl = cast<ClassDecl>(m->getDeclContext());
+    bool isResilient = classDecl->isResilient(SGM.M.getSwiftModule(),
+                                              ResilienceExpansion::Maximal);
+    assert(isResilient ||
+           m->getNumberOfVTableEntries() == 0 &&
+               "Should not be emitting fragile class with missing members");
+#endif
+  }
+};
+
+class SILGenVTable : public SILGenVTableBase<SILGenVTable> {
+public:
+  SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
+      : SILGenVTableBase(SGM, theClass) {}
 
   void emitVTable() {
     PrettyStackTraceDecl("silgen emitVTable", theClass);
 
-    // Populate our list of base methods and overrides.
-    visitAncestor(theClass);
+    collectMethods();
 
     SmallVector<SILVTable::Entry, 8> vtableEntries;
     vtableEntries.reserve(vtableMethods.size() + 2);
@@ -321,49 +377,7 @@ public:
     // Finally, create the vtable.
     SILVTable::create(SGM.M, theClass, serialized, vtableEntries);
   }
-
-  void visitAncestor(ClassDecl *ancestor) {
-    // Imported types don't have vtables right now.
-    if (ancestor->hasClangNode())
-      return;
-
-    auto *superDecl = ancestor->getSuperclassDecl();
-    if (superDecl)
-      visitAncestor(superDecl);
-
-    addVTableEntries(ancestor);
-  }
-
-  // Try to find an overridden entry.
-  void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
-    auto found = baseToIndexMap.find(baseRef);
-    assert(found != baseToIndexMap.end());
-    auto &method = vtableMethods[found->second];
-    assert(method.first == baseRef);
-    method.second = declRef;
-  }
-
-  // Add an entry to the vtable.
-  void addMethod(SILDeclRef member) {
-    unsigned index = vtableMethods.size();
-    vtableMethods.push_back(std::make_pair(member, member));
-    auto result = baseToIndexMap.insert(std::make_pair(member, index));
-    assert(result.second);
-    (void) result;
-  }
-
-  void addPlaceholder(MissingMemberDecl *m) {
-#ifndef NDEBUG
-    auto *classDecl = cast<ClassDecl>(m->getDeclContext());
-    bool isResilient =
-        classDecl->isResilient(SGM.M.getSwiftModule(),
-                               ResilienceExpansion::Maximal);
-    assert(isResilient || m->getNumberOfVTableEntries() == 0 &&
-           "Should not be emitting fragile class with missing members");
-#endif
-  }
 };
-
 } // end anonymous namespace
 
 static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
@@ -1133,6 +1147,225 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
   defaultWitnesses->convertToDefinition(builder.DefaultWitnesses);
 }
 
+namespace {
+
+std::optional<AccessorKind>
+originalAccessorKindForReplacementKind(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read2:
+    return {AccessorKind::Read};
+  case AccessorKind::Modify2:
+    return {AccessorKind::Modify};
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return std::nullopt;
+  }
+}
+
+/// Emit a default witness table for a resilient protocol definition.
+class SILGenDefaultOverrideTable
+    : public SILGenVTableBase<SILGenDefaultOverrideTable> {
+  using super = SILGenVTableBase<SILGenDefaultOverrideTable>;
+
+public:
+  SILLinkage linkage;
+  SILGenDefaultOverrideTable(SILGenModule &SGM, ClassDecl *decl,
+                             SILLinkage linkage)
+      : super(SGM, decl), linkage(linkage) {}
+
+  std::optional<SILDefaultOverrideTable::Entry>
+  entryForMethod(VTableMethod method) {
+    // Determine whether `method` semantically "replaces" some other member (in
+    // the sense that calls that previously resolved to that other member will
+    // now resolve to that new member).  If it does, produce a default override
+    // table entry which describes that replacement, including a thunk (to be
+    // installed at runtime) in subclasses which overrode only that other
+    // replaced member.
+    auto declRef = method.first;
+    auto *decl = declRef.getAbstractFunctionDecl();
+    if (decl->getEffectiveAccess() != AccessLevel::Open) {
+      // Only methods which can be overridden in different resilience domains
+      // need an entry.
+      return std::nullopt;
+    }
+    // Currently, only accessors can be replacements.
+    auto *accessor = dyn_cast_or_null<AccessorDecl>(decl);
+    if (!accessor) {
+      return std::nullopt;
+    }
+    // Specifically, read2 can replace _read and modify2 can replace _modify.
+    auto originalKind =
+        originalAccessorKindForReplacementKind(accessor->getAccessorKind());
+    if (!originalKind) {
+      return std::nullopt;
+    }
+    auto *originalDecl = accessor->getStorage()->getAccessor(*originalKind);
+    if (!originalDecl) {
+      return std::nullopt;
+    }
+    auto original = SILDeclRef(originalDecl);
+    auto *impl = SGM.emitDefaultOverride(declRef, original);
+    return {SILDefaultOverrideTable::Entry{declRef, original, impl}};
+  }
+
+  void emitTable() {
+    PrettyStackTraceDecl("silgen emitDefaultOverrideTable", theClass);
+
+    if (!theClass->isResilient()) {
+      // Only resilient classes need such tables.
+      return;
+    }
+    if (theClass->getEffectiveAccess() != AccessLevel::Open) {
+      // Only classes whose methods could be overridden in different resilience
+      // domains need an entry.
+      return;
+    }
+
+    collectMethods();
+
+    SmallVector<SILDefaultOverrideTable::Entry, 8> entries;
+
+    for (auto method : vtableMethods) {
+      auto entry = entryForMethod(method);
+      if (!entry) {
+        continue;
+      }
+      entries.push_back(*entry);
+    }
+
+    if (entries.size() == 0) {
+      // Don't emit empty tables.
+      return;
+    }
+
+    SGM.M.createDefaultOverrideTableDefinition(theClass, linkage, entries);
+  }
+};
+
+} // end anonymous namespace
+
+void SILGenModule::emitDefaultOverrideTable(ClassDecl *decl) {
+  SILLinkage linkage = getSILLinkage(getDeclLinkage(decl), ForDefinition);
+
+  SILGenDefaultOverrideTable builder(*this, decl, linkage);
+  builder.emitTable();
+}
+
+SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
+                                               SILDeclRef original) {
+  SILGenFunctionBuilder builder(*this);
+  // Add the "default override of" suffix.
+  auto name = replacement.mangle() + "Twd";
+  auto replacementTy =
+      Types.getConstantInfo(TypeExpansionContext::minimal(), replacement)
+          .SILFnType;
+  auto loc = replacement.getAsRegularLocation();
+  auto *function = builder.getOrCreateFunction(
+      loc, name, SILLinkage::Shared, replacementTy, IsBare, IsNotTransparent,
+      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      ProfileCounter(), IsNotThunk);
+
+  if (!function->empty())
+    return function;
+
+  // A shim from yield_once_2 (replacement) to yield_once (original).
+  // sil @shim : $@convention(method) @yield_once_2 (As...) -> (@yields Ys...) {
+  // entry(%as... : $As...):
+  //   %method = class_method
+  //   (%ys... : $Ys..., %token) = begin_apply %method(%as...) 
+  //                               : $@convention(method) @yield_once (As...) -> (@yields Ys...)
+  //   yield %ys : $Ys..., normal normal_block, error error_block
+  // normal_block:
+  //   %retval = end_apply %token
+  //   return %retval : $()
+  // error_block:
+  //   abort_apply %token
+  //   unwind
+  // }
+
+  auto sig = replacementTy->getSubstGenericSignature();
+  auto *env = sig.getGenericEnvironment();
+  auto subs = env ? env->getForwardingSubstitutionMap() : SubstitutionMap();
+  function->setGenericEnvironment(env);
+  SILGenFunction SGF(*this, *function, SwiftModule);
+  SmallVector<ManagedValue, 4> params;
+  SmallVector<ManagedValue, 4> indirectResults;
+  SmallVector<ManagedValue, 4> indirectErrors;
+  SGF.collectThunkParams(replacement.getDecl(), params, &indirectResults,
+                         &indirectErrors);
+
+  auto self = params.back();
+
+  auto originalTy =
+      Types.getConstantInfo(TypeExpansionContext::minimal(), original)
+          .SILFnType;
+  auto originalFn =
+      SGF.emitClassMethodRef(loc, self.getValue(), original, originalTy);
+  auto originalConvention = SILFunctionConventions(originalTy, M);
+  assert(indirectErrors.size() == 0 &&
+         "coroutine accessor with indirect error!?");
+  SmallVector<SILValue> args;
+  for (auto result : indirectResults) {
+    args.push_back(result.forward(SGF));
+  }
+  for (auto param : params) {
+    args.push_back(param.forward(SGF));
+  }
+  auto *bai = SGF.B.createBeginApply(loc, originalFn, subs, args);
+  auto *token = bai->getTokenResult();
+  auto yieldedValues = bai->getYieldedValues();
+  auto *normalBlock = function->createBasicBlockAfter(SGF.B.getInsertionBB());
+  auto *errorBlock = function->createBasicBlockAfter(normalBlock);
+  SmallVector<SILValue> yields;
+  for (auto yielded : yieldedValues) {
+    yields.push_back(yielded);
+  }
+  SGF.B.createYield(loc, yields, normalBlock, errorBlock);
+
+  SGF.B.setInsertionPoint(normalBlock);
+  llvm::SmallVector<TupleTypeElt> directResultTypes;
+
+  for (auto result : originalConvention.getDirectSILResults()) {
+    auto ty = originalConvention.getSILType(
+        result, function->getTypeExpansionContext());
+    ty = function->mapTypeIntoContext(ty);
+    directResultTypes.push_back(ty.getASTType());
+  }
+  SILType resultTy;
+  switch (directResultTypes.size()) {
+  case 0:
+    resultTy = SILType::getEmptyTupleType(getASTContext());
+    break;
+  case 1:
+    resultTy = SILType::getPrimitiveObjectType(
+        directResultTypes.front().getType()->getCanonicalType());
+    break;
+  default: {
+    ASSERT(directResultTypes.size() > 1);
+    auto tupleTy =
+        TupleType::get(directResultTypes, getASTContext())->getCanonicalType();
+    resultTy = SILType::getPrimitiveObjectType(tupleTy);
+    break;
+  }
+  }
+  SGF.B.createEndApply(loc, token, resultTy);
+  auto *retval = SGF.B.createTuple(loc, {});
+  SGF.B.createReturn(loc, retval);
+
+  SGF.B.setInsertionPoint(errorBlock);
+  SGF.B.createAbortApply(loc, token);
+  SGF.B.createUnwind(loc);
+  return function;
+}
+
 void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   auto *dd = nom->getValueTypeDestructor();
   if (!dd)
@@ -1175,6 +1408,11 @@ public:
       if (!theClass->hasClangNode()) {
         SILGenVTable genVTable(SGM, theClass);
         genVTable.emitVTable();
+      }
+      if (!theClass->hasClangNode() && theClass->isResilient()) {
+        auto *sourceFile = theClass->getParentSourceFile();
+        if (!sourceFile || sourceFile->Kind != SourceFileKind::Interface)
+          SGM.emitDefaultOverrideTable(theClass);
       }
     }
 

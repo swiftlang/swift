@@ -7857,6 +7857,27 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   return false;
 }
 
+static ClassDecl *parseClassDecl(Parser &P, SILParser &SP) {
+  Identifier DeclName;
+  SourceLoc DeclLoc;
+  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
+    return nullptr;
+
+  // Find the protocol decl. The protocol can be imported.
+  llvm::PointerUnion<ValueDecl *, ModuleDecl *> Res =
+      lookupTopDecl(P, DeclName, /*typeLookup=*/true);
+  assert(Res.is<ValueDecl *>() && "Protocol look-up should return a Decl");
+  ValueDecl *VD = Res.get<ValueDecl *>();
+  if (!VD) {
+    P.diagnose(DeclLoc, diag::sil_default_override_class_not_found, DeclName);
+    return nullptr;
+  }
+  auto *decl = dyn_cast<ClassDecl>(VD);
+  if (!decl)
+    P.diagnose(DeclLoc, diag::sil_default_override_decl_not_class, DeclName);
+  return decl;
+}
+
 static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
   Identifier DeclName;
   SourceLoc DeclLoc;
@@ -8085,7 +8106,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
   return retVal;
 }
 
-/// Parser a single SIL vtable entry and add it to either \p witnessEntries
+/// Parser a single SIL wtable entry and add it to either \p witnessEntries
 /// or \c conditionalConformances.
 static bool parseSILWitnessTableEntry(
          Parser &P,
@@ -8441,6 +8462,100 @@ bool SILParserState::parseSILDefaultWitnessTable(Parser &P) {
     Linkage = SILLinkage::Public;
 
   SILDefaultWitnessTable::create(M, *Linkage, protocol, witnessEntries);
+  return false;
+}
+
+/// Parser a single SIL default override table entry and add it to \p entries.
+/// sil-default-override-entry:
+///   SILDeclRef ':' SILDeclRef ':' @SILFunctionName
+static bool parseSILDefaultOverrideTableEntry(
+    Parser &P, SILModule &M, ClassDecl *proto, GenericSignature witnessSig,
+    GenericParamList *witnessParams, SILParser &parser,
+    std::vector<SILDefaultOverrideTable::Entry> &entries) {
+  Identifier EntryKeyword;
+  SourceLoc KeywordLoc;
+
+  SILDeclRef replacement;
+  if (parser.parseSILDeclRef(replacement, true) ||
+      P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+    return true;
+
+  SILDeclRef original;
+  if (parser.parseSILDeclRef(original, true) ||
+      P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+    return true;
+
+  SILFunction *impl = nullptr;
+  Identifier implName;
+  SourceLoc implLoc;
+  if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+      parser.parseSILIdentifier(implName, implLoc,
+                                diag::expected_sil_value_name))
+    return true;
+
+  impl = M.lookUpFunction(implName.str());
+  if (!impl) {
+    P.diagnose(implLoc, diag::sil_default_override_func_not_found, implName);
+    return true;
+  }
+
+  entries.push_back(
+      SILDefaultOverrideTable::Entry{replacement, original, impl});
+
+  return false;
+}
+
+/// decl-sil-default-override ::= 'sil_default_override_table'
+///                              sil-linkage identifier
+///                              decl-sil-default-override-body
+/// decl-sil-default-override-body:
+///   '{' sil-default-override-entry* '}'
+/// sil-default-override-entry:
+///   SILDeclRef ':' SILDeclRef ':' @SILFunctionName
+bool SILParserState::parseSILDefaultOverrideTable(Parser &P) {
+  P.consumeToken(tok::kw_sil_default_override_table);
+  SILParser OverrideState(P);
+
+  // Parse the linkage.
+  std::optional<SILLinkage> Linkage;
+  parseSILLinkage(Linkage, P);
+
+  // Parse the class.
+  ClassDecl *decl = parseClassDecl(P, OverrideState);
+  if (!decl)
+    return true;
+
+  OverrideState.ContextGenericSig = decl->getGenericSignature();
+  OverrideState.ContextGenericParams = decl->getGenericParams();
+
+  // Parse the body.
+  SourceLoc LBraceLoc = P.Tok.getLoc();
+  P.consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII Tmp(*P.L);
+
+  // Parse the entry list.
+  std::vector<SILDefaultOverrideTable::Entry> entries;
+
+  if (P.Tok.isNot(tok::r_brace)) {
+    do {
+      if (parseSILDefaultOverrideTableEntry(
+              P, M, decl, decl->getGenericSignature(), decl->getGenericParams(),
+              OverrideState, entries))
+        return true;
+    } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
+  }
+
+  SourceLoc RBraceLoc;
+  P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                       LBraceLoc);
+
+  // Default to public linkage.
+  if (!Linkage)
+    Linkage = SILLinkage::Public;
+
+  SILDefaultOverrideTable::define(M, *Linkage, decl, entries);
   return false;
 }
 
