@@ -579,8 +579,9 @@ public:
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
-        else if (isa<ClassDecl>(TD) && TD->isObjC()) 
-          emitReferencedClangTypeMetadata(NTD);
+        else if (const auto *cd = dyn_cast<ClassDecl>(TD))
+          if (cd->isObjC() || cd->isForeignReferenceType())
+            emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
         if (TAD->hasClangNode())
           emitReferencedClangTypeMetadata(TAD);
