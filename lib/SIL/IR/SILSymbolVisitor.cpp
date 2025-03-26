@@ -491,6 +491,9 @@ public:
 
     addFunction(SILDeclRef(AFD));
 
+    ASSERT(ABIRoleInfo(AFD).providesAPI()
+              && "SILSymbolVisitorImpl visiting ABI-only decl?");
+
     if (auto dynKind = getDynamicKind(AFD)) {
       // Add the global function pointer for a dynamically replaceable function.
       Visitor.addDynamicFunction(AFD, *dynKind);

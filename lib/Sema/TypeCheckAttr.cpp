@@ -195,68 +195,10 @@ public:
   IGNORED_ATTR(Unsafe)
 #undef IGNORED_ATTR
 
-private:
-  static unsigned getABIArity(AbstractFunctionDecl *afd) {
-    unsigned arity = afd->getParameters()->size();
-    arity += afd->getGenericSignature().getGenericParams().size();
-    if (afd->hasImplicitSelfDecl())
-      arity += 1;
-    return arity;
+  void visitABIAttr(ABIAttr *attr) {
+    TypeChecker::checkDeclABIAttribute(D, attr);
   }
 
-  void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
-    auto PBD = VD->getParentPatternBinding();
-
-    // To make sure we only diagnose this stuff once, check that VD is the first
-    // anchoring variable in the PBD.
-    bool isFirstAnchor = false;
-    for (auto i : range(PBD->getNumPatternEntries())) {
-      auto anchorVD = PBD->getAnchoringVarDecl(i);
-      if (anchorVD) {
-        isFirstAnchor = (anchorVD == VD);
-        break;
-      }
-    }
-
-    if (!isFirstAnchor)
-      return;
-
-    // Check that the PBDs have the same number of patterns.
-    if (PBD->getNumPatternEntries() < APBD->getNumPatternEntries()) {
-      diagnose(APBD->getPattern(PBD->getNumPatternEntries())->getLoc(),
-               diag::attr_abi_mismatched_pbd_size, /*abiHasExtra=*/false);
-      return;
-    }
-    if (PBD->getNumPatternEntries() > APBD->getNumPatternEntries()) {
-      diagnose(PBD->getPattern(APBD->getNumPatternEntries())->getLoc(),
-               diag::attr_abi_mismatched_pbd_size, /*abiHasExtra=*/true);
-      return;
-    }
-
-    // Check that each pattern has the same number of variables.
-    for (auto i : range(PBD->getNumPatternEntries())) {
-      SmallVector<VarDecl *, 8> VDs;
-      SmallVector<VarDecl *, 8> AVDs;
-
-      PBD->getPattern(i)->collectVariables(VDs);
-      APBD->getPattern(i)->collectVariables(AVDs);
-
-      if (VDs.size() < AVDs.size()) {
-        for (auto AVD : drop_begin(AVDs, VDs.size())) {
-          AVD->diagnose(diag::attr_abi_mismatched_var,
-                        AVD, /*isABI=*/true);
-        }
-      }
-      else if (VDs.size() > AVDs.size()) {
-        for (auto VD : drop_begin(VDs, AVDs.size())) {
-          VD->diagnose(diag::attr_abi_mismatched_var,
-                       VD, /*isABI=*/false);
-        }
-      }
-    }
-  }
-
-public:
   void visitExecutionAttr(ExecutionAttr *attr) {
     auto *const decl = cast<ValueDecl>(D);
 
@@ -298,81 +240,6 @@ public:
         }
       }
     }
-  }
-
-  void visitABIAttr(ABIAttr *attr) {
-    Decl *AD = attr->abiDecl;
-    if (isa<VarDecl>(D) && isa<PatternBindingDecl>(AD)) {
-      auto VD = cast<VarDecl>(D);
-      auto APBD = cast<PatternBindingDecl>(AD);
-
-      // Diagnose dissimilar PBD structures.
-      checkABIAttrPBD(APBD, VD);
-
-      // Do the rest of this checking on the corresponding VarDecl, not the
-      // PBD that's actually in the attribute. Note that `AD` will become null
-      // if they're too dissimilar to match up.
-      AD = APBD->getVarAtSimilarStructuralPosition(VD);
-    }
-    // TODO: EnumElementDecl?
-
-    if (!AD)
-      return;
-
-    // Check the ABI decl and bail if there was a problem with it.
-    TypeChecker::typeCheckDecl(AD);
-    if (AD->isInvalid())
-      return;
-
-    // Do the declarations have the same kind, broadly speaking? Many kinds have
-    // special mangling behavior (e.g. inits vs normal funcs) that make it
-    // unrealistic to treat one kind as though it were another.
-    if (D->getKind() != AD->getKind()) {
-      // FIXME: DescriptiveDeclKind is overly specific; we really just want to
-      //        say that e.g. a `func` can't have the ABI of a `var`.
-      diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_kind,
-                            D, AD->getDescriptiveKind());
-      return;
-    }
-
-    if (isa<AbstractFunctionDecl>(D)) {
-      auto AFD = cast<AbstractFunctionDecl>(D);
-      auto AAFD = cast<AbstractFunctionDecl>(AD);
-
-      // FIXME: How much should we diagnose in IRGen for more precise ABI info?
-
-      // Do the declarations have roughly the same number of parameters? We'll
-      // allow some fuzziness for what these parameters *are*, since there isn't
-      // always an ABI difference between e.g. a free function with N parameters
-      // and an instance method with N-1 parameters (plus an implicit `self`).
-      if (getABIArity(AFD) != getABIArity(AAFD)) {
-        diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_arity,
-                              AFD);
-      }
-
-      // Do the declarations match in throwing behavior? We don't care about
-      // `throws` vs. `rethrows` here, just whether callers will account for an
-      // error return.
-      // FIXME: Typed throws?
-      if (AFD->hasThrows() != AAFD->hasThrows()) {
-        diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_throws,
-                              AFD, /*abiCanThrow=*/AAFD->hasThrows());
-      }
-
-      // Do the declarations match in async-ness?
-      if (AFD->hasAsync() != AAFD->hasAsync()) {
-        diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_async,
-                              AFD, /*abiHasAsync=*/AAFD->hasAsync());
-      }
-    }
-
-    // TODO: Diagnose if Protocol::isMarkerProtocol() - contradiction in terms
-    //       (and mangler can't handle invertible protocols with @abi)
-
-    // TODO: Validate more
-    // FIXME: The list of properties that have to match is practically endless
-    // and will grow as new features are added to the compiler. We might want to
-    // write an AttributeVisitor just to help us catch omissions over time.
   }
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -1795,6 +1662,10 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
 
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
+  // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
+  if (!ABIRoleInfo(D).providesAPI())
+    return;
+
   DeclAttribute * langAttr =
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
@@ -5267,7 +5138,8 @@ void AttributeChecker::checkBackDeployedAttrs(
     }
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!AFD->hasBody()) {
+      // Ignore this for ABI-only decls; ABIDeclChecker will diagnose it better.
+      if (!AFD->hasBody() && ABIRoleInfo(AFD).providesAPI()) {
         diagnoseAndRemoveAttr(Attr, diag::back_deployed_requires_body, Attr,
                               VD);
         continue;
@@ -6800,6 +6672,12 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
   Decl *D = attr->getOriginalDeclaration();
+
+  // ABI-only decls can't have @derivative; bail out and let ABIDeclChecker
+  // diagnose this.
+  if (!ABIRoleInfo(D).providesAPI())
+    return false;
+
   auto &Ctx = D->getASTContext();
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming

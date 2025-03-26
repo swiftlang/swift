@@ -364,6 +364,41 @@ public:
 
     /// The opposite of ABIBreakingToRemove
     ABIStableToRemove = 1ull << 15,
+
+    /// Attribute should not be used in an \c \@abi attribute. Use for
+    /// attributes which cannot affect mangled names, even indirectly, and
+    /// which either don't affect ABI or where ABI-only declarations get their
+    /// behavior from their API counterpart.
+    ForbiddenInABIAttr = 1ull << 16,
+
+    /// Attribute can be used without restrictions in an \c \@abi attribute.
+    /// Use for attributes which affect mangled names but otherwise don't alter
+    /// the ABI, or ones where the \c ABIDeclChecker manually implements
+    /// special checking logic (e.g. because several different attributes
+    /// contribute to the same aspect of ABI in some complicated way).
+    UnconstrainedInABIAttr = 1ull << 17,
+
+    /// Attribute can be used in an \c \@abi attribute, but must match
+    /// equivalent on API decl. Use for attributes which affect both mangled
+    /// names and other parts of the ABI such that the declaration can only be
+    /// valid if they match. 
+    EquivalentInABIAttr = 1ull << 18,
+
+    /// Attribute can be used in an \c \@abi attribute, but must match
+    /// equivalent on API decl; if omitted, API decl's attribute will be 
+    /// cloned. Use where you would want to use \c EquivalentInABIAttr but 
+    /// repeating the attribute is judged too burdensome.
+    InferredInABIAttr = 1ull << 19,
+
+    /// Use for attributes which are \em only valid on declarations that cannot
+    /// have an \c @abi attribute, such as \c ImportDecl .
+    UnreachableInABIAttr = 1ull << 20,
+  };
+
+  enum : uint64_t {
+    InABIAttrMask = ForbiddenInABIAttr | UnconstrainedInABIAttr
+                  | EquivalentInABIAttr | InferredInABIAttr
+                  | UnreachableInABIAttr
   };
 
   LLVM_READNONE
@@ -549,6 +584,11 @@ public:
 
   /// Determine whether we can clone this attribute.
   bool canClone() const;
+
+  /// Determine if this attribute and \p other are "the same", as in, they
+  /// would have the same effect on \p attachedTo were they attached to it. A
+  /// clone should always be equivalent to the original.
+  bool isEquivalent(const DeclAttribute *other, Decl *attachedTo) const;
 };
 
 #define UNIMPLEMENTED_CLONE(AttrType)    \
@@ -582,6 +622,11 @@ public:
     return new (ctx) SimpleDeclAttr<Kind>(
         AtLoc, Range.Start, isImplicit());
   }
+
+  bool isEquivalent(const SimpleDeclAttr<Kind> *other, Decl *attachedTo) const {
+    // True by definition, since there's nothing to this other than its kind.
+    return true;
+  }
 };
 
 // Declare typedefs for all of the simple declaration attributes.
@@ -614,6 +659,10 @@ public:
   SILGenNameAttr *clone(ASTContext &ctx) const {
     return new (ctx) SILGenNameAttr(Name, Raw, AtLoc, Range, isImplicit());
   }
+
+  bool isEquivalent(const SILGenNameAttr *other, Decl *attachedTo) const {
+    return Name == other->Name && Raw == other->Raw;
+  }
 };
 
 /// Defines the @_section attribute.
@@ -636,6 +685,10 @@ public:
   SectionAttr *clone(ASTContext &ctx) const {
     return new (ctx) SectionAttr(Name, AtLoc, Range, isImplicit());
   }
+
+  bool isEquivalent(const SectionAttr *other, Decl *attachedTo) const {
+    return Name == other->Name;
+  }
 };
 
 /// Defines the @_cdecl attribute.
@@ -657,6 +710,10 @@ public:
 
   CDeclAttr *clone(ASTContext &ctx) const {
     return new (ctx) CDeclAttr(Name, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const CDeclAttr *other, Decl *attachedTo) const {
+    return Name == other->Name;
   }
 };
 
@@ -681,6 +738,10 @@ public:
   SemanticsAttr *clone(ASTContext &ctx) const {
     return new (ctx) SemanticsAttr(Value, AtLoc, Range, isImplicit());
   }
+
+  bool isEquivalent(const SemanticsAttr *other, Decl *attachedTo) const {
+    return Value == other->Value;
+  }
 };
 
 /// Defines the @_alignment attribute.
@@ -700,6 +761,10 @@ public:
 
   AlignmentAttr *clone(ASTContext &ctx) const {
     return new (ctx) AlignmentAttr(getValue(), AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const AlignmentAttr *other, Decl *attachedTo) const {
+    return getValue() == other->getValue();
   }
 };
 
@@ -731,6 +796,11 @@ public:
   SwiftNativeObjCRuntimeBaseAttr *clone(ASTContext &ctx) const {
     return new (ctx) SwiftNativeObjCRuntimeBaseAttr(
         BaseClassName, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const SwiftNativeObjCRuntimeBaseAttr *other,
+                    Decl *attachedTo) const {
+    return BaseClassName == other->BaseClassName;
   }
 };
 
@@ -914,6 +984,8 @@ public:
     return clone(C, isImplicit());
   }
 
+  bool isEquivalent(const AvailableAttr *other, Decl *attachedTo) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Available;
   }
@@ -1081,6 +1153,16 @@ public:
   /// original without source location information.
   ObjCAttr *clone(ASTContext &context) const;
 
+  bool isEquivalent(const ObjCAttr *other, Decl *attachedTo) const {
+    std::optional<ObjCSelector> thisName, otherName;
+    if (hasName() && !isNameImplicit())
+      thisName = getName();
+    if (other->hasName() && !other->isNameImplicit())
+      otherName = other->getName();
+
+    return thisName == otherName;
+  }
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ObjC;
   }
@@ -1110,6 +1192,10 @@ public:
   PrivateImportAttr *clone(ASTContext &ctx) const {
     return new (ctx) PrivateImportAttr(
         AtLoc, Range, SourceFile, SourceRange(), isImplicit());
+  }
+
+  bool isEquivalent(const PrivateImportAttr *other, Decl *attachedTo) const {
+    return getSourceFile() == other->getSourceFile();
   }
 };
 
@@ -1190,6 +1276,10 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(DynamicReplacementAttr)
+
+  bool isEquivalent(const DynamicReplacementAttr *other, Decl *attachedTo) const {
+    return getReplacedFunctionName() == other->getReplacedFunctionName();
+  }
 };
 
 /// The \c @_typeEraser(TypeEraserType) attribute.
@@ -1247,6 +1337,8 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(TypeEraserAttr)
+
+  bool isEquivalent(const TypeEraserAttr *other, Decl *attachedTo) const;
 };
 
 /// Represents any sort of access control modifier.
@@ -1286,6 +1378,10 @@ public:
   AccessControlAttr *clone(ASTContext &ctx) const {
     return new (ctx) AccessControlAttr(AtLoc, Range, getAccess(), isImplicit());
   }
+
+  bool isEquivalent(const AccessControlAttr *other, Decl *attachedTo) const {
+    return getAccess() == other->getAccess();
+  }
 };
 
 /// Represents a 'private', 'internal', or 'public' marker for a setter on a
@@ -1304,6 +1400,10 @@ public:
   /// Create a copy of this attribute.
   SetterAccessAttr *clone(ASTContext &ctx) const {
     return new (ctx) SetterAccessAttr(AtLoc, Range, getAccess(), isImplicit());
+  }
+
+  bool isEquivalent(const SetterAccessAttr *other, Decl *attachedTo) const {
+    return getAccess() == other->getAccess();
   }
 };
 
@@ -1341,6 +1441,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SPIAccessControl;
   }
+
+   bool isEquivalent(const SPIAccessControlAttr *other, Decl *attachedTo) const;
 };
 
 /// Represents an inline attribute.
@@ -1362,6 +1464,10 @@ public:
 
   InlineAttr *clone(ASTContext &ctx) const {
     return new (ctx) InlineAttr(AtLoc, Range, getKind(), isImplicit());
+  }
+
+  bool isEquivalent(const InlineAttr *other, Decl *attachedTo) const {
+    return getKind() == other->getKind();
   }
 };
 
@@ -1386,6 +1492,10 @@ public:
 
   OptimizeAttr *clone(ASTContext &ctx) const {
     return new (ctx) OptimizeAttr(AtLoc, Range, getMode(), isImplicit());
+  }
+
+  bool isEquivalent(const OptimizeAttr *other, Decl *attachedTo) const {
+    return getMode() == other->getMode();
   }
 };
 
@@ -1417,6 +1527,10 @@ public:
 
   ExclusivityAttr *clone(ASTContext &ctx) const {
     return new (ctx) ExclusivityAttr(AtLoc, Range, getMode(), isImplicit());
+  }
+
+  bool isEquivalent(const ExclusivityAttr *other, Decl *attachedTo) const {
+    return getMode() == other->getMode();
   }
 };
 
@@ -1464,6 +1578,14 @@ public:
     }
     return new (ctx) EffectsAttr(getKind());
   }
+
+  bool isEquivalent(const EffectsAttr *other, Decl *attachedTo) const {
+    if (getKind() != other->getKind())
+      return false;
+    if (getKind() == EffectsKind::Custom)
+      return getCustomString() == other->getCustomString();
+    return true;
+  }
 };
 
 
@@ -1492,6 +1614,11 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ReferenceOwnership;
   }
+
+  bool isEquivalent(const ReferenceOwnershipAttr *other,
+                    Decl *attachedTo) const {
+    return get() == other->get();
+  }
 };
 
 /// Defines the attribute that we use to model documentation comments.
@@ -1514,6 +1641,10 @@ public:
 
   RawDocCommentAttr *clone(ASTContext &ctx) const {
     return new (ctx) RawDocCommentAttr(CommentRange, isImplicit());
+  }
+
+  bool isEquivalent(const RawDocCommentAttr *other, Decl *attachedTo) const {
+    return getCommentRange() == other->getCommentRange();
   }
 };
 
@@ -1541,6 +1672,10 @@ public:
 
   ObjCBridgedAttr *clone(ASTContext &ctx) const {
     return new (ctx) ObjCBridgedAttr(ObjCClass);
+  }
+
+  bool isEquivalent(const ObjCBridgedAttr *other, Decl *attachedTo) const {
+    return getObjCClass() == other->getObjCClass();
   }
 };
 
@@ -1585,6 +1720,13 @@ public:
   SynthesizedProtocolAttr *clone(ASTContext &ctx) const {
     return new (ctx) SynthesizedProtocolAttr(
         protocol, getLazyLoader(), isUnchecked());
+  }
+
+  bool isEquivalent(const SynthesizedProtocolAttr *other,
+                    Decl *attachedTo) const {
+    return isUnchecked() == other->isUnchecked()
+            && getProtocol() == other->getProtocol()
+            && getLazyLoader() == other->getLazyLoader();
   }
 };
 
@@ -1719,6 +1861,8 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(SpecializeAttr)
+
+  bool isEquivalent(const SpecializeAttr *other, Decl *attachedTo) const;
 };
 
 class StorageRestrictionsAttr final
@@ -1763,19 +1907,24 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(StorageRestrictionsAttr)
+
+  bool isEquivalent(const StorageRestrictionsAttr *other,
+                    Decl *attachedTo) const;
 };
 
 /// The @_implements attribute, which treats a decl as the implementation for
 /// some named protocol requirement (but otherwise not-visible by that name).
 class ImplementsAttr : public DeclAttribute {
-  TypeRepr *TyR;
+  /// If constructed by the \c create() variant with a TypeRepr, the TypeRepr;
+  /// if constructed by the \c create() variant with a DeclContext and
+  /// ProtocolDecl, the DeclContext.
+  llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC;
   DeclName MemberName;
   DeclNameLoc MemberNameLoc;
 
   ImplementsAttr(SourceLoc atLoc, SourceRange Range,
-                 TypeRepr *TyR,
-                 DeclName MemberName,
-                 DeclNameLoc MemberNameLoc);
+                 llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC,
+                 DeclName MemberName, DeclNameLoc MemberNameLoc);
 
 public:
   static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
@@ -1795,7 +1944,9 @@ public:
   /// otherwise `nullopt`. This should only be used for dumping.
   std::optional<ProtocolDecl *> getCachedProtocol(DeclContext *dc) const;
 
-  TypeRepr *getProtocolTypeRepr() const { return TyR; }
+  TypeRepr *getProtocolTypeRepr() const {
+    return TyROrDC.dyn_cast<TypeRepr *>();
+  }
 
   DeclName getMemberName() const { return MemberName; }
   DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
@@ -1806,9 +1957,15 @@ public:
 
   /// Create a copy of this attribute.
   ImplementsAttr *clone(ASTContext &ctx) const {
-    return new (ctx) ImplementsAttr(
-        AtLoc, Range, TyR, getMemberName(), getMemberNameLoc());
+    if (auto tyR = getProtocolTypeRepr()) {
+      return create(ctx, AtLoc, Range, tyR, getMemberName(),
+                    getMemberNameLoc());
+    }
+    auto dc = TyROrDC.dyn_cast<DeclContext *>();
+    return create(dc, getProtocol(dc), getMemberName());
   }
+
+  bool isEquivalent(const ImplementsAttr *other, Decl *attachedTo) const;
 };
 
 /// A limited variant of \c \@objc that's used for classes with generic ancestry.
@@ -1837,6 +1994,10 @@ public:
   ObjCRuntimeNameAttr *clone(ASTContext &ctx) const {
     return new (ctx) ObjCRuntimeNameAttr(Name, AtLoc, Range, isImplicit());
   }
+
+  bool isEquivalent(const ObjCRuntimeNameAttr *other, Decl *attachedTo) const {
+    return Name == other->Name;
+  }
 };
 
 /// Attribute that specifies a protocol conformance that has been restated
@@ -1859,6 +2020,11 @@ public:
   /// Create a copy of this attribute.
   RestatedObjCConformanceAttr *clone(ASTContext &ctx) const {
     return new (ctx) RestatedObjCConformanceAttr(Proto);
+  }
+
+  bool isEquivalent(const RestatedObjCConformanceAttr *other,
+                    Decl *attachedTo) const {
+    return Proto == other->Proto;
   }
 };
 
@@ -1926,6 +2092,12 @@ public:
   ClangImporterSynthesizedTypeAttr *clone(ASTContext &ctx) const {
     return new (ctx) ClangImporterSynthesizedTypeAttr(
         originalTypeName, getKind());
+  }
+
+  bool isEquivalent(const ClangImporterSynthesizedTypeAttr *other,
+                    Decl *attachedTo) const {
+    return getKind() == other->getKind()
+            && originalTypeName == other->originalTypeName;
   }
 };
 
@@ -1998,6 +2170,8 @@ public:
 
   bool canClone() const { return argList == nullptr; }
 
+  bool isEquivalent(const CustomAttr *other, Decl *attachedTo) const;
+
 private:
   friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);
@@ -2035,6 +2209,11 @@ public:
   ProjectedValuePropertyAttr *clone(ASTContext &ctx) const {
     return new (ctx) ProjectedValuePropertyAttr(
         ProjectionPropertyName, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const ProjectedValuePropertyAttr *other,
+                    Decl *attachedTo) const {
+    return ProjectionPropertyName == other->ProjectionPropertyName;
   }
 };
 
@@ -2100,6 +2279,14 @@ public:
     return new (ctx) OriginallyDefinedInAttr(
         AtLoc, Range, ManglingModuleName, LinkerModuleName,
         Platform, MovedVersion, isImplicit());
+  }
+
+  bool isEquivalent(const OriginallyDefinedInAttr *other,
+                    Decl *attachedTo) const {
+    return ManglingModuleName == other->ManglingModuleName
+            && LinkerModuleName == other->LinkerModuleName
+            && Platform == other->Platform
+            && MovedVersion == other->MovedVersion;
   }
 };
 
@@ -2250,6 +2437,11 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(DifferentiableAttr)
+
+  bool isEquivalent(const DifferentiableAttr *other, Decl *attachedTo) const {
+    // Not properly implemented (very complex and not currently needed)
+    return false;
+  }
 };
 
 /// A declaration name with location.
@@ -2391,6 +2583,11 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(DerivativeAttr)
+
+  bool isEquivalent(const DerivativeAttr *other, Decl *attachedTo) const {
+    // Not properly implemented (very complex and not currently needed)
+    return false;
+  }
 };
 
 /// The `@transpose(of:)` attribute registers a function as a transpose of
@@ -2477,6 +2674,11 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(TransposeAttr)
+
+  bool isEquivalent(const TransposeAttr *other, Decl *attachedTo) const {
+    // Not properly implemented (very complex and not currently needed)
+    return false;
+  }
 };
 
 enum class NonSendableKind : uint8_t {
@@ -2512,6 +2714,10 @@ public:
   NonSendableAttr *clone(ASTContext &ctx) const {
     return new (ctx) NonSendableAttr(AtLoc, Range, Specificity, isImplicit());
   }
+
+  bool isEquivalent(const NonSendableAttr *other, Decl *attachedTo) const {
+    return Specificity == other->Specificity;
+  }
 };
 
 /// The @_unavailableFromAsync attribute, used to make function declarations
@@ -2538,6 +2744,11 @@ public:
   UnavailableFromAsyncAttr *clone(ASTContext &ctx) const {
     return new (ctx) UnavailableFromAsyncAttr(
         Message, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const UnavailableFromAsyncAttr *other,
+                    Decl *attachedTo) const {
+    return Message == other->Message;
   }
 };
 
@@ -2568,6 +2779,10 @@ public:
   BackDeployedAttr *clone(ASTContext &ctx) const {
     return new (ctx) BackDeployedAttr(
         AtLoc, Range, Platform, Version, isImplicit());
+  }
+
+  bool isEquivalent(const BackDeployedAttr *other, Decl *attachedTo) const {
+    return Platform == other->Platform && Version == Version;
   }
 };
 
@@ -2601,6 +2816,10 @@ public:
   ExposeAttr *clone(ASTContext &ctx) const {
     return new (ctx) ExposeAttr(
         Name, AtLoc, Range, getExposureKind(), isImplicit());
+  }
+
+  bool isEquivalent(const ExposeAttr *other, Decl *attachedTo) const {
+    return Name == other->Name && getExposureKind() == other->getExposureKind();
   }
 };
 
@@ -2657,6 +2876,11 @@ public:
         ModuleName, Name, AtLoc, getLParenLoc(), getRParenLoc(), Range,
         getExternKind(), isImplicit());
   }
+
+  bool isEquivalent(const ExternAttr *other, Decl *attachedTo) const {
+    return getExternKind() == other->getExternKind()
+            && ModuleName == other->ModuleName && Name == other->Name;
+  }
 };
 
 /// The `@_documentation(...)` attribute, used to override a symbol's visibility
@@ -2684,6 +2908,10 @@ public:
   DocumentationAttr *clone(ASTContext &ctx) const {
     return new (ctx) DocumentationAttr(
         AtLoc, Range, Metadata, Visibility, isImplicit());
+  }
+
+  bool isEquivalent(const DocumentationAttr *other, Decl *attachedTo) const {
+    return Metadata == other->Metadata && Visibility == other->Visibility;
   }
 };
 
@@ -2739,6 +2967,12 @@ public:
         CategoryName, AtLoc, Range, isEarlyAdopter(), isImplicit(),
         isCategoryNameInvalid());
   }
+
+  bool isEquivalent(const ObjCImplementationAttr *other,
+                    Decl *attachedTo) const {
+    // Ignoring `CategoryName` as it gets copied to @objc
+    return isEarlyAdopter() == other->isEarlyAdopter();
+  }
 };
 
 /// Represents nonisolated modifier.
@@ -2763,6 +2997,10 @@ public:
   /// Create a copy of this attribute.
   NonisolatedAttr *clone(ASTContext &ctx) const {
     return new (ctx) NonisolatedAttr(AtLoc, Range, isUnsafe(), isImplicit());
+  }
+
+  bool isEquivalent(const NonisolatedAttr *other, Decl *attachedTo) const {
+    return isUnsafe() == other->isUnsafe();
   }
 };
 
@@ -2817,6 +3055,11 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(MacroRoleAttr)
+
+  bool isEquivalent(const MacroRoleAttr *other, Decl *attachedTo) const {
+    // Unimplemented: complex and not immediately needed.
+    return true;
+  }
 };
 
 /// Specifies the raw storage used by a type.
@@ -2920,6 +3163,8 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(RawLayoutAttr)
+
+  bool isEquivalent(const RawLayoutAttr *other, Decl *attachedTo) const;
 };
 
 class LifetimeAttr final : public DeclAttribute {
@@ -2945,6 +3190,8 @@ public:
   LifetimeAttr *clone(ASTContext &ctx) const {
     return new (ctx) LifetimeAttr(AtLoc, Range, isImplicit(), entry);
   }
+
+  bool isEquivalent(const LifetimeAttr *other, Decl *attachedTo) const;
 };
 
 /// Predicate used to filter MatchingAttributeRange.
@@ -2993,6 +3240,9 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(AllowFeatureSuppressionAttr)
+
+  bool isEquivalent(const AllowFeatureSuppressionAttr *other,
+                    Decl *attachedTo) const;
 };
 
 /// Defines the @abi attribute.
@@ -3018,6 +3268,11 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(ABIAttr)
+
+  bool isEquivalent(const ABIAttr *other, Decl *attachedTo) const {
+    // Unsupported: tricky to implement and unneeded.
+    return true;
+  }
 };
 
 class ExecutionAttr : public DeclAttribute {
@@ -3042,6 +3297,10 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(ExecutionAttr)
+
+  bool isEquivalent(const ExecutionAttr *other, Decl *attachedTo) const {
+    return getBehavior() == other->getBehavior();
+  }
 };
 
 /// Attributes that may be applied to declarations.
