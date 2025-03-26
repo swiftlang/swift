@@ -1176,10 +1176,10 @@ def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
   HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
 
 def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
-  HelpText<"Enable large loadable types register to memory pass">;
+  HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
 
 def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
-  HelpText<"Disable large loadable types register to memory pass">;
+  HelpText<"Disable cond_fail message annotation.">;
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
