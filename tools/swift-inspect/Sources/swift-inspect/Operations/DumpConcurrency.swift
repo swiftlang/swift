@@ -452,7 +452,7 @@ fileprivate class ConcurrencyDumper {
     for (thread, task) in threadCurrentTasks {
       let taskStr: String
       if let info = tasks[swift_reflection_ptr_t(task)] {
-        taskStr = "\(hex: info.id)"
+        taskStr = "\(info.id)"
       } else {
         taskStr = "<unknown task \(hex: task)>"
       }
