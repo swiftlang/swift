@@ -557,6 +557,7 @@ function Get-InstallDir([Hashtable] $Platform) {
 # For dev productivity, install the host toolchain directly using CMake.
 # This allows iterating on the toolchain using ninja builds.
 $HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+$Variant"
+$BuildPlatform.ToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+$Variant"
 
 # Build functions
 function Invoke-BuildStep {
