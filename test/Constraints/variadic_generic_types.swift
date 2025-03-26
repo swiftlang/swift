@@ -124,3 +124,27 @@ do {
   _ = Foo(nil) // expected-error {{'nil' requires a contextual type}}
   _ = Foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
 }
+
+// https://github.com/swiftlang/swift/issues/79920
+protocol P<V> {
+  associatedtype V
+}
+do {
+  struct Q: P { enum V {} }
+  struct R<V>: P {}
+  struct S {}
+  struct A<each T> {
+    var x: any P<(Any, repeat each T)>
+    mutating func f() {
+      self.x = Q()
+      // expected-error@-1 {{cannot assign value of type '(_: Q.V)' to type '(_: Any)'}}
+      // expected-error@-2 {{pack expansion requires that 'each T' and '' have the same shape}}
+      self.x = R<Void>()
+      // expected-error@-1 {{cannot assign value of type 'Void' to type '(Any, repeat each T)'}}
+      self.x = S()
+      // expected-error@-1 {{cannot assign value of type '(_: S.V)' to type '(_: Any)'}}
+      // expected-error@-2 {{cannot assign value of type 'S' to type 'any P<(_: Any)>'}}
+      // expected-error@-3 {{pack expansion requires that 'each T' and '' have the same shape}}
+    }
+  }
+}
