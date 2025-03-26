@@ -950,13 +950,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitSequenceExpr(SequenceExpr *E) {
-    if (Walker.getSequenceWalkingBehavior() ==
-            SequenceWalking::OnlyWalkFirstOperatorWhenFolded &&
-        E->isFolded()) {
-      if (E->getNumElements() > 1) {
-        if (Expr *Elt = doIt(E->getElement(1)))
-          E->setElement(1, Elt);
-      }
+    // After folding, the SequenceExpr elements can contain a broken mess of
+    // partially folded and/or duplicate nodes (since folding can mutate nodes
+    // in-place). We remove the SequenceExpr from the AST after folding, but
+    // there's still a period of time during pre-checking when it's still in the
+    // AST. To avoid issues for e.g ASTScope and availability scope
+    // construction, only walk the folded expression if we have it.
+    if (auto *foldedExpr = E->getFoldedExpr()) {
+      auto *newExpr = doIt(foldedExpr);
+      if (!newExpr)
+        return nullptr;
+
+      E->setFoldedExpr(newExpr);
       return E;
     }
 

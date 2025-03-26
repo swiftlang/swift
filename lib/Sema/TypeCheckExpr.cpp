@@ -649,6 +649,7 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   Expr *Result = ::foldSequence(dc, LHS, Elts, PrecedenceBound());
   assert(Elts.empty());
 
+  expr->setFoldedExpr(Result);
   return Result;
 }
 
