@@ -6272,6 +6272,15 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangInheritanceInfo inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
+
+  // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
+  // to import all non-public members by default; if that is disabled, we only
+  // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
+  // are the only classes that need non-public members.)
+  auto skipIfNonPublic =
+      !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
+      importer::getPrivateFileIDAttrs(inheritingDecl->getClangDecl()).empty();
+
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
       ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
@@ -6289,16 +6298,25 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         recordDecl->getClangDecl())
       continue;
 
-    if (!ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers)) {
-      auto access = found->getAccess();
-      if ((access == clang::AS_private || access == clang::AS_protected) &&
-          (inheritance || !isa<clang::FieldDecl>(found)))
-        // 'found' is a non-public member and ImportNonPublicCxxMembers is not
-        // enabled. Don't import it unless it is a non-inherited field, which
-        // we must import because it may affect implicit conformances that
-        // iterate through all of a struct's fields, e.g., Sendable (#76892).
-        continue;
-    }
+    // We should not import 'found' if the following are all true:
+    //
+    // -  Feature::ImportNonPublicCxxMembers is not enabled
+    // -  'found' is not a member of a SWIFT_PRIVATE_FILEID-annotated class
+    // -  'found' is a non-public member.
+    // -  'found' is not a non-inherited FieldDecl; we must import private
+    //    fields because they may affect implicit conformances that iterate
+    //    through all of a struct's fields, e.g., Sendable (#76892).
+    //
+    // Note that we can skip inherited FieldDecls because implicit conformances
+    // handle those separately.
+    //
+    // The first two conditions are captured by skipIfNonPublic. The next two
+    // are conveyed by the following:
+    auto nonPublic = found->getAccess() == clang::AS_private ||
+                     found->getAccess() == clang::AS_protected;
+    auto noninheritedField = !inheritance && isa<clang::FieldDecl>(found);
+    if (skipIfNonPublic && nonPublic && !noninheritedField)
+      continue;
 
     // Don't import constructors on foreign reference types.
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
@@ -6353,8 +6371,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      if (!ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
-          base.getAccessSpecifier() != clang::AS_public)
+      if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;
 
       clang::QualType baseType = base.getType();

@@ -2,9 +2,8 @@
 // works as expected.
 //
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify %t/file1.swift -I %t/include -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main
-// RUN: %target-swift-frontend -typecheck -verify %t/file2.swift -I %t/include -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main
-// REQUIRES: swift_feature_ImportNonPublicCxxMembers
+// RUN: %target-swift-frontend -typecheck -verify %t/file1.swift -I %t/include -cxx-interoperability-mode=default -module-name main
+// RUN: %target-swift-frontend -typecheck -verify %t/file2.swift -I %t/include -cxx-interoperability-mode=default -module-name main
 
 //--- include/module.modulemap
 module CxxModule {
