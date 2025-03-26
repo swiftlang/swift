@@ -15,8 +15,8 @@
 // gatherVariableIntroducers(for:) is a use-def walk that returns the values that most closely associated with the
 // variable declarations that the given value holds an instance of.
 //
-// LifetimeDependence.init models the lifetime dependence for a FunctionArgument or a MarkDependenceInst, categorizing
-// the kind of dependence scope that the lifetime represents.
+// LifetimeDependence.init models the lifetime dependence for a FunctionArgument or a MarkDependenceInstruction,
+// categorizing the kind of dependence scope that the lifetime represents.
 //
 // LifetimeDependence.Scope.computeRange() computes the instruction range covered by a dependence scope.
 //
@@ -133,6 +133,7 @@ struct LifetimeDependence : CustomStringConvertible {
   }
   let scope: Scope
   let dependentValue: Value
+  let markDepInst: MarkDependenceInstruction?
   
   var parentValue: Value { scope.parentValue }
 
@@ -155,6 +156,7 @@ extension LifetimeDependence {
     }
     self.scope = Scope(base: arg, context)
     self.dependentValue = arg
+    self.markDepInst = nil
   }
 
   // Construct a LifetimeDependence from a return value. This only
@@ -175,23 +177,40 @@ extension LifetimeDependence {
     assert(value.ownership == .owned, "unsafe apply result must be owned")
     self.scope = Scope(base: value, context)
     self.dependentValue = value
+    self.markDepInst = nil
   }
 
   /// Construct LifetimeDependence from mark_dependence [unresolved] or mark_dependence [nonescaping].
   ///
-  /// For any LifetimeDependence constructed from a mark_dependence, its `dependentValue` will be the result of the
-  /// mark_dependence.
+  /// For a LifetimeDependence constructed from a mark_dependence, its `dependentValue` is the result of the
+  /// mark_dependence. For a mark_dependence_addr, `dependentValue` is the address operand.
   ///
   /// Returns 'nil' for unknown dependence.
-  init?(_ markDep: MarkDependenceInst, _ context: some Context) {
+  init?(_ markDep: MarkDependenceInstruction, _ context: some Context) {
+    self.init(scope: Scope(base: markDep.base, context), markDep: markDep)
+  }
+
+  /// Construct LifetimeDependence from mark_dependence [unresolved] or mark_dependence [nonescaping] with a custom
+  /// Scope.
+  ///
+  /// Returns 'nil' for unknown dependence.
+  init?(scope: LifetimeDependence.Scope, markDep: MarkDependenceInstruction) {
     switch markDep.dependenceKind {
     case .Unresolved, .NonEscaping:
-      self.scope = Scope(base: markDep.base, context)
-      self.dependentValue = markDep
+      self.scope = scope
+      switch markDep {
+      case let md as MarkDependenceInst:
+        self.dependentValue = md
+      case let md as MarkDependenceAddrInst:
+        self.dependentValue = md.address
+      default:
+        fatalError("unexpected MarkDependenceInstruction")
+      }
+      self.markDepInst = markDep
     case .Escaping:
       return nil
     }
-  }  
+  }
 
   /// Compute the range of the dependence scope.
   ///
@@ -208,7 +227,7 @@ extension LifetimeDependence {
   }
 
   func resolve(_ context: some Context) {
-    if let mdi = dependentValue as? MarkDependenceInst {
+    if let mdi = markDepInst {
       mdi.resolveToNonEscaping()
     }
   }
@@ -500,9 +519,9 @@ extension LifetimeDependence.Scope {
 ///   returnedDependence(address: FunctionArgument, on: Operand) -> WalkResult
 ///   yieldedDependence(result: Operand) -> WalkResult
 /// Start walking:
-///   walkDown(root: Value)
+///   walkDown(dependence: LifetimeDependence)
 ///
-/// Note: this may visit values that are not dominated by `root` because of dependent phi operands.
+/// Note: this may visit values that are not dominated by `dependence` because of dependent phi operands.
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
                                           OwnershipUseVisitor,
                                           AddressUseVisitor {
@@ -535,18 +554,15 @@ extension LifetimeDependenceDefUseWalker {
 
 // Start a forward walk.
 extension LifetimeDependenceDefUseWalker {
-  mutating func walkDown(root: Value) -> WalkResult {
-    if root.type.isAddress {
-      if let md = root as? MarkDependenceInst, !root.isEscapable {
-        // LifetimeDependence.dependentValue is typically a mark_dependence. If its 'value' address is a non-Escapable
-        // local variable, then consider all other reachable uses of that local variable to be dependent uses. Remember
-        // the operand to the mark_dependence as if it was a store. Diagnostics will consider this the point of variable
-        // initialization.
-        if visitStoredUses(of: md.valueOperand, into: md.value) == .abortWalk {
-          return .abortWalk
-        }
-      }
-      // The root address may also be an escapable mark_dependence that guards its address uses (unsafeAddress), or an
+  mutating func walkDown(dependence: LifetimeDependence) -> WalkResult {
+    if let mdAddr = dependence.markDepInst as? MarkDependenceAddrInst {
+      // All reachable uses of the dependent address are dependent uses. Treat the mark_dependence_addr base operand as
+      // if it was a store's address operand. Diagnostics will consider this the point of variable initialization.
+      return visitStoredUses(of: mdAddr.baseOperand, into: mdAddr.address)
+    }
+    let root = dependence.dependentValue
+    if root.type.isAddress { 
+      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), or an
       // allocation or incoming argument. In all these cases, it is sufficient to walk down the address uses.
       return walkDownAddressUses(of: root)
     }
@@ -568,7 +584,7 @@ extension LifetimeDependenceDefUseWalker {
 
   // Override ForwardingDefUseWalker.
   mutating func walkDown(operand: Operand) -> WalkResult {
-    // Initially delegate all usess to OwnershipUseVisitor.
+    // Initially delegate all uses to OwnershipUseVisitor.
     // walkDownDefault will be called for uses that forward ownership.
     return classify(operand: operand)
   }
@@ -615,7 +631,7 @@ extension LifetimeDependenceDefUseWalker {
       // like [nonescaping] even though they are not considered OSSA
       // borrows until after resolution.
       assert(operand == mdi.baseOperand)
-      return dependentUse(of: operand, into: mdi)
+      return dependentUse(of: operand, dependentValue: mdi)
 
     case is ExistentialMetatypeInst, is FixLifetimeInst, is WitnessMethodInst,
          is DynamicMethodBranchInst, is ValueMetatypeInst,
@@ -660,9 +676,22 @@ extension LifetimeDependenceDefUseWalker {
     return escapingDependence(on: operand)
   }
 
-  mutating func dependentUse(of operand: Operand, into value: Value)
+  // Handle address or non-address operands.
+  mutating func dependentUse(of operand: Operand, dependentValue value: Value)
     -> WalkResult {
     return walkDownUses(of: value, using: operand)
+  }
+
+  // Handle address or non-address operands.
+  mutating func dependentUse(of operand: Operand, dependentAddress address: Value)
+    -> WalkResult {
+    // Consider this a leaf use in addition to the dependent address uses, which might all occur earlier.
+    if leafUse(of: operand) == .abortWalk {
+      return .abortWalk
+    }
+    // The lifetime dependence is effectively "copied into" the dependent address. Find all uses of the dependent
+    // address as if this were a stored use.
+    return visitStoredUses(of: operand, into: address)
   }
 
   mutating func borrowingUse(of operand: Operand,
@@ -720,8 +749,7 @@ extension LifetimeDependenceDefUseWalker {
     return visitAppliedUse(of: operand, by: apply)
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value)
-    -> WalkResult {
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value) -> WalkResult {
     // Record the load itself, in case the loaded value is Escapable.
     if leafUse(of: operand) == .abortWalk {
       return .abortWalk
@@ -729,8 +757,8 @@ extension LifetimeDependenceDefUseWalker {
     return walkDownUses(of: value, using: operand)
   }    
 
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
-    -> WalkResult {
+  // copy_addr
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
     if leafUse(of: operand) == .abortWalk {
       return .abortWalk
     }
@@ -745,10 +773,14 @@ extension LifetimeDependenceDefUseWalker {
     }
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
-    -> WalkResult {
-    walkDownUses(of: value, using: operand)
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
+    dependentUse(of: operand, dependentValue: value)
   }    
+
+  // mark_dependence_addr
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+    dependentUse(of: operand, dependentAddress: address)
+  }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
     if let mdi = operand.instruction as? MarkDependenceInst {
@@ -797,13 +829,15 @@ extension LifetimeDependenceDefUseWalker {
     }
   }
 
-  // Visit stores to a local variable (alloc_box), temporary storage (alloc_stack). This handles stores of the entire
-  // value and stores to a tuple element. Stores to a field within another nominal value are considered lifetime
-  // dependence leaf uses; the type system enforces non-escapability on the aggregate value.
+  // Visit a dependent local variable (alloc_box), or temporary storage (alloc_stack). The depenedency is typically from
+  // storing a dependent value at `address`, but may be from an outright `mark_dependence_addr`.
   //
-  // If 'operand' is an address, then the "store" corresponds to initialization via an @out argument. The initial
-  // call to visitStoredUses will have 'operand == address' where the "stored value" is the temporary stack
-  // allocation for the @out parameter.
+  // This handles stores of the entire value and stores into a member. Storing into a member makes the entire aggregate
+  // a dependent value.
+  //
+  // If 'operand' is an address, then the "store" corresponds to a dependency on another in-memory value. This may
+  // result from `copy_addr`, `mark_dependence_addr`, or initialization of an applied `@out` argument that depends on
+  // another indirect parameter.
   private mutating func visitStoredUses(of operand: Operand,
                                         into address: Value) -> WalkResult {
     assert(address.type.isAddress)
@@ -871,19 +905,30 @@ extension LifetimeDependenceDefUseWalker {
     case .load:
       switch localAccess.instruction! {
       case let load as LoadInst:
-        return loadedAddressUse(of: localAccess.operand!, into: load)
+        return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let load as LoadBorrowInst:
-        return loadedAddressUse(of: localAccess.operand!, into: load)
+        return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let copyAddr as SourceDestAddrInstruction:
-        return loadedAddressUse(of: localAccess.operand!, into: copyAddr.destinationOperand)
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: copyAddr.destinationOperand)
       default:
         return .abortWalk
       }
-    case .dependence:
-       // An address-forwarding mark_dependence is simply a marker that indicates the start of an in-memory
-       // dependent value. Typically, it has no uses. If it does have uses, then they are visited earlier by
-       // LocalVariableAccessWalker to record any other local accesses.
-       return .continueWalk
+    case .dependenceSource:
+      switch localAccess.instruction! {
+      case let md as MarkDependenceInst:
+        if md.type.isAddress {
+          return loadedAddressUse(of: localAccess.operand!, intoAddress: md.valueOperand)
+        }
+        return loadedAddressUse(of: localAccess.operand!, intoValue: md)
+      case let md as MarkDependenceAddrInst:
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: md.addressOperand)
+      default:
+        return .abortWalk
+      }
+    case .dependenceDest:
+      // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
+      // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
+      return .continueWalk
     case .store:
       let si = localAccess.operand!.instruction as! StoringInstruction
       assert(si.sourceOperand == initialValue, "the only reachable store should be the current assignment")
@@ -921,13 +966,13 @@ extension LifetimeDependenceDefUseWalker {
       // because a mark_dependence [nonescaping] represents the
       // dependence.
       if let result = apply.singleDirectResult, !result.isEscapable {
-        if dependentUse(of: operand, into: result) == .abortWalk {
+        if dependentUse(of: operand, dependentValue: result) == .abortWalk {
           return .abortWalk
         }
       }
       for resultAddr in apply.indirectResultOperands
           where !resultAddr.value.isEscapable {
-        if visitStoredUses(of: operand, into: resultAddr.value) == .abortWalk {
+        if dependentUse(of: operand, dependentAddress: resultAddr.value) == .abortWalk {
           return .abortWalk
         }
       }
@@ -1023,10 +1068,23 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
 let lifetimeDependenceUseTest = FunctionTest("lifetime_dependence_use") {
     function, arguments, context in
   let value = arguments.takeValue()
+  var dependence: LifetimeDependence?
+  switch value {
+  case let arg as FunctionArgument:
+    dependence = LifetimeDependence(arg, context)
+  case let md as MarkDependenceInstruction:
+    dependence = LifetimeDependence(md, context)
+  default:
+    break
+  }
+  guard let dependence = dependence else {
+    print("Invalid dependence scope: \(value)")
+    return
+  }
   print("LifetimeDependence uses of: \(value)")
   var printer = LifetimeDependenceUsePrinter(function: function, context)
   defer { printer.deinitialize() }
-  _ = printer.walkDown(root: value)
+  _ = printer.walkDown(dependence: dependence)
 }
 
 

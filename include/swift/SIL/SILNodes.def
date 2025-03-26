@@ -441,6 +441,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
+  // MarkDependenceAddrInst has read effects for the base operand. See
+  // getMemoryBehavior()
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
@@ -901,7 +903,12 @@ NON_VALUE_INST(IgnoredUseInst, ignored_use,
 NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
                SILInstruction, MayReadWrite, DoesNotRelease)
 
-NODE_RANGE(NonValueInstruction, UnreachableInst, IncrementProfilerCounterInst)
+// MarkDependenceAddrInst has read effects for the base operand. See
+// getMemoryBehavior().
+NON_VALUE_INST(MarkDependenceAddrInst, mark_dependence_addr,
+               SILInstruction, None, DoesNotRelease)
+
+NODE_RANGE(NonValueInstruction, UnreachableInst, MarkDependenceAddrInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,

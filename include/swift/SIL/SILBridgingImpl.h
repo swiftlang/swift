@@ -1352,6 +1352,18 @@ void BridgedInstruction::MarkDependenceInst_settleToEscaping() const {
   getAs<swift::MarkDependenceInst>()->settleToEscaping();
 }
 
+BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceAddrInst_dependenceKind() const {
+  return (MarkDependenceKind)getAs<swift::MarkDependenceAddrInst>()->dependenceKind();
+}
+
+void BridgedInstruction::MarkDependenceAddrInst_resolveToNonEscaping() const {
+  getAs<swift::MarkDependenceAddrInst>()->resolveToNonEscaping();
+}
+
+void BridgedInstruction::MarkDependenceAddrInst_settleToEscaping() const {
+  getAs<swift::MarkDependenceAddrInst>()->settleToEscaping();
+}
+
 SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
   return (SwiftInt)getAs<swift::BeginAccessInst>()->getAccessKind();
 }
@@ -2392,6 +2404,12 @@ BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, b
 
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
+}
+
+BridgedInstruction BridgedBuilder::createMarkDependenceAddr(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
+  return {unbridged().createMarkDependenceAddr(
+      regularLoc(), value.getSILValue(), base.getSILValue(),
+      swift::MarkDependenceKind(kind))};
 }
 
 BridgedInstruction BridgedBuilder::createEndAccess(BridgedValue value) const {

@@ -1964,39 +1964,118 @@ destroy the value, such as `release_value`, `strong_release`,
 ### mark_dependence
 
 ```
-sil-instruction :: 'mark_dependence' '[nonescaping]'? sil-operand 'on' sil-operand
+sil-instruction :: 'mark_dependence' mark-dep-option? sil-operand 'on' sil-operand
+mark-dep-option ::= '[nonescaping]'
+mark-dep-option ::= '[unresolved]'
 
 %2 = mark_dependence %value : $*T on %base : $Builtin.NativeObject
 ```
 
 `%base` must not be identical to `%value`.
 
-Indicates that the validity of `%value` depends on the value of `%base`.
+The value of the result depends on the value of `%base`.
 Operations that would destroy `%base` must not be moved before any
-instructions which depend on the result of this instruction, exactly as
+instructions that depend on the result of this instruction, exactly as
 if the address had been directly derived from that operand (e.g. using
 `ref_element_addr`).
 
-The result is the forwarded value of `%value`. `%value` may be an
-address, but it could be an address in a non-obvious form, such as a
-Builtin.RawPointer or a struct containing the same.
+The result is the forwarded value of `%value`. If `%value` is an
+address, then result is also an address, and the semantics are the
+same as the non-address form: the dependency is on any value derived
+from the resulting address. The value could also be a
+Builtin.RawPointer or a struct containing the same, in which case,
+pointed-to values have a dependency if they are derived from this
+instruction's result. Note that in-memory values are only dependent on
+base if they are derived from this instruction's result. In this
+example, the load of `%dependent_value` depends on `%base`, but the
+load of `%independent_value` does not:
 
-`%base` may have either object or address type. In the latter case, the
-dependency is on the current value stored in the address.
+```
+%dependent_address = mark_dependence %original_address on %base
+%dependent_value = load [copy] %dependent_address
+%independent_value = load %original_address
+destroy_value %base
+```
 
-The optional `nonescaping` attribute indicates that no value derived
-from `%value` escapes the lifetime of `%base`. As with escaping
-`mark_dependence`, all values transitively forwarded from `%value`
-must be destroyed within the lifetime of `base`. Unlike escaping
-`mark_dependence`, this must be statically verifiable. Additionally,
-unlike escaping `mark_dependence`, nonescaping `mark_dependence` may
-produce a value of non-`Escapable` type. A non-`Escapable`
-`mark_dependence` extends the lifetime of `%base` into copies of
-`%value` and values transitively forwarded from those copies. If the
-`mark_dependence` forwards an address, then it extends the lifetime
-through loads from that address. Unlike escaping `mark_dependence`, no
-value derived from `%value` may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use).
+`%base` may have either object or address type. If it is an address,
+then the dependency is on the current value stored at the address.
+
+The optional `nonescaping` attribute indicates that the lifetime
+guarantee is statically verifiable via a def-use walk starting at this
+instruction's result. No value derived from a nonescaping
+`mark_dependence` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use). The `unresolved`
+attribute indicates that this verification is required but has not yet
+been diagnosed.
+
+`mark_dependence` may only have a non-`Escapable` result if it also
+has a `nonescaping` or `unresolved` attribute. A non-`Escapable`
+`mark_dependence` extends the lifetime of `%base` through copies of
+`%value` and values transitively forwarded from those copies. If
+`%value` is an address, then that includes loads from the
+address. None of those values may be used by a bitwise escape
+(conversion to UnsafePointer) or pointer escape (unknown use). In this
+example, the apply depends on `%base` because `%value` has a
+non-`Escapable` type:
+
+```
+%dependent_address = mark_dependence [nonescaping] %value : %*NonescapableType on %base
+%dependent_value = load %dependent_address
+%copied_value = copy_value %dependent_value
+apply %f(%dependent_value)
+destroy_value %base
+```
+
+### mark_dependence_addr
+
+```
+sil-instruction :: 'mark_dependence_addr' mark-dep-option? sil-operand 'on' sil-operand
+mark-dep-option ::= '[nonescaping]'
+mark-dep-option ::= '[unresolved]'
+
+mark_dependence_addr [nonescaping] %address : $*T on %base : $Builtin.NativeObject
+```
+
+The in-memory value at `%address` depends on the value of `%base`.
+Operations that would destroy `%base` must not be moved before any
+instructions that depend on that value, exactly as if the location at
+`%address` aliases `%base` on all paths reachable from this instruction.
+
+In this example, the load of `%dependent_value` depends on `%base`:
+
+```
+mark_dependence_addr %address on %base
+%dependent_value = load [copy] %address
+destroy_value %base
+```
+
+`%base` may have either object or address type. If it is an address,
+then the dependency is on the current value stored at the address.
+
+The optional `nonescaping` attribute indicates that the lifetime
+guarantee is statically verifiable via a data flow over all paths
+reachable from this instruction considering all addresses that may
+alias with `%address`. No aliasing address may be used by a bitwise
+escape (conversion to UnsafePointer) or pointer escape (unknown
+use). The `unresolved` attribute indicates that this verification is
+required but has not yet been diagnosed.
+
+`mark_dependence_addr` may only have a non-`Escapable` `%address` if
+it also has a `nonescaping` or `unresolved` attribute. A
+non-`Escapable` `mark_dependence_addr` extends the lifetime of `%base`
+through values loaded from the memory location at `%address` and
+through any transitively forwarded or copied values. None of those
+values may be used by a bitwise escape (conversion to UnsafePointer)
+or pointer escape (unknown use). In this example, the apply depends on
+`%base` because `%address` has a non-`Escapable` type:
+
+```
+mark_dependence_addr [nonescaping] %address : %*NonescapableType on %base
+%dependent_value = load %address
+%copied_value = copy_value %dependent_value
+apply %f(%dependent_value)
+destroy_value %base
+```
 
 ### is_unique
 

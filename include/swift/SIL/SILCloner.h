@@ -3142,6 +3142,17 @@ void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
                 Inst->dependenceKind()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::
+visitMarkDependenceAddrInst(MarkDependenceAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createMarkDependenceAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getAddress()),
+                getOpValue(Inst->getBase()),
+                Inst->dependenceKind()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {

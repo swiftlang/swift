@@ -305,19 +305,25 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       continue;
     }
 
-    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+    if (auto mdi = MarkDependenceInstruction(user)) {
       // TODO: continue walking the dependent value, which may not be an
       // address. See AddressUtils.swift. Until that is implemented, this must
       // be considered a pointer escape.
-      if (op->get() == mdi->getBase()) {
+      if (op->get() == mdi.getBase()) {
         recordEscape(op, AddressUseKind::Dependent);
         callVisitUse(op);
         continue;
       }
-
-      // If we are the value use, look through it.
-      transitiveResultUses(op);
-      continue;
+      if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+        // If we are the value use of a forwarding markdep, look through it.
+        transitiveResultUses(op);
+        continue;
+      }
+      if (auto *mdi = dyn_cast<MarkDependenceAddrInst>(user)) {
+        // The address operand is simply a leaf use.
+        callVisitUse(op);
+        continue;
+      }
     }
 
     // We were unable to recognize this user, so set AddressUseKind to unknown
