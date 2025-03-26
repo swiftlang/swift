@@ -77,9 +77,13 @@ extension DistributedResolvableMacro {
 
   static func stubMethodDecl(access: DeclModifierListSyntax, _ requirement: MemberBlockItemListSyntax.Element) -> String {
     // do we need to stub a computed variable?
-    if let variable = requirement.decl.as(VariableDeclSyntax.self) {
-      var accessorStubs: [String] = []
+    if var variable = requirement.decl.as(VariableDeclSyntax.self) {
+      variable.modifiers = variable.modifiers.filter { !$0.isAccessControl }
+      access.reversed().forEach { modifier in
+        variable.modifiers = variable.modifiers.prepending(modifier)
+      }
 
+      var accessorStubs: [String] = []
       for binding in variable.bindings {
         if let accessorBlock = binding.accessorBlock {
           for accessor in accessorBlock.accessors.children(viewMode: .all) {
@@ -91,19 +95,31 @@ extension DistributedResolvableMacro {
 
       let name = variable.bindings.first!.pattern.trimmed
       let typeAnnotation = variable.bindings.first?.typeAnnotation.map { "\($0.trimmed)" } ?? "Any"
+
+      // computed property stub
       return """
-             \(access)\(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
+             \(variable.attributes)
+             \(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
                \(accessorStubs.joined(separator: "\n  "))
              }
              """
-    }
+    } else if var fun = requirement.decl.as(FunctionDeclSyntax.self) {
+      fun.modifiers = fun.modifiers.filter { !$0.isAccessControl }
+      access.reversed().forEach { modifier in
+        fun.modifiers = fun.modifiers.prepending(modifier)
+      }
 
-    // normal function stub
-    return """
-           \(access)\(requirement) {
-             \(stubFunctionBody())
-           }
-           """
+      // normal function stub
+      return """
+             \(fun) {
+               \(stubFunctionBody())
+             }
+             """
+    } else {
+      // some declaration type we could not handle, let's silently ignore; we should not really need to emit
+      // anything others than var and func here, and it's cleaner to just ignore rather than crash here.
+      return ""
+    }
   }
 
   static func stubFunctionBody() -> DeclSyntax {
