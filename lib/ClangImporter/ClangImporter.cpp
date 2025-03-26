@@ -55,6 +55,7 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
@@ -5348,8 +5349,6 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
     }
   }
-  if (desc.annotationOnly)
-    return CxxEscapability::Unknown;
   if (desugared->isArrayType()) {
     auto elemTy = cast<clang::ArrayType>(desugared)
                       ->getElementType()
@@ -5363,7 +5362,8 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
   // Base cases
   if (desugared->isAnyPointerType() || desugared->isBlockPointerType() ||
       desugared->isMemberPointerType() || desugared->isReferenceType())
-    return CxxEscapability::NonEscapable;
+    return desc.annotationOnly ? CxxEscapability::Unknown
+                               : CxxEscapability::NonEscapable;
   if (desugared->isScalarType())
     return CxxEscapability::Escapable;
   return CxxEscapability::Unknown;
@@ -8508,7 +8508,7 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // Enums are always safe.
   if (isa<clang::EnumDecl>(decl))
     return ExplicitSafety::Safe;
-  
+
   // If it's not a record, leave it unspecified.
   auto recordDecl = dyn_cast<clang::RecordDecl>(decl);
   if (!recordDecl)
