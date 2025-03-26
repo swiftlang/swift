@@ -403,12 +403,35 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
   os << "version=" << stringForAvailability(getPlatformRange());
 
   auto domainInfos = storage->getDomainInfos();
-  if (domainInfos.size() > 0) {
-    os << " unavailable=";
-    llvm::interleave(
-        domainInfos, os,
-        [&](const DomainInfo &domainInfo) { domainInfo.getDomain().print(os); },
-        ",");
+  if (!domainInfos.empty()) {
+    auto availableInfos = llvm::make_filter_range(
+        domainInfos, [](auto info) { return !info.isUnavailable(); });
+
+    if (!availableInfos.empty()) {
+      os << " available=";
+      llvm::interleave(
+          availableInfos, os,
+          [&](const DomainInfo &domainInfo) {
+            domainInfo.getDomain().print(os);
+            if (domainInfo.getDomain().isVersioned() &&
+                domainInfo.getRange().hasMinimumVersion())
+              os << ">=" << domainInfo.getRange().getAsString();
+          },
+          ",");
+    }
+
+    auto unavailableInfos = llvm::make_filter_range(
+        domainInfos, [](auto info) { return info.isUnavailable(); });
+
+    if (!unavailableInfos.empty()) {
+      os << " unavailable=";
+      llvm::interleave(
+          unavailableInfos, os,
+          [&](const DomainInfo &domainInfo) {
+            domainInfo.getDomain().print(os);
+          },
+          ",");
+    }
   }
 
   if (isDeprecated())
