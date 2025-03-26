@@ -759,6 +759,10 @@ bool BridgedSubstitutionMap::isEmpty() const {
   return unbridged().empty();
 }
 
+bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
+  return unbridged() == rhs.unbridged();
+}
+
 bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
 }
