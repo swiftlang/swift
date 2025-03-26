@@ -702,6 +702,10 @@ namespace swift {
     /// Flush the active diagnostic to the diagnostic output engine.
     void flush();
 
+    /// Returns the \c SourceManager associated with \c SourceLoc s for this
+    /// diagnostic.
+    SourceManager &getSourceManager();
+
     /// Prevent the diagnostic from behaving more severely than \p limit. For
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
@@ -1560,6 +1564,10 @@ namespace swift {
       return getBestAddImportFixItLoc(Member, nullptr);
     }
   };
+
+  inline SourceManager &InFlightDiagnostic::getSourceManager() {
+    return Engine->SourceMgr;
+  }
 
   /// Remember details about the state of a diagnostic engine and restore them
   /// when the object is destroyed.

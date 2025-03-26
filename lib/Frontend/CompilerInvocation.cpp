@@ -1422,6 +1422,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
 
+  Opts.EnableABIInferenceRemarks = Args.hasArg(OPT_remark_abi_inference);
+
   if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
     // Only allow -experimental-skip-non-exportable-decls if either library
     // evolution is enabled (in which case the module's ABI is independent of

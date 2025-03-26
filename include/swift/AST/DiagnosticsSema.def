@@ -8351,16 +8351,16 @@ ERROR(attr_abi_mismatched_kind,none,
 
 ERROR(attr_abi_mismatched_arity,none,
       "cannot give %kind0 the ABI of a %kindonly0 with a different number of "
-      "low-level parameters",
-      (ValueDecl *))
+      "%select{|generic }1parameters",
+      (Decl *, /*genericParams=*/bool))
 
 ERROR(attr_abi_mismatched_throws,none,
       "cannot give %0 the ABI of a %kindonly0 which %select{cannot|can}1 throw",
-      (ValueDecl *, /*abiCanThrow=*/bool))
+      (Decl *, /*abiCanThrow=*/bool))
 
 ERROR(attr_abi_mismatched_async,none,
       "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
-      (ValueDecl *, /*abiIsAsync=*/bool))
+      (Decl *, /*abiIsAsync=*/bool))
 
 ERROR(attr_abi_mismatched_pbd_size,none,
       "cannot give pattern binding the ABI of a binding with "
@@ -8369,12 +8369,88 @@ ERROR(attr_abi_mismatched_pbd_size,none,
 
 ERROR(attr_abi_mismatched_var,none,
       "no match for %select{%kind0 in the ABI|ABI %kind0}1",
-      (ValueDecl *, /*isABI=*/bool))
+      (Decl *, /*isABI=*/bool))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
       "the same purpose",
       (DescriptiveDeclKind))
+
+ERROR(attr_abi_missing_attr,none,
+      "missing '%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool))
+ERROR(attr_abi_extra_attr,none,
+      "extra %select{|implicit }2'%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool, /*isImplicit=*/bool))
+ERROR(attr_abi_forbidden_attr,none,
+      "unused '%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool))
+REMARK(abi_attr_inferred_attribute,none,
+       "inferred '%0' in '@abi' to match %select{attribute|modifier}1 on API",
+       (StringRef, bool))
+
+ERROR(attr_abi_mismatched_attr,none,
+      "'%0' %select{attribute|modifier}1 in '@abi' should match '%2'",
+      (StringRef, bool, StringRef))
+NOTE(attr_abi_matching_attr_here,none,
+     "%select{should match|matches}0 %select{attribute|modifier}1 "
+     "%select{|implicitly added }2here",
+     (/*matches=*/bool, /*isModifier=*/bool, /*isImplicit=*/bool))
+
+#define TYPE_ORIGIN(KIND_IDX, DECL_IDX) "%select{|%kind" #DECL_IDX " |" \
+                            "self parameter |result |thrown |%error}" #KIND_IDX
+ERROR(attr_abi_mismatched_type,none,
+      TYPE_ORIGIN(0, 1) "type %2 in '@abi' should match %3",
+      (unsigned, Decl *, Type, Type))
+NOTE(attr_abi_should_match_type_here,none,
+     "should match type here", ())
+
+ERROR(attr_abi_mismatched_generic_signature,none,
+      "generic signature '%0' in '@abi' is not compatible with '%1'",
+      (StringRef, StringRef))
+ERROR(attr_abi_missing_generic_signature,none,
+      "declaration in '@abi' should have generic signature compatible with "
+      "'%0'",
+      (StringRef))
+ERROR(attr_abi_extra_generic_signature,none,
+      "declaration in '@abi' should not have generic signature because %0 "
+      "is not generic",
+      (Decl *))
+
+ERROR(attr_abi_mismatched_param_modifier,none,
+      "%select{default |}0%select{attribute|modifier}2 %select{|'%0' }0"
+      "on " TYPE_ORIGIN(3, 4) "in '@abi' is not compatible with "
+      "%select{default|'%1'}1",
+      (StringRef, StringRef, /*isModifier=*/bool, unsigned, Decl *))
+ERROR(attr_abi_no_default_arguments,none,
+      "%kind0 in '@abi' should not have a default argument; it does not "
+      "affect the parameter's ABI",
+      (Decl *))
+
+// These macros insert 'final', 'non-final', or nothing depending on both the
+// current decl and its counterpart, such that 'non-final' is used if the
+// counterpart would be described as 'final' or 'static'. They must be kept in
+// sync with `StaticnessAndFinality`.
+#define NONFINAL_OR_NOTHING(COUNTERPART) \
+      "%select{||non-final |non-final |non-final |%error}" #COUNTERPART
+#define FINAL_OR_NONFINAL_OR_NOTHING(CURRENT, COUNTERPART, FINAL_OK) \
+      "%select{|%select{" NONFINAL_OR_NOTHING(COUNTERPART) \
+                      "|" NONFINAL_OR_NOTHING(COUNTERPART) \
+                      "|final |final ||%error}" #CURRENT "}" #FINAL_OK
+
+ERROR(attr_abi_static_final_mismatch,none,
+      FINAL_OR_NONFINAL_OR_NOTHING(0, 2, 4) "%kind1 in '@abi' should be "
+      FINAL_OR_NONFINAL_OR_NOTHING(2, 0, 4) "%kindonly3 to ensure ABI "
+      "compatibility",
+      (uint8_t, Decl *, uint8_t, Decl *, /*isClass=*/bool))
+
+#undef NONFINAL_OR_NOTHING
+#undef FINAL_OR_NONFINAL_OR_NOTHING
+
+ERROR(attr_abi_failable_mismatch,none,
+      "cannot give %select{non-failable|failable}1 %kind0 the ABI of a "
+      "%select{non-failable|failable}2 %kindonly0",
+      (Decl *, bool, bool))
 
 //===----------------------------------------------------------------------===//
 // MARK: Isolated conformances

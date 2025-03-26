@@ -1041,6 +1041,10 @@ public:
   /// from source code.
   void attachParsedAttrs(DeclAttributes attrs);
 
+  /// Retrieve the custom name in the \c @objc attribute, if present.
+  std::optional<ObjCSelector>
+  getExplicitObjCName(bool allowInvalid = false) const;
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
@@ -5919,6 +5923,13 @@ public:
   /// Return the interface type of the stored value.
   Type getValueInterfaceType() const;
 
+  /// Retrieve the source range of the variable type, or an invalid range if the
+  /// variable's type is not explicitly written in the source.
+  ///
+  /// Only for use in diagnostics.  It is not always possible to always
+  /// precisely point to the variable type because of type aliases.
+  SourceRange getTypeSourceRangeForDiagnostics() const;
+
   /// Determine how this storage is implemented.
   StorageImplInfo getImplInfo() const;
 
@@ -6352,13 +6363,6 @@ public:
   /// environment of its parent DeclContext. Make sure this is what you want
   /// and not just getInterfaceType().
   Type getTypeInContext() const;
-
-  /// Retrieve the source range of the variable type, or an invalid range if the
-  /// variable's type is not explicitly written in the source.
-  ///
-  /// Only for use in diagnostics.  It is not always possible to always
-  /// precisely point to the variable type because of type aliases.
-  SourceRange getTypeSourceRangeForDiagnostics() const;
 
   /// Determine the mutability of this variable declaration when
   /// accessed from a given declaration context.

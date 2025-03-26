@@ -356,7 +356,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   decl->setIsDynamic(value);
 
   // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>())
+  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
+        ABIRoleInfo(decl).providesAPI())
     decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
 }
 

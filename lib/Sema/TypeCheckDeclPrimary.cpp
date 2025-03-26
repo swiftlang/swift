@@ -2173,6 +2173,10 @@ void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
 
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  // Access notes don't apply to ABI-only attributes.
+  if (!ABIRoleInfo(VD).providesAPI())
+    return {};
+
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
   if (auto note = notes.lookup(VD))
     applyAccessNote(VD, *note.get(), notes);

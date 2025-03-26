@@ -650,6 +650,11 @@ bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention) {
+  auto abiRole = ABIRoleInfo(AFD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason,
+                                 asyncConvention, errorConvention);
+
   // Clear out the async and error conventions. They will be added later if
   // needed.
   asyncConvention = std::nullopt;
@@ -1104,6 +1109,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (VD->isInvalid())
     return false;
 
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
@@ -1160,6 +1169,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
 bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
+  auto abiRole = ABIRoleInfo(SD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   ASTContext &ctx = SD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
@@ -1769,6 +1782,11 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
+
+  // ABI-only decls inherit objc-ness from their API.
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isObjC();
 
   // Access notes may add attributes that affect this calculus.
   TypeChecker::applyAccessNote(VD);
@@ -4115,6 +4133,9 @@ public:
 
 evaluator::SideEffect TypeCheckObjCImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *D) const {
+  if (!ABIRoleInfo(D).providesAPI())
+    return evaluator::SideEffect();
+
   PrettyStackTraceDecl trace("checking member implementations of", D);
 
   // FIXME: Because we check extension-by-extension, candidates and requirements

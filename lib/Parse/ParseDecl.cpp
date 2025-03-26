@@ -2189,7 +2189,7 @@ Parser::parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
 
   auto range = SourceRange(loc, parensRange.End);
   return makeParserResult(AllowFeatureSuppressionAttr::create(
-      Context, loc, range, /*implicit*/ false, /*inverted*/ inverted,
+      Context, atLoc, range, /*implicit*/ false, /*inverted*/ inverted,
       features));
 }
 
@@ -9776,10 +9776,23 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   Decls.push_back(Subscript);
 
+  bool Invalid = false;
+  // Reject 'subscript' functions outside of type decls
+  if (!(Flags & PD_HasContainerType)) {
+    diagnose(SubscriptLoc, diag::subscript_decl_wrong_scope);
+    Invalid = true;
+  }
+
   // '{'
   // Parse getter and setter.
   ParsedAccessors accessors;
   if (Tok.isNot(tok::l_brace)) {
+    // Subscript stubs should never have accessors, and this one doesn't, so
+    // we're done.
+    if (Flags.contains(PD_StubOnly)) {
+      return makeParserResult(Status, Subscript);
+    }
+
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
     if (!Status.isErrorOrHasCompletion()) {
@@ -9794,13 +9807,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   } else if (!Status.hasCodeCompletion()) {
     Status |= parseGetSet(Flags, Indices.get(), ElementTy.get(), accessors,
                           Subscript);
-  }
-
-  bool Invalid = false;
-  // Reject 'subscript' functions outside of type decls
-  if (!(Flags & PD_HasContainerType)) {
-    diagnose(SubscriptLoc, diag::subscript_decl_wrong_scope);
-    Invalid = true;
   }
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess() ||
