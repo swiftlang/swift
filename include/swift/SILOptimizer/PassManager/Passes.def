@@ -81,6 +81,8 @@ PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
+PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
+     "Diagnose Infinitely-Recursive Code")
 PASS(TestInstructionIteration, "test-instruction-iteration",
      "Tests instruction iteration")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
@@ -268,8 +270,6 @@ LEGACY_PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 LEGACY_PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
-LEGACY_PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
-     "Diagnose Infinitely-Recursive Code")
 LEGACY_PASS(DiagnoseInvalidEscapingCaptures, "diagnose-invalid-escaping-captures",
      "Diagnose Invalid Escaping Captures")
 LEGACY_PASS(DiagnoseLifetimeIssues, "diagnose-lifetime-issues",

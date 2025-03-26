@@ -339,6 +339,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedDeclObj nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
+  BRIDGED_INLINE bool calleesAreStaticallyKnowable(BridgedDeclRef method) const;
   SWIFT_IMPORT_UNSAFE BridgedFunction createEmptyFunction(BridgedStringRef name,
                                                           const BridgedParameterInfo * _Nullable bridgedParams,
                                                           SwiftInt paramCount,
@@ -381,6 +382,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
 
   // Temporary for AddressableParameters Bootstrapping.

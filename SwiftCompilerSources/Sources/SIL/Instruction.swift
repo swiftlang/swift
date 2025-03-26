@@ -1222,7 +1222,9 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}
 
-final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
+final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {
+  public var member: DeclRef { DeclRef(bridged: bridged.ClassMethodInst_getMember()) }
+}
 
 final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 

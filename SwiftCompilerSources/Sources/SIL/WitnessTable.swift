@@ -99,6 +99,16 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
+  /// A lookup for a specific method with O(n) complexity.
+  public func lookup(method: DeclRef) -> Function? {
+    for entry in entries {
+      if case .method(let req, let impl) = entry, req == method {
+        return impl
+      }
+    }
+    return nil
+  }
+
   public var entries: EntryArray { EntryArray(witnessTable: self) }
 
   public var isDefinition: Bool { !bridged.isDeclaration() }
