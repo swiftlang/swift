@@ -404,6 +404,30 @@ Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
   });
 }
 
+/// FIXME: This can be folded into its callers after a bit of cleanup.
+static FunctionType *substGenericArgs(
+    GenericFunctionType *funcTy,
+    llvm::function_ref<Type(Type)> substFn) {
+  llvm::SmallVector<AnyFunctionType::Param, 4> params;
+  params.reserve(funcTy->getNumParams());
+
+  llvm::transform(funcTy->getParams(), std::back_inserter(params),
+                  [&](const AnyFunctionType::Param &param) {
+                    return param.withType(substFn(param.getPlainType()));
+                  });
+
+  auto resultTy = substFn(funcTy->getResult());
+
+  Type thrownError = funcTy->getThrownError();
+  if (thrownError)
+    thrownError = substFn(thrownError);
+
+  // Build the resulting (non-generic) function type.
+  return FunctionType::get(params, resultTy,
+                           funcTy->getExtInfo().withThrows(
+                              funcTy->isThrowing(), thrownError));
+}
+
 FunctionType *ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        ConstraintLocatorBuilder locator,
@@ -419,7 +443,7 @@ FunctionType *ConstraintSystem::openFunctionType(
                               return openType(type, replacements, locator);
                             });
 
-    funcType = genericFn->substGenericArgs(
+    funcType = substGenericArgs(genericFn,
         [&](Type type) { return openType(type, replacements, locator); });
   }
 
@@ -1546,7 +1570,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     openedType = value->getInterfaceType()->castTo<AnyFunctionType>();
 
     if (auto *genericFn = openedType->getAs<GenericFunctionType>()) {
-      openedType = genericFn->substGenericArgs(
+      openedType = substGenericArgs(genericFn,
           [&](Type type) { return openType(type, replacements, locator); });
     }
   } else {
