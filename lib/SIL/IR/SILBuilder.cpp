@@ -805,6 +805,26 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
       target2Count, forwardingOwnershipKind));
 }
 
+BuiltinInst *SILBuilder::createZeroInitAddr(SILLocation loc, SILValue addr) {
+  assert(addr->getType().isAddress());
+  auto &C = getASTContext();
+  auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+  return createBuiltin(loc, zeroInit->getBaseIdentifier(),
+                       SILType::getEmptyTupleType(C),
+                       SubstitutionMap(),
+                       addr);
+}
+
+SILValue SILBuilder::createZeroInitValue(SILLocation loc, SILType loweredTy) {
+  assert(loweredTy.isObject());
+  auto &C = getASTContext();
+  auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+  return createBuiltin(loc, zeroInit->getBaseIdentifier(),
+                       loweredTy,
+                       SubstitutionMap(),
+                       {});
+}
+
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,
                                       function_ref<void(SILBuilder &)> func) {
   if (isa<TermInst>(inst)) {

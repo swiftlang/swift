@@ -2422,6 +2422,16 @@ public:
                               valueType, paramType));
   }
 
+  /// Create a zero-initialized value of the given (loadable) type.
+  ///
+  /// This is currently only expected to be used in narrow situations
+  /// involving bridging and only makes a best effort attempt.
+  SILValue createZeroInitValue(SILLocation loc, SILType loweredTy);
+
+  /// Zero-initialize an object in memory of the given type (which may
+  /// or may not be loadable).
+  BuiltinInst *createZeroInitAddr(SILLocation loc, SILValue addr);
+
   //===--------------------------------------------------------------------===//
   // Unchecked cast helpers
   //===--------------------------------------------------------------------===//
