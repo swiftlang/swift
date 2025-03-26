@@ -1294,7 +1294,7 @@ bool AbstractStorageDecl::isCompileTimeLiteral() const {
   return getAttrs().hasAttribute<CompileTimeLiteralAttr>();
 }
 
-bool AbstractStorageDecl::isConstVal() const {
+bool AbstractStorageDecl::isConstValue() const {
   return getAttrs().hasAttribute<ConstValAttr>();
 }
 
@@ -8924,6 +8924,8 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
           setIsolated(true);
         else if (isa<CompileTimeLiteralTypeRepr>(STR))
           setCompileTimeLiteral(true);
+        else if (isa<ConstValueTypeRepr>(STR))
+          setConstValue(true);
         else if (isa<SendingTypeRepr>(STR))
           setSending(true);
         unwrappedType = STR->getBase();
@@ -9091,7 +9093,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeLiteral(),
-      isSending(), isAddressable());
+      isSending(), isAddressable(), isConstVal());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

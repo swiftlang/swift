@@ -72,7 +72,11 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   }
 
   public var isConst: Bool {
-    return bridged.isConstVal()
+    return bridged.isConstValue()
+  }
+  
+  public var sourceLocation: SourceLoc? {
+    return SourceLoc(bridged: bridged.getSourceLocation())
   }
 
   public static func ==(lhs: GlobalVariable, rhs: GlobalVariable) -> Bool {

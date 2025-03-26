@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 932; // checked cast isolated
+const uint16_t SWIFTMODULE_VERSION_MINOR = 933; // isConstantValue
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -414,6 +414,7 @@ enum class SILParameterInfoFlags : uint8_t {
   Isolated = 0x2,
   Sending = 0x4,
   ImplicitLeading = 0x8,
+  Const = 0x10,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -1335,6 +1336,7 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeLiteral
+                     BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
                      >;
@@ -1715,6 +1717,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeLiteral?
+    BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type

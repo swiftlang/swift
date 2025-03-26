@@ -4104,7 +4104,7 @@ public:
     bool isVariadic;
     bool isAutoClosure;
     bool isIsolated;
-    bool isCompileTimeLiteral;
+    bool isCompileTimeLiteral, isConstValue;
     bool isSending;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -4116,6 +4116,7 @@ public:
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeLiteral,
+                                         isConstValue,
                                          isSending,
                                          rawDefaultArg,
                                          defaultExprType,
@@ -4160,6 +4161,7 @@ public:
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
     param->setCompileTimeLiteral(isCompileTimeLiteral);
+    param->setConstValue(isConstValue);
     param->setSending(isSending);
 
     // Decode the default argument kind.
@@ -6928,6 +6930,11 @@ getActualSILParameterOptions(uint8_t raw) {
     options -= serialization::SILParameterInfoFlags::ImplicitLeading;
     result |= SILParameterInfo::ImplicitLeading;
   }
+  
+  if (options.contains(serialization::SILParameterInfoFlags::Const)) {
+    options -= serialization::SILParameterInfoFlags::Const;
+    result |= SILParameterInfo::Const;
+  }
 
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
@@ -7322,13 +7329,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeLiteral;
+        isCompileTimeLiteral, isConstValue;
     bool isNoDerivative, isSending, isAddressable;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeLiteral, isSending, isAddressable);
+        isCompileTimeLiteral, isConstValue, isSending, isAddressable);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7344,7 +7351,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
                                            isCompileTimeLiteral, isSending,
-                                           isAddressable),
+                                           isAddressable, isConstValue),
                         MF.getIdentifier(internalLabelID));
   }
 

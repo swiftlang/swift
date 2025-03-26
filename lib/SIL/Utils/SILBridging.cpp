@@ -329,9 +329,11 @@ bool BridgedGlobalVar::mustBeInitializedStatically() const {
   return global->mustBeInitializedStatically();
 }
 
-bool BridgedGlobalVar::isConstVal() const {
+bool BridgedGlobalVar::isConstValue() const {
   SILGlobalVariable *global = getGlobal();
-  return global->getDecl()->isConstVal();
+  if (const auto &decl = global->getDecl())
+    return decl->isConstValue();
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

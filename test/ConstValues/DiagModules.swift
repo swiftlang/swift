@@ -18,3 +18,4 @@ import MyModule
 
 @const let constGlobal1: Int = foo()
 // expected-error@-1 {{@const value should be initialized with a compile-time value}}
+// expected-error@-2 {{global variable must be a compile-time constant}} // Remove this once we common out the diagnostics

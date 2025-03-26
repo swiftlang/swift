@@ -158,6 +158,8 @@ MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
      "Converts read-only var-globals to let-globals")
 MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
+MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
+     "Diagnose any '@const' entities which could not be simplified to a compile-time value")
 
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")
@@ -415,40 +417,14 @@ LEGACY_PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
      "Generate Debug Information with Source Locations into Textual SIL")
 LEGACY_PASS(EarlySROA, "early-sroa",
      "Scalar Replacement of Aggregate Stack Objects on high-level SIL")
-SWIFT_MODULE_PASS(RunUnitTests, "run-unit-tests",
-     "Runs the compiler internal unit tests")
-SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
-     "Test pass which prints the SIL of a function")
-SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
-     "Dump the results of FunctionUses")
-SWIFT_MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
-     "Performs optimizations for performance-annotated functions")
-SWIFT_MODULE_PASS(ConstGlobalVariableFoldingPass, "const-global-variable-folding",
-     "Performs simplification and folding of @const global variable initializers")
-SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
-     "Converts read-only var-globals to let-globals")
-SWIFT_MODULE_PASS(StackProtection, "stack-protection",
-     "Decides which functions need stack protectors")
-SWIFT_FUNCTION_PASS(FunctionStackProtection, "function-stack-protection",
-     "Decides which functions need stack protectors")
-PASS(SROA, "sroa",
+LEGACY_PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 LEGACY_PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
-SWIFT_FUNCTION_PASS(Simplification, "simplification",
-    "Peephole simplifications")
-SWIFT_FUNCTION_PASS(OnoneSimplification, "onone-simplification",
-    "Peephole simplifications which runs at -Onone")
-SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
-    "Peephole simplifications which can only run late in the -Onone pipeline")
-SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",
-    "Cleanup debug_step instructions for Onone")
-SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimization",
-    "Optimize copies to an indirect return value")
-SWIFT_FUNCTION_PASS(StripObjectHeaders, "strip-object-headers",
-    "Sets the bare flag on objects which don't need their headers")
-PASS(SimplifyBBArgs, "simplify-bb-args",
+LEGACY_PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
+LEGACY_PASS(SimplifyCFG, "simplify-cfg",
+     "SIL CFG Simplification")
 LEGACY_PASS(SpeculativeDevirtualization, "specdevirt",
      "Speculative Devirtualization via Guarded Calls")
 LEGACY_PASS(SplitAllCriticalEdges, "split-critical-edges",

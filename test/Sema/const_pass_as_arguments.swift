@@ -64,10 +64,6 @@ class ConstFanClassWrong2: ConstFan {
 	static _const let v: String = "\(v)" // expected-error {{_const let should be initialized with a literal value}}
 }
 
-class ConstFanClassWrong2: ConstFan {
-	static _const let v: String = "\(v)" // expected-error {{_const let should be initialized with a compile-time literal}}
-}
-
 class ConstFanClassWrong3: ConstFan {
 	static _const var v: String = "" // expected-error {{let is required for a _const variable declaration}}
 }
