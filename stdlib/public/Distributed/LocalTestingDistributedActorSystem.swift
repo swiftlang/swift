@@ -261,7 +261,7 @@ fileprivate class _Lock {
     // WASI environment has only a single thread
     #else
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    guard pthread_mutex_init(self.underlying, nil) == 0 else {
+    guard unsafe pthread_mutex_init(self.underlying, nil) == 0 else {
       fatalError("pthread_mutex_init failed")
     }
     #endif
@@ -275,7 +275,7 @@ fileprivate class _Lock {
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    guard pthread_mutex_destroy(self.underlying) == 0 else {
+    guard unsafe pthread_mutex_destroy(self.underlying) == 0 else {
       fatalError("pthread_mutex_destroy failed")
     }
     #endif
@@ -296,7 +296,7 @@ fileprivate class _Lock {
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    guard pthread_mutex_lock(self.underlying) == 0 else {
+    guard unsafe pthread_mutex_lock(self.underlying) == 0 else {
       fatalError("pthread_mutex_lock failed")
     }
     #endif
@@ -309,7 +309,7 @@ fileprivate class _Lock {
       #elseif os(WASI)
       // WASI environment has only a single thread
       #else
-      guard pthread_mutex_unlock(self.underlying) == 0 else {
+      guard unsafe pthread_mutex_unlock(self.underlying) == 0 else {
         fatalError("pthread_mutex_unlock failed")
       }
       #endif
