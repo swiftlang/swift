@@ -1139,6 +1139,9 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
   auto newStatus = oldStatus;
 
   while (true) {
+    // Ensure oldPriority is up to date if we retry the compare_exchange.
+    oldPriority = oldStatus.getStoredPriority();
+
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
     if (oldPriority >= newPriority) {
