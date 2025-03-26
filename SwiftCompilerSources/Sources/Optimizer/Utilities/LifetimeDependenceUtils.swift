@@ -584,7 +584,7 @@ extension LifetimeDependenceDefUseWalker {
 
   // Override ForwardingDefUseWalker.
   mutating func walkDown(operand: Operand) -> WalkResult {
-    // Initially delegate all usess to OwnershipUseVisitor.
+    // Initially delegate all uses to OwnershipUseVisitor.
     // walkDownDefault will be called for uses that forward ownership.
     return classify(operand: operand)
   }
@@ -631,7 +631,7 @@ extension LifetimeDependenceDefUseWalker {
       // like [nonescaping] even though they are not considered OSSA
       // borrows until after resolution.
       assert(operand == mdi.baseOperand)
-      return dependentUse(of: operand, into: mdi)
+      return dependentUse(of: operand, dependentValue: mdi)
 
     case is ExistentialMetatypeInst, is FixLifetimeInst, is WitnessMethodInst,
          is DynamicMethodBranchInst, is ValueMetatypeInst,
@@ -676,9 +676,22 @@ extension LifetimeDependenceDefUseWalker {
     return escapingDependence(on: operand)
   }
 
-  mutating func dependentUse(of operand: Operand, into value: Value)
+  // Handle address or non-address operands.
+  mutating func dependentUse(of operand: Operand, dependentValue value: Value)
     -> WalkResult {
     return walkDownUses(of: value, using: operand)
+  }
+
+  // Handle address or non-address operands.
+  mutating func dependentUse(of operand: Operand, dependentAddress address: Value)
+    -> WalkResult {
+    // Consider this a leaf use in addition to the dependent address uses, which might all occur earlier.
+    if leafUse(of: operand) == .abortWalk {
+      return .abortWalk
+    }
+    // The lifetime dependence is effectively "copied into" the dependent address. Find all uses of the dependent
+    // address as if this were a stored use.
+    return visitStoredUses(of: operand, into: address)
   }
 
   mutating func borrowingUse(of operand: Operand,
@@ -736,7 +749,7 @@ extension LifetimeDependenceDefUseWalker {
     return visitAppliedUse(of: operand, by: apply)
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value) -> WalkResult {
     // Record the load itself, in case the loaded value is Escapable.
     if leafUse(of: operand) == .abortWalk {
       return .abortWalk
@@ -745,7 +758,7 @@ extension LifetimeDependenceDefUseWalker {
   }    
 
   // copy_addr
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand) -> WalkResult {
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
     if leafUse(of: operand) == .abortWalk {
       return .abortWalk
     }
@@ -761,18 +774,12 @@ extension LifetimeDependenceDefUseWalker {
   }
 
   mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
-    walkDownUses(of: value, using: operand)
+    dependentUse(of: operand, dependentValue: value)
   }    
 
   // mark_dependence_addr
   mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
-    // Consider this a leaf use in addition to the dependent address uses, which might all occur earlier.
-    if leafUse(of: operand) == .abortWalk {
-      return .abortWalk
-    }
-    // The lifetime dependence is effectively "copied into" the dependent address. Find all uses of the dependent
-    // address as if this were a stored use.
-    return visitStoredUses(of: operand, into: address)
+    dependentUse(of: operand, dependentAddress: address)
   }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
@@ -898,19 +905,30 @@ extension LifetimeDependenceDefUseWalker {
     case .load:
       switch localAccess.instruction! {
       case let load as LoadInst:
-        return loadedAddressUse(of: localAccess.operand!, into: load)
+        return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let load as LoadBorrowInst:
-        return loadedAddressUse(of: localAccess.operand!, into: load)
+        return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let copyAddr as SourceDestAddrInstruction:
-        return loadedAddressUse(of: localAccess.operand!, into: copyAddr.destinationOperand)
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: copyAddr.destinationOperand)
       default:
         return .abortWalk
       }
-    case .dependence:
-       // An address-forwarding mark_dependence is simply a marker that indicates the start of an in-memory
-       // dependent value. Typically, it has no uses. If it does have uses, then they are visited earlier by
-       // LocalVariableAccessWalker to record any other local accesses.
-       return .continueWalk
+    case .dependenceSource:
+      switch localAccess.instruction! {
+      case let md as MarkDependenceInst:
+        if md.type.isAddress {
+          return loadedAddressUse(of: localAccess.operand!, intoAddress: md.valueOperand)
+        }
+        return loadedAddressUse(of: localAccess.operand!, intoValue: md)
+      case let md as MarkDependenceAddrInst:
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: md.addressOperand)
+      default:
+        return .abortWalk
+      }
+    case .dependenceDest:
+      // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
+      // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
+      return .continueWalk
     case .store:
       let si = localAccess.operand!.instruction as! StoringInstruction
       assert(si.sourceOperand == initialValue, "the only reachable store should be the current assignment")
@@ -948,13 +966,13 @@ extension LifetimeDependenceDefUseWalker {
       // because a mark_dependence [nonescaping] represents the
       // dependence.
       if let result = apply.singleDirectResult, !result.isEscapable {
-        if dependentUse(of: operand, into: result) == .abortWalk {
+        if dependentUse(of: operand, dependentValue: result) == .abortWalk {
           return .abortWalk
         }
       }
       for resultAddr in apply.indirectResultOperands
           where !resultAddr.value.isEscapable {
-        if visitStoredUses(of: operand, into: resultAddr.value) == .abortWalk {
+        if dependentUse(of: operand, dependentAddress: resultAddr.value) == .abortWalk {
           return .abortWalk
         }
       }

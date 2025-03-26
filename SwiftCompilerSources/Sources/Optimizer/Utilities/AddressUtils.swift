@@ -56,12 +56,12 @@ protocol AddressUseVisitor {
     -> WalkResult
 
   /// A loaded address use propagates the value at the address.
-  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value)
     -> WalkResult
 
   /// A loaded address use propagates the value at the address to the
   /// destination address operand.
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand)
     -> WalkResult
 
   /// Yielding an address may modify the value at the yield, but not past the yield. The yielded value may escape, but
@@ -137,14 +137,14 @@ extension AddressUseVisitor {
     case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
          is PackElementGetInst:
       let svi = operand.instruction as! SingleValueInstruction
-      return loadedAddressUse(of: operand, into: svi)
+      return loadedAddressUse(of: operand, intoValue: svi)
 
     case is YieldInst:
       return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction
            where sdai.sourceOperand == operand:
-      return loadedAddressUse(of: operand, into: sdai.destinationOperand)
+      return loadedAddressUse(of: operand, intoAddress: sdai.destinationOperand)
 
     case let sdai as SourceDestAddrInstruction
            where sdai.destinationOperand == operand:
@@ -401,12 +401,12 @@ extension AddressInitializationWalker {
     return convention.isIndirectIn ? .continueWalk : .abortWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value)
     -> WalkResult {
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand)
     -> WalkResult {
     return .continueWalk
   }
