@@ -98,9 +98,9 @@ struct Generic<T> {}
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="Generic<T>" protocol="Escapable"))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="Copyable"
-// CHECK-NEXT:     (abstract_conformance protocol="Copyable"))
+// CHECK-NEXT:     (abstract_conformance type="T" protocol="Copyable"))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="Escapable"
-// CHECK-NEXT:     (abstract_conformance protocol="Escapable"))
+// CHECK-NEXT:     (abstract_conformance type="T" protocol="Escapable"))
 // CHECK-NEXT:   (requirement "T" conforms_to "P1"))
 extension Generic: P1 where T: P1 {
     typealias A = T
@@ -123,9 +123,9 @@ class Super<T, U> {}
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="Super<T, U>" protocol="Escapable"))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P2"
-// CHECK-NEXT:     (abstract_conformance protocol="P2"))
+// CHECK-NEXT:     (abstract_conformance type="T" protocol="P2"))
 // CHECK-NEXT:   (assoc_conformance type="Self.B" proto="P2"
-// CHECK-NEXT:     (abstract_conformance protocol="P2"))
+// CHECK-NEXT:     (abstract_conformance type="T" protocol="P2"))
 // CHECK-NEXT:   (requirement "T" conforms_to "P2")
 // CHECK-NEXT:   (requirement "U" conforms_to "P2"))
 extension Super: P2 where T: P2, U: P2 {
@@ -177,9 +177,9 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:       (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:         (builtin_conformance type="Super<T, U>" protocol="Escapable"))
 // CHECK-NEXT:       (assoc_conformance type="Self.A" proto="P2"
-// CHECK-NEXT:         (abstract_conformance protocol="P2"))
+// CHECK-NEXT:         (abstract_conformance type="T" protocol="P2"))
 // CHECK-NEXT:       (assoc_conformance type="Self.B" proto="P2"
-// CHECK-NEXT:         (abstract_conformance protocol="P2"))
+// CHECK-NEXT:         (abstract_conformance type="T" protocol="P2"))
 // CHECK-NEXT:       (requirement "T" conforms_to "P2")
 // CHECK-NEXT:       (requirement "U" conforms_to "P2"))))
 class Sub: Super<NonRecur, Recur> {}
