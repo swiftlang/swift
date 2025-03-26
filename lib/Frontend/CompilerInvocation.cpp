@@ -3127,10 +3127,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-    Opts.EnableAddressDependencies =
-    Args.hasFlag(OPT_enable_address_dependencies,
-                 OPT_disable_address_dependencies,
-                 Opts.EnableAddressDependencies);
+  Opts.EnableAddressDependencies = Args.hasFlag(
+      OPT_enable_address_dependencies, OPT_disable_address_dependencies,
+      Opts.EnableAddressDependencies);
   Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   return false;
