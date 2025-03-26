@@ -617,9 +617,6 @@ ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
 ///          returns a pointer to the declaration.
 const AbstractFunctionDecl *isActorInitOrDeInitContext(const DeclContext *dc);
 
-/// Determine whether this declaration is always accessed asynchronously.
-bool isAsyncDecl(ConcreteDeclRef declRef);
-
 /// Determine whether this declaration can throw errors.
 bool isThrowsDecl(ConcreteDeclRef declRef);
 

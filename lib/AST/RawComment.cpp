@@ -242,7 +242,7 @@ static bool hasDoubleUnderscore(const Decl *D) {
   // If it's a function or subscript with a parameter with leading
   // double underscore, it's a private function or subscript.
   if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
-    auto *params = getParameterList(cast<ValueDecl>(const_cast<Decl *>(D)));
+    auto *params = cast<ValueDecl>(D)->getParameterList();
     if (params->hasInternalParameter(Prefix))
       return true;
   }
