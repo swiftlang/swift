@@ -170,8 +170,8 @@ extension ${GROUP_TYPE} {
       inheritContext: false,
       enqueueJob: false, // don't enqueue, we'll run it manually
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false,
-      isSynchronousStart: false
+      isDiscardingTask: ${'true' if 'Discarding' in GROUP_TYPE else 'false'},
+      isSynchronousStart: true
     )
 
     // Create the task in this group.
