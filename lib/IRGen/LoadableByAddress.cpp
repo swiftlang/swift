@@ -4165,9 +4165,9 @@ protected:
         BuiltinValueKind::ZeroInitializer) {
       auto build = assignment.getBuilder(++bi->getIterator());
       auto newAddr = assignment.createAllocStack(bi->getType());
+      build.createZeroInitAddr(bi->getLoc(), newAddr);
       assignment.mapValueToAddress(origValue, newAddr);
-      build.createStore(bi->getLoc(), origValue, newAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      assignment.markForDeletion(bi);
     } else {
       singleValueInstructionFallback(bi);
     }
