@@ -314,12 +314,12 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         callVisitUse(op);
         continue;
       }
-      if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+      if (isa<MarkDependenceInst>(user)) {
         // If we are the value use of a forwarding markdep, look through it.
         transitiveResultUses(op);
         continue;
       }
-      if (auto *mdi = dyn_cast<MarkDependenceAddrInst>(user)) {
+      if (isa<MarkDependenceAddrInst>(user)) {
         // The address operand is simply a leaf use.
         callVisitUse(op);
         continue;
