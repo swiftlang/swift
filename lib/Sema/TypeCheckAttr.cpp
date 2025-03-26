@@ -258,16 +258,20 @@ private:
 
 public:
   void visitExecutionAttr(ExecutionAttr *attr) {
-    auto *F = dyn_cast<AbstractFunctionDecl>(D);
-    if (!F)
-      return;
+    auto *const decl = cast<ValueDecl>(D);
 
-    if (!F->hasAsync()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_execution_only_on_async, F);
+    auto *const storage = dyn_cast<AbstractStorageDecl>(decl);
+    if (storage && storage->hasStorage()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_not_on_stored_properties, attr);
       return;
     }
 
-    auto parameters = F->getParameters();
+    if (!decl->isAsync()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_execution_only_on_async, decl);
+      return;
+    }
+
+    auto *parameters = decl->getParameterList();
     if (!parameters)
       return;
 
@@ -279,7 +283,8 @@ public:
       // isolated parameters affect isolation of the function itself
       if (isa<IsolatedTypeRepr>(repr)) {
         diagnoseAndRemoveAttr(
-            attr, diag::attr_execution_incompatible_isolated_parameter, F, P);
+            attr, diag::attr_execution_incompatible_isolated_parameter, decl,
+            P);
         return;
       }
 
@@ -288,7 +293,7 @@ public:
           diagnoseAndRemoveAttr(
               attr,
               diag::attr_execution_incompatible_dynamically_isolated_parameter,
-              F, P);
+              decl, P);
           return;
         }
       }
@@ -7644,7 +7649,7 @@ void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
 
 void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   if ((isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D)) &&
-      !isAsyncDecl(cast<ValueDecl>(D))) {
+      !cast<ValueDecl>(D)->isAsync()) {
     auto value = cast<ValueDecl>(D);
     ActorIsolation isolation = getActorIsolation(value);
     if (isolation.isActorIsolated()) {

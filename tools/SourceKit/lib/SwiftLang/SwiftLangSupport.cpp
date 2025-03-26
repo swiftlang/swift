@@ -967,7 +967,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     OS << ')';
   };
   if (isa<EnumElementDecl>(VD) || isa<FuncDecl>(VD)) {
-    if (const auto ParamList = getParameterList(const_cast<ValueDecl *>(VD))) {
+    if (const auto ParamList = VD->getParameterList()) {
       printParams(ParamList);
     }
   } else if (isa<VarDecl>(VD)) {

@@ -1139,7 +1139,7 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
   if (isa<AbstractClosureExpr>(DC)) {
     ParamList = cast<AbstractClosureExpr>(DC)->getParameters();
   } else {
-    ParamList = getParameterList(cast<ValueDecl>(DC->getAsDecl()));
+    ParamList = cast<ValueDecl>(DC->getAsDecl())->getParameterList();
   }
 
   unsigned UnnamedIndex = 0;

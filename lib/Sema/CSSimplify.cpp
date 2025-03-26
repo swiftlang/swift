@@ -1703,7 +1703,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (parameterBindings[paramIdx].empty() && callee) {
       // Type inference from default value expressions.
       {
-        auto *paramList = getParameterList(callee);
+        auto *paramList = callee->getParameterList();
         if (!paramList)
           continue;
 
@@ -5764,7 +5764,7 @@ bool ConstraintSystem::repairFailures(
 
           // Ignore decls that don't have meaningful parameter lists - this
           // matches variables and parameters with function types.
-          auto *paramList = getParameterList(overload->choice.getDecl());
+          auto *paramList = overload->choice.getDecl()->getParameterList();
           if (!paramList)
             return true;
 
@@ -6058,7 +6058,7 @@ bool ConstraintSystem::repairFailures(
 
       if (auto overload = findSelectedOverloadFor(calleeLocator)) {
         if (auto *decl = overload->choice.getDeclOrNull()) {
-          if (auto paramList = getParameterList(decl)) {
+          if (auto paramList = decl->getParameterList()) {
             if (paramList->get(paramIdx)->getTypeOfDefaultExpr()) {
               conversionsOrFixes.push_back(
                   IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));

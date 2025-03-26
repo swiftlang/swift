@@ -3714,13 +3714,14 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     return { };
 
   // Functions, initializers, and subscripts can contain opaque parameters.
-  ParameterList *params = nullptr;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    params = func->getParameters();
-  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
-    params = subscript->getIndices();
-  else
+  // FIXME: What's wrong with allowing them in macro decls?
+  if (isa<MacroDecl>(value)) {
     return { };
+  }
+  auto *params = value->getParameterList();
+  if (!params) {
+    return {};
+  }
 
   // Look for parameters that have "some" types in them.
   unsigned index = parsedGenericParams ? parsedGenericParams->size() : 0;

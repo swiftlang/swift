@@ -1337,8 +1337,7 @@ bool Decl::hasUnderscoredNaming() const {
   // underscore, it's a private function or subscript.
   if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
     const auto VD = cast<ValueDecl>(D);
-    if (getParameterList(const_cast<ValueDecl *>(VD))
-            ->hasInternalParameter("_")) {
+    if (VD->getParameterList()->hasInternalParameter("_")) {
       return true;
     }
   }
@@ -4117,6 +4116,26 @@ ValueDecl::getCachedOpaqueResultTypeDecl() const {
       .getCachedResult();
 }
 
+ParameterList *ValueDecl::getParameterList() {
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(this)) {
+    return function->getParameters();
+  } else if (auto *enumElement = dyn_cast<EnumElementDecl>(this)) {
+    return enumElement->getParameterList();
+  } else if (auto *subscript = dyn_cast<SubscriptDecl>(this)) {
+    return subscript->getIndices();
+  } else if (auto *macro = dyn_cast<MacroDecl>(this)) {
+    return macro->parameterList;
+  }
+
+  return nullptr;
+}
+
+const ParameterList *ValueDecl::getParameterList() const {
+  return const_cast<ValueDecl *>(this)->getParameterList();
+}
+
+bool ValueDecl::hasParameterList() const { return (bool)getParameterList(); }
+
 bool ValueDecl::isObjC() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -4180,6 +4199,24 @@ bool ValueDecl::isDynamic() const {
   return evaluateOrDefault(ctx.evaluator,
     IsDynamicRequest{const_cast<ValueDecl *>(this)},
     getAttrs().hasAttribute<DynamicAttr>());
+}
+
+bool ValueDecl::isAsync() const {
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(this)) {
+    return function->hasAsync();
+  }
+
+  // Async storage declarations must be get-only. Don't consider it async
+  // otherwise, even if it has an async getter.
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(this)) {
+    if (storage->getAllAccessors().size() == 1) {
+      if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+        return getter->hasAsync();
+      }
+    }
+  }
+
+  return false;
 }
 
 bool ValueDecl::isObjCDynamicInGenericClass() const {
@@ -9599,24 +9636,10 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-ParameterList *swift::getParameterList(ValueDecl *source) {
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
-    return AFD->getParameters();
-  } else if (auto *EED = dyn_cast<EnumElementDecl>(source)) {
-    return EED->getParameterList();
-  } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
-    return SD->getIndices();
-  } else if (auto *MD = dyn_cast<MacroDecl>(source)) {
-    return MD->parameterList;
-  }
-
-  return nullptr;
-}
-
 ParameterList *swift::getParameterList(DeclContext *source) {
   if (auto *D = source->getAsDecl()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      return getParameterList(VD);
+      return VD->getParameterList();
     }
   } else if (auto *CE = dyn_cast<AbstractClosureExpr>(source)) {
     return CE->getParameters();
@@ -9628,7 +9651,7 @@ ParameterList *swift::getParameterList(DeclContext *source) {
 const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
                                        unsigned index) {
   auto *source = declRef.getDecl();
-  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+  if (auto *params = source->getParameterList()) {
     unsigned origIndex = params->getOrigParamIndex(declRef.getSubstitutions(),
                                                    index);
     return params->get(origIndex);
@@ -9638,7 +9661,7 @@ const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
 
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
-  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+  if (auto *params = source->getParameterList()) {
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;

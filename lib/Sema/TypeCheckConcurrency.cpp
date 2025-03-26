@@ -699,7 +699,7 @@ static bool isAsyncCall(
   if (lookup->isImplicitlyAsync())
     return true;
 
-  return isAsyncDecl(lookup->getDecl());
+  return lookup->getDecl().getDecl()->isAsync();
 }
 
 /// Determine whether we should diagnose data races within the current context.
@@ -2040,24 +2040,6 @@ static ActorIsolation getInnermostIsolatedContext(
         dc->mapTypeIntoContext(isolation.getGlobalActor()))
           .withPreconcurrency(isolation.preconcurrency());
   }
-}
-
-/// Determine whether this declaration is always accessed asynchronously.
-bool swift::isAsyncDecl(ConcreteDeclRef declRef) {
-  auto decl = declRef.getDecl();
-
-  // An async function is asynchronously accessed.
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    return func->hasAsync();
-
-  // A computed property or subscript that has an 'async' getter
-  // is asynchronously accessed.
-  if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
-    if (auto effectfulGetter = storageDecl->getEffectfulGetAccessor())
-      return effectfulGetter->hasAsync();
-  }
-
-  return false;
 }
 
 AbstractFunctionDecl *swift::enclosingUnsafeInheritsExecutor(
@@ -4450,7 +4432,7 @@ namespace {
       // Make sure isolated conformances are formed in the right context.
       checkIsolatedConformancesInContext(declRef, loc, getDeclContext());
 
-      auto decl = declRef.getDecl();
+      auto *const decl = declRef.getDecl();
 
       // If this declaration is a callee from the enclosing application,
       // it's already been checked via the call.
@@ -4507,7 +4489,7 @@ namespace {
 
       // An escaping partial application of something that is part of
       // the actor's isolated state is never permitted.
-      if (partialApply && partialApply->isEscaping && !isAsyncDecl(declRef)) {
+      if (partialApply && partialApply->isEscaping && !decl->isAsync()) {
         ctx.Diags.diagnose(loc, diag::actor_isolated_partial_apply, decl);
         return true;
       }
@@ -5619,9 +5601,9 @@ static OverrideIsolationResult validOverrideIsolation(
     // It's okay to enter the actor when the overridden declaration is
     // asynchronous (because it will do the switch) or is accessible from
     // anywhere.
-    if (isAsyncDecl(overridden) ||
-        isAccessibleAcrossActors(
-            overridden, refResult.isolation, declContext)) {
+    if (overridden->isAsync() ||
+        isAccessibleAcrossActors(overridden, refResult.isolation,
+                                 declContext)) {
       return OverrideIsolationResult::Sendable;
     }
 
@@ -5651,7 +5633,7 @@ static OverrideIsolationResult validOverrideIsolation(
 /// Retrieve the index of the first isolated parameter of the given
 /// declaration, if there is one.
 static std::optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
-  auto params = getParameterList(value);
+  auto *params = value->getParameterList();
   if (!params)
     return std::nullopt;
 
@@ -5871,7 +5853,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   if (auto paramIdx = getIsolatedParamIndex(value)) {
     checkDeclWithIsolatedParameter(value);
 
-    ParamDecl *param = getParameterList(value)->get(*paramIdx);
+    ParamDecl *param = value->getParameterList()->get(*paramIdx);
     Type paramType = param->getDeclContext()->mapTypeIntoContext(
         param->getInterfaceType());
     Type actorType;
@@ -7269,7 +7251,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 
   SmallVector<AnyFunctionType::Param, 4> newTypeParams;
   auto typeParams = fnType->getParams();
-  auto paramDecls = func ? func->getParameters() : subscript->getIndices();
+  auto paramDecls = decl->getParameterList();
   assert(typeParams.size() == paramDecls->size());
   bool knownUnsafeParams = func && hasKnownUnsafeSendableFunctionParams(func);
   bool stripConcurrency =
@@ -7720,13 +7702,15 @@ ActorReferenceResult ActorReferenceResult::forReference(
     std::optional<ActorIsolation> knownContextIsolation,
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
+  auto *const decl = declRef.getDecl();
+
   // If not provided, compute the isolation of the declaration, adjusted
   // for references.
   ActorIsolation declIsolation = ActorIsolation::forUnspecified();
   if (knownDeclIsolation) {
     declIsolation = *knownDeclIsolation;
   } else {
-    declIsolation = getActorIsolationForReference(declRef.getDecl(), fromDC);
+    declIsolation = getActorIsolationForReference(decl, fromDC);
     if (declIsolation.requiresSubstitution())
       declIsolation = declIsolation.subst(declRef.getSubstitutions());
   }
@@ -7738,7 +7722,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // FIXME: Actor constructors are modeled as isolated to the actor
   // so that Sendable checking is applied to their arguments, but the
   // call itself does not hop to another executor.
-  if (auto ctor = dyn_cast<ConstructorDecl>(declRef.getDecl())) {
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     if (auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominal->isAnyActor())
         options |= Flags::OnlyArgsCrossIsolation;
@@ -7747,7 +7731,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
 
   // If the entity we are referencing is not a value, we're in the same
   // concurrency domain.
-  if (isNonValueReference(declRef.getDecl()))
+  if (isNonValueReference(decl))
     return forSameConcurrencyDomain(declIsolation, options);
 
   // Compute the isolation of the context, if not provided.
@@ -7764,9 +7748,10 @@ ActorReferenceResult ActorReferenceResult::forReference(
   if (!declIsolation.isActorIsolated()) {
     // If the declaration is asynchronous and we are in an actor-isolated
     // context (of any kind), then we exit the actor to the nonisolated context.
-    if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated() &&
-        !declRef.getDecl()->getAttrs()
-            .hasAttribute<UnsafeInheritExecutorAttr>())
+    if (decl->isAsync() && contextIsolation.isActorIsolated() &&
+        !declRef.getDecl()
+             ->getAttrs()
+             .hasAttribute<UnsafeInheritExecutorAttr>())
       return forExitsActorToNonisolated(contextIsolation, options);
 
     // Otherwise, we stay in the same concurrency domain, whether on an actor
@@ -7795,11 +7780,9 @@ ActorReferenceResult ActorReferenceResult::forReference(
   if ((declIsolation.isActorIsolated() && contextIsolation.isGlobalActor()) ||
       declIsolation.isGlobalActor()) {
     auto *init = dyn_cast<ConstructorDecl>(fromDC);
-    auto *decl = declRef.getDecl();
     if (init && init->isDesignatedInit() && isStoredProperty(decl) &&
         (!actorInstance || actorInstance->isSelf())) {
-      auto type =
-          fromDC->mapTypeIntoContext(declRef.getDecl()->getInterfaceType());
+      auto type = fromDC->mapTypeIntoContext(decl->getInterfaceType());
       if (!type->isSendableType()) {
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
@@ -7813,16 +7796,14 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // If there is an instance and it is checked by flow isolation, treat it
   // as being in the same concurrency domain.
   if (actorInstance &&
-      checkedByFlowIsolation(
-          fromDC, *actorInstance, declRef.getDecl(), declRefLoc, useKind))
+      checkedByFlowIsolation(fromDC, *actorInstance, decl, declRefLoc, useKind))
     return forSameConcurrencyDomain(declIsolation, options);
 
   // If we are delegating to another initializer, treat them as being in the
   // same concurrency domain.
   // FIXME: This has a lot of overlap with both the stored-property checks
   // below and the flow-isolation checks above.
-  if (actorInstance && actorInstance->isSelf() &&
-      isa<ConstructorDecl>(declRef.getDecl()) &&
+  if (actorInstance && actorInstance->isSelf() && isa<ConstructorDecl>(decl) &&
       isa<ConstructorDecl>(fromDC))
     return forSameConcurrencyDomain(declIsolation, options);
 
@@ -7831,16 +7812,15 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // global-actor-qualified type, then we have problems if the stored property
   // type is non-Sendable. Note that if we get here, the type must be Sendable.
   if (actorInstance && actorInstance->isSelf() &&
-      isNonInheritedStorage(declRef.getDecl(), fromDC) &&
-      declIsolation.isGlobalActor() &&
+      isNonInheritedStorage(decl, fromDC) && declIsolation.isGlobalActor() &&
       (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
     return forSameConcurrencyDomain(declIsolation, options);
 
   // At this point, we are accessing the target from outside the actor.
   // First, check whether it is something that can be accessed directly,
   // without any kind of promotion.
-  if (isAccessibleAcrossActors(
-          declRef.getDecl(), declIsolation, fromDC, options, actorInstance))
+  if (isAccessibleAcrossActors(decl, declIsolation, fromDC, options,
+                               actorInstance))
     return forEntersActor(declIsolation, options);
 
   // This is a cross-actor reference.
@@ -7850,7 +7830,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
     options |= Flags::Preconcurrency;
 
   // If the declaration isn't asynchronous, promote to async.
-  if (!isAsyncDecl(declRef))
+  if (!decl->isAsync())
     options |= Flags::AsyncPromotion;
 
   // If the declaration is isolated to a distributed actor and we are not

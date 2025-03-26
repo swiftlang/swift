@@ -6295,8 +6295,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       // If bindings were substituted we need to find "original"
       // (or contextless) parameter index for the default argument.
       if (shouldSubstituteBindings) {
-        auto *paramList = getParameterList(callee.getDecl());
-        assert(paramList);
+        auto *paramList = callee.getDecl()->getParameterList();
+        ASSERT(paramList);
         paramIdxForDefault =
             paramList->getOrigParamIndex(callee.getSubstitutions(), paramIdx);
       }
