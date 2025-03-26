@@ -312,10 +312,8 @@ bool ProtocolConformanceRef::isCanonical() const {
   if (isPack())
     return getPack()->isCanonical();
 
-  if (isAbstract()) {
-    Type conformingType = getType();
-    return !conformingType || conformingType->isCanonical();
-  }
+  if (isAbstract())
+    return getType()->isCanonical();
 
   return getConcrete()->isCanonical();
 }
@@ -328,12 +326,8 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
   if (isPack())
     return ProtocolConformanceRef(getPack()->getCanonicalConformance());
 
-  if (isAbstract()) {
-    Type conformingType = getType();
-    if (conformingType)
-      conformingType = conformingType->getCanonicalType();
-    return forAbstract(conformingType, getProtocol());
-  }
+  if (isAbstract())
+    return forAbstract(getType()->getCanonicalType(), getProtocol());
 
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }
