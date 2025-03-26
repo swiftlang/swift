@@ -795,13 +795,13 @@ Added: _$sSS5IndexVs28CustomDebugStringConvertiblesWP
 // SE-0447 Span and RawSpan
 Added: _$ss4SpanVMa
 Added: _$ss4SpanVMn
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE5countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE7indicesSnySiGvpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE7isEmptySbvpMV
+Added: _$ss4SpanVsRi_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zrlE6_countSivpMV
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvg
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvpMV
+Added: _$ss4SpanVsRi_zrlE5countSivpMV
+Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
+Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV
 Added: _$ss7RawSpanV11byteOffsetsSnySiGvpMV
