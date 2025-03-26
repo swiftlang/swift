@@ -411,7 +411,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
   let isSizedBy: Bool = false
 
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return []
+    return try base.buildBoundsChecks()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -447,7 +447,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
   public let node: SyntaxProtocol
 
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return []
+    return try base.buildBoundsChecks()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws

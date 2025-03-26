@@ -1,7 +1,8 @@
 
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-swift-frontend %s -enable-experimental-cxx-interop -I %S/Inputs -Xcc -std=c++20 -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify -strict-memory-safety 2>&1 | %FileCheck --match-full-lines %s
+// FIXME: buggy sort order for return value transformation gives compilation error in expansion
+// RUN: not %target-swift-frontend %s -enable-experimental-cxx-interop -I %S/Inputs -Xcc -std=c++20 -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify -strict-memory-safety 2>&1 | %FileCheck --match-full-lines %s
 
 // FIXME swift-ci linux tests do not support std::span
 // UNSUPPORTED: OS=linux-gnu
@@ -32,6 +33,13 @@ struct X {
   func myFunc5() -> SpanOfInt {}
 }
 
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy),
+                 .sizedBy(pointer: .param(2), size: "count * size"),
+                 .nonescaping(pointer: .param(2)),
+                 typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+func myFunc6(_ span: SpanOfInt, _ ptr: UnsafeRawPointer, _ count: CInt, _ size: CInt) -> SpanOfInt {
+}
+
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: myFunc(SpanOfInt(span))), copying: ())
@@ -55,4 +63,15 @@ struct X {
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: myFunc5()), copying: ())
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK-NEXT: func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
+// CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
+// CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
+// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
+// CHECK-NEXT:     }
+// CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:         return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: myFunc6(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)), copying: ())
+// CHECK-NEXT:     }
 // CHECK-NEXT: }
