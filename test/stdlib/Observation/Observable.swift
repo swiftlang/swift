@@ -287,6 +287,12 @@ final class CowTest {
   var container = CowContainer()
 }
 
+@Observable
+final class DeinitTriggeredObserver {
+  var property: Int = 3
+}
+
+
 @main
 struct Validator {
   @MainActor
@@ -513,23 +519,13 @@ struct Validator {
 
     suite.test("weak container observation") {
       let changed = CapturedState(state: false)
-      var contents: HasIgnoredProperty? = HasIgnoredProperty()
-      class Container {
-        weak var contents: HasIgnoredProperty?
-        init(contents: HasIgnoredProperty) {
-          self.contents = contents
-        }
-      }
-
-      let test = Container(contents: contents!)
+      var test: DeinitTriggeredObserver? = DeinitTriggeredObserver()
       withObservationTracking {
-        _blackHole(test.contents?.ignored)
-        _blackHole(test.contents?.field)
+        _blackHole(test?.property)
       } onChange: {
         changed.state = true
       }
-      
-      contents = nil
+      test = nil
       expectEqual(changed.state, true)
     }
 
