@@ -319,10 +319,15 @@ target_link_libraries(swiftCore
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
   target_link_libraries(swiftCore INTERFACE
-    swiftrt$<$<BOOL:NO>:>)
+    swiftrt)
 elseif("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "coff")
-  target_link_libraries(swiftCore INTERFACE
-    swiftrt$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:T>)
+  if(BUILD_SHARED_LIBS)
+    target_link_libraries(swiftCore INTERFACE
+      swiftrt)
+  else()
+    target_link_libraries(swiftCore INTERFACE
+      swiftrtT)
+  endif()
 endif()
 
 target_link_options(swiftCore PUBLIC
