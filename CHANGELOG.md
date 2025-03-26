@@ -10724,6 +10724,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
 [SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0419]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0419-backtrace-api.md
 [SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
