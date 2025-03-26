@@ -3937,7 +3937,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
-  case SILInstructionKind::MarkDependenceInst: {
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst: {
     std::optional<MarkDependenceKind> dependenceKind;
     SILValue Base;
     auto parseDependenceKind = [](StringRef Str) {
@@ -3955,13 +3956,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (!dependenceKind) {
       dependenceKind = MarkDependenceKind::Escaping;
     }
-    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
-    if (parseForwardingOwnershipKind(forwardingOwnership)
-        || parseSILDebugLocation(InstLoc, B))
-      return true;
+    if (Opcode == SILInstructionKind::MarkDependenceInst) {
+      ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+      if (parseForwardingOwnershipKind(forwardingOwnership)
+          || parseSILDebugLocation(InstLoc, B)) {
+        return true;
+      }
+      ResultVal = B.createMarkDependence(InstLoc, Val, Base,
+                                         forwardingOwnership,
+                                         dependenceKind.value());
+    } else {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
 
-    ResultVal = B.createMarkDependence(InstLoc, Val, Base, forwardingOwnership,
-                                       dependenceKind.value());
+      ResultVal = B.createMarkDependenceAddr(InstLoc, Val, Base,
+                                             dependenceKind.value());
+    }
     break;
   }
 

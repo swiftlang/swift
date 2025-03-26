@@ -889,16 +889,18 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         locations.clearBits(bits, opVal);
         break;
       }
-      case SILInstructionKind::MarkDependenceInst: {
-        auto *mdi = cast<MarkDependenceInst>(&I);
-        if (mdi->getBase()->getType().isAddress() &&
+      case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst: {
+        auto mdi = MarkDependenceInstruction(&I);
+        if (mdi.getBase()->getType().isAddress() &&
             // In case the mark_dependence is used for a closure it might be that the base
             // is "self" in an initializer and "self" is not fully initialized, yet.
-            !mdi->getType().isFunction()) {
-          requireBitsSet(bits, mdi->getBase(), &I);
+            (!mdi.getType() || !mdi.getType().isFunction())) {
+          requireBitsSet(bits, mdi.getBase(), &I);
         }
         // TODO: check that the base operand is alive during the whole lifetime
-        // of the value operand.
+        // of the value operand. This requires treating all transitive uses of
+        // 'mdi' as uses of 'base' (including copies for non-Escapable types).
         break;
       }
       default:

@@ -1427,6 +1427,7 @@ public:
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
@@ -6134,6 +6135,11 @@ void IRGenSILFunction::visitMarkDependenceInst(swift::MarkDependenceInst *i) {
     Explosion temp = getLoweredExplosion(value);
     setLoweredExplosion(i, temp);
   }
+}
+
+void IRGenSILFunction::
+visitMarkDependenceAddrInst(swift::MarkDependenceAddrInst *i) {
+  // Dependency-marking is purely for SIL. No result.
 }
 
 void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {

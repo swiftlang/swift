@@ -568,10 +568,16 @@ public struct Builder {
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 
-  public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceInst.DependenceKind) -> MarkDependenceInst {
+  public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceInst {
     let markDependence = bridged.createMarkDependence(value.bridged, base.bridged,
                                                       BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
+  }
+
+  public func createMarkDependenceAddr(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceAddrInst {
+    let markDependence = bridged.createMarkDependenceAddr(
+      value.bridged, base.bridged, BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
+    return notifyNew(markDependence.getAs(MarkDependenceAddrInst.self))
   }
     
   @discardableResult

@@ -57,7 +57,7 @@ sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 // CHECK:   [[IN:%.*]] = alloc_stack $AnyObject
 // CHECK:   [[SB:%.*]] = store_borrow [[MV]] to [[IN]]
 // CHECK:   apply %{{.*}}([[OUT]], [[SB]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
-// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[OUT]] on %0
+// CHECK:   mark_dependence_addr [unresolved] [[OUT]] on %0
 // CHECK:   end_borrow [[SB]]
 // CHECK:   end_borrow [[TEMP]]
 // CHECK:   [[LD:%.*]] = load [take] [[OUT]]
@@ -95,7 +95,7 @@ bb0(%0 : @guaranteed $AnyObject):
 // CHECK:   [[MD:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ALLOC]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] %0
 // CHECK:   apply %{{.*}}([[MD]], [[ACCESS]]) : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
-// CHECK:   mark_dependence [unresolved] [[ALLOC]] on [[ACCESS]]
+// CHECK:   mark_dependence_addr [unresolved] [[ALLOC]] on [[ACCESS]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK-LABEL: } // end sil function 'testInoutSpanProp'
 sil [available 9999] [ossa] @testInoutSpanProp : $@convention(method) (@inout AnyObject) -> @lifetime(borrow 0) @owned NCE {
