@@ -62,6 +62,7 @@ class WASILibc(product.Product):
         # check-symbols. The directory is required during sysroot installation step.
         os.makedirs(os.path.join(sysroot_build_dir, "share"), exist_ok=True)
 
+        sysroot_install_path = WASILibc.sysroot_install_path(build_root, target_triple)
         shell.call([
             'make', 'install',
             '-j', str(build_jobs),
@@ -74,13 +75,21 @@ class WASILibc(product.Product):
             '-C', self.source_dir,
             'OBJDIR=' + os.path.join(self.build_dir, 'obj-' + thread_model),
             'SYSROOT=' + sysroot_build_dir,
-            'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root, target_triple),
+            'INSTALL_DIR=' + sysroot_install_path,
             'CC=' + os.path.join(clang_tools_path, 'clang'),
             'AR=' + os.path.join(llvm_tools_path, 'llvm-ar'),
             'NM=' + os.path.join(llvm_tools_path, 'llvm-nm'),
             'THREAD_MODEL=' + thread_model,
             'TARGET_TRIPLE=' + target_triple,
         ])
+
+        if target_triple == "wasm32-wasi":
+            # Alias wasm32-wasip1 to wasm32-wasi as Embedded modules use
+            # wasm32-unknown-wasip1 as the target triple.
+            for subpath in ["lib", "include"]:
+                dest_path = os.path.join(sysroot_install_path, subpath, "wasm32-wasip1")
+                if not os.path.exists(dest_path):
+                    shell.symlink("wasm32-wasi", dest_path)
 
     @classmethod
     def get_dependencies(cls):
