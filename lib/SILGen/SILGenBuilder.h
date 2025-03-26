@@ -93,13 +93,13 @@ public:
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                    SILFunctionTypeIsolation::Unknown);
+                                      SILFunctionTypeIsolation::forUnknown());
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                    SILFunctionTypeIsolation::Unknown) {
+                                      SILFunctionTypeIsolation::forUnknown()) {
     return createPartialApply(loc, fn.getValue(), subs, args,
                               calleeConvention, resultIsolation);
   }

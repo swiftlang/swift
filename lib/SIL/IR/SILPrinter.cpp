@@ -1694,7 +1694,7 @@ public:
     case ParameterConvention::Pack_Inout:
       llvm_unreachable("unexpected callee convention!");
     }
-    switch (fnType->getIsolation()) {
+    switch (fnType->getIsolation().getKind()) {
     case SILFunctionTypeIsolation::Unknown:
       break;
     case SILFunctionTypeIsolation::Erased:

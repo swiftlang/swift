@@ -6797,7 +6797,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
   auto PartialApplyConvention = ParameterConvention::Direct_Owned;
-  auto PartialApplyIsolation = SILFunctionTypeIsolation::Unknown;
+  auto PartialApplyIsolation = SILFunctionTypeIsolation::forUnknown();
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
 
@@ -6828,7 +6828,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     if (AttrName == "isolated_any") {
       assert(!bool(AttrValue));
-      PartialApplyIsolation = SILFunctionTypeIsolation::Erased;
+      PartialApplyIsolation = SILFunctionTypeIsolation::forErased();
       continue;
     }
 
