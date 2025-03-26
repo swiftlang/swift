@@ -3240,8 +3240,8 @@ if (-not $SkipBuild) {
       Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
       Invoke-BuildStep Build-Foundation $Platform -Static
 
-      Move-Item "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
-      Move-Item "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
     }
     Install-Platform $AndroidSDKPlatforms Android
     Invoke-BuildStep Write-PlatformInfoPlist $Platform
