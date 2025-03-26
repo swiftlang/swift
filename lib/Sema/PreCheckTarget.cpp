@@ -1092,6 +1092,10 @@ class PreCheckTarget final : public ASTWalker {
   /// Pull some operator expressions into the optional chain.
   OptionalEvaluationExpr *hoistOptionalEvaluationExprIfNeeded(Expr *E);
 
+  /// Wrap an unresolved member or optional bind chain in an
+  /// UnresolvedMemberChainResultExpr or OptionalEvaluationExpr respectively.
+  Expr *wrapMemberChainIfNeeded(Expr *E);
+
   /// Whether the given expression "looks like" a (possibly sugared) type. For
   /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
   bool exprLooksLikeAType(Expr *expr);
@@ -1464,24 +1468,8 @@ public:
       return Action::Continue(OEE);
     }
 
-    auto *parent = Parent.getAsExpr();
-    if (isMemberChainTail(expr, parent)) {
-      Expr *wrapped = expr;
-      // If we find an unresolved member chain, wrap it in an
-      // UnresolvedMemberChainResultExpr (unless this has already been done).
-      if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
-        if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-          wrapped = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-        }
-      }
-      // Wrap optional chain in an OptionalEvaluationExpr.
-      if (isBindOptionalMemberChain(expr)) {
-        if (!parent || !isa<OptionalEvaluationExpr>(parent)) {
-          wrapped = new (ctx) OptionalEvaluationExpr(wrapped);
-        }
-      }
-      expr = wrapped;
-    }
+    expr = wrapMemberChainIfNeeded(expr);
+
     return Action::Continue(expr);
   }
 
@@ -2686,6 +2674,27 @@ PreCheckTarget::hoistOptionalEvaluationExprIfNeeded(Expr *expr) {
     }
   }
   return nullptr;
+}
+
+Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
+  auto *parent = Parent.getAsExpr();
+  Expr *wrapped = E;
+
+  if (!isMemberChainTail(E, parent))
+    return E;
+
+  // If we find an unresolved member chain, wrap it in an
+  // UnresolvedMemberChainResultExpr (unless this has already been done).
+  if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(E)) {
+    if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent))
+      wrapped = new (Ctx) UnresolvedMemberChainResultExpr(E, UME);
+  }
+  // Wrap optional chain in an OptionalEvaluationExpr.
+  if (isBindOptionalMemberChain(E)) {
+    if (!parent || !isa<OptionalEvaluationExpr>(parent))
+      wrapped = new (Ctx) OptionalEvaluationExpr(wrapped);
+  }
+  return wrapped;
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
