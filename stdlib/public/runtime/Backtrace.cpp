@@ -309,6 +309,7 @@ bool isPrivileged() {
 }
 #endif
 
+#if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 #if _WIN32
 bool writeProtectMemory(void *ptr, size_t size) {
   return !!VirtualProtect(ptr, size, PAGE_READONLY, NULL);
@@ -317,6 +318,7 @@ bool writeProtectMemory(void *ptr, size_t size) {
 bool writeProtectMemory(void *ptr, size_t size) {
   return mprotect(ptr, size, PROT_READ) == 0;
 }
+#endif
 #endif
 
 } // namespace
@@ -1061,6 +1063,7 @@ _swift_backtrace_demangle(const char *mangledName,
   return nullptr;
 }
 
+#if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 namespace {
 
 char addr_buf[18];
@@ -1117,6 +1120,7 @@ trueOrFalse(OnOffTty oot) {
 }
 
 } // namespace
+#endif
 
 // N.B. THIS FUNCTION MUST BE SAFE TO USE FROM A CRASH HANDLER.  On Linux
 // and macOS, that means it must be async-signal-safe.  On Windows, there
