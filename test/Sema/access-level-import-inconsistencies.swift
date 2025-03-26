@@ -53,13 +53,37 @@ import Lib // expected-error {{ambiguous implicit access level for import of 'Li
 //--- ManyFiles_ImplicitVsInternal_FileB.swift
 internal import Lib // expected-note {{imported 'internal' here}}
 
-// RUN: %target-swift-frontend -typecheck %t/ManyFiles_ImplicitVsPackage_FileB.swift -I %t \
-// RUN:   -primary-file %t/ManyFiles_ImplicitVsPackage_FileA.swift -verify
-//--- ManyFiles_ImplicitVsPackage_FileA.swift
-import Lib // expected-error {{ambiguous implicit access level for import of 'Lib'; it is imported as 'package' elsewhere}}
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileA.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileB.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileC.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileA.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileC.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileB.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileB.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileA.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileC.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileB.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileC.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileA.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileC.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileA.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileB.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileC.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileB.swift \
+// RUN:   %t/ManyFiles_ImplicitVsPrivate_FileA.swift
+//--- ManyFiles_ImplicitVsPrivate_FileA.swift
+import Lib // expected-error {{ambiguous implicit access level for import of 'Lib'; it is imported as 'private' elsewhere}}
 // expected-note @-1 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
-//--- ManyFiles_ImplicitVsPackage_FileB.swift
-package import Lib // expected-note {{imported 'package' here}} @:1
+//--- ManyFiles_ImplicitVsPrivate_FileB.swift
+public import Lib // expected-warning {{not used}}
+//--- ManyFiles_ImplicitVsPrivate_FileC.swift
+private import Lib // expected-note {{imported 'private' here}} @:1
 
 // RUN: %target-swift-frontend -typecheck %t/ManyFiles_AmbiguitySwift6_File?.swift -I %t \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
