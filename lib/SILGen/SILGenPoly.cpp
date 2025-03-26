@@ -159,6 +159,14 @@ public:
     if (hasAddress()) return getAddress();
     return SGF.emitTemporaryAllocation(loc, getType());
   }
+  void print(llvm::raw_ostream &os) const {
+    if (hasAddress())
+      os << "Address: " << *getAddress();
+    else
+      os << "Type: " << getType();
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); llvm::dbgs() << '\n'; }
 };
 
 } // end anonymous namespace
@@ -1271,6 +1279,13 @@ public:
            (isIndirectFormalParameter(convention) &&
             SGF.silConv.useLoweredAddresses());
   }
+
+  void print(llvm::raw_ostream &os) const {
+    os << "ParamInfo. Slot: ";
+    slot.print(os);
+  };
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); llvm::dbgs() << '\n'; }
 };
 
 /// Given a list of inputs that are suited to the parameters of one
