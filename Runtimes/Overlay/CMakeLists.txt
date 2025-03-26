@@ -22,6 +22,8 @@ project(SwiftOverlay
   LANGUAGES C CXX Swift
   VERSION 6.1.0${BUILD_NUMBER})
 
+find_package(SwiftCore)
+
 # FIXME: We should not need to refer back into the compiler sources. This is
 # needed by gyb and AvailabilityMacros
 set(SwiftOverlay_SWIFTC_SOURCE_DIR
