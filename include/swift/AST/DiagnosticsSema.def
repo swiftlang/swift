@@ -1730,11 +1730,11 @@ ERROR(missing_initializer_def,PointsToFirstBadToken,
 ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,none,
-      "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
+      "cannot declare a custom %0 '%1' operator", (DeclAttribute, StringRef))
 ERROR(attribute_requires_operator_identifier,none,
-      "'%0' requires a function with an operator identifier", (StringRef))
+      "%0 requires a function with an operator identifier", (DeclAttribute))
 ERROR(attribute_requires_single_argument,none,
-      "'%0' requires a function with one argument", (StringRef))
+      "%0 requires a function with one argument", (DeclAttribute))
 
 ERROR(nominal_type_not_attribute,none,
       "%kind0 cannot be used as an attribute", (const ValueDecl *))
@@ -1783,23 +1783,24 @@ ERROR(invalid_ibdesignable_extension,none,
       "@IBDesignable can only be applied to classes and extensions "
       "of classes", ())
 ERROR(attr_must_be_used_on_class_instance,none,
-      "only class instance properties can be declared @%0", (StringRef))
+      "only class instance properties can be declared %0", (DeclAttribute))
 ERROR(invalid_ibaction_decl,none,
-      "only instance methods can be declared @%0", (StringRef))
+      "only instance methods can be declared %0", (DeclAttribute))
 ERROR(invalid_ibaction_result,none,
-      "methods declared @%0 must %select{|not }1return a value", (StringRef, bool))
+      "methods declared %0 must %select{|not }1return a value",
+      (DeclAttribute, bool))
 ERROR(invalid_ibaction_argument_count,none,
-      "@%0 methods must have %1 to %2 arguments",
-      (StringRef, int, int))
+      "%0 methods must have %1 to %2 arguments",
+      (DeclAttribute, int, int))
 ERROR(invalid_ibaction_argument_count_exact,none,
-      "@%0 methods must have %2 argument%s2",
-      (StringRef, int, int))
+      "%0 methods must have %2 argument%s2",
+      (DeclAttribute, int, int))
 ERROR(invalid_ibaction_argument_count_max,none,
-      "@%0 methods must have at most %2 argument%s2",
-      (StringRef, int, int))
+      "%0 methods must have at most %2 argument%s2",
+      (DeclAttribute, int, int))
 ERROR(ibsegueaction_objc_method_family,none,
-      "@%0 method cannot have selector %1 because it has special memory "
-      "management behavior", (StringRef, ObjCSelector))
+      "%0 method cannot have selector %1 because it has special memory "
+      "management behavior", (DeclAttribute, ObjCSelector))
 NOTE(fixit_rename_in_swift,none,
      "change Swift name to %0", (DeclName))
 NOTE(fixit_rename_in_objc,none,
@@ -2051,7 +2052,8 @@ ERROR(extern_not_at_top_level_func,none,
 ERROR(extern_empty_c_name,none,
       "expected non-empty C name in @_extern attribute", ())
 ERROR(extern_only_non_other_attr,none,
-      "@_extern attribute cannot be applied to an '@%0' declaration", (StringRef))
+      "@_extern attribute cannot be applied to an %0 declaration",
+      (DeclAttribute))
 WARNING(extern_c_maybe_invalid_name, none,
         "C name '%0' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning",
         (StringRef))
@@ -2142,14 +2144,16 @@ ERROR(expose_zero_size_to_cxx,none,
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(attr_decl_async,none,
-      "@%0 %1 cannot be asynchronous", (StringRef, DescriptiveDeclKind))
+      "%0 %kindonly1 cannot be asynchronous", (DeclAttribute, const FuncDecl *))
 
 ERROR(attr_only_at_non_local_scope, none,
+      "attribute %0 can only be used in a non-local scope", (DeclAttribute))
+ERROR(attr_name_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 ERROR(attr_only_at_non_generic_scope, none,
-      "attribute '%0' cannot be used in a generic context", (StringRef))
+      "attribute %0 cannot be used in a generic context", (DeclAttribute))
 ERROR(attr_only_on_static_properties, none,
-      "properties with attribute '%0' must be static", (StringRef))
+      "properties with attribute %0 must be static", (DeclAttribute))
 
 ERROR(weak_unowned_in_embedded_swift, none,
       "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
@@ -4015,7 +4019,7 @@ ERROR(attr_has_no_effect_on_unavailable_decl,none,
       (DeclAttribute, const ValueDecl *, AvailabilityDomain))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
-      "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
+      "ambiguous reference to %0 in %1 attribute", (DeclNameRef, DeclAttribute))
 
 ERROR(attr_contains_multiple_versions_for_platform,none,
       "'%0' contains multiple versions for %1", (DeclAttribute, StringRef))
