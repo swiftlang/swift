@@ -317,54 +317,78 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
   return AllDeclRefs;
 }
 
+namespace {
+enum class MemberChainKind {
+  OptionalBind,     // A 'x?.y' optional binding chain
+  UnresolvedMember, // A '.foo.bar' chain
+};
+} // end anonymous namespace
+
 /// Find the next element in a chain of members. If this expression is (or
 /// could be) the base of such a chain, this will return \c nullptr.
-static Expr *getMemberChainSubExpr(Expr *expr) {
+static Expr *getMemberChainSubExpr(Expr *expr, MemberChainKind kind) {
   assert(expr && "getMemberChainSubExpr called with null expr!");
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr))
     return UDE->getBase();
-  } else if (auto *CE = dyn_cast<CallExpr>(expr)) {
+  if (auto *CE = dyn_cast<CallExpr>(expr))
     return CE->getFn();
-  } else if (auto *BOE = dyn_cast<BindOptionalExpr>(expr)) {
+  if (auto *BOE = dyn_cast<BindOptionalExpr>(expr))
     return BOE->getSubExpr();
-  } else if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
     return FVE->getSubExpr();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+  if (auto *SE = dyn_cast<SubscriptExpr>(expr))
     return SE->getBase();
-  } else if (auto *DSE = dyn_cast<DotSelfExpr>(expr)) {
+  if (auto *DSE = dyn_cast<DotSelfExpr>(expr))
     return DSE->getSubExpr();
-  } else if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+  if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr))
     return USE->getSubExpr();
-  } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
+  if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr))
     return CCE->getBase();
-  } else {
-    return nullptr;
+
+  if (kind == MemberChainKind::OptionalBind) {
+    // We allow postfix operators to be part of the optional member chain, e.g:
+    //
+    //   for?.bar++
+    //   x.y?^.foo()
+    //
+    // Note this behavior is specific to optional chains, we treat e.g
+    // `.foo^` as `(.foo)^`.
+    if (auto *PO = dyn_cast<PostfixUnaryExpr>(expr))
+      return PO->getOperand();
+
+    // Unresolved member chains can themselves be nested in optional chains
+    // since optional chains can include postfix operators.
+    if (auto *UME = dyn_cast<UnresolvedMemberChainResultExpr>(expr))
+      return UME->getSubExpr();
   }
+
+  return nullptr;
 }
 
 UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
-  if (auto *subExpr = getMemberChainSubExpr(expr))
+  if (auto *subExpr =
+          getMemberChainSubExpr(expr, MemberChainKind::UnresolvedMember)) {
     return getUnresolvedMemberChainBase(subExpr);
-  else
-    return dyn_cast<UnresolvedMemberExpr>(expr);
+  }
+  return dyn_cast<UnresolvedMemberExpr>(expr);
 }
 
 static bool isBindOptionalMemberChain(Expr *expr) {
-  if (isa<BindOptionalExpr>(expr)) {
+  if (isa<BindOptionalExpr>(expr))
     return true;
-  } else if (auto *base = getMemberChainSubExpr(expr)) {
+
+  if (auto *base = getMemberChainSubExpr(expr, MemberChainKind::OptionalBind))
     return isBindOptionalMemberChain(base);
-  } else {
-    return false;
-  }
+
+  return false;
 }
 
 /// Whether this expression sits at the end of a chain of member accesses.
-static bool isMemberChainTail(Expr *expr, Expr *parent) {
+static bool isMemberChainTail(Expr *expr, Expr *parent, MemberChainKind kind) {
   assert(expr && "isMemberChainTail called with null expr!");
   // If this expression's parent is not itself part of a chain (or, this expr
   // has no parent expr), this must be the tail of the chain.
-  return !parent || getMemberChainSubExpr(parent) != expr;
+  return !parent || getMemberChainSubExpr(parent, kind) != expr;
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
@@ -1092,6 +1116,10 @@ class PreCheckTarget final : public ASTWalker {
   /// Pull some operator expressions into the optional chain.
   OptionalEvaluationExpr *hoistOptionalEvaluationExprIfNeeded(Expr *E);
 
+  /// Wrap an unresolved member or optional bind chain in an
+  /// UnresolvedMemberChainResultExpr or OptionalEvaluationExpr respectively.
+  Expr *wrapMemberChainIfNeeded(Expr *E);
+
   /// Whether the given expression "looks like" a (possibly sugared) type. For
   /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
   bool exprLooksLikeAType(Expr *expr);
@@ -1464,24 +1492,8 @@ public:
       return Action::Continue(OEE);
     }
 
-    auto *parent = Parent.getAsExpr();
-    if (isMemberChainTail(expr, parent)) {
-      Expr *wrapped = expr;
-      // If we find an unresolved member chain, wrap it in an
-      // UnresolvedMemberChainResultExpr (unless this has already been done).
-      if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
-        if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-          wrapped = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-        }
-      }
-      // Wrap optional chain in an OptionalEvaluationExpr.
-      if (isBindOptionalMemberChain(expr)) {
-        if (!parent || !isa<OptionalEvaluationExpr>(parent)) {
-          wrapped = new (ctx) OptionalEvaluationExpr(wrapped);
-        }
-      }
-      expr = wrapped;
-    }
+    expr = wrapMemberChainIfNeeded(expr);
+
     return Action::Continue(expr);
   }
 
@@ -2653,7 +2665,6 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 ///
 ///   foo? = newFoo // LHS of the assignment operator
 ///   foo?.bar += value // LHS of 'assignment: true' precedence group operators.
-///   for?.bar++ // Postfix operator.
 ///
 /// In such cases, the operand is constructed to be an 'OperatorEvaluationExpr'
 /// wrapping the actual operand. This function hoist it and wraps the entire
@@ -2678,14 +2689,32 @@ PreCheckTarget::hoistOptionalEvaluationExprIfNeeded(Expr *expr) {
         }
       }
     }
-  } else if (auto *postfixE = dyn_cast<PostfixUnaryExpr>(expr)) {
-    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(postfixE->getOperand())) {
-      postfixE->setOperand(OEE->getSubExpr());
-      OEE->setSubExpr(postfixE);
-      return OEE;
-    }
   }
   return nullptr;
+}
+
+Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
+  auto *parent = Parent.getAsExpr();
+  Expr *wrapped = E;
+
+  // If the parent is already wrapped, we've already formed the member chain.
+  if (parent && (isa<OptionalEvaluationExpr>(parent) ||
+                 isa<UnresolvedMemberChainResultExpr>(parent))) {
+    return E;
+  }
+
+  // If we find an unresolved member chain, wrap it in an
+  // UnresolvedMemberChainResultExpr.
+  if (isMemberChainTail(E, parent, MemberChainKind::UnresolvedMember)) {
+    if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(E))
+      wrapped = new (Ctx) UnresolvedMemberChainResultExpr(E, UME);
+  }
+  // Wrap optional chain in an OptionalEvaluationExpr.
+  if (isMemberChainTail(E, parent, MemberChainKind::OptionalBind)) {
+    if (isBindOptionalMemberChain(E))
+      wrapped = new (Ctx) OptionalEvaluationExpr(wrapped);
+  }
+  return wrapped;
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {
