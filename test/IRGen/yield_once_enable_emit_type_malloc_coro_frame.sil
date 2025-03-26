@@ -49,8 +49,8 @@ unwind:
 // CHECK:       br i1 %2, label %return-coroFrameAlloc, label %return-malloc
 
 // CHECK-LABEL: return-coroFrameAlloc:
-// CHECK-32:         %3 = call ptr @swift_coroFrameAlloc(i32 %0, i64 %1) #2
-// CHECK-64:         %3 = call ptr @swift_coroFrameAlloc(i64 %0, i64 %1) #2
+// CHECK-32:         %3 = call ptr @swift_coroFrameAlloc(i32 %0, i64 %1)
+// CHECK-64:         %3 = call ptr @swift_coroFrameAlloc(i64 %0, i64 %1)
 // CHECK:         ret ptr %3
 
 // CHECK-LABEL: return-malloc:
