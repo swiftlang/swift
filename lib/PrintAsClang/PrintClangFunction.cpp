@@ -618,6 +618,15 @@ static bool isOptionalObjCExistential(Type ty) {
   return false;
 }
 
+static bool isOptionalForeignReferenceType(Type ty) {
+  if (auto obj = ty->getOptionalObjectType()) {
+    if (const auto *cd =
+            dyn_cast_or_null<ClassDecl>(obj->getNominalOrBoundGenericNominal()))
+      return cd->isForeignReferenceType();
+  }
+  return false;
+}
+
 // Returns false if the given direct type is not yet supported because
 // of its ABI.
 template <class T>
@@ -658,7 +667,8 @@ static bool printDirectReturnOrParamCType(
   if (isKnownCType(valueType, typeMapping) ||
       (Count == 1 && lastOffset.isZero() && !valueType->hasTypeParameter() &&
        (valueType->isAnyClassReferenceType() ||
-        isOptionalObjCExistential(valueType)))) {
+        isOptionalObjCExistential(valueType) ||
+        isOptionalForeignReferenceType(valueType)))) {
     prettifiedValuePrinter();
     return true;
   }
@@ -1506,10 +1516,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!nonOptResultType)
     nonOptResultType = resultTy;
   if (auto *classDecl = nonOptResultType->getClassOrBoundGenericClass();
-      classDecl || nonOptResultType->isObjCExistentialType()) {
+      (classDecl && isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) ||
+      nonOptResultType->isObjCExistentialType()) {
     assert(!classDecl || classDecl->hasClangNode());
-    assert(!classDecl ||
-           isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
     os << "return (__bridge_transfer ";
     declPrinter.withOutputStream(os).print(nonOptResultType);
     os << ")(__bridge void *)";
@@ -1766,6 +1775,9 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
               optionalObjectType->getNominalOrBoundGenericNominal())) {
         return typeInfo->canBeNullable;
       }
+      if (const auto *cd = dyn_cast<ClassDecl>(nominal))
+        if (cd->isForeignReferenceType())
+          return true;
       return isa_and_nonnull<clang::ObjCInterfaceDecl>(nominal->getClangDecl());
     }
   }
