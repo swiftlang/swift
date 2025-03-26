@@ -176,6 +176,10 @@ BridgedSourceLoc BridgedDeclObj::getLoc() const {
   return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
 }
 
+BridgedDeclObj BridgedDeclObj::getModuleContext() const {
+  return {unbridged()->getModuleContext()};
+}
+
 BridgedStringRef BridgedDeclObj::Type_getName() const {
   return getAs<swift::TypeDecl>()->getName().str();
 }
@@ -218,6 +222,10 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
 
 BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::AbstractFunction_isOverridden() const {
+  return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }
 
 bool BridgedDeclObj::Destructor_isIsolated() const {
@@ -459,6 +467,36 @@ bool BridgedASTType::isFunction() const {
   return unbridged()->is<swift::FunctionType>();
 }
 
+bool BridgedASTType::isLoweredFunction() const {
+  return unbridged()->is<swift::SILFunctionType>();
+}
+
+bool BridgedASTType::isNoEscapeFunction() const {
+  if (auto *fTy = unbridged()->getAs<swift::SILFunctionType>()) {
+    return fTy->isNoEscape();
+  }
+  return false;
+}
+
+bool BridgedASTType::isThickFunction() const {
+  if (auto *fTy = unbridged()->getAs<swift::SILFunctionType>()) {
+    return fTy->getRepresentation() == swift::SILFunctionType::Representation::Thick;
+  }
+  return false;
+}
+
+bool BridgedASTType::isAsyncFunction() const {
+  if (auto *fTy = unbridged()->getAs<swift::SILFunctionType>()) {
+    return fTy->isAsync();
+  }
+  return false;
+}
+
+bool BridgedASTType::isCalleeConsumedFunction() const {
+  auto *funcTy = unbridged()->castTo<swift::SILFunctionType>();
+  return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
+}
+
 bool BridgedASTType::isBuiltinInteger() const {
   return unbridged()->is<swift::BuiltinIntegerType>();
 }
@@ -515,6 +553,10 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
   return unbridged()->getContextSubstitutionMap();
+}
+
+BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionType() const {
+  return {unbridged()->castTo<swift::SILFunctionType>()->getInvocationGenericSignature().getPointer()};
 }
 
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
@@ -717,6 +759,10 @@ bool BridgedSubstitutionMap::isEmpty() const {
   return unbridged().empty();
 }
 
+bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
+  return unbridged() == rhs.unbridged();
+}
+
 bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
 }
@@ -739,6 +785,10 @@ BridgedASTTypeArray BridgedSubstitutionMap::getReplacementTypes() const {
 
 swift::GenericSignature BridgedGenericSignature::unbridged() const {
   return swift::GenericSignature(impl);
+}
+
+BridgedASTTypeArray BridgedGenericSignature::getGenericParams() const {
+  return {unbridged().getGenericParams()};
 }
 
 //===----------------------------------------------------------------------===//
