@@ -719,9 +719,6 @@ BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
 /// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
 BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
 
-/// zeroInitializer has type <T> () -> T
-BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
-
 /// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
@@ -841,6 +838,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
+
+/// zeroInitializer has type <T> () -> T, but the SIL builtin has its
+/// own rules.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
 
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
