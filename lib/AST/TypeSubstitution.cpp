@@ -61,29 +61,11 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs,
                                       SubstOptions options) {
-  return substGenericArgs(
-    [=](Type t) { return t.subst(subs, options); });
-}
-
-FunctionType *GenericFunctionType::substGenericArgs(
-    llvm::function_ref<Type(Type)> substFn) const {
-  llvm::SmallVector<AnyFunctionType::Param, 4> params;
-  params.reserve(getNumParams());
-
-  llvm::transform(getParams(), std::back_inserter(params),
-                  [&](const AnyFunctionType::Param &param) {
-                    return param.withType(substFn(param.getPlainType()));
-                  });
-
-  auto resultTy = substFn(getResult());
-
-  Type thrownError = getThrownError();
-  if (thrownError)
-    thrownError = substFn(thrownError);
-
-  // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy,
-                           getExtInfo().withThrows(isThrowing(), thrownError));
+  // FIXME: Before dropping the signature, we should assert that
+  // subs.getGenericSignature() is equal to this function type's
+  // generic signature.
+  Type fnType = FunctionType::get(getParams(), getResult(), getExtInfo());
+  return fnType.subst(subs, options)->castTo<FunctionType>();
 }
 
 CanFunctionType
