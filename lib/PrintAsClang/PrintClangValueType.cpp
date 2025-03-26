@@ -641,7 +641,9 @@ void ClangValueTypePrinter::printTypeGenericTraits(
               typeDecl, typeMetadataFuncName, typeMetadataFuncRequirements);
         });
   }
-  bool addPointer = typeDecl->isObjC();
+  auto classDecl = dyn_cast<ClassDecl>(typeDecl);
+  bool addPointer =
+      typeDecl->isObjC() || (classDecl && classDecl->isForeignReferenceType());
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
