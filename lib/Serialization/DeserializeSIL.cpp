@@ -2558,6 +2558,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
+    auto isolatedConformances = (ListOfValues[4] & 0x01)
+        ? CastingIsolatedConformances::Prohibit
+        : CastingIsolatedConformances::Allow;
+
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[1]),
                                         (SILValueCategory)ListOfValues[2], Fn);
     SILValue src = getLocalValue(Builder.maybeGetFunction(), ListOfValues[0],
@@ -2568,7 +2572,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     CanType targetFormalType =
         MF->getType(ListOfValues[3])->getCanonicalType();
     ResultInst = Builder.createUnconditionalCheckedCast(
-        Loc, src, targetLoweredType, targetFormalType);
+        Loc, isolatedConformances, src, targetLoweredType, targetFormalType);
     break;
   }
 
@@ -3531,7 +3535,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::CheckedCastBranchInst: {
     // Format: the cast kind, a typed value, a BasicBlock ID for success,
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
-    bool isExact = ListOfValues[0] != 0;
+    bool isExact = (ListOfValues[0] & 0x01) != 0;
+    auto isolatedConformances = (ListOfValues[0] & 0x02)
+        ? CastingIsolatedConformances::Prohibit
+        : CastingIsolatedConformances::Allow;
     CanType sourceFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType opTy = getSILType(MF->getType(ListOfValues[3]),
                               (SILValueCategory)ListOfValues[4], Fn);
@@ -3544,14 +3551,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *failureBB = getBBForReference(Fn, ListOfValues[7]);
 
     ResultInst =
-        Builder.createCheckedCastBranch(Loc, isExact, op, sourceFormalType, 
-                                        targetLoweredType, targetFormalType, 
+        Builder.createCheckedCastBranch(Loc, isExact, isolatedConformances,
+                                        op, sourceFormalType,
+                                        targetLoweredType, targetFormalType,
                                         successBB, failureBB,
                                         forwardingOwnership);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     // ignore attr.
+    auto isolatedConformances = (ListOfValues[6] & 0x01)
+        ? CastingIsolatedConformances::Prohibit
+        : CastingIsolatedConformances::Allow;
+
     CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
                                        (SILValueCategory)ListOfValues[3], Fn);
@@ -3565,11 +3577,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                   targetLoweredType);
 
     ResultInst = Builder.createUnconditionalCheckedCastAddr(
-        Loc, src, srcFormalType, dest, targetFormalType);
+        Loc, isolatedConformances, src, srcFormalType, dest, targetFormalType);
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
-    CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
+    unsigned flags = ListOfValues[0];
+    auto isolatedConformances = flags & 0x01
+      ? CastingIsolatedConformances::Prohibit
+      : CastingIsolatedConformances::Allow;
+    CastConsumptionKind consumption = getCastConsumptionKind(flags >> 1);
 
     CanType srcFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[3]),
@@ -3587,8 +3603,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultInst = Builder.createCheckedCastAddrBranch(
-        Loc, consumption, src, srcFormalType, dest, targetFormalType, successBB,
-        failureBB);
+        Loc, isolatedConformances, consumption, src, srcFormalType, dest,
+        targetFormalType, successBB, failureBB);
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {

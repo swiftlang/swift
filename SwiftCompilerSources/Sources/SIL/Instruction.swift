@@ -528,6 +528,14 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
   public var isTakeOfSrc: Bool { true }
   public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.UnconditionalCheckedCastAddr_getIsolatedConformances() {
+    case .Allow: .allow
+    case .Prohibit: .prohibit
+    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
+    }
+  }
 }
 
 final public class BeginDeallocRefInst : SingleValueInstruction, UnaryInstruction {
@@ -1031,6 +1039,14 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   }
   public var targetFormalType: CanonicalType {
     CanonicalType(bridged: bridged.UnconditionalCheckedCast_getTargetFormalType())
+  }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.UnconditionalCheckedCast_getIsolatedConformances() {
+    case .Allow: .allow
+    case .Prohibit: .prohibit
+    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
+    }
   }
 }
 
@@ -1771,6 +1787,18 @@ final public class DynamicMethodBranchInst : TermInst {
 final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
+public enum CastingIsolatedConformances {
+  case allow
+  case prohibit
+
+  var bridged: BridgedInstruction.CastingIsolatedConformances {
+    switch self {
+    case .allow: return .Allow
+    case .prohibit: return .Prohibit
+    }
+  }
+}
+
 final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var source: Value { operand.value }
   public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
@@ -1778,6 +1806,14 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 
   public func updateSourceFormalTypeFromOperandLoweredType() {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()
+  }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.CheckedCastBranch_getIsolatedConformances() {
+    case .Allow: return .allow
+    case .Prohibit: return .prohibit
+    default: fatalError("Bad CastingIsolatedConformances value")
+    }
   }
 }
 
@@ -1817,6 +1853,14 @@ final public class CheckedCastAddrBranchInst : TermInst {
     case .CopyOnSuccess: return .CopyOnSuccess
     default:
       fatalError("invalid cast consumption kind")
+    }
+  }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.CheckedCastAddrBranch_getIsolatedConformances() {
+    case .Allow: .allow
+    case .Prohibit: .prohibit
+    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
     }
   }
 }

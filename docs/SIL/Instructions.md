@@ -4851,7 +4851,9 @@ on whether the cast succeeds or not.
 ### unconditional_checked_cast
 
 ```
-sil-instruction ::= 'unconditional_checked_cast' sil-operand 'to' sil-type
+sil-instruction ::= 'unconditional_checked_cast' 
+                    sil-prohibit-isolated-conformances?
+                    sil-operand 'to' sil-type
 
 %1 = unconditional_checked_cast %0 : $A to $B
 %1 = unconditional_checked_cast %0 : $*A to $*B
@@ -4867,8 +4869,9 @@ ownership are unsupported.
 
 ```
 sil-instruction ::= 'unconditional_checked_cast_addr'
-                     sil-type 'in' sil-operand 'to'
-                     sil-type 'in' sil-operand
+                    sil-prohibit-isolated-conformances?
+                    sil-type 'in' sil-operand 'to'
+                    sil-type 'in' sil-operand
 
 unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
 // $A and $B must be both addresses
@@ -5231,10 +5234,12 @@ instruction branches to `bb2`.
 
 ```
 sil-terminator ::= 'checked_cast_br' sil-checked-cast-exact?
+                    sil-prohibit-isolated-conformances?
                     sil-type 'in'
                     sil-operand 'to' sil-type ','
                     sil-identifier ',' sil-identifier
 sil-checked-cast-exact ::= '[' 'exact' ']'
+sil-prohibit-isolated-conformances ::= '[' 'prohibit_isolated_conformances' ']'
 
 checked_cast_br A in %0 : $A to $B, bb1, bb2
 checked_cast_br *A in %0 : $*A to $*B, bb1, bb2
@@ -5253,10 +5258,14 @@ An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it. The source and target types must
 be class types.
 
+A cast can specify that the runtime should prohibit all uses of isolated
+conformances when attempting to satisfy protocol requirements of existentials.
+
 ### checked_cast_addr_br
 
 ```
 sil-terminator ::= 'checked_cast_addr_br'
+                    sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
                     sil-stype 'in' sil-operand ','

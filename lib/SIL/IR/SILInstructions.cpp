@@ -1441,13 +1441,15 @@ UncheckedRefCastAddrInst::create(SILDebugLocation Loc, SILValue src,
 }
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, SILValue src, CanType srcType, SILValue dest,
+    SILDebugLocation Loc, CastingIsolatedConformances isolatedConformances,
+    SILValue src, CanType srcType, SILValue dest,
     CanType targetType, ArrayRef<SILValue> TypeDependentOperands)
     : AddrCastInstBase(Loc, src, srcType, dest, targetType,
-        TypeDependentOperands) {}
+        TypeDependentOperands),
+      IsolatedConformances(isolatedConformances) {}
 
 UnconditionalCheckedCastAddrInst *
-UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc, SILValue src,
+UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc, CastingIsolatedConformances isolatedConformances, SILValue src,
         CanType srcType, SILValue dest, CanType targetType, SILFunction &F) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 4> allOperands;
@@ -1455,25 +1457,29 @@ UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc, SILValue src,
   unsigned size =
       totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastAddrInst));
-  return ::new (Buffer) UnconditionalCheckedCastAddrInst(Loc, src, srcType,
-    dest, targetType, allOperands);
+  return ::new (Buffer) UnconditionalCheckedCastAddrInst(
+    Loc, isolatedConformances, src, srcType, dest, targetType, allOperands);
 }
 
 CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(
-  SILDebugLocation DebugLoc, CastConsumptionKind consumptionKind,
+  SILDebugLocation DebugLoc,
+  CastingIsolatedConformances isolatedConformances,
+  CastConsumptionKind consumptionKind,
   SILValue src, CanType srcType, SILValue dest, CanType targetType,
   ArrayRef<SILValue> TypeDependentOperands,
   SILBasicBlock *successBB, SILBasicBlock *failureBB,
   ProfileCounter Target1Count, ProfileCounter Target2Count)
       : AddrCastInstBase(DebugLoc, src, srcType, dest,
             targetType, TypeDependentOperands, consumptionKind,
-            successBB, failureBB, Target1Count, Target2Count) {
+            successBB, failureBB, Target1Count, Target2Count),
+        IsolatedConformances(isolatedConformances) {
   assert(consumptionKind != CastConsumptionKind::BorrowAlways &&
          "BorrowAlways is not supported on addresses");
 }
 
 CheckedCastAddrBranchInst *
 CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
+         CastingIsolatedConformances isolatedConformances,
          CastConsumptionKind consumptionKind,
          SILValue src, CanType srcType, SILValue dest, CanType targetType,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
@@ -1485,7 +1491,8 @@ CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
   unsigned size =
       totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastAddrBranchInst));
-  return ::new (Buffer) CheckedCastAddrBranchInst(DebugLoc, consumptionKind,
+  return ::new (Buffer) CheckedCastAddrBranchInst(
+    DebugLoc, isolatedConformances, consumptionKind,
     src, srcType, dest, targetType, allOperands,
     successBB, failureBB, Target1Count, Target2Count);
 }
@@ -2684,7 +2691,8 @@ UncheckedBitwiseCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType DestLoweredTy,
+    SILDebugLocation DebugLoc, CastingIsolatedConformances isolatedConformances,
+    SILValue Operand, SILType DestLoweredTy,
     CanType DestFormalTy, SILFunction &F,
     ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &Mod = F.getModule();
@@ -2694,12 +2702,13 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(
-      DebugLoc, Operand, TypeDependentOperands, DestLoweredTy, DestFormalTy,
-      forwardingOwnershipKind);
+      DebugLoc, isolatedConformances, Operand, TypeDependentOperands,
+      DestLoweredTy, DestFormalTy, forwardingOwnershipKind);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
-    SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
+    SILDebugLocation DebugLoc, bool IsExact,
+    CastingIsolatedConformances isolatedConformances, SILValue Operand,
     CanType SrcFormalTy, SILType DestLoweredTy, CanType DestFormalTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
     ProfileCounter Target1Count, ProfileCounter Target2Count,
@@ -2713,7 +2722,8 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
       totalSizeToAlloc<swift::Operand>(3 + TypeDependentOperands.size());
   void *Buffer = module.allocateInst(size, alignof(CheckedCastBranchInst));
   return ::new (Buffer) CheckedCastBranchInst(
-      DebugLoc, IsExact, Operand, SrcFormalTy, TypeDependentOperands,
+      DebugLoc, IsExact, isolatedConformances, Operand, SrcFormalTy,
+      TypeDependentOperands,
       DestLoweredTy, DestFormalTy, SuccessBB, FailureBB, Target1Count,
       Target2Count, forwardingOwnershipKind, preservesOwnership);
 }

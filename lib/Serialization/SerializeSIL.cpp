@@ -2226,11 +2226,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
+    unsigned flags = 0;
+    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x01;
     ValueID listOfValues[] = {
       addValueRef(CI->getOperand()),
       S.addTypeRef(CI->getSourceLoweredType().getRawASTType()),
       (unsigned)CI->getSourceLoweredType().getCategory(),
-      S.addTypeRef(CI->getTargetFormalType())
+      S.addTypeRef(CI->getTargetFormalType()),
+      flags
     };
 
     SILOneTypeValuesLayout::emitRecord(
@@ -2243,13 +2247,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
+    unsigned flags = 0;
+    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x01;
     ValueID listOfValues[] = {
       S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
       S.addTypeRef(CI->getSourceLoweredType().getRawASTType()),
       (unsigned)CI->getSourceLoweredType().getCategory(),
       S.addTypeRef(CI->getTargetFormalType()),
-      addValueRef(CI->getDest())
+      addValueRef(CI->getDest()),
+      flags
     };
     SILOneTypeValuesLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
@@ -2759,8 +2767,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::CheckedCastBranchInst: {
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
+    unsigned flags = 0;
+    if (CBI->isExact())
+      flags |= 0x01;
+    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x02;
     ValueID listOfValues[] = {
-      CBI->isExact(),
+      flags,
       S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getOperand()),
       S.addTypeRef(CBI->getSourceLoweredType().getRawASTType()),
@@ -2781,8 +2794,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
+    unsigned flags =
+      toStableCastConsumptionKind(CBI->getConsumptionKind()) << 1;
+    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x01;
     ValueID listOfValues[] = {
-      toStableCastConsumptionKind(CBI->getConsumptionKind()),
+      flags,
       S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getSrc()),
       S.addTypeRef(CBI->getSourceLoweredType().getRawASTType()),
