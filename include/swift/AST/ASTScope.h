@@ -239,6 +239,9 @@ public:
   NullablePtr<Stmt> getStmtIfAny() const;
   NullablePtr<Expr> getExprIfAny() const;
 
+  /// Whether this scope is for a decl attribute.
+  bool isDeclAttribute() const;
+
 #pragma mark - debugging and printing
 
 public:

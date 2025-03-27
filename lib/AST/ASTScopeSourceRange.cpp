@@ -39,16 +39,15 @@ using namespace ast_scope;
 
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
 
-/// Retrieve the character-based source range for the given source range.
-static SourceRange getCharSourceRange(
-    SourceManager &sourceMgr, SourceRange range
-){
-  range.End = Lexer::getLocForEndOfToken(sourceMgr, range.End);
-  return range;
-}
-
 void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
                                                      const ASTContext &ctx) const {
+  // Ignore attributes on extensions, currently they exist outside of the
+  // extension's source range due to the way we've setup the scope for
+  // extension binding.
+  // FIXME: We ought to fix the source range for extension scopes.
+  if (isa<ExtensionScope>(this) && child->isDeclAttribute())
+    return;
+
   // Ignore debugger bindings - they're a special mix of user code and implicit
   // wrapper code that is too difficult to check for consistency.
   if (auto d = getDeclIfAny().getPtrOrNull())
@@ -60,14 +59,14 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
 
   auto range = getCharSourceRangeOfScope(sourceMgr);
 
-  std::function<bool(SourceRange)> containedInParent;
-  containedInParent = [&](SourceRange childCharRange) {
+  auto containedInParent = [&](SourceRange childCharRange) {
     // HACK: For code completion. Handle replaced range.
+    // Note that the replaced SourceRanges here are already disguised
+    // CharSourceRanges, we don't need to adjust them. We use `rangeContains`
+    // since we're only interested in comparing within a single buffer.
     for (const auto &pair : sourceMgr.getReplacedRanges()) {
-      auto originalRange = getCharSourceRange(sourceMgr, pair.first);
-      auto newRange = getCharSourceRange(sourceMgr, pair.second);
-      if (sourceMgr.encloses(range, originalRange) &&
-          sourceMgr.encloses(newRange, childCharRange))
+      if (sourceMgr.rangeContains(range, pair.first) &&
+          sourceMgr.rangeContains(pair.second, childCharRange))
         return true;
     }
 
