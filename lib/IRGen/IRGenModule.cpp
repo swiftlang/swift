@@ -629,7 +629,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   if (isCoroCCSupported) {
     SwiftCoroCC = llvm::CallingConv::SwiftCoro;
   } else {
-    SwiftCoroCC = llvm::CallingConv::Swift;
+    SwiftCoroCC = SwiftCC;
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
