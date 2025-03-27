@@ -3843,10 +3843,20 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
         : StorageIsMutable);
   }
 
-  if (auto *var = dyn_cast<VarDecl>(storage)) {
+  // If we're in an @implementation extension, we care about the semantics of
+  // the decl it implements.
+  auto *DC = storage->getDeclContext()->getImplementedObjCContext();
+
+  if (auto attr = storage->getParsedAttrs().getAttribute<HasStorageAttr>()) {
+    // If we see `@_hasStorage` in a context with no stored properties, diagnose
+    // and ignore it.
+    if (isa<ExtensionDecl, EnumDecl, ProtocolDecl>(DC)) {
+      storage->diagnose(diag::attr_invalid_in_context, attr,
+                        DC->getAsDecl()->getDescriptiveKind());
+
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
-    if (var->getParsedAttrs().hasAttribute<HasStorageAttr>()) {
+    } else if (auto *var = dyn_cast<VarDecl>(storage)) {
       // The SIL rules for @_hasStorage are slightly different from the non-SIL
       // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
       // and the only thing that determines mutability is the existence of the
@@ -3941,7 +3951,6 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
 
-  auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {

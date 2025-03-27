@@ -1,0 +1,10 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags:
+// expected-error@-2 {{failed to verify module interface of 'Test' due to the errors above}}
+
+// RUN: %target-swift-typecheck-module-from-interface(%s) -module-name Test -verify -verify-ignore-unknown
+// REQUIRES: OS=macosx
+
+extension Array {
+  @_hasStorage public var foo: Int { get set } // expected-error {{'@_hasStorage' attribute cannot be applied to declaration in extension}}
+}
