@@ -249,3 +249,22 @@ func testUnsafeLHS() {
   default: 0
   }
 }
+
+@safe
+struct UnsafeWrapTest {
+  @unsafe var pointer: UnsafeMutablePointer<Int>?
+
+  func test() {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to unsafe property 'pointer'}}
+      _ = unsafe pointer
+    }
+  }
+
+  func otherTest(pointer: UnsafeMutablePointer<Int>?) {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>}}
+      _ = unsafe pointer
+    }
+  }
+}
