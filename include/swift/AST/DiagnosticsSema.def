@@ -319,8 +319,8 @@ ERROR(class_cannot_be_addressable_for_dependencies,none,
       "a class cannot be @_addressableForDependencies", ())
 
 ERROR(unsupported_closure_attr,none,
-      "%select{attribute |}0'%1' is not supported on a closure",
-      (bool, StringRef))
+      "%select{attribute |}0%1 is not supported on a closure",
+      (bool, DeclAttribute))
 
 NOTE(suggest_partial_overloads,none,
       "overloads for '%1' exist with these %select{"
@@ -6002,14 +6002,15 @@ NOTE(move_global_actor_attr_to_storage_decl,none,
      "move global actor attribute to %kind0", (const ValueDecl *))
 
 ERROR(actor_isolation_multiple_attr_2,none,
-      "%kind0 has multiple actor-isolation attributes ('%1' and '%2')",
-      (const Decl *, StringRef, StringRef))
+      "%kind0 has multiple actor-isolation attributes (%1 and %2)",
+      (const Decl *, DeclAttribute, DeclAttribute))
 ERROR(actor_isolation_multiple_attr_3,none,
-      "%0 %1 has multiple actor-isolation attributes ('%2', '%3' and '%4')",
-      (const Decl *, StringRef, StringRef, StringRef))
+      "%0 %1 has multiple actor-isolation attributes (%2, %3 and %4)",
+      (const Decl *, DeclAttribute, DeclAttribute, DeclAttribute))
 ERROR(actor_isolation_multiple_attr_4,none,
-      "%0 %1 has multiple actor-isolation attributes ('%2', '%3', '%4', and '%5')",
-      (const Decl *, StringRef, StringRef, StringRef, StringRef))
+      "%0 %1 has multiple actor-isolation attributes (%2, %3, %4, and %5)",
+      (const Decl *, DeclAttribute, DeclAttribute, DeclAttribute,
+       DeclAttribute))
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %kind1 has different actor isolation from %2 overridden declaration",
       (ActorIsolation, const ValueDecl *, ActorIsolation))

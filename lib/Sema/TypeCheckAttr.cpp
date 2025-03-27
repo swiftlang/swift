@@ -4309,69 +4309,57 @@ static void checkGlobalActorAttr(
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto executionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
-  struct NameAndRange {
-    StringRef name;
-    SourceRange range;
 
-    NameAndRange(StringRef _name, SourceRange _range)
-        : name(_name), range(_range) {}
-  };
+  llvm::SmallVector<const DeclAttribute *, 2> attributes;
 
-  llvm::SmallVector<NameAndRange, 4> attributes;
-
-  attributes.push_back(NameAndRange(globalActorAttr.second->getName().str(),
-                                    globalActorAttr.first->getRangeWithAt()));
+  attributes.push_back(globalActorAttr.first);
 
   if (isolatedAttr) {
-    attributes.push_back(NameAndRange(isolatedAttr->getAttrName(),
-                                      isolatedAttr->getRangeWithAt()));
+    attributes.push_back(isolatedAttr);
   }
   if (nonisolatedAttr) {
-    attributes.push_back(NameAndRange(nonisolatedAttr->getAttrName(),
-                                      nonisolatedAttr->getRangeWithAt()));
+    attributes.push_back(nonisolatedAttr);
   }
   if (executionAttr) {
-    attributes.push_back(NameAndRange(executionAttr->getAttrName(),
-                                      executionAttr->getRangeWithAt()));
+    attributes.push_back(executionAttr);
   }
 
   if (attributes.size() == 1)
     return;
 
   if (attributes.size() == 2) {
-    decl->diagnose(diag::actor_isolation_multiple_attr_2, decl,
-                   attributes[0].name, attributes[1].name)
-        .highlight(attributes[0].range)
-        .highlight(attributes[1].range)
+    decl->diagnose(diag::actor_isolation_multiple_attr_2, decl, attributes[0],
+                   attributes[1])
+        .highlight(attributes[0]->getRangeWithAt())
+        .highlight(attributes[1]->getRangeWithAt())
         .warnUntilSwiftVersion(6)
-        .fixItRemove(attributes[1].range);
+        .fixItRemove(attributes[1]->getRangeWithAt());
     return;
   }
 
   if (attributes.size() == 3) {
-    decl->diagnose(diag::actor_isolation_multiple_attr_3, decl,
-                   attributes[0].name, attributes[1].name, attributes[2].name)
-        .highlight(attributes[0].range)
-        .highlight(attributes[1].range)
-        .highlight(attributes[2].range)
+    decl->diagnose(diag::actor_isolation_multiple_attr_3, decl, attributes[0],
+                   attributes[1], attributes[2])
+        .highlight(attributes[0]->getRangeWithAt())
+        .highlight(attributes[1]->getRangeWithAt())
+        .highlight(attributes[2]->getRangeWithAt())
         .warnUntilSwiftVersion(6)
-        .fixItRemove(attributes[1].range)
-        .fixItRemove(attributes[2].range);
+        .fixItRemove(attributes[1]->getRangeWithAt())
+        .fixItRemove(attributes[2]->getRangeWithAt());
     return;
   }
 
   assert(attributes.size() == 4);
-  decl->diagnose(diag::actor_isolation_multiple_attr_4, decl,
-                 attributes[0].name, attributes[1].name, attributes[2].name,
-                 attributes[3].name)
-      .highlight(attributes[0].range)
-      .highlight(attributes[1].range)
-      .highlight(attributes[2].range)
-      .highlight(attributes[3].range)
+  decl->diagnose(diag::actor_isolation_multiple_attr_4, decl, attributes[0],
+                 attributes[1], attributes[2], attributes[3])
+      .highlight(attributes[0]->getRangeWithAt())
+      .highlight(attributes[1]->getRangeWithAt())
+      .highlight(attributes[2]->getRangeWithAt())
+      .highlight(attributes[3]->getRangeWithAt())
       .warnUntilSwiftVersion(6)
-      .fixItRemove(attributes[1].range)
-      .fixItRemove(attributes[2].range)
-      .fixItRemove(attributes[3].range);
+      .fixItRemove(attributes[1]->getRangeWithAt())
+      .fixItRemove(attributes[2]->getRangeWithAt())
+      .fixItRemove(attributes[3]->getRangeWithAt());
 }
 
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
@@ -8137,10 +8125,10 @@ public:
     : ctx(closure->getASTContext()), closure(closure) { }
 
   void visitDeclAttribute(DeclAttribute *attr) {
-    ctx.Diags.diagnose(
-        attr->getLocation(), diag::unsupported_closure_attr,
-        attr->isDeclModifier(), attr->getAttrName())
-      .fixItRemove(attr->getRangeWithAt());
+    ctx.Diags
+        .diagnose(attr->getLocation(), diag::unsupported_closure_attr,
+                  attr->isDeclModifier(), attr)
+        .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
 
@@ -8236,18 +8224,10 @@ public:
     }
 
     // Otherwise, it's an error.
-    std::string typeName;
-    if (auto typeRepr = attr->getTypeRepr()) {
-      llvm::raw_string_ostream out(typeName);
-      typeRepr->print(out);
-    } else {
-      typeName = attr->getType().getString();
-    }
-
-    ctx.Diags.diagnose(
-        attr->getLocation(), diag::unsupported_closure_attr,
-        attr->isDeclModifier(), typeName)
-      .fixItRemove(attr->getRangeWithAt());
+    ctx.Diags
+        .diagnose(attr->getLocation(), diag::unsupported_closure_attr,
+                  attr->isDeclModifier(), attr)
+        .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
 };
