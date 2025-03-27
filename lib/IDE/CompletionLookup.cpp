@@ -1755,6 +1755,41 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
+Type CompletionLookup::getTypeAliasType(const TypeAliasDecl *TAD,
+                                        DynamicLookupInfo dynamicLookupInfo) {
+  // Substitute the base type for a nested typealias if needed.
+  auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
+  auto *typeAliasTy = dyn_cast<TypeAliasType>(ty.getPointer());
+  if (!typeAliasTy)
+    return ty;
+
+  // If the underlying type has an error, prefer to print the full typealias,
+  // otherwise get the underlying type.
+  Type underlyingTy = typeAliasTy->getSinglyDesugaredType();
+  if (underlyingTy->hasError())
+    return ty;
+
+  // The underlying type might be unbound for e.g:
+  //
+  // struct S<T> {}
+  // typealias X = S
+  //
+  // Introduce type parameters such that we print the underlying type as
+  // 'S<T>'.
+  return underlyingTy.transformRec([&](TypeBase *ty) -> std::optional<Type> {
+    if (!ty->hasUnboundGenericType()) {
+      // Skip.
+      return ty;
+    }
+    auto *UGT = dyn_cast<UnboundGenericType>(ty);
+    if (!UGT) {
+      // Recurse.
+      return std::nullopt;
+    }
+    return UGT->getDecl()->getDeclaredInterfaceType();
+  });
+}
+
 void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                                        DeclVisibilityKind Reason,
                                        DynamicLookupInfo dynamicLookupInfo) {
@@ -1764,18 +1799,7 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
   addValueBaseName(Builder, TAD->getBaseName());
-
-  // Substitute the base type for a nested typealias if needed.
-  auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
-
-  // If the underlying type has an error, prefer to print the full typealias,
-  // otherwise get the underlying type.
-  if (auto *TA = dyn_cast<TypeAliasType>(ty.getPointer())) {
-    auto underlyingTy = TA->getSinglyDesugaredType();
-    if (!underlyingTy->hasError())
-      ty = underlyingTy;
-  }
-  addTypeAnnotation(Builder, ty);
+  addTypeAnnotation(Builder, getTypeAliasType(TAD, dynamicLookupInfo));
 }
 
 void CompletionLookup::addGenericTypeParamRef(
