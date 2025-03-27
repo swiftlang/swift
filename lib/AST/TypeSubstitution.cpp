@@ -136,18 +136,17 @@ operator()(CanType dependentType, Type conformingReplacementType,
         PackConformance::get(conformingPack, conformedProtocol, conformances));
   }
 
-  assert((conformingReplacementType->is<ErrorType>() ||
-          conformingReplacementType->is<SubstitutableType>() ||
-          conformingReplacementType->is<DependentMemberType>() ||
-          conformingReplacementType->hasTypeVariable()) &&
-         "replacement requires looking up a concrete conformance");
+  if (conformingReplacementType->is<ErrorType>())
+    return ProtocolConformanceRef::forInvalid();
+
   // A class-constrained archetype might conform to the protocol
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    if (auto superclassType = archetypeType->getSuperclass()) {
+    if (archetypeType->getSuperclass()) {
       return lookupConformance(archetypeType, conformedProtocol);
     }
   }
+
   return ProtocolConformanceRef::forAbstract(
     conformingReplacementType, conformedProtocol);
 }
