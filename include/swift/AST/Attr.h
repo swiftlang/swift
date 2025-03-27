@@ -3841,7 +3841,9 @@ public:
 
   SourceLoc getAtLoc() const { return AtLoc; }
 
-  SourceLoc getStartLocImpl() const { return AtLoc; }
+  SourceLoc getStartLocImpl() const {
+    return AtLoc.isValid() ? AtLoc : getAttrLoc();
+  }
   SourceLoc getEndLocImpl() const { return getAttrLoc(); }
 };
 

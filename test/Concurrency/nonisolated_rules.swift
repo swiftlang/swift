@@ -177,3 +177,12 @@ struct UnsafeInitialization {
     self.ns = ns // okay
   }
 }
+
+// rdar://147965036 - Make sure we don't crash.
+func rdar147965036() {
+  func test(_: () -> Void) {}
+  test { @nonisolated in
+    // expected-error@-1 {{'nonisolated' is a declaration modifier, not an attribute}}
+    // expected-error@-2 {{'nonisolated' is not supported on a closure}}
+  }
+}
