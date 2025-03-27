@@ -6683,10 +6683,12 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
       if (combinedTy->isVoidTy()) {
         assert(result.empty() && "Unexpected result values");
       } else {
+        Explosion native = nativeSchema.mapIntoNative(
+            IGM, IGF, result, funcResultTypeInContext, /*isOutlined*/ false);
         if (auto *structTy = dyn_cast<llvm::StructType>(combinedTy)) {
           llvm::Value *nativeAgg = llvm::UndefValue::get(structTy);
-          for (unsigned i = 0, e = result.size(); i < e; ++i) {
-            llvm::Value *elt = result.claimNext();
+          for (unsigned i = 0, e = native.size(); i < e; ++i) {
+            llvm::Value *elt = native.claimNext();
             auto *nativeTy = structTy->getElementType(i);
             elt = convertForDirectError(IGF, elt, nativeTy,
                                         /*forExtraction*/ false);
@@ -6697,9 +6699,9 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
           while (!out.empty()) {
             nativeResultsStorage.push_back(out.claimNext());
           }
-        } else if (!result.empty()) {
+        } else if (!native.empty()) {
           auto *converted = convertForDirectError(
-              IGF, result.claimNext(), combinedTy, /*forExtraction*/ false);
+              IGF, native.claimNext(), combinedTy, /*forExtraction*/ false);
           nativeResultsStorage.push_back(converted);
         } else {
           nativeResultsStorage.push_back(llvm::UndefValue::get(combinedTy));
