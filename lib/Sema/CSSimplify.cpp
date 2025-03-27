@@ -16537,7 +16537,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::SyntacticElement:
     return simplifySyntacticElementConstraint(
         constraint.getSyntacticElement(), constraint.getElementContext(),
-        constraint.isDiscardedElement(),
         /*flags=*/std::nullopt, constraint.getLocator());
 
   case ConstraintKind::BindTupleOfFunctionParams:
