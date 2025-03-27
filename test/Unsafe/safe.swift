@@ -241,3 +241,11 @@ func testMyArray(ints: MyArray<Int>) {
     unsafe print(buffer.unsafeCount)
   }
 }
+
+func testUnsafeLHS() {
+  @unsafe var value: Int = 0
+  unsafe value = switch unsafe value {
+  case 0: 1
+  default: 0
+  }
+}
