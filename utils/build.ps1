@@ -494,7 +494,7 @@ function Write-Summary {
       "Elapsed Time" = $FormattedTime
       "%" = "$Percentage%"
     }
-  } | Sort-Object -Descending -Property "%"
+  } | Sort-Object -Descending -Property "Elapsed Time"
 
   $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
   $TotalRow = [PSCustomObject]@{
