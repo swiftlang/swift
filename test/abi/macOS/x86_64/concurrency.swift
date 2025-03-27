@@ -410,11 +410,8 @@ Added: _$sScfsE25isIsolatingCurrentContextSbyF
 
 // add callee-allocated coro entrypoints
 // TODO: CoroutineAccessors: several of these symbols should be in swiftCore
-Added: __swift_coro_malloc_allocator
-Added: __swift_coro_task_allocator
 Added: _swift_coro_alloc
 Added: _swift_coro_dealloc
-Added: _swift_coro_getGlobalAllocator
 Added: _swift_task_dealloc_through
 
 // SwiftSettings

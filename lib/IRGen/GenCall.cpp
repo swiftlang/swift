@@ -44,6 +44,7 @@
 #include <optional>
 
 #include "CallEmission.h"
+#include "ConstantBuilder.h"
 #include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
 #include "GenCall.h"
@@ -57,8 +58,8 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
-#include "IRGenModule.h"
 #include "IRGenMangler.h"
+#include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NativeConventionSchema.h"
 #include "Signature.h"
@@ -5197,18 +5198,47 @@ Address irgen::emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF) {
   return createOpaqueBufferAlloca(IGF, getYieldManyCoroutineBufferSize(IGF.IGM),
                                  getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
+
+static llvm::Constant *getAddrOfGlobalCoroAllocator(IRGenModule &IGM,
+                                                    CoroAllocatorKind kind,
+                                                    llvm::Constant *allocFn,
+                                                    llvm::Constant *deallocFn) {
+  auto entity = LinkEntity::forCoroAllocator(kind);
+  auto taskAllocator = IGM.getOrCreateLazyGlobalVariable(
+      entity,
+      [&](ConstantInitBuilder &builder) -> ConstantInitFuture {
+        auto allocator = builder.beginStruct(IGM.CoroAllocatorTy);
+        allocator.addInt32(CoroAllocatorFlags(kind).getOpaqueValue());
+        allocator.add(allocFn);
+        allocator.add(deallocFn);
+        return allocator.finishAndCreateFuture();
+      },
+      [&](llvm::GlobalVariable *var) { var->setConstant(true); });
+  return taskAllocator;
+}
+llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
+  return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Malloc,
+                                      getMallocFn(), getFreeFn());
+}
+llvm::Constant *IRGenModule::getAddrOfGlobalCoroAsyncTaskAllocator() {
+  return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Async,
+                                      getTaskAllocFn(), getTaskDeallocFn());
+}
 llvm::Value *
 irgen::emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
                                         std::optional<CoroAllocatorKind> kind) {
   if (!kind) {
     return IGF.getCoroutineAllocator();
   }
-  CoroAllocatorFlags flags(*kind);
-  auto *flagsValue = llvm::ConstantInt::get(IGF.IGM.CoroAllocatorFlagsTy,
-                                            flags.getOpaqueValue());
-
-  return IGF.Builder.CreateCall(
-      IGF.IGM.getCoroGetGlobalAllocatorFunctionPointer(), {flagsValue});
+  switch (*kind) {
+  case CoroAllocatorKind::Stack:
+    return llvm::ConstantPointerNull::get(IGF.IGM.CoroAllocatorPtrTy);
+  case CoroAllocatorKind::Async:
+    return IGF.IGM.getAddrOfGlobalCoroAsyncTaskAllocator();
+  case CoroAllocatorKind::Malloc:
+    return IGF.IGM.getAddrOfGlobalCoroMallocAllocator();
+  }
+  llvm_unreachable("unhandled case");
 }
 StackAddress irgen::emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
                                                       llvm::Value *size) {

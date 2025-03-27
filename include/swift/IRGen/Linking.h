@@ -13,6 +13,7 @@
 #ifndef SWIFT_IRGEN_LINKING_H
 #define SWIFT_IRGEN_LINKING_H
 
+#include "swift/ABI/Coro.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
@@ -24,8 +25,8 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalObject.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 
 namespace llvm {
@@ -165,6 +166,9 @@ class LinkEntity {
     ExtendedExistentialIsUniqueMask = 0x100,
     ExtendedExistentialIsSharedShift = 9,
     ExtendedExistentialIsSharedMask = 0x200,
+
+    // Used by CoroAllocator.  2 bits.
+    CoroAllocatorKindShift = 8, CoroAllocatorKindMask = 0x300,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -590,10 +594,13 @@ class LinkEntity {
     /// The pointer is a const char* of the name.
     KnownCoroFunctionPointer,
 
-    /// An coro function pointer for a distributed accessor (method or
+    /// A coro function pointer for a distributed accessor (method or
     /// property).
     /// The pointer is a SILFunction*.
     DistributedAccessorCoroFunctionPointer,
+
+    /// An allocator to be passed to swift_coro_alloc and swift_coro_dealloc.
+    CoroAllocator,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1498,6 +1505,15 @@ public:
     return entity;
   }
 
+  static LinkEntity forCoroAllocator(CoroAllocatorKind kind) {
+    LinkEntity entity;
+    entity.Pointer = nullptr;
+    entity.SecondaryPointer = nullptr;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::CoroAllocator)) |
+                  LINKENTITY_SET_FIELD(CoroAllocatorKind, unsigned(kind));
+    return entity;
+  }
+
   static LinkEntity forCoroFunctionPointer(LinkEntity other) {
     LinkEntity entity;
     entity.Pointer = other.Pointer;
@@ -1707,6 +1723,11 @@ public:
            getKind() == Kind::MethodDescriptorDerivative);
     return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
         SecondaryPointer);
+  }
+
+  CoroAllocatorKind getCoroAllocatorKind() const {
+    assert(getKind() == Kind::CoroAllocator);
+    return CoroAllocatorKind(LINKENTITY_GET_FIELD(Data, CoroAllocatorKind));
   }
 
   CanGenericSignature getExtendedExistentialTypeShapeGenSig() const {

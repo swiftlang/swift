@@ -128,25 +128,11 @@ void swift_task_dealloc(void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void swift_task_dealloc_through(void *ptr);
 
-// TODO: CoroutineAccessors: Eliminate this entry point and replace its uses
-//                           with direct references the globals.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
-
-// TODO: CoroutineAccessors: Mark the underlying struct const.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-CoroAllocator *const _swift_coro_task_allocator;
-
 // TODO: CoroutineAccessors: Move these declarations back to swiftCore {{
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void *swift_coro_alloc(CoroAllocator *allocator, size_t size);
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void swift_coro_dealloc(CoroAllocator *allocator, void *ptr);
-
-// TODO: CoroutineAccessors: Mark the underlying struct const.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-CoroAllocator *const _swift_coro_malloc_allocator;
 // }} TODO: CoroutineAccessors
 
 /// Cancel a task and all of its child tasks.
