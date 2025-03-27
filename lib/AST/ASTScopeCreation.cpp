@@ -610,6 +610,12 @@ ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
 void ScopeCreator::addChildrenForParsedAccessors(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
   asd->visitParsedAccessors([&](AccessorDecl *ad) {
+    // Ignore accessors added by macro expansions.
+    // TODO: This ought to be the default behavior of `visitParsedAccessors`,
+    // we ought to have a different entrypoint for clients that care about
+    // the semantic set of "explicit" accessors.
+    if (ad->isInMacroExpansionInContext())
+      return;
     assert(asd == ad->getStorage());
     this->addToScopeTree(ad, parent);
   });
