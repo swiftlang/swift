@@ -727,6 +727,20 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
                                          flags);
       otherDefinitions.append(found.begin(), found.end());
+
+      // Look into the generics of the type. Value generic parameters can appear
+      // as static members of the type.
+      if (auto genericDC = static_cast<Decl *>(nominal)->getAsGenericContext()) {
+        auto gpList = genericDC->getGenericParams();
+
+        if (gpList && !current->getBaseName().isSpecial()) {
+          auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
+
+          if (gp && gp->isValue()) {
+            otherDefinitions.push_back(gp);
+          }
+        }
+      }
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
@@ -1132,25 +1146,6 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
       }
 
       break;
-    }
-  }
-
-  // Look to see if this type has a value generic with the same name and that
-  // the current value is a property.
-  if (currentDC->isTypeContext() && currentDC->isGenericContext() &&
-      isa<VarDecl>(current)) {
-    auto gpList = currentDC->getAsDecl()->getAsGenericContext()->getGenericParams();
-
-    if (gpList && !current->getBaseName().isSpecial()) {
-      auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
-
-      if (gp && gp->isValue()) {
-        ctx.Diags.diagnoseWithNotes(
-          current->diagnose(diag::invalid_redecl, current), [&]() {
-          gp->diagnose(diag::invalid_redecl_prev, gp);
-        });
-        current->setInvalid();
-      }
     }
   }
 
