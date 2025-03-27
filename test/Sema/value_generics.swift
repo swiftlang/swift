@@ -131,6 +131,14 @@ struct E<A, let b: Int> { // expected-note {{'b' previously declared here}}
 
   func b() {} // expected-error {{invalid redeclaration of 'b()'}}
               // expected-note@-1 {{'b' declared here}}
+
+  func dumb() -> Int {
+    Self.b // OK
+  }
+
+  static func dumb2() -> Int {
+    Self.b // OK
+  }
 }
 
 func testE1() -> Int {
