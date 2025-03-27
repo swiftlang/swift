@@ -72,13 +72,22 @@ extension Clock {
     isolation: isolated (any Actor)? = #isolation,
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Duration {
-    try await measure(work)
+    let start = now
+    try await work()
+    let end = now
+    return start.duration(to: end)
   }
 
+  // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+  // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+  // to the type checker.
+  //
+  // This function also doubles as an ABI-compatibility shim predating the
+  // introduction of #isolation.
   @available(SwiftStdlib 5.7, *)
+  @_silgen_name("$ss5ClockPsE7measurey8DurationQzyyYaKXEYaKF")
   @_unsafeInheritExecutor // for ABI compatibility
-  @usableFromInline
-  internal func measure(
+  public func _unsafeInheritExecutor_measure(
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Duration {
     let start = now

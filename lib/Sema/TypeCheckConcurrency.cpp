@@ -2199,8 +2199,11 @@ void swift::introduceUnsafeInheritExecutorReplacements(
   if (lookup.empty())
     return;
 
-  auto baseNominal = base->getAnyNominal();
-  if (!baseNominal || !inConcurrencyModule(baseNominal))
+  SmallVector<NominalTypeDecl *, 4> nominalTypes;
+  namelookup::tryExtractDirectlyReferencedNominalTypes(base, nominalTypes);
+  if (llvm::none_of(nominalTypes, [](NominalTypeDecl *baseNominal) {
+        return inConcurrencyModule(baseNominal);
+      }))
     return;
 
   auto isReplaceable = [&](ValueDecl *decl) {
