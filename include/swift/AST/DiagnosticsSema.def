@@ -319,7 +319,7 @@ ERROR(class_cannot_be_addressable_for_dependencies,none,
       "a class cannot be @_addressableForDependencies", ())
 
 ERROR(unsupported_closure_attr,none,
-      "%select{attribute |}0 '%1' is not supported on a closure",
+      "%select{attribute |}0'%1' is not supported on a closure",
       (bool, StringRef))
 
 NOTE(suggest_partial_overloads,none,
