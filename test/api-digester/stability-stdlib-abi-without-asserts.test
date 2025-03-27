@@ -853,7 +853,6 @@ Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change f
 Accessor UnsafeMutableBufferPointer.indices.Get() has mangled name changing from 'Swift.UnsafeMutableBufferPointer.indices.getter : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.indices.getter : Swift.Range<Swift.Int>'
 Var UnsafeMutableBufferPointer.indices has mangled name changing from 'Swift.UnsafeMutableBufferPointer.indices : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.indices : Swift.Range<Swift.Int>'
 Var UnsafeMutableBufferPointer.indices is now with @_preInverseGenerics
-Constructor ObjectIdentifier.init(_:) has been removed
 Func !=(_:_:) has been removed
 Func ==(_:_:) has been removed
 Func type(of:) has been removed
