@@ -2353,7 +2353,8 @@ tryCast(
     // Try unwrapping native __SwiftValue implementation
     auto subcastResult = tryCastUnwrappingSwiftValueSource(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
