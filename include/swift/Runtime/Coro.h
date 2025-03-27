@@ -21,9 +21,6 @@
 #include "swift/Runtime/Config.h"
 #include <cstddef>
 
-namespace swift {
-SWIFT_RUNTIME_EXPORT
-SWIFT_CC(swift) void swift_coro_dealloc(CoroAllocator *allocator, void *ptr);
-} // end namespace swift
+namespace swift {} // end namespace swift
 
 #endif
