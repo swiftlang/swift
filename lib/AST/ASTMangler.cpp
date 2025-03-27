@@ -828,14 +828,12 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
 // Since we don't have a distinct mangling for sugared generic
 // parameter types, we must desugar them here.
 static Type getTypeForDWARFMangling(Type t) {
-  return t.subst(
-    [](SubstitutableType *t) -> Type {
-      if (t->isRootParameterPack()) {
-        return PackType::getSingletonPackExpansion(t->getCanonicalType());
-      }
-      return t->getCanonicalType();
-    },
-    MakeAbstractConformanceForGenericType());
+  return t.transformRec(
+    [](TypeBase *t) -> std::optional<Type> {
+      if (isa<GenericTypeParamType>(t))
+        return t->getCanonicalType();
+      return std::nullopt;
+    });
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {

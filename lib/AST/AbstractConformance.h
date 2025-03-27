@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the AbstractConformance class, which stores an
-// abstract conformance that is stashed in a ProtocolConformanceRef.
+// This file defines the AbstractConformance class, which represents
+// the conformance of a type parameter or archetype to a protocol.
+// These are usually stashed inside a ProtocolConformanceRef.
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_AST_ABSTRACT_CONFORMANCE_H
@@ -36,7 +37,7 @@ public:
     Profile(id, getType(), getProtocol());
   }
 
-  /// Profile the substitution map storage, for use with LLVM's FoldingSet.
+  /// Profile the storage for this conformance, for use with LLVM's FoldingSet.
   static void Profile(llvm::FoldingSetNodeID &id,
                       Type conformingType,
                       ProtocolDecl *requirement) {

@@ -946,8 +946,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                           openedConf);
 
   // Substitute to get the formal substituted type of the thunk.
-  auto reqtSubstTy =
-    cast<AnyFunctionType>(reqtOrigTy.subst(reqtSubs)->getCanonicalType());
+  auto reqtSubstTy = reqtOrigTy.substGenericArgs(reqtSubs);
 
   // Substitute into the requirement type to get the type of the thunk.
   auto witnessSILFnType = requirementInfo.SILFnType->substGenericArgs(

@@ -5754,7 +5754,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
     properties |= conformingType->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  // Profile the substitution map.
+  // Form the folding set key.
   llvm::FoldingSetNodeID id;
   AbstractConformance::Profile(id, conformingType, proto);
 

@@ -829,23 +829,20 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto substitutions = SubstitutionMap::get(
       hashFunc->getGenericSignature(),
       [&](SubstitutableType *dependentType) {
-        if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
-          if (gp->getDepth() == 0 && gp->getIndex() == 0)
-            return selfType;
-        }
-
-        return Type(dependentType);
+        auto gp = cast<GenericTypeParamType>(dependentType);
+        ASSERT(gp->getDepth() == 0 && gp->getIndex() == 0);
+        return selfType;
       },
       LookUpConformanceInModule());
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
 
-  Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
+  auto *hashFuncType = hashFunc->getInterfaceType()->castTo<GenericFunctionType>()
+      ->substGenericArgs(substitutions);
   auto hashExpr = new (C) DeclRefExpr(hashFuncRef, DeclNameLoc(),
                                       /*implicit*/ true,
                                       AccessSemantics::Ordinary,
                                       hashFuncType);
-  Type hashFuncResultType =
-      hashFuncType->castTo<AnyFunctionType>()->getResult();
+  Type hashFuncResultType = hashFuncType->getResult();
   auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
   auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
