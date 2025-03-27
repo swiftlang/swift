@@ -2032,7 +2032,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCast(
-                              OpLoc, OpValue, OpLoweredType, OpFormalType,
+                              OpLoc, Inst->getIsolatedConformances(), OpValue,
+                              OpLoweredType, OpFormalType,
                               getBuilder().hasOwnership()
                                   ? Inst->getForwardingOwnershipKind()
                                   : ValueOwnershipKind(OwnershipKind::None)));
@@ -2050,7 +2051,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
-                              OpLoc, SrcValue, SrcType, DestValue, TargetType));
+                              OpLoc, Inst->getIsolatedConformances(),
+                              SrcValue, SrcType, DestValue, TargetType));
 }
 
 template <typename ImplClass>
@@ -3448,6 +3450,7 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createCheckedCastBranch(
                 getOpLocation(Inst->getLoc()), Inst->isExact(),
+                Inst->getIsolatedConformances(),
                 getOpValue(Inst->getOperand()),
                 getOpASTType(Inst->getSourceFormalType()),
                 getOpType(Inst->getTargetLoweredType()),
@@ -3469,6 +3472,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   auto FalseCount = Inst->getFalseBBCount();
   recordClonedInstruction(Inst, getBuilder().createCheckedCastAddrBranch(
                                     getOpLocation(Inst->getLoc()),
+                                    Inst->getIsolatedConformances(),
                                     Inst->getConsumptionKind(), SrcValue,
                                     SrcType, DestValue, TargetType, OpSuccBB,
                                     OpFailBB, TrueCount, FalseCount));

@@ -108,8 +108,9 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
     // Otherwise, just perform an unconditional checked cast to the sil bridged
     // ty. We return the cast as our value and as our new cast instruction.
     auto *cast =
-        builder.createUnconditionalCheckedCast(loc, load, silBridgedTy,
-                                               dynamicCast.getBridgedTargetType());
+        builder.createUnconditionalCheckedCast(
+          loc, dynamicCast.getIsolatedConformances(), load, silBridgedTy,
+          dynamicCast.getBridgedTargetType());
     return {cast, cast};
   }
 
@@ -143,8 +144,10 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
 
   // Ok, we need to perform the full cast optimization. This means that we are
   // going to replace the cast terminator in inst_block with a checked_cast_br.
-  auto *ccbi = builder.createCheckedCastBranch(loc, false, load, 
-                                               dynamicCast.getBridgedSourceType(), 
+  auto *ccbi = builder.createCheckedCastBranch(loc, false,
+                                               dynamicCast.getIsolatedConformances(),
+                                               load,
+                                               dynamicCast.getBridgedSourceType(),
                                                silBridgedTy,
                                                dynamicCast.getBridgedTargetType(),
                                                castSuccessBB, castFailBB);
@@ -564,8 +567,9 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
     // If we are not conditional, we are ok with the downcast via checked cast
     // fails since we will trap.
     if (!isConditional) {
-      return builder.createUnconditionalCheckedCast(loc, newAI,
-                                                    destLoweredTy, destFormalTy);
+      return builder.createUnconditionalCheckedCast(
+          loc, dynamicCast.getIsolatedConformances(), newAI,
+          destLoweredTy, destFormalTy);
     }
 
     // Otherwise if we /are/ emitting a conditional cast, make sure that we
@@ -588,7 +592,9 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
     auto *condBrSuccessBB =
         newAI->getFunction()->createBasicBlockAfter(newAI->getParent());
     condBrSuccessBB->createPhiArgument(destLoweredTy, OwnershipKind::Owned);
-    builder.createCheckedCastBranch(loc, /* isExact*/ false, newAI,
+    builder.createCheckedCastBranch(loc, /* isExact*/ false,
+                                    dynamicCast.getIsolatedConformances(),
+                                    newAI,
                                     sourceFormalTy, destLoweredTy, destFormalTy,
                                     condBrSuccessBB, failureBB);
     builder.setInsertionPoint(condBrSuccessBB, condBrSuccessBB->begin());
@@ -1070,7 +1076,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       if (!CastedValue)
         CastedValue =
             Builder.createUnconditionalCheckedCast(
-              Loc, Op, TargetLoweredType, TargetFormalType);
+              Loc, Inst->getIsolatedConformances(), Op, TargetLoweredType,
+              TargetFormalType);
     }
 
   } else {
@@ -1159,7 +1166,9 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
                 Inst->getTargetFormalType())) {
           SILBuilderWithScope B(Inst, builderContext);
           auto NewI = B.createCheckedCastBranch(
-              Loc, false /*isExact*/, MI,
+              Loc, false /*isExact*/,
+              Inst->getIsolatedConformances(),
+              MI,
               Inst->getSourceFormalType(),
               Inst->getTargetLoweredType().getObjectType(),
               Inst->getTargetFormalType(),
@@ -1202,7 +1211,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                                   OwnershipKind::None);
     }
     return B.createCheckedCastBranch(
-        dynamicCast.getLocation(), false /*isExact*/, mi,
+        dynamicCast.getLocation(), false /*isExact*/,
+        dynamicCast.getIsolatedConformances(),
+        mi,
         // The cast is now from the MetatypeInst, so get the source formal
         // type from it.
         mi->getType().getASTType(),

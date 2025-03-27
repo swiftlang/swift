@@ -4380,6 +4380,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::CheckedCastAddrBranchInst: {
+    auto isolatedConformances = CastingIsolatedConformances::Allow;
+    StringRef attrName;
+    while (parseSILOptional(attrName, *this)) {
+      if (attrName == "prohibit_isolated_conformances")
+        isolatedConformances = CastingIsolatedConformances::Prohibit;
+    }
+
     Identifier consumptionKindToken;
     SourceLoc consumptionKindLoc;
     if (parseSILIdentifier(consumptionKindToken, consumptionKindLoc,
@@ -4408,7 +4415,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     ResultVal = B.createCheckedCastAddrBranch(
-        InstLoc, consumptionKind, SourceAddr, SourceType, DestAddr, TargetType,
+        InstLoc, isolatedConformances, consumptionKind, SourceAddr, SourceType,
+        DestAddr, TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc));
     break;
@@ -4421,15 +4429,30 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                              DestAddr, TargetType);
     break;
 
-  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+    auto isolatedConformances = CastingIsolatedConformances::Allow;
+    StringRef attrName;
+    while (parseSILOptional(attrName, *this)) {
+      if (attrName == "prohibit_isolated_conformances")
+        isolatedConformances = CastingIsolatedConformances::Prohibit;
+    }
+
     if (parseSourceAndDestAddress() || parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createUnconditionalCheckedCastAddr(
-        InstLoc, SourceAddr, SourceType, DestAddr, TargetType);
+        InstLoc, isolatedConformances, SourceAddr, SourceType,
+        DestAddr, TargetType);
     break;
-
+  }
   case SILInstructionKind::UnconditionalCheckedCastInst: {
+    auto isolatedConformances = CastingIsolatedConformances::Allow;
+    StringRef attrName;
+    while (parseSILOptional(attrName, *this)) {
+      if (attrName == "prohibit_isolated_conformances")
+        isolatedConformances = CastingIsolatedConformances::Prohibit;
+    }
+
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") ||
         parseASTType(TargetType))
       return true;
@@ -4441,16 +4464,24 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createUnconditionalCheckedCast(
-        InstLoc, Val, F->getLoweredType(opaque, TargetType), TargetType,
+        InstLoc, isolatedConformances, Val,
+        F->getLoweredType(opaque, TargetType), TargetType,
         forwardingOwnership);
     break;
   }
 
   case SILInstructionKind::CheckedCastBranchInst: {
     bool isExact = false;
-    if (Opcode == SILInstructionKind::CheckedCastBranchInst &&
-        parseSILOptional(isExact, *this, "exact"))
-      return true;
+    auto isolatedConformances = CastingIsolatedConformances::Allow;
+    StringRef attrName;
+    
+    while (parseSILOptional(attrName, *this)) {
+      if (attrName == "prohibit_isolated_conformances")
+        isolatedConformances = CastingIsolatedConformances::Prohibit;
+
+      if (attrName == "exact")
+        isExact = true;
+    }
 
     if (parseASTType(SourceType) || parseVerbatim("in"))
       return true;
@@ -4467,7 +4498,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createCheckedCastBranch(
-        InstLoc, isExact, Val, SourceType,
+        InstLoc, isExact, isolatedConformances, Val, SourceType,
         F->getLoweredType(opaque, TargetType), TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc), forwardingOwnership);

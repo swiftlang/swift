@@ -313,6 +313,11 @@ enum class DynamicCastFlags : size_t {
   /// True if the cast should destroy the source value on failure;
   /// false if the value should be left in place.
   DestroyOnFailure = 0x4,
+
+  /// True if the cast should prohibit the use of any isolated conformances,
+  /// for example because there is a Sendable constraint on the existential
+  /// type we're casting to.
+  ProhibitIsolatedConformances = 0x8,
 };
 inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
   return (size_t(a) & size_t(b)) != 0;

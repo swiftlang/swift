@@ -1289,6 +1289,7 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
     }
 
     B.createUnconditionalCheckedCastAddr(loc,
+                                         CastingIsolatedConformances::Allow,
                                          src, sourceFormalType,
                                          dest, targetFormalType);
     return true;
@@ -1394,6 +1395,7 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void swift::emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
+    CastingIsolatedConformances isolatedConformances,
     CastConsumptionKind consumption,
     SILValue srcAddr, CanType sourceFormalType,
     SILValue destAddr, CanType targetFormalType,
@@ -1432,8 +1434,9 @@ void swift::emitIndirectConditionalCastWithScalar(
   })();
 
   auto *ccb = B.createCheckedCastBranch(
-      loc, /*exact*/ false, srcValue, sourceFormalType, targetLoweredType,
-      targetFormalType, scalarSuccBB, scalarFailBB, TrueCount, FalseCount);
+      loc, /*exact*/ false, isolatedConformances, srcValue, sourceFormalType,
+      targetLoweredType, targetFormalType, scalarSuccBB, scalarFailBB,
+      TrueCount, FalseCount);
 
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {

@@ -721,7 +721,8 @@ public:
       const OpaqueValue *value,
       const Metadata *type,
       ProtocolDescriptorRef protocol,
-      const WitnessTable **conformance);
+      const WitnessTable **conformance,
+      bool prohibitIsolatedConformances);
 
   /// Construct type metadata for the given protocol.
   const Metadata *
