@@ -268,3 +268,6 @@ struct UnsafeWrapTest {
     }
   }
 }
+
+@safe @unsafe
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}

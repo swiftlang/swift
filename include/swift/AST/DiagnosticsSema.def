@@ -8233,7 +8233,7 @@ NOTE(sending_function_result_with_sending_param_note, none,
      ())
 
 //------------------------------------------------------------------------------
-// MARK: Strict Safety Diagnostics
+// MARK: Strict Memory Safety Diagnostics
 //------------------------------------------------------------------------------
 NOTE(note_reference_to_unsafe_decl,none,
       "%select{reference|call}0 to unsafe %kind1",
@@ -8271,6 +8271,9 @@ NOTE(decl_storage_mark_unsafe,none,
 NOTE(decl_storage_mark_safe,none,
       "add '@safe' if this type encapsulates the unsafe storage in "
       "a safe interface", ())
+
+ERROR(safe_and_unsafe_attr,none,
+      "%kindbase0 cannot be both @safe and @unsafe", (const Decl *))
 
 GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
      "%kindbase0 has superclass involving unsafe type %1", 
