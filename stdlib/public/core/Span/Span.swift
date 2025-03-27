@@ -25,8 +25,7 @@ import Swift
 @frozen
 @safe
 @available(SwiftStdlib 6.2, *)
-public struct Span<Element: ~Copyable & ~Escapable>
-: ~Escapable, Copyable, BitwiseCopyable {
+public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `Span`.
   ///
@@ -167,7 +166,7 @@ extension Span where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Span {
+extension Span /*where Element: Copyable*/ {
 
   /// Unsafely create a `Span` over initialized memory.
   ///
@@ -376,7 +375,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Span where Element: ~Copyable & ~Escapable {
+extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
   ///
