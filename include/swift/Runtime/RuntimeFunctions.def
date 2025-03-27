@@ -3008,16 +3008,6 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_coro_alloc(CoroAllocator *, size_t size);
-FUNCTION(CoroAlloc,
-         Swift, swift_coro_alloc, SwiftCC,
-         CoroutineAccessorsAvailability,
-         RETURNS(Int8PtrTy),
-         ARGS(CoroAllocatorPtrTy, SizeTy),
-         NO_ATTRS,
-         EFFECT(RuntimeEffect::Allocating, RuntimeEffect::Concurrency),
-         UNKNOWN_MEMEFFECTS)
-
 // void swift_coro_dealloc(CoroAllocator *, void *ptr);
 FUNCTION(CoroDealloc,
          Swift, swift_coro_dealloc, SwiftCC,

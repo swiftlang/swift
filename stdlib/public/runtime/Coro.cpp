@@ -16,10 +16,6 @@
 
 using namespace swift;
 
-void *swift::swift_coro_alloc(CoroAllocator *allocator, size_t size) {
-  return allocator->allocate(size);
-}
-
 void swift::swift_coro_dealloc(CoroAllocator *allocator, void *ptr) {
   assert(allocator);
   // Calls to swift_coro_dealloc are emitted in resume funclets for every
