@@ -3741,6 +3741,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::Nonisolated: {
+    AttrRange = Loc;
     std::optional<bool> isUnsafe(false);
     if (EnableParameterizedNonisolated) {
       isUnsafe =
