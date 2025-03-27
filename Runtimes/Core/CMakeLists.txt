@@ -176,6 +176,7 @@ add_compile_options(
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 
 add_compile_options(
+  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   "$<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
