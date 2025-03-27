@@ -244,10 +244,10 @@ using SmallMutex =
 /// A recursive variant of Mutex.
 class RecursiveMutex {
 
-  RecursiveMutex(const Mutex &) = delete;
-  RecursiveMutex &operator=(const Mutex &) = delete;
-  RecursiveMutex(Mutex &&) = delete;
-  RecursiveMutex &operator=(Mutex &&) = delete;
+  RecursiveMutex(const RecursiveMutex &) = delete;
+  RecursiveMutex &operator=(const RecursiveMutex &) = delete;
+  RecursiveMutex(RecursiveMutex &&) = delete;
+  RecursiveMutex &operator=(RecursiveMutex &&) = delete;
 
 public:
   /// Constructs a non-recursive mutex.

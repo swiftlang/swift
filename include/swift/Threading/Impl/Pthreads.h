@@ -134,7 +134,7 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
 
 using recursive_mutex_handle = ::pthread_mutex_t;
 
-inline void recursive_mutex_init(mutex_handle &handle, bool checked = false) {
+inline void recursive_mutex_init(recursive_mutex_handle &handle, bool checked = false) {
   ::pthread_mutexattr_t attr;
   SWIFT_PTHREADS_CHECK(::pthread_mutexattr_init(&attr));
   SWIFT_PTHREADS_CHECK(
@@ -142,14 +142,14 @@ inline void recursive_mutex_init(mutex_handle &handle, bool checked = false) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_init(&handle, &attr));
   SWIFT_PTHREADS_CHECK(::pthread_mutexattr_destroy(&attr));
 }
-inline void recursive_mutex_destroy(mutex_handle &handle) {
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_destroy(&handle));
 }
 
-inline void recursive_mutex_lock(mutex_handle &handle) {
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_lock(&handle));
 }
-inline void recursive_mutex_unlock(mutex_handle &handle) {
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_unlock(&handle));
 }
 
