@@ -121,16 +121,16 @@ func testC4<let T: Int>(with c: C<T, T>) {
 struct D<let N: Int & P> {} // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
 
 struct E<A, let b: Int> { // expected-note {{'b' previously declared here}}
-                          // expected-note@-1 {{'b' previously declared here}}
   static var b: Int { // expected-error {{invalid redeclaration of 'b'}}
                       // expected-note@-1 {{'b' declared here}}
     123
   }
 
-  let b: String // expected-error {{invalid redeclaration of 'b'}}
+  let b: String // expected-note {{'b' previously declared here}}
                 // expected-note@-1 {{'b' declared here}}
 
-  func b() {} // expected-note {{'b' declared here}}
+  func b() {} // expected-error {{invalid redeclaration of 'b()'}}
+              // expected-note@-1 {{'b' declared here}}
 }
 
 func testE1() -> Int {
@@ -141,15 +141,35 @@ func testE2() -> Int {
   E<Int, 123>.A // expected-error {{type 'E<Int, 123>' has no member 'A'}}
 }
 
-func testE3<let c: Int>(_: E<Int, c>.Type = E<Int, c>.self) -> Int {
+func testE3<let c: Int>(_: E<Int, c>.Type) -> Int {
   E<Int, c>.b // OK
 }
 
 func testShadowing<let a: Int>(_: A<a>) {
-  var a: Int {
-    123
+  var a: String {
+    "123"
   }
+
+  let x: String = a // OK
+  let y: Int = a // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
 
   print(a) // OK
   print(a.self) // OK
+}
+
+class F<let n: Int> {}
+class G: F<3> {}
+
+func hello() -> Int {
+  G.n // OK
+}
+
+func testTypeOf() -> Int {
+  let x = E<Int, 123>(b: "")
+  return type(of: x).b // OK
+}
+
+func testTypeOf2<let c: Int>(_: E<Int, c>.Type) -> Int {
+  let x = E<Int, c>(b: "")
+  return type(of: x).b // OK
 }

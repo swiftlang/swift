@@ -272,14 +272,6 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   public typealias Index = Int
 
-  // FIXME: Remove when SE-0452 "Integer Generic Parameters" is implemented.
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public static var count: Int {
-    count
-  }
-
   /// The number of elements in the array.
   ///
   /// - Complexity: O(1)

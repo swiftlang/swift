@@ -1827,12 +1827,12 @@ Expr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     if (Result.size() == 1) {
       auto resultDecl = Result.front().Member;
 
-      if (isa<GenericTypeParamDecl>(resultDecl) &&
+      if (resultDecl &&
+          isa<GenericTypeParamDecl>(resultDecl) &&
           cast<GenericTypeParamDecl>(resultDecl)->isValue()) {
         auto gtpd = cast<GenericTypeParamDecl>(resultDecl);
         return TypeValueExpr::createForMemberDecl(InnerTypeRepr,
-                                                  UDE->getNameLoc(),
-                                                  gtpd);
+                                                  UDE->getNameLoc(), gtpd);
 
       } else {
         return TypeExpr::createForMemberDecl(InnerTypeRepr, UDE->getNameLoc(),
@@ -1848,7 +1848,7 @@ TypeExpr *PreCheckTarget::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
   // If this is a reference type a specialized type, form a TypeExpr.
   // The base should be a TypeExpr that we already resolved.
-  if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
+  if (auto *te = dyn_cast_or_null<TypeExpr>(us->getSubExpr())) {
     if (auto *declRefTR =
             dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
       return TypeExpr::createForSpecializedDecl(
@@ -2315,7 +2315,7 @@ Expr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 
       // When simplifying a type expr like "(P1 & P2) -> (P3 & P4) -> Int",
       // it may have been folded at the same time; recursively simplify it.
-      if (auto ArgsTypeExpr = dyn_cast<TypeExpr>(simplifyTypeExpr(E))) {
+      if (auto ArgsTypeExpr = dyn_cast_or_null<TypeExpr>(simplifyTypeExpr(E))) {
         auto ArgRepr = ArgsTypeExpr->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
@@ -2336,7 +2336,7 @@ Expr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 
       // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
       // it may have been folded at the same time; recursively simplify it.
-      if (auto ArgsTypeExpr = dyn_cast<TypeExpr>(simplifyTypeExpr(E)))
+      if (auto ArgsTypeExpr = dyn_cast_or_null<TypeExpr>(simplifyTypeExpr(E)))
         return ArgsTypeExpr->getTypeRepr();
       return nullptr;
     };
@@ -2375,7 +2375,7 @@ Expr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
   // Fold '~P' into a composition type.
   if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(E)) {
     if (isTildeOperator(unaryExpr->getFn())) {
-      if (auto operand = dyn_cast<TypeExpr>(
+      if (auto operand = dyn_cast_or_null<TypeExpr>(
             simplifyTypeExpr(unaryExpr->getOperand()))) {
         auto inverseTypeRepr = new (Ctx) InverseTypeRepr(
             unaryExpr->getLoc(), operand->getTypeRepr());
@@ -2396,7 +2396,7 @@ Expr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       // If the lhs is another binary expression, we have a multi element
       // composition: 'A & B & C' is parsed as ((A & B) & C); we get
       // the protocols from the lhs here
-      if (auto expr = dyn_cast<TypeExpr>(simplifyTypeExpr(lhsExpr)))
+      if (auto expr = dyn_cast_or_null<TypeExpr>(simplifyTypeExpr(lhsExpr)))
         if (auto *repr = dyn_cast<CompositionTypeRepr>(expr->getTypeRepr()))
           // add the protocols to our list
           for (auto proto : repr->getTypes())
