@@ -38,7 +38,11 @@ typedef int BOOL;
 typedef unsigned long DWORD;
 typedef long LONG;
 typedef unsigned long ULONG;
+#if defined(_WIN64)
+typedef unsigned __int64 ULONG_PTR;
+#else
 typedef unsigned long ULONG_PTR;
+#endif
 typedef PVOID HANDLE;
 
 typedef VOID(NTAPI *PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
