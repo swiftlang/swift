@@ -166,3 +166,14 @@ final class KlassB: Sendable {
   // expected-error@+1 {{'nonisolated' cannot be applied to mutable stored properties}}
   nonisolated var test: Int = 1
 }
+
+class NotSendable {}
+
+@MainActor
+struct UnsafeInitialization {
+  nonisolated(unsafe) let ns: NotSendable
+
+  nonisolated init(ns: NotSendable) {
+    self.ns = ns // okay
+  }
+}
