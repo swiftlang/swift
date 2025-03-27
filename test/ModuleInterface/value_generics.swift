@@ -14,6 +14,8 @@ public struct Slab<Element, let N: Int> {
   public var count: Int {
     N
   }
+
+  public init() {}
 }
 
 // CHECK: public func usesGenericSlab<let N : Swift.Int>(_: ValueGeneric.Slab<Swift.Int, N>)
@@ -24,3 +26,27 @@ public func usesConcreteSlab(_: Slab<Int, 2>) {}
 
 // CHECK: public func usesNegativeSlab(_: ValueGeneric.Slab<Swift.String, -10>)
 public func usesNegativeSlab(_: Slab<String, -10>) {}
+
+// CHECK: $ValueGenericsNameLookup
+@inlinable
+public func test() -> Int {
+  // CHECK: Slab<Int, 123>.N
+  Slab<Int, 123>.N
+}
+
+// CHECK: $ValueGenericsNameLookup
+@inlinable
+public func test2() -> Int {
+  // CHECK: type(of: Slab<Int, 123>()).N
+  type(of: Slab<Int, 123>()).N
+}
+
+// CHECK: $ValueGenericsNameLookup
+@inlinable
+public func test3() {
+  {
+    print(123)
+    print(123)
+    print(Slab<Int, 123>.N)
+  }()
+}
