@@ -6322,6 +6322,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
   registerDeclTypeAbbr<IntegerTypeLayout>();
+  registerDeclTypeAbbr<InlineArrayTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
