@@ -5153,6 +5153,35 @@ static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
       /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
 }
 
+static llvm::Constant *getCoroDeallocWrapperFn(IRGenModule &IGM) {
+  return IGM.getOrCreateHelperFunction(
+      "__swift_coro_dealloc_", IGM.VoidTy,
+      {IGM.CoroAllocatorPtrTy, IGM.Int8PtrTy},
+      [](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *allocator = parameters.claimNext();
+        auto *ptr = parameters.claimNext();
+        auto *nullAllocator = IGF.Builder.CreateCmp(
+            llvm::CmpInst::Predicate::ICMP_EQ, allocator,
+            llvm::ConstantPointerNull::get(
+                cast<llvm::PointerType>(allocator->getType())));
+        auto *bailBlock = IGF.createBasicBlock("bail");
+        auto *forwardBlock = IGF.createBasicBlock("forward");
+        IGF.Builder.CreateCondBr(nullAllocator, bailBlock, forwardBlock);
+        IGF.Builder.emitBlock(bailBlock);
+        // Emit the dynamic alloca.
+        IGF.Builder.CreateRetVoid();
+        IGF.Builder.emitBlock(forwardBlock);
+        IGF.Builder.CreateCall(
+            IGF.IGM.getCoroDeallocFunctionPointer(), {allocator, ptr});
+        IGF.Builder.CreateRetVoid();
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
+}
+
 void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
                                          CanSILFunctionType fnType,
                                          llvm::Value *buffer,
@@ -5164,7 +5193,9 @@ void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
   auto allocFn = IGF.IGM.getOpaquePtr(isSwiftCoroCCAvailable
                                           ? getCoroAllocWrapperFn(IGF.IGM)
                                           : IGF.IGM.getCoroAllocFn());
-  auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroDeallocFn());
+  auto deallocFn = IGF.IGM.getOpaquePtr(isSwiftCoroCCAvailable
+                                            ? getCoroDeallocWrapperFn(IGF.IGM)
+                                            : IGF.IGM.getCoroDeallocFn());
   emitRetconCoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
       Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),

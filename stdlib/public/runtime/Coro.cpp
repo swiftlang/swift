@@ -21,8 +21,7 @@ void *swift::swift_coro_alloc(CoroAllocator *allocator, size_t size) {
 }
 
 void swift::swift_coro_dealloc(CoroAllocator *allocator, void *ptr) {
-  if (!allocator)
-    return;
+  assert(allocator);
   // Calls to swift_coro_dealloc are emitted in resume funclets for every
   // live-across dynamic allocation.  Whether such calls immediately deallocate
   // memory depends on the allocator.

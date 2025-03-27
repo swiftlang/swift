@@ -50,6 +50,26 @@
 // CHECK:         ret ptr [[OTHER_ALLOCATION]]
 // CHECK:       }
 
+// CHECK-LABEL: @__swift_coro_dealloc_(
+// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       entry:
+// CHECK:         [[BAIL:%[^,]+]] = icmp eq ptr [[ALLOCATOR]], null
+// CHECK:         br i1 [[USE_POPLESS]],
+// CHECK-SAME:        label %bail
+// CHECK-SAME:        label %forward
+// CHECK:       bail:
+// CHECK:         ret void
+// CHECK:       forward:
+// CHECK:         call swiftcc void @swift_coro_dealloc(
+// CHECK-SAME:        ptr [[ALLOCATOR]]
+// CHECK-SAME:        ptr [[ADDRESS]]
+// CHECK-SAME:    )
+// CHECK:         ret void
+// CHECK:       }
+
 public var _i: Int = 0
 
 public var i: Int {
