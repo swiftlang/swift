@@ -666,11 +666,16 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
   if (auto *var = patternBinding->getSingleVar())
     addChildrenForKnownAttributes(var, parentScope);
 
+  // Check to see if we have a local binding. Note we need to exclude bindings
+  // in `@abi` attributes here since they may be in a local DeclContext, but
+  // their scope shouldn't extend past the attribute.
   bool isLocalBinding = false;
-  for (auto i : range(patternBinding->getNumPatternEntries())) {
-    if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
-      isLocalBinding = varDecl->getDeclContext()->isLocalContext();
-      break;
+  if (!isa<ABIAttributeScope>(parentScope)) {
+    for (auto i : range(patternBinding->getNumPatternEntries())) {
+      if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
+        isLocalBinding = varDecl->getDeclContext()->isLocalContext();
+        break;
+      }
     }
   }
 
