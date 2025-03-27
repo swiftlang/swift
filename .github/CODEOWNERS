@@ -152,6 +152,7 @@
 /lib/IRGen/*Debug*                                  @adrian-prantl
 /lib/IRGen/*Distributed*                            @ktoso
 /lib/Index/                                         @ahoppen @bnbarham @hamishknight @rintaro
+/lib/Macros/Sources/SwiftMacros/Swiftify*           @hnrklssn @Xazax-hun
 /lib/Markup/                                        @nkcsgexi
 /lib/Migrator/                                      @nkcsgexi
 /lib/Parse/                                         @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
@@ -195,6 +196,7 @@
 /stdlib/                                  @swiftlang/standard-librarians
 /stdlib/private/*Runtime*/                @rjmccall
 /stdlib/private/SwiftReflectionTest/      @slavapestov
+/stdlib/public/core/Swiftify*             @hnrklssn @Xazax-hun
 /stdlib/public/*Demangl*/                 @rjmccall
 /stdlib/public/Concurrency/               @ktoso
 /stdlib/public/Cxx/                       @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
@@ -223,7 +225,8 @@
 /test/IDE/                                          @ahoppen @bnbarham @hamishknight @rintaro
 /test/IRGen/                                        @rjmccall
 /test/Index/                                        @ahoppen @bnbarham @hamishknight @rintaro
-/test/Interop/                                      @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/test/Interop/                                      @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro @hnrklssn
+/test/Macros/SwiftifyImport                         @hnrklssn @Xazax-hun
 /test/Migrator/                                     @nkcsgexi
 /test/Parse/                                        @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /test/Profiler                                      @ahoppen @bnbarham @hamishknight @rintaro
