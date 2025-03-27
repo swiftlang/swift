@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.29)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
+
 if($ENV{BUILD_NUMBER})
   math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
   set(BUILD_NUMBER ".${BUILD_NUMBER}")
@@ -20,9 +22,13 @@ set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
 
 find_package(SwiftCore)
 
+include(AvailabilityMacros)
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
 
 add_subdirectory(_RegexParser)
+add_subdirectory(_StringProcessing)
+add_subdirectory(RegexBuilder)
