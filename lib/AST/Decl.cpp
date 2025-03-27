@@ -1228,10 +1228,6 @@ ExplicitSafety Decl::getExplicitSafety() const {
       if (auto extSafety = getExplicitSafetyFromAttrs(ext))
         return *extSafety;
     }
-
-    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
-      if (auto nominalSafety = getExplicitSafetyFromAttrs(enclosingNominal))
-        return *nominalSafety;
   }
 
   // If an extension extends an unsafe nominal type, it's unsafe.
@@ -1241,11 +1237,12 @@ ExplicitSafety Decl::getExplicitSafety() const {
         return ExplicitSafety::Unsafe;
   }
 
-  // If this is a pattern binding declaration, check whether the first
-  // variable is @unsafe.
+  // If this is a pattern binding declaration, check whether there is a
+  // safety-related attribute on the first variable we find.
   if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
-    if (auto var = patternBinding->getSingleVar())
-      return var->getExplicitSafety();
+    for (auto index : range(patternBinding->getNumPatternEntries()))
+      if (auto var = patternBinding->getAnchoringVarDecl(index))
+        return var->getExplicitSafety();
   }
 
   return ExplicitSafety::Unspecified;
