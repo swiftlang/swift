@@ -211,6 +211,15 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 #endif
   }
 
+  if (tripleBTCFIByDefaultInOpenBSD(getTriple())) {
+#ifndef SWIFT_OPENBSD_BTCFI
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-z");
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("nobtcfi");
+#endif
+  }
+
   // Configure the toolchain.
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
