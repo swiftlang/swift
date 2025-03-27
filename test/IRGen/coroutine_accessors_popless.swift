@@ -23,7 +23,7 @@
 // CHECK-SAME:      swift_task_dealloc
 // CHECK-SAME:  }
 // CHECK-LABEL: _swift_coro_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-SAME:       i32 2,
+// CHECK-SAME:       i32 258,
 // CHECK-SAME:       malloc,
 // CHECK-SAME:       free
 // CHECK-SAME:  }

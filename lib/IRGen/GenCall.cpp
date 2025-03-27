@@ -5230,16 +5230,17 @@ Address irgen::emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF) {
                                  getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
 
-static llvm::Constant *getAddrOfGlobalCoroAllocator(IRGenModule &IGM,
-                                                    CoroAllocatorKind kind,
-                                                    llvm::Constant *allocFn,
-                                                    llvm::Constant *deallocFn) {
+static llvm::Constant *getAddrOfGlobalCoroAllocator(
+    IRGenModule &IGM, CoroAllocatorKind kind, bool shouldDeallocateImmediately,
+    llvm::Constant *allocFn, llvm::Constant *deallocFn) {
   auto entity = LinkEntity::forCoroAllocator(kind);
   auto taskAllocator = IGM.getOrCreateLazyGlobalVariable(
       entity,
       [&](ConstantInitBuilder &builder) -> ConstantInitFuture {
         auto allocator = builder.beginStruct(IGM.CoroAllocatorTy);
-        allocator.addInt32(CoroAllocatorFlags(kind).getOpaqueValue());
+        auto flags = CoroAllocatorFlags(kind);
+        flags.setShouldDeallocateImmediately(shouldDeallocateImmediately);
+        allocator.addInt32(flags.getOpaqueValue());
         allocator.add(allocFn);
         allocator.add(deallocFn);
         return allocator.finishAndCreateFuture();
@@ -5249,10 +5250,12 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(IRGenModule &IGM,
 }
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
   return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Malloc,
+                                      /*shouldDeallocateImmediately=*/true,
                                       getMallocFn(), getFreeFn());
 }
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroAsyncTaskAllocator() {
   return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Async,
+                                      /*shouldDeallocateImmediately=*/false,
                                       getTaskAllocFn(), getTaskDeallocFn());
 }
 llvm::Value *
