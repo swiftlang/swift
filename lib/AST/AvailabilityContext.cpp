@@ -237,7 +237,7 @@ AvailabilityContext::getAvailabilityRange(AvailabilityDomain domain,
                                           const ASTContext &ctx) const {
   DEBUG_ASSERT(domain.supportsContextRefinement());
 
-  if (domain.isActive(ctx) && domain.isPlatform())
+  if (domain.isActivePlatform(ctx))
     return storage->platformRange;
 
   for (auto domainInfo : storage->getDomainInfos()) {
@@ -315,7 +315,7 @@ void AvailabilityContext::constrainWithAvailabilityRange(
     const ASTContext &ctx) {
   DEBUG_ASSERT(domain.supportsContextRefinement());
 
-  if (domain.isActive(ctx) && domain.isPlatform()) {
+  if (domain.isActivePlatform(ctx)) {
     constrainWithPlatformRange(range, ctx);
     return;
   }
@@ -371,7 +371,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       break;
     case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-        if (domain.isActive(ctx) && domain.isPlatform()) {
+        if (domain.isActivePlatform(ctx)) {
           isConstrained |= constrainRange(platformRange, *introducedRange);
         } else {
           declDomainInfos.push_back({domain, *introducedRange});
