@@ -7853,9 +7853,9 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     clangFunctionType = clangType.get();
   }
 
-  auto isolation = SILFunctionTypeIsolation::Unknown;
+  auto isolation = SILFunctionTypeIsolation::forUnknown();
   if (erasedIsolation)
-    isolation = SILFunctionTypeIsolation::Erased;
+    isolation = SILFunctionTypeIsolation::forErased();
 
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
