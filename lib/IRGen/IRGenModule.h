@@ -1671,6 +1671,9 @@ public:
                                             ConstantInit init);
   SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
+  llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
+
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
   void emitDispatchThunk(SILDeclRef declRef);
