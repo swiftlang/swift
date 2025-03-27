@@ -817,7 +817,18 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         return openType(type, replacements, locator);
       });
 
-  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+  // Infer @Sendable for global actor isolated function types under the
+  // upcoming feature flag.
+  if (Context.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)
+      && !adjustedTy->getExtInfo().isSendable()) {
+    if (adjustedTy->getExtInfo().getIsolation().isGlobalActor()) {
+      adjustedTy =
+          adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
+    }
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures) &&
+      !adjustedTy->getExtInfo().isSendable()) {
     DeclContext *DC = nullptr;
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
       DC = FD->getDeclContext();
