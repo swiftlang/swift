@@ -411,7 +411,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
   let isSizedBy: Bool = false
 
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return []
+    return try base.buildBoundsChecks()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -447,7 +447,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
   public let node: SyntaxProtocol
 
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return []
+    return try base.buildBoundsChecks()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -1142,7 +1142,13 @@ public struct SwiftifyImportMacro: PeerMacro {
       parsedArgs.sort { a, b in
         // make sure return value cast to Span happens last so that withUnsafeBufferPointer
         // doesn't return a ~Escapable type
-        (a.pointerIndex != .return && b.pointerIndex == .return) || paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
+        if a.pointerIndex != .return && b.pointerIndex == .return {
+          return true
+        }
+        if a.pointerIndex == .return && b.pointerIndex != .return {
+          return false
+        }
+        return paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
       }
       let baseBuilder = FunctionCallBuilder(funcDecl)
 

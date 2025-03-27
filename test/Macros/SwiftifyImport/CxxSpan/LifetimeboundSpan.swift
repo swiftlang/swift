@@ -32,6 +32,27 @@ struct X {
   func myFunc5() -> SpanOfInt {}
 }
 
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy),
+                 .sizedBy(pointer: .param(2), size: "count * size"),
+                 .nonescaping(pointer: .param(2)),
+                 typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+func myFunc6(_ span: SpanOfInt, _ ptr: UnsafeRawPointer, _ count: CInt, _ size: CInt) -> SpanOfInt {
+}
+
+@_SwiftifyImport(.sizedBy(pointer: .param(2), size: "count * size"),
+                 .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy),
+                 .nonescaping(pointer: .param(2)),
+                 typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+func myFunc7(_ span: SpanOfInt, _ ptr: UnsafeRawPointer, _ count: CInt, _ size: CInt) -> SpanOfInt {
+}
+
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "count * size"),
+                 .nonescaping(pointer: .param(1)),
+                 .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy),
+                 typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+func myFunc8(_ ptr: UnsafeRawPointer, _ span: SpanOfInt, _ count: CInt, _ size: CInt) -> SpanOfInt {
+}
+
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: myFunc(SpanOfInt(span))), copying: ())
@@ -55,4 +76,37 @@ struct X {
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: myFunc5()), copying: ())
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK-NEXT: func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
+// CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
+// CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
+// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
+// CHECK-NEXT:     }
+// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:         return unsafe myFunc6(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)
+// CHECK-NEXT:     }), copying: ())
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK-NEXT: func myFunc7(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
+// CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
+// CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
+// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
+// CHECK-NEXT:     }
+// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:         return unsafe myFunc7(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)
+// CHECK-NEXT:     }), copying: ())
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK-NEXT: func myFunc8(_ ptr: RawSpan, _ span: Span<CInt>, _ count: CInt, _ size: CInt) -> Span<CInt> {
+// CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
+// CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
+// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
+// CHECK-NEXT:     }
+// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:         return unsafe myFunc8(_ptrPtr.baseAddress!, SpanOfInt(span), count, size)
+// CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
