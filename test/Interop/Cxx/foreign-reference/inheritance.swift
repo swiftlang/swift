@@ -40,6 +40,13 @@ InheritanceTestSuite.test("DerivedOutOfOrder") {
   expectEqual(789, d.leafField)
 }
 
+InheritanceTestSuite.test("DerivedUsesBaseTailPadding") {
+  let d = DerivedUsesBaseTailPadding.getInstance()
+  expectEqual(123, d.field8)
+  expectEqual(456, d.field4)
+  expectEqual(789, d.field2)
+}
+
 InheritanceTestSuite.test("ParentChild") {
   let immortalRefType = ImmortalRefereceExample.returnImmortalRefType()
   expectTrue(
