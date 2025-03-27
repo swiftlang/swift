@@ -44,6 +44,7 @@ public:
   bool isUnavailable() const { return range.isKnownUnreachable(); }
 
   bool constrainRange(const AvailabilityRange &range);
+  bool unionRange(const AvailabilityRange &range);
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(domain.getOpaqueValue());

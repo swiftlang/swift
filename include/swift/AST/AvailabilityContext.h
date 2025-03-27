@@ -99,10 +99,14 @@ public:
   void constrainWithContext(const AvailabilityContext &other,
                             const ASTContext &ctx);
 
-  /// Constrain the platform availability range with `platformRange`.
+  /// Constrain the platform version range with `range`.
   // FIXME: [availability] Remove; superseded by constrainWithAvailableRange().
-  void constrainWithPlatformRange(const AvailabilityRange &platformRange,
+  void constrainWithPlatformRange(const AvailabilityRange &range,
                                   const ASTContext &ctx);
+
+  /// Expand the platform version range to contain `range`.
+  void unionWithPlatformRange(const AvailabilityRange &range,
+                              const ASTContext &ctx);
 
   /// Constrain the available range for `domain` by `range`.
   void constrainWithAvailabilityRange(const AvailabilityRange &range,

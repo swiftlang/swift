@@ -46,6 +46,15 @@ static bool constrainRange(AvailabilityRange &existing,
   return true;
 }
 
+static bool unionRange(AvailabilityRange &existing,
+                       const AvailabilityRange &other) {
+  if (!existing.isContainedIn(other))
+    return false;
+
+  existing = other;
+  return true;
+}
+
 /// Returns true if `domainInfos` will be constrained by merging the domain
 /// availability represented by `otherDomainInfo`. Additionally, this function
 /// has a couple of side-effects:
@@ -134,6 +143,11 @@ static bool constrainDomainInfos(
 bool AvailabilityContext::DomainInfo::constrainRange(
     const AvailabilityRange &otherRange) {
   return ::constrainRange(range, otherRange);
+}
+
+bool AvailabilityContext::DomainInfo::unionRange(
+    const AvailabilityRange &otherRange) {
+  return ::unionRange(range, otherRange);
 }
 
 AvailabilityContext
@@ -284,9 +298,22 @@ void AvailabilityContext::constrainWithPlatformRange(
                          storage->getDomainInfos(), ctx);
 }
 
+void AvailabilityContext::unionWithPlatformRange(const AvailabilityRange &range,
+                                                 const ASTContext &ctx) {
+  auto platformRange = storage->platformRange;
+  if (!unionRange(platformRange, range))
+    return;
+
+  // FIXME: [availability] Should this remove any unavailable platform domains?
+
+  storage = Storage::get(platformRange, storage->isDeprecated,
+                         storage->getDomainInfos(), ctx);
+}
+
 void AvailabilityContext::constrainWithAvailabilityRange(
     const AvailabilityRange &range, AvailabilityDomain domain,
     const ASTContext &ctx) {
+  DEBUG_ASSERT(domain.supportsContextRefinement());
 
   if (domain.isActive(ctx) && domain.isPlatform()) {
     constrainWithPlatformRange(range, ctx);

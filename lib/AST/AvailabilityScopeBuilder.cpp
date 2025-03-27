@@ -103,6 +103,13 @@ class AvailabilityScopeBuilder : private ASTWalker {
     return availability;
   }
 
+  const AvailabilityContext constrainCurrentAvailabilityWithContext(
+      const AvailabilityContext &otherContext) {
+    auto availability = getCurrentScope()->getAvailabilityContext();
+    availability.constrainWithContext(otherContext, Context);
+    return availability;
+  }
+
   void pushContext(AvailabilityScope *scope, ParentTy popAfterNode) {
     ContextInfo info;
     info.Scope = scope;
@@ -701,16 +708,16 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *ifStmt) {
-    std::optional<AvailabilityRange> thenRange;
-    std::optional<AvailabilityRange> elseRange;
-    std::tie(thenRange, elseRange) =
+    std::optional<AvailabilityContext> thenContext;
+    std::optional<AvailabilityContext> elseContext;
+    std::tie(thenContext, elseContext) =
         buildStmtConditionRefinementContext(ifStmt->getCond());
 
-    if (thenRange.has_value()) {
+    if (thenContext.has_value()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
       auto availabilityContext =
-          constrainCurrentAvailabilityWithPlatformRange(thenRange.value());
+          constrainCurrentAvailabilityWithContext(*thenContext);
       auto *thenScope = AvailabilityScope::createForIfStmtThen(
           Context, ifStmt, getCurrentDeclContext(), getCurrentScope(),
           availabilityContext);
@@ -730,11 +737,11 @@ private:
     // the current platform and minimum deployment target.
     // If we add a more precise version range lattice (i.e., one that can
     // support "<") we should create non-empty contexts for the Else branch.
-    if (elseRange.has_value()) {
+    if (elseContext.has_value()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
       auto availabilityContext =
-          constrainCurrentAvailabilityWithPlatformRange(elseRange.value());
+          constrainCurrentAvailabilityWithContext(*elseContext);
       auto *elseScope = AvailabilityScope::createForIfStmtElse(
           Context, ifStmt, getCurrentDeclContext(), getCurrentScope(),
           availabilityContext);
@@ -749,14 +756,14 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildWhileStmtRefinementContext(WhileStmt *whileStmt) {
-    std::optional<AvailabilityRange> bodyRange =
+    std::optional<AvailabilityContext> bodyContext =
         buildStmtConditionRefinementContext(whileStmt->getCond()).first;
 
-    if (bodyRange.has_value()) {
+    if (bodyContext.has_value()) {
       // Create a new context for the body and traverse it in the new
       // context.
       auto availabilityContext =
-          constrainCurrentAvailabilityWithPlatformRange(bodyRange.value());
+          constrainCurrentAvailabilityWithContext(*bodyContext);
       auto *bodyScope = AvailabilityScope::createForWhileStmtBody(
           Context, whileStmt, getCurrentDeclContext(), getCurrentScope(),
           availabilityContext);
@@ -783,15 +790,15 @@ private:
     // This is slightly tricky because, unlike our other control constructs,
     // the refined region is not lexically contained inside the construct
     // introducing the availability scope.
-    std::optional<AvailabilityRange> fallthroughRange;
-    std::optional<AvailabilityRange> elseRange;
-    std::tie(fallthroughRange, elseRange) =
+    std::optional<AvailabilityContext> fallthroughContext;
+    std::optional<AvailabilityContext> elseContext;
+    std::tie(fallthroughContext, elseContext) =
         buildStmtConditionRefinementContext(guardStmt->getCond());
 
     if (Stmt *elseBody = guardStmt->getBody()) {
-      if (elseRange.has_value()) {
+      if (elseContext.has_value()) {
         auto availabilityContext =
-            constrainCurrentAvailabilityWithPlatformRange(elseRange.value());
+            constrainCurrentAvailabilityWithContext(*elseContext);
         auto *trueScope = AvailabilityScope::createForGuardStmtElse(
             Context, guardStmt, getCurrentDeclContext(), getCurrentScope(),
             availabilityContext);
@@ -804,12 +811,12 @@ private:
 
     auto *parentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
     assert(parentBrace && "Expected parent of GuardStmt to be BraceStmt");
-    if (!fallthroughRange.has_value())
+    if (!fallthroughContext.has_value())
       return;
 
     // Create a new context for the fallthrough.
     auto fallthroughAvailability =
-        constrainCurrentAvailabilityWithPlatformRange(fallthroughRange.value());
+        constrainCurrentAvailabilityWithContext(*fallthroughContext);
     auto *fallthroughScope = AvailabilityScope::createForGuardStmtFallthrough(
         Context, guardStmt, parentBrace, getCurrentDeclContext(),
         getCurrentScope(), fallthroughAvailability);
@@ -818,10 +825,11 @@ private:
   }
 
   /// Build the availability scopes for a StmtCondition and return a pair of
-  /// optional version ranges, the first for the true branch and the second
-  /// for the false branch. A value of `nullopt` for a given branch indicates
-  /// that the branch does not introduce a new scope.
-  std::pair<std::optional<AvailabilityRange>, std::optional<AvailabilityRange>>
+  /// optional availability contexts, the first for the true branch and the
+  /// second for the false branch. A value of `nullopt` for a given branch
+  /// indicates that the branch does not introduce a new scope.
+  std::pair<std::optional<AvailabilityContext>,
+            std::optional<AvailabilityContext>>
   buildStmtConditionRefinementContext(StmtCondition cond) {
     if (Context.LangOpts.DisableAvailabilityChecking)
       return {};
@@ -835,8 +843,14 @@ private:
     // for the StmtCondition.
     unsigned nestedCount = 0;
 
-    // Tracks the potential version range when the condition is false.
-    auto falseFlow = AvailabilityRange::neverAvailable();
+    // Tracks the availability of the region in which the condition is false.
+    // By default, we assume the false flow is unreachable and therefore start
+    // with no platform versions available in the context. If we find that it
+    // is actually reachable, the context must expand to cover the potentially
+    // available range.
+    auto falseFlowContext = getCurrentScope()->getAvailabilityContext();
+    falseFlowContext.constrainWithPlatformRange(
+        AvailabilityRange::neverAvailable(), Context);
 
     AvailabilityScope *startingScope = getCurrentScope();
 
@@ -845,7 +859,7 @@ private:
 
     for (StmtConditionElement element : cond) {
       auto *currentScope = getCurrentScope();
-      auto currentInfo = currentScope->getPlatformAvailabilityRange();
+      auto currentContext = currentScope->getAvailabilityContext();
 
       // If the element is not a condition, walk it in the current scope.
       if (element.getKind() != StmtConditionElement::CK_Availability) {
@@ -854,7 +868,9 @@ private:
         // potentially be false, so conservatively combine the version
         // range of the current context with the accumulated false flow
         // of all other conjuncts.
-        falseFlow.unionWith(currentInfo);
+        // FIXME: [availability] Fully union with current context.
+        falseFlowContext.unionWithPlatformRange(
+            currentContext.getPlatformRange(), Context);
 
         element.walk(*this);
         continue;
@@ -956,7 +972,9 @@ private:
         }
       }
 
-      if (currentInfo.isContainedIn(newConstraint)) {
+      auto newContext = currentContext;
+      newContext.constrainWithPlatformRange(newConstraint, Context);
+      if (currentContext.isContainedIn(newContext)) {
         // No need to actually create the availability scope if we know it is
         // useless.
         continue;
@@ -967,38 +985,38 @@ private:
       // context.
       // We could be more precise here if we enriched the lattice to include
       // ranges of the form [x, y).
-      falseFlow.unionWith(currentInfo);
+      // FIXME: [availability] Fully union with current context.
+      falseFlowContext.unionWithPlatformRange(currentContext.getPlatformRange(),
+                                              Context);
 
-      auto constrainedAvailability =
-          constrainCurrentAvailabilityWithPlatformRange(newConstraint);
       auto *scope = AvailabilityScope::createForConditionFollowingQuery(
           Context, query, lastElement, getCurrentDeclContext(), currentScope,
-          constrainedAvailability);
+          newContext);
 
       pushContext(scope, ParentTy());
       ++nestedCount;
     }
 
-    std::optional<AvailabilityRange> falseRefinement = std::nullopt;
+    std::optional<AvailabilityContext> falseRefinement = std::nullopt;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
-    assert(
-        falseFlow.isContainedIn(startingScope->getPlatformAvailabilityRange()));
+    assert(falseFlowContext.isContainedIn(
+        startingScope->getAvailabilityContext()));
 
-    // If the starting version range is not completely contained in the
-    // false flow version range then it must be the case that false flow range
-    // is strictly smaller than the starting range (because the false flow
-    // range *is* contained in the starting range), so we should introduce a
+    // If the starting availability context is not completely contained in the
+    // false flow context then it must be the case that false flow context
+    // is strictly smaller than the starting context (because the false flow
+    // context *is* contained in the starting context), so we should introduce a
     // new availability scope for the false flow.
-    if (!startingScope->getPlatformAvailabilityRange().isContainedIn(
-            falseFlow)) {
-      falseRefinement = falseFlow;
+    if (!startingScope->getAvailabilityContext().isContainedIn(
+            falseFlowContext)) {
+      falseRefinement = falseFlowContext;
     }
 
     auto makeResult =
-        [isUnavailability](std::optional<AvailabilityRange> trueRefinement,
-                           std::optional<AvailabilityRange> falseRefinement) {
-          if (isUnavailability.has_value() && isUnavailability.value()) {
+        [isUnavailability](std::optional<AvailabilityContext> trueRefinement,
+                           std::optional<AvailabilityContext> falseRefinement) {
+          if (isUnavailability.has_value() && *isUnavailability) {
             // If this is an unavailability check, invert the result.
             return std::make_pair(falseRefinement, trueRefinement);
           }
@@ -1014,8 +1032,7 @@ private:
 
     assert(getCurrentScope() == startingScope);
 
-    return makeResult(nestedScope->getPlatformAvailabilityRange(),
-                      falseRefinement);
+    return makeResult(nestedScope->getAvailabilityContext(), falseRefinement);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
