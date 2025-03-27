@@ -1,4 +1,4 @@
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 
   set(library_name "swiftCompatibilitySpan")
 
