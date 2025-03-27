@@ -714,13 +714,9 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
     auto substitutions = SubstitutionMap::get(
         buildRemoteExecutorDecl->getGenericSignature(),
         [&](SubstitutableType *dependentType) {
-          if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
-            if (gp->getDepth() == 0 && gp->getIndex() == 0) {
-              return getter->getImplicitSelfDecl()->getTypeInContext();
-            }
-          }
-
-          return Type();
+          auto gp = cast<GenericTypeParamType>(dependentType);
+          ASSERT(gp->getDepth() == 0 && gp->getIndex() == 0);
+          return getter->getImplicitSelfDecl()->getTypeInContext();
         },
         LookUpConformanceInModule()
     );
@@ -730,8 +726,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
             DeclNameLoc(),/*implicit=*/true,
             AccessSemantics::Ordinary);
     buildRemoteExecutorExpr->setType(
-        buildRemoteExecutorDecl->getInterfaceType()
-         .subst(substitutions)
+        buildRemoteExecutorDecl->getInterfaceType()->castTo<GenericFunctionType>()
+         ->substGenericArgs(substitutions)
         );
 
     Expr *selfForBuildRemoteExecutor = DerivedConformance::createSelfDeclRef(getter);

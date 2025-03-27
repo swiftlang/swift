@@ -3856,15 +3856,22 @@ filterProtocolRequirements(
 
     auto OverloadTy = Req->getOverloadSignatureType();
     if (OverloadTy) {
-      OverloadTy =
-          OverloadTy.subst(getProtocolSubstitutionMap(Req))->getCanonicalType();
+      auto Subs = getProtocolSubstitutionMap(Req);
+      // FIXME: This is wrong if the overload has its own generic parameters
+      if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OverloadTy))
+        OverloadTy = GenericFnTy.substGenericArgs(Subs);
+      else
+        OverloadTy = OverloadTy.subst(Subs)->getCanonicalType();
     }
     if (llvm::any_of(DeclsByName[Req->getName()], [&](ValueDecl *OtherReq) {
           auto OtherOverloadTy = OtherReq->getOverloadSignatureType();
           if (OtherOverloadTy) {
-            OtherOverloadTy =
-                OtherOverloadTy.subst(getProtocolSubstitutionMap(OtherReq))
-                    ->getCanonicalType();
+            auto Subs = getProtocolSubstitutionMap(OtherReq);
+            // FIXME: This is wrong if the overload has its own generic parameters
+            if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OtherOverloadTy))
+              OtherOverloadTy = GenericFnTy.substGenericArgs(Subs);
+            else
+              OtherOverloadTy = OtherOverloadTy.subst(Subs)->getCanonicalType();
           }
           return conflicting(Req->getASTContext(), Req->getOverloadSignature(),
                              OverloadTy, OtherReq->getOverloadSignature(),
@@ -7397,7 +7404,10 @@ bool swift::forEachConformance(
     if (forEachConformance(subs, body, visitedConformances))
       return true;
 
-    type = type.subst(subs);
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
+    else
+      type = type.subst(subs);
   }
 
   if (forEachConformance(type, body, visitedConformances))

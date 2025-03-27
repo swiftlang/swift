@@ -208,8 +208,12 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
   auto subs = declRef.getSubstitutions();
   {
     auto type = decl->getInterfaceType();
-    if (subs)
-      type = type.subst(subs);
+    if (subs) {
+      if (auto *genericFnType = type->getAs<GenericFunctionType>())
+        type = genericFnType->substGenericArgs(subs);
+      else
+        type = type.subst(subs);
+    }
 
     bool shouldReturnTrue = false;
     diagnoseUnsafeType(ctx, loc, type, [&](Type unsafeType) {

@@ -5748,13 +5748,31 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
     Type conformingType, ProtocolDecl *proto) {
   ASTContext &ctx = proto->getASTContext();
 
+  auto kind = conformingType->getDesugaredType()->getKind();
+  switch (kind) {
+  case TypeKind::GenericTypeParam:
+  case TypeKind::TypeVariable:
+  case TypeKind::DependentMember:
+  case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::ExistentialArchetype:
+  case TypeKind::ElementArchetype:
+    break;
+
+  default:
+    llvm::errs() << "Abstract conformance with bad subject type:\n";
+    conformingType->dump(llvm::errs());
+    abort();
+  }
+
   // Figure out which arena this should go in.
-  RecursiveTypeProperties properties;
-  if (conformingType)
-    properties |= conformingType->getRecursiveProperties();
+  auto properties = conformingType->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  // Profile the substitution map.
+  // Form the folding set key.
   llvm::FoldingSetNodeID id;
   AbstractConformance::Profile(id, conformingType, proto);
 

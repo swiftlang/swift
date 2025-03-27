@@ -666,7 +666,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
       .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
+  auto type = superclassCtor->getInitializerInterfaceType();
+  if (auto *genericFnType = type->getAs<GenericFunctionType>())
+    type = genericFnType->substGenericArgs(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);
