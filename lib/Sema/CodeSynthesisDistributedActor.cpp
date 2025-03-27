@@ -857,7 +857,7 @@ void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
           }
           if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
             // we have found all the necessary fields, let's assert their order
-            assert(idIdx < actorSystemIdx < unownedExecutorIdx &&
+            assert(idIdx < actorSystemIdx && actorSystemIdx < unownedExecutorIdx &&
                    "order of fields MUST be exact.");
           }
         }
