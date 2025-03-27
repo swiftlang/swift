@@ -1073,8 +1073,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
-        (hasErasedIsolation ? SILFunctionTypeIsolation::Erased
-                            : SILFunctionTypeIsolation::Unknown);
+        (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
+                            : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
                            calleeConvention, resultIsolation);
@@ -1847,7 +1847,7 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
   PartialApplyInst *setterPAI =
       B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
@@ -1899,7 +1899,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
 

@@ -1276,7 +1276,8 @@ bool BridgedInstruction::PartialApplyInst_isOnStack() const {
 }
 
 bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
-  return getAs<swift::PartialApplyInst>()->getResultIsolation() == swift::SILFunctionTypeIsolation::Unknown;
+  return getAs<swift::PartialApplyInst>()->getResultIsolation() ==
+         swift::SILFunctionTypeIsolation::forUnknown();
 }
 
 bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
@@ -2276,16 +2277,15 @@ BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
                                                       BridgedSubstitutionMap bridgedSubstitutionMap,
                                                       bool hasUnknownIsolation,
                                                       bool isOnStack) const {
-  llvm::SmallVector<swift::SILValue, 8> capturedArgs;                                        
+  llvm::SmallVector<swift::SILValue, 8> capturedArgs;
   return {unbridged().createPartialApply(
-    regularLoc(), 
-    funcRef.getSILValue(), 
-    bridgedSubstitutionMap.unbridged(),
-    bridgedCapturedArgs.getValues(capturedArgs), 
-    getParameterConvention(calleeConvention),
-    hasUnknownIsolation ? swift::SILFunctionTypeIsolation::Unknown : swift::SILFunctionTypeIsolation::Erased,
-    isOnStack ? swift:: PartialApplyInst::OnStack : swift::PartialApplyInst::NotOnStack
-  )};
+      regularLoc(), funcRef.getSILValue(), bridgedSubstitutionMap.unbridged(),
+      bridgedCapturedArgs.getValues(capturedArgs),
+      getParameterConvention(calleeConvention),
+      hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
+                          : swift::SILFunctionTypeIsolation::forErased(),
+      isOnStack ? swift::PartialApplyInst::OnStack
+                : swift::PartialApplyInst::NotOnStack)};
 }                                                                                  
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
