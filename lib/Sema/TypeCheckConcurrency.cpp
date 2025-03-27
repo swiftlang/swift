@@ -7539,9 +7539,19 @@ ActorIsolation swift::getActorIsolationForReference(ValueDecl *decl,
   // the access is outside the module or if the property type is not
   // 'Sendable'.
   //
+  // Note that this is only allowed for source compatibility reasons.
+  // It is generally invalid to write `nonisolated` on an actor `let`
+  // if the type of the property is not Sendable. However, older compilers
+  // used to allow this, so it's only an error in the Swift 6 language
+  // mode, and it is a warning in prior language modes.
+  //
   // FIXME: getActorIsolation(decl) should treat these as isolated.
   // FIXME: Expand this out to local variables?
   if (auto var = dyn_cast<VarDecl>(decl)) {
+    // 'nonisolated(unsafe)' opts out of actor isolation.
+    if (declIsolation.isNonisolatedUnsafe())
+      return declIsolation;
+
     auto *fromModule = fromDC->getParentModule();
     ActorReferenceResult::Options options = std::nullopt;
     if (varIsSafeAcrossActors(fromModule, var, declIsolation, std::nullopt, options) &&
