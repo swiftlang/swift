@@ -44,11 +44,26 @@ func testUpcast(arr: [@execution(caller) () async -> Void]) {
 }
 
 // Isolated parameter
-func testParameterIsolation(fn: @escaping (isolated (any Actor)?) async -> Void) {
+func testParameterIsolation(fn: @escaping (isolated (any Actor)?) async -> Void, caller: @escaping @execution(caller) (String) async -> Void) {
   let _: @execution(caller) () async -> Void = fn
   // expected-error@-1 {{cannot convert value of type '(isolated (any Actor)?) async -> Void' to specified type '@execution(caller) () async -> Void'}}
   let _: @execution(concurrent) () async -> Void = fn
   // expected-error@-1 {{cannot convert value of type '(isolated (any Actor)?) async -> Void' to specified type '() async -> Void'}}
+
+  let _: (isolated (any Actor)?) async -> Void = callerTest // Ok
+  let _: (isolated (any Actor)?) -> Void = callerTest
+  // expected-error@-1 {{invalid conversion from 'async' function of type '@execution(caller) () async -> ()' to synchronous function type '(isolated (any Actor)?) -> Void'}}
+  let _: (isolated (any Actor)?) async -> Void = concurrentTest
+  // expected-error@-1 {{cannot convert value of type '() async -> ()' to specified type '(isolated (any Actor)?) async -> Void'}}
+  let _: (isolated (any Actor)?, Int) async -> Void = callerTest
+  // expected-error@-1 {{cannot convert value of type '@execution(caller) () async -> ()' to specified type '(isolated (any Actor)?, Int) async -> Void'}}
+
+  let _: (String, isolated any Actor) async -> Void = caller // Ok
+  let _: (isolated (any Actor)?, String) async -> Void = caller // Ok
+
+  let _: (Int, isolated any Actor) async -> Void = { @execution(caller) x in } // Ok
+  let _: (Int, isolated any Actor) async -> Void = { @execution(caller) (x: Int) in } // Ok
+  let _: (isolated any Actor, Int, String) async -> Void = { @execution(caller) (x: Int, _: String) in } // Ok
 }
 
 // Non-conversion situations
