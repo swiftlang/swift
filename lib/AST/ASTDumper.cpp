@@ -234,11 +234,15 @@ std::string typeUSR(Type type) {
     return "";
 
   if (type->hasArchetype()) {
-    // We can't generate USRs for types that contain archetypes. Replace them
-    // with their interface types.
+    type = type->mapTypeOutOfContext();
+  }
+  if (type->hasLocalArchetype()) {
+    // If we have local archetypes, we can't mangle those. Replace them with
+    // their existential upper bounds, which loses information but is probably
+    // close enough for most purposes.
     type = type.transformRec([&](TypeBase *t) -> std::optional<Type> {
-      if (auto AT = dyn_cast<ArchetypeType>(t)) {
-        return AT->getInterfaceType();
+      if (auto LAT = dyn_cast<LocalArchetypeType>(t)) {
+        return LAT->getExistentialType();
       }
       return std::nullopt;
     });
@@ -1270,11 +1274,25 @@ namespace {
 
       printField(requirement.getKind(), Label::optional("kind"));
 
-      if (requirement.getKind() != RequirementKind::Layout
-            && requirement.getSecondType())
-        printTypeField(requirement.getSecondType(),
-                       Label::optional("second_type"), opts);
-      else if (requirement.getLayoutConstraint())
+      if (requirement.getKind() != RequirementKind::Layout &&
+          requirement.getSecondType()) {
+        if (Writer.isParsable()) {
+          // If this is a conformance requirement, print the USR of the protocol
+          // decl instead of the type. The type USR for a protocol is based on
+          // the equivalent expanded existential, which drops suppressed
+          // protocols.
+          if (requirement.getKind() == RequirementKind::Conformance) {
+            printReferencedDeclField(requirement.getProtocolDecl(),
+                                     Label::optional("protocol"));
+          } else {
+            printTypeField(requirement.getSecondType(),
+                           Label::optional("second_type"), opts);
+          }
+        } else {
+          printTypeField(requirement.getSecondType(),
+                         Label::optional("second_type"), opts);
+        }
+      } else if (requirement.getLayoutConstraint())
         printFieldQuoted(requirement.getLayoutConstraint(),
                          Label::optional("layout"));
 
@@ -1925,6 +1943,62 @@ namespace {
       }
     }
 
+    void printInheritance(const IterableDeclContext *DC) {
+      if (!(Writer.isParsable() && isTypeChecked())) {
+        // If the output is not parsable or we're not type-checked, just print
+        // the inheritance list as written.
+        switch (DC->getIterableContextKind()) {
+        case IterableDeclContextKind::NominalTypeDecl:
+          printInherited(cast<NominalTypeDecl>(DC)->getInherited());
+          break;
+        case IterableDeclContextKind::ExtensionDecl:
+          printInherited(cast<ExtensionDecl>(DC)->getInherited());
+          break;
+        }
+        return;
+      }
+
+      // For parsable, type-checked output, print a more structured
+      // representation of the data.
+      printRecArbitrary(
+          [&](Label label) {
+            printHead("inheritance", FieldLabelColor, label);
+
+            SmallPtrSet<const ProtocolConformance *, 4> dumped;
+            printList(
+                DC->getLocalConformances(),
+                [&](auto conformance, Label label) {
+                  printRec(conformance, dumped, label);
+                },
+                Label::always("conformances"));
+
+            if (auto CD = dyn_cast<ClassDecl>(DC); CD && CD->hasSuperclass()) {
+              printReferencedDeclField(CD->getSuperclassDecl(),
+                                       Label::always("superclass_decl_usr"));
+            }
+
+            if (auto ED = dyn_cast<EnumDecl>(DC); ED && ED->hasRawType()) {
+              printTypeField(ED->getRawType(), Label::always("raw_type"));
+            }
+
+            if (auto PD = dyn_cast<ProtocolDecl>(DC)) {
+              printList(
+                  PD->getAllInheritedProtocols(),
+                  [&](auto inherited, Label label) {
+                    printReferencedDeclField(inherited, label);
+                  },
+                  Label::always("protocols"));
+              if (PD->hasSuperclass()) {
+                printReferencedDeclField(PD->getSuperclassDecl(),
+                                         Label::always("superclass_decl_usr"));
+              }
+            }
+
+            printFoot();
+          },
+          Label::always("inherits"));
+    }
+
     void printInherited(InheritedTypes Inherited) {
       if (Writer.isParsable()) {
         printList(
@@ -2260,13 +2334,13 @@ namespace {
       switch (IDC->getIterableContextKind()) {
       case IterableDeclContextKind::NominalTypeDecl: {
         const auto NTD = cast<NominalTypeDecl>(IDC);
-        printInherited(NTD->getInherited());
+        printInheritance(NTD);
         printWhereRequirements(NTD);
         break;
       }
       case IterableDeclContextKind::ExtensionDecl:
         const auto ED = cast<ExtensionDecl>(IDC);
-        printInherited(ED->getInherited());
+        printInheritance(ED);
         printWhereRequirements(ED);
         break;
       }
@@ -5765,27 +5839,33 @@ public:
 
 void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
                          Label label) {
-  printRecArbitrary([&](Label label) {
-    PrintConformance(Writer)
-        .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited,
-                              label);
-  }, label);
+  printRecArbitrary(
+      [&](Label label) {
+        PrintConformance(Writer, MemberLoading)
+            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
+                                  visited, label);
+      },
+      label);
 }
 
 void PrintBase::printRec(const ProtocolConformanceRef &ref,
                          VisitedConformances &visited, Label label) {
-  printRecArbitrary([&](Label label) {
-    PrintConformance(Writer)
-          .visitProtocolConformanceRef(ref, visited, label);
-  }, label);
+  printRecArbitrary(
+      [&](Label label) {
+        PrintConformance(Writer, MemberLoading)
+            .visitProtocolConformanceRef(ref, visited, label);
+      },
+      label);
 }
 
 void PrintBase::printRec(const ProtocolConformance *conformance,
                          VisitedConformances &visited, Label label) {
-  printRecArbitrary([&](Label label) {
-    PrintConformance(Writer)
-        .visitProtocolConformance(conformance, visited, label);
-  }, label);
+  printRecArbitrary(
+      [&](Label label) {
+        PrintConformance(Writer, MemberLoading)
+            .visitProtocolConformance(conformance, visited, label);
+      },
+      label);
 }
 
 } // end anonymous namespace
