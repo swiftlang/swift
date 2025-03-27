@@ -779,19 +779,24 @@ SwitchEnumInst *SILBuilder::createSwitchEnum(
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILLocation Loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ProfileCounter target1Count,
     ProfileCounter target2Count) {
   auto forwardingOwnership =
       deriveForwardingOwnership(op, destLoweredTy, getFunction());
   return createCheckedCastBranch(
-      Loc, isExact, op, srcFormalTy, destLoweredTy, destFormalTy, successBB,
+      Loc, isExact, isolatedConformances, op, srcFormalTy, destLoweredTy,
+      destFormalTy, successBB,
       failureBB, forwardingOwnership, target1Count, target2Count);
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILLocation Loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ValueOwnershipKind forwardingOwnershipKind,
     ProfileCounter target1Count, ProfileCounter target2Count) {
@@ -800,9 +805,9 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
          "failureBB's argument doesn't match incoming argument type");
 
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op, srcFormalTy, destLoweredTy,
-      destFormalTy, successBB, failureBB, getFunction(), target1Count,
-      target2Count, forwardingOwnershipKind));
+      getSILDebugLocation(Loc), isExact, isolatedConformances, op, srcFormalTy,
+      destLoweredTy, destFormalTy, successBB, failureBB, getFunction(),
+      target1Count, target2Count, forwardingOwnershipKind));
 }
 
 BuiltinInst *SILBuilder::createZeroInitAddr(SILLocation loc, SILValue addr) {

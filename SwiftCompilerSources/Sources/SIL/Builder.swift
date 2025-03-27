@@ -180,7 +180,8 @@ public struct Builder {
   public func createCheckedCastAddrBranch(
     source: Value, sourceFormalType: CanonicalType,
     destination: Value, targetFormalType: CanonicalType,
-    consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind, 
+    isolatedConformances: CastingIsolatedConformances,
+    consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind,
     successBlock: BasicBlock,
     failureBlock: BasicBlock
   ) -> CheckedCastAddrBranchInst {
@@ -191,8 +192,10 @@ public struct Builder {
       case .TakeOnSuccess: bridgedConsumption = .TakeOnSuccess
       case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess    
     }
+
     let cast = bridged.createCheckedCastAddrBranch(source.bridged, sourceFormalType.bridged,
                                                    destination.bridged, targetFormalType.bridged,
+                                                   isolatedConformances.bridged,
                                                    bridgedConsumption,
                                                    successBlock.bridged, failureBlock.bridged)
     return notifyNew(cast.getAs(CheckedCastAddrBranchInst.self))
@@ -200,11 +203,15 @@ public struct Builder {
 
   @discardableResult
   public func createUnconditionalCheckedCastAddr(
+    isolatedConformances: CastingIsolatedConformances,
     source: Value, sourceFormalType: CanonicalType,
     destination: Value, targetFormalType: CanonicalType
   ) -> UnconditionalCheckedCastAddrInst {
-    let cast = bridged.createUnconditionalCheckedCastAddr(source.bridged, sourceFormalType.bridged,
-                                                          destination.bridged, targetFormalType.bridged)
+    let cast = bridged.createUnconditionalCheckedCastAddr(
+        isolatedConformances.bridged, source.bridged,
+        sourceFormalType.bridged,
+        destination.bridged, targetFormalType.bridged
+    )
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
   }
 

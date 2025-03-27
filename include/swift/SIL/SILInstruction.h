@@ -6395,6 +6395,16 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
+/// Whether isolated conformances are allowed or not in a checked cast
+/// instruction.
+enum class CastingIsolatedConformances: uint8_t {
+  /// Allow isolated conformances so long as we are running within their
+  /// executor.
+  Allow,
+  /// Prohibit isolated conformances regardless of what executor is currently
+  /// active.
+  Prohibit
+};
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
@@ -6403,19 +6413,24 @@ class UnconditionalCheckedCastInst final
           UnconditionalCheckedCastInst,
           OwnershipForwardingSingleValueInstruction> {
   CanType DestFormalTy;
+  CastingIsolatedConformances IsolatedConformances;
   friend SILBuilder;
 
-  UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
+  UnconditionalCheckedCastInst(SILDebugLocation DebugLoc,
+                               CastingIsolatedConformances isolatedConformances,
+                               SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestLoweredTy, CanType DestFormalTy,
                                ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestLoweredTy,
             forwardingOwnershipKind),
-        DestFormalTy(DestFormalTy) {}
+        DestFormalTy(DestFormalTy),
+        IsolatedConformances(isolatedConformances) {}
 
   static UnconditionalCheckedCastInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestLoweredTy,
+  create(SILDebugLocation DebugLoc, CastingIsolatedConformances isolatedConformances,
+         SILValue Operand, SILType DestLoweredTy,
          CanType DestFormalTy, SILFunction &F,
          ValueOwnershipKind forwardingOwnershipKind);
 
@@ -6425,6 +6440,10 @@ public:
 
   CanType getTargetFormalType() const { return DestFormalTy; }
   SILType getTargetLoweredType() const { return getType(); }
+
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 };
 
 /// StructInst - Represents a constructed loadable struct.
@@ -11102,8 +11121,10 @@ class CheckedCastBranchInst final
   SILType DestLoweredTy;
   CanType DestFormalTy;
   bool IsExact;
+  CastingIsolatedConformances IsolatedConformances;
 
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
+                        CastingIsolatedConformances isolatedConformances,
                         SILValue Operand, CanType SrcFormalTy,
                         ArrayRef<SILValue> TypeDependentOperands,
                         SILType DestLoweredTy, CanType DestFormalTy,
@@ -11117,10 +11138,12 @@ class CheckedCastBranchInst final
             Target1Count, Target2Count, forwardingOwnershipKind,
             preservesOwnership),
         SrcFormalTy(SrcFormalTy), DestLoweredTy(DestLoweredTy),
-        DestFormalTy(DestFormalTy), IsExact(IsExact) {}
+        DestFormalTy(DestFormalTy), IsExact(IsExact),
+        IsolatedConformances(isolatedConformances) {}
 
   static CheckedCastBranchInst *
-  create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
+  create(SILDebugLocation DebugLoc, bool IsExact,
+         CastingIsolatedConformances isolatedConformances, SILValue Operand,
          CanType SrcFormalTy, SILType DestLoweredTy, CanType DestFormalTy,
          SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
@@ -11128,6 +11151,10 @@ class CheckedCastBranchInst final
 
 public:
   bool isExact() const { return IsExact; }
+
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
   CanType getSourceFormalType() const { return SrcFormalTy; }
@@ -11147,8 +11174,10 @@ class CheckedCastAddrBranchInst final
               SILInstructionKind::CheckedCastAddrBranchInst,
               CheckedCastAddrBranchInst, CastBranchWithConsumptionKindBase> {
   friend SILBuilder;
+  CastingIsolatedConformances IsolatedConformances;
 
   CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
+                            CastingIsolatedConformances isolatedConformances,
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
                             ArrayRef<SILValue> TypeDependentOperands,
@@ -11157,11 +11186,18 @@ class CheckedCastAddrBranchInst final
                             ProfileCounter Target2Count);
 
   static CheckedCastAddrBranchInst *
-  create(SILDebugLocation DebugLoc, CastConsumptionKind consumptionKind,
+  create(SILDebugLocation DebugLoc,
+         CastingIsolatedConformances isolatedConformances,
+         CastConsumptionKind consumptionKind,
          SILValue src, CanType srcType, SILValue dest, CanType targetType,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
          SILFunction &F);
+
+public:
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 };
 
 /// Converts a heap object reference to a different type without any runtime
@@ -11204,16 +11240,24 @@ class UnconditionalCheckedCastAddrInst final
                SILInstructionKind::UnconditionalCheckedCastAddrInst,
                UnconditionalCheckedCastAddrInst, NonValueInstruction> {
   friend SILBuilder;
+  CastingIsolatedConformances IsolatedConformances;
 
   UnconditionalCheckedCastAddrInst(SILDebugLocation Loc,
+                                   CastingIsolatedConformances isolatedConformances,
                                    SILValue src, CanType sourceType,
                                    SILValue dest, CanType targetType,
                                    ArrayRef<SILValue> TypeDependentOperands);
 
   static UnconditionalCheckedCastAddrInst *
-  create(SILDebugLocation DebugLoc, SILValue src, CanType sourceType,
+  create(SILDebugLocation DebugLoc, CastingIsolatedConformances isolatedConformances,
+         SILValue src, CanType sourceType,
          SILValue dest, CanType targetType,
          SILFunction &F);
+
+public:
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.

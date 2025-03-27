@@ -696,6 +696,11 @@ struct BridgedInstruction {
     CopyOnSuccess
   };
 
+  enum class CastingIsolatedConformances {
+    Allow,
+    Prohibit
+  };
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef CondFailInst_getMessage() const;
   BRIDGED_INLINE SwiftInt LoadInst_getLoadOwnership() const ;
   BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
@@ -802,14 +807,22 @@ struct BridgedInstruction {
   BRIDGED_INLINE void LoadInst_setOwnership(SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCast_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCast_getTargetFormalType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
+      UnconditionalCheckedCast_getIsolatedConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCastAddr_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCastAddr_getTargetFormalType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
+      UnconditionalCheckedCastAddr_getIsolatedConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getFailureBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
+      CheckedCastBranch_getIsolatedConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getTargetFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getFailureBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
+      CheckedCastAddrBranch_getIsolatedConformances() const;
   BRIDGED_INLINE void CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType() const;
   BRIDGED_INLINE CastConsumptionKind CheckedCastAddrBranch_getConsumptionKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap ApplySite_getSubstitutionMap() const;
@@ -1122,13 +1135,15 @@ struct BridgedBuilder{
                                                                                 BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
-                                          BridgedValue source, BridgedCanType sourceFormalType,
-                                          BridgedValue destination, BridgedCanType targetFormalType,
-                                          BridgedInstruction::CastConsumptionKind consumptionKind,
-                                          BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;
+      BridgedValue source, BridgedCanType sourceFormalType,
+      BridgedValue destination, BridgedCanType targetFormalType,
+      BridgedInstruction::CastingIsolatedConformances isolatedConformances,
+      BridgedInstruction::CastConsumptionKind consumptionKind,
+      BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnconditionalCheckedCastAddr(
-                                          BridgedValue source, BridgedCanType sourceFormalType,
-                                          BridgedValue destination, BridgedCanType targetFormalType) const;
+        BridgedInstruction::CastingIsolatedConformances isolatedConformances,
+        BridgedValue source, BridgedCanType sourceFormalType,
+        BridgedValue destination, BridgedCanType targetFormalType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoad(BridgedValue op, SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoadBorrow(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginDeallocRef(BridgedValue reference,

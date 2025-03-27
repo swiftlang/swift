@@ -7186,7 +7186,8 @@ visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
                   src, i->getSourceFormalType(),
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional);
+                  CheckedCastMode::Unconditional,
+                  CastingIsolatedConformances::Allow);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -7416,6 +7417,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                         i->getTargetLoweredType(),
                         i->getTargetFormalType(),
                         CheckedCastMode::Unconditional,
+                        i->getIsolatedConformances(),
                         ex);
   setLoweredExplosion(i, ex);
 }
@@ -7604,7 +7606,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   src, i->getSourceFormalType(),
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional);
+                  CheckedCastMode::Unconditional,
+                  i->getIsolatedConformances());
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
@@ -7625,6 +7628,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                           i->getTargetLoweredType(),
                           i->getTargetFormalType(),
                           CheckedCastMode::Conditional,
+                          i->getIsolatedConformances(),
                           ex);
     auto val = ex.claimNext();
     castResult.casted = val;
@@ -7662,7 +7666,8 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
     emitCheckedCast(*this,
                     src, i->getSourceFormalType(),
                     dest, i->getTargetFormalType(),
-                    i->getConsumptionKind(), CheckedCastMode::Conditional);
+                    i->getConsumptionKind(), CheckedCastMode::Conditional,
+                    i->getIsolatedConformances());
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
