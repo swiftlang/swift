@@ -3267,6 +3267,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   SmallVector<AnyFunctionType::Param, 8> func2Params;
   func2Params.append(func2->getParams().begin(), func2->getParams().end());
 
+  // Support conversion from `@execution(caller)` to a function type
+  // with an isolated parameter.
+  if (subKind == ConstraintKind::Subtype &&
+      func1->getIsolation().isNonIsolatedCaller() &&
+      func2->getIsolation().isParameter()) {
+    // `@execution(caller)` function gets an implicit isolation parameter
+    // introduced during SILGen and thunk is going to forward an isolation
+    // from the caller to it.
+    // Let's remove the isolated parameter from consideration, function
+    // types have to match on everything else.
+    llvm::erase_if(func2Params, [](const AnyFunctionType::Param &param) {
+      return param.isIsolated();
+    });
+  }
+
   // Add a very narrow exception to SE-0110 by allowing functions that
   // take multiple arguments to be passed as an argument in places
   // that expect a function that takes a single tuple (of the same
