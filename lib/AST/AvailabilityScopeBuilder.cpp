@@ -843,16 +843,91 @@ private:
     // for the StmtCondition.
     unsigned nestedCount = 0;
 
-    // Tracks the availability of the region in which the condition is false.
-    // By default, we assume the false flow is unreachable and therefore start
-    // with no platform versions available in the context. If we find that it
-    // is actually reachable, the context must expand to cover the potentially
-    // available range.
-    auto falseFlowContext = getCurrentScope()->getAvailabilityContext();
-    falseFlowContext.constrainWithPlatformRange(
-        AvailabilityRange::neverAvailable(), Context);
+    /// Tracks the state that is necessary to produce the `AvailabilityContext`
+    /// for the false flow of the StmtCondition. The builder starts in a state
+    /// where the false flow is assumed to be unreachable at runtime and then is
+    /// refined by expanding the availability domain range it covers.
+    class FalseFlowContextBuilder {
+      enum class State {
+        // The flow doesn't refine anything yet.
+        Empty,
+        // The flow has a valid refinement.
+        Refined,
+        // There is no possible refinement.
+        Undefined,
+      };
+
+      State state;
+      AvailabilityDomain refinedDomain;
+      AvailabilityRange availableRange;
+      const ASTContext &ctx;
+
+    public:
+      FalseFlowContextBuilder(const ASTContext &ctx)
+          : state(State::Empty),
+            refinedDomain(AvailabilityDomain::forUniversal()),
+            availableRange(AvailabilityRange::neverAvailable()), ctx(ctx) {}
+
+      /// Attempts to union the flow's existing domain and range with the given
+      /// domain and range. If the given domain is compatible with the flow's
+      /// existing domain then the refinement's range will be expanded as
+      /// needed. Otherwise, the flow's availability context becomes "undefined"
+      /// since it cannot be represented.
+      void unionWithRange(const AvailabilityRange &range,
+                          AvailabilityDomain domain) {
+        switch (state) {
+        case State::Empty:
+          // There false flow doesn't refine any domain or range yet.
+          refinedDomain = domain;
+          availableRange = range;
+          state = State::Refined;
+          return;
+
+        case State::Refined:
+          // There's an existing domain and range. As long as the new domains is
+          // compatible, then its available range can be expanded if needed.
+          if (refinedDomain == domain || (refinedDomain.isActivePlatform(ctx) &&
+                                          domain.isActivePlatform(ctx))) {
+            availableRange.unionWith(range);
+            return;
+          }
+
+          // The domains aren't compatible so the availability of the false flow
+          // can't be represented.
+          state = State::Undefined;
+          return;
+
+        case State::Undefined:
+          // The availability of the false flow can't be represented.
+          return;
+        }
+      }
+
+      /// Force the availability context of the false flow to be undefined.
+      void setUndefined() { state = State::Undefined; }
+
+      /// Constrains the given context using the refined availability that has
+      /// been built up.
+      AvailabilityContext constrainContext(AvailabilityContext context) {
+        auto contextCopy = context;
+        switch (state) {
+        case State::Empty:
+          contextCopy.constrainWithPlatformRange(availableRange, ctx);
+          break;
+        case State::Refined:
+          contextCopy.constrainWithAvailabilityRange(availableRange,
+                                                     refinedDomain, ctx);
+          break;
+        case State::Undefined:
+          break;
+        }
+
+        return contextCopy;
+      }
+    };
 
     AvailabilityScope *startingScope = getCurrentScope();
+    FalseFlowContextBuilder falseFlowBuilder(Context);
 
     // Tracks if we're refining for availability or unavailability.
     std::optional<bool> isUnavailability = std::nullopt;
@@ -863,15 +938,10 @@ private:
 
       // If the element is not a condition, walk it in the current scope.
       if (element.getKind() != StmtConditionElement::CK_Availability) {
-
         // Assume any condition element that is not a #available() can
-        // potentially be false, so conservatively combine the version
-        // range of the current context with the accumulated false flow
-        // of all other conjuncts.
-        // FIXME: [availability] Fully union with current context.
-        falseFlowContext.unionWithPlatformRange(
-            currentContext.getPlatformRange(), Context);
-
+        // potentially be false, so conservatively make the false flow's
+        // refinement undefined since there is nothing we can prove about it.
+        falseFlowBuilder.setUndefined();
         element.walk(*this);
         continue;
       }
@@ -903,19 +973,17 @@ private:
 
       auto spec = bestActiveSpecForQuery(query);
       if (!spec) {
-        // We couldn't find an appropriate spec for the current platform,
-        // so rather than refining, emit a diagnostic and just use the current
-        // scope.
+        // We couldn't find an active spec so rather than refining, emit a
+        // diagnostic and just use the current scope.
         Context.Diags.diagnose(
             query->getLoc(), diag::availability_query_required_for_platform,
             platformString(targetPlatform(Context.LangOpts)));
-
+        falseFlowBuilder.setUndefined();
         continue;
       }
 
-      AvailabilityRange newConstraint = contextForSpec(*spec, false);
-      query->setAvailableRange(
-          contextForSpec(*spec, true).getRawVersionRange());
+      auto runtimeQueryRange = runtimeQueryRangeForSpec(*spec);
+      query->setAvailableRange(runtimeQueryRange.getRawVersionRange());
 
       // When compiling zippered for macCatalyst, we need to collect both
       // a macOS version (the target version) and an iOS/macCatalyst version
@@ -926,68 +994,69 @@ private:
         auto variantSpec =
             bestActiveSpecForQuery(query, /*ForTargetVariant*/ true);
         if (variantSpec) {
-          VersionRange variantRange =
-              contextForSpec(*variantSpec, true).getRawVersionRange();
-          query->setVariantAvailableRange(variantRange);
+          auto variantQueryRange = runtimeQueryRangeForSpec(*variantSpec);
+          query->setVariantAvailableRange(
+              variantQueryRange.getRawVersionRange());
         }
       }
 
-      if (spec->isWildcard()) {
-        // The wildcard spec '*' represents the minimum deployment target, so
-        // there is no need to create an availability scope for this query.
-        // Further, we won't diagnose for useless #available() conditions
-        // where * matched on this platform -- presumably those conditions are
-        // needed for some other platform.
+      // Wildcards are expected to be "useless". There may be other specs in
+      // this query that are useful when compiling for other platforms.
+      if (spec->isWildcard())
         continue;
-      }
 
-      // If the explicitly-specified (via #availability) version range for the
-      // current scope is completely contained in the range for the spec, then
-      // a version query can never be false, so the spec is useless.
-      // If so, report this.
-      auto explicitRange = currentScope->getExplicitAvailabilityRange();
-      if (explicitRange && explicitRange->isContainedIn(newConstraint)) {
-        // Unavailability scopes are always "useless" from a symbol
-        // availability point of view, so only useless availability specs are
-        // reported.
-        if (isUnavailability.value()) {
-          continue;
-        }
-        DiagnosticEngine &diags = Context.Diags;
-        if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-          PlatformKind bestPlatform = targetPlatform(Context.LangOpts);
-
-          auto Domain = spec->getDomain();
-          // If possible, try to report the diagnostic in terms for the
-          // platform the user uttered in the '#available()'. For a platform
-          // that inherits availability from another platform it may be
-          // different from the platform specified in the target triple.
-          if (Domain.getPlatformKind() != PlatformKind::none)
-            bestPlatform = Domain.getPlatformKind();
-          diags.diagnose(query->getLoc(),
-                         diag::availability_query_useless_enclosing_scope,
-                         platformString(bestPlatform));
-          diags.diagnose(currentScope->getIntroductionLoc(),
-                         diag::availability_query_useless_enclosing_scope_here);
-        }
-      }
-
+      auto domain = spec->getDomain();
       auto newContext = currentContext;
-      newContext.constrainWithPlatformRange(newConstraint, Context);
+      std::optional<AvailabilityRange> trueRange, falseRange;
+      std::tie(trueRange, falseRange) =
+          statementConditionRangesForSpec(*spec, currentContext);
+
+      if (trueRange)
+        newContext.constrainWithAvailabilityRange(*trueRange, domain, Context);
+
+      // Check whether the new context refines availability. If it doesn't, the
+      // query is useless and should potentially be diagnosed.
       if (currentContext.isContainedIn(newContext)) {
-        // No need to actually create the availability scope if we know it is
-        // useless.
+        // If the explicitly-specified (via #availability) version range for the
+        // current scope is completely contained in the range for the spec, then
+        // a version query can never be false, so the spec is useless.
+        // If so, report this.
+        // FIXME: [availability] Diagnose non-platform queries as useless too.
+        auto explicitRange = currentScope->getExplicitAvailabilityRange();
+        if (domain.isPlatform() && explicitRange && trueRange &&
+            explicitRange->isContainedIn(*trueRange)) {
+          // Platform unavailability queries never refine availability so don't
+          // diangose them.
+          if (isUnavailability.value())
+            continue;
+
+          DiagnosticEngine &diags = Context.Diags;
+          if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
+            PlatformKind bestPlatform = targetPlatform(Context.LangOpts);
+
+            // If possible, try to report the diagnostic in terms for the
+            // platform the user uttered in the '#available()'. For a platform
+            // that inherits availability from another platform it may be
+            // different from the platform specified in the target triple.
+            if (domain.getPlatformKind() != PlatformKind::none)
+              bestPlatform = domain.getPlatformKind();
+            diags.diagnose(query->getLoc(),
+                           diag::availability_query_useless_enclosing_scope,
+                           platformString(bestPlatform));
+            diags.diagnose(
+                currentScope->getIntroductionLoc(),
+                diag::availability_query_useless_enclosing_scope_here);
+          }
+        }
+
         continue;
       }
 
-      // If the #available() is not useless then there is potential false flow,
-      // so join the false flow with the potential versions of the current
-      // context.
-      // We could be more precise here if we enriched the lattice to include
-      // ranges of the form [x, y).
-      // FIXME: [availability] Fully union with current context.
-      falseFlowContext.unionWithPlatformRange(currentContext.getPlatformRange(),
-                                              Context);
+      // If the #available() is not useless then there is a potential false
+      // flow and we need to potentially expand the range covered by the false
+      // flow branch.
+      if (falseRange)
+        falseFlowBuilder.unionWithRange(*falseRange, domain);
 
       auto *scope = AvailabilityScope::createForConditionFollowingQuery(
           Context, query, lastElement, getCurrentDeclContext(), currentScope,
@@ -997,17 +1066,19 @@ private:
       ++nestedCount;
     }
 
-    std::optional<AvailabilityContext> falseRefinement = std::nullopt;
+    auto startingContext = startingScope->getAvailabilityContext();
+    auto falseFlowContext = falseFlowBuilder.constrainContext(startingContext);
+
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
-    assert(falseFlowContext.isContainedIn(
-        startingScope->getAvailabilityContext()));
+    DEBUG_ASSERT(falseFlowContext.isContainedIn(startingContext));
 
     // If the starting availability context is not completely contained in the
     // false flow context then it must be the case that false flow context
     // is strictly smaller than the starting context (because the false flow
     // context *is* contained in the starting context), so we should introduce a
     // new availability scope for the false flow.
+    std::optional<AvailabilityContext> falseRefinement = std::nullopt;
     if (!startingScope->getAvailabilityContext().isContainedIn(
             falseFlowContext)) {
       falseRefinement = falseFlowContext;
@@ -1051,8 +1122,14 @@ private:
       }
 
       auto domain = spec.getDomain();
-      if (!domain.isPlatform())
+      if (!domain.supportsQueries())
         continue;
+
+      if (!domain.isPlatform()) {
+        // We found an active, non-platform constraint. It should be the only
+        // one, so just return it.
+        return spec;
+      }
 
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
@@ -1079,6 +1156,7 @@ private:
       return foundWildcardSpec;
     } else if (available->isUnavailability()) {
       // For #unavailable, imply the presence of a wildcard.
+      // FIXME: [availability] Creating a new wildcard spec here is wasteful.
       SourceLoc loc = available->getRParenLoc();
       return AvailabilitySpec::createWildcard(Context, loc);
     } else {
@@ -1087,15 +1165,38 @@ private:
   }
 
   /// Return the availability context for the given spec.
-  AvailabilityRange contextForSpec(SemanticAvailabilitySpec spec,
-                                   bool getRuntimeContext) {
+  AvailabilityRange runtimeQueryRangeForSpec(SemanticAvailabilitySpec spec) {
     if (spec.isWildcard())
       return AvailabilityRange::alwaysAvailable();
 
-    llvm::VersionTuple version =
-        (getRuntimeContext ? spec.getRuntimeVersion() : spec.getVersion());
+    auto domain = spec.getDomain();
+    if (domain.isVersioned())
+      return AvailabilityRange(spec.getRuntimeVersion());
 
-    return AvailabilityRange(version);
+    // If it's not a versioned domain, we must be querying whether a domain is
+    // present or absent.
+    if (domain.isCustom() && domain.getCustomDomain()->getKind() ==
+                                 CustomAvailabilityDomain::Kind::Disabled)
+      return AvailabilityRange::neverAvailable();
+
+    return AvailabilityRange::alwaysAvailable();
+  }
+
+  /// For the given spec, returns a pair of availability ranges. The first range
+  /// is for the if/then flow and the second is for the if/else flow.
+  std::pair<std::optional<AvailabilityRange>, std::optional<AvailabilityRange>>
+  statementConditionRangesForSpec(SemanticAvailabilitySpec spec,
+                                  const AvailabilityContext &currentContext) {
+    static auto always = AvailabilityRange::alwaysAvailable();
+    static auto never = AvailabilityRange::neverAvailable();
+    ASSERT(!spec.isWildcard());
+
+    auto domain = spec.getDomain();
+    if (!domain.isVersioned())
+      return {always, never};
+
+    return {AvailabilityRange(spec.getVersion()),
+            currentContext.getAvailabilityRange(domain, Context)};
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {

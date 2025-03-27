@@ -104,10 +104,6 @@ public:
   void constrainWithPlatformRange(const AvailabilityRange &range,
                                   const ASTContext &ctx);
 
-  /// Expand the platform version range to contain `range`.
-  void unionWithPlatformRange(const AvailabilityRange &range,
-                              const ASTContext &ctx);
-
   /// Constrain the available range for `domain` by `range`.
   void constrainWithAvailabilityRange(const AvailabilityRange &range,
                                       AvailabilityDomain domain,

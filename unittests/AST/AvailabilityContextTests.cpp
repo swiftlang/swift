@@ -67,19 +67,6 @@ TEST_F(AvailabilityContextTest, PlatformRange) {
   EXPECT_NE(macOS10_9, macOS10_10);
   EXPECT_TRUE(macOS10_10.isContainedIn(macOS10_9));
   EXPECT_FALSE(macOS10_9.isContainedIn(macOS10_10));
-
-  // Attempt to union the macOS version with >= 10.11. This should have no
-  // effect, since 10.11 is already contained.
-  auto stillMacOS10_10 = macOS10_10;
-  stillMacOS10_10.unionWithPlatformRange(getAvailabilityRange(10, 11), ctx);
-  EXPECT_EQ(getPlatformIntro(stillMacOS10_10), llvm::VersionTuple(10, 10));
-
-  // Attempt to union the macOS version with >= 10.9. This should expand the
-  // range.
-  auto backToMacOS10_9 = macOS10_10;
-  backToMacOS10_9.unionWithPlatformRange(getAvailabilityRange(10, 9), ctx);
-  EXPECT_EQ(getPlatformIntro(backToMacOS10_9), llvm::VersionTuple(10, 9));
-  EXPECT_EQ(backToMacOS10_9, macOS10_9);
 }
 
 TEST_F(AvailabilityContextTest, UnavailableDomains) {
