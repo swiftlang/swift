@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,15 +26,32 @@ import CRT
 
 import Swift
 
+extension String {
+  init<T: BinaryInteger>(_ value: T,
+                         width: Int,
+                         radix: Int = 10,
+                         uppercase: Bool = false) {
+    let digits = String(value, radix: radix, uppercase: uppercase)
+    if digits.count >= width {
+      self = digits
+      return
+    }
+
+    let padding = String(repeating: "0",
+                         count: width - digits.count)
+    self = padding + digits
+  }
+}
+
 internal func hex<T: FixedWidthInteger>(_ value: T,
                                         withPrefix: Bool = true) -> String {
-  let digits = String(value, radix: 16)
-  let padTo = value.bitWidth / 4
-  let padding = digits.count >= padTo ? "" : String(repeating: "0",
-                                                    count: padTo - digits.count)
-  let prefix = withPrefix ? "0x" : ""
+  let formatted = String(value, width: value.bitWidth / 4, radix: 16)
 
-  return "\(prefix)\(padding)\(digits)"
+  if withPrefix {
+    return "0x" + formatted
+  } else {
+    return formatted
+  }
 }
 
 internal func hex(_ bytes: [UInt8]) -> String {
@@ -96,6 +113,7 @@ internal func recursiveRemoveContents(_ dir: String) throws {
   }
 }
 
+/// Remove a directory and its contents.
 internal func recursiveRemove(_ dir: String) throws {
   try recursiveRemoveContents(dir)
 
@@ -104,8 +122,25 @@ internal func recursiveRemove(_ dir: String) throws {
   }
 }
 
-internal func withTemporaryDirectory(pattern: String, shouldDelete: Bool = true,
-                                     body: (String) throws -> ()) throws {
+/// Run a closure, passing in the name of a temporary directory that will
+/// (optionally) be deleted automatically when the closure returns.
+///
+/// Parameters:
+///
+/// - pattern:       A string with some number of trailing 'X's giving the name
+///                  to use for the directory; the 'X's will be replaced with a
+///                  unique combination of alphanumeric characters.
+/// - shouldDelete:  If `true` (the default), the directory and its contents
+///                  will be removed automatically when the closure returns.
+/// - body:          The closure to execute.
+///
+/// Returns:
+///
+/// This function returns whatever the closure returns.
+internal func withTemporaryDirectory<R>(
+  pattern: String, shouldDelete: Bool = true,
+  body: (String) throws -> R
+) throws -> R {
   var buf = Array<UInt8>(pattern.utf8)
   buf.append(0)
 
@@ -124,9 +159,10 @@ internal func withTemporaryDirectory(pattern: String, shouldDelete: Bool = true,
     }
   }
 
-  try body(dir)
+  return try body(dir)
 }
 
+/// Start a program with the specified arguments
 internal func spawn(_ path: String, args: [String]) throws {
   var cargs = args.map{ strdup($0) }
   cargs.append(nil)
@@ -143,6 +179,7 @@ internal func spawn(_ path: String, args: [String]) throws {
 
 #endif // os(macOS)
 
+/// Test if the specified path is a directory
 internal func isDir(_ path: String) -> Bool {
   var st = stat()
   guard stat(path, &st) == 0 else {
@@ -151,6 +188,7 @@ internal func isDir(_ path: String) -> Bool {
   return (st.st_mode & S_IFMT) == S_IFDIR
 }
 
+/// Test if the specified path exists
 internal func exists(_ path: String) -> Bool {
   var st = stat()
   guard stat(path, &st) == 0 else {
@@ -177,3 +215,145 @@ struct CFileStream: TextOutputStream {
 
 var standardOutput = CFileStream(fp: stdout)
 var standardError = CFileStream(fp: stderr)
+
+/// Format a timespec as an ISO8601 date/time
+func formatISO8601(_ time: timespec) -> String {
+  var exploded = tm()
+  var secs = time.tv_sec
+
+  gmtime_r(&secs, &exploded)
+
+  let isoTime = """
+\(String(exploded.tm_year + 1900, width: 4))-\
+\(String(exploded.tm_mon + 1, width: 2))-\
+\(String(exploded.tm_mday, width: 2))T\
+\(String(exploded.tm_hour, width: 2)):\
+\(String(exploded.tm_min, width: 2)):\
+\(String(exploded.tm_sec, width: 2)).\
+\(String(time.tv_nsec / 1000, width: 6))Z
+"""
+
+  return isoTime
+}
+
+/// Escape a JSON string
+func escapeJSON(_ s: String) -> String {
+  var result = ""
+  let utf8View = s.utf8
+  var chunk = utf8View.startIndex
+  var pos = chunk
+  let end = utf8View.endIndex
+
+  result.reserveCapacity(utf8View.count)
+
+  while pos != end {
+    let scalar = utf8View[pos]
+    switch scalar {
+      case 0x22, 0x5c, 0x00...0x1f:
+        result += s[chunk..<pos]
+        result += "\\"
+        result += String(Unicode.Scalar(scalar))
+        pos = utf8View.index(after: pos)
+        chunk = pos
+      default:
+        pos = utf8View.index(after: pos)
+    }
+  }
+
+  if chunk != end {
+    result += s[chunk..<pos]
+  }
+
+  return result
+}
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+fileprivate func getSysCtlString(_ name: String) -> String? {
+  return withUnsafeTemporaryAllocation(byteCount: 256, alignment: 16) {
+    (buffer: UnsafeMutableRawBufferPointer) -> String? in
+
+    var len = buffer.count
+    let ret = sysctlbyname(name,
+                           buffer.baseAddress, &len,
+                           nil, 0)
+    if ret != 0 {
+      return nil
+    }
+
+    return String(validatingUTF8:
+                    buffer.baseAddress!.assumingMemoryBound(to: CChar.self))
+  }
+}
+
+func getPlatform() -> String {
+
+  #if os(macOS)
+  var platform = "macOS"
+  #elseif os(iOS)
+  var platform = "iOS"
+  #elseif os(watchOS)
+  var platform = "watchOS"
+  #elseif os(tvOS)
+  var platform = "tvOS"
+  #elseif os(visionOS)
+  var platform = "visionOS"
+  #endif
+
+  let osVersion = getSysCtlString("kern.osversion") ?? "<unknown>"
+  let osProductVersion = getSysCtlString("kern.osproductversion") ?? "<unknown>"
+
+  return "\(platform) \(osProductVersion) (\(osVersion))"
+}
+#elseif os(Linux)
+fileprivate func readOSRelease(fd: CInt) -> [String:String]? {
+  let len = lseek(fd, 0, SEEK_END)
+  guard len >= 0 else {
+    return nil
+  }
+  return withUnsafeTemporaryAllocation(byteCount: len, alignment: 16) {
+    (buffer: UnsafeMutableRawBufferPointer) -> [String:String]? in
+
+    _ = lseek(fd, 0, SEEK_SET)
+    let bytesRead = read(fd, buffer.baseAddress, buffer.count)
+    guard bytesRead == buffer.count else {
+      return nil
+    }
+
+    let asString = String(decoding: buffer, as: UTF8.self)
+    return Dictionary(OSReleaseScanner(asString),
+                      uniquingKeysWith: { $1 })
+  }
+}
+
+fileprivate func readOSRelease() -> [String:String]? {
+  var fd = open("/etc/os-release", O_RDONLY)
+  if fd == -1 {
+    fd = open("/usr/lib/os-release", O_RDONLY)
+  }
+  if fd == -1 {
+    return nil
+  }
+  defer {
+    close(fd)
+  }
+
+  return readOSRelease(fd: fd)
+}
+
+func getPlatform() -> String {
+  guard let info = readOSRelease(),
+        let pretty = info["PRETTY_NAME"] else {
+    return "Linux (unknown)"
+  }
+
+  return "Linux (\(pretty))"
+}
+#elseif os(Windows)
+func getPlatform() -> String {
+  return "Windows"
+}
+#else
+func getPlatform() -> String {
+  return "Unknown"
+}
+#endif

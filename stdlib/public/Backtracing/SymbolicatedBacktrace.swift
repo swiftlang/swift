@@ -252,6 +252,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     return backtrace.addressWidth
   }
 
+  /// The architecture on which this backtrace was captured.
+  public var architecture: String { return backtrace.architecture }
+
   /// A list of captured frame information.
   public var frames: [Frame]
 
