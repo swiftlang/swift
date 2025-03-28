@@ -3869,6 +3869,14 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
+  // If this global variable contains an opaque type, replace it with its
+  // underlying type.
+  if (auto UnderlyingType = IGM.substOpaqueTypesWithUnderlyingTypes(
+          DbgTy.getType()->getCanonicalType())) {
+    auto &TI = IGM.getTypeInfoForUnlowered(UnderlyingType);
+    DbgTy = DebugTypeInfo::getFromTypeInfo(UnderlyingType, TI, IGM);
+  }
+
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   VarDecl *VD = nullptr;
   if (Loc)
