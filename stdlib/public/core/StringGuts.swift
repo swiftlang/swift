@@ -249,7 +249,7 @@ extension _StringGuts {
       // This branch looks unreachable, but can be reached via `withCString`
       // in binaries that haven't been recompiled since the termination flag
       // was added to _StringObject. Retry the fast path if so.
-      return try withCString(body)
+      return try unsafe withCString(body)
     }
     return try String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
