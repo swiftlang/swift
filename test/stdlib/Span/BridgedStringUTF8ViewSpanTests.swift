@@ -28,6 +28,7 @@ let strings = [
   "A long ASCII string exceeding 16 code units.",
   "🇯🇵",
   "🏂☃❅❆❄︎⛄️❄️",
+  "",
 ]
 
 strings.forEach { expected in
