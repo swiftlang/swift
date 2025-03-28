@@ -34,12 +34,12 @@
 
   ```swift
   func evilMalloc(size: Int) -> Int {
-    // warning: call to global function 'malloc' involves unsafe type 'UnsafeMutableRawPointer'
+    // use of global function 'malloc' involves unsafe type 'UnsafeMutableRawPointer'
     return Int(bitPattern: malloc(size))
   }
   ```
 
-  These warnings are in their own diagnostic group (`Unsafe`) and can
+  These warnings are in their own diagnostic group (`StrictMemorySafety`) and can
   be suppressed by ackwnowledging the memory-unsafe behavior, for
   example with an `unsafe` expression:
 
