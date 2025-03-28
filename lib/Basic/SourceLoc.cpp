@@ -829,9 +829,14 @@ static bool isBeforeInSource(
   auto [firstMismatch, secondMismatch] = std::mismatch(
       firstAncestors.begin(), firstAncestors.end(),
       secondAncestors.begin(), secondAncestors.end());
-  assert(firstMismatch != firstAncestors.begin() &&
-         secondMismatch != secondAncestors.begin() &&
-         "Ancestors don't have the same root source file");
+  if (firstMismatch == firstAncestors.begin() ||
+      secondMismatch == secondAncestors.begin()) {
+    // FIXME: This is currently being hit for code completion
+    // (rdar://134522702), possibly due to an invalid ASTScope node range. For
+    // now, let's bail with `false` in non-asserts builds.
+    assert(false && "Ancestors don't have the same root source file");
+    return false;
+  }
 
   SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
       ? firstLoc
