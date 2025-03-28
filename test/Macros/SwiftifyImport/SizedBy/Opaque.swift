@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2>&1 | %FileCheck --match-full-lines %s
 
-// rdar://145899513 ([StrictMemorySafety] Call to RawSpan::withUnsafeBytes not recognized as unsafe, while call to Span::withUnsafeBufferPointer is)
+// FIXME: Waiting for optional to handle nonescapable types
 // RUN: not %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
