@@ -9,6 +9,7 @@ set_target_properties(swift_Builtin_float PROPERTIES
 target_compile_options(swift_Builtin_float PRIVATE
   "$<$<PLATFORM_ID:Darwin>:SHELL:-Xfrontend -module-abi-name -Xfrontend Darwin>")
 target_link_libraries(swift_Builtin_float PRIVATE
+  $<$<PLATFORM_ID:Windows>:ClangModules>
   swiftCore)
 
 install(TARGETS swift_Builtin_float
