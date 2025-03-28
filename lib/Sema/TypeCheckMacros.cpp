@@ -2093,7 +2093,7 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
                                                 MacroDecl *macro,
                                                 MacroRole role,
                                                 NominalTypeDecl *nominal) {
-  if (nominal->getDeclContext()->isLocalContext()) {
+  if (nominal->getLocalContext()) {
     nominal->diagnose(diag::local_extension_macro);
     return std::nullopt;
   }

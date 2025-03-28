@@ -115,6 +115,12 @@ func testLocal() {
   @DelegatedConformance
   struct Local<Element> {}
   // expected-error@-1{{local type cannot have attached extension macro}}
+
+  struct S {
+    @DelegatedConformance
+    struct Local<Element> {}
+    // expected-error@-1{{local type cannot have attached extension macro}}
+  }
 }
 
 @DelegatedConformance
