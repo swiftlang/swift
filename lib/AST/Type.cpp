@@ -3858,6 +3858,15 @@ Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
                                       /*HasExplicitAnyObject=*/false);
 }
 
+/// Constructs a protocol composition corresponding to the `any ~Copyable &
+/// ~Escapable` type.
+///
+/// Note: This includes the inverse of all current invertible protocols.
+Type ProtocolCompositionType::theUnconstrainedAnyType(const ASTContext &C) {
+  return ProtocolCompositionType::get(C, {}, InvertibleProtocolSet::allKnown(),
+                                      /*HasExplicitAnyObject=*/false);
+}
+
 /// Constructs a protocol composition containing the `AnyObject` constraint.
 Type ProtocolCompositionType::theAnyObjectType(const ASTContext &C) {
   return ProtocolCompositionType::get(C, {}, /*Inverses=*/{},

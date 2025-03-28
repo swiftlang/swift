@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
+// is_same_metatype builtin is no longer used due to rdar://145707064 (Builtin.is_same_metatype should support noncopyable/nonescapable types)
+// XFAIL: rdar145707064
+
 // Check type equality related optimizations.
 
 // CHECK-LABEL: sil @{{.*}}areEqualTypes1{{.*}} : $@convention(thin)

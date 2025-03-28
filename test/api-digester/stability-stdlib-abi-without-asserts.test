@@ -225,7 +225,6 @@ Protocol ExpressibleByFloatLiteral has added inherited protocol Copyable
 Protocol ExpressibleByFloatLiteral has added inherited protocol Escapable
 Protocol ExpressibleByIntegerLiteral has added inherited protocol Copyable
 Protocol ExpressibleByIntegerLiteral has added inherited protocol Escapable
-Protocol ExpressibleByNilLiteral has added inherited protocol Escapable
 Protocol ExpressibleByStringInterpolation has added inherited protocol Copyable
 Protocol ExpressibleByStringInterpolation has added inherited protocol Escapable
 Protocol ExpressibleByStringLiteral has added inherited protocol Copyable
@@ -409,12 +408,12 @@ Accessor ManagedBufferPointer.header.Modify() has generic signature change from 
 Accessor ManagedBufferPointer.header.Modify() has mangled name changing from 'Swift.ManagedBufferPointer.header.modify : A' to '(extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>.header.modify : A'
 Accessor ManagedBufferPointer.header.Set() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBufferPointer.header.Set() has mangled name changing from 'Swift.ManagedBufferPointer.header.setter : A' to '(extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>.header.setter : A'
-Accessor MemoryLayout.alignment.Get() has generic signature change from <T> to <T where T : ~Copyable>
-Accessor MemoryLayout.alignment.Get() has mangled name changing from 'static Swift.MemoryLayout.alignment.getter : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.alignment.getter : Swift.Int'
-Accessor MemoryLayout.size.Get() has generic signature change from <T> to <T where T : ~Copyable>
-Accessor MemoryLayout.size.Get() has mangled name changing from 'static Swift.MemoryLayout.size.getter : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.size.getter : Swift.Int'
-Accessor MemoryLayout.stride.Get() has generic signature change from <T> to <T where T : ~Copyable>
-Accessor MemoryLayout.stride.Get() has mangled name changing from 'static Swift.MemoryLayout.stride.getter : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.stride.getter : Swift.Int'
+Accessor MemoryLayout.alignment.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Accessor MemoryLayout.alignment.Get() has mangled name changing from 'static Swift.MemoryLayout.alignment.getter : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.alignment.getter : Swift.Int'
+Accessor MemoryLayout.size.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Accessor MemoryLayout.size.Get() has mangled name changing from 'static Swift.MemoryLayout.size.getter : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.size.getter : Swift.Int'
+Accessor MemoryLayout.stride.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Accessor MemoryLayout.stride.Get() has mangled name changing from 'static Swift.MemoryLayout.stride.getter : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.stride.getter : Swift.Int'
 Accessor UnsafeBufferPointer._position.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer._position.Get() has mangled name changing from 'Swift.UnsafeBufferPointer._position.getter : Swift.Optional<Swift.UnsafePointer<A>>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>._position.getter : Swift.Optional<Swift.UnsafePointer<A>>'
 Accessor UnsafeBufferPointer.baseAddress.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -452,7 +451,7 @@ Accessor UnsafePointer._rawValue.Get() has mangled name changing from 'Swift.Uns
 Accessor UnsafePointer.hashValue.Get() has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Accessor UnsafePointer.hashValue.Get() has mangled name changing from 'Swift.UnsafePointer.hashValue.getter : Swift.Int' to '(extension in Swift):Swift.UnsafePointer< where A: ~Swift.Copyable>.hashValue.getter : Swift.Int'
 Class ManagedBuffer has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
-Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature change from <Self where Self : Swift.ExpressibleByNilLiteral> to <Self where Self : Swift.ExpressibleByNilLiteral, Self : ~Copyable>
+Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature change from <Self where Self : Swift.ExpressibleByNilLiteral> to <Self where Self : Swift.ExpressibleByNilLiteral, Self : ~Copyable, Self : ~Escapable>
 Constructor ManagedBuffer.init(_doNotCallMe:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor ManagedBuffer.init(_doNotCallMe:) has mangled name changing from 'Swift.ManagedBuffer.init(_doNotCallMe: ()) -> Swift.ManagedBuffer<A, B>' to '(extension in Swift):Swift.ManagedBuffer< where B: ~Swift.Copyable>.init(_doNotCallMe: ()) -> Swift.ManagedBuffer<A, B>'
 Constructor ManagedBuffer.init(_doNotCallMe:) is now with @_preInverseGenerics
@@ -482,8 +481,8 @@ Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wr
 Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.init(A) -> Swift.Optional<A>'
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(_:) is now with @_preInverseGenerics
-Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Constructor Optional.init(nilLiteral:) has mangled name changing from 'Swift.Optional.init(nilLiteral: ()) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.init(nilLiteral: ()) -> Swift.Optional<A>'
+Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Constructor Optional.init(nilLiteral:) has mangled name changing from 'Swift.Optional.init(nilLiteral: ()) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.init(nilLiteral: ()) -> Swift.Optional<A>'
 Constructor Optional.init(nilLiteral:) is now with @_preInverseGenerics
 Constructor UnsafeBufferPointer.init(_:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Constructor UnsafeBufferPointer.init(_:) has mangled name changing from 'Swift.UnsafeBufferPointer.init(Swift.UnsafeMutableBufferPointer<A>) -> Swift.UnsafeBufferPointer<A>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.init(Swift.UnsafeMutableBufferPointer<A>) -> Swift.UnsafeBufferPointer<A>'
@@ -532,13 +531,13 @@ Constructor UnsafeRawPointer.init(_:) has mangled name changing from 'Swift.Unsa
 Constructor UnsafeRawPointer.init(_:) has mangled name changing from 'Swift.UnsafeRawPointer.init<A>(Swift.UnsafeMutablePointer<A>) -> Swift.UnsafeRawPointer' to 'Swift.UnsafeRawPointer.init<A where A: ~Swift.Copyable>(Swift.UnsafeMutablePointer<A>) -> Swift.UnsafeRawPointer'
 Constructor UnsafeRawPointer.init(_:) has mangled name changing from 'Swift.UnsafeRawPointer.init<A>(Swift.UnsafePointer<A>) -> Swift.UnsafeRawPointer' to 'Swift.UnsafeRawPointer.init<A where A: ~Swift.Copyable>(Swift.UnsafePointer<A>) -> Swift.UnsafeRawPointer'
 Constructor UnsafeRawPointer.init(_:) is now with @_preInverseGenerics
-Enum MemoryLayout has generic signature change from <T> to <T where T : ~Copyable>
-Enum Optional has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
-EnumElement Optional.none has declared type change from <τ_0_0> (τ_0_0?.Type) -> τ_0_0? to <τ_0_0 where τ_0_0 : ~Copyable> (τ_0_0?.Type) -> τ_0_0?
-EnumElement Optional.some has declared type change from <τ_0_0> (τ_0_0?.Type) -> (τ_0_0) -> τ_0_0? to <τ_0_0 where τ_0_0 : ~Copyable> (τ_0_0?.Type) -> (τ_0_0) -> τ_0_0?
-EnumElement Result.failure has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1>
-EnumElement Result.success has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1>
+Enum MemoryLayout has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Enum Optional has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
+EnumElement Optional.none has declared type change from <τ_0_0> (τ_0_0?.Type) -> τ_0_0? to <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (τ_0_0?.Type) -> τ_0_0?
+EnumElement Optional.some has declared type change from <τ_0_0> (τ_0_0?.Type) -> (τ_0_0) -> τ_0_0? to <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (τ_0_0?.Type) -> (τ_0_0) -> τ_0_0?
+EnumElement Result.failure has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1>
+EnumElement Result.success has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1>
 Func ??(_:_:) has been removed
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has mangled name changing from 'static Swift.ManagedBuffer.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>' to 'static (extension in Swift):Swift.ManagedBuffer< where B: ~Swift.Copyable>.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>'
@@ -546,6 +545,9 @@ Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) is now with @_preIn
 Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has been removed
 Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has been removed
 Func ManagedBuffer.withUnsafeMutablePointers(_:) has been removed
+Func ManagedBufferPointer.==(_:_:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
+Func ManagedBufferPointer.==(_:_:) has mangled name changing from 'static Swift.ManagedBufferPointer.== infix(Swift.ManagedBufferPointer<A, B>, Swift.ManagedBufferPointer<A, B>) -> Swift.Bool' to 'static (extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>.== infix(Swift.ManagedBufferPointer<A, B>, Swift.ManagedBufferPointer<A, B>) -> Swift.Bool'
+Func ManagedBufferPointer.==(_:_:) is now with @_preInverseGenerics
 Func ManagedBufferPointer._checkValidBufferClass(_:creating:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBufferPointer._checkValidBufferClass(_:creating:) has mangled name changing from 'static Swift.ManagedBufferPointer._checkValidBufferClass(_: Swift.AnyObject.Type, creating: Swift.Bool) -> ()' to 'static (extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>._checkValidBufferClass(_: Swift.AnyObject.Type, creating: Swift.Bool) -> ()'
 Func ManagedBufferPointer._checkValidBufferClass(_:creating:) is now with @_preInverseGenerics
@@ -558,32 +560,32 @@ Func ManagedBufferPointer.isUniqueReference() is now with @_preInverseGenerics
 Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) has been removed
 Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) has been removed
 Func ManagedBufferPointer.withUnsafeMutablePointers(_:) has been removed
-Func MemoryLayout.alignment(ofValue:) has generic signature change from <T> to <T where T : ~Copyable>
-Func MemoryLayout.alignment(ofValue:) has mangled name changing from 'static Swift.MemoryLayout.alignment(ofValue: A) -> Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.alignment(ofValue: A) -> Swift.Int'
+Func MemoryLayout.alignment(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func MemoryLayout.alignment(ofValue:) has mangled name changing from 'static Swift.MemoryLayout.alignment(ofValue: A) -> Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.alignment(ofValue: A) -> Swift.Int'
 Func MemoryLayout.alignment(ofValue:) has parameter 0 changing from Default to Shared
 Func MemoryLayout.alignment(ofValue:) is now with @_preInverseGenerics
-Func MemoryLayout.size(ofValue:) has generic signature change from <T> to <T where T : ~Copyable>
-Func MemoryLayout.size(ofValue:) has mangled name changing from 'static Swift.MemoryLayout.size(ofValue: A) -> Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.size(ofValue: A) -> Swift.Int'
+Func MemoryLayout.size(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func MemoryLayout.size(ofValue:) has mangled name changing from 'static Swift.MemoryLayout.size(ofValue: A) -> Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.size(ofValue: A) -> Swift.Int'
 Func MemoryLayout.size(ofValue:) has parameter 0 changing from Default to Shared
 Func MemoryLayout.size(ofValue:) is now with @_preInverseGenerics
-Func MemoryLayout.stride(ofValue:) has generic signature change from <T> to <T where T : ~Copyable>
-Func MemoryLayout.stride(ofValue:) has mangled name changing from 'static Swift.MemoryLayout.stride(ofValue: A) -> Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.stride(ofValue: A) -> Swift.Int'
+Func MemoryLayout.stride(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func MemoryLayout.stride(ofValue:) has mangled name changing from 'static Swift.MemoryLayout.stride(ofValue: A) -> Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.stride(ofValue: A) -> Swift.Int'
 Func MemoryLayout.stride(ofValue:) has parameter 0 changing from Default to Shared
 Func MemoryLayout.stride(ofValue:) is now with @_preInverseGenerics
-Func Optional.!=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Func Optional.!=(_:_:) has mangled name changing from 'static Swift.Optional.!= infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.!= infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool'
-Func Optional.!=(_:_:) has mangled name changing from 'static Swift.Optional.!= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.!= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
+Func Optional.!=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Func Optional.!=(_:_:) has mangled name changing from 'static Swift.Optional.!= infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.!= infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool'
+Func Optional.!=(_:_:) has mangled name changing from 'static Swift.Optional.!= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.!= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.!=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.!=(_:_:) is now with @_preInverseGenerics
-Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool'
-Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
+Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool'
+Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.==(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.==(_:_:) is now with @_preInverseGenerics
-Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Func Optional.~=(_:_:) has mangled name changing from 'static Swift.Optional.~= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.~= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
+Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Func Optional.~=(_:_:) has mangled name changing from 'static Swift.Optional.~= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.~= infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.~=(_:_:) is now with @_preInverseGenerics
 Func Result.get() has been removed
@@ -682,8 +684,8 @@ Func UnsafeRawPointer.assumingMemoryBound(to:) is now with @_preInverseGenerics
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has mangled name changing from 'Swift.UnsafeRawPointer.bindMemory<A>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>' to 'Swift.UnsafeRawPointer.bindMemory<A where A: ~Swift.Copyable>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>'
 Func UnsafeRawPointer.bindMemory(to:capacity:) is now with @_preInverseGenerics
-Func _fixLifetime(_:) has generic signature change from <T> to <T where T : ~Copyable>
-Func _fixLifetime(_:) has mangled name changing from 'Swift._fixLifetime<A>(A) -> ()' to 'Swift._fixLifetime<A where A: ~Swift.Copyable>(A) -> ()'
+Func _fixLifetime(_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func _fixLifetime(_:) has mangled name changing from 'Swift._fixLifetime<A>(A) -> ()' to 'Swift._fixLifetime<A where A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func _fixLifetime(_:) has parameter 0 changing from Default to Shared
 Func _fixLifetime(_:) is now with @_preInverseGenerics
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
@@ -733,11 +735,11 @@ Var ManagedBufferPointer.capacity has mangled name changing from 'Swift.ManagedB
 Var ManagedBufferPointer.capacity is now with @_preInverseGenerics
 Var ManagedBufferPointer.header has mangled name changing from 'Swift.ManagedBufferPointer.header : A' to '(extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>.header : A'
 Var ManagedBufferPointer.header is now with @_preInverseGenerics
-Var MemoryLayout.alignment has mangled name changing from 'static Swift.MemoryLayout.alignment : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.alignment : Swift.Int'
+Var MemoryLayout.alignment has mangled name changing from 'static Swift.MemoryLayout.alignment : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.alignment : Swift.Int'
 Var MemoryLayout.alignment is now with @_preInverseGenerics
-Var MemoryLayout.size has mangled name changing from 'static Swift.MemoryLayout.size : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.size : Swift.Int'
+Var MemoryLayout.size has mangled name changing from 'static Swift.MemoryLayout.size : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.size : Swift.Int'
 Var MemoryLayout.size is now with @_preInverseGenerics
-Var MemoryLayout.stride has mangled name changing from 'static Swift.MemoryLayout.stride : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable>.stride : Swift.Int'
+Var MemoryLayout.stride has mangled name changing from 'static Swift.MemoryLayout.stride : Swift.Int' to 'static (extension in Swift):Swift.MemoryLayout< where A: ~Swift.Copyable, A: ~Swift.Escapable>.stride : Swift.Int'
 Var MemoryLayout.stride is now with @_preInverseGenerics
 Var UnsafeBufferPointer._position has mangled name changing from 'Swift.UnsafeBufferPointer._position : Swift.Optional<Swift.UnsafePointer<A>>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>._position : Swift.Optional<Swift.UnsafePointer<A>>'
 Var UnsafeBufferPointer._position is now with @_preInverseGenerics
@@ -834,5 +836,25 @@ Protocol Error has added inherited protocol SendableMetatype
 Struct EnumeratedSequence has added a conformance to an existing protocol BidirectionalCollection
 Struct EnumeratedSequence has added a conformance to an existing protocol Collection
 Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection
+
+Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
+Accessor Optional.unsafelyUnwrapped.Get() has mangled name changing from 'Swift.Optional.unsafelyUnwrapped.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>.unsafelyUnwrapped.getter : A'
+Var Optional.unsafelyUnwrapped has mangled name changing from 'Swift.Optional.unsafelyUnwrapped : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>.unsafelyUnwrapped : A'
+Var Optional.unsafelyUnwrapped is now with @_preInverseGenerics
+Accessor Optional._unsafelyUnwrappedUnchecked.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
+Accessor Optional._unsafelyUnwrappedUnchecked.Get() has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked.getter : A'
+Var Optional._unsafelyUnwrappedUnchecked has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked : A'
+Var Optional._unsafelyUnwrappedUnchecked is now with @_preInverseGenerics
+Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeBufferPointer.indices.Get() has mangled name changing from 'Swift.UnsafeBufferPointer.indices.getter : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.indices.getter : Swift.Range<Swift.Int>'
+Var UnsafeBufferPointer.indices has mangled name changing from 'Swift.UnsafeBufferPointer.indices : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.indices : Swift.Range<Swift.Int>'
+Var UnsafeBufferPointer.indices is now with @_preInverseGenerics
+Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeMutableBufferPointer.indices.Get() has mangled name changing from 'Swift.UnsafeMutableBufferPointer.indices.getter : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.indices.getter : Swift.Range<Swift.Int>'
+Var UnsafeMutableBufferPointer.indices has mangled name changing from 'Swift.UnsafeMutableBufferPointer.indices : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.indices : Swift.Range<Swift.Int>'
+Var UnsafeMutableBufferPointer.indices is now with @_preInverseGenerics
+Func !=(_:_:) has been removed
+Func ==(_:_:) has been removed
+Func type(of:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

@@ -18,7 +18,6 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/AsyncLet.h"
-#include "swift/ABI/Coro.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 
@@ -127,13 +126,6 @@ void swift_task_dealloc(void *ptr);
 /// including that allocation will be deallocated.
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void swift_task_dealloc_through(void *ptr);
-
-// TODO: CoroutineAccessors: Move these declarations back to swiftCore {{
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void *swift_coro_alloc(CoroAllocator *allocator, size_t size);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void swift_coro_dealloc(CoroAllocator *allocator, void *ptr);
-// }} TODO: CoroutineAccessors
 
 /// Cancel a task and all of its child tasks.
 ///

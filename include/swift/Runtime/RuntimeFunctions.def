@@ -3010,7 +3010,7 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
 
 // void *swift_coro_alloc(CoroAllocator *, size_t size);
 FUNCTION(CoroAlloc,
-         _Concurrency, swift_coro_alloc, SwiftCC,
+         Swift, swift_coro_alloc, SwiftCC,
          CoroutineAccessorsAvailability,
          RETURNS(Int8PtrTy),
          ARGS(CoroAllocatorPtrTy, SizeTy),
@@ -3020,7 +3020,7 @@ FUNCTION(CoroAlloc,
 
 // void swift_coro_dealloc(CoroAllocator *, void *ptr);
 FUNCTION(CoroDealloc,
-         _Concurrency, swift_coro_dealloc, SwiftCC,
+         Swift, swift_coro_dealloc, SwiftCC,
          CoroutineAccessorsAvailability,
          RETURNS(VoidTy),
          ARGS(CoroAllocatorPtrTy, Int8PtrTy),
