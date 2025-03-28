@@ -544,6 +544,12 @@ public:
   BridgedDiagnosticArgument(BridgedStringRef s);
 };
 
+class BridgedFixIt {
+public:
+  BridgedCharSourceRange replacementRange;
+  BridgedStringRef replacementText;
+};
+
 class BridgedDiagnosticFixIt {
 public:
   int64_t storage[7];
