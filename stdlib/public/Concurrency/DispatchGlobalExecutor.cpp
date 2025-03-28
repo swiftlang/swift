@@ -321,7 +321,8 @@ platform_time(uint64_t nsec) {
 #endif
 
 static inline dispatch_time_t
-clock_and_value_to_time(int clock, long long deadline) {
+clock_and_value_to_time(int clock, long long sec, long long nsec) {
+  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
@@ -331,6 +332,13 @@ clock_and_value_to_time(int clock, long long deadline) {
     return value;
   case swift_clock_id_continuous:
     return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+  case swift_clock_id_wall: {
+    struct timespec ts = { 
+      .tv_sec = sec,
+      .tv_nsec = nsec
+    };
+    return dispatch_walltime(&ts, 0);
+  }
   }
   __builtin_unreachable();
 }
@@ -349,9 +357,8 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
   job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
-
-  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
-  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
+  
+  dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
   
   if (tnsec != -1) {
     uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
