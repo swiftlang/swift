@@ -15,7 +15,7 @@
 @safe
 @frozen
 @available(SwiftStdlib 6.2, *)
-public struct MutableSpan<Element: ~Copyable & ~Escapable>
+public struct MutableSpan<Element: ~Copyable>
 : ~Copyable, ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
@@ -212,7 +212,7 @@ extension MutableSpan where Element: ~Copyable {
 
 //MARK: Collection, RandomAccessCollection
 @available(SwiftStdlib 6.2, *)
-extension MutableSpan where Element: ~Copyable & ~Escapable {
+extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var count: Int { _count }

@@ -817,8 +817,8 @@ Added: _$ss7RawSpanVN
 // SE-0467 MutableSpan and MutableRawSpan
 Added: _$ss11MutableSpanVMa
 Added: _$ss11MutableSpanVMn
-Added: _$ss11MutableSpanVsRi_zRi0_zrlE6_countSivg
-Added: _$ss11MutableSpanVsRi_zRi0_zrlE8_pointerSvSgvg
+Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
+Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
 Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
 Added: _$ss14MutableRawSpanV6_countSivg
 Added: _$ss14MutableRawSpanV8_pointerSvSgvg
