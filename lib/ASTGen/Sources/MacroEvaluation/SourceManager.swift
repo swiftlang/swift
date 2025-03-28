@@ -217,13 +217,17 @@ extension SourceManager {
         )
         newText = replacingChildData.newChild.description
 
-      case .textualReplacement(replacementRange: let replacementRange, sourceFile: let sourceFile, newText: let replacementText):
+      case .replaceText(
+        range: let replacementRange,
+        with: let replacementText,
+        in: let syntax
+      ):
         replaceStartLoc = bridgedSourceLoc(
-          for: sourceFile,
+          for: syntax,
           at: replacementRange.lowerBound
         )
         replaceEndLoc = bridgedSourceLoc(
-          for: sourceFile,
+          for: syntax,
           at: replacementRange.upperBound
         )
         newText = replacementText

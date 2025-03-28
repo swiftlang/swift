@@ -389,15 +389,14 @@ public func addQueuedDiagnostic(
       guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
             let endPos = sourceFile.position(
               of: fixIt.replacementRange.start.advanced(
-                by: fixIt.replacementRange.byteLength)),
-      let sourceFileSyntax = sourceFile.syntax.as(SourceFileSyntax.self) else {
+                by: fixIt.replacementRange.byteLength)) else {
         return nil
       }
 
-      return FixIt.Change.textualReplacement(
-        replacementRange: startPos..<endPos,
-        sourceFile: sourceFileSyntax,
-        newText: String(bridged: fixIt.replacementText)
+      return FixIt.Change.replaceText(
+        range: startPos..<endPos,
+        with: String(bridged: fixIt.replacementText),
+        in: sourceFile.syntax
       )
     }
   }
