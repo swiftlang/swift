@@ -3748,8 +3748,12 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
     return false;
 
   // @_hasStorage implies that it... has storage.
-  if (var->getAttrs().hasAttribute<HasStorageAttr>())
-    return true;
+  if (var->getAttrs().hasAttribute<HasStorageAttr>()) {
+    // Except in contexts where it would be invalid. This is diagnosed in
+    // StorageImplInfoRequest.
+    return !isa<ProtocolDecl, ExtensionDecl, EnumDecl>(
+               storage->getDeclContext()->getImplementedObjCContext());
+  }
 
   // Protocol requirements never have storage.
   if (isa<ProtocolDecl>(storage->getDeclContext()))
@@ -3852,7 +3856,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     // and ignore it.
     if (isa<ExtensionDecl, EnumDecl, ProtocolDecl>(DC)) {
       storage->diagnose(diag::attr_invalid_in_context, attr,
-                        DC->getAsDecl()->getDescriptiveKind());
+                        DC->getAsDecl()->getDescriptiveKind())
+        .warnInSwiftInterface(storage->getDeclContext());
 
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
