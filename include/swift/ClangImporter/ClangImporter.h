@@ -898,6 +898,14 @@ private:
   }
 };
 
+/// Construct the clang overlay VFS that's needed for the clang instance
+/// used by the clang importer to find injected platform-specific modulemaps
+/// that are created by `getClangInvocationFileMapping`.
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+createClangInvocationFileMappingVFS(
+    const ClangInvocationFileMapping &fileMapping, ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS);
+
 } // end namespace swift
 
 #endif

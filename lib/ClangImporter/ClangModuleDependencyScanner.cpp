@@ -184,6 +184,12 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(remapPath(overlay));
       }
+
+      StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
+      if (!SDKPath.empty()) {
+        swiftArgs.push_back("-sdk");
+        swiftArgs.push_back(SDKPath.str());
+      }
     }
 
     // Add args reported by the scanner.

@@ -551,13 +551,31 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  if (setUpInputs()) {
-    Error = "Setting up inputs failed";
+  if (setUpASTContextIfNeeded()) {
+    Error = "Setting up ASTContext failed";
     return true;
   }
 
-  if (setUpASTContextIfNeeded()) {
-    Error = "Setting up ASTContext failed";
+  // In the emit-pcm action where we take a modulemap file as an input
+  // file, since it can refer to one on the VFS overlay (e.g.,
+  // vcruntime.modulemap on Windows), we need to setup the necessary
+  // VFS overlay here.
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::EmitPCM &&
+      !Invocation.getClangImporterOptions().HasClangIncludeTreeRoot) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS =
+      llvm::vfs::createPhysicalFileSystem();
+    auto FileMapping = swift::getClangInvocationFileMapping(
+        *Context, BaseFS, /*suppressDiagnostic=*/true);
+    if (!FileMapping.redirectedFiles.empty()) {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> ClangFS =
+          createClangInvocationFileMappingVFS(FileMapping, *Context, BaseFS);
+      SourceMgr.setFileSystem(std::move(ClangFS));
+    }
+  }
+
+  if (setUpInputs()) {
+    Error = "Setting up inputs failed";
     return true;
   }
 

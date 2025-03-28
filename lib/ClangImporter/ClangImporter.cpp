@@ -1345,39 +1345,8 @@ ClangImporter::create(ASTContext &ctx,
   // Avoid creating indirect file system when using include tree.
   if (!ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
     // Wrap Swift's FS to allow Clang to override the working directory
-    VFS = llvm::vfs::RedirectingFileSystem::create(
-        fileMapping.redirectedFiles, true, *ctx.SourceMgr.getFileSystem());
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer redirected file mappings:\n";
-      for (const auto &mapping : fileMapping.redirectedFiles) {
-        llvm::errs() << "   mapping real file '" << mapping.second
-                     << "' to virtual file '" << mapping.first << "'\n";
-      }
-      llvm::errs() << "\n";
-    }
-
-    if (!fileMapping.overridenFiles.empty()) {
-      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> overridenVFS =
-          new llvm::vfs::InMemoryFileSystem();
-      for (const auto &file : fileMapping.overridenFiles) {
-        if (importerOpts.DumpClangDiagnostics) {
-          llvm::errs() << "clang importer overriding file '" << file.first
-                       << "' with the following contents:\n";
-          llvm::errs() << file.second << "\n";
-        }
-        auto contents = ctx.Allocate<char>(file.second.size() + 1);
-        std::copy(file.second.begin(), file.second.end(), contents.begin());
-        // null terminate the buffer.
-        contents[contents.size() - 1] = '\0';
-        overridenVFS->addFile(file.first, 0,
-                              llvm::MemoryBuffer::getMemBuffer(StringRef(
-                                  contents.begin(), contents.size() - 1)));
-      }
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayVFS =
-          new llvm::vfs::OverlayFileSystem(VFS);
-      VFS = overlayVFS;
-      overlayVFS->pushOverlay(overridenVFS);
-    }
+    VFS = createClangInvocationFileMappingVFS(fileMapping, ctx,
+                                              ctx.SourceMgr.getFileSystem());
   }
 
   // Create a new Clang compiler invocation.
