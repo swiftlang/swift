@@ -138,15 +138,19 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public func referToLoudProperGuarding(_ t: {{.*}}.LoudlyNC<Swift.String>)
 // CHECK-MISC-NEXT: public struct NoCopyPls : ~Swift.Copyable {
 // CHECK-MISC-NEXT: }
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substCopyable(_ t: Swift.String?)
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substGenericCopyable<T>(_ t: T?)
+// CHECK-MISC-NEXT: #endif
 
-// NOTE: we really shouldn't be emitting the else branch for the two funcs
-// below, since the suppressed version isn't valid. We don't have a good way of
-// fixing that right now, either.
-
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substNC(_ t: borrowing {{.*}}.NoCopyPls?)
+// CHECK-MISC-NEXT: #endif
+// CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT: public func substGenericNC<T>(_ t: borrowing T?) where T : ~Copyable
+// CHECK-MISC-NEXT: #endif
 
 // CHECK-MISC:      public protocol Publik : ~Copyable {
 // CHECK-MISC-NEXT: }

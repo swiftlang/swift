@@ -101,7 +101,6 @@ Protocol ExpressibleByFloatLiteral has added inherited protocol Copyable
 Protocol ExpressibleByFloatLiteral has added inherited protocol Escapable
 Protocol ExpressibleByIntegerLiteral has added inherited protocol Copyable
 Protocol ExpressibleByIntegerLiteral has added inherited protocol Escapable
-Protocol ExpressibleByNilLiteral has added inherited protocol Escapable
 Protocol ExpressibleByStringInterpolation has added inherited protocol Copyable
 Protocol ExpressibleByStringInterpolation has added inherited protocol Escapable
 Protocol ExpressibleByStringLiteral has added inherited protocol Copyable
@@ -193,9 +192,9 @@ Accessor ManagedBufferPointer.buffer.Get() has generic signature change from <He
 Accessor ManagedBufferPointer.capacity.Get() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBufferPointer.header.Get() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBufferPointer.header.Set() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
-Accessor MemoryLayout.alignment.Get() has generic signature change from <T> to <T where T : ~Copyable>
-Accessor MemoryLayout.size.Get() has generic signature change from <T> to <T where T : ~Copyable>
-Accessor MemoryLayout.stride.Get() has generic signature change from <T> to <T where T : ~Copyable>
+Accessor MemoryLayout.alignment.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Accessor MemoryLayout.size.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Accessor MemoryLayout.stride.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Accessor UnsafeBufferPointer.baseAddress.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.count.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.endIndex.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -213,13 +212,13 @@ Accessor UnsafePointer.hashValue.Get() has generic signature change from <Pointe
 Accessor UnsafePointer.pointee.Get() has been removed
 Accessor UnsafePointer.subscript(_:).Get() has been removed
 Class ManagedBuffer has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
-Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature change from <Self where Self : Swift.ExpressibleByNilLiteral> to <Self where Self : Swift.ExpressibleByNilLiteral, Self : ~Copyable>
+Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature change from <Self where Self : Swift.ExpressibleByNilLiteral> to <Self where Self : Swift.ExpressibleByNilLiteral, Self : ~Copyable, Self : ~Escapable>
 Constructor ManagedBufferPointer.init(bufferClass:minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor ManagedBufferPointer.init(unsafeBufferObject:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T where T : ~Copyable>
 Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
-Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Constructor Result.init(catching:) has generic signature change from <Success, Failure where Failure == any Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
 Constructor UnsafeBufferPointer.init(_:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Constructor UnsafeBufferPointer.init(start:count:) has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -231,28 +230,28 @@ Constructor UnsafeMutableRawBufferPointer.init(_:) has generic signature change 
 Constructor UnsafeMutableRawPointer.init(_:) has generic signature change from <T> to <T where T : ~Copyable>
 Constructor UnsafeRawBufferPointer.init(_:) has generic signature change from <T> to <T where T : ~Copyable>
 Constructor UnsafeRawPointer.init(_:) has generic signature change from <T> to <T where T : ~Copyable>
-Enum MemoryLayout has generic signature change from <T> to <T where T : ~Copyable>
-Enum Optional has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
+Enum MemoryLayout has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Enum Optional has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
 Func ??(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func ??(_:_:) has parameter 0 changing from Default to Owned
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBufferPointer.isUniqueReference() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
-Func MemoryLayout.alignment(ofValue:) has generic signature change from <T> to <T where T : ~Copyable>
+Func MemoryLayout.alignment(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Func MemoryLayout.alignment(ofValue:) has parameter 0 changing from Default to Shared
-Func MemoryLayout.size(ofValue:) has generic signature change from <T> to <T where T : ~Copyable>
+Func MemoryLayout.size(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Func MemoryLayout.size(ofValue:) has parameter 0 changing from Default to Shared
-Func MemoryLayout.stride(ofValue:) has generic signature change from <T> to <T where T : ~Copyable>
+Func MemoryLayout.stride(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Func MemoryLayout.stride(ofValue:) has parameter 0 changing from Default to Shared
-Func Optional.!=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Func Optional.!=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.!=(_:_:) has parameter 1 changing from Default to Shared
-Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.==(_:_:) has parameter 1 changing from Default to Shared
-Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
-Func Result.get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
+Func Result.get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
 Func Result.get() has self access kind changing from NonMutating to Consuming
 Func Result.mapError(_:) has self access kind changing from NonMutating to Consuming
 Func UnsafeBufferPointer.deallocate() has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -320,6 +319,7 @@ Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has generic signature ch
 Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) is now without rethrows
 Func ManagedBuffer.withUnsafeMutablePointers(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
 Func ManagedBuffer.withUnsafeMutablePointers(_:) is now without rethrows
+Func ManagedBufferPointer.==(_:_:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
 Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) is now without rethrows
 Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
@@ -334,7 +334,7 @@ Func Result.flatMap(_:) has generic signature change from <Success, Failure, New
 Func Result.flatMapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable>
 Func Result.flatMapError(_:) has self access kind changing from NonMutating to Consuming
 Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
-Func Result.mapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable>
+Func Result.mapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) is now without rethrows
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>
@@ -343,7 +343,7 @@ Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has generic signatur
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) is now without rethrows
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, E, Result where E : Swift.Error, Pointee : ~Copyable, T : ~Copyable, Result : ~Copyable>
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) is now without rethrows
-Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, T : ~Escapable, Result : ~Copyable>
 Func withExtendedLifetime(_:_:) is now without rethrows
 Func Array.withUnsafeBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func Array.withUnsafeBufferPointer(_:) is now without rethrows
@@ -366,3 +366,10 @@ Struct CollectionOfOne is now with @_addressableForDependencies
 
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
+
+Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
+Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+
+Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
+Func type(of:) has parameter 0 changing from Default to Shared

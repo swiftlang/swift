@@ -815,6 +815,8 @@ ASTContext::ASTContext(
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
+      TheUnconstrainedAnyType(
+          ProtocolCompositionType::theUnconstrainedAnyType(*this)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -1324,6 +1326,10 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
 
 CanType ASTContext::getAnyExistentialType() const {
   return ExistentialType::get(TheAnyType)->getCanonicalType();
+}
+
+CanType ASTContext::getUnconstrainedAnyExistentialType() const {
+  return ExistentialType::get(TheUnconstrainedAnyType)->getCanonicalType();
 }
 
 CanType ASTContext::getAnyObjectConstraint() const {
