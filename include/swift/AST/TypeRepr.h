@@ -1146,6 +1146,7 @@ public:
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeLiteral ||
+           T->getKind() == TypeReprKind::ConstValue ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
            T->getKind() == TypeReprKind::Sending;
   }
@@ -1216,6 +1217,21 @@ public:
     return T->getKind() == TypeReprKind::CompileTimeLiteral;
   }
   static bool classof(const CompileTimeLiteralTypeRepr *T) { return true; }
+};
+
+/// An '@const' type.
+/// \code
+///   x : @const Int
+/// \endcode
+class ConstValueTypeRepr : public SpecifierTypeRepr {
+public:
+  ConstValueTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::ConstValue, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ConstValue;
+  }
+  static bool classof(const ConstValueTypeRepr *T) { return true; }
 };
 
 /// A sending type.
@@ -1661,6 +1677,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Integer:
     return true;

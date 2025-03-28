@@ -3257,6 +3257,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
   case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:

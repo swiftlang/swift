@@ -1005,6 +1005,9 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeLiteral, popTypeAndGetChild()));
+  case 'g':
+    return createType(
+        createWithChild(Node::Kind::ConstValue, popTypeAndGetChild()));
   case 'T':
     return createNode(Node::Kind::SendingResultFunctionType);
   case 'u':

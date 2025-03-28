@@ -3921,6 +3921,9 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
+  
+  if (flags.isConstValue())
+    printer.printKeyword("@const", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -7741,6 +7744,11 @@ void SILParameterInfo::print(
   if (options.contains(SILParameterInfo::Isolated)) {
     options -= SILParameterInfo::Isolated;
     Printer << "@sil_isolated ";
+  }
+      
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    Printer << "@const ";
   }
 
   if (lifetimeDependence) {

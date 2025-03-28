@@ -1976,6 +1976,11 @@ ManglingError Remangler::mangleCompileTimeLiteral(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
+ManglingError Remangler::mangleConstValue(Node *node, unsigned depth) {
+  Buffer << "Yg";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   Buffer << 'k';
   return mangleSingleChildNode(node, depth + 1); // type

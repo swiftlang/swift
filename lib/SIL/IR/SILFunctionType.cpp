@@ -1921,6 +1921,8 @@ private:
       param = param.addingOption(SILParameterInfo::Isolated);
     if (isImplicit)
       param = param.addingOption(SILParameterInfo::ImplicitLeading);
+    if (origFlags.isConstValue())
+      param = param.addingOption(SILParameterInfo::Const);
 
     Inputs.push_back(param);
     ParameterMap.push_back(formalParameterIndex);

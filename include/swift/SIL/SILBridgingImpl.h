@@ -37,6 +37,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SILOptimizer/Utils/ConstExpr.h"
+#include "swift/SIL/SILConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <string>
@@ -679,6 +681,10 @@ SwiftInt BridgedFunction::getNumIndirectFormalResults() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumIndirectFormalResults();
 }
 
+BridgedDeclRef BridgedFunction::getDeclRef() const {
+  return getFunction()->getDeclRef();
+}
+
 bool BridgedFunction::hasIndirectErrorResult() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->hasIndirectErrorResult();
 }
@@ -867,6 +873,13 @@ void BridgedGlobalVar::setLet(bool value) const { getGlobal()->setLet(value); }
 
 BridgedLinkage BridgedGlobalVar::getLinkage() const {
   return (BridgedLinkage)getGlobal()->getLinkage();
+}
+
+BridgedSourceLoc BridgedGlobalVar::getSourceLocation() const {
+  if (getGlobal()->hasLocation())
+    return getGlobal()->getLocation().getSourceLoc();
+  else
+    return BridgedSourceLoc();
 }
 
 bool BridgedGlobalVar::isPossiblyUsedExternally() const {
@@ -1965,6 +1978,32 @@ SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
 BridgedWitnessTableEntry BridgedDefaultWitnessTable::getEntry(SwiftInt index) const {
   return BridgedWitnessTableEntry::bridge(table->getEntries()[index]);
 }
+
+//===----------------------------------------------------------------------===//
+//                         ConstExprFunctionState
+//===----------------------------------------------------------------------===//
+BridgedConstExprFunctionState BridgedConstExprFunctionState::create() {
+  auto allocator = new swift::SymbolicValueBumpAllocator();
+  auto evaluator = new swift::ConstExprEvaluator(*allocator, 0);
+  auto numEvaluatedSILInstructions = new unsigned int(0);
+  auto state = new swift::ConstExprFunctionState(*evaluator, nullptr, {},
+                                                 *numEvaluatedSILInstructions, true);
+  return {state, allocator, evaluator, numEvaluatedSILInstructions};
+}
+
+bool BridgedConstExprFunctionState::isConstantValue(BridgedValue bridgedValue) {
+  auto value = bridgedValue.getSILValue();
+  auto symbolicValue = state->getConstantValue(value);
+  return symbolicValue.isConstant();
+}
+
+void BridgedConstExprFunctionState::deinitialize() {
+  delete state;
+  delete numEvaluatedSILInstructions;
+  delete constantEvaluator;
+  delete allocator;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                BridgedBuilder
