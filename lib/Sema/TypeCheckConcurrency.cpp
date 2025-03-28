@@ -402,27 +402,10 @@ GlobalActorAttributeRequest::evaluate(
   if (decl->getDeclContext()->getParentSourceFile() == nullptr)
     return result;
 
-  auto isStoredInstancePropertyOfStruct = [](VarDecl *var) {
-    if (var->isStatic() || !var->isOrdinaryStoredProperty())
-      return false;
+  auto *const globalActorAttr = result->first;
 
-    auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl();
-    return isa_and_nonnull<StructDecl>(nominal) &&
-           !isWrappedValueOfPropWrapper(var);
-  };
-
-  auto globalActorAttr = result->first;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    // Nominal types are okay...
-    if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
-      if (classDecl->isActor()) {
-        // ... except for actors.
-        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
-            .highlight(globalActorAttr->getRangeWithAt());
-        return std::nullopt;
-      }
-    }
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+  const auto isGlobalActorAnErrorOnStorage = [&](AbstractStorageDecl *storage,
+                                                 bool diagnose) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
 
@@ -431,66 +414,75 @@ GlobalActorAttributeRequest::evaluate(
           (var->getDeclContext()->isAsyncContext() ||
            var->getASTContext().LangOpts.StrictConcurrencyLevel >=
              StrictConcurrency::Complete)) {
-        var->diagnose(diag::global_actor_top_level_var)
-            .highlight(globalActorAttr->getRangeWithAt());
-        return std::nullopt;
+        if (diagnose) {
+          var->diagnose(diag::global_actor_top_level_var)
+              .highlight(globalActorAttr->getRangeWithAt());
+        }
+        return true;
       }
 
       // ... and not if it's local property
       if (var->getDeclContext()->isLocalContext()) {
-        var->diagnose(diag::global_actor_on_local_variable, var->getName())
+        if (diagnose) {
+          var->diagnose(diag::global_actor_on_local_variable, var->getName())
+              .highlight(globalActorAttr->getRangeWithAt());
+        }
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    // Nominal types are okay...
+    if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+      if (classDecl->isActor()) {
+        // ... except for actors.
+        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return std::nullopt;
       }
     }
-  } else if (isa<ExtensionDecl>(decl)) {
-    // Extensions are okay.
-  } else if (isa<ConstructorDecl>(decl) || isa<FuncDecl>(decl) ||
-             isa<DestructorDecl>(decl)) {
-    // None of the accessors/addressors besides a getter are allowed
-    // to have a global actor attribute.
-    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
-      if (!accessor->isGetter()) {
-        decl->diagnose(diag::global_actor_disallowed,
-                       decl->getDescriptiveKind())
-            .warnUntilSwiftVersion(6)
-            .fixItRemove(globalActorAttr->getRangeWithAt());
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (isGlobalActorAnErrorOnStorage(storage, /*diagnose=*/true)) {
+      return std::nullopt;
+    }
+  } else if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto &diags = decl->getASTContext().Diags;
 
-        auto &ctx = decl->getASTContext();
-        auto *storage = accessor->getStorage();
-        // Let's suggest to move the attribute to the storage if
-        // this is an accessor/addressor of a property of subscript.
-        if (storage->getDeclContext()->isTypeContext()) {
-          auto canMoveAttr = [&]() {
-            // If enclosing declaration has a global actor,
-            // skip the suggestion.
-            if (storage->getGlobalActorAttr())
-              return false;
+    // Complain about a global actor attribute on an accessor.
+    const auto isError =
+        diags
+            .diagnose(accessor->getLoc(), diag::global_actor_disallowed,
+                      decl->getDescriptiveKind())
+            .warnUntilSwiftVersion(accessor->isGetter() ? 7 : 6)
+            .isError();
 
-            // Global actor attribute cannot be applied to
-            // an instance stored property of a struct.
-            if (auto *var = dyn_cast<VarDecl>(storage)) {
-              return !isStoredInstancePropertyOfStruct(var);
-            }
+    auto *storage = accessor->getStorage();
 
-            return true;
-          };
-
-          if (canMoveAttr()) {
-            decl->diagnose(diag::move_global_actor_attr_to_storage_decl,
-                           storage)
-                .fixItInsert(
-                    storage->getAttributeInsertionLoc(/*forModifier=*/false),
-                    llvm::Twine("@", result->second->getNameStr()).str());
-          }
-        }
-
-        // In Swift 6, once the diag above is an error, it is disallowed.
-        if (ctx.isSwiftVersionAtLeast(6))
-          return std::nullopt;
+    // Suggest to move the attribute to the storage if it is legal and the
+    // storage does not specify some kind of explicit isolation.
+    if (!isGlobalActorAnErrorOnStorage(storage, /*diagnose=*/false)) {
+      auto storageIsolation = getInferredActorIsolation(storage);
+      if (storageIsolation.source.kind != IsolationSource::Explicit) {
+        diags
+            .diagnose(accessor->getLoc(),
+                      diag::move_global_actor_attr_to_storage_decl, storage)
+            .highlight(globalActorAttr->getRangeWithAt())
+            .fixItRemove(globalActorAttr->getRangeWithAt())
+            .fixItInsertAttribute(storage->getAttributeInsertionLoc(
+                                      globalActorAttr->isDeclModifier()),
+                                  globalActorAttr);
       }
     }
-    // Functions are okay.
+
+    // Fail if we emitted an error.
+    if (isError)
+      return std::nullopt;
+
+  } else if (isa<ExtensionDecl>(decl) || isa<AbstractFunctionDecl>(decl)) {
+    // Other functions and extensions are okay.
   } else {
     // Everything else is disallowed.
     decl->diagnose(diag::global_actor_disallowed, decl->getDescriptiveKind());
