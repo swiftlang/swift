@@ -129,21 +129,13 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
   if (isConcrete()) {
     return getConcrete()->subst(
-        [](SubstitutableType *type) -> Type {
-          if (auto *archetypeType = type->getAs<ArchetypeType>())
-            return archetypeType->getInterfaceType();
-          return type;
-        },
+        MapTypeOutOfContext(),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
-        [](SubstitutableType *type) -> Type {
-          if (auto *archetypeType = type->getAs<ArchetypeType>())
-            return archetypeType->getInterfaceType();
-          return type;
-        },
+        MapTypeOutOfContext(),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
