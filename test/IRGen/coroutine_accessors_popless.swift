@@ -23,7 +23,7 @@
 // CHECK-SAME:      swift_task_dealloc
 // CHECK-SAME:  }
 // CHECK-LABEL: _swift_coro_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-SAME:       i32 2,
+// CHECK-SAME:       i32 258,
 // CHECK-SAME:       malloc,
 // CHECK-SAME:       free
 // CHECK-SAME:  }
@@ -48,6 +48,26 @@
 // CHECK-SAME:        i64 [[SIZE]]
 // CHECK-SAME:    )
 // CHECK:         ret ptr [[OTHER_ALLOCATION]]
+// CHECK:       }
+
+// CHECK-LABEL: @__swift_coro_dealloc_(
+// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       entry:
+// CHECK:         [[BAIL:%[^,]+]] = icmp eq ptr [[ALLOCATOR]], null
+// CHECK:         br i1 [[USE_POPLESS]],
+// CHECK-SAME:        label %bail
+// CHECK-SAME:        label %forward
+// CHECK:       bail:
+// CHECK:         ret void
+// CHECK:       forward:
+// CHECK:         call swiftcc void @swift_coro_dealloc(
+// CHECK-SAME:        ptr [[ALLOCATOR]]
+// CHECK-SAME:        ptr [[ADDRESS]]
+// CHECK-SAME:    )
+// CHECK:         ret void
 // CHECK:       }
 
 public var _i: Int = 0
