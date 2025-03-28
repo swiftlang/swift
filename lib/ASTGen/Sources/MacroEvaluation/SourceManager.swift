@@ -216,6 +216,17 @@ extension SourceManager {
           at: replacementRange.upperBound
         )
         newText = replacingChildData.newChild.description
+
+      case .textualReplacement(replacementRange: let replacementRange, sourceFile: let sourceFile, newText: let replacementText):
+        replaceStartLoc = bridgedSourceLoc(
+          for: sourceFile,
+          at: replacementRange.lowerBound
+        )
+        replaceEndLoc = bridgedSourceLoc(
+          for: sourceFile,
+          at: replacementRange.upperBound
+        )
+        newText = replacementText
       }
 
       newText.withBridgedString { bridgedMessage in
