@@ -4210,8 +4210,7 @@ namespace {
         // Form a <global actor type>.shared reference.
         Type globalActorType = getDeclContext()->mapTypeIntoContext(
             isolation.getGlobalActor());
-        auto typeExpr = TypeExpr::createForDecl(
-            DeclNameLoc(loc), globalActorType->getAnyNominal(), dc);
+        auto typeExpr = TypeExpr::createImplicit(globalActorType, ctx);
         actorExpr = new (ctx) UnresolvedDotExpr(
             typeExpr, loc, DeclNameRef(ctx.Id_shared), DeclNameLoc(loc),
             /*implicit=*/false);
