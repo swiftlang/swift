@@ -169,7 +169,7 @@ target_include_directories(cxx-support PUBLIC
 
 add_executable(CxxInterop ./Sources/CxxInterop/main.swift)
 target_compile_options(CxxInterop PRIVATE
-  "SHELL:-cxx-interoperability-mode=default"
+  "SHELL:-cxx-interoperability-mode=default")
 target_link_libraries(CxxInterop PRIVATE cxx-support)
 
 ```
