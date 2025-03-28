@@ -17,6 +17,9 @@
 #elseif canImport(Glibc)
   import Glibc
   typealias JumpBuffer = jmp_buf
+#elseif canImport(FreeBSD)
+  import FreeBSD
+  typealias JumpBuffer = jmp_buf
 #else
 #error("Unsupported platform")
 #endif
