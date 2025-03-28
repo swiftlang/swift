@@ -138,7 +138,8 @@ extension LifetimeDependentApply {
       // for consistency, we use yieldAddress if any yielded value is an address.
       let targetKind = beginApply.yieldedValues.contains(where: { $0.type.isAddress })
         ? TargetKind.yieldAddress : TargetKind.yield
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: .scope(addressable: false),
+      info.sources.push(LifetimeSource(targetKind: targetKind,
+                                       convention: .scope(addressable: false, addressableForDeps: false),
                                        value: beginApply.token))
     }
     for operand in applySite.parameterOperands {
@@ -218,7 +219,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
       // addressable dependencies directly depend on the incoming address.
-      if context.options.enableAddressDependencies() && source.convention.isAddressable {
+      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value) {
         bases.append(source.value)
         return
       }
@@ -285,26 +286,21 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
                                     _ context: FunctionPassContext) {
   var currentValue = value
   for base in bases {
-    let markDep = builder.createMarkDependence(
-      value: currentValue, base: base, kind: .Unresolved)
-
     if value.type.isAddress {
       // Address dependencies cannot be represented as SSA values, so it does not make sense to replace any uses of the
       // dependent address.
-      //
-      // TODO: insert a separate mark_dependence_addr instruction with no return value and do not update currentValue.
-    } else {
-      // TODO: implement non-inout parameter dependencies. This assumes that currentValue is the apply immediately
-      // preceeding the mark_dependence.
-      let uses = currentValue.uses.lazy.filter {
-        if $0.isScopeEndingUse {
-          return false
-        }
-        let inst = $0.instruction
-        return inst != markDep && inst != initializer && !(inst is Deallocation)
-      }
-      uses.replaceAll(with: markDep, context)
+      _ = builder.createMarkDependenceAddr(value: currentValue, base: base, kind: .Unresolved)
+      continue
     }
+    let markDep = builder.createMarkDependence(value: currentValue, base: base, kind: .Unresolved)
+    let uses = currentValue.uses.lazy.filter {
+      if $0.isScopeEndingUse {
+        return false
+      }
+      let inst = $0.instruction
+      return inst != markDep && inst != initializer && !(inst is Deallocation)
+    }
+    uses.replaceAll(with: markDep, context)
     currentValue = markDep
   }
 }

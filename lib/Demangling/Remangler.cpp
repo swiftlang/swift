@@ -1056,6 +1056,11 @@ ManglingError Remangler::mangleCoroFunctionPointer(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDefaultOverride(Node *node, unsigned depth) {
+  Buffer << "Twd";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentAssociatedTypeRef(Node *node,
                                                           unsigned depth) {
   RETURN_IF_ERROR(mangleIdentifier(node->getFirstChild(), depth));
@@ -1842,6 +1847,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::BackDeploymentFallback:
       case Node::Kind::HasSymbolQuery:
       case Node::Kind::CoroFunctionPointer:
+      case Node::Kind::DefaultOverride:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3805,6 +3811,14 @@ ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
 ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
   Buffer << "XSa";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleSugaredInlineArray(Node *node, unsigned int depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
+  Buffer << "XSA";
   return ManglingError::Success;
 }
 

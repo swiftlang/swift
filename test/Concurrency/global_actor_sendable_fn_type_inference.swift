@@ -20,3 +20,8 @@ func allowNonSendableCaptures() {
     let _ = nonSendable // okay
   }
 }
+
+func testLocalFunctionReference() {
+  @MainActor func f() {}
+  _ = f as any Sendable
+}

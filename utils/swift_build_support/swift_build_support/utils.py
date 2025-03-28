@@ -48,8 +48,11 @@ def clear_log_time():
 
 
 def log_time(event, command, duration=0):
-    f = open(log_time_path(), "a")
+    log_time_dir = os.path.dirname(log_time_path())
+    if not os.path.isdir(log_time_dir):
+        os.mkdir(log_time_dir)
 
+    f = open(log_time_path(), "a")
     log_event = {
         "event": event,
         "command": command,

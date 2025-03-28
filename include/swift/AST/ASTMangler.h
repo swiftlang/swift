@@ -412,10 +412,18 @@ public:
   std::string mangleMacroExpansion(const FreestandingMacroExpansion *expansion);
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
+  std::string mangleAttachedMacroExpansion(
+      ClosureExpr *attachedTo, CustomAttr *attr, MacroDecl *macro);
 
   void appendMacroExpansion(const FreestandingMacroExpansion *expansion);
   void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC,
-                                   const FreestandingMacroExpansion *expansion);
+                                   Identifier macroName,
+                                   unsigned discriminator);
+
+  void appendMacroExpansion(ClosureExpr *attachedTo,
+                            CustomAttr *attr,
+                            MacroDecl *macro);
+
   void appendMacroExpansionOperator(
       StringRef macroName, MacroRole role, unsigned discriminator);
 

@@ -29,11 +29,13 @@
 #   -- Will need shadow invocations to generate swiftmodules for Swift parts
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
 
-cmake_minimum_required(VERSION 3.26...3.29)
+cmake_minimum_required(VERSION 3.29)
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
@@ -223,12 +225,12 @@ install(EXPORT SwiftCoreTargets
   COMPONENT SwiftCore_cmake)
 include(CMakePackageConfigHelpers)
 configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftCoreConfig.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfig.cmake"
   INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore")
-write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfigVersion.cmake"
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfigVersion.cmake"
   VERSION "${PROJECT_VERSION}"
   COMPATIBILITY ExactVersion)
 install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfig.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfigVersion.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore")

@@ -1,0 +1,352 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 6.2-dev effective-5.10 (LLVM 09f3cd831902283, Swift 889522485775a5d)
+// swift-module-flags: -module-name lifetime_depend_infer -enable-experimental-feature LifetimeDependence -swift-version 5 -enable-library-evolution
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.2
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+@_hasMissingDesignatedInitializers public class C {}
+public struct NE : ~Swift.Escapable {
+}
+public struct NEImmortal : ~Swift.Escapable {
+  #if $LifetimeDependence
+  @lifetime(immortal)
+  public init()
+  #endif
+}
+public struct NonEscapableSelf : ~Swift.Escapable {
+  #if $LifetimeDependence
+  public func methodNoParam() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self)
+  public func methodNoParamLifetime() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(copy self)
+  public func methodNoParamCopy() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(borrow self)
+  public func methodNoParamBorrow() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self)
+  public mutating func mutatingMethodNoParamLifetime() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(copy self)
+  public mutating func mutatingMethodNoParamCopy() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodNoParamBorrow() -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  public func methodOneParam(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self)
+  public func methodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(copy self)
+  public func methodOneParamCopy(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(borrow self)
+  public func methodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self)
+  public mutating func mutatingMethodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(copy self)
+  public mutating func mutatingMethodOneParamCopy(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+  #if $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
+  #endif
+}
+public struct EscapableTrivialSelf {
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public func methodNoParamLifetime() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public func methodNoParamBorrow() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public mutating func mutatingMethodNoParamLifetime() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodNoParamBorrow() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public func methodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public func methodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public mutating func mutatingMethodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+}
+public struct EscapableNonTrivialSelf {
+  public init(c: lifetime_depend_infer.C)
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  public func methodNoParam() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public func methodNoParamLifetime() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public func methodNoParamBorrow() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  public func mutatingMethodNoParam() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public mutating func mutatingMethodNoParamLifetime() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodNoParamBorrow() -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  public func methodOneParam(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public func methodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public func methodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  public mutating func mutatingMethodOneParam(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(self)
+  public mutating func mutatingMethodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+  #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
+  #endif
+}
+public struct NonescapableInitializers : ~Swift.Escapable {
+  public var c: lifetime_depend_infer.C
+  #if $LifetimeDependence
+  public init(ne: lifetime_depend_infer.NE)
+  #endif
+}
+public struct NonescapableConsumingInitializers : ~Swift.Escapable {
+  public var c: lifetime_depend_infer.C
+  #if $LifetimeDependence
+  public init(ne: consuming lifetime_depend_infer.NE)
+  #endif
+}
+public struct NonescapableBorrowingInitializers : ~Swift.Escapable {
+  public var c: lifetime_depend_infer.C
+  #if $LifetimeDependence
+  public init(c: borrowing lifetime_depend_infer.C)
+  #endif
+  #if $LifetimeDependence
+  public init(c: borrowing lifetime_depend_infer.C, _: Swift.Int)
+  #endif
+  #if $LifetimeDependence
+  public init(ne: borrowing lifetime_depend_infer.NE)
+  #endif
+}
+public struct NonescapableInoutInitializers : ~Swift.Escapable {
+  public var c: lifetime_depend_infer.C
+  #if $LifetimeDependence
+  public init(c: inout lifetime_depend_infer.C)
+  #endif
+}
+#if $LifetimeDependence
+@lifetime(immortal)
+public func noParamImmortal() -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+@lifetime(c)
+public func oneParamLifetime(c: lifetime_depend_infer.C) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+public func oneParamBorrow(c: borrowing lifetime_depend_infer.C) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+@lifetime(c)
+public func oneParamBorrowLifetime(c: borrowing lifetime_depend_infer.C) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+public func oneParamInout(c: inout lifetime_depend_infer.C) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+@lifetime(c)
+public func oneParamInoutLifetime(c: inout lifetime_depend_infer.C) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+@lifetime(c)
+public func twoParamsLifetime(c: lifetime_depend_infer.C, _: Swift.Int) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+public func twoParamsBorrow(c: borrowing lifetime_depend_infer.C, _: Swift.Int) -> lifetime_depend_infer.NEImmortal
+#endif
+#if $LifetimeDependence
+public func neParam(ne: lifetime_depend_infer.NE) -> lifetime_depend_infer.NE
+#endif
+#if $LifetimeDependence
+@lifetime(ne)
+public func neParamLifetime(ne: lifetime_depend_infer.NE) -> lifetime_depend_infer.NE
+#endif
+#if $LifetimeDependence
+public func neParamBorrow(ne: borrowing lifetime_depend_infer.NE) -> lifetime_depend_infer.NE
+#endif
+#if $LifetimeDependence
+@lifetime(ne)
+public func neParamBorrowLifetime(ne: borrowing lifetime_depend_infer.NE) -> lifetime_depend_infer.NE
+#endif
+#if $LifetimeDependence
+public func neParamConsume(ne: consuming lifetime_depend_infer.NE) -> lifetime_depend_infer.NE
+#endif
+#if $LifetimeDependence
+@lifetime(ne)
+public func neParamConsumeLifetime(ne: consuming lifetime_depend_infer.NE) -> lifetime_depend_infer.NE
+#endif
+#if $LifetimeDependence
+public func neTwoParam(ne: lifetime_depend_infer.NE, _: Swift.Int) -> lifetime_depend_infer.NE
+#endif
+public struct Accessors {
+  #if $LifetimeDependence
+  public var neYielded: lifetime_depend_infer.NEImmortal {
+    _read
+    _modify
+  }
+  #endif
+}
+public struct NonescapableSelfAccessors : ~Swift.Escapable {
+  public var ne: lifetime_depend_infer.NE
+  #if $LifetimeDependence
+  public init(ne: lifetime_depend_infer.NE)
+  #endif
+  #if $LifetimeDependence
+  public var neComputed: lifetime_depend_infer.NE {
+    get
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neYielded: lifetime_depend_infer.NE {
+    _read
+    @lifetime(borrow self)
+    _modify
+  }
+  #endif
+}
+public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
+  public var ne: lifetime_depend_infer.NE
+  #if $LifetimeDependence
+  public var neComputed: lifetime_depend_infer.NE {
+    get
+    set
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neYielded: lifetime_depend_infer.NE {
+    _read
+    @lifetime(borrow self)
+    _modify
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neComputedLifetime: lifetime_depend_infer.NE {
+    @lifetime(self)
+    get
+    @lifetime(self)
+    set
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neYieldedLifetime: lifetime_depend_infer.NE {
+    @lifetime(self)
+    _read
+    @lifetime(self)
+    _modify
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neComputedCopy: lifetime_depend_infer.NE {
+    @lifetime(copy self)
+    get
+    @lifetime(copy self)
+    set
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neYieldedCopy: lifetime_depend_infer.NE {
+    @lifetime(copy self)
+    _read
+    @lifetime(copy self)
+    _modify
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neComputedBorrow: lifetime_depend_infer.NE {
+    @lifetime(borrow self)
+    get
+    @lifetime(borrow self)
+    set
+  }
+  #endif
+  #if $LifetimeDependence
+  public var neYieldedBorrow: lifetime_depend_infer.NE {
+    @lifetime(borrow self)
+    _read
+    @lifetime(borrow self)
+    _modify
+  }
+  #endif
+}
+public struct NonEscapableMutableSelf : ~Swift.Escapable {
+  #if $LifetimeDependence
+  public mutating func mutatingMethodNoParam()
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self: self)
+  public mutating func mutatingMethodNoParamLifetime()
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self: copy self)
+  public mutating func mutatingMethodNoParamCopy()
+  #endif
+  #if $LifetimeDependence
+  @lifetime(self: self)
+  public mutating func mutatingMethodOneParamLifetime(_: lifetime_depend_infer.NE)
+  #endif
+  #if $LifetimeDependence
+  @lifetime(copy self)
+  public mutating func mutatingMethodOneParamCopy(_: lifetime_depend_infer.NE)
+  #endif
+  #if $LifetimeDependence
+  @lifetime(borrow self)
+  public mutating func mutatingMethodOneParamBorrow(_: lifetime_depend_infer.NE)
+  #endif
+}

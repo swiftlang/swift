@@ -62,20 +62,28 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
   ASSERT(node);
   ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption());
 
-  AbstractFunctionDecl *functionDecl = nullptr;
+  ValueDecl *decl = nullptr;
   ClosureExpr *closure = nullptr;
   FunctionTypeRepr *functionRepr = nullptr;
 
-  if (auto *decl = node.dyn_cast<ValueDecl *>()) {
+  if ((decl = node.dyn_cast<ValueDecl *>())) {
     // Diagnose only explicit nodes.
     if (decl->isImplicit()) {
       return;
     }
 
-    // Diagnose only functions.
-    functionDecl = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!functionDecl) {
+    // If the attribute cannot appear on this kind of declaration, we can't
+    // diagnose it.
+    if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution,
+                                                 decl)) {
       return;
+    }
+
+    // For storage, make sure we have an explicit getter to diagnose.
+    if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
+      if (!storageDecl->getParsedAccessor(AccessorKind::Get)) {
+        return;
+      }
     }
   } else if (auto *anyClosure = node.dyn_cast<AbstractClosureExpr *>()) {
     // Diagnose only explicit nodes.
@@ -107,8 +115,8 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
   // If the intended behavior is specified explicitly, don't diagnose.
   {
     const DeclAttributes *attrs = nullptr;
-    if (functionDecl) {
-      attrs = &functionDecl->getAttrs();
+    if (decl) {
+      attrs = &decl->getAttrs();
     } else if (closure) {
       attrs = &closure->getAttrs();
     }
@@ -121,8 +129,8 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
   // The execution behavior changes only for async functions.
   {
     bool isAsync = false;
-    if (functionDecl) {
-      isAsync = functionDecl->hasAsync();
+    if (decl) {
+      isAsync = decl->isAsync();
     } else if (closure) {
       isAsync = closure->isBodyAsync();
     } else {
@@ -137,14 +145,26 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
   const ExecutionAttr attr(ExecutionKind::Concurrent, /*implicit=*/true);
 
   const auto featureName = getFeatureName(feature);
-  if (functionDecl) {
+  if (decl) {
+    // Diagnose the function, but slap the attribute on the storage declaration
+    // instead if the function is an accessor.
+    auto *functionDecl = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!functionDecl) {
+      auto *storageDecl = cast<AbstractStorageDecl>(decl);
+
+      // This whole logic assumes that an 'async' storage declaration only has
+      // a getter. Yell for an update if this ever changes.
+      ASSERT(!storageDecl->getAccessor(AccessorKind::Set));
+
+      functionDecl = storageDecl->getParsedAccessor(AccessorKind::Get);
+    }
+
     ctx.Diags
         .diagnose(functionDecl->getLoc(),
                   diag::attr_execution_nonisolated_behavior_will_change_decl,
                   featureName, functionDecl, &attr)
         .fixItInsertAttribute(
-            functionDecl->getAttributeInsertionLoc(/*forModifier=*/false),
-            &attr);
+            decl->getAttributeInsertionLoc(/*forModifier=*/false), &attr);
   } else if (closure) {
     ctx.Diags
         .diagnose(closure->getLoc(),

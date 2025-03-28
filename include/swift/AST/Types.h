@@ -1473,7 +1473,7 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  SWIFT_DEBUG_DUMPER(dumpPrint());
+  SWIFT_DEBUG_DUMPER(print());
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
@@ -2377,6 +2377,10 @@ enum class ParamSpecifier : uint8_t {
 };
 
 StringRef getNameForParamSpecifier(ParamSpecifier name);
+
+/// What does \c ParamSpecifier::Default mean for a parameter that's directly
+/// attached to \p VD ? Pass \c nullptr for the value for a closure.
+ParamSpecifier getDefaultParamSpecifier(const ValueDecl *VD);
 
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
@@ -4146,7 +4150,6 @@ public:
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(SubstitutionMap subs,
                                  SubstOptions options = std::nullopt);
-  FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     std::optional<ExtInfo> info = std::nullopt;
@@ -6197,6 +6200,27 @@ public:
   }
 };
 
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayType : public SyntaxSugarType {
+  Type Count;
+  Type Elt;
+
+  InlineArrayType(const ASTContext &ctx, Type count, Type elt,
+                  RecursiveTypeProperties properties)
+      : SyntaxSugarType(TypeKind::InlineArray, ctx, properties), Count(count),
+        Elt(elt) {}
+
+public:
+  static InlineArrayType *get(Type count, Type elt);
+
+  Type getCountType() const { return Count; }
+  Type getElementType() const { return Elt; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::InlineArray;
+  }
+};
+
 /// The type T?, which is always sugar for a library type.
 class OptionalType : public UnarySyntaxSugarType {
   OptionalType(const ASTContext &ctx,Type base,
@@ -6337,6 +6361,12 @@ public:
 
   /// Constructs a protocol composition corresponding to the `Any` type.
   static Type theAnyType(const ASTContext &C);
+
+  /// Constructs a protocol composition corresponding to the `any ~Copyable &
+  /// ~Escapable` type.
+  ///
+  /// Note: This includes the inverse of all current invertible protocols.
+  static Type theUnconstrainedAnyType(const ASTContext &C);
 
   /// Constructs a protocol composition corresponding to the `AnyObject` type.
   static Type theAnyObjectType(const ASTContext &C);

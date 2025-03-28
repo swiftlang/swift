@@ -117,6 +117,7 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
+  #if !$Embedded
   /// Suspends the current task until the given deadline within a tolerance.
   ///
   /// If the task is canceled before the time ends, this function throws 
@@ -153,6 +154,7 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     try await clock.sleep(for: duration, tolerance: tolerance)
   }
+  #endif
 }
 #else
 @available(SwiftStdlib 5.7, *)

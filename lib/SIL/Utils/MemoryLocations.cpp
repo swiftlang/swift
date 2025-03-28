@@ -339,7 +339,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       case SILInstructionKind::MarkDependenceInst: {
         auto *mdi = cast<MarkDependenceInst>(user);
-        if (use == &mdi->getAllOperands()[MarkDependenceInst::Value]) {
+        if (use == &mdi->getAllOperands()[MarkDependenceInst::Dependent]) {
           if (!analyzeLocationUsesRecursively(mdi, locIdx, collectedVals, subLocationMap))
             return false;
         }

@@ -377,6 +377,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
+      ASSERT(ABIRoleInfo(storage).providesAPI()
+                && "addFunctionAttributes() on ABI-only accessor?");
+
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
                             
@@ -395,6 +398,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
         F->setInlineStrategy(NoInline);
       }
     }
+    ASSERT(ABIRoleInfo(decl).providesAPI()
+              && "addFunctionAttributes() on ABI-only decl?");
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
   }

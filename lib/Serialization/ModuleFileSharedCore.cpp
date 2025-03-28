@@ -1000,6 +1000,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Conformances, scratch);
         break;
+      case index_block::ABSTRACT_CONFORMANCE_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(AbstractConformances, scratch);
+        break;
       case index_block::PACK_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(PackConformances, scratch);

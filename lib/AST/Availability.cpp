@@ -411,6 +411,11 @@ bool Decl::isAvailableAsSPI() const {
 
 SemanticAvailableAttributes
 Decl::getSemanticAvailableAttrs(bool includeInactive) const {
+  // A decl in an @abi gets its availability from the decl it's attached to.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSemanticAvailableAttrs(includeInactive);
+
   return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
 }
 
@@ -552,11 +557,15 @@ getRootTargetDomains(const ASTContext &ctx) {
   if (ctx.LangOpts.hasFeature(Feature::Embedded))
     return domains;
 
-  if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
-    domains.insert(targetDomain->getRootDomain());
+  auto targetPlatform = swift::targetPlatform(ctx.LangOpts);
+  if (targetPlatform != PlatformKind::none)
+    domains.insert(
+        AvailabilityDomain::forPlatform(targetPlatform).getRootDomain());
 
-  if (auto variantDomain = AvailabilityDomain::forTargetVariantPlatform(ctx))
-    domains.insert(variantDomain->getRootDomain());
+  auto targetVariantPlatform = swift::targetVariantPlatform(ctx.LangOpts);
+  if (targetVariantPlatform != PlatformKind::none)
+    domains.insert(
+        AvailabilityDomain::forPlatform(targetVariantPlatform).getRootDomain());
 
   return domains;
 }

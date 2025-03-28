@@ -3003,6 +3003,7 @@ CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
+CONSTANT_TRANSLATION(MarkDependenceAddrInst, Assign)
 
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)

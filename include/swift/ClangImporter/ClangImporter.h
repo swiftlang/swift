@@ -330,7 +330,7 @@ public:
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
-  ClangNode getEffectiveClangNode(const Decl *decl) const;
+  ClangNode getEffectiveClangNode(const Decl *decl) const override;
 
   /// Look for textually included declarations from the bridging header.
   ///
@@ -485,10 +485,11 @@ public:
   bridgeClangModuleDependencies(
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
+      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+      RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,

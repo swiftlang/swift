@@ -112,7 +112,7 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
   let localReachabilityCache = LocalVariableReachabilityCache()
 
   for instruction in function.instructions {
-    guard let markDep = instruction as? MarkDependenceInst else {
+    guard let markDep = instruction as? MarkDependenceInstruction else {
       continue
     }
     guard let innerLifetimeDep = LifetimeDependence(markDep, context) else {
@@ -129,43 +129,68 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
   }
 }
 
-private extension MarkDependenceInst {
+private extension MarkDependenceInstruction {
   /// Rewrite the mark_dependence base operand to ignore inner borrow scopes (begin_borrow, load_borrow).
   ///
   /// Note: this could be done as a general simplification, e.g. after inlining. But currently this is only relevant for
   /// diagnostics.
   func rewriteSkippingBorrow(scope: LifetimeDependence.Scope, _ context: FunctionPassContext) -> LifetimeDependence {
     guard let newScope = scope.ignoreBorrowScope(context) else {
-      return LifetimeDependence(scope: scope, dependentValue: self)
+      return LifetimeDependence(scope: scope, markDep: self)!
     }
     let newBase = newScope.parentValue
     if newBase != self.baseOperand.value {
       self.baseOperand.set(to: newBase, context)
     }
-    return LifetimeDependence(scope: newScope, dependentValue: self)
+    return LifetimeDependence(scope: newScope, markDep: self)!
   }
 
-  /// Rewrite the mark_dependence base operand, setting it to a function argument.
-  ///
-  /// To handle more than one function argument, new mark_dependence instructions will be chained.
-  /// This is called when the dependent value is returned by the function and the dependence base is in the caller.
   func redirectFunctionReturn(to args: SingleInlineArray<FunctionArgument>, _ context: FunctionPassContext) {
-    var updatedMarkDep: MarkDependenceInst?
+    var updatedMarkDep: MarkDependenceInstruction?
     for arg in args {
       guard let currentMarkDep = updatedMarkDep else {
         self.baseOperand.set(to: arg, context)
         updatedMarkDep = self
         continue
       }
-      let newMarkDep = Builder(after: currentMarkDep, location: currentMarkDep.location, context)
-        .createMarkDependence(value: currentMarkDep, base: arg, kind: .Unresolved)
-      let uses = currentMarkDep.uses.lazy.filter {
-        let inst = $0.instruction
-        return inst != newMarkDep
+      switch currentMarkDep {
+      case let mdi as MarkDependenceInst:
+        updatedMarkDep = mdi.redirectFunctionReturnForward(to: arg, input: mdi, context)
+      case let mdi as MarkDependenceAddrInst:
+        updatedMarkDep = mdi.redirectFunctionReturnAddress(to: arg, context)
+      default:
+        fatalError("unexpected MarkDependenceInstruction")
       }
-      uses.replaceAll(with: newMarkDep, context)
-      updatedMarkDep = newMarkDep
     }
+  }
+}
+
+private extension MarkDependenceInst {
+  /// Rewrite the mark_dependence base operand, setting it to a function argument.
+  ///
+  /// This is called when the dependent value is returned by the function and the dependence base is in the caller.
+  func redirectFunctionReturnForward(to arg: FunctionArgument, input: MarkDependenceInst,
+    _ context: FunctionPassContext) -> MarkDependenceInst {
+    // To handle more than one function argument, new mark_dependence instructions will be chained.
+    let newMarkDep = Builder(after: input, location: input.location, context)
+      .createMarkDependence(value: input, base: arg, kind: .Unresolved)
+    let uses = input.uses.lazy.filter {
+      let inst = $0.instruction
+      return inst != newMarkDep
+    }
+    uses.replaceAll(with: newMarkDep, context)
+    return newMarkDep
+  }
+}
+
+private extension MarkDependenceAddrInst {
+  /// Rewrite the mark_dependence_addr base operand, setting it to a function argument.
+  ///
+  /// This is called when the dependent value is returned by the function and the dependence base is in the caller.
+  func redirectFunctionReturnAddress(to arg: FunctionArgument, _ context: FunctionPassContext)
+    -> MarkDependenceAddrInst {
+    return Builder(after: self, location: self.location, context)
+        .createMarkDependenceAddr(value: self.address, base: arg, kind: .Unresolved)
   }
 }
 
@@ -211,8 +236,8 @@ private func extendScopes(dependence: LifetimeDependence,
   var dependsOnArgs = SingleInlineArray<FunctionArgument>()
   for scopeExtension in scopeExtensions {
     var scopeExtension = scopeExtension
-    guard var useRange = computeDependentUseRange(of: dependence.dependentValue, within: &scopeExtension,
-                                                  localReachabilityCache, context) else {
+    guard var useRange = computeDependentUseRange(of: dependence, within: &scopeExtension, localReachabilityCache,
+                                                  context) else {
       continue
     }
 
@@ -463,12 +488,12 @@ extension ScopeExtension {
   }
 }
 
-/// Return an InstructionRange covering all the dependent uses of 'value'.
-private func computeDependentUseRange(of value: Value, within scopeExtension: inout ScopeExtension,
+/// Return an InstructionRange covering all the dependent uses of 'dependence'.
+private func computeDependentUseRange(of dependence: LifetimeDependence, within scopeExtension: inout ScopeExtension,
                                       _ localReachabilityCache: LocalVariableReachabilityCache,
                                       _ context: FunctionPassContext)
   -> InstructionRange? {
-
+  let function = dependence.function
   guard var ownershipRange = scopeExtension.computeRange(localReachabilityCache, context) else {
     return nil
   }
@@ -476,7 +501,6 @@ private func computeDependentUseRange(of value: Value, within scopeExtension: in
 
   // The innermost scope that must be extended must dominate all uses.
   var useRange = InstructionRange(begin: scopeExtension.innerScope.extendableBegin!.instruction, context)
-  let function = value.parentFunction
   var walker = LifetimeDependentUseWalker(function, localReachabilityCache, context) {
     // Do not extend the useRange past the ownershipRange.
     let dependentInst = $0.instruction
@@ -487,7 +511,7 @@ private func computeDependentUseRange(of value: Value, within scopeExtension: in
   }
   defer {walker.deinitialize()}
 
-  _ = walker.walkDown(root: value)
+  _ = walker.walkDown(dependence: dependence)
 
   log("Scope fixup for dependent uses:\n\(useRange)")
 
@@ -495,9 +519,12 @@ private func computeDependentUseRange(of value: Value, within scopeExtension: in
 
   // Lifetime dependenent uses may not be dominated by the access. The dependent value may be used by a phi or stored
   // into a memory location. The access may be conditional relative to such uses. If any use was not dominated, then
-  // `useRange` will include the function entry.
+  // `useRange` will include the function entry. There is not way to directly check
+  // useRange.isValid. useRange.blockRange.isValid is not a strong enough check because it will always succeed when
+  // useRange.begin == entryBlock even if a use if above useRange.begin.
   let firstInst = function.entryBlock.instructions.first!
   if firstInst != useRange.begin, useRange.contains(firstInst) {
+    useRange.deinitialize()
     return nil
   }
   return useRange

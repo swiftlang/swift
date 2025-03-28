@@ -61,29 +61,11 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs,
                                       SubstOptions options) {
-  return substGenericArgs(
-    [=](Type t) { return t.subst(subs, options); });
-}
-
-FunctionType *GenericFunctionType::substGenericArgs(
-    llvm::function_ref<Type(Type)> substFn) const {
-  llvm::SmallVector<AnyFunctionType::Param, 4> params;
-  params.reserve(getNumParams());
-
-  llvm::transform(getParams(), std::back_inserter(params),
-                  [&](const AnyFunctionType::Param &param) {
-                    return param.withType(substFn(param.getPlainType()));
-                  });
-
-  auto resultTy = substFn(getResult());
-
-  Type thrownError = getThrownError();
-  if (thrownError)
-    thrownError = substFn(thrownError);
-
-  // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy,
-                           getExtInfo().withThrows(isThrowing(), thrownError));
+  // FIXME: Before dropping the signature, we should assert that
+  // subs.getGenericSignature() is equal to this function type's
+  // generic signature.
+  Type fnType = FunctionType::get(getParams(), getResult(), getExtInfo());
+  return fnType.subst(subs, options)->castTo<FunctionType>();
 }
 
 CanFunctionType
@@ -154,87 +136,19 @@ operator()(CanType dependentType, Type conformingReplacementType,
         PackConformance::get(conformingPack, conformedProtocol, conformances));
   }
 
-  assert((conformingReplacementType->is<ErrorType>() ||
-          conformingReplacementType->is<SubstitutableType>() ||
-          conformingReplacementType->is<DependentMemberType>() ||
-          conformingReplacementType->hasTypeVariable()) &&
-         "replacement requires looking up a concrete conformance");
+  if (conformingReplacementType->is<ErrorType>())
+    return ProtocolConformanceRef::forInvalid();
+
   // A class-constrained archetype might conform to the protocol
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    if (auto superclassType = archetypeType->getSuperclass()) {
+    if (archetypeType->getSuperclass()) {
       return lookupConformance(archetypeType, conformedProtocol);
     }
   }
+
   return ProtocolConformanceRef::forAbstract(
     conformingReplacementType, conformedProtocol);
-}
-
-static Type substGenericFunctionType(GenericFunctionType *genericFnType,
-                                     InFlightSubstitution &IFS) {
-  // Substitute into the function type (without generic signature).
-  auto *bareFnType = FunctionType::get(genericFnType->getParams(),
-                                       genericFnType->getResult(),
-                                       genericFnType->getExtInfo());
-  Type result = Type(bareFnType).subst(IFS);
-  if (!result || result->is<ErrorType>()) return result;
-
-  auto *fnType = result->castTo<FunctionType>();
-  // Substitute generic parameters.
-  bool anySemanticChanges = false;
-  SmallVector<GenericTypeParamType *, 2> genericParams;
-  for (auto param : genericFnType->getGenericParams()) {
-    Type paramTy = Type(param).subst(IFS);
-    if (!paramTy)
-      return Type();
-
-    if (auto newParam = paramTy->getAs<GenericTypeParamType>()) {
-      if (!newParam->isEqual(param))
-        anySemanticChanges = true;
-
-      genericParams.push_back(newParam);
-    } else {
-      anySemanticChanges = true;
-    }
-  }
-
-  // If no generic parameters remain, this is a non-generic function type.
-  if (genericParams.empty())
-    return result;
-
-  // Transform requirements.
-  SmallVector<Requirement, 2> requirements;
-  for (const auto &req : genericFnType->getRequirements()) {
-    // Substitute into the requirement.
-    auto substReqt = req.subst(IFS);
-
-    // Did anything change?
-    if (!anySemanticChanges &&
-        (!req.getFirstType()->isEqual(substReqt.getFirstType()) ||
-         (req.getKind() != RequirementKind::Layout &&
-          !req.getSecondType()->isEqual(substReqt.getSecondType())))) {
-      anySemanticChanges = true;
-    }
-
-    requirements.push_back(substReqt);
-  }
-
-  GenericSignature genericSig;
-  if (anySemanticChanges) {
-    // If there were semantic changes, we need to build a new generic
-    // signature.
-    ASTContext &ctx = genericFnType->getASTContext();
-    genericSig = buildGenericSignature(ctx, GenericSignature(),
-                                       genericParams, requirements,
-                                       /*allowInverses=*/false);
-  } else {
-    // Use the mapped generic signature.
-    genericSig = GenericSignature::get(genericParams, requirements);
-  }
-
-  // Produce the new generic function type.
-  return GenericFunctionType::get(genericSig, fnType->getParams(),
-                                  fnType->getResult(), fnType->getExtInfo());
 }
 
 InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
@@ -558,11 +472,8 @@ Type Type::subst(TypeSubstitutionFn substitutions,
 }
 
 Type Type::subst(InFlightSubstitution &IFS) const {
-  // Handle substitutions into generic function types.
-  // FIXME: This should be banned.
-  if (auto genericFnType = getPointer()->getAs<GenericFunctionType>()) {
-    return substGenericFunctionType(genericFnType, IFS);
-  }
+  ASSERT(!getPointer()->getAs<GenericFunctionType>() &&
+         "Perhaps you want GenericFunctionType::substGenericArgs() instead");
 
   if (IFS.isInvariant(*this))
     return *this;

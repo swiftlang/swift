@@ -26,8 +26,24 @@
 #include "llvm/ADT/STLExtras.h"
 #include <optional>
 
+namespace swift {
+class AbstractConformance;
+}
+
 namespace llvm {
-  class raw_ostream;
+class raw_ostream;
+
+template <>
+struct PointerLikeTypeTraits<swift::AbstractConformance *> {
+public:
+  static inline void *getAsVoidPointer(swift::AbstractConformance *ptr) {
+    return ptr;
+  }
+  static inline swift::AbstractConformance *getFromVoidPointer(void *ptr) {
+    return (swift::AbstractConformance *)ptr;
+  }
+  enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+};
 }
 
 namespace swift {
@@ -53,21 +69,26 @@ enum class EffectKind : uint8_t;
 /// ProtocolConformanceRef allows the efficient recovery of the protocol
 /// even when the conformance is abstract.
 class ProtocolConformanceRef {
-  using UnionType = llvm::PointerUnion<ProtocolDecl *,
+public:
+  using UnionType = llvm::PointerUnion<AbstractConformance *,
                                        ProtocolConformance *,
                                        PackConformance *>;
+
+private:
   UnionType Union;
 
   explicit ProtocolConformanceRef(UnionType value) : Union(value) {}
 
-  /// Create an abstract protocol conformance reference.
-  explicit ProtocolConformanceRef(ProtocolDecl *proto) : Union(proto) {
-    assert(proto != nullptr &&
-           "cannot construct ProtocolConformanceRef with null");
-  }
-
 public:
   ProtocolConformanceRef() : Union() {}
+  ProtocolConformanceRef(std::nullptr_t) : Union() {}
+
+  /// Create an abstract protocol conformance reference.
+  explicit ProtocolConformanceRef(AbstractConformance *abstract)
+      : Union(abstract) {
+    assert(abstract != nullptr &&
+           "cannot construct ProtocolConformanceRef with null");
+  }
 
   /// Create a concrete protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolConformance *conf) : Union(conf) {
@@ -95,7 +116,7 @@ public:
   explicit operator bool() const { return !isInvalid(); }
 
   /// Create an abstract conformance for a type parameter or archetype.
-  static ProtocolConformanceRef forAbstract(Type subjectType,
+  static ProtocolConformanceRef forAbstract(Type conformingType,
                                             ProtocolDecl *protocol);
 
   bool isConcrete() const {
@@ -115,12 +136,11 @@ public:
   }
 
   bool isAbstract() const {
-    return !isInvalid() && Union.is<ProtocolDecl*>();
+    return !isInvalid() && Union.is<AbstractConformance*>();
   }
 
-  ProtocolDecl *getAbstract() const {
-    ASSERT(isAbstract());
-    return Union.get<ProtocolDecl*>();
+  AbstractConformance *getAbstract() const {
+    return Union.get<AbstractConformance *>();
   }
 
   /// Determine whether this conformance (or a conformance it depends on)
@@ -149,7 +169,7 @@ public:
   /// The given `body` will be called on each isolated conformance. If it ever
   /// returns `true`, this function will abort the search and return `true`.
   bool forEachIsolatedConformance(
-      llvm::function_ref<bool(ProtocolConformance*)> body
+      llvm::function_ref<bool(ProtocolConformanceRef)> body
   ) const;
 
   using OpaqueValue = void*;
@@ -158,8 +178,11 @@ public:
     return ProtocolConformanceRef(UnionType::getFromOpaqueValue(value));
   }
 
+  /// Retrieve the conforming type.
+  Type getType() const;
+
   /// Return the protocol requirement.
-  ProtocolDecl *getRequirement() const;
+  ProtocolDecl *getProtocol() const;
   
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,
@@ -239,5 +262,23 @@ void simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRe
 SourceLoc extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef);
 
 } // end namespace swift
+
+namespace llvm {
+class raw_ostream;
+
+template <>
+struct PointerLikeTypeTraits<swift::ProtocolConformanceRef>
+  : PointerLikeTypeTraits<swift::ProtocolConformanceRef::UnionType>
+{
+public:
+  static inline void *getAsVoidPointer(swift::ProtocolConformanceRef ref) {
+    return ref.getOpaqueValue();
+  }
+  static inline swift::ProtocolConformanceRef getFromVoidPointer(void *ptr) {
+    return swift::ProtocolConformanceRef::getFromOpaqueValue(ptr);
+  }
+};
+
+}
 
 #endif // LLVM_SWIFT_AST_PROTOCOLCONFORMANCEREF_H

@@ -480,6 +480,12 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     D = accessor->getStorage();
   }
 
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    // ABI-only decls can't have @available attributes of their own.
+    D = abiRole.getCounterpart();
+  }
+
   return D->getAbstractSyntaxDeclForAttributes();
 }
 
@@ -645,7 +651,7 @@ static void fixAvailabilityForDecl(
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  const Decl *ConcDecl = D->getConcreteSyntaxDeclForAttributes();
+  const Decl *ConcDecl = relatedDeclForAvailabilityFixit(D);
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
@@ -3145,7 +3151,26 @@ public:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
+  bool checkInlineArrayTypeRepr(InlineArrayTypeRepr *T) {
+    // Has the same availability as InlineArray.
+    auto &ctx = where.getDeclContext()->getASTContext();
+    auto *D = ctx.getInlineArrayDecl();
+    if (!D) {
+      // If we have a broken stdlib we will have already diagnosed.
+      return false;
+    }
+    return diagnoseDeclAvailability(D, T->getSourceRange(), /*call*/ nullptr,
+                                    where, flags);
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    if (auto *IAT = dyn_cast<InlineArrayTypeRepr>(T)) {
+      if (checkInlineArrayTypeRepr(IAT)) {
+        foundAnyIssues = true;
+      }
+      return Action::Continue();
+    }
+
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR)
       return Action::Continue();

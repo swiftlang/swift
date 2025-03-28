@@ -596,6 +596,10 @@ struct SILOptOptions {
   llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
       "enable-address-dependencies",
       llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+
+  llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
+      "mergeable-traps",
+      llvm::cl::desc("Enable cond_fail merging."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -914,6 +918,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.EnablePackMetadataStackPromotion;
 
   SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)

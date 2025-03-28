@@ -20,6 +20,9 @@ public class Decl: CustomStringConvertible, Hashable {
 
   public var description: String { String(taking: bridged.getDebugDescription()) }
 
+  /// The module in which this declaration resides.
+  public var parentModule: ModuleDecl { bridged.getModuleContext().getAs(ModuleDecl.self) }
+
   // True if this declaration is imported from C/C++/ObjC.
   public var hasClangNode: Bool { bridged.hasClangNode() }
 
@@ -88,7 +91,9 @@ final public class ParamDecl: VarDecl {}
 
 final public class SubscriptDecl: AbstractStorageDecl {}
 
-public class AbstractFunctionDecl: ValueDecl {}
+public class AbstractFunctionDecl: ValueDecl {
+  public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
+}
 
 final public class ConstructorDecl: AbstractFunctionDecl {}
 

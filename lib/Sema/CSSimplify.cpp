@@ -1703,7 +1703,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (parameterBindings[paramIdx].empty() && callee) {
       // Type inference from default value expressions.
       {
-        auto *paramList = getParameterList(callee);
+        auto *paramList = callee->getParameterList();
         if (!paramList)
           continue;
 
@@ -3266,6 +3266,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   SmallVector<AnyFunctionType::Param, 8> func2Params;
   func2Params.append(func2->getParams().begin(), func2->getParams().end());
+
+  // Support conversion from `@execution(caller)` to a function type
+  // with an isolated parameter.
+  if (subKind == ConstraintKind::Subtype &&
+      func1->getIsolation().isNonIsolatedCaller() &&
+      func2->getIsolation().isParameter()) {
+    // `@execution(caller)` function gets an implicit isolation parameter
+    // introduced during SILGen and thunk is going to forward an isolation
+    // from the caller to it.
+    // Let's remove the isolated parameter from consideration, function
+    // types have to match on everything else.
+    llvm::erase_if(func2Params, [](const AnyFunctionType::Param &param) {
+      return param.isIsolated();
+    });
+  }
 
   // Add a very narrow exception to SE-0110 by allowing functions that
   // take multiple arguments to be passed as an argument in places
@@ -5764,7 +5779,7 @@ bool ConstraintSystem::repairFailures(
 
           // Ignore decls that don't have meaningful parameter lists - this
           // matches variables and parameters with function types.
-          auto *paramList = getParameterList(overload->choice.getDecl());
+          auto *paramList = overload->choice.getDecl()->getParameterList();
           if (!paramList)
             return true;
 
@@ -6058,7 +6073,7 @@ bool ConstraintSystem::repairFailures(
 
       if (auto overload = findSelectedOverloadFor(calleeLocator)) {
         if (auto *decl = overload->choice.getDeclOrNull()) {
-          if (auto paramList = getParameterList(decl)) {
+          if (auto paramList = decl->getParameterList()) {
             if (paramList->get(paramIdx)->getTypeOfDefaultExpr()) {
               conversionsOrFixes.push_back(
                   IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
@@ -8710,18 +8725,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If we aren't allowed to have an isolated conformance, check for any
     // isolated conformances here.
     if (kind == ConstraintKind::NonisolatedConformsTo &&
-        !conformance.getRequirement()->isMarkerProtocol()) {
+        !conformance.getProtocol()->isMarkerProtocol()) {
       // Grab the first isolated conformance, if there is one.
-      ProtocolConformance *isolatedConformance = nullptr;
-      conformance.forEachIsolatedConformance([&](ProtocolConformance *conf) {
+      ProtocolConformanceRef isolatedConformance;
+      conformance.forEachIsolatedConformance([&](ProtocolConformanceRef conf) {
         if (!isolatedConformance)
           isolatedConformance = conf;
         return true;
       });
 
-      if (isolatedConformance) {
+      if (isolatedConformance && isolatedConformance.isConcrete()) {
         auto fix = IgnoreIsolatedConformance::create(
-            *this, getConstraintLocator(locator), isolatedConformance);
+            *this, getConstraintLocator(locator),
+            isolatedConformance.getConcrete());
         if (recordFix(fix)) {
           return SolutionKind::Error;
         }

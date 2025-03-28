@@ -98,6 +98,12 @@ copy_files("" "Core" FILES "Info.plist.in")
 
 # Platform Overlays
 
+# Copy magic linker symbols
+copy_library_sources("linker-support" "" "Overlay")
+
+message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
+copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
@@ -121,3 +127,22 @@ copy_files(public/Platform Overlay/Windows/CRT
 
 # TODO: Add source directories for the platform overlays, supplemental
 # libraries, and test support libraries.
+
+# Supplemental Libraries
+
+# Copy StringProcessing, RegexParser, RegexBuilder
+if(NOT DEFINED StringProcessing_ROOT_DIR)
+  find_path(StringProcessing_ROOT_DIR
+    "swift-experimental-string-processing/Package.swift"
+    HINTS "${CMAKE_CURRENT_LIST_DIR}/../../")
+endif()
+message(STATUS "String Processing Root: ${StringProcessing_ROOT_DIR}")
+
+copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+copy_library_sources(_StringProcessing "Sources" "Supplemental/StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")

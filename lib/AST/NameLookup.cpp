@@ -1546,7 +1546,7 @@ void MemberLookupTable::addMember(Decl *member) {
     A->getMemberName().addToLookupTable(Lookup, vd);
 
   auto abiRole = ABIRoleInfo(vd);
-  if (!abiRole.providesABI())
+  if (!abiRole.providesABI() && abiRole.getCounterpart())
     addMember(abiRole.getCounterpart());
 }
 
@@ -3167,6 +3167,10 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     result.first.push_back(ctx.getArrayDecl());
     return result;
 
+  case TypeReprKind::InlineArray:
+    result.first.push_back(ctx.getInlineArrayDecl());
+    return result;
+
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
@@ -3710,13 +3714,14 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     return { };
 
   // Functions, initializers, and subscripts can contain opaque parameters.
-  ParameterList *params = nullptr;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    params = func->getParameters();
-  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
-    params = subscript->getIndices();
-  else
+  // FIXME: What's wrong with allowing them in macro decls?
+  if (isa<MacroDecl>(value)) {
     return { };
+  }
+  auto *params = value->getParameterList();
+  if (!params) {
+    return {};
+  }
 
   // Look for parameters that have "some" types in them.
   unsigned index = parsedGenericParams ? parsedGenericParams->size() : 0;

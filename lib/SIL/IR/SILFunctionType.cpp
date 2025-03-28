@@ -1665,8 +1665,7 @@ private:
 
     // If we are an async function that is unspecified or nonisolated, insert an
     // isolated parameter if AsyncCallerExecution is enabled.
-    if (IsolationInfo &&
-        IsolationInfo->getKind() == ActorIsolation::CallerIsolationInheriting &&
+    if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
         extInfoBuilder.isAsync()) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
@@ -1823,14 +1822,12 @@ private:
       // is addressable-for-dependencies, then lower it with maximal abstraction
       // as well.
       auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
-      if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
+      if (initialSubstTL.getRecursiveProperties()
+          .isAddressableForDependencies()) {
         origType = AbstractionPattern::getOpaque();
 
-        // Remember that this lowered parameter is conditionally addressable in
-        // the addressable parameters vector.
-        AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
-        AddressableLoweredParameters[ParameterMap.size()] = true;
-
+        // Remember that this lowered parameter is conditionally
+        // addressable. Specialization may clear this flag.
         ConditionallyAddressableLoweredParameters
           .resize(ParameterMap.size() + 1, false);
         ConditionallyAddressableLoweredParameters[ParameterMap.size()] = true;
@@ -2594,6 +2591,13 @@ static CanSILFunctionType getSILFunctionType(
         actorIsolation =
             getActorIsolationOfContext(constant->getInnermostDeclContext());
       }
+    } else if (substFnInterfaceType->hasExtInfo() &&
+               substFnInterfaceType->getExtInfo()
+                   .getIsolation()
+                   .isNonIsolatedCaller()) {
+      // If our function type is a nonisolated caller and we can not infer from
+      // our constant, we must be caller isolation inheriting.
+      actorIsolation = ActorIsolation::forCallerIsolationInheriting();
     }
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,

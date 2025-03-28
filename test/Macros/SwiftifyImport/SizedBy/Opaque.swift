@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2>&1 | %FileCheck --match-full-lines %s
 
-// rdar://145899513 ([StrictMemorySafety] Call to RawSpan::withUnsafeBytes not recognized as unsafe, while call to Span::withUnsafeBufferPointer is)
+// FIXME: Waiting for optional to handle nonescapable types
 // RUN: not %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
@@ -21,8 +21,6 @@ func impNullableUnsafeRawBufferPointer(_ ptr: OpaquePointer!, _ size: CInt) {
 func nonnullSpan(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
-// expected-note@+2{{in expansion of macro '_SwiftifyImport' on global function 'nullableSpan' here}}
-// Cannot refer to source location for the error: "type 'RawSpan' does not conform to protocol 'Escapable'" (which is currently necessary for Optional)
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
 func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 }

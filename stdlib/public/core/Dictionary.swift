@@ -1388,7 +1388,7 @@ extension Dictionary {
         return true
       }
 #else
-      if unsafe lhs._variant.asNative._storage === rhs._variant.asNative._storage {
+      if lhs._variant.asNative._storage === rhs._variant.asNative._storage {
         return true
       }
 #endif

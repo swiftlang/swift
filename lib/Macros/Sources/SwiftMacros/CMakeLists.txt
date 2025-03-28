@@ -14,7 +14,7 @@ add_swift_macro_library(SwiftMacros
   OptionSetMacro.swift
   DebugDescriptionMacro.swift
   DistributedResolvableMacro.swift
-  StartTaskMacro.swift
+  TaskMacro.swift
   SyntaxExtensions.swift
   TaskLocalMacro.swift
   SwiftifyImportMacro.swift

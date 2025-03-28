@@ -17,6 +17,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -107,6 +108,7 @@ class SILPerformanceInliner {
   DominanceAnalysis *DA;
   SILLoopAnalysis *LA;
   BasicCalleeAnalysis *BCA;
+  IsSelfRecursiveAnalysis *SRA;
 
   // For keys of SILFunction and SILLoop.
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
@@ -238,14 +240,14 @@ class SILPerformanceInliner {
 
 public:
   SILPerformanceInliner(StringRef PassName, SILOptFunctionBuilder &FuncBuilder,
-                        InlineSelection WhatToInline,
-                        SILPassManager *pm, DominanceAnalysis *DA,
-                        PostDominanceAnalysis *PDA,
+                        InlineSelection WhatToInline, SILPassManager *pm,
+                        DominanceAnalysis *DA, PostDominanceAnalysis *PDA,
                         SILLoopAnalysis *LA, BasicCalleeAnalysis *BCA,
-                        OptimizationMode OptMode, OptRemark::Emitter &ORE)
+                        IsSelfRecursiveAnalysis *SRA, OptimizationMode OptMode,
+                        OptRemark::Emitter &ORE)
       : PassName(PassName), FuncBuilder(FuncBuilder),
-        WhatToInline(WhatToInline), pm(pm), DA(DA), LA(LA), BCA(BCA), CBI(DA, PDA), ORE(ORE),
-        OptMode(OptMode) {}
+        WhatToInline(WhatToInline), pm(pm), DA(DA), LA(LA), BCA(BCA), SRA(SRA),
+        CBI(DA, PDA), ORE(ORE), OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -1087,7 +1089,7 @@ void SILPerformanceInliner::collectAppliesToInline(
     // At this occasion we record additional weight increases.
     addWeightCorrection(FAS, WeightCorrections);
 
-    if (SILFunction *Callee = getEligibleFunction(FAS, WhatToInline)) {
+    if (SILFunction *Callee = getEligibleFunction(FAS, WhatToInline, SRA)) {
       // Compute the shortest-path analysis for the callee.
       SILLoopInfo *CalleeLI = LA->get(Callee);
       ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
@@ -1138,7 +1140,7 @@ void SILPerformanceInliner::collectAppliesToInline(
 
       FullApplySite AI = FullApplySite(&*I);
 
-      auto *Callee = getEligibleFunction(AI, WhatToInline);
+      auto *Callee = getEligibleFunction(AI, WhatToInline, SRA);
       if (Callee) {
         // Check if we have an always_inline or transparent function. If we do,
         // just add it to our final Applies list and continue.
@@ -1328,7 +1330,7 @@ void SILPerformanceInliner::visitColdBlocks(
       if (!AI)
         continue;
 
-      auto *Callee = getEligibleFunction(AI, WhatToInline);
+      auto *Callee = getEligibleFunction(AI, WhatToInline, SRA);
       if (Callee && decideInColdBlock(AI, Callee, numCallerBlocks)) {
         AppliesToInline.push_back(AI);
       }
@@ -1358,6 +1360,7 @@ public:
     PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
+    IsSelfRecursiveAnalysis *SRA = PM->getAnalysis<IsSelfRecursiveAnalysis>();
     OptRemark::Emitter ORE(DEBUG_TYPE, *getFunction());
 
     if (getOptions().InlineThreshold == 0) {
@@ -1369,7 +1372,8 @@ public:
     SILOptFunctionBuilder FuncBuilder(*this);
 
     SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline,
-                              getPassManager(), DA, PDA, LA, BCA, OptMode, ORE);
+                                  getPassManager(), DA, PDA, LA, BCA, SRA,
+                                  OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

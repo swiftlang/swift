@@ -502,7 +502,7 @@ extension _NativeSet {
     if self.count != other.count { return false }
 
     defer { _fixLifetime(self) }
-    for bucket in unsafe self.hashTable {
+    for unsafe bucket in unsafe self.hashTable {
       let key = self.uncheckedElement(at: bucket)
       let bridgedKey = _bridgeAnythingToObjectiveC(key)
       guard other.contains(bridgedKey) else { return false }

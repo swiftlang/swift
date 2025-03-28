@@ -328,6 +328,7 @@ private:
     case Node::Kind::TypeSymbolicReference:
     case Node::Kind::SugaredOptional:
     case Node::Kind::SugaredArray:
+    case Node::Kind::SugaredInlineArray:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
     case Node::Kind::Integer:
@@ -659,6 +660,7 @@ private:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
     case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::CoroFunctionPointer:
+    case Node::Kind::DefaultOverride:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3289,6 +3291,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     Printer << "]";
     return nullptr;
+  case Node::Kind::SugaredInlineArray: {
+    Printer << "[";
+    print(Node->getChild(0), depth + 1);
+    Printer << " x ";
+    print(Node->getChild(1), depth + 1);
+    Printer << "]";
+    return nullptr;
+  }
   case Node::Kind::SugaredDictionary:
     Printer << "[";
     print(Node->getChild(0), depth + 1);
@@ -3484,6 +3494,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::CoroFunctionPointer:
     Printer << "coro function pointer to ";
+    return nullptr;
+  case Node::Kind::DefaultOverride:
+    Printer << "default override of ";
     return nullptr;
   }
 

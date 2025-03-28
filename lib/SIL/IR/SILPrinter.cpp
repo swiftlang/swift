@@ -1024,6 +1024,16 @@ public:
 
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
+  void printCastingIsolatedConformancesIfNeeded(CastingIsolatedConformances flag) {
+    switch (flag) {
+    case CastingIsolatedConformances::Allow:
+      break;
+
+    case CastingIsolatedConformances::Prohibit:
+      *this << "[prohibit_isolated_conformances] ";
+      break;
+    }
+  }
 
   void printTypeDependentOperands(const SILInstruction *I) {
     ArrayRef<Operand> TypeDepOps = I->getTypeDependentOperands();
@@ -1694,7 +1704,7 @@ public:
     case ParameterConvention::Pack_Inout:
       llvm_unreachable("unexpected callee convention!");
     }
-    switch (fnType->getIsolation()) {
+    switch (fnType->getIsolation().getKind()) {
     case SILFunctionTypeIsolation::Unknown:
       break;
     case SILFunctionTypeIsolation::Erased:
@@ -2081,11 +2091,13 @@ public:
   }
 
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
+    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
+    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
     if (CI->isExact())
       *this << "[exact] ";
     *this << CI->getSourceFormalType() << " in ";
@@ -2100,12 +2112,14 @@ public:
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
+    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
+    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
@@ -2701,7 +2715,8 @@ public:
   void visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
     *this << getIDAndType(CBOI->getOperand());
   }
-  void visitMarkDependenceInst(MarkDependenceInst *MDI) {
+  template <SILInstructionKind Opc, typename T>
+  void visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, T> *MDI) {
     switch (MDI->dependenceKind()) {
     case MarkDependenceKind::Unresolved:
       *this << "[unresolved] ";
@@ -2712,9 +2727,16 @@ public:
       *this << "[nonescaping] ";
       break;
     }
-    *this << getIDAndType(MDI->getValue()) << " on "
-          << getIDAndType(MDI->getBase());
+    *this <<
+      getIDAndType(MDI->getOperand(MarkDependenceInstBase<Opc, T>::Dependent))
+          << " on " << getIDAndType(MDI->getBase());
+  }
+  void visitMarkDependenceInst(MarkDependenceInst *MDI) {
+    visitMarkDependenceInstBase(MDI);
     printForwardingOwnershipKind(MDI, MDI->getValue());
+  }
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *MDI) {
+    visitMarkDependenceInstBase(MDI);
   }
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << getIDAndType(RI->getOperand());
@@ -3876,6 +3898,28 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
     wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+static void printSILDefaultOverrideTables(
+    SILPrintContext &Ctx,
+    const SILModule::DefaultOverrideTableListType &tables) {
+  if (!Ctx.sortSIL()) {
+    for (const auto &table : tables)
+      table.print(Ctx.OS(), Ctx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILDefaultOverrideTable *> sorted;
+  sorted.reserve(tables.size());
+  for (const auto &table : tables)
+    sorted.push_back(&table);
+  std::sort(sorted.begin(), sorted.end(),
+            [](const auto *left, const auto *right) -> bool {
+              return left->getClass()->getName().compare(
+                         right->getClass()->getName()) == -1;
+            });
+  for (const auto *table : sorted)
+    table->print(Ctx.OS(), Ctx.printVerbose());
+}
+
 static void printSILDifferentiabilityWitnesses(
     SILPrintContext &Ctx,
     const SILModule::DifferentiabilityWitnessListType &diffWitnesses) {
@@ -4111,6 +4155,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTables());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
+  printSILDefaultOverrideTables(PrintCtx, getDefaultOverrideTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   printSILMoveOnlyDeinits(PrintCtx, getMoveOnlyDeinits());
@@ -4273,7 +4318,7 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
     out << "associated_conformance (";
     (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
     auto conformance = assocProtoWitness.Witness;
-    out << ": " << conformance.getRequirement()->getName() << "): ";
+    out << ": " << conformance.getProtocol()->getName() << "): ";
     if (conformance.isConcrete())
       conformance.getConcrete()->printName(out, options);
     else {
@@ -4325,7 +4370,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
     OS << "  conditional_conformance (";
     conditionalConformance.Requirement.print(OS, Options);
-    OS << ": " << conditionalConformance.Conformance.getRequirement()->getName()
+    OS << ": " << conditionalConformance.Conformance.getProtocol()->getName()
        << "): ";
     if (conditionalConformance.Conformance.isConcrete())
       conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
@@ -4364,6 +4409,49 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
+
+void SILDefaultOverrideTable::Entry::print(llvm::raw_ostream &out,
+                                           bool verbose) const {
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  out << "  ";
+  // #replacement.declref : #original.declref : @function
+  method.print(out);
+  out << ": ";
+  original.print(out);
+  out << ": ";
+
+  auto *decl = method.getDecl();
+  QualifiedSILTypeOptions.CurrentModule =
+      decl->getDeclContext()->getParentModule();
+  decl->getInterfaceType().print(out, QualifiedSILTypeOptions);
+  out << " : ";
+  impl->printName(out);
+  out << "\t// " << demangleSymbol(impl->getName());
+  out << '\n';
+}
+
+void SILDefaultOverrideTable::Entry::dump() const {
+  print(llvm::errs(), /*verbose=*/false);
+}
+
+void SILDefaultOverrideTable::print(llvm::raw_ostream &OS, bool Verbose) const {
+  // sil_default_override_table [<Linkage>] <Protocol> <MinSize>
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  OS << "sil_default_override_table ";
+  printLinkage(OS, getLinkage(), ForDefinition);
+  OS << decl->getName() << " {\n";
+
+  PrintOptions options = PrintOptions::printSIL();
+  options.GenericSig = decl->getGenericSignatureOfContext().getPointer();
+
+  for (auto &entry : getEntries()) {
+    entry.print(OS, Verbose);
+  }
+
+  OS << "}\n\n";
+}
+
+void SILDefaultOverrideTable::dump() const { print(llvm::errs()); }
 
 void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
                                         bool verbose) const {

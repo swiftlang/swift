@@ -465,9 +465,6 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
-// When a parameter has unspecified isolation, infer it as main actor isolated.
-EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
-
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
@@ -494,7 +491,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Be strict about the Sendable conformance of metatypes.
 EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
-
 /// Allow public enumerations to be extensible by default
 /// regardless of whether the module they are declared in
 /// is resilient or not.
@@ -503,14 +499,23 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
 
+/// Infer conformance isolation on global-actor-conforming types.
+EXPERIMENTAL_FEATURE(InferIsolatedConformances, true)
+
 /// Allow SwiftSettings
 EXPERIMENTAL_FEATURE(SwiftSettings, false)
 
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
+/// Enable syntax sugar type '[3 x Int]' for Inline Array
+EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
+
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
+
+/// Allow function body macros applied to closures.
+EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -488,6 +488,11 @@ BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
   return swift::SILType::getBuiltinIntegerType(bitWidth, ctxt);
 }
 
+bool BridgedPassContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return swift::calleesAreStaticallyKnowable(*mod, method.unbridged());
+}
+
 void BridgedPassContext::beginTransformFunction(BridgedFunction function) const {
   invocation->beginTransformFunction(function.getFunction());
 }
@@ -543,6 +548,11 @@ bool BridgedPassContext::enableStackProtection() const {
   return mod->getOptions().EnableStackProtection;
 }
 
+bool BridgedPassContext::enableMergeableTraps() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().MergeableTraps;
+}
+
 bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getASTContext().LangOpts.hasFeature((swift::Feature)feature);
@@ -566,6 +576,10 @@ BridgedPassContext::AssertConfiguration BridgedPassContext::getAssertConfigurati
 bool BridgedPassContext::shouldExpand(BridgedType ty) const {
   swift::SILModule &mod = *invocation->getPassManager()->getModule();
   return swift::shouldExpand(mod, ty.unbridged());
+}
+
+BridgedDeclObj BridgedPassContext::getCurrentModuleContext() const {
+  return {invocation->getPassManager()->getModule()->getSwiftModule()};
 }
 
 bool BridgedPassContext::enableWMORequiredDiagnostics() const {

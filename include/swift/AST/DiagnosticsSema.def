@@ -42,8 +42,6 @@ NOTE(opaque_return_type_declared_here,none,
      "opaque return type declared here", ())
 NOTE(default_value_declared_here,none,
      "default value declared here", ())
-NOTE(protocol_requirement_declared_here,none,
-     "requirement %0 declared here", (const ValueDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -321,7 +319,7 @@ ERROR(class_cannot_be_addressable_for_dependencies,none,
       "a class cannot be @_addressableForDependencies", ())
 
 ERROR(unsupported_closure_attr,none,
-      "%select{attribute |}0 '%1' is not supported on a closure",
+      "%select{attribute |}0'%1' is not supported on a closure",
       (bool, StringRef))
 
 NOTE(suggest_partial_overloads,none,
@@ -2151,7 +2149,7 @@ ERROR(attr_only_at_non_local_scope, none,
 ERROR(attr_only_at_non_generic_scope, none,
       "attribute '%0' cannot be used in a generic context", (StringRef))
 ERROR(attr_only_on_static_properties, none,
-      "properties with attribute '_section' must be static", (StringRef))
+      "properties with attribute '%0' must be static", (StringRef))
 
 ERROR(weak_unowned_in_embedded_swift, none,
       "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
@@ -2743,8 +2741,6 @@ WARNING(add_predates_concurrency_import,none,
 GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
                 DefaultIgnore,
                 "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
-NOTE(add_preconcurrency_to_conformance,none,
-     "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (Identifier))
@@ -4049,6 +4045,10 @@ ERROR(attr_incompatible_with_override,none,
 ERROR(attr_incompatible_with_objc,none,
       "'%0' must not be used on an '@objc' %1",
       (DeclAttribute, DescriptiveDeclKind))
+
+ERROR(attr_unusable_in_protocol,none,
+      "'%0' cannot be used inside a protocol declaration",
+      (DeclAttribute))
 
 ERROR(final_not_on_accessors,none,
       "only the %select{property|subscript}0 itself can be marked as 'final'"
@@ -5444,15 +5444,7 @@ ERROR(async_in_nonasync_function,none,
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (const ValueDecl *))
-NOTE(note_add_nonisolated_to_decl,none,
-     "add 'nonisolated' to %0 to make this %kindonly0 not isolated to the actor",
-     (const ValueDecl *))
-NOTE(note_add_async_and_throws_to_decl,none,
-     "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
-     "to allow actor-isolated conformances",
-     (const ValueDecl *, unsigned))
-NOTE(note_add_distributed_to_decl,none,
-     "add 'distributed' to %0 to make this %kindonly0 satisfy the protocol requirement",
+NOTE(note_non_distributed,none, "non-distributed %kind0",
      (const ValueDecl *))
 ERROR(invalid_isolated_calls_in_body,none,
      "calls to '@%0'-isolated' code in %kind1",
@@ -5684,6 +5676,11 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
+ERROR(conformance_missing_distributed,none,
+      "conformance of %0 to distributed %kind1 uses non-distributed operations",
+      (Type, const ValueDecl *))
+NOTE(note_add_distributed_multi,none,
+     "mark all declarations used in the conformance 'distributed'", ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -5702,16 +5699,26 @@ NOTE(shared_state_make_immutable,none,
      (const ValueDecl *))
 NOTE(shared_state_nonisolated_unsafe,none,
      "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
-ERROR(actor_isolated_witness,none,
-     "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 "
-     "requirement from protocol %base4",
-     (bool, ActorIsolation, const ValueDecl *, ActorIsolation,
-      const ValueDecl *))
+NOTE(note_actor_isolated_witness,none,
+     "%0 %kind1 cannot satisfy %2 requirement",
+     (ActorIsolation, const ValueDecl *, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
 NOTE(protocol_isolated_to_global_actor_here,none,
      "%0 is isolated to global actor %1 here", (Type, Type))
+ERROR(conformance_mismatched_isolation,none,
+      "conformance of %0 to %kind1 involves isolation mismatches "
+      "and can cause data races",
+      (Type, const ValueDecl *))
+ERROR(conformance_mismatched_isolation_common,none,
+      "conformance of %0 to %kind1 crosses into %2 code and can cause "
+      "data races", (Type, const ValueDecl *, ActorIsolation))
+NOTE(note_make_conformance_preconcurrency,none,
+     "turn data races into runtime errors with '@preconcurrency'",
+     ())
+NOTE(note_make_witnesses_nonisolated,none,
+     "mark all declarations used in the conformance 'nonisolated'", ())
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter type %0 does not conform to 'Actor' "
@@ -6066,7 +6073,7 @@ NOTE(note_recursive_enum_case_here,none,
 
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
-      "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
+      "%select{Array|Optional|InlineArray|Dictionary|"
       "Error}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
@@ -7840,6 +7847,9 @@ ERROR(conformance_macro,none,
 ERROR(experimental_macro,none,
       "macro %0 is experimental",
       (DeclName))
+ERROR(experimental_closure_body_macro,none,
+      "function body macros on closures is experimental",
+      ())
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",
@@ -8223,7 +8233,7 @@ NOTE(sending_function_result_with_sending_param_note, none,
      ())
 
 //------------------------------------------------------------------------------
-// MARK: Strict Safety Diagnostics
+// MARK: Strict Memory Safety Diagnostics
 //------------------------------------------------------------------------------
 NOTE(note_reference_to_unsafe_decl,none,
       "%select{reference|call}0 to unsafe %kind1",
@@ -8261,6 +8271,9 @@ NOTE(decl_storage_mark_unsafe,none,
 NOTE(decl_storage_mark_safe,none,
       "add '@safe' if this type encapsulates the unsafe storage in "
       "a safe interface", ())
+
+ERROR(safe_and_unsafe_attr,none,
+      "%kindbase0 cannot be both @safe and @unsafe", (const Decl *))
 
 GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
      "%kindbase0 has superclass involving unsafe type %1", 
@@ -8328,6 +8341,9 @@ ERROR(invalid_value_for_type_same_type,none,
 ERROR(inlinearray_literal_incorrect_count,none,
       "expected %0 elements in inline array literal, but got %1", (Type, Type))
 
+ERROR(inline_array_type_backwards,none,
+      "element count must precede inline array element type", ())
+
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
 //===----------------------------------------------------------------------===//
@@ -8338,16 +8354,16 @@ ERROR(attr_abi_mismatched_kind,none,
 
 ERROR(attr_abi_mismatched_arity,none,
       "cannot give %kind0 the ABI of a %kindonly0 with a different number of "
-      "low-level parameters",
-      (ValueDecl *))
+      "%select{|generic }1parameters",
+      (Decl *, /*genericParams=*/bool))
 
 ERROR(attr_abi_mismatched_throws,none,
       "cannot give %0 the ABI of a %kindonly0 which %select{cannot|can}1 throw",
-      (ValueDecl *, /*abiCanThrow=*/bool))
+      (Decl *, /*abiCanThrow=*/bool))
 
 ERROR(attr_abi_mismatched_async,none,
       "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
-      (ValueDecl *, /*abiIsAsync=*/bool))
+      (Decl *, /*abiIsAsync=*/bool))
 
 ERROR(attr_abi_mismatched_pbd_size,none,
       "cannot give pattern binding the ABI of a binding with "
@@ -8356,12 +8372,88 @@ ERROR(attr_abi_mismatched_pbd_size,none,
 
 ERROR(attr_abi_mismatched_var,none,
       "no match for %select{%kind0 in the ABI|ABI %kind0}1",
-      (ValueDecl *, /*isABI=*/bool))
+      (Decl *, /*isABI=*/bool))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
       "the same purpose",
       (DescriptiveDeclKind))
+
+ERROR(attr_abi_missing_attr,none,
+      "missing '%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool))
+ERROR(attr_abi_extra_attr,none,
+      "extra %select{|implicit }2'%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool, /*isImplicit=*/bool))
+ERROR(attr_abi_forbidden_attr,none,
+      "unused '%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool))
+REMARK(abi_attr_inferred_attribute,none,
+       "inferred '%0' in '@abi' to match %select{attribute|modifier}1 on API",
+       (StringRef, bool))
+
+ERROR(attr_abi_mismatched_attr,none,
+      "'%0' %select{attribute|modifier}1 in '@abi' should match '%2'",
+      (StringRef, bool, StringRef))
+NOTE(attr_abi_matching_attr_here,none,
+     "%select{should match|matches}0 %select{attribute|modifier}1 "
+     "%select{|implicitly added }2here",
+     (/*matches=*/bool, /*isModifier=*/bool, /*isImplicit=*/bool))
+
+#define TYPE_ORIGIN(KIND_IDX, DECL_IDX) "%select{|%kind" #DECL_IDX " |" \
+                            "self parameter |result |thrown |%error}" #KIND_IDX
+ERROR(attr_abi_mismatched_type,none,
+      TYPE_ORIGIN(0, 1) "type %2 in '@abi' should match %3",
+      (unsigned, Decl *, Type, Type))
+NOTE(attr_abi_should_match_type_here,none,
+     "should match type here", ())
+
+ERROR(attr_abi_mismatched_generic_signature,none,
+      "generic signature '%0' in '@abi' is not compatible with '%1'",
+      (StringRef, StringRef))
+ERROR(attr_abi_missing_generic_signature,none,
+      "declaration in '@abi' should have generic signature compatible with "
+      "'%0'",
+      (StringRef))
+ERROR(attr_abi_extra_generic_signature,none,
+      "declaration in '@abi' should not have generic signature because %0 "
+      "is not generic",
+      (Decl *))
+
+ERROR(attr_abi_mismatched_param_modifier,none,
+      "%select{default |}0%select{attribute|modifier}2 %select{|'%0' }0"
+      "on " TYPE_ORIGIN(3, 4) "in '@abi' is not compatible with "
+      "%select{default|'%1'}1",
+      (StringRef, StringRef, /*isModifier=*/bool, unsigned, Decl *))
+ERROR(attr_abi_no_default_arguments,none,
+      "%kind0 in '@abi' should not have a default argument; it does not "
+      "affect the parameter's ABI",
+      (Decl *))
+
+// These macros insert 'final', 'non-final', or nothing depending on both the
+// current decl and its counterpart, such that 'non-final' is used if the
+// counterpart would be described as 'final' or 'static'. They must be kept in
+// sync with `StaticnessAndFinality`.
+#define NONFINAL_OR_NOTHING(COUNTERPART) \
+      "%select{||non-final |non-final |non-final |%error}" #COUNTERPART
+#define FINAL_OR_NONFINAL_OR_NOTHING(CURRENT, COUNTERPART, FINAL_OK) \
+      "%select{|%select{" NONFINAL_OR_NOTHING(COUNTERPART) \
+                      "|" NONFINAL_OR_NOTHING(COUNTERPART) \
+                      "|final |final ||%error}" #CURRENT "}" #FINAL_OK
+
+ERROR(attr_abi_static_final_mismatch,none,
+      FINAL_OR_NONFINAL_OR_NOTHING(0, 2, 4) "%kind1 in '@abi' should be "
+      FINAL_OR_NONFINAL_OR_NOTHING(2, 0, 4) "%kindonly3 to ensure ABI "
+      "compatibility",
+      (uint8_t, Decl *, uint8_t, Decl *, /*isClass=*/bool))
+
+#undef NONFINAL_OR_NOTHING
+#undef FINAL_OR_NONFINAL_OR_NOTHING
+
+ERROR(attr_abi_failable_mismatch,none,
+      "cannot give %select{non-failable|failable}1 %kind0 the ABI of a "
+      "%select{non-failable|failable}2 %kindonly0",
+      (Decl *, bool, bool))
 
 //===----------------------------------------------------------------------===//
 // MARK: Isolated conformances
@@ -8369,21 +8461,21 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 ERROR(isolated_conformance_experimental_feature,none,
       "isolated conformances require experimental feature "
       " 'IsolatedConformances'", ())
+NOTE(note_isolate_conformance_to_global_actor,none,
+     "isolate this conformance to the %select{global actor %0|main actor}1 "
+     "with '@%2'", (Type, bool, StringRef))
+NOTE(note_depends_on_isolated_conformance,none,
+     "conformance depends on %0 conformance of %1 to %kind2",
+     (ActorIsolation, Type, const ValueDecl *))
 ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
       "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as '%5'",
       (Type, DeclName, ActorIsolation, Type, DeclName, StringRef))
-ERROR(isolated_conformance_mismatch_with_associated_isolation,none,
-      "%0 conformance of %1 to %2 cannot depend on %3 conformance of %4 to %5",
-      (ActorIsolation, Type, DeclName, ActorIsolation, Type, DeclName))
-NOTE(add_isolated_to_conformance,none,
-     "add '%0' to the %1 conformance to restrict it to %2 code",
-    (StringRef, DeclName, ActorIsolation))
 ERROR(isolated_conformance_with_sendable,none,
-      "%4 conformance of %0 to %1 cannot be used to satisfy conformance "
+      "%4 conformance of %0 to %1 cannot satisfy conformance "
       "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "
       "parameter %3", (Type, DeclName, bool, Type, ActorIsolation))
 ERROR(isolated_conformance_with_sendable_simple,none,
-      "%2 conformance of %0 to %1 cannot be used to satisfy "
+      "%2 conformance of %0 to %1 cannot satisfy "
       "conformance requirement for a `Sendable` type parameter ",
       (Type, DeclName, ActorIsolation))
 ERROR(isolated_conformance_wrong_domain,none,

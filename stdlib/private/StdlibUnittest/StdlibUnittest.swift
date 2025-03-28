@@ -2444,6 +2444,8 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case haikuAny(reason: String)
 
+  case wasiAny(reason: String)
+
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
 
@@ -2564,6 +2566,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .haikuAny(reason: let reason):
       return "haikuAny(*, reason: \(reason))"
+
+    case .wasiAny(reason: let reason):
+      return "wasiAny(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -2942,6 +2947,14 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .haikuAny:
       switch _getRunningOSVersion() {
       case .haiku:
+        return true
+      default:
+        return false
+      }
+
+    case .wasiAny:
+      switch _getRunningOSVersion() {
+      case .wasi:
         return true
       default:
         return false

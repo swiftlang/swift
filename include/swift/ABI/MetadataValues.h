@@ -313,6 +313,11 @@ enum class DynamicCastFlags : size_t {
   /// True if the cast should destroy the source value on failure;
   /// false if the value should be left in place.
   DestroyOnFailure = 0x4,
+
+  /// True if the cast should prohibit the use of any isolated conformances,
+  /// for example because there is a Sendable constraint on the existential
+  /// type we're casting to.
+  ProhibitIsolatedConformances = 0x8,
 };
 inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
   return (size_t(a) & size_t(b)) != 0;
@@ -1955,7 +1960,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
+    /// WARNING: 5 is the last bit!
+
     // Type-specific flags:
+
+    Class_HasDefaultOverrideTable = 6,
 
     /// Set if the class is an actor.
     ///
@@ -2062,6 +2071,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsActor,
                                 class_isActor,
                                 class_setIsActor)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
+                                class_hasDefaultOverrideTable,
+                                class_setHasDefaultOverrideTable)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,

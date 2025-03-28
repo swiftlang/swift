@@ -487,6 +487,9 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
    "Path to the directory that contains Swift tools that are executable on the build machine")
 
+set(SWIFT_WASI_SYSROOT_PATH "" CACHE PATH
+  "Path to the directory that contains WASI Sysroot")
+
 option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
@@ -1627,7 +1630,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
         DEPENDS PopulateRuntimeSourceDir
         CMAKE_ARGS
-          -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}
+          -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib
           # Compiler will see mismatched swift modules and fail initial checks
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DBUILD_SHARED_LIBS:BOOLEAN=YES # TODO: Make this configurable
@@ -1643,12 +1646,33 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-          -DSwiftCore_PLATFORM_SUBDIR=${SWIFT_SDK_${sdk}_LIB_SUBDIR}
-          -DSwiftCore_ARCH_SUBDIR=${arch}
+          -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=YES)
       if(NOT ${CMAKE_CROSSCOMPILING})
-        add_dependencies("${stdlib_target}" swift-frontend)
+        add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
+
+      ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
+
+      ExternalProject_Add("${stdlib_target}-StringProcessing"
+        SOURCE_DIR
+          "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental/StringProcessing"
+        DEPENDS "${stdlib_target}-core"
+        INSTALL_DIR "${INSTALL_DIR}"
+        INSTALL_COMMAND "" # No install story set up yet
+        CMAKE_ARGS
+          -DBUILD_SHARED_LIBS=YES
+          -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
+          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+          -DCMAKE_INSTALL_PREFIX:FILEPATH=${INSTALL_DIR}
+          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+          -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM})
     endforeach()
   endforeach()
 endif()

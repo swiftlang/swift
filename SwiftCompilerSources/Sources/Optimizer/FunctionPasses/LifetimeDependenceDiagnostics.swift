@@ -123,7 +123,7 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
-  let result = walker.walkDown(root: dependence.dependentValue)
+  let result = walker.walkDown(dependence: dependence)
   // The walk may abort without a diagnostic error.
   assert(!error || result == .abortWalk)
   return result == .continueWalk
@@ -354,7 +354,7 @@ private struct LifetimeVariable {
 }
 
 /// Walk up an address into which a dependent value has been stored. If any address in the use-def chain is a
-/// mark_dependence, follow the depenedence base rather than the forwarded value. If any of the dependence bases in
+/// mark_dependence, follow the dependence base rather than the forwarded value. If any of the dependence bases in
 /// within the current scope is with (either local checkInoutResult), then storing a value into that address is
 /// nonescaping.
 ///

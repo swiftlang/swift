@@ -2189,7 +2189,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getRequirement(), type, conformance);
+      conformance.getProtocol(), type, conformance);
 
   return emitApplyOfLibraryIntrinsic(loc, convertFn, subMap, value, C);
 }
@@ -4265,16 +4265,16 @@ static void lowerKeyPathMemberIndexTypes(
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
     auto subscriptSubstTy = subscript->getInterfaceType();
     auto sig = subscript->getGenericSignature();
-    if (sig) {
-      subscriptSubstTy = subscriptSubstTy.subst(memberSubs);
+    if (auto *subscriptGenericTy = subscriptSubstTy->getAs<GenericFunctionType>()) {
+      subscriptSubstTy = subscriptGenericTy->substGenericArgs(memberSubs);
     }
     needsGenericContext |= subscriptSubstTy->hasArchetype();
     processIndicesOrParameters(subscript->getIndices(), &sig);
   } else if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
     auto methodSubstTy = method->getInterfaceType();
     auto sig = method->getGenericSignature();
-    if (sig) {
-      methodSubstTy = methodSubstTy.subst(memberSubs);
+    if (auto *methodGenericTy = methodSubstTy->getAs<GenericFunctionType>()) {
+      methodSubstTy = methodGenericTy->substGenericArgs(memberSubs);
     }
     needsGenericContext |= methodSubstTy->hasArchetype();
     processIndicesOrParameters(method->getParameters(), &sig);
@@ -4834,12 +4834,11 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   }
 
   auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
-  auto loweredElementType = SGF.getLoweredType(elementType);
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
 
   SILValue alloc = SGF.emitTemporaryAllocation(E, loweredIAType);
   SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
-                                            loweredElementType.getAddressType());
+                                            eltTL.getLoweredType().getAddressType());
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;

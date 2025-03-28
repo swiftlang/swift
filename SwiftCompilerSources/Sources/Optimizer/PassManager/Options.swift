@@ -40,6 +40,10 @@ struct Options {
     _bridged.hasFeature(.Embedded)
   }
 
+  var enableMergeableTraps: Bool {
+    _bridged.enableMergeableTraps()
+  }
+
   func hasFeature(_ feature: BridgedFeature) -> Bool {
     _bridged.hasFeature(feature)
   }

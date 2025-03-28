@@ -31,6 +31,8 @@ int freeFunction(int x, int y);
 import CxxStdlib
 import CxxModule
 
+// CHECK-NOT: warning: 'import_owned' Swift attribute ignored on type
+
 // REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/std-{{.*}}.pcm.symbolicswiftinterface{{$}}
 // REMARK_NEW: remark: emitting symbolic interface at {{.*}}/interfaces/CxxModule-{{.*}}.pcm.symbolicswiftinterface{{$}}
 

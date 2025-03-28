@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -426,6 +427,19 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
     attr->setOriginalDeclaration(this);
   for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
     recordABIAttr(attr);
+
+  // @implementation requires an explicit @objc attribute, but
+  // @_objcImplementation didn't. Insert one if necessary.
+  auto implAttr = attrs.getAttribute<ObjCImplementationAttr>();
+  if (implAttr && isa<ExtensionDecl>(this) && implAttr->isEarlyAdopter() &&
+      !attrs.hasAttribute<ObjCAttr>()) {
+    ObjCAttr *objcAttr =
+        implAttr->CategoryName.empty()
+            ? ObjCAttr::createUnnamedImplicit(getASTContext())
+            : ObjCAttr::createNullary(getASTContext(), implAttr->CategoryName,
+                                      /*isNameImplicit=*/false);
+    attrs.add(objcAttr);
+  }
 
   getAttrs() = attrs;
 }
@@ -903,6 +917,10 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
   if (!clangModule)
     return nullptr;
 
+  // Swift groups all submodules of a Clang module together, and imports them as
+  // a single top-level module.
+  clangModule = clangModule->getTopLevelModule();
+
   return ctx.getClangModuleLoader()->getWrapperForModule(clangModule);
 }
 
@@ -1084,7 +1102,7 @@ StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
       if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
-        return OD->OriginalModuleName;
+        return OD->ManglingModuleName;
       }
     }
   }
@@ -1211,10 +1229,6 @@ ExplicitSafety Decl::getExplicitSafety() const {
       if (auto extSafety = getExplicitSafetyFromAttrs(ext))
         return *extSafety;
     }
-
-    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
-      if (auto nominalSafety = getExplicitSafetyFromAttrs(enclosingNominal))
-        return *nominalSafety;
   }
 
   // If an extension extends an unsafe nominal type, it's unsafe.
@@ -1224,11 +1238,12 @@ ExplicitSafety Decl::getExplicitSafety() const {
         return ExplicitSafety::Unsafe;
   }
 
-  // If this is a pattern binding declaration, check whether the first
-  // variable is @unsafe.
+  // If this is a pattern binding declaration, check whether there is a
+  // safety-related attribute on the first variable we find.
   if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
-    if (auto var = patternBinding->getSingleVar())
-      return var->getExplicitSafety();
+    for (auto index : range(patternBinding->getNumPatternEntries()))
+      if (auto var = patternBinding->getAnchoringVarDecl(index))
+        return var->getExplicitSafety();
   }
 
   return ExplicitSafety::Unspecified;
@@ -1277,6 +1292,10 @@ bool AbstractStorageDecl::isCompileTimeLiteral() const {
   return getAttrs().hasAttribute<CompileTimeLiteralAttr>();
 }
 
+bool AbstractStorageDecl::isConstVal() const {
+  return getAttrs().hasAttribute<ConstValAttr>();
+}
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }
@@ -1316,8 +1335,7 @@ bool Decl::hasUnderscoredNaming() const {
   // underscore, it's a private function or subscript.
   if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
     const auto VD = cast<ValueDecl>(D);
-    if (getParameterList(const_cast<ValueDecl *>(VD))
-            ->hasInternalParameter("_")) {
+    if (VD->getParameterList()->hasInternalParameter("_")) {
       return true;
     }
   }
@@ -4096,6 +4114,26 @@ ValueDecl::getCachedOpaqueResultTypeDecl() const {
       .getCachedResult();
 }
 
+ParameterList *ValueDecl::getParameterList() {
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(this)) {
+    return function->getParameters();
+  } else if (auto *enumElement = dyn_cast<EnumElementDecl>(this)) {
+    return enumElement->getParameterList();
+  } else if (auto *subscript = dyn_cast<SubscriptDecl>(this)) {
+    return subscript->getIndices();
+  } else if (auto *macro = dyn_cast<MacroDecl>(this)) {
+    return macro->parameterList;
+  }
+
+  return nullptr;
+}
+
+const ParameterList *ValueDecl::getParameterList() const {
+  return const_cast<ValueDecl *>(this)->getParameterList();
+}
+
+bool ValueDecl::hasParameterList() const { return (bool)getParameterList(); }
+
 bool ValueDecl::isObjC() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -4116,6 +4154,10 @@ void ValueDecl::setIsObjC(bool value) {
 }
 
 Identifier ExtensionDecl::getObjCCategoryName() const {
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getObjCCategoryName();
+
   // If there's an @objc attribute, it's authoritative. (ClangImporter
   // attaches one automatically.)
   if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid*/true)) {
@@ -4159,6 +4201,24 @@ bool ValueDecl::isDynamic() const {
   return evaluateOrDefault(ctx.evaluator,
     IsDynamicRequest{const_cast<ValueDecl *>(this)},
     getAttrs().hasAttribute<DynamicAttr>());
+}
+
+bool ValueDecl::isAsync() const {
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(this)) {
+    return function->hasAsync();
+  }
+
+  // Async storage declarations must be get-only. Don't consider it async
+  // otherwise, even if it has an async getter.
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(this)) {
+    if (storage->getAllAccessors().size() == 1) {
+      if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+        return getter->hasAsync();
+      }
+    }
+  }
+
+  return false;
 }
 
 bool ValueDecl::isObjCDynamicInGenericClass() const {
@@ -4351,6 +4411,10 @@ StringRef ValueDecl::getCDeclName() const {
       return clangDecl->getName();
   }
 
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getCDeclName();
+
   // Handle explicit cdecl attributes.
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
     return cdeclAttr->Name;
@@ -4387,6 +4451,18 @@ ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
   return std::nullopt;
 }
 
+std::optional<ObjCSelector>
+Decl::getExplicitObjCName(bool allowInvalid) const {
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getExplicitObjCName();
+
+  auto objcAttr = getAttrs().getAttribute<ObjCAttr>(allowInvalid);
+  if (objcAttr && !objcAttr->isNameImplicit())
+    return objcAttr->getName();
+  return std::nullopt;
+}
+
 bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   // Only makes sense for a requirement of an @objc protocol.
   auto proto = cast<ProtocolDecl>(requirement->getDeclContext());
@@ -4399,9 +4475,8 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 
   // If there is already an @objc attribute with an explicit name, we
   // can't infer a name (it's already there).
-  if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>()) {
-    if (objcAttr->hasName() && !objcAttr->isNameImplicit())
-      return false;
+  if (getExplicitObjCName().has_value()) {
+    return false;
   }
 
   // If the nominal type doesn't conform to the protocol at all, we
@@ -4641,6 +4716,11 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() < AccessLevel::Public);
+
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isUsableFromInline();
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
@@ -5076,6 +5156,10 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 static bool
 isObjCMemberImplementation(const ValueDecl *VD,
                            llvm::function_ref<AccessLevel()> getAccessLevel) {
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isObjCMemberImplementation(abiRole.getCounterpart(), getAccessLevel);
+
   if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
     if (ED->isObjCImplementation() && !isa<TypeDecl>(VD)) {
       auto attrDecl = isa<AccessorDecl>(VD)
@@ -5348,9 +5432,29 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 
   // Prefer module names earlier in the alphabet.
   if (dc1->isModuleScopeContext() && dc2->isModuleScopeContext()) {
-    auto module1 = dc1->getParentModule();
-    auto module2 = dc2->getParentModule();
-    if (int result = module1->getName().str().compare(module2->getName().str()))
+    // For protocol declarations specifically, the order here is part
+    // of the ABI, and so we must take care to get the correct module
+    // name for the comparison.
+    auto getModuleNameForOrder = [&](const TypeDecl *decl) -> StringRef {
+      // Respect @_originallyDefinedIn on the type itself, so that
+      // moving a protocol across modules does not change its
+      // position in the order.
+      auto alternateName = decl->getAlternateModuleName();
+      if (!alternateName.empty())
+        return alternateName;
+
+      // This used to just call getName(), which caused accidental ABI breaks
+      // when a module is imported under different aliases.
+      //
+      // Ideally, we would use getABIName() here. However, this would
+      // cause ABI breaks with the _Concurrency and CompilerSwiftSyntax
+      // builds, which already passed in a -module-abi-name but had
+      // existing symbols mangled with the wrong order.
+      auto *module = decl->getDeclContext()->getParentModule();
+      return module->getRealName().str();
+    };
+
+    if (int result = getModuleNameForOrder(type1).compare(getModuleNameForOrder(type2)))
       return result;
   }
 
@@ -6555,6 +6659,10 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
 StringRef ClassDecl::getObjCRuntimeName(
                        llvm::SmallVectorImpl<char> &buffer) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCRuntimeName(buffer);
+
   // If there is a Clang declaration, use it's runtime name.
   if (auto objcClass
         = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
@@ -7063,6 +7171,10 @@ ProtocolDecl::getPrimaryAssociatedTypes() const {
 
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCRuntimeName(buffer);
+
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName())
@@ -7535,6 +7647,10 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
 
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCGetterSelector(preferredName);
+
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getAccessor(AccessorKind::Get)) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
@@ -7565,6 +7681,10 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
 
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCSetterSelector(preferredName);
+
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getAccessor(AccessorKind::Set);
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
@@ -7816,14 +7936,19 @@ SourceRange VarDecl::getSourceRange() const {
   return getNameLoc();
 }
 
-SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
+SourceRange AbstractStorageDecl::getTypeSourceRangeForDiagnostics() const {
+  // Subscripts always have an explicitly-written type.
+  if (auto *SD = dyn_cast<SubscriptDecl>(this))
+    return SD->getElementTypeSourceRange();
+
   // For a parameter, map back to its parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
     if (auto typeRepr = PD->getTypeRepr())
       return typeRepr->getSourceRange();
   }
-  
-  Pattern *Pat = getParentPattern();
+
+  auto *VD = cast<VarDecl>(this);
+  Pattern *Pat = VD->getParentPattern();
   if (!Pat || Pat->isImplicit())
     return SourceRange();
 
@@ -8547,6 +8672,10 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCPropertyName();
+
   if (auto attr = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = attr->getName())
       return name->getSelectorPieces()[0];
@@ -9578,24 +9707,10 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-ParameterList *swift::getParameterList(ValueDecl *source) {
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
-    return AFD->getParameters();
-  } else if (auto *EED = dyn_cast<EnumElementDecl>(source)) {
-    return EED->getParameterList();
-  } else if (auto *SD = dyn_cast<SubscriptDecl>(source)) {
-    return SD->getIndices();
-  } else if (auto *MD = dyn_cast<MacroDecl>(source)) {
-    return MD->parameterList;
-  }
-
-  return nullptr;
-}
-
 ParameterList *swift::getParameterList(DeclContext *source) {
   if (auto *D = source->getAsDecl()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      return getParameterList(VD);
+      return VD->getParameterList();
     }
   } else if (auto *CE = dyn_cast<AbstractClosureExpr>(source)) {
     return CE->getParameters();
@@ -9607,7 +9722,7 @@ ParameterList *swift::getParameterList(DeclContext *source) {
 const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
                                        unsigned index) {
   auto *source = declRef.getDecl();
-  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+  if (auto *params = source->getParameterList()) {
     unsigned origIndex = params->getOrigParamIndex(declRef.getSubstitutions(),
                                                    index);
     return params->get(origIndex);
@@ -9617,7 +9732,7 @@ const ParamDecl *swift::getParameterAt(ConcreteDeclRef declRef,
 
 const ParamDecl *swift::getParameterAt(const ValueDecl *source,
                                        unsigned index) {
-  if (auto *params = getParameterList(const_cast<ValueDecl *>(source))) {
+  if (auto *params = source->getParameterList()) {
     return index < params->size() ? params->get(index) : nullptr;
   }
   return nullptr;
@@ -10165,6 +10280,11 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCSelector(preferredName,
+                                                      skipIsObjCResolution);
+
   // FIXME: Forces computation of the Objective-C selector.
   if (!skipIsObjCResolution)
     (void)isObjC();
@@ -10915,6 +11035,9 @@ AccessorDecl *AccessorDecl::createParsed(
 
       newParams.push_back(param);
     }
+
+    if (isa<SendingTypeRepr>(SD->getElementTypeRepr()))
+      accessor->setSendingResult();
   }
   accessor->setParameters(
       ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
@@ -11596,7 +11719,12 @@ bool ClassDecl::isNonDefaultExplicitDistributedActor(ModuleDecl *M,
 bool ClassDecl::isNativeNSObjectSubclass() const {
   // @objc actors implicitly inherit from NSObject.
   if (isActor()) {
-    if (getAttrs().hasAttribute<ObjCAttr>()) {
+    DeclAttributes attrs = getAttrs();
+    auto abiRole = ABIRoleInfo(this);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      attrs = abiRole.getCounterpart()->getAttrs();
+
+    if (attrs.hasAttribute<ObjCAttr>()) {
       return true;
     }
     ClassDecl *superclass = getSuperclassDecl();

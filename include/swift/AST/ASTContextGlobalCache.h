@@ -18,17 +18,71 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ActorIsolation.h"
+#include <variant>
 
 namespace swift {
 
+class NormalProtocolConformance;
+class ValueDecl;
+
+/// Describes an isolation error where the witness has actor isolation that
+/// conflicts with the requirement's expectation.
+struct WitnessIsolationError {
+  /// The requirement declaration.
+  ValueDecl *requirement;
+
+  /// The witness.
+  ValueDecl *witness;
+
+  /// The pre-Swift-6 diagnostic behavior.
+  DiagnosticBehavior behavior;
+
+  /// Whether the witness is missing "distributed".
+  bool isMissingDistributed;
+
+  /// The isolation of the requirement, mapped into the conformance.
+  ActorIsolation requirementIsolation;
+
+  /// The isolation domain that the witness would need to go into for it
+  /// to be suitable for the requirement.
+  ActorIsolation referenceIsolation;
+
+  /// Diagnose this witness isolation error.
+  void diagnose(const NormalProtocolConformance *conformance) const;
+};
+
+/// Describes an isolation error involving an associated conformance.
+struct AssociatedConformanceIsolationError {
+  ProtocolConformance *isolatedConformance;
+
+  /// Diagnose this associated conformance isolation error.
+  void diagnose(const NormalProtocolConformance *conformance) const;
+};
+
+/// Describes an isolation error that occurred during conformance checking.
+using ConformanceIsolationError = std::variant<
+    WitnessIsolationError, AssociatedConformanceIsolationError>;
+
 /// A collection of side tables associated with the ASTContext itself, meant
-// as
+/// as a way to keep sparse information out of the AST nodes themselves and
+/// not require one to touch ASTContext.h to add such information.
 struct ASTContext::GlobalCache {
   /// Mapping from normal protocol conformances to the explicitly-specified
   /// global actor isolations, e.g., when the conformance was spelled
   /// `@MainActor P` or similar.
   llvm::DenseMap<const NormalProtocolConformance *, TypeExpr *>
       conformanceExplicitGlobalActorIsolation;
+
+  /// Mapping from normal protocol conformances to the set of actor isolation
+  /// problems that occur within the conformances.
+  ///
+  /// This map will be empty for well-formed code, and is used to accumulate
+  /// information so that the diagnostics can be coalesced.
+  llvm::DenseMap<
+    const NormalProtocolConformance *,
+    std::vector<ConformanceIsolationError>
+  > conformanceIsolationErrors;
 };
 
 } // end namespace 

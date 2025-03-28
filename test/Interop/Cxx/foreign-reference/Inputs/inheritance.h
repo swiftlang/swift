@@ -71,6 +71,27 @@ DerivedOutOfOrder : public BaseT, public DerivedWithVirtualDestructor {
     }
 };
 
+struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")))
+BaseAlign8 {
+  long long field8 = 123;
+}; // sizeof=8, dsize=8, align=8
+
+struct DerivedHasTailPadding : public BaseAlign8 {
+  int field4 = 456;
+}; // sizeof=16, dsize=12, align=8
+
+struct DerivedUsesBaseTailPadding : public DerivedHasTailPadding {
+  short field2 = 789;
+
+  static DerivedUsesBaseTailPadding& getInstance() {
+    static DerivedUsesBaseTailPadding singleton;
+    return singleton;
+  }
+}; // sizeof=16, dsize=14, align=8
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace ImmortalRefereceExample {

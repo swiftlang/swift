@@ -250,8 +250,6 @@ if(NOT LINUX AND NOT ANDROID)
   target_sources(swiftCore PRIVATE ObjectIdentifier+DebugDescription.swift)
 endif()
 
-set_target_properties(swiftCore PROPERTIES Swift_MODULE_NAME Swift)
-
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
   target_sources(swiftCore PRIVATE CommandLine.swift)
   target_link_libraries(swiftCore PRIVATE swiftCommandLineSupport)
@@ -271,27 +269,9 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
     "${CMAKE_CURRENT_BINARY_DIR}/SIMDVectorTypes.swift")
 endif()
 
-if(APPLE AND BUILD_SHARED_LIBS)
-  target_link_options(swiftCore PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
-endif()
-
-target_compile_options(swiftCore PRIVATE
-  # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
-  # see also 327ea8bce2d1107a847d444651b19ca6a2901c9e
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
-  $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
-  $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
-  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
-
-if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
-  # Using these in MinSizeRel would result in a 15% increase in the binary size
-  target_compile_options(swiftCore PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
-endif()
+set_target_properties(swiftCore PROPERTIES
+  Swift_MODULE_NAME Swift
+  LINKER_LANGUAGE CXX)
 
 target_compile_definitions(swiftCore
   PRIVATE
@@ -300,8 +280,30 @@ target_compile_definitions(swiftCore
     $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>
   INTERFACE
     $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>)
+
 target_compile_options(swiftCore PRIVATE
-  "$<$<AND:$<BOOL:${BUILD_SHARED_LIBS}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DswiftCore_EXPORTS>")
+  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${BUILD_SHARED_LIBS}>>:SHELL:-Xcc -DswiftCore_EXPORTS>"
+  # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+  # see also 327ea8bce2d1107a847d444651b19ca6a2901c9e
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
+  $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
+  $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
+  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  # Using these in MinSizeRel would result in a 15% increase in the binary size
+  target_compile_options(swiftCore PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+endif()
+
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftCore INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
 target_link_libraries(swiftCore
   PRIVATE
@@ -313,8 +315,24 @@ target_link_libraries(swiftCore
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
   PUBLIC
     swiftShims)
-target_link_options(swiftCore PRIVATE
-  -nostartfiles)
+
+string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
+if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
+  target_link_libraries(swiftCore INTERFACE
+    swiftrt)
+elseif("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "coff")
+  if(BUILD_SHARED_LIBS)
+    target_link_libraries(swiftCore INTERFACE
+      swiftrt)
+  else()
+    target_link_libraries(swiftCore INTERFACE
+      swiftrtT)
+  endif()
+endif()
+
+target_link_options(swiftCore PUBLIC
+  $<$<LINK_LANGUAGE:Swift>:-nostartfiles>)
+
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
     $<TARGET_OBJECTS:swiftRuntime>
@@ -327,6 +345,10 @@ endif()
 if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
   find_library(EXECINFO_LIBRARY execinfo)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
+endif()
+
+if(APPLE AND BUILD_SHARED_LIBS)
+  target_link_options(swiftCore PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
 endif()
 
 install(TARGETS swiftCore

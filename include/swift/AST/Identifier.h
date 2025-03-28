@@ -385,7 +385,11 @@ public:
   }
 
   int compare(DeclBaseName other) const {
-    return userFacingName().compare(other.userFacingName());
+    if (int result = userFacingName().compare(other.userFacingName()))
+      return result;
+    if (getKind() == other.getKind())
+      return 0;
+    return getKind() < other.getKind() ? -1 : 1;
   }
 
   bool operator==(StringRef Str) const {

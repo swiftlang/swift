@@ -1174,7 +1174,11 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const char *swift_keyPath_copySymbolName(void *address) {
   if (auto info = SymbolInfo::lookup(address)) {
     if (info->getSymbolName()) {
+#if defined(_WIN32)
+      return _strdup(info->getSymbolName());
+#else
       return strdup(info->getSymbolName());
+#endif
     }
   }
   return nullptr;
@@ -1192,9 +1196,12 @@ SWIFT_RUNTIME_STDLIB_INTERNAL const
   std::string mangledName = keyPathSourceString(name, length);
   if (mangledName == "") {
     return 0;
-  } else {
-    return strdup(mangledName.c_str());
   }
+#if defined(_WIN32)
+  return _strdup(mangledName.c_str());
+#else
+  return strdup(mangledName.c_str());
+#endif
 }
 
 #endif  // SWIFT_ENABLE_REFLECTION

@@ -13,6 +13,10 @@ func testDictionary() {
 func testString() throws {
   // Optional
   let stringOpt = NSString(path: "blah", encoding: 0)
+  // expected-note@-1 {{short-circuit using 'guard' to exit this function early if the optional value contains 'nil'}}
+  // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
   _ = stringOpt as NSString // expected-error{{value of optional type 'NSString?' must be unwrapped to a value of type 'NSString'}}
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}

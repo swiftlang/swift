@@ -96,6 +96,11 @@ namespace swift {
     TaskToThread,
   };
 
+  enum class DefaultIsolation : uint8_t {
+    MainActor,
+    Nonisolated
+  };
+
   /// Describes the code size optimization behavior for code associated with
   /// declarations that are marked unavailable.
   enum class UnavailableDeclOptimization : uint8_t {
@@ -263,6 +268,9 @@ namespace swift {
 
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
+
+    /// Emit a remark when \c \@abi infers an attribute or modifier.
+    bool EnableABIInferenceRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -631,6 +639,9 @@ namespace swift {
 
     /// Disables `DynamicActorIsolation` feature.
     bool DisableDynamicActorIsolation = false;
+
+    /// Defines the default actor isolation.
+    DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
     /// Whether or not to allow experimental features that are only available
     /// in "production".

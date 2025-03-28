@@ -648,8 +648,8 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   if ((isa<AbstractFunctionDecl>(derivedDecl) &&
        isa<AbstractFunctionDecl>(baseDecl)) ||
       isa<SubscriptDecl>(baseDecl)) {
-    derivedParams = getParameterList(const_cast<ValueDecl *>(derivedDecl));
-    baseParams = getParameterList(const_cast<ValueDecl *>(baseDecl));
+    derivedParams = derivedDecl->getParameterList();
+    baseParams = baseDecl->getParameterList();
   }
 
   if (!derivedParams && !baseParams) {
@@ -1726,6 +1726,7 @@ namespace  {
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeLiteral)
     UNINTERESTING_ATTR(ConstVal)
+    UNINTERESTING_ATTR(ConstInitialized)
 
     UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
@@ -2097,7 +2098,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
       overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
       !override->isImplicit() &&
-      override->getDeclContext()->getParentSourceFile()) {
+      override->getDeclContext()->getParentSourceFile() &&
+      ABIRoleInfo(override).providesAPI()) {
     auto theDiag =
       overrideRequiresKeyword(base) == OverrideRequiresKeyword::Always
         ? diag::missing_override
@@ -2512,6 +2514,19 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
 
 llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    auto apiOverriddenDecls = abiRole.getCounterpart()->getOverriddenDecls();
+
+    TinyPtrVector<ValueDecl *> abiOverriddenDecls;
+    for (auto apiOverriddenDecl : apiOverriddenDecls) {
+      auto abiOverriddenDecl = ABIRoleInfo(apiOverriddenDecl).getCounterpart();
+      abiOverriddenDecls.push_back(abiOverriddenDecl);
+    }
+
+    return abiOverriddenDecls;
+  }
+
   auto &ctx = decl->getASTContext();
   auto overridden = computeOverriddenDecls(decl, false);
 

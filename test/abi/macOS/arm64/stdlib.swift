@@ -794,13 +794,13 @@ Added: _$sSS5IndexVs28CustomDebugStringConvertiblesWP
 // SE-0447 Span and RawSpan
 Added: _$ss4SpanVMa
 Added: _$ss4SpanVMn
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE5countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE7indicesSnySiGvpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE7isEmptySbvpMV
+Added: _$ss4SpanVsRi_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zrlE6_countSivpMV
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvg
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvpMV
+Added: _$ss4SpanVsRi_zrlE5countSivpMV
+Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
+Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV
 Added: _$ss7RawSpanV11byteOffsetsSnySiGvpMV
@@ -813,6 +813,18 @@ Added: _$ss7RawSpanV9byteCountSivpMV
 Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
+
+// Span-providing properties
+Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSW5bytess7RawSpanVvpMV
+Added: _$sSa4spans4SpanVyxGvpMV
+Added: _$sSrsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSw5bytess7RawSpanVvpMV
+Added: _$ss10ArraySliceV4spans4SpanVyxGvpMV
+Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
+Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
+Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
@@ -930,6 +942,10 @@ Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
 Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
 Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
 Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
+
+// CoroutineAccessors
+Added: _swift_coro_alloc
+Added: _swift_coro_dealloc
 
 // Shared string creation for Foundation, again
 Added: _$ss53_SwiftCreateNonTerminatedImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF

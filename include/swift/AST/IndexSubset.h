@@ -197,6 +197,7 @@ public:
 
   bool isSubsetOf(IndexSubset *other) const;
   bool isSupersetOf(IndexSubset *other) const;
+  bool isDisjointWith(IndexSubset *other) const;
 
   IndexSubset *adding(unsigned index, ASTContext &ctx) const;
   IndexSubset *extendingCapacity(ASTContext &ctx,

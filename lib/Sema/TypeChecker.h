@@ -135,8 +135,8 @@ enum class TypeCheckExprFlags {
   /// Don't expand macros.
   DisableMacroExpansions = 0x04,
 
-  /// If set, typeCheckExpression will avoid invalidating the AST if
-  /// type-checking fails. Do not add new uses of this.
+  /// If set, typeCheckExpression will avoid pre-checking and invalidating
+  /// the AST if type-checking fails. Do not add new uses of this.
   AvoidInvalidatingAST = 0x08,
 };
 
@@ -244,7 +244,7 @@ public:
     SmallVector<ParentConditionalConformance, 2> ReqPath;
 
     /// The isolated conformances that caused the requirement failure.
-    llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances = {};
+    llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances = {};
 
     /// The protocol (Sendable or SendableMetatype) to which the type
     /// parameter conforms, causing a conflict with the isolated conformances
@@ -282,7 +282,7 @@ public:
 
   static CheckGenericArgumentsResult createIsolatedConformanceFailure(
       Requirement Req, Requirement SubstReq,
-      llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances,
+      llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances,
       ProtocolDecl *IsolatedConformanceProto) {
     return CheckGenericArgumentsResult(
         CheckRequirementsResult::RequirementFailure,
@@ -506,6 +506,7 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
+void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
 

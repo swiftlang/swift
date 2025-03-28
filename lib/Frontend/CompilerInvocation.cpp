@@ -1422,6 +1422,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
 
+  Opts.EnableABIInferenceRemarks = Args.hasArg(OPT_remark_abi_inference);
+
   if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
     // Only allow -experimental-skip-non-exportable-decls if either library
     // evolution is enabled (in which case the module's ABI is independent of
@@ -1813,6 +1815,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableDynamicActorIsolation |=
       Args.hasArg(OPT_disable_dynamic_actor_isolation);
+
+  if (const Arg *A = Args.getLastArg(options::OPT_default_isolation)) {
+    auto behavior =
+        llvm::StringSwitch<std::optional<DefaultIsolation>>(A->getValue())
+            .Case("MainActor", DefaultIsolation::MainActor)
+            .Case("nonisolated", DefaultIsolation::Nonisolated)
+            .Default(std::nullopt);
+
+    if (behavior) {
+      Opts.DefaultIsolationBehavior = *behavior;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    }
+  } else {
+    Opts.DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
+  }
+
+  if (Opts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    Opts.enableFeature(Feature::InferIsolatedConformances);
 
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -3106,8 +3129,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-  
-  Opts.EnableAddressDependencies = Args.hasArg(OPT_enable_address_dependencies);
+  Opts.EnableAddressDependencies = Args.hasFlag(
+      OPT_enable_address_dependencies, OPT_disable_address_dependencies,
+      Opts.EnableAddressDependencies);
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   return false;
 }
@@ -3764,12 +3789,19 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableLayoutStringValueWitnessesInstantiation = Args.hasFlag(OPT_enable_layout_string_value_witnesses_instantiation,
                                       OPT_disable_layout_string_value_witnesses_instantiation,
                                       Opts.EnableLayoutStringValueWitnessesInstantiation);
+  Opts.AnnotateCondFailMessage =
+      Args.hasFlag(OPT_enable_cond_fail_message_annotation,
+                   OPT_disable_cond_fail_message_annotation,
+                   Opts.AnnotateCondFailMessage);
+
 
   if (Opts.EnableLayoutStringValueWitnessesInstantiation &&
       !Opts.EnableLayoutStringValueWitnesses) {
     Diags.diagnose(SourceLoc(), diag::layout_string_instantiation_without_layout_strings);
     return true;
   }
+
+  Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,

@@ -157,8 +157,7 @@ public typealias CBool = Bool
 @frozen
 @unsafe
 public struct OpaquePointer {
-  @unsafe @usableFromInline
-  @safe
+  @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
   @usableFromInline @_transparent

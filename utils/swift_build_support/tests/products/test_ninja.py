@@ -70,8 +70,7 @@ class NinjaTestCase(unittest.TestCase):
         ninja_build = Ninja.new_builder(
             args=self.args,
             toolchain=self.toolchain,
-            workspace=self.workspace,
-            host=self.host)
+            workspace=self.workspace)
 
         self.assertEqual(ninja_build.ninja_bin_path,
                          os.path.join(
@@ -82,8 +81,7 @@ class NinjaTestCase(unittest.TestCase):
         ninja_build = Ninja.new_builder(
             args=self.args,
             toolchain=self.toolchain,
-            workspace=self.workspace,
-            host=self.host)
+            workspace=self.workspace)
 
         ninja_build.build()
 
