@@ -8467,9 +8467,6 @@ NOTE(note_isolate_conformance_to_global_actor,none,
 NOTE(note_depends_on_isolated_conformance,none,
      "conformance depends on %0 conformance of %1 to %kind2",
      (ActorIsolation, Type, const ValueDecl *))
-ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
-      "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as '%5'",
-      (Type, DeclName, ActorIsolation, Type, DeclName, StringRef))
 ERROR(isolated_conformance_with_sendable,none,
       "%4 conformance of %0 to %1 cannot satisfy conformance "
       "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "
