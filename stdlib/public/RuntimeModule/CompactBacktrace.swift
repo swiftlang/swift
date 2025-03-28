@@ -16,7 +16,8 @@
 
 import Swift
 
-enum CompactBacktraceFormat {
+@_spi(CompactBacktraceFormat)
+public enum CompactBacktraceFormat {
   /// Tells us what size of machine words were used when generating the
   /// backtrace.
   enum WordSize: UInt8 {
@@ -205,14 +206,14 @@ enum CompactBacktraceFormat {
 
   /// Adapts a Sequence containing Compact Backtrace Format data into a
   /// Sequence of `Backtrace.Frame`s.
-  struct Decoder<S: Sequence<UInt8>>: Sequence {
-    typealias Frame = Backtrace.Frame
+  public struct Decoder<S: Sequence<UInt8>>: Sequence {
+    public typealias Element = Backtrace.Frame
     typealias Address = Backtrace.Address
     typealias Storage = S
 
     private var storage: Storage
 
-    init(_ storage: S) {
+    public init(_ storage: S) {
       self.storage = storage
     }
 
@@ -231,7 +232,7 @@ enum CompactBacktraceFormat {
       return Iterator(iterator, size)
     }
 
-    struct Iterator: IteratorProtocol {
+    public struct Iterator: IteratorProtocol {
       var iterator: Storage.Iterator?
       let wordSize: WordSize
       let wordMask: UInt64
@@ -396,8 +397,10 @@ enum CompactBacktraceFormat {
 
   /// Adapts a Sequence of RichFrames into a sequence containing Compact
   /// Backtrace Format data.
-  struct Encoder<A: FixedWidthInteger, S: Sequence<RichFrame<A>>>: Sequence {
-    typealias Element = UInt8
+  public struct Encoder<
+    A: FixedWidthInteger, S: Sequence<RichFrame<A>>
+  >: Sequence {
+    public typealias Element = UInt8
     typealias Frame = Backtrace.Frame
     typealias SourceFrame = RichFrame<A>
     typealias Address = A
@@ -405,7 +408,7 @@ enum CompactBacktraceFormat {
 
     private var source: Source
 
-    init(_ source: Source) {
+    public init(_ source: S) {
       self.source = source
     }
 
@@ -413,7 +416,7 @@ enum CompactBacktraceFormat {
       return Iterator(source.makeIterator())
     }
 
-    struct Iterator: IteratorProtocol {
+    public struct Iterator: IteratorProtocol {
       var iterator: Source.Iterator
       var lastAddress: Address = 0
 
@@ -577,7 +580,7 @@ enum CompactBacktraceFormat {
             // Grab a rich frame and encode it
             guard let frame = iterator.next() else {
               state = .done
-              return nil
+              return Instruction.end.rawValue
             }
 
             if let lastFrame, lastFrame == frame {
