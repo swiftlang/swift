@@ -49,7 +49,7 @@ extension ConformsToMultiP: MultiP {
   // expected-note@-1{{unsafe type 'UnsafeSuper' cannot satisfy safe associated type 'Ptr'}}
   @unsafe func f() -> UnsafeSuper {
     .init() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-    // expected-note@-1{{reference to unsafe initializer 'init()'}}
+    // expected-note@-1{{reference to initializer 'init()' involves unsafe type 'UnsafeSuper'}}
   }
 }
 
@@ -156,7 +156,7 @@ func testMe(
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   _ = unsafeVar // expected-note{{reference to unsafe var 'unsafeVar'}}
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
-  unsafeSuper.f() // expected-note{{reference to unsafe instance method 'f()'}}
+  unsafeSuper.f() // expected-note{{reference to instance method 'f()' involves unsafe type 'UnsafeSuper'}}
   // expected-note@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}

@@ -1680,6 +1680,11 @@ void PreCheckTarget::markAnyValidSingleValueStmts(Expr *E) {
       while (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(E))
         E = IIO->getSubExpr();
     }
+
+    // Look through "unsafe" expressions.
+    if (auto UE = dyn_cast<UnsafeExpr>(E))
+      E = UE->getSubExpr();
+
     return dyn_cast<AssignExpr>(E);
   };
 

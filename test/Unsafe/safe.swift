@@ -241,3 +241,33 @@ func testMyArray(ints: MyArray<Int>) {
     unsafe print(buffer.unsafeCount)
   }
 }
+
+func testUnsafeLHS() {
+  @unsafe var value: Int = 0
+  unsafe value = switch unsafe value {
+  case 0: 1
+  default: 0
+  }
+}
+
+@safe
+struct UnsafeWrapTest {
+  var pointer: UnsafeMutablePointer<Int>?
+
+  func test() {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to property 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>'}}
+      _ = unsafe pointer
+    }
+  }
+
+  func otherTest(pointer: UnsafeMutablePointer<Int>?) {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>}}
+      _ = unsafe pointer
+    }
+  }
+}
+
+@safe @unsafe
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}

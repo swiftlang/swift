@@ -668,7 +668,10 @@ public:
       recurse = asImpl().checkThrow(thr);
     } else if (auto forEach = dyn_cast<ForEachStmt>(S)) {
       recurse = asImpl().checkForEach(forEach);
+    } else if (auto labeled = dyn_cast<LabeledConditionalStmt>(S)) {
+      asImpl().noteLabeledConditionalStmt(labeled);
     }
+
     if (!recurse)
       return Action::SkipNode(S);
 
@@ -690,6 +693,8 @@ public:
   }
 
   void visitExprPre(Expr *expr) { asImpl().visitExprPre(expr); }
+
+  void noteLabeledConditionalStmt(LabeledConditionalStmt *stmt) { }
 };
 
 /// A potential reason why something might have an effect.
@@ -3420,6 +3425,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// passed directly into an explicitly `@safe` function.
   llvm::DenseSet<const Expr *> assumedSafeArguments;
 
+  /// Keeps track of the expressions that were synthesized as initializers for
+  /// the "if let x" shorthand syntax.
+  llvm::SmallPtrSet<const Expr *, 4> synthesizedIfLetInitializers;
+
   /// Tracks all of the uncovered uses of unsafe constructs based on their
   /// anchor expression, so we can emit diagnostics at the end.
   llvm::MapVector<Expr *, std::vector<UnsafeUse>> uncoveredUnsafeUses;
@@ -4429,7 +4438,67 @@ private:
     Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
       .fixItRemove(E->getUnsafeLoc());
   }
-  
+
+  void noteLabeledConditionalStmt(LabeledConditionalStmt *stmt) {
+    // Make a note of any initializers that are the synthesized right-hand side
+    // for an "if let x".
+    for (const auto &condition: stmt->getCond()) {
+      switch (condition.getKind()) {
+      case StmtConditionElement::CK_Availability:
+      case StmtConditionElement::CK_Boolean:
+      case StmtConditionElement::CK_HasSymbol:
+        continue;
+
+      case StmtConditionElement::CK_PatternBinding:
+        break;
+      }
+
+      auto init = condition.getInitializer();
+      if (!init)
+        continue;
+
+      auto pattern = condition.getPattern();
+      if (!pattern)
+        continue;
+
+      auto optPattern = dyn_cast<OptionalSomePattern>(pattern);
+      if (!optPattern)
+        continue;
+
+      auto var = optPattern->getSubPattern()->getSingleVar();
+      if (!var)
+        continue;
+
+      // If the right-hand side has the same location as the variable, it was
+      // synthesized.
+      if (var->getLoc().isValid() &&
+          var->getLoc() == init->getStartLoc() &&
+          init->getStartLoc() == init->getEndLoc())
+        synthesizedIfLetInitializers.insert(init);
+    }
+  }
+
+  /// Determine whether this is the synthesized right-hand-side when we have
+  /// expanded an "if let x" into its semantic equivalent, "if let x = x".
+  VarDecl *isShorthandIfLetSyntax(const Expr *expr) const {
+    // Check whether this is referencing a variable.
+    VarDecl *var = nullptr;
+    if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+      var = dyn_cast_or_null<VarDecl>(declRef->getDecl());
+    } else if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+      var = dyn_cast_or_null<VarDecl>(memberRef->getMember().getDecl());
+    }
+
+    if (!var)
+      return nullptr;
+
+    // If we identified this as one of the bindings, return the variable.
+    if (synthesizedIfLetInitializers.contains(expr))
+      return var;
+
+    return nullptr;
+  }
+
   std::pair<SourceLoc, std::string>
   getFixItForUncoveredSite(const Expr *anchor, StringRef keyword) const {
     SourceLoc insertLoc = anchor->getStartLoc();
@@ -4442,13 +4511,10 @@ private:
         insertLoc = tryExpr->getSubExpr()->getStartLoc();
       // Supply a tailored fixIt including the identifier if we are
       // looking at a shorthand optional binding.
-    } else if (anchor->isImplicit()) {
-      if (auto declRef = dyn_cast<DeclRefExpr>(anchor))
-        if (auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl())) {
-          insertText = (" = " + keyword).str() + " " + var->getNameStr().str();
-          insertLoc = Lexer::getLocForEndOfToken(Ctx.Diags.SourceMgr,
-                                                 anchor->getStartLoc());
-        }
+    } else if (auto var = isShorthandIfLetSyntax(anchor)) {
+      insertText = (" = " + keyword).str() + " " + var->getNameStr().str();
+      insertLoc = Lexer::getLocForEndOfToken(Ctx.Diags.SourceMgr,
+                                             anchor->getStartLoc());
     }
     return std::make_pair(insertLoc, insertText);
   }
