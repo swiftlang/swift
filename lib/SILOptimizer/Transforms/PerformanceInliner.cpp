@@ -456,6 +456,33 @@ bool isProfitableToInlineAutodiffVJP(SILFunction *vjp, SILFunction *caller,
   return true;
 }
 
+static bool isConstantValue(SILValue v, ValueSet &visited) {
+  if (!visited.insert(v))
+    return true;
+
+  if (isa<LiteralInst>(v))
+    return true;
+  if (auto *s = dyn_cast<StructInst>(v)) {
+    for (Operand &op : s->getAllOperands()) {
+      if (!isConstantValue(op.get(), visited))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+static bool hasConstantArguments(FullApplySite fas) {
+  ValueSet visited(fas.getFunction());
+  for (Operand &op : fas.getArgumentOperands()) {
+    if (!fas.isIndirectResultOperand(op)) {
+      if (!isConstantValue(op.get(), visited))
+        return false;
+    }
+  }
+  return true;
+}
+
 bool SILPerformanceInliner::isProfitableToInline(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
@@ -521,6 +548,11 @@ bool SILPerformanceInliner::isProfitableToInline(
     LLVM_DEBUG(dumpCaller(AI.getFunction());
                llvm::dbgs() << "    pure-call decision " << Callee->getName()
                             << '\n');
+    return true;
+  }
+
+  if (Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_INLINE_CONSTANT_ARGUMENTS) &&
+      hasConstantArguments(AI)) {
     return true;
   }
 
