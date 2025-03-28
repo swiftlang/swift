@@ -10,5 +10,6 @@ set_target_properties(swiftRegexBuilder PROPERTIES
   Swift_MODULE_NAME RegexBuilder)
 
 target_link_libraries(swiftRegexBuilder PRIVATE
+  swift_RegexParser
   swift_StringProcessing
   swiftCore)

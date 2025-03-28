@@ -28,7 +28,7 @@
 // CHECK-SAME:       free
 // CHECK-SAME:  }
 
-// CHECK-LABEL: @__swift_coro_alloc_(
+// CHECK-LABEL: @_swift_coro_alloc(
 // CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
 // CHECK-SAME:      i64 [[SIZE:%[^)]+]]
 // CHECK-SAME:  )
@@ -36,21 +36,23 @@
 // CHECK:       entry:
 // CHECK:         [[USE_POPLESS:%[^,]+]] = icmp eq ptr [[ALLOCATOR]], null
 // CHECK:         br i1 [[USE_POPLESS]],
-// CHECK-SAME:        label %coro.return.popless
-// CHECK-SAME:        label %coro.return.normal
-// CHECK:       coro.return.popless:
+// CHECK-SAME:        label %popless
+// CHECK-SAME:        label %normal
+// CHECK:       popless:
 // CHECK:         [[STACK_ALLOCATION:%[^,]+]] = alloca i8, i64 [[SIZE]]
 // CHECK:         musttail call void @llvm.ret.popless()
 // CHECK:         ret ptr [[STACK_ALLOCATION]]
-// CHECK:       coro.return.normal:
-// CHECK:         [[OTHER_ALLOCATION:%[^,]+]] = call swiftcc ptr @swift_coro_alloc(
+// CHECK:       normal:
+// CHECK:         [[ALLOCATE_FN_PTR:%[^,]+]] = getelementptr inbounds %swift.coro_allocator
 // CHECK-SAME:        ptr [[ALLOCATOR]]
-// CHECK-SAME:        i64 [[SIZE]]
-// CHECK-SAME:    )
-// CHECK:         ret ptr [[OTHER_ALLOCATION]]
+// CHECK-SAME:        i32 0
+// CHECK-SAME:        i32 1
+// CHECK:         [[ALLOCATE_FN:%[^,]+]] = load ptr, ptr [[ALLOCATE_FN_PTR]]
+// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](i64 [[SIZE]])
+// CHECK:         ret ptr [[ALLOCATION]]
 // CHECK:       }
 
-// CHECK-LABEL: @__swift_coro_dealloc_(
+// CHECK-LABEL: @_swift_coro_dealloc(
 // CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
 // CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
 // CHECK-SAME:  )
@@ -58,15 +60,30 @@
 // CHECK:       entry:
 // CHECK:         [[BAIL:%[^,]+]] = icmp eq ptr [[ALLOCATOR]], null
 // CHECK:         br i1 [[USE_POPLESS]],
-// CHECK-SAME:        label %bail
-// CHECK-SAME:        label %forward
-// CHECK:       bail:
+// CHECK-SAME:        label %null_allocator
+// CHECK-SAME:        label %nonnull_allocator
+// CHECK:       null_allocator:
 // CHECK:         ret void
-// CHECK:       forward:
-// CHECK:         call swiftcc void @swift_coro_dealloc(
+// CHECK:       nonnull_allocator:
+// CHECK:         [[FLAGS_ADDR:%[^,]+]] = getelementptr inbounds %swift.coro_allocator
 // CHECK-SAME:        ptr [[ALLOCATOR]]
-// CHECK-SAME:        ptr [[ADDRESS]]
-// CHECK-SAME:    )
+// CHECK-SAME:        i32 0
+// CHECK-SAME:        i32 0
+// CHECK:         [[FLAGS:%[^,]+]] = load i32, ptr [[FLAGS_ADDR]], align 4
+// CHECK:         [[DEALLOC_DEFERRING_ALLOCATOR:%[^,]+]] = and i32 [[FLAGS]], 256
+// CHECK:         [[IS_DEALLOC_DEFERRING_ALLOCATOR:%[^,]+]] = icmp ne i32 [[DEALLOC_DEFERRING_ALLOCATOR]], 0
+// CHECK:         br i1 [[IS_DEALLOC_DEFERRING_ALLOCATOR]]
+// CHECK-SAME:        label %deferring_allocator
+// CHECK-SAME:        label %normal
+// CHECK:         deferring_allocator:
+// CHECK:           ret void
+// CHECK:         normal:
+// CHECK:           [[DEALLOCATE_FN_PTR:%[^,]+]] = getelementptr inbounds %swift.coro_allocator
+// CHECK-SAME:          ptr [[ALLOCATOR]]
+// CHECK-SAME:          i32 0
+// CHECK-SAME:          i32 2
+// CHECK:           [[DEALLOCATE_FN:%[^,]+]] = load ptr, ptr [[DEALLOCATE_FN_PTR]]
+// CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr [[ADDRESS]])
 // CHECK:         ret void
 // CHECK:       }
 

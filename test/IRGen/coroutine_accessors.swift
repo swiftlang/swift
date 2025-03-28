@@ -24,6 +24,49 @@
 // CHECK-SAME:      swift_task_dealloc
 // CHECK-SAME:  }
 
+// CHECK-LABEL: @_swift_coro_alloc(
+// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      [[INT]] [[SIZE:%[^)]+]]
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       entry:
+// CHECK:         [[ALLOCATE_FN_PTR:%[^,]+]] = getelementptr inbounds %swift.coro_allocator
+// CHECK-SAME:        ptr [[ALLOCATOR]]
+// CHECK-SAME:        i32 0
+// CHECK-SAME:        i32 1
+// CHECK:         [[ALLOCATE_FN:%[^,]+]] = load ptr, ptr [[ALLOCATE_FN_PTR]]
+// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]]([[INT]] [[SIZE]])
+// CHECK:         ret ptr [[ALLOCATION]]
+// CHECK:       }
+
+// CHECK-LABEL: @_swift_coro_dealloc(
+// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
+// CHECK-SAME:  )
+// CHECK-SAME:  {
+// CHECK:       entry:
+// CHECK:         [[FLAGS_ADDR:%[^,]+]] = getelementptr inbounds %swift.coro_allocator
+// CHECK-SAME:        ptr [[ALLOCATOR]]
+// CHECK-SAME:        i32 0
+// CHECK-SAME:        i32 0
+// CHECK:         [[FLAGS:%[^,]+]] = load i32, ptr [[FLAGS_ADDR]], align 4
+// CHECK:         [[DEALLOC_DEFERRING_ALLOCATOR:%[^,]+]] = and i32 [[FLAGS]], 256
+// CHECK:         [[IS_DEALLOC_DEFERRING_ALLOCATOR:%[^,]+]] = icmp ne i32 [[DEALLOC_DEFERRING_ALLOCATOR]], 0
+// CHECK:         br i1 [[IS_DEALLOC_DEFERRING_ALLOCATOR]]
+// CHECK-SAME:        label %deferring_allocator
+// CHECK-SAME:        label %normal
+// CHECK:         deferring_allocator:
+// CHECK:           ret void
+// CHECK:         normal:
+// CHECK:           [[DEALLOCATE_FN_PTR:%[^,]+]] = getelementptr inbounds %swift.coro_allocator
+// CHECK-SAME:          ptr [[ALLOCATOR]]
+// CHECK-SAME:          i32 0
+// CHECK-SAME:          i32 2
+// CHECK:           [[DEALLOCATE_FN:%[^,]+]] = load ptr, ptr [[DEALLOCATE_FN_PTR]]
+// CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr [[ADDRESS]])
+// CHECK:         ret void
+// CHECK:       }
+
 @frozen
 public struct S {
 public var o: any AnyObject
