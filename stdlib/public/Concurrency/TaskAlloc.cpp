@@ -20,7 +20,6 @@
 #include "TaskPrivate.h"
 #include "swift/ABI/Task.h"
 #include "swift/Runtime/Concurrency.h"
-#include "swift/Runtime/Coro.h"
 
 #include <stdlib.h>
 
