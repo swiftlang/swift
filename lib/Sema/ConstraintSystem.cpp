@@ -4984,14 +4984,12 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
 
   // Have we bound an overload for the argument already?
   if (argExpr) {
-    auto locator = getConstraintLocator(argExpr);
-    auto knownOverloadBinding = ResolvedOverloads.find(locator);
-    if (knownOverloadBinding != ResolvedOverloads.end()) {
+    if (auto selectedOverload = findSelectedOverloadFor(argExpr)) {
       // If the overload choice is a generic function, then we have a generic
       // function reference.
-      auto choice = knownOverloadBinding->second;
-      if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
-              choice.choice.getDeclOrNull())) {
+      auto choice = selectedOverload->choice;
+      if (auto func =
+              dyn_cast_or_null<AbstractFunctionDecl>(choice.getDeclOrNull())) {
         if (func->isGeneric())
           return true;
       }
