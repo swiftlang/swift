@@ -201,9 +201,9 @@ struct Crash {
 // CHECK-NEXT:           "line": 0,
 // CHECK-NEXT:           "column": 0
 // CHECK-NEXT:         }
-// CHECK-NEXT:       },
+// CHECK-NEXT:       }
 
-// More frames here, but they're system specific
+// Possibly more frames here, but they're system specific
 
 // CHECK:          ]
 // CHECK:        }
