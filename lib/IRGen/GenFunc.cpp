@@ -1465,7 +1465,9 @@ public:
     // Call the right 'llvm.coro.id.retcon' variant.
     llvm::Value *buffer = origParams.claimNext();
     llvm::Value *id;
-    if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame) {
+    if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame
+        && !llvm::Triple(subIGF.IGM.Triple).isOSLinux()
+        && !llvm::Triple(subIGF.IGM.Triple).isOSWindows()) {
       // Use swift_coroFrameAllocStub to emit our allocator.
       auto coroAllocFn = subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
       auto mallocTypeId = subIGF.getMallocTypeId();

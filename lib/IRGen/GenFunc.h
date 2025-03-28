@@ -73,7 +73,6 @@ namespace irgen {
       auto *size = parameters.claimNext();
       auto coroAllocPtr = IGF.IGM.getCoroFrameAllocFn();
       auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
-      // if (!llvm::Triple(IGM.Triple).isOSWindows())
       coroAllocFn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
       auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
       auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(

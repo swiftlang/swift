@@ -5090,7 +5090,9 @@ void irgen::emitYieldOnceCoroutineEntry(
   auto *buffer = emission.getCoroutineBuffer();
   llvm::SmallVector<llvm::Value *, 2> finalArgs;
   llvm::Constant *allocFn = nullptr;
-  if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
+  if (IGF.getOptions().EmitTypeMallocForCoroFrame
+      && !llvm::Triple(IGF.IGM.Triple).isOSLinux()
+      && !llvm::Triple(IGF.IGM.Triple).isOSWindows()) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
     // Use swift_coroFrameAllocStub to emit our allocator.
