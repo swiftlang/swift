@@ -1,7 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen -enable-experimental-feature IsolatedConformances -verify %s | %FileCheck %s
-
-// REQUIRES: swift_feature_IsolatedConformances
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen -verify %s | %FileCheck %s
 
 protocol P { }
 
