@@ -957,8 +957,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
 
   case MacroRole::Extension: {
+    // Extensions are expanded at the top-level.
+    auto *NTD = cast<NominalTypeDecl>(target.get<Decl *>());
+    auto *topLevelDecl = NTD->getTopmostDeclarationDeclContext();
+
     SourceLoc afterDeclLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+        Lexer::getLocForEndOfToken(sourceMgr, topLevelDecl->getEndLoc());
     return CharSourceRange(afterDeclLoc, 0);
   }
 

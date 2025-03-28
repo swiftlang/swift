@@ -161,6 +161,17 @@ struct TestUndocumentedEncodable {}
 
 // CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedEncodable'
 
+@attached(extension)
+macro BadExtension() = #externalMacro(module: "MacroDefinition", type: "BadExtensionMacro")
+
+// Make sure 'extension Foo' is rejected here as it needs to
+// be a qualified reference.
+struct HasSomeNestedType {
+  @BadExtension // expected-note {{in expansion of macro 'BadExtension' on struct 'SomeNestedType' here}}
+  struct SomeNestedType {}
+}
+// CHECK-DIAGS: error: cannot find type 'SomeNestedType' in scope
+
 #endif
 
 @attached(extension, conformances: Equatable)
