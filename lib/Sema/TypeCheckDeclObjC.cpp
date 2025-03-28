@@ -4154,3 +4154,28 @@ evaluate(Evaluator &evaluator, Decl *D) const {
 
   return evaluator::SideEffect();
 }
+
+evaluator::SideEffect
+TypeCheckCDeclAttributeRequest::evaluate(Evaluator &evaluator,
+                                         FuncDecl *FD,
+                                         CDeclAttr *attr) const {
+  auto &ctx = FD->getASTContext();
+
+  std::optional<ForeignAsyncConvention> asyncConvention;
+  std::optional<ForeignErrorConvention> errorConvention;
+  ObjCReason reason(ObjCReason::ExplicitlyCDecl, attr);
+  if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
+    if (FD->hasAsync()) {
+      FD->setForeignAsyncConvention(*asyncConvention);
+      ctx.Diags.diagnose(attr->getLocation(), diag::attr_decl_async,
+                         attr, FD);
+    } else if (FD->hasThrows()) {
+      FD->setForeignErrorConvention(*errorConvention);
+      ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_throws);
+    }
+  } else {
+    reason.setAttrInvalid();
+  }
+
+  return {};
+}

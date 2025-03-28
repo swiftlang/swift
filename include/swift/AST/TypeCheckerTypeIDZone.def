@@ -554,6 +554,9 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckCDeclAttributeRequest,
+              evaluator::SideEffect(FuncDecl *, CDeclAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasInitAccessorRequest,
               bool(AbstractStorageDecl *), Cached,
               NoLocationInfo)
