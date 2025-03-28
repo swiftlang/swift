@@ -147,6 +147,25 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   (void)::mtx_unlock(&handle.mutex);
 }
 
+// .. Recursive mutex support .................................................
+
+using recursive_mutex_handle = ::mtx_t;
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {
+  SWIFT_C11THREADS_CHECK(::mtx_init(&handle, ::mtx_recursive));
+}
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {
+  ::mtx_destroy(&handle);
+}
+
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::mtx_lock(&handle));
+}
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::mtx_unlock(&handle));
+}
+
 // .. ConditionVariable support ..............................................
 
 struct cond_handle {
