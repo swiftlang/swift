@@ -423,7 +423,7 @@ extension _StringGuts {
   private static var associationKey: UnsafeRawPointer {
     // We never dereference this, we only use this address as a unique key
     unsafe unsafeBitCast(
-      ObjectIdentifier(_StringGuts.self),
+      ObjectIdentifier(__StringStorage.self),
       to: UnsafeRawPointer.self
     )
   }
@@ -437,7 +437,6 @@ extension _StringGuts {
       ) -> UnsafeRawPointer?).self
     )
     _precondition(_object.hasObjCBridgeableObject)
-    // print("has ObjC Bridgeable Object")
     if let assocPtr = unsafe getter(
       _object.objCBridgeableObject,
       Self.associationKey
@@ -484,7 +483,7 @@ extension _StringGuts {
       } else {
         var contents = String.UnicodeScalarView()
         // always reserve a size larger than a small string
-        contents.reserveCapacity(Swift.max(31, 1 + count + count >> 1))
+        contents.reserveCapacity(Swift.max(_SmallString.capacity + 1, 1 + count + count >> 1))
         for c in String.UnicodeScalarView(self) {
           contents.append(c)
         }
