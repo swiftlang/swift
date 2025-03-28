@@ -69,9 +69,17 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
   }
 }
 
-llvm::raw_ostream &ASTScopeImpl::verificationError() const {
-  return llvm::errs() << "ASTScopeImpl verification error in source file '"
-                      << getSourceFile()->getFilename() << "': ";
+void ASTScopeImpl::abortWithVerificationError(
+    llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const {
+  llvm::SmallString<0> errorStr;
+  llvm::raw_svector_ostream out(errorStr);
+
+  out << "ASTScopeImpl verification error in source file '"
+      << getSourceFile()->getFilename() << "':\n";
+  messageFn(out);
+
+  llvm::PrettyStackTraceString trace(errorStr.c_str());
+  abort();
 }
 
 #pragma mark printing

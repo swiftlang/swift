@@ -76,11 +76,12 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
   auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
 
   if (!containedInParent(childCharRange)) {
-    auto &out = verificationError() << "child not contained in its parent:\n";
-    child->print(out);
-    out << "\n***Parent node***\n";
-    this->print(out);
-    abort();
+    abortWithVerificationError([&](llvm::raw_ostream &out) {
+      out << "child not contained in its parent:\n";
+      child->print(out);
+      out << "\n***Parent node***\n";
+      this->print(out);
+    });
   }
 
   if (!storedChildren.empty()) {
@@ -89,13 +90,14 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
         sourceMgr).End;
 
     if (!sourceMgr.isAtOrBefore(endOfPreviousChild, childCharRange.Start)) {
-      auto &out = verificationError() << "child overlaps previous child:\n";
-      child->print(out);
-      out << "\n***Previous child\n";
-      previousChild->print(out);
-      out << "\n***Parent node***\n";
-      this->print(out);
-      abort();
+      abortWithVerificationError([&](llvm::raw_ostream &out) {
+        out << "child overlaps previous child:\n";
+        child->print(out);
+        out << "\n***Previous child\n";
+        previousChild->print(out);
+        out << "\n***Parent node***\n";
+        this->print(out);
+      });
     }
   }
 }
