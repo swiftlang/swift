@@ -137,6 +137,10 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
+  } else if (isAbstract()) {
+    auto *abstract = getAbstract();
+    return forAbstract(abstract->getType()->mapTypeOutOfContext(),
+                       abstract->getProtocol());
   }
 
   return *this;
