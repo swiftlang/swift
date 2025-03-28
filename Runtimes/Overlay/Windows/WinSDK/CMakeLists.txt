@@ -6,6 +6,7 @@ set_target_properties(swiftWinSDK PROPERTIES
 target_compile_definitions(swiftCRT PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
 target_link_libraries(swiftWinSDK PRIVATE
+  ClangModules
   swiftCore)
 
 install(TARGETS swiftWinSDK
