@@ -8144,7 +8144,8 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
   if (auto safeAttr = D->getAttrs().getAttribute<SafeAttr>()) {
     D->diagnose(diag::safe_and_unsafe_attr, D)
       .highlight(attr->getRange())
-      .highlight(safeAttr->getRange());
+      .highlight(safeAttr->getRange())
+      .warnInSwiftInterface(D->getDeclContext());
   }
 }
 
