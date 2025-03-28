@@ -251,7 +251,6 @@ extension _StringGuts {
       // was added to _StringObject. Retry the fast path if so.
       return try withCString(body)
     }
-    _internalInvariant(!_object.isFastZeroTerminated)
     return try String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
       return try unsafe body(ptr)
