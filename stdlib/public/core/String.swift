@@ -723,7 +723,8 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    if targetEncoding == UTF8.self {
+    if targetEncoding == UTF8.self ||
+       (targetEncoding == Unicode.ASCII.self && _guts.isASCII) {
       return try unsafe self.withCString {
         (cPtr: UnsafePointer<CChar>) -> Result  in
         _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)

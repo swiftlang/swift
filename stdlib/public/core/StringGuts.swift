@@ -245,6 +245,12 @@ extension _StringGuts {
   internal func _slowWithCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
+    if _object.isFastZeroTerminated {
+      // This branch looks unreachable, but can be reached via `withCString`
+      // in binaries that haven't been recompiled since the termination flag
+      // was added to _StringObject. Retry the fast path if so.
+      return try withCString(body)
+    }
     _internalInvariant(!_object.isFastZeroTerminated)
     return try String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
