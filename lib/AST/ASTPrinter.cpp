@@ -4517,6 +4517,13 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
+    if (!Options.SuppressSendingArgsAndResults) {
+      if (auto typeRepr = decl->getElementTypeRepr()) {
+        if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
+          Printer << "sending ";
+      }
+    }
+
     PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
       elementTy, decl->isImplicitlyUnwrappedOptional());

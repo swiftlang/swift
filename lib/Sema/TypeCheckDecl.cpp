@@ -2656,6 +2656,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     AnyFunctionType::ExtInfoBuilder infoBuilder;
     maybeAddParameterIsolation(infoBuilder, argTy);
 
+    if (auto typeRepr = SD->getElementTypeRepr())
+      if (isa<SendingTypeRepr>(typeRepr))
+        infoBuilder = infoBuilder.withSendingResult();
+
     Type funcTy;
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     auto info = infoBuilder.build();
