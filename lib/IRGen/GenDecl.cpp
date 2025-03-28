@@ -2778,9 +2778,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       }
 
       DebugTypeInfo DbgTy =
-          inFixedBuffer ? DebugTypeInfo::getGlobalFixedBuffer(var, fixedSize,
-                                                              fixedAlignment)
-                        : DebugTypeInfo::getGlobal(var, *this);
+          inFixedBuffer
+              ? DebugTypeInfo::getGlobalFixedBuffer(var, fixedAlignment, *this)
+              : DebugTypeInfo::getGlobal(var, *this);
 
       gvar = createVariable(*this, link, globalTy, fixedAlignment, DbgTy, loc, name);
     }
