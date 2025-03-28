@@ -3262,13 +3262,29 @@ void EnumTypeLayoutEntry::storeMultiPayloadValue(IRGenFunction &IGF,
                                                  Address enumAddr) const {
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
+
+  auto emptyBB = IGF.createBasicBlock("empty-payload");
+  auto nonEmptyBB = IGF.createBasicBlock("non-empty-payload");
+  auto contBB = IGF.createBasicBlock("");
+
   auto truncSize = Builder.CreateZExtOrTrunc(maxPayloadSize(IGF), IGM.Int32Ty);
+  auto empty =
+      Builder.CreateICmpEQ(truncSize, llvm::ConstantInt::get(IGM.Int32Ty, 0));
+
+  Builder.CreateCondBr(empty, emptyBB, nonEmptyBB);
+
+  Builder.emitBlock(nonEmptyBB);
   auto four = IGM.getInt32(4);
   auto sizeGTE4 = Builder.CreateICmpUGE(truncSize, four);
   auto sizeClampedTo4 = Builder.CreateSelect(sizeGTE4, four, truncSize);
   Builder.CreateMemSet(enumAddr, llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
                        truncSize);
   emitStore1to4Bytes(IGF, enumAddr, value, sizeClampedTo4);
+  Builder.CreateBr(contBB);
+
+  Builder.emitBlock(emptyBB);
+  Builder.CreateBr(contBB);
+  Builder.emitBlock(contBB);
 }
 
 void EnumTypeLayoutEntry::storeEnumTagSinglePayloadForMultiPayloadEnum(
