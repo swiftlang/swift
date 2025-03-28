@@ -5289,6 +5289,40 @@ Address irgen::emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF) {
                                  getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
 
+static llvm::Constant *getAddrOfSwiftCCMalloc(IRGenModule &IGM) {
+  auto mallocFnPtr = IGM.getMallocFunctionPointer();
+  auto sig = mallocFnPtr.getSignature();
+  if (sig.getCallingConv() == IGM.SwiftCC) {
+    return IGM.getMallocFn();
+  }
+  return IGM.getOrCreateHelperFunction(
+      "_swift_malloc", sig.getType()->getReturnType(), sig.getType()->params(),
+      [](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *size = parameters.claimNext();
+        auto malloc = IGF.IGM.getMallocFunctionPointer();
+        auto *call = IGF.Builder.CreateCall(malloc, {size});
+        IGF.Builder.CreateRet(call);
+      });
+}
+
+static llvm::Constant *getAddrOfSwiftCCFree(IRGenModule &IGM) {
+  auto freeFnPtr = IGM.getFreeFunctionPointer();
+  auto sig = freeFnPtr.getSignature();
+  if (sig.getCallingConv() == IGM.SwiftCC) {
+    return IGM.getFreeFn();
+  }
+  return IGM.getOrCreateHelperFunction(
+      "_swift_free", sig.getType()->getReturnType(), sig.getType()->params(),
+      [](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *ptr = parameters.claimNext();
+        auto free = IGF.IGM.getFreeFunctionPointer();
+        IGF.Builder.CreateCall(free, {ptr});
+        IGF.Builder.CreateRetVoid();
+      });
+}
+
 static llvm::Constant *getAddrOfGlobalCoroAllocator(
     IRGenModule &IGM, CoroAllocatorKind kind, bool shouldDeallocateImmediately,
     llvm::Constant *allocFn, llvm::Constant *deallocFn) {
@@ -5310,7 +5344,8 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
   return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Malloc,
                                       /*shouldDeallocateImmediately=*/true,
-                                      getMallocFn(), getFreeFn());
+                                      getAddrOfSwiftCCMalloc(*this),
+                                      getAddrOfSwiftCCFree(*this));
 }
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroAsyncTaskAllocator() {
   return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Async,
