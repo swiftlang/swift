@@ -149,7 +149,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   /// their operand.
   public final var isIncidentalUse: Bool {
     switch self {
-    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst:
+    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst,
+         is IgnoredUseInst:
       return true
     default:
       return isEndOfScopeMarker
