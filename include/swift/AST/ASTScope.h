@@ -239,6 +239,9 @@ public:
   NullablePtr<Stmt> getStmtIfAny() const;
   NullablePtr<Expr> getExprIfAny() const;
 
+  /// Whether this scope is for a decl attribute.
+  bool isDeclAttribute() const;
+
 #pragma mark - debugging and printing
 
 public:
@@ -264,7 +267,9 @@ public:
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineColumn);
 
 private:
-  llvm::raw_ostream &verificationError() const;
+  [[noreturn]]
+  void abortWithVerificationError(
+      llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const;
 
 #pragma mark - Scope tree creation
 public:

@@ -1008,10 +1008,20 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 }
 
 bool Decl::isInMacroExpansionInContext() const {
-  auto *dc = getDeclContext();
-  auto parentFile = dc->getParentSourceFile();
   auto *mod = getModuleContext();
   auto *file = mod->getSourceFileContainingLocation(getStartLoc());
+
+  auto parentFile = [&]() {
+    // For accessors, the storage decl is the more accurate thing to check
+    // since the entire property/subscript could be macro-generated, in which
+    // case the accessor shouldn't be considered "added by macro expansion".
+    if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+      auto storageLoc = accessor->getStorage()->getLoc();
+      if (storageLoc.isValid())
+        return mod->getSourceFileContainingLocation(storageLoc);
+    }
+    return getDeclContext()->getParentSourceFile();
+  }();
 
   // Decls in macro expansions always have a source file. The source
   // file can be null if the decl is implicit or has an invalid

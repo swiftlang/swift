@@ -984,6 +984,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
                                  closure->getEndLoc()));
     }
 
+    // If the function has a body, that's what's being replaced.
+    auto *AFD = cast<AbstractFunctionDecl>(target.get<Decl *>());
+    if (auto range = AFD->getBodySourceRange())
+      return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, range);
+
+    // Otherwise we have no body, just use the end of the decl.
     SourceLoc afterDeclLoc =
         Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
     return CharSourceRange(afterDeclLoc, 0);
