@@ -72,7 +72,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX70_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-5]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }
@@ -126,6 +126,24 @@ struct Bad {}
 // CHECK-DIAGS: typealias _ImageLiteralType = Void
 // CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
 // CHECK-DIAGS: END CONTENTS OF FILE
+
+// Redeclaration checking should behave as though expansions are part of the
+// source file.
+struct RedeclChecking {
+  #varValue
+
+  // expected-error@+1 {{invalid redeclaration of 'value'}}
+  var value: Int { 0 }
+}
+
+// CHECK-DIAGS: macro_expand.swift:[[@LINE-3]]:7: error: invalid redeclaration of 'value'
+// CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-8]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:1:5: note: 'value' previously declared here
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-9]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:
+// CHECK-DIAGS: var value: Int {
+// CHECK-DIAGS:     1
+// CHECK-DIAGS: }
+// CHECK-DIAGS: END CONTENTS OF FILE
+
 #endif
 
 @freestanding(declaration)
@@ -138,7 +156,7 @@ macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "Fa
 func invalidDeclarationMacro() {
   #accidentalCodeItem
   // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX138_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-3]]_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}

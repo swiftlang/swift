@@ -618,15 +618,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
 /// Returns \c true if \p current and \p other are in the same source file
 /// \em and \c current appears before \p other in that file.
 static bool isBeforeInSameFile(Decl *current, Decl *other) {
-  if (current->getDeclContext()->getParentSourceFile() !=
-                  other->getDeclContext()->getParentSourceFile())
+  if (current->getDeclContext()->getOutermostParentSourceFile() !=
+                  other->getDeclContext()->getOutermostParentSourceFile())
     return false;
 
-  if (!current->getLoc().isValid())
+  if (current->getLoc().isInvalid() || other->getLoc().isInvalid())
     return false;
 
   return current->getASTContext().SourceMgr
-                        .isBeforeInBuffer(current->getLoc(), other->getLoc());
+                        .isBefore(current->getLoc(), other->getLoc());
 }
 
 template <typename T>
