@@ -348,7 +348,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   if (!Ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
     evaluateOrDefault(
       Ctx.evaluator,
-      CheckInconsistentAccessLevelOnImport{SF},
+      CheckInconsistentAccessLevelOnImport{SF->getParentModule()},
       {});
   }
 
