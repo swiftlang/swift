@@ -288,6 +288,7 @@ KNOWN_SETTINGS=(
     cross-compile-with-host-tools                 ""                "set to use the clang we build for the host to then build the cross-compile hosts"
     cross-compile-install-prefixes                ""                "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
     cross-compile-deps-path                       ""                "path for CMake to look for cross-compiled library dependencies, such as libXML2"
+    cross-compile-sysroots                        ""                "path(s) for CMake to look for cross-compilation sysroots for different platforms or architectures"
     cross-compile-append-host-target-to-destdir   "1"               "turns on appending the host target name of each cross-compiled toolchain to its install-destdir, to keep them separate from the natively-built toolchain"
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
@@ -1103,7 +1104,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* | linux-static-* )
+        macosx* | iphone* | appletv* | watch* | linux-* | android-* | openbsd-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1697,6 +1698,16 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
                         -DSWIFT_INCLUDE_TEST_BINARIES:BOOL=FALSE
                     )
+                    
+                    # This allows passing a sysroot other than "/" to compile Swift and libraries
+                    # It also assumes the sysroot contains arch libraries matching --stdlib-deployment-targets
+                    if [ ! -z "${CROSS_COMPILE_SYSROOTS}" ]; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DSWIFT_CROSS_COMPILE_SYSROOTS:STRING="${CROSS_COMPILE_SYSROOTS}"
+                            -DSWIFT_USE_LINKER:STRING="lld"
+                        )
+                    fi
                 fi
 
                 # Command-line parameters override any autodetection that we
