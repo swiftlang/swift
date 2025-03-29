@@ -771,7 +771,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
       C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
 
   unsigned index = 0;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     if (auto *unavailableElementCase =
             DerivedConformance::unavailableEnumElementCaseStmt(enumType, elt,
@@ -871,8 +871,8 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
   if (!enumElementDecl->hasAssociatedValues())
     return nullptr;
 
-  auto argumentType = enumElementDecl->getArgumentInterfaceType();
-  if (auto tupleType = argumentType->getAs<TupleType>()) {
+  auto payloadType = enumElementDecl->getPayloadInterfaceType();
+  if (auto tupleType = payloadType->getAs<TupleType>()) {
     // Either multiple (labeled or unlabeled) arguments, or one labeled
     // argument. Return a tuple pattern that matches the enum element in arity,
     // types, and labels. For example:
@@ -909,8 +909,7 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
   // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
   // underlying type is the same as the payload. For example:
   // case a(Int) => (let a0)
-  auto underlyingType = argumentType->getWithoutParens();
-  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
+  auto payloadVar = indexedVarDecl(varPrefix, 0, payloadType, varContext);
   boundVars.push_back(payloadVar);
 
   auto namedPattern = new (C) NamedPattern(payloadVar);

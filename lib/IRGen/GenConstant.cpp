@@ -32,6 +32,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
 
 using namespace swift;
@@ -322,8 +323,16 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
       }
       case BuiltinValueKind::ZExtOrBitCast: {
         auto *val = emitConstantValue(IGM, args[0]).claimNextConstant();
-        return llvm::ConstantExpr::getZExtOrBitCast(val,
-                                                    IGM.getStorageType(BI->getType()));
+        auto storageTy = IGM.getStorageType(BI->getType());
+
+        if (val->getType() == storageTy)
+          return val;
+
+        auto *result = llvm::ConstantFoldCastOperand(
+            llvm::Instruction::ZExt, val, storageTy, IGM.DataLayout);
+        ASSERT(result != nullptr &&
+               "couldn't constant fold initializer expression");
+        return result;
       }
       case BuiltinValueKind::StringObjectOr: {
         // It is a requirement that the or'd bits in the left argument are
@@ -387,16 +396,19 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
     CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
 
-    if (irgen::classifyFunctionPointerKind(fn).isAsyncFunctionPointer()) {
+    auto fpKind = irgen::classifyFunctionPointerKind(fn);
+    if (fpKind.isAsyncFunctionPointer()) {
       llvm::Constant *asyncFnPtr = IGM.getAddrOfAsyncFunctionPointer(fn);
       fnPtr = llvm::ConstantExpr::getBitCast(asyncFnPtr, fnPtr->getType());
+    } else if (fpKind.isCoroFunctionPointer()) {
+      llvm::Constant *coroFnPtr = IGM.getAddrOfCoroFunctionPointer(fn);
+      fnPtr = llvm::ConstantExpr::getBitCast(coroFnPtr, fnPtr->getType());
     }
 
     auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
     if (authInfo.isSigned()) {
       auto constantDiscriminator =
-          cast<llvm::Constant>(authInfo.getDiscriminator());
-      assert(!constantDiscriminator->getType()->isPointerTy());
+          cast<llvm::ConstantInt>(authInfo.getDiscriminator());
       fnPtr = IGM.getConstantSignedPointer(fnPtr, authInfo.getKey(), nullptr,
         constantDiscriminator);
     }
@@ -425,6 +437,24 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *atp = dyn_cast<AddressToPointerInst>(operand)) {
     auto *val = emitConstantValue(IGM, atp->getOperand()).claimNextConstant();
     return val;
+  } else if (auto *vector = dyn_cast<VectorInst>(operand)) {
+    if (flatten) {
+      Explosion out;
+      for (SILValue element : vector->getElements()) {
+        Explosion e = emitConstantValue(IGM, element, flatten);
+        out.add(e.claimAll());
+      }
+      return out;
+    }
+    llvm::SmallVector<llvm::Constant *, 8> elementValues;
+    for (SILValue element : vector->getElements()) {
+      auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfo(element->getType()));
+      Size paddingBytes = ti.getFixedStride() - ti.getFixedSize();
+      Explosion e = emitConstantValue(IGM, element, flatten);
+      elementValues.push_back(IGM.getConstantValue(std::move(e), paddingBytes.getValue()));
+    }
+    auto *arrTy = llvm::ArrayType::get(elementValues[0]->getType(), elementValues.size());
+    return llvm::ConstantArray::get(arrTy, elementValues);
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }
@@ -458,7 +488,8 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   if (IGM.canMakeStaticObjectReadOnly(OI->getType())) {
     if (!IGM.swiftImmortalRefCount) {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-        // = HeapObject.immortalRefCount
+        // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+        // 0xffff_ffff on 32-bit, 0xffff_ffff_ffff_ffff on 64-bit
         IGM.swiftImmortalRefCount = llvm::ConstantInt::get(IGM.IntPtrTy, -1);
       } else {
         IGM.swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(

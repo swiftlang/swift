@@ -306,8 +306,10 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
     assert(rootWTable && "root witness table not bound in local context!");
   }
 
+  auto conformance = ProtocolConformanceRef::forAbstract(
+      rootArchetype, rootProtocol);
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
-                                       ProtocolConformanceRef(rootProtocol),
+                                       conformance,
                                        MetadataResponse::forComplete(rootWTable),
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();
@@ -403,7 +405,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.
   IsABIAccessible_t abiAccessible = IsABIAccessible;
-  if (auto opaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
+  if (isa<OpaqueTypeArchetypeType>(archetype)) {
     auto &currentSILModule = IGM.getSILModule();
     abiAccessible =
         currentSILModule.isTypeMetadataAccessible(archetype->getCanonicalType())
@@ -453,12 +455,16 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     SmallVector<llvm::Value *, 4> args;
     SmallVector<llvm::Type *, 4> types;
 
+    // We need to pass onHeapPacks=true because the runtime demangler
+    // expects to differentiate on-heap packs from non-pack types by
+    // checking the least significant bit of the metadata pointer.
     enumerateGenericSignatureRequirements(
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto arg = emitGenericRequirementFromSubstitutions(
               IGF, reqt, MetadataState::Abstract,
-              archetype->getSubstitutions());
+              archetype->getSubstitutions(),
+              /*onHeapPacks=*/true);
           args.push_back(arg);
           types.push_back(args.back()->getType());
         });
@@ -521,8 +527,8 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeMetadata2FunctionPointer() :
@@ -564,8 +570,8 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeConformance2FunctionPointer() :

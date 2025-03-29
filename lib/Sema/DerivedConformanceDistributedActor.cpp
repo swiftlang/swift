@@ -16,15 +16,16 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
-#include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
+#include "TypeChecker.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -155,7 +156,7 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
                       C.getIdentifier("result"), afd);
   {
-    auto resultLoadCall = CallExpr::createImplicit(
+    Expr *resultLoadCall = CallExpr::createImplicit(
         C,
         UnresolvedDotExpr::createImplicit(
             C,
@@ -169,6 +170,9 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
             C, {Argument(sloc, C.getIdentifier("as"),
                          new (C) DeclRefExpr(ConcreteDeclRef(returnTypeParam),
                                              dloc, implicit))}));
+
+    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety))
+      resultLoadCall = new (C) UnsafeExpr(sloc, resultLoadCall, Type(), true);
 
     auto resultPattern = NamedPattern::createImplicit(C, resultVar);
     auto resultPB = PatternBindingDecl::createImplicit(
@@ -710,13 +714,9 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
     auto substitutions = SubstitutionMap::get(
         buildRemoteExecutorDecl->getGenericSignature(),
         [&](SubstitutableType *dependentType) {
-          if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
-            if (gp->getDepth() == 0 && gp->getIndex() == 0) {
-              return getter->getImplicitSelfDecl()->getTypeInContext();
-            }
-          }
-
-          return Type();
+          auto gp = cast<GenericTypeParamType>(dependentType);
+          ASSERT(gp->getDepth() == 0 && gp->getIndex() == 0);
+          return getter->getImplicitSelfDecl()->getTypeInContext();
         },
         LookUpConformanceInModule()
     );
@@ -726,8 +726,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
             DeclNameLoc(),/*implicit=*/true,
             AccessSemantics::Ordinary);
     buildRemoteExecutorExpr->setType(
-        buildRemoteExecutorDecl->getInterfaceType()
-         .subst(substitutions)
+        buildRemoteExecutorDecl->getInterfaceType()->castTo<GenericFunctionType>()
+         ->substGenericArgs(substitutions)
         );
 
     Expr *selfForBuildRemoteExecutor = DerivedConformance::createSelfDeclRef(getter);
@@ -809,8 +809,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
     asAvailableAs.push_back(enclosingDecl);
 
-  AvailabilityInference::applyInferredAvailableAttrs(
-      property, asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);

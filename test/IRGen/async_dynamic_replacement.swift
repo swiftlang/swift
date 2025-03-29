@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -disable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -target %target-swift-5.1-abi-triple -disable-objc-interop | %FileCheck %s
 
 // REQUIRES: concurrency
 // LLVM does not support swifttailcc for WebAssembly target for now

@@ -215,6 +215,19 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   return It->second;
 }
 
+void SourceManager::recordSourceFile(unsigned bufferID, SourceFile *sourceFile){
+  bufferIDToSourceFiles[bufferID].push_back(sourceFile);
+}
+
+llvm::TinyPtrVector<SourceFile *>
+SourceManager::getSourceFilesForBufferID(unsigned bufferID) const {
+  auto found = bufferIDToSourceFiles.find(bufferID);
+  if (found == bufferIDToSourceFiles.end())
+    return { };
+
+  return found->second;
+}
+
 SourceManager::~SourceManager() {
   for (auto &generated : GeneratedSourceInfos) {
     free((void*)generated.second.onDiskBufferCopyFileName.data());
@@ -290,10 +303,11 @@ StringRef SourceManager::getIdentifierForBuffer(
   if (ForceGeneratedSourceToDisk) {
     if (const GeneratedSourceInfo *generatedInfo =
             getGeneratedSourceInfo(bufferID)) {
-      // We only care about macros, so skip everything else.
+      // We only care about macro expansion buffers, so skip everything else.
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
           generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted ||
-          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument)
+          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument ||
+          generatedInfo->kind == GeneratedSourceInfo::AttributeFromClang)
         return buffer->getBufferIdentifier();
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
@@ -387,6 +401,7 @@ void SourceManager::setGeneratedSourceInfo(
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -814,18 +829,23 @@ static bool isBeforeInSource(
   auto [firstMismatch, secondMismatch] = std::mismatch(
       firstAncestors.begin(), firstAncestors.end(),
       secondAncestors.begin(), secondAncestors.end());
-  assert(firstMismatch != firstAncestors.begin() &&
-         secondMismatch != secondAncestors.begin() &&
-         "Ancestors don't have the same root source file");
+  if (firstMismatch == firstAncestors.begin() ||
+      secondMismatch == secondAncestors.begin()) {
+    // FIXME: This is currently being hit for code completion
+    // (rdar://134522702), possibly due to an invalid ASTScope node range. For
+    // now, let's bail with `false` in non-asserts builds.
+    assert(false && "Ancestors don't have the same root source file");
+    return false;
+  }
 
   SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
       ? firstLoc
       : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
-          ->originalSourceRange.getEnd();
+          ->originalSourceRange.getStart();
   SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
       ? secondLoc
       : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
-          ->originalSourceRange.getEnd();
+          ->originalSourceRange.getStart();
   return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
     (allowEqual && firstLocInLCA == secondLocInLCA);
 }
@@ -849,4 +869,16 @@ bool SourceManager::containsLoc(SourceRange range, SourceLoc loc) const {
 bool SourceManager::encloses(SourceRange enclosing, SourceRange inner) const {
   return containsLoc(enclosing, inner.Start) &&
       isAtOrBefore(inner.End, enclosing.End);
+}
+
+bool SourceManager::isImportMacroGeneratedLoc(SourceLoc loc) {
+  if (loc.isInvalid())
+    return false;
+
+  auto buffer = findBufferContainingLoc(loc);
+  auto genInfo = getGeneratedSourceInfo(buffer);
+  if (genInfo && genInfo->macroName == "_SwiftifyImport")
+    return true;
+
+  return false;
 }

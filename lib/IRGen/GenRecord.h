@@ -297,31 +297,31 @@ public:
                        std::function<void
                           (const TypeInfo &, SILType, Address, Address)> body) const {
     if (rawLayout->shouldMoveAsLikeType()) {
-      // Because we have a rawlayout attribute, we know this has to be a struct.
-      auto structDecl = T.getStructOrBoundGenericStruct();
+      auto likeType = T.getRawLayoutSubstitutedLikeType();
+      auto loweredLikeType = IGF.IGM.getLoweredType(likeType);
+      auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
 
-      if (auto likeType = rawLayout->getResolvedScalarLikeType(structDecl)) {
-        auto astT = T.getASTType();
-        auto subs = astT->getContextSubstitutionMap();
-        auto loweredLikeType = IGF.IGM.getLoweredType(likeType->subst(subs));
-        auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+      // Fixup src/dest address element types because currently they are in
+      // terms of the raw layout type's [n x i8] where we're at a point to use
+      // the like type's concrete storage type.
+      src = Address(src.getAddress(), likeTypeInfo.getStorageType(),
+                    src.getAlignment());
+      dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
+                     dest.getAlignment());
 
+      // If we're a scalar, then we only need to run the body once.
+      if (rawLayout->getScalarLikeType()) {
         body(likeTypeInfo, loweredLikeType, dest, src);
       }
 
-      if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(structDecl)) {
-        auto likeType = likeArray->first;
-        auto countType = likeArray->second;
+      // Otherwise, emit a loop that calls body N times where N is the count
+      // of the array variant. This could be generic in which case we need to
+      // pull the value out of metadata or it could be a constant integer.
+      if (rawLayout->getArrayLikeTypeAndCount()) {
+        auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
 
-        auto astT = T.getASTType();
-        auto subs = astT->getContextSubstitutionMap();
-        auto loweredLikeType = IGF.IGM.getLoweredType(likeType.subst(subs));
-        auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
-        countType = countType.subst(subs);
-
-        IGF.emitLoopOverElements(likeTypeInfo, loweredLikeType,
-                                 countType->getCanonicalType(), dest, src,
-            [&](Address dest, Address src) {
+        IGF.emitLoopOverElements(likeTypeInfo, loweredLikeType, countType,
+                                 dest, src, [&](Address dest, Address src) {
           body(likeTypeInfo, loweredLikeType, dest, src);
         });
       }
@@ -555,6 +555,23 @@ public:
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
+
+    // If we're a raw layout type, collect metadata from our like type and count
+    // as well.
+    if (auto likeType = T.getRawLayoutSubstitutedLikeType()) {
+      auto loweredLikeType = collector.IGF.IGM.getLoweredType(likeType);
+      collector.IGF.IGM.getTypeInfo(loweredLikeType)
+          .collectMetadataForOutlining(collector, loweredLikeType);
+
+      if (auto countType = T.getRawLayoutSubstitutedCountType()) {
+        if (countType->isValueParameter()) {
+          auto loweredCountType = collector.IGF.IGM.getLoweredType(countType);
+          collector.IGF.IGM.getTypeInfo(loweredCountType)
+            .collectMetadataForOutlining(collector, loweredCountType);
+        }
+      }
+    }
+
     collector.collectTypeMetadata(T);
   }
 };

@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_error %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -Xllvm -sil-print-types -module-name objc_error %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

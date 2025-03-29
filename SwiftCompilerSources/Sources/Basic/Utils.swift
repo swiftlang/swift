@@ -80,7 +80,7 @@ public extension NoReflectionChildren {
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, NoReflectionChildren {
-  let _bridged: BridgedStringRef
+  public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
 
@@ -173,8 +173,26 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
 
 extension BridgedArrayRef {
   public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    let start = data?.bindMemory(to: ty, capacity: count)
+    let start = data?.assumingMemoryBound(to: ty)
     let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Sequence Utilities
+//===----------------------------------------------------------------------===//
+
+/// RandomAccessCollection which bridges to some C++ array.
+///
+/// It fixes the default reflection for bridged random access collections, which usually have a
+/// `bridged` stored property.
+/// Conforming to this protocol displays the "real" children  not just `bridged`.
+public protocol BridgedRandomAccessCollection : RandomAccessCollection, CustomReflectable {
+}
+
+extension BridgedRandomAccessCollection {
+  public var customMirror: Mirror {
+    Mirror(self, children: self.map { (label: nil, value: $0 as Any) })
   }
 }

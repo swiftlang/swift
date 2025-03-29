@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence
 // RUN: %FileCheck %s < %t/Swift.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi)
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi -DDEBUG=1)
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 
@@ -86,8 +88,7 @@
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const UTF8View& newValue) SWIFT_SYMBOL({{.*}});
-// CHECK:  #if defined(__OBJC__)
-// CHECK-NEXT:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
+// CHECK:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
 // CHECK-NEXT:   }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init(NSString * _Nonnull nsString) noexcept {
@@ -97,7 +98,7 @@
 // CHECK-NEXT:  return result;
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
-// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #endif // defined(__OBJC__)
 // CHECK-NEXT: #define SWIFT_CXX_INTEROP_STRING_MIXIN
 
 // CHECK-NEXT: #pragma clang diagnostic push

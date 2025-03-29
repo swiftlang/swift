@@ -20,6 +20,7 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 //#define NODE_FACTORY_DEBUGGING
@@ -405,6 +406,8 @@ protected:
   /// as part of the name.
   bool IsOldFunctionTypeMangling = false;
 
+  Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default;
+
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
 
@@ -636,8 +639,6 @@ protected:
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
-
-  NodePointer demangleLifetimeDependence();
 
   NodePointer demangleIntegerType();
 

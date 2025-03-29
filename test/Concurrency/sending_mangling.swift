@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-silgen -swift-version 6 | swift-demangle | %FileCheck -check-prefix=CHECK %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -emit-silgen -swift-version 6 | swift-demangle | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -swift-version 6 | %FileCheck -check-prefix=SIL %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -109,4 +111,22 @@ struct ConstructorSharedTest {
   //
   // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.functionSuppressed(sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, ConstructorSharedTest) -> () {
   func functionSuppressed(_ x: __shared sending NonSendableKlass) {}
+}
+
+// Make sure that we produce the appropriate reabstraction thunk.
+func reabstractionThunkTest_takeSendingReturnSending<T>(
+  _ x: sending T) -> sending T { fatalError() }
+func reabstractionThunkTest_reabstractionThunkGenerator<T>(
+  _ x: sending T,
+  _ f: (sending T) -> T) {}
+
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass) : $@convention(thin) (@sil_sending @owned NonSendableKlass, @guaranteed @callee_guaranteed (@sil_sending @in NonSendableKlass) -> @sil_sending @out NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+// SIL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR : $@convention(thin) (@sil_sending @owned NonSendableKlass, @guaranteed @callee_guaranteed (@sil_sending @in NonSendableKlass) -> @sil_sending @out NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @reabstraction thunk helper from @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> (@owned sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> (@out sending_mangling.NonSendableKlass) : $@convention(thin) (@sil_sending @in NonSendableKlass, @guaranteed @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> @owned NonSendableKlass) -> @out NonSendableKlass {
+// SIL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s16sending_mangling16NonSendableKlassCACIgxTo_A2CIegiTr_TR : $@convention(thin) (@sil_sending @in NonSendableKlass, @guaranteed @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> @owned NonSendableKlass) -> @out NonSendableKlass {
+func reabstractionThunkTest() {
+  reabstractionThunkTest_reabstractionThunkGenerator(
+    NonSendableKlass(),
+    reabstractionThunkTest_takeSendingReturnSending)
 }

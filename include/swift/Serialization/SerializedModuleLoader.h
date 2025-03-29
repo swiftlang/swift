@@ -15,8 +15,10 @@
 
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/Serialization/Validation.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/TargetParser/Triple.h"
@@ -164,10 +166,12 @@ protected:
 
   /// Scan the given serialized module file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo>
-  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
+  scanModuleFile(Twine modulePath, bool isFramework,
+                 bool isTestableImport, bool isCandidateForTextualModule);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
+    llvm::StringSet<> exportedModules;
     std::string headerImport;
   };
 
@@ -179,7 +183,21 @@ protected:
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
   getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
-  
+
+  /// If the module has a package name matching the one
+  /// specified, return a set of package-only imports for this module.
+  static llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
+  getMatchingPackageOnlyImportsOfModule(Twine modulePath,
+                                        bool isFramework,
+                                        bool isRequiredOSSAModules,
+                                        StringRef SDKName,
+                                        StringRef packageName,
+                                        llvm::vfs::FileSystem *fileSystem,
+                                        PathObfuscator &recoverer);
+
+  std::optional<MacroPluginDependency>
+  resolveMacroPlugin(const ExternalMacroPlugin &macro, StringRef packageName);
+
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
@@ -246,13 +264,16 @@ public:
   virtual void verifyAllModules() override;
 
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper,
+                        llvm::PrefixMapper *mapper,
                         bool isTestableImport) override;
+
+  /// A textual reason why the compiler rejected a binary module load
+  /// attempt with a given status, to be used for diagnostic output.
+  static std::optional<std::string> invalidModuleReason(serialization::Status status);
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -416,7 +437,7 @@ public:
   getFilenameForPrivateDecl(const Decl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
-  
+
   virtual OpaqueTypeDecl *
   lookupOpaqueResultType(StringRef MangledName) override;
 
@@ -503,6 +524,9 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
@@ -519,6 +543,10 @@ public:
   virtual StringRef getModuleDefiningPath() const override;
 
   virtual StringRef getExportedModuleName() const override;
+
+  virtual StringRef getPublicModuleName() const override;
+
+  virtual version::Version getSwiftInterfaceCompilerVersion() const override;
 
   ValueDecl *getMainDecl() const override;
 
@@ -556,6 +584,11 @@ bool extractCompilerFlagsFromInterface(
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
+
+/// Extract embedded bridging header from binary module.
+std::string
+extractEmbeddedBridgingHeaderContent(std::unique_ptr<llvm::MemoryBuffer> file,
+                                     ASTContext &Context);
 } // end namespace swift
 
 #endif

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature RawLayout -parse -verify %s
 
+// REQUIRES: swift_feature_RawLayout
+
 @_rawLayout(size: 4, alignment: 4)
 struct Lock: ~Copyable {}
 

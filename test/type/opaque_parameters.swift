@@ -131,3 +131,18 @@ struct I61387_1 {
     }
   }
 }
+
+// However, it's fine if the inferred type of a closure refers to opaque parameters from the outer scope.
+public func combinator<T>(_: T, _: ((T) -> ()) -> ()) {}
+
+public func closureWithOpaqueParameterInConsumingPosition(p: some Any) {
+  // Single-expression
+  combinator(p) { $0(p) }
+
+  // Multi-expression
+  combinator(p) { fn in
+    let result: () = fn(p)
+    return result
+  }
+}
+

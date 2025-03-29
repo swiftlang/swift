@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library %s | %FileCheck %s
 
 enum TrivialUnion {
   case Foo
@@ -47,6 +47,7 @@ func getAddressOnlyUnion<T>(_: T.Type) -> AddressOnlyUnion<T> { return .Foo }
 func destroyUnionRValues() {
   // CHECK:   [[GET_TRIVIAL_UNION:%.*]] = function_ref @$s15lifetime_unions15getTrivialUnionAA0dE0OyF : $@convention(thin) () -> TrivialUnion
   // CHECK:   [[TRIVIAL_UNION:%.*]] = apply [[GET_TRIVIAL_UNION]]() : $@convention(thin) () -> TrivialUnion
+  // CHECK-NEXT: ignored_use [[TRIVIAL_UNION]]
   // CHECK-NOT: [[TRIVIAL_UNION]]
   getTrivialUnion()
 

@@ -99,6 +99,15 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
   out << ")";
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           RegexLiteralPatternFeatureKind kind) {
+  out << "regex pattern feature " << kind.getRawValue();
+}
+
+SourceLoc swift::extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind) {
+  return SourceLoc();
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
@@ -347,7 +356,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   decl->setIsDynamic(value);
 
   // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>())
+  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
+        ABIRoleInfo(decl).providesAPI())
     decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
 }
 
@@ -373,6 +383,28 @@ void DynamicallyReplacedDeclRequest::cacheResult(ValueDecl *result) const {
     return;
   }
 
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
+// OpaqueResultTypeRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<OpaqueTypeDecl *>
+OpaqueResultTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.noOpaqueResultType)
+    return std::optional(nullptr);
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void OpaqueResultTypeRequest::cacheResult(OpaqueTypeDecl *result) const {
+  auto *decl = std::get<0>(getStorage());
+  if (!result) {
+    decl->LazySemanticInfo.noOpaqueResultType = 1;
+    return;
+  }
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
@@ -792,18 +824,34 @@ void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
 // RequiresOpaqueModifyCoroutineRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<bool>
+// NOTE: The [[clang::optnone]] annotation works around a miscompile in clang
+//       version 13.0.0 affecting at least Ubuntu 20.04, 22.04, and UBI 9.
+[[clang::optnone]] std::optional<bool>
 RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
-  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
-    return static_cast<bool>(storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
+  auto isUnderscored = std::get<1>(getStorage());
+  if (isUnderscored) {
+    if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+      return static_cast<bool>(
+          storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
+  } else {
+    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+      return static_cast<bool>(
+          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+  }
   return std::nullopt;
 }
 
 void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
   auto *storage = std::get<0>(getStorage());
-  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
-  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+  auto isUnderscored = std::get<1>(getStorage());
+  if (isUnderscored) {
+    storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+  } else {
+    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -838,9 +886,13 @@ SynthesizeAccessorRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   auto kind = std::get<1>(getStorage());
   auto *accessor = storage->getAccessor(kind);
-  if (accessor)
-    return accessor;
-  return std::nullopt;
+  if (!accessor)
+    return std::nullopt;
+
+  if (accessor->doesAccessorHaveBody() && !accessor->hasBody())
+    return std::nullopt;
+
+  return accessor;
 }
 
 void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
@@ -1318,6 +1370,43 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// ConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<ActorIsolation>
+ConformanceIsolationRequest::getCachedResult() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return ActorIsolation::forNonisolated(false);
+
+  // Was actor isolation non-isolated?
+  if (rootNormal->isComputedNonisolated())
+    return ActorIsolation::forNonisolated(false);
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      cast<NormalProtocolConformance>(conformance->getRootConformance());
+
+  // Common case: conformance is nonisolated.
+  if (result.isNonisolated()) {
+    rootNormal->setComputedNonnisolated();
+    return;
+  }
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1353,13 +1442,14 @@ void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // DefaultArgumentInitContextRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<Initializer *>
+std::optional<DefaultArgumentInitializer *>
 DefaultArgumentInitContextRequest::getCachedResult() const {
   auto *param = std::get<0>(getStorage());
   return param->getCachedDefaultArgumentInitContext();
 }
 
-void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+void DefaultArgumentInitContextRequest::cacheResult(
+    DefaultArgumentInitializer *init) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultArgumentInitContext(init);
 }
@@ -1418,6 +1508,9 @@ void swift::simple_display(llvm::raw_ostream &out, Initializer *init) {
     break;
   case InitializerKind::PropertyWrapper:
     out << "property wrapper initializer";
+    break;
+  case InitializerKind::CustomAttribute:
+    out << "custom attribute initializer";
     break;
   }
 }
@@ -1572,16 +1665,44 @@ void ResolveRawLayoutTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckSourceFileRequest computation.
+// RenamedDeclRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+std::optional<ValueDecl *> RenamedDeclRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  auto attr = std::get<1>(getStorage());
+
+  if (attr->hasComputedRenamedDecl()) {
+    if (attr->hasCachedRenamedDecl())
+      return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+
+    return nullptr;
+  }
+
+  return std::nullopt;
+}
+
+void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
+  auto decl = std::get<0>(getStorage());
+  auto attr = const_cast<AvailableAttr *>(std::get<1>(getStorage()));
+
+  attr->setComputedRenamedDecl(value != nullptr);
+  if (value)
+    decl->getASTContext().evaluator.cacheNonEmptyOutput(*this,
+                                                        std::move(value));
+}
+
+//----------------------------------------------------------------------------//
+// TypeCheckPrimaryFileRequest computation.
+//----------------------------------------------------------------------------//
+
+evaluator::DependencySource TypeCheckPrimaryFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   return std::get<0>(getStorage());
 }
 
 std::optional<evaluator::SideEffect>
-TypeCheckSourceFileRequest::getCachedResult() const {
+TypeCheckPrimaryFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
     return std::make_tuple<>();
@@ -1589,7 +1710,7 @@ TypeCheckSourceFileRequest::getCachedResult() const {
   return std::nullopt;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
+void TypeCheckPrimaryFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.
@@ -1774,6 +1895,7 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
+  case CallerIsolationInheriting:
   case ActorInstance:
   case Nonisolated:
   case NonisolatedUnsafe:
@@ -1789,6 +1911,7 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
+  case CallerIsolationInheriting:
   case Nonisolated:
   case NonisolatedUnsafe:
   case Unspecified:
@@ -1807,6 +1930,11 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
   switch (*this) {
   case ActorIsolation::ActorInstance:
     os << "actor" << (asNoun ? " isolation" : "-isolated");
+    break;
+
+  case ActorIsolation::CallerIsolationInheriting:
+    os << "caller isolation inheriting"
+       << (asNoun ? " isolation" : "-isolated");
     break;
 
   case ActorIsolation::GlobalActor: {
@@ -1845,6 +1973,9 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
       os << ". name: '" << vd->getBaseIdentifier() << "'";
     }
     return;
+  case CallerIsolationInheriting:
+    os << "caller_isolation_inheriting";
+    return;
   case Nonisolated:
     os << "nonisolated";
     return;
@@ -1868,6 +1999,9 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
     return;
   case ActorInstance:
     os << "actor_instance";
+    return;
+  case CallerIsolationInheriting:
+    os << "caller_isolation_inheriting";
     return;
   case Nonisolated:
     os << "nonisolated";
@@ -1912,6 +2046,10 @@ void swift::simple_display(
       } else {
         out << state.getActor()->getName();
       }
+      break;
+
+    case ActorIsolation::CallerIsolationInheriting:
+      out << "isolated to isolation of caller";
       break;
 
     case ActorIsolation::Nonisolated:
@@ -2544,19 +2682,17 @@ void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed,
+                 "body");
 }
 
 void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity_through,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed_through,
+                 "body");
 }
 
 //----------------------------------------------------------------------------//
@@ -2616,18 +2752,26 @@ void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsUnsafeRequest computation.
+// SemanticAvailableAttrRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<bool> IsUnsafeRequest::getCachedResult() const {
-  auto *decl = std::get<0>(getStorage());
-  if (!decl->isUnsafeComputed())
+std::optional<std::optional<SemanticAvailableAttr>>
+SemanticAvailableAttrRequest::getCachedResult() const {
+  const AvailableAttr *attr = std::get<0>(getStorage());
+  if (!attr->hasComputedSemanticAttr())
     return std::nullopt;
 
-  return decl->isUnsafeRaw();
+  if (!attr->getDomainOrIdentifier().isDomain()) {
+    return std::optional<SemanticAvailableAttr>{};
+  }
+
+  return SemanticAvailableAttr(attr);
 }
 
-void IsUnsafeRequest::cacheResult(bool value) const {
-  auto *decl = std::get<0>(getStorage());
-  decl->setUnsafe(value);
+void SemanticAvailableAttrRequest::cacheResult(
+    std::optional<SemanticAvailableAttr> value) const {
+  AvailableAttr *attr = const_cast<AvailableAttr *>(std::get<0>(getStorage()));
+  attr->setComputedSemanticAttr();
+  if (!value)
+    attr->setInvalid();
 }

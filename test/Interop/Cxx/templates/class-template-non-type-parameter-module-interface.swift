@@ -17,3 +17,4 @@
 
 // CHECK: typealias MagicIntPair = MagicArray<CInt, _C{{.*}}_2>
 // CHECK: typealias MagicIntTriple = MagicArray<CInt, _C{{.*}}_3>
+// CHECK: typealias NegativeThree = integral_constant<CInt, _C{{.*}}_Neg_3>

@@ -55,6 +55,7 @@ class ExecutorBreadcrumb;
 
 struct LValueOptions {
   bool IsNonAccessing = false;
+  bool TryAddressable = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -63,7 +64,6 @@ struct LValueOptions {
 
     // Assume we're going to access the base.
     copy.IsNonAccessing = false;
-
     return copy;
   }
 
@@ -71,6 +71,12 @@ struct LValueOptions {
   /// applying the derived component will not touch the memory.
   LValueOptions forProjectedBaseLValue() const {
     auto copy = *this;
+    return copy;
+  }
+  
+  LValueOptions withAddressable(bool addressable) const {
+    auto copy = *this;
+    copy.TryAddressable = addressable;
     return copy;
   }
 };
@@ -465,19 +471,113 @@ public:
     /// It may be invalid if no box was made for the value (e.g., because it was
     /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
-
-    static VarLoc get(SILValue value, SILValue box = SILValue()) {
-      VarLoc Result;
-      Result.value = value;
-      Result.box = box;
-      return Result;
-    }
+    
+    /// What kind of access enforcement should be used to access the variable,
+    /// or `Unknown` if it's known to be immutable.
+    SILAccessEnforcement access;
+    
+    /// A structure used for bookkeeping the on-demand formation and cleanup
+    /// of an addressable representation for an immutable value binding.
+    struct AddressableBuffer {
+      struct State {
+        // If the value needs to be reabstracted to provide an addressable
+        // representation, this SILValue owns the reabstracted representation.
+        SILValue reabstraction = SILValue();
+        // The stack allocation for the addressable representation.
+        SILValue allocStack = SILValue();
+        // The initiation of the in-memory borrow.
+        SILValue storeBorrow = SILValue();
+        
+        State(SILValue reabstraction,
+              SILValue allocStack,
+              SILValue storeBorrow)
+          : reabstraction(reabstraction), allocStack(allocStack),
+            storeBorrow(storeBorrow)
+        {}
+      };
+      
+      std::unique_ptr<State> state = nullptr;
+      
+      // If the variable cleanup is triggered before the addressable
+      // representation is demanded, but the addressable representation
+      // gets demanded later, we save the insertion points where the
+      // representation would be cleaned up so we can backfill them.
+      llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
+      
+      AddressableBuffer() = default;
+      
+      AddressableBuffer(AddressableBuffer &&other)
+        : state(std::move(other.state))
+      {
+        cleanupPoints.swap(other.cleanupPoints);
+      }
+      
+      AddressableBuffer &operator=(AddressableBuffer &&other) {
+        state = std::move(other.state);
+        cleanupPoints.swap(other.cleanupPoints);
+        return *this;
+      }
+      
+      ~AddressableBuffer();
+    };
+    AddressableBuffer addressableBuffer;
+    
+    VarLoc() = default;
+    
+    VarLoc(SILValue value, SILAccessEnforcement access,
+           SILValue box = SILValue())
+      : value(value), box(box), access(access)
+    {}
   };
   
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+  
+  // Represents an addressable buffer that has been allocated but not yet used.
+  struct PreparedAddressableBuffer {
+    SILInstruction *insertPoint = nullptr;
+    
+    PreparedAddressableBuffer() = default;
+    
+    PreparedAddressableBuffer(SILInstruction *insertPoint)
+      : insertPoint(insertPoint)
+    {}
+    
+    PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
+      : insertPoint(other.insertPoint)
+    {
+      other.insertPoint = nullptr;
+    }
+    
+    PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
+      insertPoint = other.insertPoint;
+      other.insertPoint = nullptr;
+      return *this;
+    }
+    
+    ~PreparedAddressableBuffer() {
+      if (insertPoint) {
+        // Remove the insertion point if it went unused.
+        insertPoint->eraseFromParent();
+      }
+    }
+  };
+  llvm::DenseMap<VarDecl *, PreparedAddressableBuffer> AddressableBuffers;
+  
+  /// Establish the scope for the addressable buffer that might be allocated
+  /// for a local variable binding.
+  ///
+  /// This must be enclosed within the scope of the value binding for the
+  /// variable, and cover the scope in which the variable can be referenced.
+  void enterLocalVariableAddressableBufferScope(VarDecl *decl);
+  
+  /// Get a stable address which is suitable for forming dependent pointers
+  /// if possible.
+  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
+                                             SILLocation loc,
+                                             ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
@@ -575,11 +675,58 @@ public:
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
+  class ExpectedExecutorStorage {
+    static ValueBase *invalid() {
+      return reinterpret_cast<ValueBase*>(uintptr_t(0));
+    }
+    static ValueBase *unnecessary() {
+      return reinterpret_cast<ValueBase*>(uintptr_t(1));
+    }
+    static ValueBase *lazy() {
+      return reinterpret_cast<ValueBase*>(uintptr_t(2));
+    }
+
+    ValueBase *Value;
+
+  public:
+    ExpectedExecutorStorage() : Value(invalid()) {}
+
+    bool isValid() const { return Value != invalid(); }
+
+    bool isNecessary() const {
+      assert(isValid());
+      return Value != unnecessary();
+    }
+    void setUnnecessary() {
+      assert(Value == invalid());
+      Value = unnecessary();
+    }
+
+    bool isEager() const {
+      assert(Value != invalid() && Value != unnecessary());
+      return Value != lazy();
+    }
+    SILValue getEager() const {
+      assert(isEager());
+      return Value;
+    }
+    void set(SILValue value) {
+      assert(Value == invalid());
+      assert(value != nullptr);
+      Value = value;
+    }
+
+    void setLazy() {
+      assert(Value == invalid());
+      Value = lazy();
+    }
+  };
+
   /// If set, the current function is an async function which is formally
   /// isolated to the given executor, and hop_to_executor instructions must
   /// be inserted at the begin of the function and after all suspension
   /// points.
-  SILValue ExpectedExecutor;
+  ExpectedExecutorStorage ExpectedExecutor;
 
   struct ActivePackExpansion {
     GenericEnvironment *OpenedElementEnv;
@@ -736,6 +883,15 @@ public:
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
   void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }
 
+  /// Can the generated code reference \c decl safely?
+  ///
+  /// Checks that the module defining \c decl is as visible to clients as the
+  /// code referencing it, preventing an inlinable function to reference an
+  /// implementation-only dependency and similar. This applies similar checks
+  /// as the exportability checker does to source code for decls referenced by
+  /// generated code.
+  bool referenceAllowed(ValueDecl *decl);
+
   std::optional<SILAccessEnforcement>
   getStaticEnforcement(VarDecl *var = nullptr);
   std::optional<SILAccessEnforcement>
@@ -815,15 +971,19 @@ public:
 
   /// Generates code for class/move only deallocating destructor. This calls the
   /// destroying destructor and then deallocates 'self'.
-  void emitDeallocatingDestructor(DestructorDecl *dd);
+  void emitDeallocatingDestructor(DestructorDecl *dd, bool isIsolated);
 
-  /// Generates code for a class deallocating destructor. This
+  /// Generates code for a class (isolated-)deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
-  void emitDeallocatingClassDestructor(DestructorDecl *dd);
+  void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
 
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
   void emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd);
+
+  /// Generates code for a class deallocating destructor that switches executor
+  /// and calls isolated deallocating destuctor on the right executor.
+  void emitIsolatingDestructor(DestructorDecl *dd);
 
   /// Whether we are inside a constructor whose hops are injected by
   /// definite initialization.
@@ -902,12 +1062,8 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
-  /// \param finishBB If set, used as the basic block after members have been
-  ///                 destroyed, and we're ready to perform final cleanups
-  ///                 before returning.
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
-                                  CleanupLocation cleanupLoc,
-                                  SILBasicBlock* finishBB);
+                                  CleanupLocation cleanupLoc);
 
   /// Generates code to destroy the instance variables of a move only non-class
   /// nominal type.
@@ -1013,18 +1169,21 @@ public:
                            bool isSelfConformance, bool isPreconcurrency,
                            std::optional<ActorIsolation> enterIsolation);
 
-  /// Generates subscript arguments for keypath. This function handles lowering
-  /// of all index expressions including default arguments.
+  /// Generates subscript or method arguments for keypath. This function handles
+  /// lowering of all arguments or index expressions including default
+  /// arguments.
   ///
   /// \returns Lowered index arguments.
-  /// \param subscript - The subscript decl who's arguments are being lowered.
-  /// \param subs - Used to get subscript function type and to substitute generic args.
-  /// \param argList - The argument list of the subscript.
-  SmallVector<ManagedValue, 4>
-  emitKeyPathSubscriptOperands(SILLocation loc,
-                               SubscriptDecl *subscript,
-                               SubstitutionMap subs,
-                               ArgumentList *argList);
+  /// \param decl - The subscript or method decl whose arguments are being
+  /// lowered.
+  /// \param subs - Used to get subscript or method function type and to
+  /// substitute generic args.
+  /// \param argList - The argument list of the
+  /// subscript or method.
+  SmallVector<ManagedValue, 4> emitKeyPathOperands(SILLocation loc,
+                                                   ValueDecl *decl,
+                                                   SubstitutionMap subs,
+                                                   ArgumentList *argList);
 
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
@@ -1154,17 +1313,6 @@ public:
   /// that unsafely inherits its executor.
   bool unsafelyInheritsExecutor();
 
-  /// A version of `emitHopToTargetActor` that is specialized to the needs
-  /// of various types of ConstructorDecls, like class or value initializers,
-  /// because their prolog emission is not the same as for regular functions.
-  ///
-  /// This function emits the appropriate hop_to_executor for a constructor's
-  /// prologue.
-  ///
-  /// NOTE: this does not support actor initializers!
-  void emitConstructorPrologActorHop(SILLocation loc,
-                                     std::optional<ActorIsolation> actorIso);
-
   /// Set the given global actor as the isolation for this function
   /// (generally a thunk) and hop to it.
   void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
@@ -1186,13 +1334,10 @@ public:
   void emitPreconditionCheckExpectedExecutor(
       SILLocation loc, SILValue executor);
 
-  /// Emit a precondition check to ensure that the closure is executing in
-  /// the expected isolation context.
-  void emitExpectedExecutorPreconditionForClosure();
-
-  /// Gets a reference to the current executor for the task.
-  /// \returns a value of type Builtin.Executor
-  SILValue emitGetCurrentExecutor(SILLocation loc);
+  /// Emit the expected executor value at the current position.
+  /// Returns a reference of some actor type, possibly optional,
+  /// possibly borrowed.
+  ManagedValue emitExpectedExecutor(SILLocation loc);
 
   /// Emit a "hoppable" reference to the executor value for the generic
   /// (concurrent) executor.
@@ -1250,6 +1395,11 @@ public:
   ManagedValue emitClosureIsolation(SILLocation loc, SILDeclRef constant,
                                     ArrayRef<ManagedValue> captures);
 
+  /// Emit the opaque isolation value for the current point of a function
+  /// with flow-sensitive isolation.
+  ManagedValue emitFlowSensitiveSelfIsolation(SILLocation loc,
+                                              ActorIsolation isolation);
+
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
@@ -1272,7 +1422,8 @@ public:
 
   /// Set up the ExpectedExecutor field for the current function and emit
   /// whatever hops or assertions are locally expected.
-  void emitExpectedExecutor();
+  void emitExpectedExecutorProlog();
+  void emitConstructorExpectedExecutorProlog();
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1379,6 +1530,16 @@ public:
   ManagedValue manageBufferForExprResult(SILValue buffer,
                                          const TypeLowering &bufferTL,
                                          SGFContext C);
+                                         
+  /// Tries to emit an argument referring to an addressable parameter as the
+  /// stable address of the parameter.
+  ///
+  /// Returns a null ManagedValue if the argument is not a parameter reference,
+  /// the referenced parameter is not addressable, or the requested
+  /// \c ownership is not compatible with the parameter's ownership. \c arg
+  /// is consumed only if the operation succeeds.
+  ManagedValue tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
+                                                    ValueOwnership ownership);
   
   //===--------------------------------------------------------------------===//
   // Type conversions for expr emission and thunks
@@ -1803,11 +1964,14 @@ public:
                                 const FunctionTypeInfo &typeContext,
                                 SubstitutionMap subs);
 
-  PreparedArguments prepareSubscriptIndices(SILLocation loc,
-                                            SubscriptDecl *subscript,
-                                            SubstitutionMap subs,
-                                            AccessStrategy strategy,
-                                            ArgumentList *argList);
+  /// Get substituted type for a given interface type, optionally apply a
+  /// substitution map if provided.
+  CanFunctionType prepareStorageType(ValueDecl *decl, SubstitutionMap subs);
+
+  /// Evaluate and associate arguments with their expressions.
+  PreparedArguments prepareIndices(SILLocation loc, CanFunctionType substFnType,
+                                   AccessStrategy strategy,
+                                   ArgumentList *argList);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
@@ -1827,6 +1991,18 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
+
+  RValue emitRValueForKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseFormalType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
+
+  RValue emitUnappliedKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
@@ -2136,12 +2312,14 @@ public:
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  std::pair<MultipleValueInstructionResult *, CleanupHandle>
+  std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
+             CleanupHandle>
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
                             SubstitutionMap subs, ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token);
+                               MultipleValueInstructionResult *token,
+                               SILValue allocation);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);
@@ -2464,6 +2642,25 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  /// Emit conversion from T.TangentVector to Optional<T>.TangentVector.
+  ManagedValue
+  emitTangentVectorToOptionalTangentVector(SILLocation loc,
+                                           ManagedValue input,
+                                           CanType wrappedType, // `T`
+                                           CanType inputType,   // `T.TangentVector`
+                                           CanType outputType,  // `Optional<T>.TangentVector`
+                                           SGFContext ctxt);
+
+  /// Emit conversion from Optional<T>.TangentVector to T.TangentVector.
+  ManagedValue
+  emitOptionalTangentVectorToTangentVector(SILLocation loc,
+                                           ManagedValue input,
+                                           CanType wrappedType, // `T`
+                                           CanType inputType,   // `Optional<T>.TangentVector`
+                                           CanType outputType,  // `T.TangentVector`
+                                           SGFContext ctxt);
+
+  
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//
@@ -2522,9 +2719,8 @@ public:
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
-  void emitDistributedIfRemoteBranch(SILLocation Loc,
-                                     ManagedValue selfValue, Type selfTy,
-                                     SILBasicBlock *isRemoteBB,
+  void emitDistributedIfRemoteBranch(SILLocation Loc, SILValue selfValue,
+                                     Type selfTy, SILBasicBlock *isRemoteBB,
                                      SILBasicBlock *isLocalBB);
 
   /// Notify transport that actor has initialized successfully,
@@ -2547,22 +2743,14 @@ public:
   /// \param actorSelf the SIL value representing the distributed actor instance
   void emitDistributedActorSystemResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
-  
-  /// Emit code that tests whether the distributed actor is local, and if so,
-  /// resigns the distributed actor's identity.
-  /// \param continueBB the target block where execution will continue after
-  ///                   the conditional call, whether actor is local or remote.
-  void emitConditionalResignIdentityCall(SILLocation loc,
-                                         ClassDecl *actorDecl,
-                                         ManagedValue actorSelf,
-                                         SILBasicBlock *continueBB,
-                                         SILBasicBlock *finishBB);
 
-  void emitDistributedActorClassMemberDestruction(
-      SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
-      SILBasicBlock *normalMemberDestroyBB,
-      SILBasicBlock *remoteMemberDestroyBB,
-      SILBasicBlock *finishBB);
+  /// Emits check for remote actor and a branch that implements deallocating
+  /// deinit for remote proxy. Calls \p emitLocalDeinit to generate branch for
+  /// local actor.
+  void
+  emitDistributedRemoteActorDeinit(SILValue selfValue, DestructorDecl *dd,
+                                   bool isIsolated,
+                                   llvm::function_ref<void()> emitLocalDeinit);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -2600,10 +2788,6 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
-    // No lowering support needed.
-  }
-
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 
@@ -2666,6 +2850,9 @@ public:
 
   /// Destroy the class member.
   void destroyClassMember(SILLocation L, ManagedValue selfValue, VarDecl *D);
+
+  /// Destroy the default actor implementation.
+  void emitDestroyDefaultActor(CleanupLocation cleanupLoc, SILValue selfValue);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);
@@ -2863,7 +3050,7 @@ public:
 
   /// Returns the SILDeclRef to use for references to the given accessor.
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
-    return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
+    return SGM.getFuncDeclRef(accessor, F.getResilienceExpansion());
   }
 
   /// Given a lowered pack expansion type, produce a generic environment

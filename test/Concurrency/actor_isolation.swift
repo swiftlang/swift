@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -target %target-swift-5.1-abi-triple -parse-as-library
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 import GlobalVariables
 import OtherActors // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
@@ -742,7 +742,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
     // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 
@@ -752,7 +752,7 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
       // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
   }
@@ -834,21 +834,31 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l32: Int = v
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l34: Int = self.v
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 
     nonisolated lazy var l41: Int = { l }()
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l42: Int = l
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l43: Int = { self.l }()
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l44: Int = self.l
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l45: Int = { [unowned self] in self.l }()
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
 }
 
 // Infer global actors from context only for instance members.
@@ -1494,15 +1504,18 @@ class MA {
 @SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
 
 protocol SGA_Proto {
-  @SomeGlobalActor func method() // expected-note {{mark the protocol requirement 'method()' 'async' to allow actor-isolated conformances}}
+  @SomeGlobalActor func method()
 }
 
 // try to override a MA method with inferred isolation from a protocol requirement
+// expected-warning@+1{{conformance of 'SGA_MA' to protocol 'SGA_Proto' involves isolation mismatches and can cause data races}}
 class SGA_MA: MA, SGA_Proto {
+  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
+  
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated protocol requirement}}
+  // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
-  // expected-note@-1{{add 'nonisolated' to 'method()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {
@@ -1604,13 +1617,14 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 class NonSendable {}
 
 protocol NonisolatedProtocol {
-  var ns: NonSendable { get } // expected-note {{'ns' declared here}}
+  var ns: NonSendable { get }
 }
 
+// expected-warning@+1{{conformance of 'ActorWithNonSendableLet' to protocol 'NonisolatedProtocol' crosses into actor-isolated code and can cause data races}}
 actor ActorWithNonSendableLet: NonisolatedProtocol {
-  // expected-note@-1{{add '@preconcurrency' to the 'NonisolatedProtocol' conformance to defer isolation checking to run time}}{{32-32=@preconcurrency }}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{32-32=@preconcurrency }}
 
-  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in the Swift 6 language mode}}
+  // expected-note@+1 {{actor-isolated property 'ns' cannot satisfy nonisolated requirement}}
   let ns = NonSendable()
 }
 

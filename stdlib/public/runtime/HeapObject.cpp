@@ -1113,7 +1113,7 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
   return dest;
 }
 
-#ifndef NDEBUG
+#ifndef NDEBUG // "not not debug", or "debug-able configurations"
 
 /// Returns true if the "immutable" flag is set on \p object.
 ///

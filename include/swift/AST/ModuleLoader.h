@@ -35,7 +35,7 @@
 
 namespace llvm {
 class FileCollectorBase;
-class TreePathPrefixMapper;
+class PrefixMapper;
 namespace vfs {
 class OutputBackend;
 }
@@ -184,7 +184,6 @@ struct SubCompilerInstanceInfo {
   CompilerInstance* Instance;
   StringRef Hash;
   ArrayRef<StringRef> BuildArguments;
-  ArrayRef<StringRef> ExtraPCMArgs;
 };
 
 /// Abstract interface for a checker of module interfaces and prebuilt modules.
@@ -210,15 +209,16 @@ struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubContext(StringRef moduleName,
                                           StringRef interfacePath,
                                           StringRef sdkPath,
+                                          std::optional<StringRef> sysroot,
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
-                                       ArrayRef<StringRef>,
                                        ArrayRef<StringRef>, StringRef,
                                        StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
                                                    StringRef sdkPath,
+                                                   std::optional<StringRef> sysroot,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
                                                    bool silenceErrors,
@@ -372,12 +372,11 @@ public:
   /// if no such module exists.
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName,
-                        StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+                        StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper = nullptr,
+                        llvm::PrefixMapper *mapper = nullptr,
                         bool isTestableImport = false) = 0;
 };
 

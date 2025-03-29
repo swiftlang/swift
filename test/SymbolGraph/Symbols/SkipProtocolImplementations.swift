@@ -36,7 +36,6 @@
 // There should only be three symbols with sourceOrigin information:
 // - SomeStruct.otherFunc()
 // - ExtraStruct.Inner
-// - HiddenStruct.T
 // (ExtraStruct.Inner will have two sourceOrigins because it has two relationships: a memberOf and a
 // conformsTo)
 // COUNT-COUNT-4: sourceOrigin

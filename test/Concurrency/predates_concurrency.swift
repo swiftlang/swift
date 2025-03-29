@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 
@@ -201,9 +201,9 @@ class C { // expected-complete-tns-note {{'C' does not conform to the 'Sendable'
     func doNext() { // expected-complete-tns-warning {{concurrently-executed local function 'doNext()' must be marked as '@Sendable'}}
       doPreconcurrency {
         self.ev?.scheduleTask(deadline: i, doNext)
-        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a `@Sendable` closure}}
+        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a '@Sendable' closure}}
         // expected-complete-tns-warning @-2 {{converting non-sendable function value to '@Sendable () throws -> ()' may introduce data races}}
-        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
         // expected-complete-tns-note @-4 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         return
       }
@@ -227,17 +227,16 @@ nonisolated func blah() {
 
 protocol NotIsolated {
   func requirement()
-  // expected-complete-tns-note@-1 {{mark the protocol requirement 'requirement()' 'async' to allow actor-isolated conformances}}
 }
 
+// expected-complete-tns-warning@+1{{conformance of 'MainActorPreconcurrency' to protocol 'NotIsolated' crosses into main actor-isolated code and can cause data races}}
 extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-note@-1{{add '@preconcurrency' to the 'NotIsolated' conformance to suppress isolation-related diagnostics}}{{36-36=@preconcurrency }}
-  // expected-complete-tns-note@-2{{add '@preconcurrency' to the 'NotIsolated' conformance to defer isolation checking to run time}}{{36-36=@preconcurrency }}
-
+  // expected-complete-tns-note@-2{{turn data races into runtime errors with '@preconcurrency'}}{{36-36=@preconcurrency }}
+  // expected-complete-tns-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
   func requirement() {}
-  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
-  // expected-complete-tns-note@-2 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
-  // expected-complete-tns-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note@-1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
+  // expected-complete-tns-note@-2 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
 
 
   class Nested {
@@ -271,6 +270,19 @@ do {
       nil
     }
 
+    @preconcurrency
+    open var test5: (@MainActor () -> Void)? { // expected-note {{overridden declaration is here}}
+      nil
+    }
+
+    open var test6: (@MainActor () -> Void)? { // expected-note {{attempt to override property here}}
+      nil
+    }
+
+    @preconcurrency
+    func test7(_: (@MainActor () -> Void)? = nil) { // expected-note {{overridden declaration is here}}
+    }
+
     init() {
       self.test1 = nil
       self.test2 = [:]
@@ -300,6 +312,20 @@ do {
     override var test4: (((any Sendable)?) -> Void)? {
       // expected-warning@-1 {{declaration 'test4' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
       nil
+    }
+
+    override var test5: (() -> Void)? {
+      // expected-warning@-1 {{declaration 'test5' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+      nil
+    }
+
+    override var test6: (() -> Void)? {
+      // expected-error@-1 {{property 'test6' with type '(() -> Void)?' cannot override a property with type '(@MainActor () -> Void)?'}}
+      nil
+    }
+
+    override func test7(_: (() -> Void)?) {
+      // expected-warning@-1 {{declaration 'test7' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
     }
   }
 }

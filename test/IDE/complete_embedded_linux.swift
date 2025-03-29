@@ -1,7 +1,7 @@
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=linux-gnu
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_feature_Embedded
 // RUN: %batch-code-completion -enable-experimental-feature Embedded
 
 func test() {
@@ -11,6 +11,6 @@ func test() {
 // GLOBAL: Literal[Boolean]/None:              false[#Bool#];
 // GLOBAL: Literal[Nil]/None:                  nil;
 // GLOBAL: Literal[String]/None:               "{#(abc)#}"[#String#];
-// GLOBAL: Literal[Array]/None:                [{#(values)#}][#Array#];
-// GLOBAL: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
+// GLOBAL: Literal[Array]/None:                [{#(values)#}][#Array<Element>#];
+// GLOBAL: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#];
 }

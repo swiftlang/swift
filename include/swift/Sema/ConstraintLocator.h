@@ -256,6 +256,10 @@ public:
   /// of the key path at some index.
   bool isKeyPathSubscriptComponent() const;
 
+  /// Determine whether this locator points to a member component
+  /// of the key path at some index.
+  bool isKeyPathMemberComponent() const;
+
   /// Determine whether this locator points to the member found
   /// via key path dynamic member lookup.
   bool isForKeyPathDynamicMemberLookup() const;
@@ -748,6 +752,18 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::KeyPathComponent;
+  }
+};
+
+class LocatorPathElt::ProtocolCompositionMemberType final : public StoredIntegerElement<1> {
+public:
+  ProtocolCompositionMemberType(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::GenericArgument, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ProtocolCompositionMemberType;
   }
 };
 
@@ -1263,7 +1279,7 @@ public:
 
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
-          return elt.getKind() != ConstraintLocator::OptionalPayload &&
+          return elt.getKind() != ConstraintLocator::OptionalInjection &&
                  elt.getKind() != ConstraintLocator::GenericArgument;
         });
 
@@ -1277,6 +1293,21 @@ public:
     if (auto lastElt = last()) {
       auto requirement = lastElt->getAs<LocatorPathElt::AnyRequirement>();
       return requirement && kind == requirement->getRequirementKind();
+    }
+    return false;
+  }
+
+  bool isForExistentialMemberAccessConversion() const {
+    for (auto prev = this; prev;
+         prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+      if (auto elt = prev->element) {
+        if (elt->is<LocatorPathElt::ExistentialMemberAccessConversion>())
+          return true;
+      }
+
+      if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>())
+        return bool(locator->findLast<
+                    LocatorPathElt::ExistentialMemberAccessConversion>());
     }
     return false;
   }

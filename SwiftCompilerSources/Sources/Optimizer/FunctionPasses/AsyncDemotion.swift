@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 private struct Stats: CustomStringConvertible {
@@ -122,8 +123,7 @@ enum Executor: CustomStringConvertible, Hashable {
         assert(enm.payload == nil, "expected empty payload case for a def")
         def = .nonisolated
 
-      } else if value.type.isNominal {
-        let nom = value.type.nominal
+      } else if let nom = value.type.nominal {
         def = nom.isGlobalActor ? .globalActor(nom) : .unknown(value.hashable)
 
       } else {

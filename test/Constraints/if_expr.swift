@@ -706,3 +706,25 @@ func testInvalidOptionalChainingInIfContext() {
   let v63796 = 1
   if v63796? {} // expected-error{{cannot use optional chaining on non-optional value of type 'Int'}}
 }
+
+// https://github.com/swiftlang/swift/issues/79395
+_ = {
+  if .random() {
+    struct S: Error {}
+    throw S()
+  } else {
+    1
+  }
+}
+_ = {
+  if .random() {
+    if .random() {
+      struct S: Error {}
+      throw S()
+    } else {
+      0
+    }
+  } else {
+    1
+  }
+}

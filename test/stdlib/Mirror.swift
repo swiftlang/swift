@@ -27,6 +27,7 @@
 // REQUIRES: reflection
 
 // rdar://96439408
+// UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
@@ -1667,6 +1668,48 @@ mirrors.test("MetatypeMirror") {
       "- Mirror.SomeNativeProto & Mirror.SomeOtherNativeProto #0\n",
       output)
   }
+}
+
+class MetatypeExampleClass {}
+class MetatypeExampleSubclass: MetatypeExampleClass {}
+final class MetatypeExampleFinalClass {}
+enum MetatypeExampleEnum {}
+struct MetatypeContainer {
+  var before = 42
+  var before2 = 43
+  var structType = String.self
+  var enumType = MetatypeExampleEnum.self
+  var tupleType = (Int, String, AnyObject).self
+  var functionType = (() -> Void).self
+  var classType = MetatypeExampleClass.self
+  var subclassType: MetatypeExampleClass.Type = MetatypeExampleSubclass.self
+  var finalClassType = MetatypeExampleFinalClass.self
+  var existentialType: (any Any).Type = Any.self
+  var existentialType2: Any.Type = Any.self
+  var after = 45
+}
+
+mirrors.test("MetatypeFields") {
+  var output = ""
+  let container = MetatypeContainer()
+  dump(container, to: &output)
+  expectEqual("""
+    ▿ Mirror.MetatypeContainer
+      - before: 42
+      - before2: 43
+      - structType: Swift.String #0
+      - enumType: Mirror.MetatypeExampleEnum #1
+      - tupleType: (Swift.Int, Swift.String, Swift.AnyObject) #2
+      - functionType: () -> () #3
+      - classType: Mirror.MetatypeExampleClass #4
+      - subclassType: Mirror.MetatypeExampleSubclass #5
+      - finalClassType: Mirror.MetatypeExampleFinalClass #6
+      - existentialType: Any #7
+      - existentialType2: Any #7
+      - after: 45
+
+    """,
+    output)
 }
 
 //===--- Tuples -----------------------------------------------------------===//

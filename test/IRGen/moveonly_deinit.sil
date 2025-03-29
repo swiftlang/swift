@@ -2,6 +2,8 @@
 // RUN: %{python} %utils/chex.py < %s > %t/moveonly_deinit.sil
 // RUN: %target-swift-frontend -enable-experimental-feature MoveOnlyEnumDeinits -emit-ir %t/moveonly_deinit.sil | %FileCheck %t/moveonly_deinit.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 // UNSUPPORTED: CPU=arm64e
 
 import Builtin
@@ -207,7 +209,7 @@ entry(%b : $*MOEnum):
 
 // CHECK-LABEL: define{{.*}}@destroy_combo_struct_value(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:   call {{.*}} @[[COMBO_STRUCT_OUTLINED_DESTROY:"\$.*13MOComboStructVWOs"]](
+// CHECK-NEXT:   call {{.*}} @[[COMBO_STRUCT_OUTLINED_DESTROY:"\$.*13MOComboStructVWOh"]](
 // CHECK-NEXT:   ret void
 sil @destroy_combo_struct_value : $@convention(thin) (@owned MOComboStruct) -> () {
 entry(%b : $MOComboStruct):

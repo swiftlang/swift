@@ -132,6 +132,15 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     Visitor.addAsyncFunctionPointer(declRef);
   }
 
+  void addCoroFunctionPointer(SILDeclRef declRef) {
+    auto silLinkage = effectiveLinkageForClassMember(
+        declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
+    if (shouldSkipVisit(silLinkage))
+      return;
+
+    Visitor.addCoroFunctionPointer(declRef);
+  }
+
   void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
                                     const AutoDiffConfig &config,
                                     AutoDiffLinearMapKind kind) {
@@ -152,7 +161,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     AutoDiffConfig silConfig{
         loweredParamIndices, config.resultIndices,
         autodiff::getDifferentiabilityWitnessGenericSignature(
@@ -207,7 +216,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         autodiff::getDifferentiabilityWitnessGenericSignature(
             original->getGenericSignature(), derivativeGenericSignature)};
 
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     auto mangledName = mangler.mangleSILDifferentiabilityWitness(
         originalMangledName, kind, config);
 
@@ -482,6 +491,9 @@ public:
 
     addFunction(SILDeclRef(AFD));
 
+    ASSERT(ABIRoleInfo(AFD).providesAPI()
+              && "SILSymbolVisitorImpl visiting ABI-only decl?");
+
     if (auto dynKind = getDynamicKind(AFD)) {
       // Add the global function pointer for a dynamically replaceable function.
       Visitor.addDynamicFunction(AFD, *dynKind);
@@ -529,6 +541,12 @@ public:
 
     if (AFD->hasAsync()) {
       addAsyncFunctionPointer(SILDeclRef(AFD));
+    }
+
+    auto *accessor = dyn_cast<AccessorDecl>(AFD);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
     // Skip non objc compatible methods or non-public methods.
@@ -715,9 +733,9 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    // Destructors come in two forms (deallocating and non-deallocating), like
-    // constructors above. Classes use both but move only non-class nominal
-    // types only use the deallocating one. This is the deallocating one:
+    // Destructors come in three forms (non-deallocating, deallocating, isolated
+    // deallocating) Classes use all three but move only non-class nominal types
+    // only use the deallocating one. This is the deallocating one:
     visitAbstractFunctionDecl(DD);
 
     if (auto parentClass = DD->getParent()->getSelfClassDecl()) {
@@ -726,10 +744,18 @@ public:
         addFunction(SILDeclRef(DD, SILDeclRef::Kind::Destroyer));
       }
     }
+
+    // And isolated also does not always exist
+    if (Lowering::needsIsolatingDestructor(DD)) {
+      addFunction(SILDeclRef(DD, SILDeclRef::Kind::IsolatedDeallocator));
+    }
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto nominal = ED->getExtendedNominal();
+    if (!nominal)
+      return;
+
     if (canSkipNominal(nominal))
       return;
 
@@ -757,8 +783,6 @@ public:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
-    case DeclKind::IfConfig:
-    case DeclKind::PoundDiagnostic:
       return true;
     case DeclKind::OpaqueType:
     case DeclKind::Enum:
@@ -816,6 +840,16 @@ public:
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
           }
+          auto *decl =
+              llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
+          if (decl && decl->hasBody()) {
+            Visitor.addFunction(declRef);
+            auto *accessor = dyn_cast<AccessorDecl>(decl);
+            if (accessor && requiresFeatureCoroutineAccessors(
+                                accessor->getAccessorKind())) {
+              Visitor.addCoroFunctionPointer(SILDeclRef(accessor));
+            }
+          }
         }
 
         void addAssociatedType(AssociatedType associatedType) {
@@ -850,8 +884,7 @@ public:
 #ifndef NDEBUG
     // There are currently no symbols associated with the members of a protocol;
     // each conforming type has to handle them individually.
-    // (NB. anything within an active IfConfigDecls also appears outside). Let's
-    // assert this fact:
+    // Let's assert this fact:
     for (auto *member : PD->getMembers()) {
       assert(isExpectedProtocolMember(member) &&
              "unexpected member of protocol during TBD generation");
@@ -875,14 +908,12 @@ public:
   void visit##CLASS##Decl(CLASS##Decl *) {}
 
   UNINTERESTING_DECL(EnumCase)
-  UNINTERESTING_DECL(IfConfig)
   UNINTERESTING_DECL(Import)
   UNINTERESTING_DECL(MacroExpansion)
   UNINTERESTING_DECL(Missing)
   UNINTERESTING_DECL(MissingMember)
   UNINTERESTING_DECL(Operator)
   UNINTERESTING_DECL(PatternBinding)
-  UNINTERESTING_DECL(PoundDiagnostic)
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)

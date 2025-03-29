@@ -476,7 +476,7 @@ func r25178926(_ a : Type) {
   switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo, .Bar where 1 != 100:
-    // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this 'case'}}
     // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{14-14=\n       }}
     // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{12-12= where 1 != 100}}
     break
@@ -501,6 +501,34 @@ func r25178926(_ a : Type) {
   // expected-note@-3 {{add missing cases}}
   case .Foo where 1 != 100, .Bar where 1 != 100:
     break
+  }
+}
+
+func testAmbiguousWhereInCatch() {
+  protocol P1 {}
+  protocol P2 {}
+  func throwingFn() throws {}
+  do {
+    try throwingFn()
+  } catch is P1, is P2 where .random() {
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this 'catch'}}
+    // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{18-18=\n          }}
+    // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{16-16= where .random()}}
+  } catch {
+
+  }
+  do {
+    try throwingFn()
+  } catch is P1,
+          is P2 where .random() {
+  } catch {
+
+  }
+  do {
+    try throwingFn()
+  } catch is P1 where .random(), is P2 where .random() {
+  } catch {
+
   }
 }
 

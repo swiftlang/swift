@@ -89,6 +89,9 @@ static SILValue getBaseValue(SILValue addr) {
       case ValueKind::BeginAccessInst:
         addr = cast<BeginAccessInst>(addr)->getOperand();
         break;
+      case ValueKind::MarkDependenceInst:
+        addr = cast<MarkDependenceInst>(addr)->getValue();
+        break;
       default:
         return addr;
     }
@@ -334,6 +337,14 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         if (!cast<LoadBorrowInst>(user)->getUsersOfType<BranchInst>().empty())
           return false;
         break;
+      case SILInstructionKind::MarkDependenceInst: {
+        auto *mdi = cast<MarkDependenceInst>(user);
+        if (use == &mdi->getAllOperands()[MarkDependenceInst::Dependent]) {
+          if (!analyzeLocationUsesRecursively(mdi, locIdx, collectedVals, subLocationMap))
+            return false;
+        }
+        break;
+      }
       case SILInstructionKind::DebugValueInst:
         if (cast<DebugValueInst>(user)->hasAddrVal())
           break;
@@ -425,7 +436,7 @@ bool MemoryLocations::analyzeAddrProjection(
       // open_existential_addr).
       if (!isa<OpenExistentialAddrInst>(loc->representativeValue))
         return false;
-      assert(loc->representativeValue->getType().isOpenedExistential());
+      assert(loc->representativeValue->getType().is<ExistentialArchetypeType>());
       loc->representativeValue = projection;
     }
   }

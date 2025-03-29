@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Async Let -------------------------------------------------------------
 // Only has internal / builtin functions as it is not really accessible directly

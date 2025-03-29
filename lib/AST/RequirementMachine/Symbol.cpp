@@ -113,7 +113,7 @@ struct Symbol::Storage final
   }
 
   Storage(CanType type, ArrayRef<Term> substitutions, const ProtocolDecl *proto) {
-    DEBUG_ASSERT(!type->hasTypeVariable());
+    ASSERT(!type->hasTypeVariable());
     ASSERT(type->hasTypeParameter() != substitutions.empty());
 
     Kind = Symbol::Kind::ConcreteConformance;
@@ -684,6 +684,15 @@ Symbol Symbol::transformConcreteSubstitutions(
     return *this;
 
   return withConcreteSubstitutions(substitutions, ctx);
+}
+
+bool Symbol::containsNameSymbols() const {
+  for (auto t : getSubstitutions()) {
+    if (t.containsNameSymbols())
+      return true;
+  }
+
+  return false;
 }
 
 /// Print the symbol using our mnemonic representation.

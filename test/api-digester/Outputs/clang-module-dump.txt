@@ -623,16 +623,8 @@
       "children": [
         {
           "kind": "TypeNominal",
-          "name": "Paren",
-          "printedName": "(__ObjC.__va_list_tag)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "__va_list_tag",
-              "printedName": "__ObjC.__va_list_tag",
-              "usr": "c:@S@__va_list_tag"
-            }
-          ],
+          "name": "__va_list_tag",
+          "printedName": "__ObjC.__va_list_tag",
           "usr": "c:@S@__va_list_tag"
         }
       ],

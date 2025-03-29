@@ -68,6 +68,8 @@ private:
 /// not part of the enclosing context.
 FeatureSet getUniqueFeaturesUsed(Decl *decl);
 
+bool usesFeatureIsolatedDeinit(const Decl *decl);
+
 } // end namespace swift
 
 #endif /* SWIFT_AST_FEATURES_H */

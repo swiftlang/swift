@@ -4,7 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency func send(_: Sendable) { }
 func sendOpt(_: Sendable?) { }

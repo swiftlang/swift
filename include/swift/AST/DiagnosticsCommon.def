@@ -47,11 +47,15 @@ ERROR(error_no_group_info,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-WARNING(error_in_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_swift_lang_mode,none,
         "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
 
-WARNING(error_in_a_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_a_future_swift_lang_mode,none,
         "%0; this will be an error in a future Swift language mode",
         (DiagnosticInfo *))
 
@@ -73,14 +77,20 @@ ERROR(class_subscript_not_in_class,none,
       "class subscripts are only allowed within classes; "
       "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 subscript", (bool))
 
-ERROR(require_static_for_const,none,
+ERROR(require_static_for_literal,none,
       "'static' is required for _const variable declaration", ())
 
-ERROR(require_let_for_const,none,
+ERROR(require_let_for_literal,none,
       "let is required for a _const variable declaration", ())
 
+ERROR(require_literal_initializer_for_literal,none,
+      "_const let should be initialized with a literal value", ())
+      
 ERROR(require_const_initializer_for_const,none,
-      "_const let should be initialized with a compile-time literal", ())
+      "@const value should be initialized with a compile-time value", ())
+
+ERROR(require_const_arg_for_parameter,none,
+      "expected a compile-time value for a '@const' parameter", ())
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
@@ -116,10 +126,6 @@ ERROR(generic_signature_not_valid,none,
 ERROR(generic_signature_not_equal,none,
       "generic signature %0 is not equal to new signature %1",
       (StringRef, StringRef))
-
-// Used in diagnostics that are split across requests implemented in several places.
-ERROR(concurrency_default_actor_not_found,none,
-      "broken standard library: cannot find default actor type '%0'", (StringRef))
 
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
@@ -212,14 +218,34 @@ ERROR(scanner_arguments_invalid, none,
 ERROR(error_scanner_extra, none,
       "failed inside dependency scanner: '%0'", (StringRef))
 
-WARNING(warn_scanner_deserialize_failed, none,
-        "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
+REMARK(warn_scanner_deserialize_failed, none,
+       "Incremental module scan: Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
 REMARK(remark_reuse_cache, none,
-       "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
+       "Incremental module scan: Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
+
+REMARK(remark_scanner_uncached_lookups, none,
+       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
 
 REMARK(remark_save_cache, none,
-       "Serializing module scanning dependency cache to: '%0'.", (StringRef))
+       "Incremental module scan: Serializing module scanning dependency cache to: '%0'.", (StringRef))
+
+REMARK(remark_scanner_stale_result_invalidate, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to a modified input"
+       " since last scan: '%1'.", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_upstream, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to an out-of-date"
+       " dependency.", (StringRef))
+
+REMARK(remark_scanner_invalidate_configuration, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to wrong configuration.", (StringRef))
+
+REMARK(remark_scanner_invalidate_cas_error, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to cas error: %1", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_missing_cas, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to missing CAS input '%1'.", (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics
@@ -236,6 +262,13 @@ NOTE(in_macro_expansion,none,
 ERROR(macro_experimental,none,
       "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
       (StringRef, StringRef))
+      
+//------------------------------------------------------------------------------
+// MARK: lexical lookup diagnostics
+//------------------------------------------------------------------------------
+      
+ERROR(lookup_outputs_dont_match,none,
+"Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics
@@ -246,6 +279,13 @@ WARNING(bridged_warning, none,"%0", (StringRef))
 ERROR(bridged_error, none, "%0", (StringRef))
 ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
 REMARK(bridged_remark, none, "%0", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: #warning and #error
+//------------------------------------------------------------------------------
+
+WARNING(pound_warning, none, "%0", (StringRef))
+ERROR(pound_error, none, "%0", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

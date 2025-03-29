@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 // This is a copy of test/expr/primary/keypath/keypath-observe-objc.swift with additional requirements to test sendable key paths
 

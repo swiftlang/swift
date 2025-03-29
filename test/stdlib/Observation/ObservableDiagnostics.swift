@@ -8,6 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: rdar112623492
+// REQUIRES: swift_feature_Macros
 
 import Observation
 

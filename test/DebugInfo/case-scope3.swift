@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name a -parse-as-library -emit-sil -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name a -parse-as-library -Xllvm -sil-print-types -emit-sil -g %s | %FileCheck %s
 
 enum E {
 case integerValue(Int?)

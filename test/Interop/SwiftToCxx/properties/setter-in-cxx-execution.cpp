@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/setter-in-cxx.swift -typecheck -module-name Properties -clang-header-expose-decls=all-public -emit-clang-header-path %t/properties.h
+// RUN: %target-swift-frontend %S/setter-in-cxx.swift -module-name Properties -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/properties.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-props-execution.o
 // RUN: %target-interop-build-swift %S/setter-in-cxx.swift -o %t/swift-props-execution -Xlinker %t/swift-props-execution.o -module-name Properties -Xfrontend -entry-point-function-name -Xfrontend swiftMain

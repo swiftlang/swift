@@ -12,7 +12,7 @@
 
 // Second test (bonus): check if the optimization is done: statically initialize the array of function pointers.
 
-// RUN: %target-build-swift -O -wmo -parse-as-library -module-name=Test %s -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-build-swift -O -wmo -parse-as-library -module-name=Test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
 
 // REQUIRES: executable_test
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
@@ -36,7 +36,7 @@ public struct S: P {
   }
 }
 
-// CHECK-SIL-LABEL: sil_global private @$s4Test8funcPtrs{{.*}}_WZTv_ : $_ContiguousArrayStorage<FuncPtr> = {
+// CHECK-SIL-LABEL: sil_global private [let] @$s4Test8funcPtrs{{.*}}_WZTv_ : $_ContiguousArrayStorage<FuncPtr> = {
 // CHECK-SIL: %{{[0-9]+}} = function_ref @$s4Test7FuncPtr{{.*}}Tg5 : $@convention(thin) () -> ()
 // CHECK-SIL: %initval = object $_ContiguousArrayStorage<FuncPtr> ({{%[0-9]+}} : $_ArrayBody, [tail_elems] {{%[0-9]+}} : $FuncPtr, {{%[0-9]+}} : $FuncPtr)
 private let funcPtrs = [

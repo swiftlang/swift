@@ -7,7 +7,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s 2>&1 | %FileCheck %s
 
 import Distributed
 

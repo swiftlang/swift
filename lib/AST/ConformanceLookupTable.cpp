@@ -16,6 +16,7 @@
 
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -148,19 +149,13 @@ void ConformanceLookupTable::destroy() {
 
 namespace {
   struct ConformanceConstructionInfo : public Located<ProtocolDecl *> {
-    /// The location of the "unchecked" attribute, if present.
-    const SourceLoc uncheckedLoc;
-
-    /// The location of the "preconcurrency" attribute if present.
-    const SourceLoc preconcurrencyLoc;
+    ConformanceAttributes attributes;
 
     ConformanceConstructionInfo() { }
 
     ConformanceConstructionInfo(ProtocolDecl *item, SourceLoc loc,
-                                SourceLoc uncheckedLoc,
-                                SourceLoc preconcurrencyLoc)
-        : Located(item, loc), uncheckedLoc(uncheckedLoc),
-          preconcurrencyLoc(preconcurrencyLoc) {}
+                                ConformanceAttributes attributes)
+        : Located(item, loc), attributes(attributes) {}
   };
 }
 
@@ -216,7 +211,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       registerProtocolConformances(next, conformances);
       for (auto conf : conformances) {
         protocols.push_back(
-            {conf->getProtocol(), SourceLoc(), SourceLoc(), SourceLoc()});
+            {conf->getProtocol(), SourceLoc(), ConformanceAttributes()});
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
@@ -225,8 +220,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, inverses, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-          protocols.push_back(
-              {proto, found.Loc, found.uncheckedLoc, found.preconcurrencyLoc});
+          protocols.push_back({proto, found.Loc, found.attributes});
       }
     }
 
@@ -313,9 +307,8 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                   kp.has_value() &&
                       "suppressed conformance for non-known protocol!?");
             if (!found.isSuppressed) {
-              addProtocol(proto, found.Loc,
-                          source.withUncheckedLoc(found.uncheckedLoc)
-                                .withPreconcurrencyLoc(found.preconcurrencyLoc));
+              addProtocol(
+                  proto, found.Loc, source.withAttributes(found.attributes));
             }
           }
 
@@ -329,8 +322,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           for (auto locAndProto : protos)
             addProtocol(
                 locAndProto.Item, locAndProto.Loc,
-                source.withUncheckedLoc(locAndProto.uncheckedLoc)
-                      .withPreconcurrencyLoc(locAndProto.preconcurrencyLoc));
+                source.withAttributes(locAndProto.attributes));
         });
     break;
 
@@ -981,8 +973,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     auto normalConf = ctx.getNormalConformance(
         conformingType, protocol, conformanceLoc, conformingDC,
         ProtocolConformanceState::Incomplete,
-        entry->Source.getUncheckedLoc().isValid(),
-        entry->Source.getPreconcurrencyLoc().isValid(),
+        entry->Source.getOptions(),
         entry->Source.getPreconcurrencyLoc());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the

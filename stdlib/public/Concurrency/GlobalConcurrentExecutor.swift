@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // None of TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -32,6 +31,7 @@ import Swift
 ///
 /// Customizing the global concurrent executor is currently not supported.
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
     _DefaultGlobalConcurrentExecutor.shared
@@ -44,6 +44,7 @@ public var globalConcurrentExecutor: any TaskExecutor {
 /// thread pool that is used as the default executor for Swift concurrency
 /// tasks.
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
   public static let shared: _DefaultGlobalConcurrentExecutor = .init()
 

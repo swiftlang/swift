@@ -25,10 +25,12 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
@@ -180,6 +182,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::Allocator:
     return getMagicFunctionName(cast<ConstructorDecl>(ref.getDecl()));
   case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator:
   case SILDeclRef::Kind::Destroyer:
     return getMagicFunctionName(cast<DestructorDecl>(ref.getDecl()));
   case SILDeclRef::Kind::GlobalAccessor:
@@ -206,6 +209,35 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+bool SILGenFunction::referenceAllowed(ValueDecl *decl) {
+  // Use in any non-fragile functions.
+  if (FunctionDC->getResilienceExpansion() == ResilienceExpansion::Maximal)
+    return true;
+
+  // Allow same-module references.
+  auto *targetMod = decl->getDeclContext()->getParentModule();
+  auto *thisMod = FunctionDC->getParentModule();
+  if (thisMod == targetMod)
+    return true;
+
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilterKind::SPIOnly};
+  if (thisMod->getResilienceStrategy() != ResilienceStrategy::Resilient)
+    filter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
+
+  // Look through public module local imports and their reexports.
+  llvm::SmallVector<ImportedModule, 8> imports;
+  thisMod->getImportedModules(imports, filter);
+  auto &importCache = getASTContext().getImportCache();
+  for (auto &import : imports) {
+    if (importCache.isImportedBy(targetMod, import.importedModule))
+      return true;
+  }
+  return false;
 }
 
 SILDebugLocation SILGenFunction::getSILDebugLocation(
@@ -293,7 +325,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   if (!Info.astNode)
     return Result;
   // Keep this in sync with ASTMangler::appendMacroExpansionContext().
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(FunctionDC->getASTContext());
   switch (Info.kind) {
   case GeneratedSourceInfo::ExpressionMacroExpansion: {
     auto parent = ASTNode::getFromOpaqueValue(Info.astNode);
@@ -347,6 +379,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     break;
   }
   return Result;
@@ -737,7 +770,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       }
     };
 
-    auto Entry = found->second;
+    auto &Entry = found->second;
     auto val = Entry.value;
 
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
@@ -1040,8 +1073,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
-        (hasErasedIsolation ? SILFunctionTypeIsolation::Erased
-                            : SILFunctionTypeIsolation::Unknown);
+        (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
+                            : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
                            calleeConvention, resultIsolation);
@@ -1814,7 +1847,7 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
   PartialApplyInst *setterPAI =
       B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
@@ -1866,7 +1899,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
 

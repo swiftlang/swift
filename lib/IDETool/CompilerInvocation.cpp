@@ -17,8 +17,8 @@
 #include "swift/Frontend/Frontend.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/TargetInfo.h"
-#include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/PCHContainerOperations.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Serialization/ASTReader.h"
@@ -327,9 +327,6 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
       CCArgs.push_back("-iquote");
       CCArgs.push_back(Entry.Path);
       break;
-    case clang::frontend::IndexHeaderMap:
-      CCArgs.push_back("-index-header-map");
-      LLVM_FALLTHROUGH;
     case clang::frontend::Angled: {
       std::string Flag;
       if (Entry.IsFramework)

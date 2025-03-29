@@ -113,7 +113,7 @@ macro(configure_sdks_darwin)
   set(macosx_ver "13.0")
   set(iphoneos_ver "16.0")
   set(appletvos_ver "16.0")
-  set(watchos_ver "9.0")
+  set(watchos_ver "6.0")
 
   set(macosx_vendor "apple")
   set(iphoneos_vendor "apple")

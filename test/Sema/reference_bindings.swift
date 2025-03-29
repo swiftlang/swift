@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ReferenceBindings
 
+// REQUIRES: swift_feature_ReferenceBindings
+
 var globalValue = String()
 class Klass {
     var sStored: String = ""

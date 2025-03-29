@@ -35,8 +35,8 @@
 
 | **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
-|**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
-|**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
+|**[Android](https://github.com/swiftlang/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_24_04_android.json)** | X86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build)|
+|**[Android](https://github.com/swiftlang/swift-community-hosted-continuous-integration/blob/main/nodes/aarch64_ubuntu_24_04_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64)|
 |**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019_VS2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019)|
 
 ## Welcome to Swift

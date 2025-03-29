@@ -12,7 +12,8 @@
 /// This file is copied from swift-collections and should not be modified here.
 /// Rather all changes should be made to swift-collections and copied back.
 
-#if !SWIFT_STDLIB_STATIC_PRINT
+#if !SWIFT_STDLIB_STATIC_PRINT && !$Embedded
+
 import Swift
 
 extension _Deque: CustomStringConvertible {
@@ -32,4 +33,5 @@ extension _Deque: CustomStringConvertible {
     return result
   }
 }
+
 #endif

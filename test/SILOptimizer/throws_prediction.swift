@@ -1,17 +1,17 @@
 // RUN: %target-swift-frontend %s \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -enable-throws-prediction \
 // RUN:   -sil-verify-all -module-name=test -emit-sil \
 // RUN:       | %FileCheck --check-prefix CHECK-SIL %s
 
 // RUN: %target-swift-frontend %s \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -enable-throws-prediction \
 // RUN:   -sil-verify-all -module-name=test -emit-irgen \
 // RUN:       | %FileCheck --check-prefix CHECK-IR %s
 
 // RUN: %target-swift-frontend %s \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -disable-throws-prediction \
 // RUN:   -sil-verify-all -module-name=test -emit-sil \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s

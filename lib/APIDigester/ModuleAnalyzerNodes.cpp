@@ -1,10 +1,11 @@
-#include "llvm/ADT/STLExtras.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include <swift/APIDigester/ModuleAnalyzerNodes.h>
+#include "llvm/ADT/STLExtras.h"
 #include <algorithm>
+#include <swift/APIDigester/ModuleAnalyzerNodes.h>
 
 using namespace swift;
 using namespace ide;
@@ -129,7 +130,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         SugaredGenericSig(Info.SugaredGenericSig),
         FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}),
+                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
         ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
@@ -1071,9 +1072,6 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
 
 static StringRef getTypeName(SDKContext &Ctx, Type Ty,
                              bool IsImplicitlyUnwrappedOptional) {
-  if (Ty->getKind() == TypeKind::Paren) {
-    return Ctx.buffer("Paren");
-  }
   if (Ty->isVoid()) {
     return Ctx.buffer("Void");
   }
@@ -1118,7 +1116,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
   if (auto *attr = VD->getAttrs().getAttribute<SILGenNameAttr>()) {
     return Ctx.buffer(attr->Name);
   }
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(VD->getASTContext());
   return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
                                     /*bool respectOriginallyDefinedIn*/true));
 }
@@ -1341,14 +1339,14 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
 // check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->Platform != PlatformKind::none && AVA->Introduced &&
-          AVA->Introduced->getMajor() == 9999) {
-        Platforms.insert(AVA->Platform);
-      }
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    if (attr.isPlatformSpecific() && attr.getIntroduced().has_value() &&
+        attr.getIntroduced()->getMajor() == 9999) {
+      Platforms.insert(attr.getPlatform());
     }
   }
+
+  // FIXME: [availability] This probably isn't correct now that visionOS exists
   return Platforms.size() == 4;
 }
 
@@ -1363,11 +1361,10 @@ static bool isABIPlaceholderRecursive(Decl *D) {
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
   if (!D)
     return StringRef();
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->Platform == Kind && AVA->Introduced) {
-        return buffer(AVA->Introduced->getAsString());
-      }
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    auto domain = attr.getDomain();
+    if (domain.getPlatformKind() == Kind && attr.getIntroduced()) {
+      return buffer(attr.getIntroduced()->getAsString());
     }
   }
   return StringRef();
@@ -1376,11 +1373,11 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
 StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   if (!D)
     return StringRef();
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->isLanguageVersionSpecific() && AVA->Introduced) {
-        return buffer(AVA->Introduced->getAsString());
-      }
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    auto domain = attr.getDomain();
+
+    if (domain.isSwiftLanguage() && attr.getIntroduced()) {
+      return buffer(attr.getIntroduced()->getAsString());
     }
   }
   return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
@@ -1471,11 +1468,12 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),
       IsImplicit(D->isImplicit()),
-      IsDeprecated(D->getAttrs().isDeprecated(D->getASTContext())),
+      IsDeprecated(D->isDeprecated()),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
       IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {
@@ -1500,7 +1498,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
-    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
+    SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {
@@ -1662,12 +1660,6 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
 
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
-  // Keep paren type as a stand-alone level.
-  if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-    Root->addChild(constructTypeNode(PT->getSinglyDesugaredType()));
-    return Root;
-  }
-
   // Handle the case where Type has sub-types.
   if (auto BGT = T->getAs<BoundGenericType>()) {
     for (auto Arg : BGT->getGenericArgs()) {
@@ -1775,8 +1767,8 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (D->isPrivateSystemDecl(false))
       return true;
   }
-  if (AvailableAttr::isUnavailable(D))
-     return true;
+  if (D->isUnavailable())
+    return true;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
@@ -1943,10 +1935,6 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<EnumCaseDecl>(Member)) {
       // All containing variables should have been handled.
-    } else if (isa<IfConfigDecl>(Member)) {
-      // All containing members should have been handled.
-    } else if (isa<PoundDiagnosticDecl>(Member)) {
-      // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
     } else if (isa<MissingMemberDecl>(Member)) {
@@ -1986,7 +1974,8 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
     for (auto *inherited : PD->getAllInheritedProtocols()) {
       if (!Ctx.shouldIgnore(inherited)) {
-        ProtocolConformanceRef Conf(inherited);
+        auto Conf = ProtocolConformanceRef::forAbstract(
+          PD->getSelfInterfaceType(), inherited);
         auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
             .createSDKNode(SDKNodeKind::Conformance);
         Root->addConformance(ConfNode);
@@ -2448,7 +2437,7 @@ class ConstExtractor: public ASTWalker {
     }
     assert(ReferencedDecl);
     if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
-      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeLiteralAttr>()) {
         return false;
       }
       if (auto *PD = VAR->getParentPatternBinding()) {

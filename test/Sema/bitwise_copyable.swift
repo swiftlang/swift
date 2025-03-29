@@ -1,9 +1,12 @@
 // RUN: %target-typecheck-verify-swift                       \
 // RUN:     -disable-availability-checking                   \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature Sensitive           \
+// RUN:     -enable-experimental-feature LifetimeDependence  \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
+
+// REQUIRES: swift_feature_Sensitive
+// REQUIRES: swift_feature_LifetimeDependence
 
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(BEGIN)===================={{
@@ -106,6 +109,17 @@ func passS_Implicit_Sensitive(_ s: S_Implicit_Sensitive) {
            // expected-note@-94 {{where_requirement_failure_one_subst}}
 }
 
+import Builtin
+
+func passFixedArray1N<T>(_ fa: Builtin.FixedArray<1, T>) {
+  take1(fa) // expected-error {{type_does_not_conform_decl_owner}}
+            // expected-note@-101 {{where_requirement_failure_one_subst}}
+}
+
+func passFixedArray1N<T : BitwiseCopyable>(_ fa: Builtin.FixedArray<1, T>) {
+  take1(fa)
+}
+
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(END)======================}}
 //==============================================================================
@@ -200,9 +214,7 @@ struct S_Explicit_With_2BitwiseCopyable_Generic_Optional<T : BitwiseCopyable> : 
   var o2: T?
 }
 
-// TODO: When the standard library is built with NonescapableTypes, this should
-//       be uncommented.
-//struct S_Explicit_Nonescapable : ~Escapable, BitwiseCopyable {}
+struct S_Explicit_Nonescapable : ~Escapable, BitwiseCopyable {}
 
 struct S_Explicit_Noncopyable : ~Copyable, BitwiseCopyable {} // expected-error{{type_does_not_conform}}
 

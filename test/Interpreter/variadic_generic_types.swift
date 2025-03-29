@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-concrete-type-metadata-mangled-name-accessors -Xfrontend -disable-availability-checking)
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-concrete-type-metadata-mangled-name-accessors -target %target-swift-5.9-abi-triple)
+// RUN: %target-run-simple-swift(-target %target-swift-5.9-abi-triple)
 
 // REQUIRES: executable_test
 

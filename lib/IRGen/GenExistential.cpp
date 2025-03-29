@@ -900,11 +900,16 @@ class OpaqueExistentialTypeInfo final :
 
   OpaqueExistentialTypeInfo(ArrayRef<const ProtocolDecl *> protocols,
                             llvm::Type *ty, Size size,
+                            IsCopyable_t copyable,
                             SpareBitVector &&spareBits,
                             Alignment align)
     : super(protocols, ty, size,
             std::move(spareBits), align,
-            IsNotTriviallyDestroyable, IsBitwiseTakable, IsCopyable,
+            IsNotTriviallyDestroyable,
+            // Copyable existentials are bitwise-takable and borrowable.
+            // Noncopyable existentials are bitwise-takable only.
+            copyable ? IsBitwiseTakableAndBorrowable : IsBitwiseTakableOnly,
+            copyable,
             IsFixedSize, IsABIAccessible) {}
 
 public:
@@ -1649,14 +1654,19 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   OpaqueExistentialLayout opaque(protosWithWitnessTables.size());
   Alignment align = opaque.getAlignment(IGM);
   Size size = opaque.getSize(IGM);
+  IsCopyable_t copyable = T->isNoncopyable() ? IsNotCopyable : IsCopyable;
+  
   // There are spare bits in the metadata pointer and witness table pointers
   // consistent with a native object reference.
-  // TODO: There are spare bits we could theoretically use in the type metadata
-  // and witness table pointers, but opaque existentials are currently address-
+  // NB: There are spare bits we could theoretically use in the type metadata
+  // and witness table pointers, but opaque existentials are address-
   // only, and we can't soundly take advantage of spare bits for in-memory
   // representations.
+  // Maybe an ABI break that made opaque existentials loadable could use those
+  // bits, though.
   auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
   return OpaqueExistentialTypeInfo::create(protosWithWitnessTables, type, size,
+                                           copyable,
                                            std::move(spareBits),
                                            align);
 }
@@ -1791,13 +1801,8 @@ static void forEachProtocolWitnessTable(
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
 
-  // Don't emit witness tables in embedded Swift.
-  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    return;
-  }
-
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    assert(protocols[i] == witnessConformances[i].getRequirement());
+    assert(protocols[i] == witnessConformances[i].getProtocol());
     auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
                                      witnessConformances[i]);
     body(i, table);
@@ -1872,7 +1877,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolDecl *proto = destTI.getStoredProtocols()[0];
   (void) proto;
-  assert(proto == conformances[0].getRequirement());
+  assert(proto == conformances[0].getProtocol());
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
                                      conformances[0]);
   
@@ -1890,7 +1895,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
 
   auto archetype =
-      OpenedArchetypeType::get(destType.getASTType());
+      ExistentialArchetypeType::get(destType.getASTType());
   auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
                                             formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,
@@ -1960,7 +1965,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
 static size_t numProtocolsWithWitnessTables(
     ArrayRef<ProtocolConformanceRef> conformances) {
   return llvm::count_if(conformances, [](ProtocolConformanceRef conformance) {
-    auto proto = conformance.getRequirement();
+    auto proto = conformance.getProtocol();
     return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
   });
 }

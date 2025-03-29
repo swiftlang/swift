@@ -4,17 +4,13 @@
 //
 // REQUIRES: executable_test
 //
-// RUN: %empty-directory(%t)
-// RUN: cp %s %t/main.swift
-// RUN: %target-build-swift -whole-module-optimization -module-name PlaygroundSupport -emit-module-path %t/PlaygroundSupport.swiftmodule -parse-as-library -c -o %t/PlaygroundSupport.o %S/Inputs/SilentPCMacroRuntime.swift %S/Inputs/PlaygroundsRuntime.swift
+// -playground
+// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -playground -Xfrontend -playground-high-performance -Xfrontend -playground-option -Xfrontend FunctionParameters -Xfrontend -playground-option -Xfrontend ScopeEvents -Xfrontend -playground-option -Xfrontend ThisOptionShouldBeGracefullyIgnored) | %FileCheck %s
+// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -playground -Xfrontend -playground-high-performance -Xfrontend -playground-option -Xfrontend FunctionParameters -Xfrontend -playground-option -Xfrontend ScopeEvents -Xfrontend -playground-option -Xfrontend ThisOptionShouldBeGracefullyIgnored) | %FileCheck %s
 //
-// RUN: %target-build-swift -Xfrontend -playground -Xfrontend -playground-high-performance -Xfrontend -playground-option -Xfrontend FunctionParameters -Xfrontend -playground-option -Xfrontend ScopeEvents -Xfrontend -playground-option -Xfrontend ThisOptionShouldBeGracefullyIgnored -o %t/main -I=%t %t/PlaygroundSupport.o %t/main.swift
-// RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
-//
-// RUN: %target-build-swift -Xfrontend -playground -Xfrontend -playground-high-performance -Xfrontend -playground-option -Xfrontend FunctionParameters -Xfrontend -playground-option -Xfrontend ScopeEvents -Xfrontend -playground-option -Xfrontend ThisOptionShouldBeGracefullyIgnored -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift
-// RUN: %target-codesign %t/main2
-// RUN: %target-run %t/main2 | %FileCheck %s
+// -pc-macro -playground
+// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -playground -Xfrontend -pc-macro -Xfrontend -playground-high-performance -Xfrontend -playground-option -Xfrontend FunctionParameters -Xfrontend -playground-option -Xfrontend ScopeEvents -Xfrontend -playground-option -Xfrontend ThisOptionShouldBeGracefullyIgnored) | %FileCheck %s
+// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -playground -Xfrontend -pc-macro -Xfrontend -playground-high-performance -Xfrontend -playground-option -Xfrontend FunctionParameters -Xfrontend -playground-option -Xfrontend ScopeEvents -Xfrontend -playground-option -Xfrontend ThisOptionShouldBeGracefullyIgnored) | %FileCheck %s
 
 import PlaygroundSupport
 

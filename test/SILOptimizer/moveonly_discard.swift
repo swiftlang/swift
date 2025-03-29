@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -enable-experimental-feature ConsumeSelfInDeinit %s
 
+// REQUIRES: swift_feature_ConsumeSelfInDeinit
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 
 func posix_close(_ t: Int) {}
 

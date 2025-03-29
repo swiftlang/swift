@@ -18,6 +18,7 @@
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
 #include "Error.h"
+#include "TaskLocal.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -28,6 +29,7 @@
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
 #include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
@@ -89,10 +91,15 @@ AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 
 /// Cancel all the child tasks that belong to `group`.
 ///
-/// The caller must guarantee that this is either called from the
-/// owning task of the task group or while holding the owning task's
-/// status record lock.
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
 void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called from the owning task.
+void _swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
+                                                 AsyncTask *owningTask);
 
 /// Remove the given task from the given task group.
 ///
@@ -322,8 +329,12 @@ public:
     fillWithError(future->getError());
   }
   void fillWithError(SwiftError *error) {
+    #if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("untyped error used in embedded Swift");
+    #else
     errorResult = error;
     swift_errorRetain(error);
+    #endif
   }
 };
 
@@ -588,27 +599,25 @@ public:
 #endif
   }
 
-  /// Is there a lock on the linked list of status records?
+  /// Does some thread hold the status record lock?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
-  ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
+  ActiveTaskStatus withStatusRecordLocked() const {
     assert(!isStatusRecordLocked());
-    assert(lockRecord->Parent == Record);
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags | IsStatusRecordLocked,
+                            ExecutionLock);
 #else
-    return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked);
+    return ActiveTaskStatus(Record, Flags | IsStatusRecordLocked);
 #endif
   }
-  ActiveTaskStatus withoutLockingRecord() const {
+  ActiveTaskStatus withoutStatusRecordLocked() const {
     assert(isStatusRecordLocked());
-    assert(Record->getKind() == TaskStatusRecordKind::Private_RecordLock);
 
-    // Remove the lock record, and put the next one as the head
-    auto newRecord = Record->Parent;
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(newRecord, Flags & ~IsStatusRecordLocked, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags & ~IsStatusRecordLocked,
+                            ExecutionLock);
 #else
-    return ActiveTaskStatus(newRecord, Flags & ~IsStatusRecordLocked);
+    return ActiveTaskStatus(Record, Flags & ~IsStatusRecordLocked);
 #endif
   }
 
@@ -769,6 +778,9 @@ struct AsyncTask::PrivateStorage {
   /// async task stack when it is needed.
   TaskDependencyStatusRecord *dependencyRecord = nullptr;
 
+  // The lock used to protect more complicated operations on the task status.
+  RecursiveMutex statusLock;
+
   // Always create an async task with max priority in ActiveTaskStatus = base
   // priority. It will be updated later if needed.
   PrivateStorage(JobPriority basePri)
@@ -785,23 +797,29 @@ struct AsyncTask::PrivateStorage {
   /// Called on the thread that was previously executing the task that we are
   /// now trying to complete.
   void complete(AsyncTask *task) {
-    // If during task creation we created a task preference record;
-    // we must destroy it here; The record is task-local allocated,
-    // so we must do so specifically here, before the task-local storage
-    // elements are destroyed; in order to respect stack-discipline of
-    // the task-local allocator.
-    if (task->hasInitialTaskExecutorPreferenceRecord()) {
-      task->dropInitialTaskExecutorPreferenceRecord();
+    // If during task creation we created a any Initial* records, destroy them.
+    //
+    // Initial records are task-local allocated, so we must do so specifically
+    // here, before the task-local storage elements are destroyed; in order to
+    // respect stack-discipline of the task-local allocator.
+    {
+      if (task->hasInitialTaskNameRecord()) {
+        task->dropInitialTaskNameRecord();
+      }
+      if (task->hasInitialTaskExecutorPreferenceRecord()) {
+        task->dropInitialTaskExecutorPreferenceRecord();
+      }
     }
 
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      // Task is completing, it shouldn't have any records and therefore
-      // cannot be status record locked.
-      assert(oldStatus.getInnermostRecord() == NULL);
-      assert(!oldStatus.isStatusRecordLocked());
+      // Task is completing
+      assert(oldStatus.getInnermostRecord() == NULL &&
+             "Status records should have been removed by this time!");
+      assert(!oldStatus.isStatusRecordLocked() &&
+             "Task is completing, cannot be locked anymore!");
 
       assert(oldStatus.isRunning());
 
@@ -860,8 +878,11 @@ struct AsyncTask::PrivateStorage {
 
 // It will be aligned to 2 words on all platforms. On arm64_32, we have an
 // additional requirement where it is aligned to 4 words.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 static_assert(((offsetof(AsyncTask, Private) + offsetof(AsyncTask::PrivateStorage, StatusStorage)) % ACTIVE_TASK_STATUS_SIZE == 0),
    "StatusStorage is not aligned in the AsyncTask");
+#pragma clang diagnostic pop
 static_assert(sizeof(AsyncTask::PrivateStorage) <= sizeof(AsyncTask::OpaquePrivateStorage),
               "Task-private storage doesn't fit in reserved space");
 
@@ -1111,7 +1132,9 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // reference to the dependencyStatusRecord or its contents, once we have
     // published it in the ActiveTaskStatus since someone else could
     // concurrently made us runnable.
-    dependencyStatusRecord->performEscalationAction(newStatus.getStoredPriority());
+    dependencyStatusRecord->performEscalationAction(
+        oldStatus.getStoredPriority(),
+        newStatus.getStoredPriority());
 
     // Always add the dependency status record
     return true;

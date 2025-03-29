@@ -22,6 +22,8 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY                               \
+  "swift-module-flags-ignorable-private"
 
 namespace swift {
 
@@ -63,22 +65,11 @@ struct ModuleInterfaceOptions {
   /// Flags which appear only in the .package.swiftinterface.
   InterfaceFlags PackageFlags = {};
 
-  /// Print imports with both @_implementationOnly and @_spi, only applies
-  /// when PrintSPIs is true.
-  bool ExperimentalSPIImports = false;
-
   /// Print imports that are missing from the source and used in API.
   bool PrintMissingImports = true;
 
-  /// If true, package-name flag is not printed in either public or private
-  /// interface file.
-  bool DisablePackageNameForNonPackageInterface = false;
-
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
-
-  /// A list of modules we shouldn't import in the public interfaces.
-  std::vector<std::string> ModulesToSkipInPublicInterface;
 
   /// A mode which decides whether the printed interface contains package, SPIs, or public/inlinable declarations.
   PrintOptions::InterfaceMode InterfaceContentMode = PrintOptions::InterfaceMode::Public;

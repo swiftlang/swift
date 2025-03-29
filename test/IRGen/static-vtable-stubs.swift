@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o - | %FileCheck %t/A.swift -check-prefix CHECK
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o - | %FileCheck %t/B.swift -check-prefix CHECK
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o - | %FileCheck %t/A.swift -check-prefix CHECK
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o - | %FileCheck %t/B.swift -check-prefix CHECK
 
 // Verify that we can link successfully.
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -O %t/A.swift %t/B.swift -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -O %t/A.swift %t/B.swift -o %t/a.out
 
 // REQUIRES: concurrency
 

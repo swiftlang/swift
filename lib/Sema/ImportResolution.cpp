@@ -28,7 +28,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
@@ -36,9 +35,9 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/TargetParser/Host.h"
 #include <algorithm>
 #include <system_error>
 using namespace swift;
@@ -193,6 +192,11 @@ public:
 
   void addImplicitImports();
 
+  void addImplicitImport(ModuleDecl *module) {
+    boundImports.push_back(ImportedModule(module));
+    bindPendingImports();
+  }
+
   /// Retrieve the finalized imports.
   ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
     return boundImports;
@@ -262,6 +266,19 @@ private:
 // MARK: performImportResolution
 //===----------------------------------------------------------------------===//
 
+void swift::performImportResolution(ModuleDecl *M) {
+  for (auto *file : M->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    performImportResolution(*SF);
+    assert(SF->ASTStage >= SourceFile::ImportsResolved &&
+           "file has not had its imports resolved");
+  }
+  M->setHasResolvedImports();
+}
+
 /// performImportResolution - This walks the AST to resolve imports.
 ///
 /// Before we can type-check a source file, we need to make declarations
@@ -300,6 +317,27 @@ void swift::performImportResolution(SourceFile &SF) {
 
   SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
+}
+
+void swift::performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *clangModule
+) {
+  // If we've already performed import resolution, bail.
+  if (SF.ASTStage == SourceFile::ImportsResolved)
+    return;
+
+  ImportResolver resolver(SF);
+  resolver.addImplicitImport(clangModule);
+
+  // FIXME: This is a hack that we shouldn't need, but be sure that we can
+  // see the Swift standard library.
+  if (auto stdlib = SF.getASTContext().getStdlibModule())
+    resolver.addImplicitImport(stdlib);
+
+  SF.setImports(resolver.getFinishedImports());
+  SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
+
+  SF.ASTStage = SourceFile::ImportsResolved;
 }
 
 //===----------------------------------------------------------------------===//
@@ -623,7 +661,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     import.preconcurrencyRange = attr->getRangeWithAt();
   }
 
-  if (auto attr = ID->getAttrs().getAttribute<WeakLinkedAttr>())
+  if (ID->getAttrs().hasAttribute<WeakLinkedAttr>())
     import.options |= ImportFlags::WeakLinked;
 
   import.docVisibility = swift::symbolgraphgen::documentationVisibilityForDecl(ID);
@@ -790,6 +828,26 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   }
 }
 
+/// Returns true if the importer and importee tuple are on an allow list for
+/// use of `@_implementationOnly import`, which is deprecated. Some existing
+/// uses of `@_implementationOnly import` cannot be safely replaced by
+/// `internal import` because the existence of the imported module must always
+/// be hidden from clients.
+static bool shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    StringRef targetName, StringRef importerName) {
+  if (targetName == "SwiftConcurrencyInternalShims")
+    return importerName == "_Concurrency";
+
+  if (targetName == "CCryptoBoringSSL" || targetName == "CCryptoBoringSSLShims")
+    return importerName == "Crypto" || importerName == "_CryptoExtras" ||
+           importerName == "CryptoBoringWrapper";
+
+  if (targetName == "CNIOBoringSSL" || targetName == "CNIOBoringSSLShims")
+    return importerName != "NIOSSL";
+
+  return false;
+}
+
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
   if (!topLevelModule)
@@ -825,14 +883,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
     } else if ( // Non-resilient client
-      !(((targetName.str() == "CCryptoBoringSSL" ||
-          targetName.str() == "CCryptoBoringSSLShims") &&
-         (importerName.str() == "Crypto" ||
-          importerName.str() == "_CryptoExtras" ||
-          importerName.str() == "CryptoBoringWrapper")) ||
-        ((targetName.str() == "CNIOBoringSSL" ||
-          targetName.str() == "CNIOBoringSSLShims") &&
-         importerName.str() == "NIOSSL"))) {
+        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+            targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
                          diag::implementation_only_requires_library_evolution,
                          importerName);

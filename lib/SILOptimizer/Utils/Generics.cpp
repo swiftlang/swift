@@ -370,6 +370,8 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
     LLVM_DEBUG(llvm::dbgs() << "Scan caller's specialization history\n");
   }
 
+  llvm::SmallSet<const GenericSpecializationInformation *, 8> visited;
+
   while (CurSpecializationInfo) {
     LLVM_DEBUG(llvm::dbgs() << "Current caller is a specialization:\n"
                             << "Caller: "
@@ -384,6 +386,10 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                        .getReplacementTypes()) {
                  Replacement->dump(llvm::dbgs());
                });
+
+    if (!visited.insert(CurSpecializationInfo).second) {
+      return true;
+    }
 
     if (CurSpecializationInfo->getParent() == GenericFunc) {
       LLVM_DEBUG(llvm::dbgs() << "Found a call graph loop, checking "
@@ -725,8 +731,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     SubstitutedType = createSubstitutedType(Callee, CallerInterfaceSubs,
                                             HasUnboundGenericParams);
   }
-  assert(!SubstitutedType->hasArchetype() &&
-         "Substituted function type should not contain archetypes");
 
   // Check which parameters and results can be converted from
   // indirect to direct ones.
@@ -2011,11 +2015,11 @@ GenericFuncSpecializer::GenericFuncSpecializer(
   auto FnTy = ReInfo.getSpecializedType();
 
   if (ReInfo.isPartialSpecialization()) {
-    Mangle::PartialSpecializationMangler Mangler(
+    Mangle::PartialSpecializationMangler Mangler(GenericFunc->getASTContext(),
         GenericFunc, FnTy, ReInfo.getSerializedKind(), /*isReAbstracted*/ true);
     ClonedName = Mangler.mangle();
   } else {
-    Mangle::GenericSpecializationMangler Mangler(
+    Mangle::GenericSpecializationMangler Mangler(GenericFunc->getASTContext(),
         GenericFunc, ReInfo.getSerializedKind());
     if (ReInfo.isPrespecialized()) {
       ClonedName = Mangler.manglePrespecialized(ParamSubs);
@@ -2320,6 +2324,104 @@ cleanupCallArguments(SILBuilder &builder, SILLocation loc,
   }
 }
 
+bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
+  SILFunction *f = cm->getFunction();
+  SILModule &m = f->getModule();
+
+  SILValue instance = cm->getOperand();
+  SILType classTy = instance->getType();
+  if (classTy.is<MetatypeType>())
+    classTy = classTy.getLoweredInstanceTypeOfMetatype(cm->getFunction());
+
+  CanType astType = classTy.getASTType();
+  if (!astType->isSpecialized())
+    return false;
+
+  SubstitutionMap subs = astType->getContextSubstitutionMap();
+
+  SILType funcTy = cm->getType();
+  SILType substitutedType =
+      funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
+
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(), m);
+  reInfo.createSubstitutedAndSpecializedTypes();
+  CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
+  SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
+
+  SILBuilder builder(cm);
+  auto *newCM = builder.createClassMethod(cm->getLoc(), cm->getOperand(),
+                                          cm->getMember(), finalSILTy);
+
+  while (!cm->use_empty()) {
+    Operand *use = *cm->use_begin();
+    SILInstruction *user = use->getUser();
+    ApplySite AI = ApplySite::isa(user);
+    if (AI && AI.getCalleeOperand() == use) {
+      replaceWithSpecializedCallee(AI, newCM, reInfo);
+      AI.getInstruction()->eraseFromParent();
+      continue;
+    }
+    llvm::errs() << "unsupported use of class method "
+                 << newCM->getMember().getDecl()->getName() << " in function "
+                 << newCM->getFunction()->getName() << '\n';
+    llvm::report_fatal_error("unsupported class method");
+  }
+
+  return true;
+}
+
+bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
+  SILFunction *f = wm->getFunction();
+  SILModule &m = f->getModule();
+
+  CanType astType = wm->getLookupType();
+  if (!isa<ExistentialArchetypeType>(astType))
+    return false;
+
+  if (wm->isSpecialized())
+    return false;
+
+  // This should not happen. Just to be on the safe side.
+  if (wm->use_empty())
+    return false;
+
+  Operand *firstUse = *wm->use_begin();
+  ApplySite AI = ApplySite::isa(firstUse->getUser());
+  assert(AI && AI.getCalleeOperand() == firstUse && "wrong use of witness_method instruction");
+
+  SubstitutionMap subs = AI.getSubstitutionMap();
+
+  SILType funcTy = wm->getType();
+  SILType substitutedType =
+      funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
+
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(), m);
+  reInfo.createSubstitutedAndSpecializedTypes();
+  CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
+  SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
+
+  SILBuilder builder(wm);
+  auto *newWM = builder.createWitnessMethod(wm->getLoc(), wm->getLookupType(),
+                                            wm->getConformance(), wm->getMember(), finalSILTy);
+
+  while (!wm->use_empty()) {
+    Operand *use = *wm->use_begin();
+    SILInstruction *user = use->getUser();
+    ApplySite AI = ApplySite::isa(user);
+    if (AI && AI.getCalleeOperand() == use) {
+      replaceWithSpecializedCallee(AI, newWM, reInfo);
+      AI.getInstruction()->eraseFromParent();
+      continue;
+    }
+    llvm::errs() << "unsupported use of witness method "
+                 << newWM->getMember().getDecl()->getName() << " in function "
+                 << newWM->getFunction()->getName() << '\n';
+    llvm::report_fatal_error("unsupported witness method");
+  }
+
+  return true;
+}
+
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 ApplySite
@@ -2534,12 +2636,12 @@ public:
         SpecializedFunc(SpecializedFunc), ReInfo(ReInfo), OrigPAI(OrigPAI),
         Loc(RegularLocation::getAutoGeneratedLocation()) {
     if (!ReInfo.isPartialSpecialization()) {
-      Mangle::GenericSpecializationMangler Mangler(OrigF, ReInfo.getSerializedKind());
+      Mangle::GenericSpecializationMangler Mangler(OrigF->getASTContext(), OrigF, ReInfo.getSerializedKind());
       ThunkName = Mangler.mangleNotReabstracted(
           ReInfo.getCalleeParamSubstitutionMap(),
           ReInfo.getDroppedArgs());
     } else {
-      Mangle::PartialSpecializationMangler Mangler(
+      Mangle::PartialSpecializationMangler Mangler(OrigF->getASTContext(),
           OrigF, ReInfo.getSpecializedType(), ReInfo.getSerializedKind(),
           /*isReAbstracted*/ false);
 
@@ -2889,7 +2991,14 @@ static bool usePrespecialized(
   if (refF->getSpecializeAttrs().empty())
     return false;
 
-  SmallVector<std::tuple<unsigned, ReabstractionInfo, AvailabilityContext>, 4>
+  // `Array._endMutation` was added for pre-specialization by mistake. But we
+  // cannot remove the specialize-attributes anymore because the pre-specialized
+  // functions are now part of the stdlib's ABI.
+  // Therefore make an exception for `Array._endMutation` here.
+  if (refF->getName() == "$sSa12_endMutationyyF")
+    return false;
+
+  SmallVector<std::tuple<unsigned, ReabstractionInfo, AvailabilityRange>, 4>
       layoutMatches;
 
   ReabstractionInfo specializedReInfo(funcBuilder.getModule().getSwiftModule(),
@@ -2917,7 +3026,7 @@ static bool usePrespecialized(
     // target depending which one is more recent.
     auto specializationAvail = SA->getAvailability();
     auto &ctxt = funcBuilder.getModule().getSwiftModule()->getASTContext();
-    auto deploymentAvail = AvailabilityContext::forDeploymentTarget(ctxt);
+    auto deploymentAvail = AvailabilityRange::forDeploymentTarget(ctxt);
     auto currentFn = apply.getFunction();
     auto isInlinableCtxt = (currentFn->getResilienceExpansion()
                              == ResilienceExpansion::Minimal);
@@ -3034,7 +3143,7 @@ static bool usePrespecialized(
 
       auto newSubstMap = SubstitutionMap::get(
           apply.getSubstitutionMap().getGenericSignature(), newSubs,
-          apply.getSubstitutionMap().getConformances());
+          LookUpConformanceInModule());
 
       ReabstractionInfo layoutReInfo = ReabstractionInfo(
           funcBuilder.getModule().getSwiftModule(),
@@ -3051,7 +3160,7 @@ static bool usePrespecialized(
     }
 
     SubstitutionMap subs = reInfo.getCalleeParamSubstitutionMap();
-    Mangle::GenericSpecializationMangler mangler(refF, reInfo.getSerializedKind());
+    Mangle::GenericSpecializationMangler mangler(refF->getASTContext(), refF, reInfo.getSerializedKind());
     std::string name = reInfo.isPrespecialized() ?
         mangler.manglePrespecialized(subs) :
         mangler.mangleReabstracted(subs, reInfo.needAlternativeMangling());
@@ -3068,7 +3177,7 @@ static bool usePrespecialized(
 
   if (!layoutMatches.empty()) {
 
-    std::tuple<unsigned, ReabstractionInfo, AvailabilityContext> res =
+    std::tuple<unsigned, ReabstractionInfo, AvailabilityRange> res =
         layoutMatches[0];
     for (auto &tuple : layoutMatches) {
       if (std::get<0>(tuple) > std::get<0>(res))
@@ -3080,7 +3189,7 @@ static bool usePrespecialized(
 
     // TODO: Deduplicate
     SubstitutionMap subs = reInfo.getCalleeParamSubstitutionMap();
-    Mangle::GenericSpecializationMangler mangler(refF, reInfo.getSerializedKind());
+    Mangle::GenericSpecializationMangler mangler(refF->getASTContext(), refF, reInfo.getSerializedKind());
     std::string name = reInfo.isPrespecialized()
                            ? mangler.manglePrespecialized(subs)
                            : mangler.mangleReabstracted(
@@ -3404,6 +3513,13 @@ void swift::trySpecializeApplyOfGeneric(
       }
       if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
         SILValue result = NewPAI;
+        if (NewPAI->getFunction()->hasOwnership()) {
+          auto convention = ApplySite(PAI).getCaptureConvention(*Use);
+          if (convention == SILArgumentConvention::Direct_Guaranteed) {
+            SILBuilderWithScope builder(Apply.getInstruction());
+            result = builder.createCopyValue(Apply.getLoc(), result);
+          }
+        }
         if (SpecializedF.hasTypeReplacements()) {
           SILBuilderWithScope builder(Apply.getInstruction());
           auto fnType = PAI->getType();

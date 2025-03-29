@@ -10,11 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILValue.h"
-#include <memory>
 #define DEBUG_TYPE "sil-verifier"
 
-#include "VerifierPrivate.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -50,6 +47,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
@@ -60,8 +58,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
+#include <memory>
+
 using namespace swift;
-using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -296,12 +295,12 @@ void verifyKeyPathComponent(SILModule &M,
   auto getTypeInExpansionContext = [&](CanType ty) -> CanType {
     return M.Types.getLoweredType(opaque, ty, typeExpansionContext).getASTType();
   };
-  auto checkIndexEqualsAndHash = [&]{
-    if (!component.getSubscriptIndices().empty()) {
+  auto checkIndexEqualsAndHash = [&] {
+    if (!component.getArguments().empty()) {
       // Equals should be
       // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
       {
-        auto equals = component.getSubscriptIndexEquals();
+        auto equals = component.getIndexEquals();
         require(equals, "key path pattern with indexes must have equals "
                         "operator");
         
@@ -333,7 +332,7 @@ void verifyKeyPathComponent(SILModule &M,
       {
         // Hash should be
         // <Sig...> @convention(thin) (RawPointer) -> Int
-        auto hash = component.getSubscriptIndexHash();
+        auto hash = component.getIndexHash();
         require(hash, "key path pattern with indexes must have hash "
                       "operator");
         
@@ -360,8 +359,7 @@ void verifyKeyPathComponent(SILModule &M,
                 "result should be Int");
       }
     } else {
-      require(!component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(!component.getIndexEquals() && !component.getIndexHash(),
               "component without indexes must not have equals/hash");
     }
   };
@@ -396,18 +394,18 @@ void verifyKeyPathComponent(SILModule &M,
   }
     
   case KeyPathPatternComponent::Kind::GettableProperty:
-  case KeyPathPatternComponent::Kind::SettableProperty: {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
     if (forPropertyDescriptor) {
-      require(component.getSubscriptIndices().empty()
-              && !component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(component.getArguments().empty() && !component.getIndexEquals() &&
+                  !component.getIndexHash(),
               "property descriptor should not have index information");
-      
+
       require(component.getExternalDecl() == nullptr
               && component.getExternalSubstitutions().empty(),
               "property descriptor should not refer to another external decl");
     } else {
-      require(hasIndices == !component.getSubscriptIndices().empty(),
+      require(hasIndices == !component.getArguments().empty(),
               "component for subscript should have indices");
     }
     
@@ -415,7 +413,7 @@ void verifyKeyPathComponent(SILModule &M,
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
-      auto getter = component.getComputedPropertyGetter();
+      auto getter = component.getComputedPropertyForGettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 getter->hasValidLinkageForFragileRef(serializedKind),
@@ -461,8 +459,8 @@ void verifyKeyPathComponent(SILModule &M,
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
       // Setter should be
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
-      
-      auto setter = component.getComputedPropertySetter();
+
+      auto setter = component.getComputedPropertyForSettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 setter->hasValidLinkageForFragileRef(serializedKind),
@@ -511,7 +509,7 @@ void verifyKeyPathComponent(SILModule &M,
     }
     
     if (!forPropertyDescriptor) {
-      for (auto &index : component.getSubscriptIndices()) {
+      for (auto &index : component.getArguments()) {
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
@@ -713,6 +711,7 @@ struct ImmutableAddressUseVerifier {
         break;
       }
       case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
@@ -720,6 +719,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
+      case SILInstructionKind::IgnoredUseInst:
         break;
       case SILInstructionKind::DebugValueInst:
         if (cast<DebugValueInst>(inst)->hasAddrVal())
@@ -932,8 +932,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
   std::shared_ptr<DeadEndBlocks> deadEndBlocks;
 
-  LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
-
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
   llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
@@ -1012,6 +1010,11 @@ public:
 #define requireAddressType(type, value, valueDescription) \
   _requireAddressType<type>(value, valueDescription, #type)
 
+  void requireVoidObjectType(SILType type, const Twine &valueDescription) {
+    _require(type.isObject() && type.isVoid(),
+             valueDescription + " must be a scalar of type ()");
+  }
+
   template <class T>
   typename CanTypeWrapperTraits<T>::type
   _forbidObjectType(SILType type, const Twine &valueDescription,
@@ -1070,6 +1073,24 @@ public:
     auto objectType = type.getASTType().getOptionalObjectType();
     require(objectType && objectType == M->getASTContext().TheExecutorType,
             what + " must be Optional<Builtin.Executor>");
+  }
+
+  /// Require the operand to be an object of some type that conforms to
+  /// Actor or DistributedActor.
+  void requireAnyActorType(SILValue value, bool allowOptional,
+                           bool allowExecutor, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+
+    auto actorType = type.getASTType();
+    if (allowOptional) {
+      if (auto objectType = actorType.getOptionalObjectType())
+        actorType = objectType;
+    }
+    if (allowExecutor && isa<BuiltinExecutorType>(actorType))
+      return;
+    require(actorType->isAnyActorType(),
+            what + " must be some kind of actor type");
   }
 
   /// Assert that two types are equal.
@@ -1183,8 +1204,7 @@ public:
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
         Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)),
-        loadBorrowImmutabilityAnalysis(DEBlocks.get(), &F) {
+        InstNumbers(numInstsInFunction(F)) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1262,11 +1282,6 @@ public:
   void visitSILArgument(SILArgument *arg) {
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
-
-    // Ensure flags on the argument are not stale.
-    require(!arg->getFunction()->hasOwnership() ||
-                computeIsReborrow(arg) == arg->isReborrow(),
-            "Stale reborrow flag");
 
     if (checkLinearLifetime) {
       checkValueBaseOwnership(arg);
@@ -1448,12 +1463,16 @@ public:
                 "kind since guaranteed and owned values can always be passed "
                 "in unowned positions");
 
-        require(operand.getOperandOwnership() !=
-                        OperandOwnership::InteriorPointer ||
-                    InteriorPointerOperandKind::get(&operand) !=
-                        InteriorPointerOperandKind::Invalid,
-                "All operands with InteriorPointer operand ownership should be "
-                "added to the InteriorPointerOperand utility");
+        switch (operand.getOperandOwnership()) {
+        default:
+          break;
+        case OperandOwnership::InteriorPointer:
+        case OperandOwnership::AnyInteriorPointer:
+          require(InteriorPointerOperandKind::get(&operand) !=
+                  InteriorPointerOperandKind::Invalid,
+                  "All operands with InteriorPointer operand ownership should be "
+                  "added to the InteriorPointerOperand utility");
+        }
       }
     }
 
@@ -1686,8 +1705,11 @@ public:
   }
 
   static bool isLegalSILTokenProducer(SILValue value) {
-    if (auto *baResult = isaResultOf<BeginApplyInst>(value))
-      return baResult->isBeginApplyToken();
+    if (auto *baResult = isaResultOf<BeginApplyInst>(value)) {
+      auto *bai = cast<BeginApplyInst>(baResult->getParent());
+      return value == bai->getTokenResult() ||
+             value == bai->getCalleeAllocationResult();
+    }
 
     if (isa<OpenPackElementInst>(value))
       return true;
@@ -1782,13 +1804,6 @@ public:
     // dealloc_stack. This can come up if the source contains a
     // withUnsafePointer where the pointer escapes.
     // It's illegal code but the compiler should not crash on it.
-  }
-
-  void checkAllocVectorInst(AllocVectorInst *AI) {
-    require(AI->getType().isAddress(),
-            "result of alloc_vector must be an address type");
-    require(AI->getOperand()->getType().is<BuiltinIntegerType>(),
-            "capacity needs integer type");
   }
 
   void checkAllocPackInst(AllocPackInst *AI) {
@@ -2108,8 +2123,12 @@ public:
               "begin_apply instruction cannot call function with error result");
     }
 
-    require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
-            "must call yield_once coroutine with begin_apply");
+    auto coroKind = calleeConv.funcTy->getCoroutineKind();
+
+    require(coroKind == SILCoroutineKind::YieldOnce ||
+                coroKind == SILCoroutineKind::YieldOnce2,
+            "first operand of begin_apply must be a yield_once or yield_once_2 "
+            "coroutine");
     require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
             "cannot call an async function from a non async function");
   }
@@ -2117,6 +2136,12 @@ public:
   void checkAbortApplyInst(AbortApplyInst *AI) {
     require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
+    auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
+                AI->getFunction()->getASTContext().LangOpts.hasFeature(
+                    Feature::CoroutineAccessorsUnwindOnCallerError),
+            "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
@@ -2160,6 +2185,11 @@ public:
     }
   }
 
+  void checkMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    require(mir->getNumOperands() >= 2, "Must have at least two parameters");
+    require(F.hasOwnership(), "Only valid when OSSA is enabled");
+  }
+
   void checkMarkDependencInst(MarkDependenceInst *MDI) {
     require(isa<SILUndef>(MDI->getValue()) || MDI->getValue() != MDI->getBase(),
             "mark_dependence operands must be distinct");
@@ -2169,13 +2199,16 @@ public:
               "mark_dependence [nonescaping] must be an owned value");
     }
   }
-  
+
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
     verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
+
+    require(PAI->getType().isNoEscapeFunction() == PAI->isOnStack(),
+            "closure must be on stack to have a noescape function type");
 
     // We rely on all indirect captures to be in the argument list.
     require(PAI->getCallee()->getType().isObject(),
@@ -2348,6 +2381,23 @@ public:
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
 
+    if (builtinKind == BuiltinValueKind::ZeroInitializer) {
+      require(!BI->getSubstitutions(),
+              "zeroInitializer has no generic arguments as a SIL builtin");
+      if (arguments.size() == 0) {
+        require(!fnConv.useLoweredAddresses()
+                || BI->getType().isLoadable(*BI->getFunction()),
+                "scalar zeroInitializer must have a loadable result type");
+      } else {
+        require(arguments.size() == 1,
+                "zeroInitializer cannot have multiple arguments");
+        require(arguments[0]->getType().isAddress(),
+                "zeroInitializer argument must have address type");
+        requireVoidObjectType(BI->getType(),
+                              "result of zeroInitializer");
+      }
+    }
+
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
       require(F.isAsync(),
@@ -2402,8 +2452,8 @@ public:
     if (builtinKind == BuiltinValueKind::CreateAsyncTask) {
       requireType(BI->getType(), _object(_tuple(_nativeObject, _rawPointer)),
                   "result of createAsyncTask");
-      require(arguments.size() == 6,
-              "createAsyncTask expects six arguments");
+      require(arguments.size() == 7,
+              "createAsyncTask expects seven arguments");
       requireType(arguments[0]->getType(), _object(_swiftInt),
                   "first argument of createAsyncTask");
       requireType(arguments[1]->getType(), _object(_optional(_executor)),
@@ -2423,7 +2473,9 @@ public:
                     _object(_optional(_executor)),
                     "fifth argument of createAsyncTask");
       }
-      auto fnType = requireObjectType(SILFunctionType, arguments[5],
+      requireType(arguments[5]->getType(), _object(_optional(_rawPointer)),
+                  "sixth argument of createAsyncTask");
+      auto fnType = requireObjectType(SILFunctionType, arguments[6],
                                       "result of createAsyncTask");
       bool haveSending =
           F.getASTContext().LangOpts.hasFeature(Feature::SendingArgsAndResults);
@@ -2657,13 +2709,6 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    if (LBI->isUnchecked()) {
-      require(LBI->getModule().getStage() == SILStage::Raw,
-              "load_borrow can only be [unchecked] in raw SIL");
-    } else {
-      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-              "Found load borrow that is invalidated by a local write?!");
-    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -3366,6 +3411,8 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
+    require(!I->getOperand()->getType().isMoveOnly(),
+            "retain value operand type must be copyable");
     require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
@@ -3531,7 +3578,7 @@ public:
     if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
       // The lowered type must be the properly-abstracted form of the AST type.
       SILType exType = AEBI->getExistentialType();
-      auto archetype = OpenedArchetypeType::get(exType.getASTType());
+      auto archetype = ExistentialArchetypeType::get(exType.getASTType());
 
       auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                         AEBI->getFormalConcreteType())
@@ -3620,7 +3667,7 @@ public:
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
-    require(UI->getElement()->getArgumentInterfaceType(),
+    require(UI->getElement()->getPayloadInterfaceType(),
             "UncheckedEnumData case must have a data type");
     require(UI->getOperand()->getType().isObject(),
             "UncheckedEnumData must take an address operand");
@@ -3642,7 +3689,7 @@ public:
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->getArgumentInterfaceType(),
+    require(UI->getElement()->getPayloadInterfaceType(),
             "UncheckedTakeEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must take an address operand");
@@ -3766,13 +3813,21 @@ public:
   }
 
   void checkDeallocStackInst(DeallocStackInst *DI) {
+    auto isTokenFromCalleeAllocatedBeginApply = [](SILValue value) -> bool {
+      auto *inst = value->getDefiningInstruction();
+      if (!inst)
+        return false;
+      auto *bai = dyn_cast<BeginApplyInst>(inst);
+      if (!bai)
+        return false;
+      return value == bai->getCalleeAllocationResult();
+    };
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
-                isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
-                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()),
-            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or partial_apply "
-            "[stack]");
+                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()) ||
+                (isTokenFromCalleeAllocatedBeginApply(DI->getOperand())),
+            "Operand of dealloc_stack must be an alloc_stack or partial_apply [stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||
@@ -4112,29 +4167,31 @@ public:
               == F.getModule().Types.getProtocolWitnessRepresentation(protocol),
             "result of witness_method must have correct representation for protocol");
 
-    require(methodType->isPolymorphic(),
-            "result of witness_method must be polymorphic");
+    if (methodType->isPolymorphic()) {
+      require(methodType->isPolymorphic(),
+              "result of witness_method must be polymorphic");
 
-    auto genericSig = methodType->getInvocationGenericSignature();
+      auto genericSig = methodType->getInvocationGenericSignature();
 
-    auto selfGenericParam = genericSig.getGenericParams()[0];
-    require(selfGenericParam->getDepth() == 0
-            && selfGenericParam->getIndex() == 0,
-            "method should be polymorphic on Self parameter at depth 0 index 0");
-    std::optional<Requirement> selfRequirement;
-    for (auto req : genericSig.getRequirements()) {
-      if (req.getKind() != RequirementKind::SameType) {
-        selfRequirement = req;
-        break;
+      auto selfGenericParam = genericSig.getGenericParams()[0];
+      require(selfGenericParam->getDepth() == 0
+              && selfGenericParam->getIndex() == 0,
+              "method should be polymorphic on Self parameter at depth 0 index 0");
+      std::optional<Requirement> selfRequirement;
+      for (auto req : genericSig.getRequirements()) {
+        if (req.getKind() != RequirementKind::SameType) {
+          selfRequirement = req;
+          break;
+        }
       }
-    }
 
-    require(selfRequirement &&
-            selfRequirement->getKind() == RequirementKind::Conformance,
-            "first non-same-typerequirement should be conformance requirement");
-    const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
-    require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
-            "requirement Self parameter must conform to called protocol");
+      require(selfRequirement &&
+              selfRequirement->getKind() == RequirementKind::Conformance,
+              "first non-same-typerequirement should be conformance requirement");
+      const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
+      require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
+              "requirement Self parameter must conform to called protocol");
+    }
 
     auto lookupType = AMI->getLookupType();
     if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
@@ -4142,7 +4199,7 @@ public:
               "Must have a type dependent operand for the opened archetype");
       verifyLocalArchetype(AMI, lookupType);
     } else {
-      require(AMI->getTypeDependentOperands().empty(),
+      require(AMI->getTypeDependentOperands().empty() || lookupType->hasLocalArchetype(),
               "Should not have an operand for the opened existential");
     }
     if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {
@@ -4605,7 +4662,7 @@ public:
             "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = OpenedArchetypeType::get(exType.getASTType());
+    auto archetype = ExistentialArchetypeType::get(exType.getASTType());
 
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       AEI->getFormalConcreteType())
@@ -4634,7 +4691,7 @@ public:
             "init_existential_value result must not be an address");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = OpenedArchetypeType::get(exType.getASTType());
+    auto archetype = ExistentialArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       IEI->getFormalConcreteType());
     requireSameType(
@@ -4666,7 +4723,7 @@ public:
     
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = OpenedArchetypeType::get(exType.getASTType());
+    auto archetype = ExistentialArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getLoweredType(Lowering::AbstractionPattern(archetype),
                                       IEI->getFormalConcreteType());
     requireSameType(concreteType, loweredTy,
@@ -4773,7 +4830,7 @@ public:
     }
 
     for (auto i : indices(conformances)) {
-      require(conformances[i].getRequirement() == protocols[i]->getDecl(),
+      require(conformances[i].getProtocol() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
     }
@@ -5207,6 +5264,15 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+  }
+
+  void checkThunkInst(ThunkInst *ti) {
+    auto objTI =
+        requireObjectType(SILFunctionType, ti->getOperand(), "thunk operand");
+    auto resTI = requireObjectType(SILFunctionType, ti, "thunk result");
+    require(resTI == ti->getThunkKind().getDerivedFunctionType(
+                         ti->getFunction(), objTI, ti->getSubstitutionMap()),
+            "resTI is not the thunk kind assigned derived function type");
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -5761,10 +5827,21 @@ public:
     if (HI->getModule().getStage() == SILStage::Lowered) {
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
+    } else {
+      requireAnyActorType(executor,
+                          /*allow optional*/ true,
+                          /*allow executor*/ true,
+                          "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    requireObjectType(BuiltinExecutorType, EEI,
+                      "extract_executor result");
+    requireAnyActorType(EEI->getExpectedExecutor(),
+                        /*allow optional*/ false,
+                        /*allow executor*/ false,
+                        "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
@@ -5848,7 +5925,8 @@ public:
         switch (component.getKind()) {
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty:
-          hasIndices = !component.getSubscriptIndices().empty();
+        case KeyPathPatternComponent::Kind::Method:
+          hasIndices = !component.getArguments().empty();
           break;
         
         case KeyPathPatternComponent::Kind::StoredProperty:
@@ -5880,7 +5958,7 @@ public:
         "final component should match leaf value type of key path type");
   }
 
-  void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
+  void checkDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *IEC) {
     // The closure operand is allowed to be an optional closure.
     auto operandType = IEC->getOperand()->getType();
     if (operandType.getOptionalObjectType())
@@ -5891,11 +5969,11 @@ public:
                 !fnType->isNoEscape() &&
                 fnType->getExtInfo().getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
-            "is_escaping_closure must have a thick "
+            "destroy_not_escaped_closure must have a thick "
             "function operand");
-    require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
+    require(IEC->getVerificationType() == DestroyNotEscapedClosureInst::ObjCEscaping ||
                 IEC->getVerificationType() ==
-                    IsEscapingClosureInst::WithoutActuallyEscaping,
+                    DestroyNotEscapedClosureInst::WithoutActuallyEscaping,
             "unknown verification type");
   }
 
@@ -6284,9 +6362,10 @@ public:
 
         auto *genericEnv = archetype->getGenericEnvironment();
         auto interfaceTy = archetype->getInterfaceType();
+        auto rootParamTy = interfaceTy->getRootGenericParam();
 
         auto root = genericEnv->mapTypeIntoContext(
-            interfaceTy->getRootGenericParam())->castTo<ElementArchetypeType>();
+            rootParamTy)->castTo<ElementArchetypeType>();
         auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
 
@@ -6299,12 +6378,12 @@ public:
           assert(!indexedShape && "pack substitution doesn't match in shape");
         }
 
-        if (interfaceTy->is<GenericTypeParamType>())
-          return packElementType;
-
-        return interfaceTy->castTo<DependentMemberType>()
-            ->substRootParam(packElementType, LookUpConformanceInModule(),
-                             std::nullopt);
+        return interfaceTy.subst(
+          [&](SubstitutableType *type) {
+            ASSERT(type->isEqual(rootParamTy));
+            return packElementType;
+          },
+          LookUpConformanceInModule());
       };
 
       // If the pack components and expected element types are SIL types,
@@ -6750,7 +6829,7 @@ public:
     };
 
     struct BBState {
-      std::vector<SingleValueInstruction*> Stack;
+      std::vector<SILValue> Stack;
 
       /// Contents: BeginAccessInst*, BeginApplyInst*.
       std::set<SILInstruction*> ActiveOps;
@@ -6800,9 +6879,15 @@ public:
         }
           
         if (i.isAllocatingStack()) {
-          state.Stack.push_back(cast<SingleValueInstruction>(&i));
-
-        } else if (i.isDeallocatingStack()) {
+          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
+            state.Stack.push_back(BAI->getCalleeAllocationResult());
+          } else {
+            state.Stack.push_back(cast<SingleValueInstruction>(&i));
+          }
+          // Not "else if": begin_apply both allocates stack and begins an
+          // operation.
+        }
+        if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
           while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
             op = mvi->getOperand();
@@ -7147,11 +7232,18 @@ public:
 
   void verifyParentFunctionSILFunctionType(CanSILFunctionType FTy) {
     bool foundIsolatedParameter = false;
+    bool foundExplicitParameter = false;
+
     for (const auto &parameterInfo : FTy->getParameters()) {
+      foundExplicitParameter |=
+          !parameterInfo.hasOption(SILParameterInfo::ImplicitLeading);
+      require(!foundExplicitParameter ||
+                  !parameterInfo.hasOption(SILParameterInfo::ImplicitLeading),
+              "Implicit parameters must be before /all/ explicit parameters");
+
       if (parameterInfo.hasOption(SILParameterInfo::Isolated)) {
-           auto argType = parameterInfo.getArgumentType(F.getModule(),
-                                                     FTy,
-                                                     F.getTypeExpansionContext());
+        auto argType = parameterInfo.getArgumentType(
+            F.getModule(), FTy, F.getTypeExpansionContext());
 
         if (argType->isOptional())
           argType = argType->lookThroughAllOptionalTypes()->getCanonicalType();
@@ -7159,10 +7251,11 @@ public:
         auto genericSig = FTy->getInvocationGenericSignature();
         auto &ctx = F.getASTContext();
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
-        auto *distributedProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+        auto *distributedProtocol =
+            ctx.getProtocol(KnownProtocolKind::DistributedActor);
         require(argType->isAnyActorType() ||
-                genericSig->requiresProtocol(argType, actorProtocol) ||
-                genericSig->requiresProtocol(argType, distributedProtocol),
+                    genericSig->requiresProtocol(argType, actorProtocol) ||
+                    genericSig->requiresProtocol(argType, distributedProtocol),
                 "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;
@@ -7305,6 +7398,10 @@ static bool verificationEnabled(const SILModule &M) {
   if (M.getOptions().VerifyAll)
     return true;
 
+  // If we have asserts enabled, always verify...
+  if (CONDITIONAL_ASSERT_enabled())
+    return true;
+
 #ifndef NDEBUG
   // Otherwise if we do have asserts enabled, always verify...
   return true;
@@ -7347,24 +7444,39 @@ void SILFunction::verifySILUndefMap() const {
   }
 }
 
+CanType SILProperty::getBaseType() const {
+  auto *decl = getDecl();
+  auto *dc = decl->getInnermostDeclContext();
+
+  // TODO: base type for global descriptors
+  auto sig = dc->getGenericSignatureOfContext();
+  auto baseTy =
+      dc->getInnermostTypeContext()->getSelfInterfaceType()->getReducedType(
+          sig);
+  if (decl->isStatic())
+    baseTy = CanMetatypeType::get(baseTy);
+
+  if (sig) {
+    auto env = dc->getGenericEnvironmentOfContext();
+    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+  }
+
+  return baseTy;
+}
+
 /// Verify that a property descriptor follows invariants.
 void SILProperty::verify(const SILModule &M) const {
   if (!verificationEnabled(M))
     return;
 
   auto *decl = getDecl();
-  auto *dc = decl->getInnermostDeclContext();
-  
-  // TODO: base type for global/static descriptors
-  auto sig = dc->getGenericSignatureOfContext();
-  auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
-                  ->getReducedType(sig);
+  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto leafTy = decl->getValueInterfaceType()->getReducedType(sig);
   SubstitutionMap subs;
   if (sig) {
-    auto env = dc->getGenericEnvironmentOfContext();
+    auto env =
+        decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
     subs = env->getForwardingSubstitutionMap();
-    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
     leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
   }
   bool hasIndices = false;
@@ -7385,6 +7497,7 @@ void SILProperty::verify(const SILModule &M) const {
     auto typeExpansionContext =
         TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
             ResilienceExpansion::Maximal);
+    auto baseTy = getBaseType();
     verifyKeyPathComponent(const_cast<SILModule&>(M),
                            typeExpansionContext,
                            getSerializedKind(),
@@ -7611,8 +7724,6 @@ void SILGlobalVariable::verify() const {
       assert(!init->use_empty() && "dead instruction in static initializer");
       assert(!isa<ObjectInst>(init) &&
              "object instruction is only allowed for final initial value");
-      assert(!isa<VectorInst>(init) &&
-             "vector instruction is only allowed for final initial value");
     }
     assert(I.getParent() == &StaticInitializerBlock);
   }
@@ -7676,7 +7787,7 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<RootProtocolConformance*> wtableConformances;
+  llvm::DenseSet<ProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();

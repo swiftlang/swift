@@ -1,9 +1,8 @@
-
-// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -enable-builtin-module -module-name builtins -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
-import Swift
+import Builtin
 
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
@@ -860,6 +859,15 @@ func getEnumTag<T>(_ x: T) -> UInt32 {
 // CHECK: call void %DestructiveInjectEnumTag(ptr {{.*}} %0, i32 %1, ptr %T)
 func injectEnumTag<T>(_ x: inout T, tag: UInt32) {
   Builtin.injectEnumTag(&x, tag._value)
+}
+
+// Check that we still support the obsolete allocVector builtin in old Swift.interface files.
+
+// CHECK-LABEL: define {{.*}} swiftcc ptr @"$s8builtins14allocateVector11elementType8capacityBpxm_BwtlF"
+// CHECK:       trap()
+// CHECK:       unreachable
+func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) -> Builtin.RawPointer {
+  return Builtin.allocVector(elementType, capacity)
 }
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

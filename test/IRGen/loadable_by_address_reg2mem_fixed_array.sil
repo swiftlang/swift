@@ -1,0 +1,40 @@
+// %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+
+// RUN: %target-swift-frontend %s -disable-availability-checking -enable-experimental-feature BuiltinModule  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_BuiltinModule
+
+// wasm currently disables aggressive reg2mem
+// UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
+
+import Builtin
+import Swift
+
+
+sil_stage canonical
+
+// CHECK: sil @test1 : $@convention(thin) (@in_guaranteed Builtin.FixedArray<16, Builtin.Int64>) -> () {
+// CHECK-NOT: load
+// CHECK-NOT: store
+// CHECK:   alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+// CHECK-NOT: load
+// CHECK-NOT: store
+// CHECK:   copy_addr [take] {{.*}} to [init] {{.*}} : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK-NOT: load
+// CHECK-NOT: store
+// CHECK: } // end sil function 'test1'
+
+sil @test1 : $@convention(thin) (Builtin.FixedArray<16, Builtin.Int64>) -> () {
+bb0(%0 : $Builtin.FixedArray<16, Builtin.Int64>):
+  %1 = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+  %2 = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+  store %0 to %1 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %3 = load %1 : $*Builtin.FixedArray<16, Builtin.Int64>
+  store %3 to %2 : $*Builtin.FixedArray<16, Builtin.Int64>
+  dealloc_stack %2 : $*Builtin.FixedArray<16, Builtin.Int64>
+  dealloc_stack %1 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %t = tuple ()
+  return %t : $()
+}

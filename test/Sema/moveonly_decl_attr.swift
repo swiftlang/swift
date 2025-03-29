@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 // expected-error@+1 {{'@_moveOnly' attribute is deprecated and will be removed; use '~Copyable' instead}}
 @_moveOnly class C { // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}{{1-12=}}

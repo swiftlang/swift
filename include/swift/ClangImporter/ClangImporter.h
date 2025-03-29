@@ -16,7 +16,10 @@
 #ifndef SWIFT_CLANG_IMPORTER_H
 #define SWIFT_CLANG_IMPORTER_H
 
+#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
@@ -70,6 +73,7 @@ namespace swift {
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
+class ClangInheritanceInfo;
 class ClangModuleUnit;
 class ClangNode;
 class ConcreteDeclRef;
@@ -90,6 +94,9 @@ class SwiftLookupTable;
 class TypeDecl;
 class ValueDecl;
 class VisibleDeclConsumer;
+using ModuleDependencyIDSetVector =
+    llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                    std::set<ModuleDependencyID>>;
 enum class SelectorSplitKind;
 
 /// Kinds of optional types.
@@ -153,6 +160,8 @@ public:
 private:
   Implementation &Impl;
 
+  bool requiresBuiltinHeadersInSystemModules = false;
+
   ClangImporter(ASTContext &ctx,
                 DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
@@ -188,15 +197,20 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         bool ignoreFileMapping = false);
 
-  static std::vector<std::string>
+  std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  static std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ClangImporter *importer, ASTContext &ctx,
+  std::optional<std::vector<std::string>>
+  getClangCC1Arguments(ASTContext &ctx,
                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                        bool ignoreClangTarget = false);
+
+  std::vector<std::string>
+  getClangDepScanningInvocationArguments(ASTContext &ctx,
+      std::optional<StringRef> sourceFileName = std::nullopt);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
@@ -322,7 +336,7 @@ public:
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
-  ClangNode getEffectiveClangNode(const Decl *decl) const;
+  ClangNode getEffectiveClangNode(const Decl *decl) const override;
 
   /// Look for textually included declarations from the bridging header.
   ///
@@ -477,27 +491,33 @@ public:
   bridgeClangModuleDependencies(
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
+      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+      RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper,
+                        llvm::PrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
   void recordBridgingHeaderOptions(
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  /// Add dependency information for header dependencies
+  void getBridgingHeaderOptions(
+      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      std::vector<std::string> &swiftArgs);
+
+  /// Query dependency information for header dependencies
   /// of a binary Swift module.
   ///
   /// \param moduleID the name of the Swift module whose dependency
   /// information will be augmented with information about the given
   /// textual header inputs.
+  ///
+  /// \param headerPath the path to the header to be scanned.
   ///
   /// \param clangScanningTool The clang dependency scanner.
   ///
@@ -505,10 +525,15 @@ public:
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  bool addHeaderDependencies(
-      ModuleDependencyID moduleID,
+  bool getHeaderDependencies(
+      ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
+      std::optional<llvm::MemoryBufferRef> sourceBuffer,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      ModuleDependenciesCache &cache);
+      ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &headerClangModuleDependencies,
+      std::vector<std::string> &headerFileInputs,
+      std::vector<std::string> &bridgingHeaderCommandLine,
+      std::optional<std::string> &includeTreeID);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
@@ -644,8 +669,8 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                  DeclContext *newContext) override;
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                  ClangInheritanceInfo inheritance) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -663,6 +688,11 @@ public:
 
   const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
       const clang::Decl *candidateDecl) override;
+
+  /// Create cache key for embedded bridging header.
+  static llvm::Expected<llvm::cas::ObjectRef>
+  createEmbeddedBridgingHeaderCacheKey(
+      llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef ChainedPCHIncludeTree);
 
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
@@ -705,6 +735,9 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 
+/// Determine whether type is a c++ foreign reference type.
+bool isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type);
+
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
 llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
@@ -715,20 +748,165 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
+/// Map the access specifier of a Clang record member to a Swift access level.
+///
+/// This mapping is conservative: the resulting Swift access should be at _most_
+/// as permissive as the input C++ access.
+AccessLevel convertClangAccess(clang::AccessSpecifier access);
+
+/// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
+///
+/// May return >1 fileID when a decl is annotated more than once, which should
+/// be treated as an error and appropriately diagnosed (using the included
+/// SourceLocation).
+///
+/// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
+/// and should be parsed using swift::SourceFile::FileIDStr::parse().
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+getPrivateFileIDAttrs(const clang::Decl *decl);
+
+/// Use some heuristics to determine whether the clang::Decl associated with
+/// \a decl would not exist without C++ interop.
+///
+/// For instance, a namespace is C++-only, but a plain struct is valid in both
+/// C and C++.
+///
+/// Returns false if \a decl was not imported by ClangImporter.
+bool declIsCxxOnly(const Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
+  /// Mapping from a file name to an existing file path.
   SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// Mapping from a file name to a string of characters that represents the
+  /// contents of the file.
   SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
+
   bool requiresBuiltinHeadersInSystemModules;
 };
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
+///
+/// `suppressDiagnostic` prevents us from emitting warning messages when we
+/// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
     ASTContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
+    bool suppressDiagnostic = false);
+
+/// Information used to compute the access level of inherited C++ members.
+class ClangInheritanceInfo {
+  /// The cumulative inheritance access specifier, that is used to compute the
+  /// effective access level of a particular inherited member.
+  ///
+  /// When constructing ClangInheritanceInfo for nested inheritance, this field
+  /// gets clamped to the least permissive level between its current value and
+  /// the inheritance access specifier.
+  ///
+  /// If we encounter \e nested private inheritance in the class hierarchy
+  /// (i.e., private inheritance beyond the first level of inheritance), we set
+  /// the access level to nullopt to indicate that none of the members from
+  /// classes beyond that point in the hierarchy should be accessible. This case
+  /// must be treated separately from non-nested private inheritance, where
+  /// inherited members are private but accessible from extensions.
+  ///
+  /// See ClangInheritanceInfo::cumulativeInheritedAccess() for an example.
+  std::optional<clang::AccessSpecifier> access;
+
+public:
+  /// Default constructor for this class that is used as the base case when
+  /// recursively walking up a class inheritance hierarchy.
+  ClangInheritanceInfo() : access(clang::AS_none) {}
+
+  /// Inductive case for this class that is used to accumulate inheritance
+  /// metadata for cases of (nested) inheritance.
+  ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
+      : access(computeAccess(prev, base)) {}
+
+  /// Whether this info represents a case of nested private inheritance.
+  bool isNestedPrivate() const { return !access.has_value(); }
+
+  /// Whether this info represents a case of C++ inheritance.
+  ///
+  /// Returns \c false for the default instance of this class.
+  bool isInheriting() const {
+    return isNestedPrivate() || *access != clang::AS_none;
+  }
+
+  /// Whether this is info represents a case of C++ inheritance.
+  operator bool() const { return isInheriting(); }
+
+  /// Compute the (Swift) access level for inherited base member \param decl,
+  /// for when its inherited (cloned) member in the derived class.
+  ///
+  /// This access level is determined by whichever is more restrictive: what the
+  /// \param decl was declared with (in its base class), or what it is being
+  /// inherited with (ClangInheritanceInfo::access).
+  ///
+  /// Always returns swift::AccessLevel::Public (i.e., corresponding to
+  /// clang::AS_none) if this ClangInheritanceInfo::isInheriting() is \c false.
+  AccessLevel accessForBaseDecl(const ValueDecl *baseDecl) const;
+
+  /// Marks \param clonedDecl as unavailable (using \c @available) if it
+  /// cannot be accessed from the derived class, either because \param baseDecl
+  /// was declared as private in the base class, or because \param clonedDecl
+  /// was inherited with private inheritance.
+  ///
+  /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
+  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+                                 ValueDecl *clonedDecl) const;
+
+  friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {
+    return llvm::hash_combine(info.access);
+  }
+
+private:
+  /// An example of how ClangInheritanceInfo:access is accumulated while
+  /// recursively traversing the class hierarchy starting from \c E:
+  ///
+  /// \code{.cpp}
+  /// struct A { ... };               // access = nullopt (nested private)
+  /// struct B : private   A { ... }; // access = protected
+  /// struct C : public    B { ... }; // access = protected
+  /// struct D : protected C { ... }; // access = public
+  /// struct E : public    D { ... }; // access = none [base case]
+  /// \endcode
+  ///
+  /// Another example, this time with non-nested private inheritance:
+  ///
+  /// \code{.cpp}
+  /// struct A { ... };               // access = nullopt
+  /// struct B : public    A { ... }; // access = nullopt
+  /// struct C : private   B { ... }; // access = private
+  /// struct D : public    C { ... }; // access = private
+  /// struct E : private   D { ... }; // access = none [base case]
+  /// \endcode
+  static std::optional<clang::AccessSpecifier>
+  computeAccess(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base) {
+    auto baseAccess = base.getAccessSpecifier();
+    assert(baseAccess != clang::AS_none &&
+           "this should always be public, protected, or private");
+
+    if (!prev.isInheriting())
+      // This is the first level of inheritance, so we just take the access
+      // specifier from CXXBaseSpecifier. Note that this is the only scenario
+      // where we can have access = private.
+      return {baseAccess};
+
+    if (prev.isNestedPrivate() || baseAccess == clang::AS_private)
+      // This is a case of nested inheritance, and either we encountered nested
+      // private inheritance before, or this is our first time encountering it.
+      return std::nullopt;
+
+    static_assert(clang::AS_private > clang::AS_protected &&
+                  clang::AS_protected > clang::AS_public &&
+                  "using std::max() relies on this ordering");
+    return {std::max(*prev.access, baseAccess)};
+  }
+};
 
 } // end namespace swift
 

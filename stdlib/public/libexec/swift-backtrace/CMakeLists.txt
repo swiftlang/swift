@@ -12,11 +12,11 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   set(musl Musl)
 endif()
 
-# Similarly, we only want the _Backtracing dependency if we're building
+# Similarly, we only want the Runtime dependency if we're building
 # with the stdlib.
-set(backtracing)
-if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_BACKTRACING)
-  set(backtracing _Backtracing)
+set(runtime)
+if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_RUNTIME_MODULE)
+  set(runtime Runtime)
 endif()
 
 if(NOT SWIFT_BUILD_STDLIB)
@@ -24,24 +24,28 @@ if(NOT SWIFT_BUILD_STDLIB)
 endif()
 
 set(BACKTRACING_COMPILE_FLAGS
-  "-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules"
+  "-cxx-interoperability-mode=default"
+  "-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
-  "-Xcc;-I${CMAKE_BINARY_DIR}/include")
+  "-Xcc;-I${CMAKE_BINARY_DIR}/include"
+  "-disable-upcoming-feature;MemberImportVisibility")
 
 set(BACKTRACING_SOURCES
   main.swift
   AnsiColor.swift
+  JSON.swift
   TargetMacOS.swift
   TargetLinux.swift
   Themes.swift
   Utils.swift
   )
 
-# We have to build with a deployment target of at least 10.14.4, otherwise
+# We have to build with a deployment target of at least 10.15, otherwise
 # the tests will all fail because dyld will get confused at the use of
-# @rpath (from magic-symbols-for-install-name.c).
-if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.14.4")
-  set(osx_deployment_target "10.14.4")
+# @rpath (from magic-symbols-for-install-name.c) and the `some Sequence<Frame>`
+# in Backtrace won't be accessible.
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.15")
+  set(osx_deployment_target "10.15")
 else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
 endif()
@@ -49,7 +53,7 @@ endif()
 add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   ${BACKTRACING_SOURCES}
 
-  SWIFT_MODULE_DEPENDS         ${backtracing}
+  SWIFT_MODULE_DEPENDS         ${runtime}
 
   SWIFT_MODULE_DEPENDS_OSX          ${darwin}
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
@@ -78,7 +82,7 @@ if(static_target_sdks)
 
     ${BACKTRACING_SOURCES}
 
-    SWIFT_MODULE_DEPENDS         ${backtracing}
+    SWIFT_MODULE_DEPENDS         ${runtime}
 
     SWIFT_MODULE_DEPENDS_OSX          ${darwin}
     SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}

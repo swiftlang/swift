@@ -4,6 +4,7 @@
 // RUN: %target-swift-emit-ir %s -module-name main -parse-as-library -enable-experimental-feature Volatile -Osize | %FileCheck %s
 
 // REQUIRES: volatile
+// REQUIRES: swift_feature_Volatile
 
 import _Volatile
 

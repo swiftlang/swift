@@ -130,8 +130,7 @@ swift::getDistributedActorAsActorConformanceRef(ASTContext &C) {
   auto distributedActorAsActorConformance =
       getDistributedActorAsActorConformance(C);
 
-  auto actorProto = C.getProtocol(KnownProtocolKind::Actor);
-  return ProtocolConformanceRef(actorProto, distributedActorAsActorConformance);
+  return ProtocolConformanceRef(distributedActorAsActorConformance);
 }
 NormalProtocolConformance *
 swift::getDistributedActorAsActorConformance(ASTContext &C) {
@@ -170,7 +169,7 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(
   }
 
   /// === Maybe the value is declared in a protocol?
-  if (auto protocol = DC->getSelfProtocolDecl()) {
+  if (DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = anyValue->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();

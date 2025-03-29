@@ -29,7 +29,7 @@ using namespace swift;
 SILArgument::SILArgument(ValueKind subClassKind,
                          SILBasicBlock *inputParentBlock, SILType type,
                          ValueOwnershipKind ownershipKind,
-                         const ValueDecl *inputDecl, bool reborrow,
+                         ValueDecl *inputDecl, bool reborrow,
                          bool pointerEscape)
     : ValueBase(subClassKind, type), parentBlock(inputParentBlock),
       decl(inputDecl) {

@@ -116,8 +116,6 @@ class TBDGenVisitor : public IRSymbolVisitor {
   void addSymbol(StringRef name, SymbolSource source, SymbolFlags flags,
                  EncodeKind kind = EncodeKind::GlobalSymbol);
 
-  void addSymbol(LinkEntity entity);
-  
   bool addClassMetadata(ClassDecl *CD);
 
 public:
@@ -126,7 +124,7 @@ public:
                 APIRecorder &recorder)
       : DataLayoutDescription(dataLayoutString),
         UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false,
-                          /*static=*/false),
+                          /*static=*/false, /*mergeableSymbols*/false),
         SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
 

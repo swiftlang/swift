@@ -17,7 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
@@ -147,7 +147,27 @@ ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
 Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
                                          SubstOptions options) const {
-  return getTypeWitnessAndDecl(assocType, options).getWitnessType();
+  auto witness = getTypeWitnessAndDecl(assocType, options);
+  auto witnessTy = witness.getWitnessType();
+  if (!witnessTy)
+    return witnessTy;
+
+  // This is a hacky feature allowing code completion to migrate to
+  // using Type::subst() without changing output.
+  //
+  // FIXME: Remove this hack and do whatever we need to do in the
+  // ASTPrinter instead.
+  if (options & SubstFlags::DesugarMemberTypes) {
+    if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+      witnessTy = aliasType->getSinglyDesugaredType();
+
+    // Another hack. If the type witness is a opaque result type. They can
+    // only be referred using the name of the associated type.
+    if (witnessTy->is<OpaqueTypeArchetypeType>())
+      witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+  }
+
+  return witnessTy;
 }
 
 ConcreteDeclRef
@@ -462,6 +482,26 @@ void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *loader,
   LoaderContextData = contextData;
 }
 
+TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
+  if (!Bits.NormalProtocolConformance.HasExplicitGlobalActor)
+    return nullptr;
+
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
+}
+
+void
+NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
+  if (!typeExpr) {
+    Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    return;
+  }
+
+  Bits.NormalProtocolConformance.HasExplicitGlobalActor = true;
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this] = typeExpr;
+}
+
 namespace {
   class PrettyStackTraceRequirement : public llvm::PrettyStackTraceEntry {
     const char *Action;
@@ -711,12 +751,11 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
           //  funcs; there seems to be a problem that we mark completed, but
           //  afterwards will record the thunk witness;
           (dyn_cast<FuncDecl>(requirement)
-            ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
-               dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
-            : false) ||
+               ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
+                  dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
+               : false) ||
           requirement->getAttrs().hasAttribute<OptionalAttr>() ||
-          requirement->getAttrs().isUnavailable(
-                                        requirement->getASTContext())) &&
+          requirement->isUnavailable()) &&
          "Conformance already complete?");
   Mapping[requirement] = witness;
 }
@@ -956,8 +995,7 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype())
+    if (IFS.isInvariant(origType))
       return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
@@ -978,8 +1016,7 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
   case ProtocolConformanceKind::Builtin: {
     auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype())
+    if (IFS.isInvariant(origType))
       return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
@@ -1002,18 +1039,14 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
+    auto origType = getType();
+    if (IFS.isInvariant(origType))
+      return ProtocolConformanceRef(mutableThis);
+
     auto inheritedConformance
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
 
-    auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype()) {
-      return ProtocolConformanceRef(mutableThis);
-    }
-
-    auto origBaseType = inheritedConformance->getType();
-    if (origBaseType->hasTypeParameter() ||
-        origBaseType->hasArchetype()) {
+    if (!IFS.isInvariant(inheritedConformance->getType())) {
       // Substitute into the superclass.
       auto substConformance = inheritedConformance->subst(IFS);
       if (!substConformance.isConcrete())

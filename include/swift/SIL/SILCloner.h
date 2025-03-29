@@ -93,7 +93,7 @@ struct SubstitutionMapWithLocalArchetypes {
     if (SubsMap)
       return SubsMap->lookupConformance(origType, proto);
 
-    return ProtocolConformanceRef(proto);
+    return ProtocolConformanceRef::forAbstract(substType, proto);
   }
 
   void dump(llvm::raw_ostream &out) const {
@@ -383,7 +383,7 @@ public:
     return numScalarElements == 1;
   }
 
-  void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
+  void remapRootOpenedType(CanExistentialArchetypeType archetypeTy) {
     auto *origEnv = archetypeTy->getGenericEnvironment();
 
     auto genericSig = origEnv->getGenericSignature();
@@ -1053,17 +1053,6 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAllocVectorInst(
-    AllocVectorInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createAllocVector(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getCapacity()),
-                                    getOpType(Inst->getElementType())));
-}
-
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1166,6 +1155,15 @@ SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
                 getOpLocation(Inst->getLoc()), Inst->getName(),
                 getOpType(Inst->getType()),
                 getOpSubstitutionMap(Inst->getSubstitutions()), Args));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMergeIsolationRegionInst(
+    MergeIsolationRegionInst *Inst) {
+  auto Args = getOpValueArray<8>(Inst->getOperandValues());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createMergeIsolationRegion(
+                                    getOpLocation(Inst->getLoc()), Args));
 }
 
 template<typename ImplClass>
@@ -1784,6 +1782,15 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitThunkInst(ThunkInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createThunk(getOpLocation(Inst->getLoc()),
+                                     getOpValue(Inst->getOperand()),
+                                     Inst->getThunkKind()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2025,7 +2032,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCast(
-                              OpLoc, OpValue, OpLoweredType, OpFormalType,
+                              OpLoc, Inst->getIsolatedConformances(), OpValue,
+                              OpLoweredType, OpFormalType,
                               getBuilder().hasOwnership()
                                   ? Inst->getForwardingOwnershipKind()
                                   : ValueOwnershipKind(OwnershipKind::None)));
@@ -2043,7 +2051,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
-                              OpLoc, SrcValue, SrcType, DestValue, TargetType));
+                              OpLoc, Inst->getIsolatedConformances(),
+                              SrcValue, SrcType, DestValue, TargetType));
 }
 
 template <typename ImplClass>
@@ -2673,7 +2682,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   recordClonedInstruction(Inst,
                           getBuilder().createWitnessMethod(
                               getOpLocation(Inst->getLoc()), newLookupType,
-                              conformance, Inst->getMember(), Inst->getType()));
+                              conformance, Inst->getMember(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>
@@ -3135,6 +3144,17 @@ void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
                 Inst->dependenceKind()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::
+visitMarkDependenceAddrInst(MarkDependenceAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createMarkDependenceAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getAddress()),
+                getOpValue(Inst->getBase()),
+                Inst->dependenceKind()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
@@ -3167,11 +3187,11 @@ void SILCloner<ImplClass>::visitEndCOWMutationInst(EndCOWMutationInst *Inst) {
                         getOpValue(Inst->getOperand()), Inst->doKeepUnique()));
 }
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitIsEscapingClosureInst(
-    IsEscapingClosureInst *Inst) {
+void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(
+    DestroyNotEscapedClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createIsEscapingClosure(getOpLocation(Inst->getLoc()),
+      Inst, getBuilder().createDestroyNotEscapedClosure(getOpLocation(Inst->getLoc()),
                                                  getOpValue(Inst->getOperand()),
                                                  Inst->getVerificationType()));
 }
@@ -3430,6 +3450,7 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createCheckedCastBranch(
                 getOpLocation(Inst->getLoc()), Inst->isExact(),
+                Inst->getIsolatedConformances(),
                 getOpValue(Inst->getOperand()),
                 getOpASTType(Inst->getSourceFormalType()),
                 getOpType(Inst->getTargetLoweredType()),
@@ -3451,6 +3472,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   auto FalseCount = Inst->getFalseBBCount();
   recordClonedInstruction(Inst, getBuilder().createCheckedCastAddrBranch(
                                     getOpLocation(Inst->getLoc()),
+                                    Inst->getIsolatedConformances(),
                                     Inst->getConsumptionKind(), SrcValue,
                                     SrcType, DestValue, TargetType, OpSuccBB,
                                     OpFailBB, TrueCount, FalseCount));
@@ -3618,8 +3640,8 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   SmallVector<SILValue, 4> opValues;
-  for (auto &op : Inst->getAllOperands())
-    opValues.push_back(getOpValue(op.get()));
+  for (Operand *op : Inst->getRealOperands())
+    opValues.push_back(getOpValue(op->get()));
 
   recordClonedInstruction(Inst,
                           getBuilder().createKeyPath(
@@ -3776,6 +3798,14 @@ void SILCloner<ImplClass>::visitHasSymbolInst(HasSymbolInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createHasSymbol(getOpLocation(Inst->getLoc()),
                                          Inst->getDecl()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIgnoredUseInst(IgnoredUseInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createIgnoredUse(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
 }
 
 } // end namespace swift

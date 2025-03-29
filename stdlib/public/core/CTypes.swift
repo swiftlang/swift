@@ -108,6 +108,8 @@ public typealias CLongDouble = Double
 #elseif os(OpenBSD)
 #if arch(x86_64)
 public typealias CLongDouble = Float80
+#elseif arch(arm64)
+public typealias CLongDouble = Double
 #else
 #error("CLongDouble needs to be defined for this OpenBSD architecture")
 #endif
@@ -134,6 +136,9 @@ public typealias CWideChar = UInt16
 public typealias CWideChar = Unicode.Scalar
 #endif
 
+/// The C++20 'char8_t' type, which has UTF-8 encoding.
+public typealias CChar8 = UInt8
+
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
 /// The C++11 'char16_t' type, which has UTF-16 encoding.
@@ -157,7 +162,7 @@ public struct OpaquePointer {
 
   @usableFromInline @_transparent
   internal init(_ v: Builtin.RawPointer) {
-    self._rawValue = v
+    unsafe self._rawValue = v
   }
 }
 
@@ -173,7 +178,7 @@ extension OpaquePointer {
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    unsafe self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Creates a new `OpaquePointer` from the given address, specified as a bit
@@ -184,7 +189,7 @@ extension OpaquePointer {
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    unsafe self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 }
 
@@ -192,8 +197,9 @@ extension OpaquePointer {
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
@@ -201,8 +207,9 @@ extension OpaquePointer {
   /// The result is `nil` if `from` is `nil`.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init?<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>?) {
-    guard let unwrapped = from else { return nil }
+    guard let unwrapped = unsafe from else { return nil }
     self.init(unwrapped)
   }
 }
@@ -211,8 +218,9 @@ extension OpaquePointer {
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
@@ -220,36 +228,40 @@ extension OpaquePointer {
   /// The result is `nil` if `from` is `nil`.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init?<T: ~Copyable>(@_nonEphemeral _ from: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = from else { return nil }
+    guard let unwrapped = unsafe from else { return nil }
     self.init(unwrapped)
   }
 }
 
 extension OpaquePointer: Equatable {
   @inlinable // unsafe-performance
+  @safe
   public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+    return unsafe Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 
-extension OpaquePointer: Hashable {
+extension OpaquePointer: @unsafe Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
   @inlinable
+  @safe
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
+    unsafe hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 
 @_unavailableInEmbedded
 extension OpaquePointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
+  @safe
   public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
+    return unsafe _rawPointerToString(_rawValue)
   }
 }
 
@@ -262,8 +274,9 @@ extension Int {
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
   @inlinable // unsafe-performance
+  @safe
   public init(bitPattern pointer: OpaquePointer?) {
-    self.init(bitPattern: UnsafeRawPointer(pointer))
+    unsafe self.init(bitPattern: UnsafeRawPointer(pointer))
   }
 }
 
@@ -276,16 +289,18 @@ extension UInt {
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
   @inlinable // unsafe-performance
+  @safe
   public init(bitPattern pointer: OpaquePointer?) {
-    self.init(bitPattern: UnsafeRawPointer(pointer))
+    unsafe self.init(bitPattern: UnsafeRawPointer(pointer))
   }
 }
 
 /// A wrapper around a C `va_list` pointer.
 #if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) ||  os(Windows))
 @frozen
+@unsafe
 public struct CVaListPointer {
-  @usableFromInline // unsafe-performance
+  @unsafe @usableFromInline // unsafe-performance
   internal var _value: (__stack: UnsafeMutablePointer<Int>?,
                         __gr_top: UnsafeMutablePointer<Int>?,
                         __vr_top: UnsafeMutablePointer<Int>?,
@@ -305,6 +320,7 @@ public struct CVaListPointer {
 
 @_unavailableInEmbedded
 extension CVaListPointer: CustomDebugStringConvertible {
+  @safe
   public var debugDescription: String {
     return "(\(_value.__stack.debugDescription), " +
            "\(_value.__gr_top.debugDescription), " +
@@ -317,22 +333,24 @@ extension CVaListPointer: CustomDebugStringConvertible {
 #else
 
 @frozen
+@unsafe
 public struct CVaListPointer {
-  @usableFromInline // unsafe-performance
+  @unsafe @usableFromInline // unsafe-performance
   internal var _value: UnsafeMutableRawPointer
 
   @inlinable // unsafe-performance
   public // @testable
   init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
-    _value = from
+    unsafe _value = from
   }
 }
 
 @_unavailableInEmbedded
 extension CVaListPointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
+  @safe
   public var debugDescription: String {
-    return _value.debugDescription
+    return unsafe _value.debugDescription
   }
 }
 

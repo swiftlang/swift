@@ -55,13 +55,13 @@ The property appears in a non-generic context, so there is no parent generic sig
 \end{quote}
 
 The return statement's underlying type is \texttt{LazyFilterSequence<Array<Horse>>}, so the substitution map is
-\[
-\SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{LazyFilterSequence<Array<Horse>>}
-}{
-\SubstConf{\ttgp{0}{0}}{LazyFilterSequence<Array<Horse>>}{Collection}
+\begin{align*}
+\SubstMapC{
+&\SubstType{\ttgp{0}{0}}{LazyFilterSequence<Array<Horse>>}
+}{\\
+&\SubstConf{\ttgp{0}{0}}{LazyFilterSequence<Array<Horse>>}{Collection}
 }
-\]
+\end{align*}
 The opaque generic environment has a single opaque archetype $\archetype{\ttgp{0}{0}}$ corresponding to the opaque interface generic signature's single generic parameter \ttgp{0}{0}. The interface type of the declaration \texttt{hungryHorses} is the opaque archetype $\archetype{\ttgp{0}{0}}$.
 \end{example}
 
@@ -83,15 +83,15 @@ The opaque interface generic signature is constructed from this with two additio
 \end{quote}
 
 The substitution map sends the outer generic parameter \ttgp{0}{0} to itself, and the two inner generic parameters \ttgp{1}{0}, \ttgp{1}{1} both to \texttt{Array<\ttgp{0}{0}>}.
-\[
-\SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{\ttgp{0}{0}}\\
-\SubstType{\ttgp{1}{0}}{Array<\ttgp{0}{0}>}\\
-\SubstType{\ttgp{1}{1}}{Array<\ttgp{0}{0}>}
-}{
-\SubstConf{\ttgp{0}{0}}{\ttgp{0}{0}}{Equatable}
+\begin{align*}
+\SubstMapC{
+&\SubstType{\ttgp{0}{0}}{\ttgp{0}{0}},\\
+&\SubstType{\ttgp{1}{0}}{Array<\ttgp{0}{0}>},\\
+&\SubstType{\ttgp{1}{1}}{Array<\ttgp{0}{0}>}
+}{\\
+&\SubstConf{\ttgp{0}{0}}{\ttgp{0}{0}}{Equatable}
 }
-\]
+\end{align*}
 The opaque generic environment has two opaque archetypes $\archetype{\ttgp{1}{0}}$ and $\archetype{\ttgp{1}{1}}$. The interface type of the function is
 \begin{quote}
 \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:\ Equatable> (\ttgp{0}{0}) -> ($\archetype{\ttgp{1}{0}}$, \archetype{\ttgp{1}{1}})}

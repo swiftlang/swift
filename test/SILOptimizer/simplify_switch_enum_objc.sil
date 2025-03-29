@@ -1,8 +1,8 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // Just make sure that we do not infinite loop when compiling without block merging.
 //
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg -simplify-cfg-simplify-unconditional-branches=0
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -simplify-cfg -simplify-cfg-simplify-unconditional-branches=0
 
 // REQUIRES: objc_interop
 

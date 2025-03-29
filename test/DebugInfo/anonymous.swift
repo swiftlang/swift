@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -g -o - | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -g -o - | %FileCheck --check-prefix=SIL %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 // SIL: debug_value %1 : $*T, let, name "_0", argno 1, expr op_deref

@@ -29,7 +29,7 @@ sil_witness_table hidden <T where T : Inner> Generic<T>: Inner module sil {
 }
 
 sil_witness_table hidden <U where U : Outer> Concrete<U>: Outer module sil {
-  associated_type_protocol (T: Inner): Generic<U.T>: specialize <U.T> (<T where T : Inner> Generic<T>: Inner module main)
+  associated_conformance (T: Inner): Generic<U.T>: specialize <U.T> (<T where T : Inner> Generic<T>: Inner module main)
   associated_type T: Generic<U.T>
 }
 

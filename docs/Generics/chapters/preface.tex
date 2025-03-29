@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter*{Preface}
+\addchap{Preface}
 
 % Emit this before the first citation to customize bibliography
 \bstctlcite{IEEEexample:BSTcontrol}
@@ -18,6 +18,7 @@ This book is divided into five parts. \PartRef{part syntax} gives a high-level o
 \item \ChapRef{types} describes how the compiler models the \emph{types} of values declared by the source program. Types form a miniature language of their own, and we often find ourselves taking them apart and re-assembling them in new ways. Generic parameter types, dependent member types, and generic nominal types are the three fundamental kinds; others are also summarized.
 \item \ChapRef{decls} is about \emph{declarations}, the building blocks of Swift code. Functions, structs, and protocols are examples of declarations. Various kinds of declarations can be \emph{generic}. There is a common syntax for declaring generic parameters and stating \emph{requirements}. Protocols can declare associated types and impose \emph{associated requirements} on their associated types in a similar manner.
 \end{itemize}
+
 \PartRef{part semantics} focuses on the core \emph{semantic} objects in the generics implementation. To grasp the mathematical asides, it helps to have had some practice working with definitions and proofs, at the level of an introductory course in calculus, linear algebra or combinatorics. A summary of basic math appears in \AppendixRef{math summary}.
 \begin{itemize}
 \item \ChapRef{genericsig} defines the \emph{generic signature}, which collects the generic parameters and explicit requirements of a generic declaration. The explicit requirements of a generate signature generate a set of \emph{derived requirements} and \emph{valid type parameters}, which explains how we type check code \emph{inside} a generic declaration. This formalism is realized in the implementation via \emph{generic signature queries}.
@@ -27,24 +28,26 @@ This book is divided into five parts. \PartRef{part syntax} gives a high-level o
 \item \ChapRef{conformances} defines the \emph{conformance}, a description of how a concrete type fulfills the requirements of a protocol, in particular its associated types. In the type substitution algebra, conformances are to protocols what substitution maps are to generic signatures.
 
 \item \ChapRef{genericenv} defines \emph{archetypes} and \emph{generic environments}, two abstractions used throughout the compiler. Also describes the \emph{type parameter graph} that gives us an intuitive visualization of a generic signature.
+
+\item \ChapRef{typeresolution} describes \emph{type resolution}, which uses name lookup and substitution to resolve syntactic representations to semantic types. Checking if a substitution map satisfies the requirements of its generic signature links our two formalisms.
 \end{itemize}
 
-\PartRef{part specialties} explores the implementation of various compiler subsystems, while further developing the derived requirements formalism and type substitution:
+\PartRef{part specialties} covers some additional language features and compiler internals, while further developing the derived requirements formalism and type substitution:
 \begin{itemize}
-\item \ChapRef{typeresolution} details \emph{type resolution}, which uses name lookup and substitution to resolve syntactic representations to semantic types. Checking if a substitution map satisfies the requirements of its generic signature links our two formalisms.
-
 \item \ChapRef{extensions} discusses extension declarations, which add members and conformances to existing types. Extensions can also declare \emph{conditional conformances}, which have some interesting behaviors.
 
-\item \ChapRef{building generic signatures} explains how we build a generic signature from the syntax written in source, via the process of \emph{requirement minimization}, which eliminates requirements proved redundant. This chapter also shows how invalid requirements are diagnosed. A \emph{well-formed generic signature} is one that satisfies the validity condition, and its theoretical properties have nice practical consequences.
+\item \ChapRef{building generic signatures} explains how we build a generic signature from syntax written in source, and gives a formal description of \emph{requirement minimization}. This chapter also shows how invalid requirements are diagnosed, and defines a \emph{well-formed generic signature} as one that passes these checks.
 
-\item \ChapRef{conformance paths} fills out the remainder of the type substitution algebra, explaining  \emph{conformance paths}. The concept of a \emph{recursive conformance} is explored, and finally, the type substitution algebra is shown to be Turing-complete.
+\item \ChapRef{conformance paths} shows that \emph{conformance paths} give us a way to evaluate expressions in the type substitution algebra, which completes the formalism. The concept of a \emph{recursive conformance} is explored, and finally, the type substitution algebra is shown to be Turing-complete.
+
+\item \ChapRef{opaqueresult} is unfinished. It will describe opaque return types.
+
+\item \ChapRef{existentialtypes} is unfinished. It will describe existential types.
 \end{itemize}
-
-\PartRef{part supplements} is currently unfinished. It will describe opaque return types (\ChapRef{opaqueresult}), existential types (\ChapRef{existentialtypes}), and subclassing (\ChapRef{classinheritance}).
 
 \PartRef{part rqm} describes the Requirement Machine, a \emph{decision procedure} for the derived requirements formalism. The original contribution here is that generic signature queries and requirement minimization are problems in the theory of \emph{string rewriting}:
 \begin{itemize}
-\item \ChapRef{rqm basic operation} describes the entry points for generic signature queries and requirement minimization, and how they recursively build a \emph{requirement machine} for a generic signature from the requirement machines of its \emph{protocol components}.
+\item \ChapRef{rqm basic operation} gives a high level overview of how both generic signature queries and requirement minimization recursively build a \emph{requirement machine} for a generic signature from the requirement machines of its \emph{protocol components}.
 
 \item \ChapRef{monoids} introduces \emph{finitely-presented monoids} and the \emph{word problem}, and then presents the theoretical result that a finitely-presented monoid can be encoded as a generic signature, such that word problems become generic signature queries. Therefore, derived requirements are \emph{at least} as expressive as the word problem; that is, undecidable in the general case.
 

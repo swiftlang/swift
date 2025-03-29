@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,13 +20,13 @@
 import Darwin
 import Darwin.Mach
 
-import _Backtracing
-@_spi(Internal) import _Backtracing
-@_spi(Contexts) import _Backtracing
-@_spi(MemoryReaders) import _Backtracing
+import Runtime
+@_spi(Internal) import Runtime
+@_spi(Contexts) import Runtime
+@_spi(MemoryReaders) import Runtime
 
-@_implementationOnly import Runtime
-@_implementationOnly import OS.Darwin
+internal import BacktracingImpl.OS.Darwin
+internal import BacktracingImpl.Runtime
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext
@@ -70,8 +70,7 @@ class Target {
   var crashingThread: TargetThread.ThreadID
 
   var task: task_t
-  var images: [Backtrace.Image] = []
-  var sharedCacheInfo: Backtrace.SharedCacheInfo?
+  var images: ImageMap
 
   var threads: [TargetThread] = []
   var crashingThreadNdx: Int = -1
@@ -103,7 +102,7 @@ class Target {
     }
   }
 
-  var reader: CachingMemoryReader<RemoteMemoryReader>
+  var reader: RemoteMemoryReader
 
   var mcontext: MContext
 
@@ -129,21 +128,28 @@ class Target {
     }
   }
 
-  static func isPlatformBinary(pid: pid_t) -> Bool {
+  static func isPrivileged(pid: pid_t) -> Bool {
     var flags = UInt32(0)
 
-    return csops(pid,
-                 UInt32(CS_OPS_STATUS),
-                 &flags,
-                 MemoryLayout<UInt32>.size) != 0 ||
-      (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH)) != 0
+    guard csops(pid,
+                UInt32(CS_OPS_STATUS),
+                &flags,
+                MemoryLayout<UInt32>.size) == 0 else {
+      return true
+    }
+
+    if (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH | CS_RUNTIME)) != 0 {
+      return true
+    }
+
+    return (flags & UInt32(CS_GET_TASK_ALLOW)) == 0
   }
 
   init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool,
        symbolicate: SwiftBacktrace.Symbolication) {
     pid = getppid()
 
-    if Self.isPlatformBinary(pid: pid) {
+    if Self.isPrivileged(pid: pid) {
       /* Exit silently in this case; either
 
          1. We can't call csops(), because we're sandboxed, or
@@ -164,7 +170,7 @@ class Target {
 
     task = parentTask
 
-    reader = CachingMemoryReader(for: RemoteMemoryReader(task: task_t(task)))
+    reader = RemoteMemoryReader(task: task_t(task))
 
     name = Self.getProcessName(pid: pid)
 
@@ -188,8 +194,7 @@ class Target {
 
     mcontext = mctx
 
-    images = Backtrace.captureImages(for: task)
-    sharedCacheInfo = Backtrace.captureSharedCacheInfo(for: task)
+    images = ImageMap.capture(for: task)
 
     fetchThreads(limit: limit, top: top, cache: cache, symbolicate: symbolicate)
   }
@@ -249,11 +254,12 @@ class Target {
 
       if info.thread_id == crashingThread {
         ctx = HostContext.fromHostMContext(mcontext)
-        crashingThreadNdx = Int(ndx)
+        crashingThreadNdx = threads.count
       } else {
         guard let threadCtx = HostContext.fromHostThread(ports[Int(ndx)]) else {
           // This can happen legitimately, e.g. when looking at a Rosetta 2
           // process, where there are ARM64 threads AS WELL AS the x86_64 ones.
+          mach_port_deallocate(mach_task_self_, ports[Int(ndx)])
           continue
         }
         ctx = threadCtx
@@ -262,7 +268,9 @@ class Target {
       guard let backtrace = try? Backtrace.capture(from: ctx,
                                                    using: reader,
                                                    images: nil,
+                                                   algorithm: .auto,
                                                    limit: limit,
+                                                   offset: 0,
                                                    top: top) else {
         print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",
               to: &standardError)
@@ -270,30 +278,28 @@ class Target {
       }
 
       let shouldSymbolicate: Bool
-      let showInlineFrames: Bool
-      let showSourceLocations: Bool
+      var options: Backtrace.SymbolicationOptions
       switch symbolicate {
         case .off:
           shouldSymbolicate = false
-          showInlineFrames = false
-          showSourceLocations = false
+          options = []
         case .fast:
           shouldSymbolicate = true
-          showInlineFrames = false
-          showSourceLocations = false
+          options = [ .showSourceLocations ]
         case .full:
           shouldSymbolicate = true
-          showInlineFrames = true
-          showSourceLocations = true
+          options = [ .showInlineFrames, .showSourceLocations ]
+      }
+
+      if cache {
+        options.insert(.useSymbolCache)
       }
 
       if shouldSymbolicate {
         guard let symbolicated = backtrace.symbolicated(
                 with: images,
-                sharedCacheInfo: sharedCacheInfo,
-                showInlineFrames: showInlineFrames,
-                showSourceLocations: showSourceLocations,
-                useSymbolCache: cache) else {
+                options: options
+              ) else {
           print("unable to symbolicate backtrace from context for thread \(ndx)",
                 to: &standardError)
           exit(1)
@@ -327,7 +333,9 @@ class Target {
       guard let backtrace = try? Backtrace.capture(from: context,
                                                    using: reader,
                                                    images: nil,
+                                                   algorithm: .auto,
                                                    limit: limit,
+                                                   offset: 0,
                                                    top: top) else {
         print("swift-backtrace: unable to capture backtrace from context for thread \(ndx)",
               to: &standardError)
@@ -335,30 +343,28 @@ class Target {
       }
 
       let shouldSymbolicate: Bool
-      let showInlineFrames: Bool
-      let showSourceLocations: Bool
+      var options: Backtrace.SymbolicationOptions
       switch symbolicate {
         case .off:
           shouldSymbolicate = false
-          showInlineFrames = false
-          showSourceLocations = false
+          options = []
         case .fast:
           shouldSymbolicate = true
-          showInlineFrames = false
-          showSourceLocations = false
+          options = [ .showSourceLocations ]
         case .full:
           shouldSymbolicate = true
-          showInlineFrames = true
-          showSourceLocations = true
+          options = [ .showInlineFrames, .showSourceLocations ]
+      }
+
+      if cache {
+        options.insert(.useSymbolCache)
       }
 
       if shouldSymbolicate {
         guard let symbolicated = backtrace.symbolicated(
                 with: images,
-                sharedCacheInfo: sharedCacheInfo,
-                showInlineFrames: showInlineFrames,
-                showSourceLocations: showSourceLocations,
-                useSymbolCache: cache) else {
+                options: options
+              ) else {
           print("swift-backtrace: unable to symbolicate backtrace from context for thread \(ndx)",
                 to: &standardError)
           continue

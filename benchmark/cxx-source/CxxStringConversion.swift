@@ -15,7 +15,7 @@ import CxxStdlibPerformance
 import CxxStdlib
 
 let cxxStringSize = 1_000_000
-let swiftStringSize = 25_000
+let swiftStringSize = 1_000_000
 
 var cxxString: std.string? = nil
 var swiftString: String? = nil

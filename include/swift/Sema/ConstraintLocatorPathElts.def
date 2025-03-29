@@ -76,7 +76,7 @@ CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)
 
 /// The superclass of a protocol composition type.
-SIMPLE_LOCATOR_PATH_ELT(ProtocolCompositionSuperclassType)
+CUSTOM_LOCATOR_PATH_ELT(ProtocolCompositionMemberType)
 
 /// The constraint of an existential type.
 SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
@@ -153,8 +153,8 @@ CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 /// type at the base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
 
-/// An optional payload.
-SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
+/// The optional payload in an optional injection, ie a T -> T? conversion.
+SIMPLE_LOCATOR_PATH_ELT(OptionalInjection)
 
 /// The parent of a nested type.
 SIMPLE_LOCATOR_PATH_ELT(ParentType)

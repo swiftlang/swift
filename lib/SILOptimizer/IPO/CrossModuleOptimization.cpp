@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
@@ -53,7 +54,7 @@ namespace {
 class CrossModuleOptimization {
   friend class InstructionVisitor;
 
-  llvm::DenseMap<SILType, bool> typesChecked;
+  llvm::DenseMap<CanType, bool> canTypesChecked;
   llvm::SmallPtrSet<TypeBase *, 16> typesHandled;
 
   SILModule &M;
@@ -90,20 +91,27 @@ private:
   void trySerializeFunctions(ArrayRef<SILFunction *> functions);
 
   bool canSerializeFunction(SILFunction *function,
-                    FunctionFlags &canSerializeFlags, int maxDepth);
+                            FunctionFlags &canSerializeFlags,
+                            int maxDepth);
 
-  bool canSerializeInstruction(SILInstruction *inst,
-                    FunctionFlags &canSerializeFlags, int maxDepth);
+  bool canSerializeFieldsByInstructionKind(SILInstruction *inst,
+                               FunctionFlags &canSerializeFlags,
+                               int maxDepth);
 
   bool canSerializeGlobal(SILGlobalVariable *global);
 
   bool canSerializeType(SILType type);
+  bool canSerializeType(CanType type);
+  bool canSerializeDecl(NominalTypeDecl *decl);
+
+  /// Check whether decls imported with certain access levels or attributes
+  /// can be serialized.
+  /// The \p ctxt can e.g. be a NominalType or the context of a function.
+  bool checkImports(DeclContext *ctxt) const;
 
   bool canUseFromInline(DeclContext *declCtxt);
 
   bool canUseFromInline(SILFunction *func);
-
-  bool shouldSerialize(SILFunction *F);
 
   void serializeFunction(SILFunction *function,
                    const FunctionFlags &canSerializeFlags);
@@ -120,11 +128,10 @@ private:
   void makeDeclUsableFromInline(ValueDecl *decl);
 
   void makeTypeUsableFromInline(CanType type);
-
-  void makeSubstUsableFromInline(const SubstitutionMap &substs);
 };
 
-/// Visitor for making used types of an instruction inlinable.
+/// Visitor for detecting if an instruction can be serialized and also making used
+/// types of an instruction inlinable if so.
 ///
 /// We use the SILCloner for visiting types, though it sucks that we allocate
 /// instructions just to delete them immediately. But it's better than to
@@ -136,12 +143,22 @@ class InstructionVisitor : public SILCloner<InstructionVisitor> {
   friend class SILInstructionVisitor<InstructionVisitor>;
   friend class CrossModuleOptimization;
 
+public:
+  /// This visitor is used for 2 passes, 1st pass that detects whether the instruction
+  /// visited can be serialized, and 2nd pass that does the serializing.
+  enum class VisitMode {
+    DetectSerializableInst,
+    SerializeInst
+  };
+
 private:
   CrossModuleOptimization &CMS;
+  VisitMode mode;
+  bool isInstSerializable = true;
 
 public:
-  InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS) :
-    SILCloner(F), CMS(CMS) {}
+  InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, VisitMode visitMode) :
+    SILCloner(F), CMS(CMS), mode(visitMode) {}
 
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
@@ -151,7 +168,15 @@ public:
                     SubstFlags::SubstituteLocalArchetypes);
     }
 
-    CMS.makeTypeUsableFromInline(Ty.getASTType());
+    switch (mode) {
+      case VisitMode::DetectSerializableInst:
+        if (!CMS.canSerializeType(Ty))
+          isInstSerializable = false;
+        break;
+      case VisitMode::SerializeInst:
+        CMS.makeTypeUsableFromInline(Ty.getASTType());
+        break;
+    }
     return Ty;
   }
 
@@ -162,7 +187,15 @@ public:
                     SubstFlags::SubstituteLocalArchetypes)->getCanonicalType();
     }
 
-    CMS.makeTypeUsableFromInline(Ty);
+    switch (mode) {
+      case VisitMode::DetectSerializableInst:
+        if (!CMS.canSerializeType(Ty))
+          isInstSerializable = false;
+        break;
+      case VisitMode::SerializeInst:
+        CMS.makeTypeUsableFromInline(Ty);
+        break;
+    }
     return Ty;
   }
 
@@ -173,7 +206,33 @@ public:
                         SubstFlags::SubstituteLocalArchetypes);
     }
 
-    CMS.makeSubstUsableFromInline(Subs);
+    for (Type replType : Subs.getReplacementTypes()) {
+      switch (mode) {
+        case VisitMode::DetectSerializableInst:
+          if (!CMS.canSerializeType(replType->getCanonicalType()))
+            isInstSerializable = false;
+          break;
+        case VisitMode::SerializeInst:
+          /// Ensure that all replacement types of \p Subs are usable from serialized
+          /// functions.
+          CMS.makeTypeUsableFromInline(replType->getCanonicalType());
+          break;
+      }
+    }
+    for (ProtocolConformanceRef pref : Subs.getConformances()) {
+      if (pref.isConcrete()) {
+        ProtocolConformance *concrete = pref.getConcrete();
+        switch (mode) {
+          case VisitMode::DetectSerializableInst:
+            if (!CMS.canSerializeDecl(concrete->getProtocol()))
+              isInstSerializable = false;
+            break;
+          case VisitMode::SerializeInst:
+            CMS.makeDeclUsableFromInline(concrete->getProtocol());
+            break;
+        }
+      }
+    }
     return Subs;
   }
 
@@ -182,9 +241,36 @@ public:
     Cloned->eraseFromParent();
   }
 
-  SILValue getMappedValue(SILValue Value) { return Value; }
+  // This method retrieves the operand passed as \p Value as mapped
+  // in a previous instruction.
+  SILValue getMappedValue(SILValue Value) {
+    switch (mode) {
+    case VisitMode::DetectSerializableInst:
+      // Typically, the type of the operand (\p Value) is already checked
+      // and remapped as the resulting type of a previous instruction, so
+      // rechecking the type isn't necessary. However, certain instructions
+      // have operands that weren’t previously mapped, such as:
+      //
+      // ```
+      // bb0(%0 : $*Foo):
+      //   %1 = struct_element_addr %0 : $*Foo, #Foo.bar
+      // ```
+      // where the operand of the first instruction is the argument of the
+      // basic block. In such case, an explicit check for the operand's type
+      // is required to ensure serializability.
+      remapType(Value->getType());
+      break;
+    case VisitMode::SerializeInst:
+      break;
+    }
+    return Value;
+  }
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+
+  bool canSerializeTypesInInst(SILInstruction *inst) {
+    return isInstSerializable;
+  }
 };
 
 static bool isPackageCMOEnabled(ModuleDecl *mod) {
@@ -351,6 +437,15 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 }
 
 void CrossModuleOptimization::serializeVTablesInModule() {
+  if (everything) {
+    for (SILVTable *vt : M.getVTables()) {
+      vt->setSerializedKind(IsSerialized);
+      for (auto &entry : vt->getEntries()) {
+        makeFunctionUsableFromInline(entry.getImplementation());
+      }
+    }
+    return;
+  }
   if (!isPackageCMOEnabled(M.getSwiftModule()))
     return;
 
@@ -429,37 +524,65 @@ bool CrossModuleOptimization::canSerializeFunction(
       return false;
   }
 
-  // Ask the heuristic.
-  if (!shouldSerialize(function))
+  if (function->hasSemanticsAttr("optimize.no.crossmodule"))
     return false;
 
+  // If package-cmo is enabled, we don't want to limit inlining
+  // or should at least increase the size limit.
+  bool skipSizeLimitCheck = isPackageCMOEnabled(M.getSwiftModule());
+
+  if (!conservative) {
+    // The basic heuristic: serialize all generic functions, because it makes a
+    // huge difference if generic functions can be specialized or not.
+    if (function->getLoweredFunctionType()->isPolymorphic())
+      skipSizeLimitCheck = true;
+    if (function->getLinkage() == SILLinkage::Shared)
+      skipSizeLimitCheck = true;
+  }
+
+  if (!skipSizeLimitCheck) {
+    // Also serialize "small" non-generic functions.
+    int size = 0;
+    for (SILBasicBlock &block : *function) {
+      for (SILInstruction &inst : block) {
+        size += (int)instructionInlineCost(inst);
+        if (size >= CMOFunctionSizeLimit)
+          return false;
+      }
+    }
+  }
+
   // Check if any instruction prevents serializing the function.
+  InstructionVisitor visitor(*function, *this, InstructionVisitor::VisitMode::DetectSerializableInst);
+
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
-      if (!canSerializeInstruction(&inst, canSerializeFlags, maxDepth)) {
+      visitor.getBuilder().setInsertionPoint(&inst);
+      // First, visit each instruction and see if its
+      // canonical or substituted types are serializalbe.
+      visitor.visit(&inst);
+      if (!visitor.canSerializeTypesInInst(&inst)) {
+        M.reclaimUnresolvedLocalArchetypeDefinitions();
+        return false;
+      }
+      // Next, check for any fields that weren't visited.
+      if (!canSerializeFieldsByInstructionKind(&inst, canSerializeFlags, maxDepth)) {
+        M.reclaimUnresolvedLocalArchetypeDefinitions();
         return false;
       }
     }
   }
+  M.reclaimUnresolvedLocalArchetypeDefinitions();
+
   canSerializeFlags[function] = true;
   return true;
 }
 
-/// Returns true if \p inst can be serialized.
+/// Returns true if \p inst can be serialized by checking its fields per instruction kind.
 ///
 /// If \p inst is a function_ref, recursively visits the referenced function.
-bool CrossModuleOptimization::canSerializeInstruction(
+bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
     SILInstruction *inst, FunctionFlags &canSerializeFlags, int maxDepth) {
-  // First check if any result or operand types prevent serialization.
-  for (SILValue result : inst->getResults()) {
-    if (!canSerializeType(result->getType()))
-      return false;
-  }
-  for (Operand &op : inst->getAllOperands()) {
-    if (!canSerializeType(op.get()->getType()))
-      return false;
-  }
-
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
     SILFunction *callee = FRI->getReferencedFunctionOrNull();
     if (!callee)
@@ -515,6 +638,8 @@ bool CrossModuleOptimization::canSerializeInstruction(
             canUse = false;
         },
         [&](SILDeclRef method) {
+          if (!canUse) // If already set to false in the above lambda, return
+            return;
           if (method.isForeign)
             canUse = false;
           else if (isPackageCMOEnabled(method.getModuleContext())) {
@@ -526,6 +651,21 @@ bool CrossModuleOptimization::canSerializeInstruction(
             canUse = methodScope.isPublicOrPackage();
           }
         });
+    auto pattern = KPI->getPattern();
+    for (auto &component : pattern->getComponents()) {
+      if (!canUse) {
+        break;
+      }
+      switch (component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto property = component.getStoredPropertyDecl();
+        canUse = isPackageOrPublic(property->getEffectiveAccess());
+        break;
+      }
+      default:
+        break;
+      }
+    }
     return canUse;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
@@ -551,6 +691,46 @@ bool CrossModuleOptimization::canSerializeInstruction(
   return true;
 }
 
+bool CrossModuleOptimization::canSerializeType(SILType type) {
+  return canSerializeType(type.getASTType());
+}
+
+bool CrossModuleOptimization::canSerializeType(CanType type) {
+  auto iter = canTypesChecked.find(type);
+  if (iter != canTypesChecked.end())
+    return iter->getSecond();
+
+  bool success = !type.findIf(
+     [this](Type rawSubType) {
+       CanType subType = rawSubType->getCanonicalType();
+       if (auto nominal = subType->getNominalOrBoundGenericNominal()) {
+         return !canSerializeDecl(nominal);
+       }
+       // Types that might not have nominal include Builtin types (e.g. Builtin.Int64),
+       // generic parameter types (e.g. T as in Foo<T>), SIL function result types
+       // (e.g. @convention(method) (Int, @thin Hasher.Type) -> Hasher), etc.
+       return false;
+  });
+
+  canTypesChecked[type] = success;
+  return success;
+}
+
+bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
+  assert(decl && "Decl should not be null when checking if it can be serialized");
+
+  // In conservative mode we don't want to change the access level of types.
+  if (conservative && decl->getEffectiveAccess() < AccessLevel::Package) {
+    return false;
+  }
+  // Exclude types which are defined in an @_implementationOnly imported
+  // module. Such modules are not transitively available.
+  if (!canUseFromInline(decl)) {
+    return false;
+  }
+  return true;
+}
+
 bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
   // Check for referenced functions in the initializer.
   for (const SILInstruction &initInst : *global) {
@@ -572,32 +752,6 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
   return true;
 }
 
-bool CrossModuleOptimization::canSerializeType(SILType type) {
-  auto iter = typesChecked.find(type);
-  if (iter != typesChecked.end())
-    return iter->getSecond();
-
-  bool success = !type.getASTType().findIf(
-    [this](Type rawSubType) {
-      CanType subType = rawSubType->getCanonicalType();
-      if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
-
-        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Package) {
-          return true;
-        }
-
-        // Exclude types which are defined in an @_implementationOnly imported
-        // module. Such modules are not transitively available.
-        if (!canUseFromInline(subNT)) {
-          return true;
-        }
-      }
-      return false;
-    });
-  typesChecked[type] = success;
-  return success;
-}
-
 /// Returns true if the function in \p funcCtxt could be linked statically to
 /// this module.
 static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
@@ -612,7 +766,12 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
   // The stdlib module is always linked dynamically.
   if (funcModule == module.getASTContext().getStdlibModule())
     return false;
-    
+
+  // An sdk or system module should be linked dynamically.
+  if (isPackageCMOEnabled(module.getSwiftModule()) &&
+      funcModule->isNonUserModule())
+    return false;
+
   // Conservatively assume the function is in a statically linked module.
   return true;
 }
@@ -622,7 +781,7 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   if (everything)
     return true;
 
-  if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(declCtxt))
+  if (!checkImports(declCtxt))
     return false;
 
   /// If we are emitting a TBD file, the TBD file only contains public symbols
@@ -635,6 +794,58 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
     
+  return true;
+}
+
+bool CrossModuleOptimization::checkImports(DeclContext *ctxt) const {
+  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
+
+  // If the context defined in the same module - or is the same module, it's
+  // fine.
+  if (moduleOfCtxt == M.getSwiftModule())
+    return true;
+
+  ModuleDecl::ImportFilter filter;
+
+  if (isPackageCMOEnabled(M.getSwiftModule())) {
+    // When Package CMO is enabled, types imported with `package import`
+    // or `@_spiOnly import` into this module should be allowed to be
+    // serialized. These types may be used in APIs with `package` or
+    // higher access level, with or without `@_spi`, and such APIs should
+    // be serializable to allow direct access by another module if it's
+    // in the same package.
+    //
+    // However, types are from modules imported as `@_implementationOnly`
+    // should not be serialized, even if their defining modules are SDK
+    // or system modules. Since these types are intended to remain hidden
+    // from external clients, their metadata (e.g. field offsets) may be
+    // stripped, making it unavailable for look up at runtime. If serialized,
+    // the client will attempt to use the serialized accessor and fail
+    // because the metadata is missing, leading to a linker error.
+    //
+    // This issue applies to transitively imported types as well;
+    // `@_implementationOnly import Foundation` imports `ObjectiveC`
+    // indirectly, and metadata for types like `NSObject` from `ObjectiveC`
+    // can also be stripped, thus such types should not be allowed for
+    // serialization.
+    filter = { ModuleDecl::ImportFilterKind::ImplementationOnly };
+  } else {
+    // See if context is imported in a "regular" way, i.e. not with
+    // @_implementationOnly, `package import` or @_spiOnly.
+    filter = {
+      ModuleDecl::ImportFilterKind::ImplementationOnly,
+      ModuleDecl::ImportFilterKind::PackageOnly,
+      ModuleDecl::ImportFilterKind::SPIOnly
+    };
+  }
+  SmallVector<ImportedModule, 4> results;
+  M.getSwiftModule()->getImportedModules(results, filter);
+
+  auto &imports = M.getSwiftModule()->getASTContext().getImportCache();
+  for (auto &desc : results) {
+    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
+      return false;
+  }
   return true;
 }
 
@@ -669,45 +880,6 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
   return true;
 }
 
-/// Decide whether to serialize a function.
-bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
-  // Check if we already handled this function before.
-  if (isSerializedWithRightKind(M, function))
-    return false;
-
-  if (everything)
-    return true;
-
-  if (function->hasSemanticsAttr("optimize.no.crossmodule"))
-    return false;
-
-  if (!conservative) {
-    // The basic heuristic: serialize all generic functions, because it makes a
-    // huge difference if generic functions can be specialized or not.
-    if (function->getLoweredFunctionType()->isPolymorphic())
-      return true;
-
-    if (function->getLinkage() == SILLinkage::Shared)
-      return true;
-  }
-
-  // If package-cmo is enabled, we don't want to limit inlining
-  // or should at least increase the cap.
-  if (!M.getSwiftModule()->serializePackageEnabled()) {
-    // Also serialize "small" non-generic functions.
-    int size = 0;
-    for (SILBasicBlock &block : *function) {
-      for (SILInstruction &inst : block) {
-        size += (int)instructionInlineCost(inst);
-        if (size >= CMOFunctionSizeLimit)
-          return false;
-      }
-    }
-  }
-
-  return true;
-}
-
 /// Serialize \p function and recursively all referenced functions which are
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(SILFunction *function,
@@ -730,7 +902,7 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
   }
   function->setSerializedKind(getRightSerializedKind(M));
 
-  InstructionVisitor visitor(*function, *this);
+  InstructionVisitor visitor(*function, *this, InstructionVisitor::VisitMode::SerializeInst);
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       visitor.getBuilder().setInsertionPoint(&inst);
@@ -838,25 +1010,13 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
   }
 }
 
-/// Make a nominal type, including it's context, usable from inline.
+/// Make a nominal type, including its context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
-    return;
+    return;  
 
-  // FIXME: rdar://130456707
-  // Currently not all types are visited in canSerialize* calls, sometimes
-  // resulting in an internal type getting @usableFromInline, which is
-  // incorrect.
-  // For example, for `let q = P() as? Q`, where Q is an internal class
-  // inherting a public class P, Q is not visited in the canSerialize*
-  // checks, thus resulting in `@usableFromInline class Q`; this is not
-  // the intended behavior in the conservative mode as it modifies AST.
-  //
-  // To properly fix, instruction visitor needs to be refactored to do
-  // both the "canSerialize" check (that visits all types) and serialize
-  // or update visibility (modify AST in non-conservative modes). 
-  if (isPackageCMOEnabled(M.getSwiftModule()))
-    return;
+  // This function should not be called in Package CMO mode.
+  assert(!isPackageCMOEnabled(M.getSwiftModule()));
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
@@ -927,21 +1087,6 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
       }
     }
   });
-}
-
-/// Ensure that all replacement types of \p substs are usable from serialized
-/// functions.
-void CrossModuleOptimization::makeSubstUsableFromInline(
-                                                const SubstitutionMap &substs) {
-  for (Type replType : substs.getReplacementTypes()) {
-    makeTypeUsableFromInline(replType->getCanonicalType());
-  }
-  for (ProtocolConformanceRef pref : substs.getConformances()) {
-    if (pref.isConcrete()) {
-      ProtocolConformance *concrete = pref.getConcrete();
-      makeDeclUsableFromInline(concrete->getProtocol());
-    }
-  }
 }
 
 class CrossModuleOptimizationPass: public SILModuleTransform {

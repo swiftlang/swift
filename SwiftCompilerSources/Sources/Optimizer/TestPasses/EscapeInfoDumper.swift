@@ -14,7 +14,7 @@ import SIL
 
 /// Dumps the results of escape analysis.
 ///
-/// Dumps the EscapeInfo query results for all `alloc_stack` instructions in a function.
+/// Dumps the EscapeInfo query results for all `alloc_ref` instructions in a function.
 ///
 /// This pass is used for testing EscapeInfo.
 let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {

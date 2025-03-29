@@ -202,7 +202,7 @@ internal func Equatable_isEqual_indirect<T: Equatable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>
 ) -> Bool {
-  return lhs.pointee == rhs.pointee
+  return unsafe lhs.pointee == rhs.pointee
 }
 
 
@@ -270,6 +270,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 }
 #else
 @inlinable // trivial-implementation
+@safe
 public func ===<T: AnyObject, U: AnyObject>(lhs: T?, rhs: U?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):

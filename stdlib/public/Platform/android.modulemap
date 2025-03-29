@@ -556,6 +556,14 @@ module _bits_sa_family_t [system] {
   header "bits/sa_family_t.h"
   export *
 }
+
+module _bits_sockaddr_storage [system] {
+  // Note: this module is not part of 'sys_socket'
+  // to prevent a circular modular dependency
+     header "bits/sockaddr_storage.h"
+     export *
+}
+
 module _bits_stdatomic [system] {
   // Note: this module is not part of 'stdatomic'
   // as it depends on libc++ and forcing it to

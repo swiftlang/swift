@@ -18,20 +18,22 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/Basic/CASOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Basic/BlockList.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/DarwinSDKInfo.h"
@@ -66,10 +68,13 @@ namespace llvm {
 }
 
 namespace swift {
+  class ABIAttr;
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
-  class AvailabilityContext;
+  class AvailabilityDomain;
+  class AvailabilityMacroMap;
+  class AvailabilityRange;
   class BoundGenericType;
   class BuiltinTupleDecl;
   class ClangModuleLoader;
@@ -265,13 +270,22 @@ class ASTContext final {
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+      DiagnosticEngine &Diags,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
   Implementation &getImpl() const;
+
+  struct GlobalCache;
+
+  /// Retrieve a reference to the global cache within this ASTContext,
+  /// which is a place where we can stash side tables without having to
+  /// recompile the world every time we add a side table. See
+  /// "swift/AST/ASTContextGlobalCache.h"
+  GlobalCache &getGlobalCache() const;
 
   friend ConstraintCheckerArenaRAII;
 
@@ -282,7 +296,8 @@ public:
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+      DiagnosticEngine &Diags,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -312,6 +327,9 @@ public:
 
   /// The CAS options used by this AST context.
   const CASOptions &CASOpts;
+
+  /// Options for Serialization
+  const SerializationOptions &SerializationOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;
@@ -370,6 +388,11 @@ public:
   /// Should we globally ignore swiftmodule files adjacent to swiftinterface
   /// files?
   bool IgnoreAdjacentModules = false;
+
+  /// Accept recovering from more issues at deserialization, even if it can
+  /// lead to an inconsistent state. This is enabled for index-while-building
+  /// as it runs last and it can afford to read an AST with inconsistencies.
+  bool ForceExtendedDeserializationRecovery = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -589,11 +612,19 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
+  /// getDollarIdentifier - Return the uniqued and AST-Context-owned version of
+  /// anonymous closure parameter (e.g. '$1') name by the index.
+  Identifier getDollarIdentifier(size_t Idx) const;
+
   /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+
+  /// Adds a given alias to the map of Identifiers between module aliases and
+  /// their actual names.
+  void addModuleAlias(StringRef moduleAlias, StringRef realName);
 
   /// Look up option used in \c getRealModuleName when module aliasing is applied.
   enum class ModuleAliasLookupOption {
@@ -650,6 +681,11 @@ public:
 
   /// Retrieve the type Swift.Any as an existential type.
   CanType getAnyExistentialType() const;
+
+  /// Retrieve the existential type 'any ~Copyable & ~Escapable'.
+  ///
+  /// This is the most permissive existential type.
+  CanType getUnconstrainedAnyExistentialType() const;
 
   /// Retrieve the type Swift.AnyObject as a constraint.
   CanType getAnyObjectConstraint() const;
@@ -870,25 +906,25 @@ public:
 
   /// Get the availability of features introduced in the specified version
   /// of the Swift compiler for the target platform.
-  AvailabilityContext getSwiftAvailability(unsigned major, unsigned minor) const;
+  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
   // the latter, with the suffix RuntimeAvailabilty, is for use with
-  // AvailabilityContext::forRuntimeTarget(), and only looks at the Swift
+  // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
-#define FEATURE(N, V)                                                       \
-  inline AvailabilityContext get##N##Availability() const {                 \
-    return getSwiftAvailability V;                                          \
-  }                                                                         \
-  inline AvailabilityContext get##N##RuntimeAvailability() const {          \
-    return AvailabilityContext(VersionRange::allGTE(llvm::VersionTuple V)); \
+#define FEATURE(N, V)                                                          \
+  inline AvailabilityRange get##N##Availability() const {                      \
+    return getSwiftAvailability V;                                             \
+  }                                                                            \
+  inline AvailabilityRange get##N##RuntimeAvailability() const {               \
+    return AvailabilityRange(VersionRange::allGTE(llvm::VersionTuple V));      \
   }
 
-  #include "swift/AST/FeatureAvailability.def"
+#include "swift/AST/FeatureAvailability.def"
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
-  AvailabilityContext getSwiftFutureAvailability() const;
+  AvailabilityRange getSwiftFutureAvailability() const;
 
   /// Returns `true` if versioned availability annotations are supported for the
   /// target triple.
@@ -903,78 +939,78 @@ public:
 
   /// Get the runtime availability of features introduced in the Swift 5.0
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift50Availability() const {
+  inline AvailabilityRange getSwift50Availability() const {
     return getSwiftAvailability(5, 0);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift51Availability() const {
+  inline AvailabilityRange getSwift51Availability() const {
     return getSwiftAvailability(5, 1);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift52Availability() const {
+  inline AvailabilityRange getSwift52Availability() const {
     return getSwiftAvailability(5, 2);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.3
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift53Availability() const {
+  inline AvailabilityRange getSwift53Availability() const {
     return getSwiftAvailability(5, 3);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.4
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift54Availability() const {
+  inline AvailabilityRange getSwift54Availability() const {
     return getSwiftAvailability(5, 4);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.5
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift55Availability() const {
+  inline AvailabilityRange getSwift55Availability() const {
     return getSwiftAvailability(5, 5);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.6
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift56Availability() const {
+  inline AvailabilityRange getSwift56Availability() const {
     return getSwiftAvailability(5, 6);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.7
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift57Availability() const {
+  inline AvailabilityRange getSwift57Availability() const {
     return getSwiftAvailability(5, 7);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.8
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift58Availability() const {
+  inline AvailabilityRange getSwift58Availability() const {
     return getSwiftAvailability(5, 8);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.9
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift59Availability() const {
+  inline AvailabilityRange getSwift59Availability() const {
     return getSwiftAvailability(5, 9);
   }
 
   /// Get the runtime availability of features introduced in the Swift 5.10
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift510Availability() const {
+  inline AvailabilityRange getSwift510Availability() const {
     return getSwiftAvailability(5, 10);
   }
 
   /// Get the runtime availability of features introduced in the Swift 6.0
   /// compiler for the target platform.
-  inline AvailabilityContext getSwift60Availability() const {
+  inline AvailabilityRange getSwift60Availability() const {
     return getSwiftAvailability(6, 0);
   }
 
   /// Get the runtime availability for a particular version of Swift (5.0+).
-  inline AvailabilityContext
+  inline AvailabilityRange
   getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) const {
     return getSwiftAvailability(swiftVersion.getMajor(),
                                 *swiftVersion.getMinor());
@@ -982,10 +1018,13 @@ public:
 
   /// Get the runtime availability of getters and setters of multi payload enum
   /// tag single payloads.
-  inline AvailabilityContext getMultiPayloadEnumTagSinglePayload() const {
+  inline AvailabilityRange getMultiPayloadEnumTagSinglePayload() const {
     // This didn't fit the pattern, so needed renaming
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
+
+  /// Availability macros parsed from the command line arguments.
+  const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
   /// Test support utility for loading a platform remap file
   /// in case an SDK is not specified to the compilation.
@@ -1009,6 +1048,9 @@ public:
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
+  const CanType TheUnconstrainedAnyType;  /// This is 'any ~Copyable & ~Escapable',
+                                          /// the empty protocol composition
+                                          /// without any implicit constraints.
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
 #include "swift/AST/TypeNodes.def"
@@ -1108,6 +1150,16 @@ public:
   void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
+
+  /// Given `Optional<T>.TangentVector` type, retrieve the
+  /// `Optional<T>.TangentVector.init` declaration.
+  ConstructorDecl *getOptionalTanInitDecl(CanType optionalTanType);
+
+  /// Optional<T>.TangentVector is a struct with a single
+  /// Optional<T.TangentVector> `value` property. This is an implementation
+  /// detail of OptionalDifferentiation.swift. Retrieve `VarDecl` corresponding
+  /// to this property.
+  VarDecl *getOptionalTanValueDecl(CanType optionalTanType);
 
   /// Retrieve the next macro expansion discriminator within the given
   /// name and context.
@@ -1285,8 +1337,7 @@ public:
                        SourceLoc loc,
                        DeclContext *dc,
                        ProtocolConformanceState state,
-                       bool isUnchecked,
-                       bool isPreconcurrency,
+                       ProtocolConformanceOptions options,
                        SourceLoc preconcurrencyLoc = SourceLoc());
 
   /// Produce a self-conformance for the given protocol.
@@ -1571,9 +1622,10 @@ private:
 public:
   clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 
-  /// Returns the string to use in diagnostics when printing the platform being
-  /// targetted.
-  StringRef getTargetPlatformStringForDiagnostics() const;
+  /// Returns the availability domain corresponding to the target triple. If
+  /// there isn't a `PlatformKind` associated with the current target triple,
+  /// then this returns the universal domain (`*`).
+  AvailabilityDomain getTargetAvailabilityDomain() const;
 };
 
 } // end namespace swift

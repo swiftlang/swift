@@ -27,6 +27,8 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 @_extern(c, "putchar")

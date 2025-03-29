@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking -debug-forbid-typecheck-prefix NEVER_TYPECHECK -experimental-skip-non-inlinable-function-bodies | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP-NONINLINE
-// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking -debug-forbid-typecheck-prefix NEVER_TYPECHECK -debug-forbid-typecheck-prefix SKIP_ALL_NO_TYPECHECK -experimental-skip-all-function-bodies | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP-ALL
+// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -target %target-swift-5.7-abi-triple -debug-forbid-typecheck-prefix NEVER_TYPECHECK -experimental-skip-non-inlinable-function-bodies | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP-NONINLINE
+// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -target %target-swift-5.7-abi-triple -debug-forbid-typecheck-prefix NEVER_TYPECHECK -debug-forbid-typecheck-prefix SKIP_ALL_NO_TYPECHECK -experimental-skip-all-function-bodies | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP-ALL
 
 // REQUIRES: concurrency
 // REQUIRES: distributed

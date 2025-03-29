@@ -34,13 +34,13 @@ writeOnlyIntArray[2] = 654
 let writeOnlyValue = writeOnlyIntArray[2]
 
 var readOnlyRvalueParam = ReadOnlyRvalueParam()
-let readOnlyRvalueVal = readOnlyRvalueParam[1] // expected-error {{value of type 'ReadOnlyRvalueParam' has no subscripts}}
+let readOnlyRvalueVal = readOnlyRvalueParam[consuming: 1]
 
 var readWriteRvalueParam = ReadWriteRvalueParam()
-let readWriteRvalueVal = readWriteRvalueParam[1] // expected-error {{value of type 'ReadWriteRvalueParam' has no subscripts}}
+let readWriteRvalueVal = readWriteRvalueParam[consuming: 1]
 
 var readWriteRvalueGetterParam = ReadWriteRvalueGetterParam()
-let readWriteRvalueGetterVal = readWriteRvalueGetterParam[1]
+let readWriteRvalueGetterVal = readWriteRvalueGetterParam[consuming: 1]
 
 var diffTypesArray = DifferentTypesArray()
 let diffTypesResultInt: Int32 = diffTypesArray[0]
@@ -72,6 +72,7 @@ let immortalIncrement = myCounter.successor() // expected-error {{value of type 
 
 let derivedConstIter = DerivedFromConstIteratorPrivately()
 derivedConstIter.pointee // expected-error {{value of type 'DerivedFromConstIteratorPrivately' has no member 'pointee'}}
+// FIXME: inheriting operators is currently flaky. the error should be {{'pointee' is inaccessible due to 'private' protection level}}
 
 let derivedConstIterWithUD = DerivedFromConstIteratorPrivatelyWithUsingDecl()
 let _ = derivedConstIterWithUD.pointee
@@ -95,5 +96,5 @@ let _ = classWithOperatorStarUnavailable.pointee // expected-error {{'pointee' i
 // FIXME: The below test should also fail with 'pointee' is unavailable in Swift error, 
 // but currently pointee is not hidden in derived classes.
 let derivedClassWithOperatorStarUnavailable = DerivedClassWithOperatorStarUnavailable()
-let _ = derivedClassWithOperatorStarUnavailable.pointee  
+let _ = derivedClassWithOperatorStarUnavailable.pointee
 

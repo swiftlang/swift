@@ -2,8 +2,8 @@
 // optionals, or else we do not discern the difference between a failure and a
 // constructed value. Run in compatibility modes that disable and enable
 // the flattening to verify this.
-// RUN: %target-swift-emit-silgen %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -swift-version 4.2 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -swift-version 4.2 | %FileCheck %s
 
 extension Optional {
   init(nonFailable1: ()) {

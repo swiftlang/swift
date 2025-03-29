@@ -184,6 +184,7 @@ public:
     bool IsFuture;
     bool IsGroupChildTask;
     bool IsAsyncLetTask;
+    bool IsSynchronousStartTask;
 
     // Task flags.
     unsigned MaxPriority;
@@ -193,6 +194,7 @@ public:
     bool HasIsRunning; // If false, the IsRunning flag is not valid.
     bool IsRunning;
     bool IsEnqueued;
+    bool IsComplete;
 
     bool HasThreadPort;
     uint32_t ThreadPort;
@@ -202,6 +204,7 @@ public:
     StoredPointer AllocatorSlabPtr;
     std::vector<StoredPointer> ChildTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
+    StoredPointer ResumeAsyncContext;
   };
 
   struct ActorInfo {
@@ -1037,10 +1040,12 @@ public:
       // Generic SIL @box type - there is always an instantiated metadata
       // pointer for the boxed type.
       if (auto Meta = readMetadata(*MetadataAddress)) {
-        auto GenericHeapMeta =
-          cast<TargetGenericBoxHeapMetadata<Runtime>>(Meta.getLocalBuffer());
-        return getMetadataTypeInfo(GenericHeapMeta->BoxedType,
-                                   ExternalTypeInfo);
+        if (auto *GenericHeapMeta = cast<TargetGenericBoxHeapMetadata<Runtime>>(
+                Meta.getLocalBuffer())) {
+          auto MetadataAddress = GenericHeapMeta->BoxedType;
+          auto TR = readTypeFromMetadata(MetadataAddress);
+          return getTypeInfo(TR, ExternalTypeInfo);
+        }
       }
       return nullptr;
     }
@@ -1286,6 +1291,12 @@ public:
       // If there is no superclass the stat of the instance's field is right
       // after the isa and retain fields.
       return isaAndRetainCountSize;
+
+    // `ObjCClassTypeRef` instances represent classes in the ObjC module ("__C").
+    // These will never have Swift type metadata.
+    if (auto *objcSuper = dyn_cast<ObjCClassTypeRef>(superclass))
+      if (auto *superTI = ExternalTypeInfo->getTypeInfo(objcSuper->getName()))
+        return superTI->getSize();
 
     auto superclassStart =
         computeUnalignedFieldStartOffset(superclass, ExternalTypeInfo);
@@ -1769,6 +1780,7 @@ private:
         TaskStatusFlags & ActiveTaskStatusFlags::IsStatusRecordLocked;
     Info.IsEscalated = TaskStatusFlags & ActiveTaskStatusFlags::IsEscalated;
     Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
+    Info.IsComplete = TaskStatusFlags & ActiveTaskStatusFlags::IsComplete;
 
     setIsRunning(Info, AsyncTaskObj.get());
     std::tie(Info.HasThreadPort, Info.ThreadPort) =
@@ -1819,9 +1831,12 @@ private:
       RecordPtr = RecordObj->Parent;
     }
 
+    const auto TaskResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+    Info.ResumeAsyncContext = TaskResumeContext;
+
     // Walk the async backtrace.
     if (Info.HasIsRunning && !Info.IsRunning) {
-      auto ResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+      auto ResumeContext = TaskResumeContext;
       unsigned AsyncBacktraceLoopCount = 0;
       while (ResumeContext && AsyncBacktraceLoopCount++ < AsyncBacktraceLimit) {
         auto ResumeContextObj = readObj<AsyncContext<Runtime>>(ResumeContext);
@@ -1973,7 +1988,7 @@ private:
     std::set<std::pair<const TypeRef *, const MetadataSource *>> Done;
     GenericArgumentMap Subs;
 
-    ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
+    llvm::ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
 
     // Closure context element layout depends on the layout of the
     // captured types, but captured types might depend on element

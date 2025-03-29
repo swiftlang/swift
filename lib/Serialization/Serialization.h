@@ -238,6 +238,10 @@ class Serializer : public SerializerBase {
                        index_block::PROTOCOL_CONFORMANCE_OFFSETS>
   ConformancesToSerialize;
 
+  ASTBlockRecordKeeper<AbstractConformance *, ProtocolConformanceID,
+                       index_block::ABSTRACT_CONFORMANCE_OFFSETS>
+  AbstractConformancesToSerialize;
+
   ASTBlockRecordKeeper<PackConformance *, ProtocolConformanceID,
                        index_block::PACK_CONFORMANCE_OFFSETS>
   PackConformancesToSerialize;
@@ -382,6 +386,9 @@ private:
 
   void writeLocalNormalProtocolConformance(NormalProtocolConformance *);
 
+  /// Writes an abstract conformance.
+  void writeASTBlockEntity(AbstractConformance *conformance);
+
   /// Writes a pack conformance.
   void writeASTBlockEntity(PackConformance *conformance);
 
@@ -424,7 +431,8 @@ private:
                     const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M, bool serializeAllSIL);
+  void writeSIL(const SILModule *M, bool serializeAllSIL,
+                bool serializeDebugInfo);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);

@@ -356,7 +356,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}} {{23-23=Int(}} {{33-33=)}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}} {{23-23=Int(}} {{33-33=)}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -1267,3 +1267,73 @@ do {
 
 // Currently legal.
 let _: () -> Int = { return fatalError() }
+
+// Make sure that `Void` assigned to closure result doesn't get eagerly propagated into the body
+do {
+  class C {
+    func f(_: Any) -> Int! { fatalError() }
+    static func f(_: Any) -> Int! { fatalError() }
+  }
+
+  class G<T> {
+    func g<U>(_ u: U, _: (U, T) -> ()) {}
+
+    func g<U: C>(_ u: U) {
+        g(u) { $0.f($1) } // expected-warning {{result of call to 'f' is unused}}
+    }
+  }
+}
+
+// Make sure that closure gets both Void? and Void attempted
+// otherwise it won't be possible to type-check the second closure.
+do {
+  struct Semaphore {
+    func signal() -> Int {}
+  }
+
+  func compute(_ completion: (Semaphore?) -> Void?) {}
+
+  func test() {
+    compute { $0?.signal() }
+    // expected-warning@-1 {{result of call to 'signal()' is unused}}
+
+    true
+      ? compute({ $0?.signal() }) // expected-warning {{result of call to 'signal()' is unused}}
+      : compute({
+           let sem = $0!
+           sem.signal() // expected-warning {{result of call to 'signal()' is unused}}
+        })
+  }
+}
+
+// rdar://143474313 - invalid error: member 'init(item:)' in 'Test.Item?' produces result of type 'Test.Item', but context expects 'Test.Item?'
+do {
+  struct List {
+    struct Item {
+    }
+
+    var items: [Item] = []
+  }
+
+  struct Test {
+    struct Item {
+      init(item: List.Item) {
+      }
+    }
+
+    let list: List
+
+    var items: [Test.Item] { .init(list.items.compactMap { .init(item: $0) }) } // Ok
+  }
+}
+
+// This should type check
+func rdar143338891() {
+  func takesAny(_: Any?) {}
+
+  class Test {
+    func test() {
+      _ = { [weak self] in takesAny(self) }
+    }
+  }
+}

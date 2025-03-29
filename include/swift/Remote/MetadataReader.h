@@ -18,6 +18,7 @@
 #define SWIFT_REMOTE_METADATAREADER_H
 
 
+#include "swift/ABI/Metadata.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
@@ -1220,7 +1221,8 @@ public:
       if (!node || node->getKind() != Node::Kind::Type)
         return BuiltType();
 
-      auto mangling = Demangle::mangleNode(node);
+      auto mangling =
+          Demangle::mangleNode(node, Mangle::ManglingFlavor::Default);
       if (!mangling.isSuccess())
         return BuiltType();
       auto name = mangling.result();
@@ -1450,135 +1452,107 @@ public:
     if (address == 0)
       return nullptr;
 
+    auto remoteAddress = RemoteAddress(address);
+    auto ptr = Reader->readBytes(remoteAddress,
+                                 sizeof(TargetContextDescriptor<Runtime>));
+    if (!ptr)
+      return nullptr;
+
     auto cached = ContextDescriptorCache.find(address);
     if (cached != ContextDescriptorCache.end())
       return ContextDescriptorRef(
           address, reinterpret_cast<const TargetContextDescriptor<Runtime> *>(
                        cached->second.get()));
 
-    // Read the flags to figure out how much space we should read.
-    ContextDescriptorFlags flags;
-    if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
-                           sizeof(flags)))
-      return nullptr;
-    
-    TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
-    uint64_t baseSize = 0;
-    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
-    uint64_t metadataInitSize = 0;
-    bool hasVTable = false;
-
-    auto readMetadataInitSize = [&]() -> unsigned {
-      switch (typeFlags.getMetadataInitialization()) {
-      case TypeContextDescriptorFlags::NoMetadataInitialization:
-        return 0;
-      case TypeContextDescriptorFlags::SingletonMetadataInitialization:
-        // FIXME: classes
-        return sizeof(TargetSingletonMetadataInitialization<Runtime>);
-      case TypeContextDescriptorFlags::ForeignMetadataInitialization:
-        return sizeof(TargetForeignMetadataInitialization<Runtime>);
-      }
-      return 0;
-    };
-
-    switch (auto kind = flags.getKind()) {
+    bool success = false;
+    switch (
+        reinterpret_cast<const TargetContextDescriptor<Runtime> *>(ptr.get())
+            ->getKind()) {
     case ContextDescriptorKind::Module:
-      baseSize = sizeof(TargetModuleContextDescriptor<Runtime>);
+      ptr = Reader->readBytes(remoteAddress,
+                              sizeof(TargetModuleContextDescriptor<Runtime>));
+      success = ptr != nullptr;
       break;
-    // TODO: Should we include trailing generic arguments in this load?
     case ContextDescriptorKind::Extension:
-      baseSize = sizeof(TargetExtensionContextDescriptor<Runtime>);
+      success =
+          readFullContextDescriptor<TargetExtensionContextDescriptor<Runtime>>(
+              remoteAddress, ptr);
       break;
     case ContextDescriptorKind::Anonymous:
-      baseSize = sizeof(TargetAnonymousContextDescriptor<Runtime>);
-      if (AnonymousContextDescriptorFlags(flags.getKindSpecificFlags())
-            .hasMangledName()) {
-        metadataInitSize = sizeof(TargetMangledContextName<Runtime>);
-      }
+      success =
+          readFullContextDescriptor<TargetAnonymousContextDescriptor<Runtime>>(
+              remoteAddress, ptr);
       break;
     case ContextDescriptorKind::Class:
-      baseSize = sizeof(TargetClassDescriptor<Runtime>);
-      genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      hasVTable = typeFlags.class_hasVTable();
-      metadataInitSize = readMetadataInitSize();
+      success = readFullContextDescriptor<TargetClassDescriptor<Runtime>>(
+          remoteAddress, ptr);
       break;
     case ContextDescriptorKind::Enum:
-      baseSize = sizeof(TargetEnumDescriptor<Runtime>);
-      genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      metadataInitSize = readMetadataInitSize();
+      success = readFullContextDescriptor<TargetEnumDescriptor<Runtime>>(
+          remoteAddress, ptr);
       break;
     case ContextDescriptorKind::Struct:
-      baseSize = sizeof(TargetStructDescriptor<Runtime>);
-      genericHeaderSize = sizeof(TypeGenericContextDescriptorHeader);
-      metadataInitSize = readMetadataInitSize();
+      success = readFullContextDescriptor<TargetStructDescriptor<Runtime>>(
+          remoteAddress, ptr);
       break;
     case ContextDescriptorKind::Protocol:
-      baseSize = sizeof(TargetProtocolDescriptor<Runtime>);
+      success = readFullContextDescriptor<TargetProtocolDescriptor<Runtime>>(
+          remoteAddress, ptr);
       break;
     case ContextDescriptorKind::OpaqueType:
-      baseSize = sizeof(TargetOpaqueTypeDescriptor<Runtime>);
-      metadataInitSize =
-        sizeof(typename Runtime::template RelativeDirectPointer<const char>)
-          * flags.getKindSpecificFlags();
+      success = readFullContextDescriptor<TargetOpaqueTypeDescriptor<Runtime>>(
+          remoteAddress, ptr);
       break;
     default:
       // We don't know about this kind of context.
       return nullptr;
     }
-
-    // Determine the full size of the descriptor. This is reimplementing a fair
-    // bit of TrailingObjects but for out-of-process; maybe there's a way to
-    // factor the layout stuff out...
-    uint64_t genericsSize = 0;
-    if (flags.isGeneric()) {
-      GenericContextDescriptorHeader header;
-      auto headerAddr = address
-        + baseSize
-        + genericHeaderSize
-        - sizeof(header);
-      
-      if (!Reader->readBytes(RemoteAddress(headerAddr),
-                             (uint8_t*)&header, sizeof(header)))
-        return nullptr;
-      
-      genericsSize = genericHeaderSize
-        + (header.NumParams + 3u & ~3u)
-        + header.NumRequirements
-          * sizeof(TargetGenericRequirementDescriptor<Runtime>);
-    }
-
-    uint64_t vtableSize = 0;
-    if (hasVTable) {
-      TargetVTableDescriptorHeader<Runtime> header;
-      auto headerAddr = address
-        + baseSize
-        + genericsSize
-        + metadataInitSize;
-      
-      if (!Reader->readBytes(RemoteAddress(headerAddr),
-                             (uint8_t*)&header, sizeof(header)))
-        return nullptr;
-
-      vtableSize = sizeof(header)
-        + header.VTableSize * sizeof(TargetMethodDescriptor<Runtime>);
-    }
-
-    uint64_t size = baseSize + genericsSize + metadataInitSize + vtableSize;
-    if (size > MaxMetadataSize)
-      return nullptr;
-    auto readResult = Reader->readBytes(RemoteAddress(address), size);
-    if (!readResult)
+    if (!success)
       return nullptr;
 
-    auto descriptor =
-        reinterpret_cast<const TargetContextDescriptor<Runtime> *>(
-            readResult.get());
-
-    ContextDescriptorCache.insert(
-        std::make_pair(address, std::move(readResult)));
+    auto *descriptor =
+        reinterpret_cast<const TargetContextDescriptor<Runtime> *>(ptr.get());
+    ContextDescriptorCache.insert(std::make_pair(address, std::move(ptr)));
     return ContextDescriptorRef(address, descriptor);
   }
-  
+
+  template <typename DescriptorTy>
+  bool readFullContextDescriptor(RemoteAddress address,
+                                 MemoryReader::ReadBytesResult &ptr) {
+    // Read the full base descriptor if it's bigger than what we have so far.
+    if (sizeof(DescriptorTy) > sizeof(TargetContextDescriptor<Runtime>)) {
+      ptr = Reader->template readObj<DescriptorTy>(address);
+      if (!ptr)
+        return false;
+    }
+
+    // We don't know how much memory we need to read to get all the trailing
+    // objects, but we need to read the memory to figure out how much memory we
+    // need to read. Handle this by reading incrementally.
+    //
+    // We rely on the fact that each trailing object's count depends only on
+    // that comes before it. If we've read the first N trailing objects, then we
+    // can safely compute the size with N+1 trailing objects. If that size is
+    // bigger than what we've read so far, re-read the descriptor with the new
+    // size. Once we've walked through all the trailing objects, we've read
+    // everything.
+
+    size_t sizeSoFar = sizeof(DescriptorTy);
+
+    for (size_t i = 0; i < DescriptorTy::trailingTypeCount(); i++) {
+      const DescriptorTy *descriptorSoFar =
+          reinterpret_cast<const DescriptorTy *>(ptr.get());
+      size_t thisSize = descriptorSoFar->sizeWithTrailingTypeCount(i);
+      if (thisSize > sizeSoFar) {
+        ptr = Reader->readBytes(address, thisSize);
+        if (!ptr)
+          return false;
+        sizeSoFar = thisSize;
+      }
+    }
+    return true;
+  }
+
   /// Demangle the entity represented by a symbolic reference to a given symbol name.
   Demangle::NodePointer
   buildContextManglingForSymbol(StringRef symbol, Demangler &dem) {
@@ -1814,12 +1788,9 @@ public:
       if (!type->hasResilientSuperclass())
         return type->getNonResilientGenericArgumentOffset();
 
-      auto bounds = readMetadataBoundsOfSuperclass(descriptor);
+      auto bounds = computeMetadataBoundsFromSuperclass(descriptor);
       if (!bounds)
         return std::nullopt;
-
-      bounds->adjustForSubclass(type->areImmediateMembersNegative(),
-                                type->NumImmediateMembers);
 
       return bounds->ImmediateMembersOffset / sizeof(StoredPointer);
     }
@@ -1841,39 +1812,72 @@ public:
 
   using ClassMetadataBounds = TargetClassMetadataBounds<Runtime>;
 
-  // This follows computeMetadataBoundsForSuperclass.
+  // This follows getMetadataBounds in ABI/Metadata.h.
   std::optional<ClassMetadataBounds>
-  readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
-    auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
-    if (!subclass->hasResilientSuperclass())
-      return ClassMetadataBounds::forSwiftRootClass();
+  getClassMetadataBounds(ContextDescriptorRef classRef) {
+    auto classDescriptor = cast<TargetClassDescriptor<Runtime>>(classRef);
 
-    auto rawSuperclass =
-      resolveRelativeField(subclassRef, subclass->getResilientSuperclass());
-    if (!rawSuperclass) {
-      return ClassMetadataBounds::forSwiftRootClass();
+    if (!classDescriptor->hasResilientSuperclass()) {
+      auto nonResilientImmediateMembersOffset =
+          classDescriptor->areImmediateMembersNegative()
+              ? -int32_t(classDescriptor->MetadataNegativeSizeInWords)
+              : int32_t(classDescriptor->MetadataPositiveSizeInWords -
+                        classDescriptor->NumImmediateMembers);
+      typename Runtime::StoredPointerDifference immediateMembersOffset =
+          nonResilientImmediateMembersOffset * sizeof(StoredPointer);
+
+      ClassMetadataBounds bounds{immediateMembersOffset,
+                                 classDescriptor->MetadataNegativeSizeInWords,
+                                 classDescriptor->MetadataPositiveSizeInWords};
+      return bounds;
     }
 
-    return forTypeReference<ClassMetadataBounds>(
-        subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
-        [&](ContextDescriptorRef superclass)
-            -> std::optional<ClassMetadataBounds> {
-          if (!isa<TargetClassDescriptor<Runtime>>(superclass))
-            return std::nullopt;
-          return readMetadataBoundsOfSuperclass(superclass);
-        },
-        [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
-          auto cls = dyn_cast<TargetClassMetadata>(metadata);
-          if (!cls)
-            return std::nullopt;
+    return computeMetadataBoundsFromSuperclass(classRef);
+  }
 
-          return cls->getClassBoundsAsSwiftSuperclass();
-        },
-        [](StoredPointer objcClassName) -> std::optional<ClassMetadataBounds> {
-          // We have no ability to look up an ObjC class by name.
-          // FIXME: add a query for this; clients may have a way to do it.
-          return std::nullopt;
-        });
+  // This follows computeMetadataBoundsFromSuperclass in Metadata.cpp.
+  std::optional<ClassMetadataBounds>
+  computeMetadataBoundsFromSuperclass(ContextDescriptorRef subclassRef) {
+    auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
+    std::optional<ClassMetadataBounds> bounds;
+
+    if (!subclass->hasResilientSuperclass()) {
+      bounds = ClassMetadataBounds::forSwiftRootClass();
+    } else {
+      auto rawSuperclass =
+          resolveRelativeField(subclassRef, subclass->getResilientSuperclass());
+      if (!rawSuperclass) {
+        return std::nullopt;
+      }
+
+      bounds = forTypeReference<ClassMetadataBounds>(
+          subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
+          [&](ContextDescriptorRef superclass)
+              -> std::optional<ClassMetadataBounds> {
+            if (!isa<TargetClassDescriptor<Runtime>>(superclass))
+              return std::nullopt;
+            return getClassMetadataBounds(superclass);
+          },
+          [&](MetadataRef metadata) -> std::optional<ClassMetadataBounds> {
+            auto cls = dyn_cast<TargetClassMetadata>(metadata);
+            if (!cls)
+              return std::nullopt;
+
+            return cls->getClassBoundsAsSwiftSuperclass();
+          },
+          [](StoredPointer objcClassName)
+              -> std::optional<ClassMetadataBounds> {
+            // We have no ability to look up an ObjC class by name.
+            // FIXME: add a query for this; clients may have a way to do it.
+            return std::nullopt;
+          });
+    }
+    if (!bounds) {
+      return std::nullopt;
+    }
+    bounds->adjustForSubclass(subclass->areImmediateMembersNegative(),
+                              subclass->NumImmediateMembers);
+    return bounds;
   }
 
   template <class Result, class DescriptorFn, class MetadataFn,
@@ -1885,11 +1889,12 @@ public:
                                          const ClassNameFn &classNameFn) {
     switch (refKind) {
     case TypeReferenceKind::IndirectTypeDescriptor: {
-      StoredPointer descriptorAddress = 0;
-      if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
+      StoredSignedPointer descriptorAddress;
+      if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress)) {
         return std::nullopt;
+      }
 
-      ref = descriptorAddress;
+      ref = stripSignedPointer(descriptorAddress);
       LLVM_FALLTHROUGH;
     }
 

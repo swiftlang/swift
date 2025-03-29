@@ -72,7 +72,7 @@ func completeInKeyPath6() {
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop2[#ObjCClass?#]; name=prop2
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop3[#[ObjCClass]?#]; name=prop3
-// CHECK-IN_KEYPATH: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue
+// CHECK-IN_KEYPATH: Decl[InstanceVar]/Super/IsSystem:   hashValue[#Int#]; name=hashValue
 
 // Make sure we unwrap optionals (members of Optional itself are invalid in this context)
 //

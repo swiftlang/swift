@@ -159,6 +159,40 @@ struct ProjectionWrapper<Value> {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/77823
+// Make sure we correctly handle compound applied functions.
+func testCompoundApplication() {
+  func foo(@ProjectionWrapper x: Int) {}
+  struct HasProjectionWrapperMember {
+    static func foo(@ProjectionWrapper x: Int) {}
+  }
+
+  foo(x:)(0)
+  foo($x:)(ProjectionWrapper(wrappedValue: 0))
+
+  (foo($x:).self)(ProjectionWrapper(wrappedValue: 0))
+  HasProjectionWrapperMember.foo($x:)(ProjectionWrapper(wrappedValue: 0))
+
+  foo(x:)(ProjectionWrapper(wrappedValue: 0)) // expected-error {{cannot convert value of type 'ProjectionWrapper<Int>' to expected argument type 'Int'}}
+  foo(x:)(ProjectionWrapper(wrappedValue: "")) // expected-error {{cannot convert value of type 'ProjectionWrapper<String>' to expected argument type 'Int'}}
+  foo(x:)("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+  foo($x:)(ProjectionWrapper(wrappedValue: "")) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  foo($x:)(0) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ProjectionWrapper<Int>'}}
+  foo($x:)("") // expected-error {{cannot convert value of type 'String' to expected argument type 'ProjectionWrapper<Int>'}}
+
+  func bar(x: Int) {} // expected-note 2{{parameter 'x' does not have an attached property wrapper}}
+  bar($x:)(0) // expected-error {{cannot use property wrapper projection argument}}
+  _ = bar($x:) // expected-error {{cannot use property wrapper projection argument}}
+
+  func baz(@ProjectionWrapper x: Int, @ProjectionWrapper y: Int) {}
+  baz($x:y:)(ProjectionWrapper(wrappedValue: 0), 0)
+  baz(x:$y:)(0, ProjectionWrapper(wrappedValue: 0))
+
+  let _: (ProjectionWrapper<Int>, Int) -> Void = baz($x:y:)
+  let _: (Int, ProjectionWrapper<Int>) -> Void = baz(x:$y:)
+}
+
 func testImplicitPropertyWrapper() {
   typealias PropertyWrapperTuple = (ProjectionWrapper<Int>, Int, ProjectionWrapper<Int>)
 
@@ -188,4 +222,29 @@ func takesWrapperClosure<T>(_: ProjectionWrapper<[S<T>]>, closure: (ProjectionWr
 
 func testGenericPropertyWrapper<U>(@ProjectionWrapper wrappers: [S<U>]) {
   takesWrapperClosure($wrappers) { $wrapper in }
+}
+
+@propertyWrapper
+struct Binding<Value> {
+  var wrappedValue: Value
+
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+
+  public var projectedValue: Binding<Value> {
+    return self
+  }
+
+  public init(projectedValue: Binding<Value>) {
+    self = projectedValue
+  }
+}
+
+struct Widget {
+  init(@ProjectionWrapper w: Int) {}
+}
+
+func buildWidget(_ w: ProjectionWrapper<Int>) -> Widget {
+  Widget($w: w)
 }

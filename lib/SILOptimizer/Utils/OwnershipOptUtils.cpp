@@ -164,6 +164,9 @@ GuaranteedOwnershipExtension::Status
 GuaranteedOwnershipExtension::checkAddressOwnership(SILValue parentAddress,
                                                     SILValue childAddress) {
   AddressOwnership addressOwnership(parentAddress);
+  if (!addressOwnership) {
+    return Invalid;
+  }
   if (!addressOwnership.hasLocalOwnershipLifetime()) {
     // Indirect Arg, Stack, Global, Unidentified, Yield
     // (these have no reference lifetime to extend).
@@ -436,6 +439,18 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   }
 }
 
+bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
+  if (oldValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
+                                 &ctx->deBlocks)) {
+    return false;
+  }
+  return true;
+}
+
 bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
                                               ArrayRef<Operand *> uses) {
   assert(value->isLexical());
@@ -454,6 +469,37 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
   }
 
   return false;
+}
+
+bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                       DeadEndBlocks *deBlocks) {
+  assert(value->getFunction()->hasOwnership());
+
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    return true;
+  }
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed &&
+      value->getOwnershipKind() != OwnershipKind::Owned) {
+    return false;
+  }
+  if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    // For guaranteed values, we have to find the borrow introducing guaranteed
+    // reference roots and then ensure uses are within all of their lifetimes.
+    // For simplicity, we only look through single forwarding operations to find
+    // a borrow introducer here.
+    value = findOwnershipReferenceAggregate(value);
+    BorrowedValue borrowedValue(value);
+    if (!borrowedValue) {
+      return false;
+    }
+    if (!borrowedValue.isLocalScope()) {
+      return true;
+    }
+  }
+  SSAPrunedLiveness liveness(value->getFunction());
+  liveness.initializeDef(value);
+  liveness.computeSimple();
+  return liveness.areUsesWithinBoundary(uses, deBlocks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -572,7 +618,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
       SWIFT_ASSERT_ONLY(reborrowedOperands.insert(endScope));
 
       // TODO: if non-phi reborrows are added, handle multiple results.
-      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult().value);
+      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult());
     }
     return true;
   };
@@ -1385,6 +1431,12 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // NOTE: We also need to handle this here since a pointer_to_address is not a
   // valid base value for an access path since it doesn't refer to any storage.
   AddressOwnership addressOwnership(newValue);
+
+  if (!addressOwnership) {
+    invalidate();
+    return;
+  }
+
   if (!addressOwnership.hasLocalOwnershipLifetime())
     return;
 
@@ -1913,27 +1965,56 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::UpdateBorrowedFromFn updateBorrowedFromFunction;
-static BridgedUtilities::UpdateBorrowedFromPhisFn updateBorrowedFromPhisFunction;
+static BridgedUtilities::UpdateFunctionFn updateAllGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn updateGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn replacePhisWithIncomingValuesFunction;
 
-void BridgedUtilities::registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                                   UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn) {
-  updateBorrowedFromFunction = updateBorrowedFromFn;
-  updateBorrowedFromPhisFunction = updateBorrowedFromPhisFn;
+void BridgedUtilities::registerPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
+                                          UpdatePhisFn updateGuaranteedPhisFn,
+                                          UpdatePhisFn replacePhisWithIncomingValuesFn) {
+  updateAllGuaranteedPhisFunction = updateAllGuaranteedPhisFn;
+  updateGuaranteedPhisFunction = updateGuaranteedPhisFn;
+  replacePhisWithIncomingValuesFunction = replacePhisWithIncomingValuesFn;
 }
 
-void swift::updateBorrowedFrom(SILPassManager *pm, SILFunction *f) {
-  if (updateBorrowedFromFunction)
-    updateBorrowedFromFunction({pm->getSwiftPassInvocation()}, {f});
+void swift::updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f) {
+  if (updateAllGuaranteedPhisFunction)
+    updateAllGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, {f});
 }
 
-void swift::updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
-  if (!updateBorrowedFromPhisFunction)
+void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!updateGuaranteedPhisFunction)
     return;
 
   llvm::SmallVector<BridgedValue, 8> bridgedPhis;
   for (SILPhiArgument *phi : phis) {
     bridgedPhis.push_back({phi});
   }
-  updateBorrowedFromPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+  updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+}
+
+void swift::replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!replacePhisWithIncomingValuesFunction)
+    return;
+
+  llvm::SmallVector<BridgedValue, 8> bridgedPhis;
+  for (SILPhiArgument *phi : phis) {
+    bridgedPhis.push_back({phi});
+  }
+  replacePhisWithIncomingValuesFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+}
+
+bool swift::hasOwnershipOperandsOrResults(SILInstruction *inst) {
+  if (!inst->getFunction()->hasOwnership())
+    return false;
+
+  for (SILValue result : inst->getResults()) {
+    if (result->getOwnershipKind() != OwnershipKind::None)
+      return true;
+  }
+  for (Operand &op : inst->getAllOperands()) {
+    if (op.get()->getOwnershipKind() != OwnershipKind::None)
+      return true;
+  }
+  return false;
 }

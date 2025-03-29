@@ -19,6 +19,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
@@ -184,7 +185,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo().isUnappliedBaseName() &&
            isModulePath(UDE->getBase());
   }
 
@@ -834,6 +835,11 @@ Result Parser::parseIfConfigRaw(
       // determined solely by which block has the completion token.
       !ideInspectionClauseLoc.isValid();
 
+  // For constructing syntactic structures, we need AST nodes even for
+  // non-active regions.
+  bool allActive = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::PoundIfAllActive);
+
   bool foundActive = false;
   bool isVersionCondition = false;
   CharSourceRange activeBodyRange;
@@ -892,6 +898,9 @@ Result Parser::parseIfConfigRaw(
     // Treat the region containing code completion token as "active".
     if (ideInspectionClauseLoc.isValid() && !foundActive)
       isActive = (ClauseLoc == ideInspectionClauseLoc);
+
+    if (allActive)
+      isActive = true;
 
     foundActive |= isActive;
 
@@ -972,49 +981,37 @@ Result Parser::parseIfConfigRaw(
   return finish(EndLoc, HadMissingEnd);
 }
 
-/// Parse and populate a #if ... #endif directive.
+// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-ParserResult<IfConfigDecl> Parser::parseIfConfig(
+ParserStatus Parser::parseIfConfig(
     IfConfigContext ifConfigContext,
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
-  SmallVector<IfConfigClause, 4> clauses;
-  return parseIfConfigRaw<ParserResult<IfConfigDecl>>(
+    llvm::function_ref<void(bool)> parseElements) {
+  ParserStatus status = makeParserSuccess();
+  return parseIfConfigRaw<ParserStatus>(
       ifConfigContext,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
-        SmallVector<ASTNode, 16> elements;
         if (role != IfConfigElementsRole::Skipped)
-          parseElements(elements, isActive);
-        if (role == IfConfigElementsRole::SyntaxOnly)
-          elements.clear();
-
-        clauses.emplace_back(
-            clauseLoc, condition, Context.AllocateCopy(elements), isActive);
+          parseElements(isActive);
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {
-        auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                               Context.AllocateCopy(clauses),
-                                               endLoc, hadMissingEnd);
-        return makeParserResult(ICD);
-      });
+      return status;
+    });
 }
 
-ParserStatus Parser::parseIfConfigDeclAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+ParserStatus Parser::parseIfConfigAttributes(
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
       IfConfigContext::DeclAttrs,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
         if (isActive) {
-          status |= parseDeclAttributeList(
-              attributes, ifConfigsAreDeclAttrs, initContext);
+          status |= parseDeclAttributeList(attributes, ifConfigsAreDeclAttrs);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
-              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+              skippedAttributes, ifConfigsAreDeclAttrs);
         }
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {

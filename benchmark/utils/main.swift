@@ -57,6 +57,7 @@ import CountAlgo
 import CreateObjects
 // rdar://128520766
 // import CxxSetToCollection
+import CxxSpanTests
 import CxxStringConversion
 // rdar://128520766
 // import CxxVectorSum
@@ -162,6 +163,7 @@ import RandomShuffle
 import RandomTree
 import RandomValues
 import RangeAssignment
+import RangeContains
 import RangeIteration
 import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
@@ -255,6 +257,7 @@ register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 // rdar://128520766
 // register(CxxSetToCollection.benchmarks)
+register(CxxSpanTests.benchmarks)
 register(CxxStringConversion.benchmarks)
 // rdar://128520766
 // register(CxxVectorSum.benchmarks)
@@ -360,6 +363,7 @@ register(RandomShuffle.benchmarks)
 register(RandomTree.benchmarks)
 register(RandomValues.benchmarks)
 register(RangeAssignment.benchmarks)
+register(RangeContains.benchmarks)
 register(RangeIteration.benchmarks)
 register(RangeOverlaps.benchmarks)
 register(RangeReplaceableCollectionPlusDefault.benchmarks)

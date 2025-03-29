@@ -13,14 +13,14 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "clang/AST/Mangle.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/Mangle.h"
 
 using namespace swift;
 
@@ -61,7 +61,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (auto *A = Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
+  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
   // Propagate @_specialize.
@@ -89,9 +89,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (hasSPI) {
       spiGroupIdent = spiGroups[0];
     }
-    auto availability =
-      AvailabilityInference::annotatedAvailableRangeForAttr(SA,
-         M.getSwiftModule()->getASTContext());
+    auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
+        attributedFuncDecl, SA, M.getSwiftModule()->getASTContext());
     auto specializedSignature = SA->getSpecializedSignature(attributedFuncDecl);
     if (targetFunctionDecl) {
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
@@ -378,6 +377,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
+      ASSERT(ABIRoleInfo(storage).providesAPI()
+                && "addFunctionAttributes() on ABI-only accessor?");
+
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
                             
@@ -396,6 +398,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
         F->setInlineStrategy(NoInline);
       }
     }
+    ASSERT(ABIRoleInfo(decl).providesAPI()
+              && "addFunctionAttributes() on ABI-only decl?");
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
   }

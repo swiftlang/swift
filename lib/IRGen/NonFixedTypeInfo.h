@@ -72,12 +72,6 @@ public:
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
-  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                              llvm::Value *capacity,
-                              const Twine &name) const override {
-    llvm_unreachable("not implemented, yet");
-  }
-
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
@@ -136,6 +130,8 @@ class BitwiseCopyableTypeInfo
     : public WitnessSizedTypeInfo<BitwiseCopyableTypeInfo> {
   using Self = BitwiseCopyableTypeInfo;
   using Super = WitnessSizedTypeInfo<Self>;
+
+protected:
   BitwiseCopyableTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
       : Super(type, Alignment(1), IsNotTriviallyDestroyable,
               IsNotBitwiseTakable, IsCopyable, abiAccessible) {}

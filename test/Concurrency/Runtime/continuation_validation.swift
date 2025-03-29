@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-as-library %s -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: env %env-SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS=1 %target-run %t/a.out
 

@@ -5,9 +5,9 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling
+// REQUIRES: swift_feature_Embedded
 
 print("Hello Embedded Swift!")
 print(42)

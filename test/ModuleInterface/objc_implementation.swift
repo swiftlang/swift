@@ -21,6 +21,9 @@ import Foundation
 // @objc should be omitted on extensions
 // NEGATIVE-NOT: @objc{{.*}} extension
 
+// Stored properties in objcImpl extensions shouldn't have @_hasStorage
+// NEGATIVE-NOT: @_hasStorage
+
 //
 // @_objcImplementation class
 //
@@ -41,6 +44,11 @@ import Foundation
 
   // CHECK-DAG: final public var implProperty2: ObjectiveC.NSObject? { get set }
   public final var implProperty2: NSObject?
+
+  // CHECK-DAG: final public var implProperty3: ObjectiveC.NSObject? {
+  public final var implProperty3: NSObject? {
+    didSet { }
+  }
 
   // CHECK-NOT: func mainMethod
   @objc public func mainMethod(_: Int32) { print(implProperty) }

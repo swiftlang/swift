@@ -68,7 +68,7 @@ protocol ProtoWithTransparent {
 class TestTranspClass : ProtoWithTransparent {
   @_transparent  // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   init () {}
-  @_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{3-17=}}
+  @_transparent // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   deinit {}
   @_transparent // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   class func transStatic() {}
@@ -307,6 +307,9 @@ class ExclusivityAttrClass {
 
 class HasStorage {
   @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
+}
+extension HasStorage {
+  @_hasStorage var y : Int { 24 } // expected-error {{'@_hasStorage' attribute cannot be applied to declaration in extension}}
 }
 
 @_show_in_interface protocol _underscored {}

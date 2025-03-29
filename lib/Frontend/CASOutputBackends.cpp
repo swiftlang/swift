@@ -57,9 +57,10 @@ class SwiftCASOutputBackend::Implementation {
 public:
   Implementation(ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
                  const FrontendInputsAndOutputs &InputsAndOutputs,
+                 const FrontendOptions &Opts,
                  FrontendOptions::ActionType Action)
       : CAS(CAS), Cache(Cache), BaseKey(BaseKey),
-        InputsAndOutputs(InputsAndOutputs), Action(Action) {
+        InputsAndOutputs(InputsAndOutputs), Opts(Opts), Action(Action) {
     initBackend(InputsAndOutputs);
   }
 
@@ -67,13 +68,35 @@ public:
   createFileImpl(llvm::StringRef ResolvedPath,
                  std::optional<llvm::vfs::OutputConfig> Config) {
     auto ProducingInput = OutputToInputMap.find(ResolvedPath);
+    if (ProducingInput == OutputToInputMap.end() &&
+        ResolvedPath.starts_with(Opts.SymbolGraphOutputDir)) {
+      return std::make_unique<SwiftCASOutputFile>(
+          ResolvedPath, [this](StringRef Path, StringRef Bytes) -> Error {
+            bool Shortened = Path.consume_front(Opts.SymbolGraphOutputDir);
+            assert(Shortened && "symbol graph path outside output dir");
+            (void)Shortened;
+            std::optional<ObjectRef> PathRef;
+            if (Error E =
+                    CAS.storeFromString(std::nullopt, Path).moveInto(PathRef))
+              return E;
+            std::optional<ObjectRef> BytesRef;
+            if (Error E =
+                    CAS.storeFromString(std::nullopt, Bytes).moveInto(BytesRef))
+              return E;
+            auto Ref = CAS.store({*PathRef, *BytesRef}, {});
+            if (!Ref)
+              return Ref.takeError();
+            SymbolGraphOutputRefs.push_back(*Ref);
+            return Error::success();
+          });
+    }
     assert(ProducingInput != OutputToInputMap.end() && "Unknown output file");
 
     unsigned InputIndex = ProducingInput->second.first;
     auto OutputType = ProducingInput->second.second;
 
     // Uncached output kind.
-    if (file_types::isProducedFromDiagnostics(OutputType))
+    if (!isStoredDirectly(OutputType))
       return std::make_unique<llvm::vfs::NullOutputFileImpl>();
 
     return std::make_unique<SwiftCASOutputFile>(
@@ -97,6 +120,7 @@ private:
   ActionCache &Cache;
   ObjectRef BaseKey;
   const FrontendInputsAndOutputs &InputsAndOutputs;
+  const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
 
   // Map from output path to the input index and output kind.
@@ -104,20 +128,28 @@ private:
 
   // A vector of output refs where the index is the input index.
   SmallVector<DenseMap<file_types::ID, ObjectRef>> OutputRefs;
+
+  SmallVector<ObjectRef> SymbolGraphOutputRefs;
 };
 
 SwiftCASOutputBackend::SwiftCASOutputBackend(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action)
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action)
     : Impl(*new SwiftCASOutputBackend::Implementation(
-          CAS, Cache, BaseKey, InputsAndOutputs, Action)) {}
+          CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action)) {}
 
 SwiftCASOutputBackend::~SwiftCASOutputBackend() { delete &Impl; }
 
+bool SwiftCASOutputBackend::isStoredDirectly(file_types::ID Kind) {
+  return !file_types::isProducedFromDiagnostics(Kind) &&
+         Kind != file_types::TY_Dependencies;
+}
+
 IntrusiveRefCntPtr<OutputBackend> SwiftCASOutputBackend::cloneImpl() const {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
-      Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Action);
+      Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Opts,
+      Impl.Action);
 }
 
 Expected<std::unique_ptr<OutputFileImpl>>
@@ -140,6 +172,18 @@ Error SwiftCASOutputBackend::storeCachedDiagnostics(unsigned InputIndex,
                                                     StringRef Bytes) {
   return storeImpl("<cached-diagnostics>", Bytes, InputIndex,
                    file_types::ID::TY_CachedDiagnostics);
+}
+
+Error SwiftCASOutputBackend::storeMakeDependenciesFile(StringRef OutputFilename,
+                                                       llvm::StringRef Bytes) {
+  auto Input = Impl.OutputToInputMap.find(OutputFilename);
+  if (Input == Impl.OutputToInputMap.end())
+    return llvm::createStringError("InputIndex for output file not found!");
+  auto InputIndex = Input->second.first;
+  assert(Input->second.second == file_types::TY_Dependencies &&
+         "wrong output type");
+  return storeImpl(OutputFilename, Bytes, InputIndex,
+                   file_types::TY_Dependencies);
 }
 
 Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
@@ -226,6 +270,13 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
   llvm::for_each(ProducedOutputs, [&OutputsForInput](auto E) {
     OutputsForInput.emplace_back(E.first, E.second);
   });
+  if (InputIndex == InputsAndOutputs.getIndexOfFirstOutputProducingInput() &&
+      !SymbolGraphOutputRefs.empty()) {
+    auto SGRef = CAS.store(SymbolGraphOutputRefs, {});
+    if (!SGRef)
+      return SGRef.takeError();
+    OutputsForInput.emplace_back(file_types::ID::TY_SymbolGraphFile, *SGRef);
+  }
   // Sort to a stable ordering for deterministic output cache object.
   llvm::sort(OutputsForInput,
              [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });
@@ -274,8 +325,30 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
                           << CAS.getID(*CacheKey).toString() << "\' => \'"
                           << CAS.getID(*Result).toString() << "\'\n";);
 
-  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result)))
-    return E;
+  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result))) {
+    // If `SWIFT_STRICT_CAS_ERRORS` environment is set, do not attempt to
+    // recover from error.
+    if (::getenv("SWIFT_STRICT_CAS_ERRORS"))
+      return E;
+    // Failed to update the action cache, this can happen when there is a
+    // non-deterministic output from compiler. Check that the cache entry is
+    // not missing, if so, then assume this is a cache poisoning that might
+    // be benign and the build might continue without problem.
+    auto Check = Cache.get(CAS.getID(*CacheKey));
+    if (!Check) {
+      // A real CAS error, return the original error.
+      consumeError(Check.takeError());
+      return E;
+    }
+    if (!*Check)
+      return E;
+    // Emit an error message to stderr but don't fail the job. Ideally this
+    // should be sent to a DiagnosticEngine but CASBackend lives longer than
+    // diagnostic engine and needs to capture all diagnostic outputs before
+    // sending this request.
+    llvm::errs() << "error: failed to update cache: " << toString(std::move(E))
+                 << "\n";
+  }
 
   return Error::success();
 }

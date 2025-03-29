@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -module-name=test -enable-library-evolution -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -module-name=test -enable-library-evolution -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

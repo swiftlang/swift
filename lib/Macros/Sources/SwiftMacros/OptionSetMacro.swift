@@ -47,19 +47,6 @@ private let optionsEnumNameArgumentLabel = "optionsName"
 /// eventually be overridable.
 private let defaultOptionsEnumName = "Options"
 
-extension LabeledExprListSyntax {
-  /// Retrieve the first element with the given label.
-  func first(labeled name: String) -> Element? {
-    return first { element in
-      if let label = element.label, label.text == name {
-        return true
-      }
-
-      return false
-    }
-  }
-}
-
 public struct OptionSetMacro {
   /// Decodes the arguments to the macro expansion.
   ///
@@ -72,7 +59,7 @@ public struct OptionSetMacro {
     of attribute: AttributeSyntax,
     attachedTo decl: Decl,
     in context: Context
-  ) -> (StructDeclSyntax, EnumDeclSyntax, TypeSyntax)? {
+  ) -> (StructDeclSyntax, EnumDeclSyntax, GenericArgumentSyntax.Argument)? {
     // Determine the name of the options enum.
     let optionsEnumName: String
     if case let .argumentList(arguments) = attribute.arguments,
@@ -152,6 +139,7 @@ extension OptionSetMacro: MemberMacro {
   >(
     of attribute: AttributeSyntax,
     providingMembersOf decl: Decl,
+    conformingTo protocols: [TypeSyntax],
     in context: Context
   ) throws -> [DeclSyntax] {
     // Decode the expansion arguments.

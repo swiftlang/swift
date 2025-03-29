@@ -8,6 +8,8 @@ import Builtin
 
 class C {}
 
+protocol Error {}
+
 // CHECK-LABEL: Begin Error in function end_borrow_1_addr_alloc_stack
 // CHECK:       SIL verification failed: end_borrow of an address not produced by store_borrow
 // CHECK-LABEL: End Error in function end_borrow_1_addr_alloc_stack
@@ -43,4 +45,26 @@ sil [ossa] @dealloc_box_dead_end : $@convention(thin) () -> () {
   dealloc_box [dead_end] %b : ${ var C }
   %retval = tuple()
   return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function abort_apply_callee_allocated_coro
+// CHECK:       SIL verification failed: abort_apply of callee-allocated yield-once coroutine!?
+// CHECK:       Verifying instruction:
+// CHECK:          ({{%[^,]+}}, **[[TOKEN:%[^,]+]]**, {{%[^,]+}}) = begin_apply
+// CHECK:       ->   abort_apply [[TOKEN]]
+// CHECK-LABEL: End Error in function abort_apply_callee_allocated_coro
+sil [ossa] @abort_apply_callee_allocated_coro : $@convention(thin) () -> (@error any Error) {
+entry:
+  (%value, %token, %allocation) = begin_apply undef() : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  try_apply undef() : $@convention(thin) () -> @error any Error, normal success, error failure
+
+success(%val : $()):
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  return undef : $()
+
+failure(%error : @owned $any Error):
+  abort_apply %token
+  dealloc_stack %allocation : $*Builtin.SILToken
+  throw %error : $any Error
 }

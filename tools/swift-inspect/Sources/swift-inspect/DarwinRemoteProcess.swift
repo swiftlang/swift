@@ -86,6 +86,8 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     return swift_addr_t(range.location)
   }
 
+  static var Free: FreeFunction? { return nil }
+
   static var ReadBytes: ReadBytesFunction {
     return { (context, address, size, _) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
@@ -125,7 +127,17 @@ internal final class DarwinRemoteProcess: RemoteProcess {
       return nil
     }
 
-    if forkCorpse {
+    // Consult with VMUProcInfo to determine if we should force forkCorpse.
+    let forceForkCorpse: Bool
+    if let procInfoClass = getVMUProcInfoClass() {
+      let procInfo = procInfoClass.init(task: task)
+      forceForkCorpse = procInfo.shouldAnalyzeWithCorpse
+    } else {
+      // Default to not forcing forkCorpse.
+      forceForkCorpse = false
+    }
+
+    if forkCorpse || forceForkCorpse {
       var corpse = task_t()
       let maxRetry = 6
       for retry in 0..<maxRetry {
@@ -151,6 +163,11 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     self.swiftCore =
         CSSymbolicatorGetSymbolOwnerWithNameAtTime(self.symbolicator,
                                                    "libswiftCore.dylib", kCSNow)
+    if CSIsNull(self.swiftCore) {
+      print("pid \(processId) does not have libswiftCore.dylib loaded")
+      return nil
+    }
+
     self.swiftConcurrency = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
       symbolicator, "libswift_Concurrency.dylib", kCSNow)
     _ = task_start_peeking(self.task)

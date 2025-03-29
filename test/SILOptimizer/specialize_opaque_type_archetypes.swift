@@ -2,9 +2,9 @@
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-module -o - | %target-sil-opt -sil-print-types -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: swift_in_compiler
 
@@ -377,15 +377,15 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $Int, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlFSi_Tgq5'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $*T, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV26eagerMoveInlineableContextyyF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV17inlineableContextyyF
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV17inlineableContextyyF
 // RESILIENT:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)

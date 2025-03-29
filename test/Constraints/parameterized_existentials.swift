@@ -17,7 +17,7 @@ func f2(x: any P<Int>) -> any P {
 
 func f3(x: any P<Int>) -> any P<String> {
   // FIXME: Misleading diagnostic
-  return x // expected-error {{cannot convert return expression of type 'String' to return type 'Int'}}
+  return x // expected-error {{cannot convert return expression of type 'Int' to return type 'String'}}
 }
 
 struct G<T> {}

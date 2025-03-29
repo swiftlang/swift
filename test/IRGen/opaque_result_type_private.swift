@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -c -primary-file %s %S/Inputs/opaque_result_type_private_2.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -c -primary-file %s %S/Inputs/opaque_result_type_private_2.swift
 
 // This test used to crash during IRGen.
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -413,5 +413,15 @@ do {
         Row(value: String(describing: asset.orientation)) // Ok
       ])
     ]
+  }
+}
+
+
+do {
+  func f<R>(fn: () -> [R]) -> [R] { [] }
+
+  // Requires collection upcast from Array<(key: String, value: String)> to `Array<(String, String)>`
+  func g(v: [String: String]) {
+    let _: [(String, String)] = f { return Array(v) } + v // Ok
   }
 }

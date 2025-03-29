@@ -150,6 +150,7 @@
 
 #include "RequirementLowering.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Requirement.h"
@@ -250,6 +251,18 @@ static void desugarSameTypeRequirement(
         }
       }
 
+      if (!firstType->isValueParameter() && secondType->is<IntegerType>()) {
+        errors.push_back(RequirementError::forInvalidValueForTypeSameType(
+            sugaredFirstType, secondType, loc));
+        return true;
+      }
+
+      if (!secondType->isValueParameter() && firstType->is<IntegerType>()) {
+        errors.push_back(RequirementError::forInvalidValueForTypeSameType(
+            secondType, sugaredFirstType, loc));
+        return true;
+      }
+
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;
@@ -287,7 +300,7 @@ static void desugarSuperclassRequirement(
 
   SmallVector<Requirement, 2> subReqs;
 
-  switch (req.checkRequirement(subReqs)) {
+  switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
     break;
@@ -320,7 +333,7 @@ static void desugarLayoutRequirement(
 
   SmallVector<Requirement, 2> subReqs;
 
-  switch (req.checkRequirement(subReqs)) {
+  switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
     break;
@@ -651,9 +664,8 @@ struct InferRequirementsWalker : public TypeWalker {
       if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
-          auto secondType = assocType->getDeclaredInterfaceType()
-              ->castTo<DependentMemberType>()
-              ->substBaseType(firstType);
+          auto conformance = lookupConformance(firstType, differentiableProtocol);
+          auto secondType = conformance.getTypeWitness(firstType, assocType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});

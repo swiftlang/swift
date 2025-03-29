@@ -133,10 +133,6 @@ ERROR(error_darwin_static_stdlib_not_supported, none,
 WARNING(warn_darwin_link_objc_deprecated, none,
       "-link-objc-runtime is no longer supported on Apple platforms", ())
 
-ERROR(error_darwin_only_supports_libcxx, none,
-      "The only C++ standard library supported on Apple platforms is libc++",
-      ())
-
 ERROR(error_wasm_doesnt_support_global_base, none,
       "The --global-base argument is not supported when targeting WebAssembly",
       ())

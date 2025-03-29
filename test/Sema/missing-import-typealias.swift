@@ -81,6 +81,7 @@ public class InheritsFromClazzAlias: ClazzAlias {}
 public func takesGeneric<T: ProtoAlias>(_ t: T) {}
 
 public struct HasMembers {
+  // expected-warning@+3 {{cannot use property 'wrappedValue' here; 'Original' was not imported by this file}}
   // expected-warning@+2 {{'WrapperAlias' aliases 'Original.Wrapper' and cannot be used as property wrapper here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
  // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
   @WrapperAlias public var wrapped: Int

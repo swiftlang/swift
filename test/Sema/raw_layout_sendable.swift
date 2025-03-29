@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature StrictConcurrency -enable-experimental-feature RawLayout -typecheck -verify %s
 
+// REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_feature_StrictConcurrency
+
 func checkSendable(_: @Sendable () -> ()) {}
 
 @_rawLayout(size: 4, alignment: 4)

@@ -190,33 +190,27 @@ endfunction()
 # we create a `swift-driver` symlink adjacent to the `swift` and `swiftc` executables
 # to ensure that `swiftc` forwards to the standalone driver when invoked.
 function(swift_create_early_driver_copies target)
-  # Early swift-driver is built adjacent to the compiler (swift build dir)
-  if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    set(driver_package_configuration_dir "release")
+  set(SWIFT_EARLY_SWIFT_DRIVER_BUILD "" CACHE PATH "Path to early swift-driver build")
+
+  if(NOT SWIFT_EARLY_SWIFT_DRIVER_BUILD)
+    return()
+  endif()
+
+  if(EXISTS ${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-driver${CMAKE_EXECUTABLE_SUFFIX})
+    message(STATUS "Creating early SwiftDriver symlinks")
+
+    # Use `configure_file` instead of `file(COPY ...)` to establish a
+    # dependency.  Further changes to `swift-driver` will cause it to be copied
+    # over.
+    configure_file(${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}
+                   ${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}
+                   COPYONLY)
+    configure_file(${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-help${CMAKE_EXECUTABLE_SUFFIX}
+                   ${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}
+                   COPYONLY)
   else()
-    set(driver_package_configuration_dir "debug")
+    message(STATUS "Not creating early SwiftDriver symlinks (swift-driver not found)")
   endif()
-  
-  set(driver_bin_dir "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/${driver_package_configuration_dir}/bin")
-  set(swift_bin_dir "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  # If early swift-driver wasn't built, nothing to do here.
-  if(NOT EXISTS "${driver_bin_dir}/swift-driver" OR NOT EXISTS "${driver_bin_dir}/swift-help")
-      message(STATUS "Skipping creating early SwiftDriver symlinks - no early SwiftDriver build found at: ${driver_bin_dir}.")
-      return()
-  endif()
-
-  message(STATUS "Copying over early SwiftDriver executable.")
-  message(STATUS "From: ${driver_bin_dir}/swift-driver")
-  message(STATUS "To: ${swift_bin_dir}/swift-driver")
-  # Use configure_file instead of file(COPY...) to establish a dependency.
-  # Further Changes to `swift-driver` will cause it to be copied over.
-  configure_file(${driver_bin_dir}/swift-driver ${swift_bin_dir}/swift-driver COPYONLY)
-
-  message(STATUS "From: ${driver_bin_dir}/swift-help")
-  message(STATUS "To: ${swift_bin_dir}/swift-help")
-  # Use configure_file instead of file(COPY...) to establish a dependency.
-  # Further Changes to `swift-driver` will cause it to be copied over.  
-  configure_file(${driver_bin_dir}/swift-help ${swift_bin_dir}/swift-help COPYONLY)
 endfunction()
 
 function(dump_swift_vars)

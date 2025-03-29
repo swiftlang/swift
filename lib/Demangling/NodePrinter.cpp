@@ -296,6 +296,7 @@ private:
     case Node::Kind::BoundGenericFunction:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::BuiltinTupleType:
+    case Node::Kind::BuiltinFixedArray:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
     case Node::Kind::DependentMemberType:
@@ -327,6 +328,7 @@ private:
     case Node::Kind::TypeSymbolicReference:
     case Node::Kind::SugaredOptional:
     case Node::Kind::SugaredArray:
+    case Node::Kind::SugaredInlineArray:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
     case Node::Kind::Integer:
@@ -367,8 +369,10 @@ private:
     case Node::Kind::Constructor:
     case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
+    case Node::Kind::SILThunkIdentity:
     case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
+    case Node::Kind::IsolatedDeallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
@@ -448,11 +452,13 @@ private:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
     case Node::Kind::Sending:
-    case Node::Kind::CompileTimeConst:
+    case Node::Kind::CompileTimeLiteral:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
     case Node::Kind::KeyPathSetterThunkHelper:
+    case Node::Kind::KeyPathUnappliedMethodThunkHelper:
+    case Node::Kind::KeyPathAppliedMethodThunkHelper:
     case Node::Kind::KeyPathEqualsThunkHelper:
     case Node::Kind::KeyPathHashThunkHelper:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
@@ -469,6 +475,7 @@ private:
     case Node::Kind::MethodDescriptor:
     case Node::Kind::MethodLookupFunction:
     case Node::Kind::ModifyAccessor:
+    case Node::Kind::Modify2Accessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
     case Node::Kind::NativePinningAddressor:
@@ -519,6 +526,7 @@ private:
     case Node::Kind::ReabstractionThunkHelperWithSelf:
     case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
     case Node::Kind::ReadAccessor:
+    case Node::Kind::Read2Accessor:
     case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::RetroactiveConformance:
     case Node::Kind::Setter:
@@ -566,6 +574,7 @@ private:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
+    case Node::Kind::NonIsolatedCallerFunctionType:
     case Node::Kind::SendingResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
@@ -648,9 +657,10 @@ private:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
-    case Node::Kind::LifetimeDependence:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
     case Node::Kind::DependentGenericParamValueMarker:
+    case Node::Kind::CoroFunctionPointer:
+    case Node::Kind::DefaultOverride:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -893,16 +903,37 @@ private:
       // handled earlier
       ++startIndex;
     }
+
+    // Be sure to check for function signature components in the same
+    // order that they're added by the demangler, which is the reverse
+    // of the order that they appear in the mangling grammar.
+
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::SendingResultFunctionType) {
+      ++startIndex;
+      hasSendingResult = true;
+    }
+
+    // function-isolation; note that these can't actually both appear.
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::IsolatedAnyFunctionType) {
       print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
+
+    Node *nonIsolatedCallerNode = nullptr;
+    if (node->getChild(startIndex)->getKind() ==
+          Node::Kind::NonIsolatedCallerFunctionType) {
+      nonIsolatedCallerNode = node->getChild(startIndex);
+      ++startIndex;
+    }
+
     if (node->getChild(startIndex)->getKind() ==
           Node::Kind::GlobalActorFunctionType) {
       print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
+
     if (node->getChild(startIndex)->getKind() ==
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
@@ -927,11 +958,6 @@ private:
       ++startIndex;
       isAsync = true;
     }
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::SendingResultFunctionType) {
-      ++startIndex;
-      hasSendingResult = true;
-    }
 
     switch (diffKind) {
     case MangledDifferentiabilityKind::Forward:
@@ -949,6 +975,9 @@ private:
     case MangledDifferentiabilityKind::NonDifferentiable:
       break;
     }
+
+    if (nonIsolatedCallerNode)
+      print(nonIsolatedCallerNode, depth + 1);
 
     if (isSendable)
       Printer << "@Sendable ";
@@ -1061,7 +1090,8 @@ private:
       auto child = Node->getChild(firstRequirement);
       if (child->getKind() == Node::Kind::Type)
         child = child->getChild(0);
-      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker) {
+      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker &&
+          child->getKind() != Node::Kind::DependentGenericParamValueMarker) {
         break;
       }
     }
@@ -1421,6 +1451,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::SILThunkIdentity:
+    Printer << "identity thunk of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::DispatchThunk:
@@ -1798,7 +1832,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "sending ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::CompileTimeConst:
+  case Node::Kind::CompileTimeLiteral:
     Printer << "_const ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
@@ -1814,21 +1848,6 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@noDerivative ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::LifetimeDependence: {
-    auto kind = (MangledLifetimeDependenceKind)Node->getChild(0)->getIndex();
-    switch (kind) {
-    case MangledLifetimeDependenceKind::Inherit:
-      Printer << "inherit lifetime dependence: ";
-      break;
-    case MangledLifetimeDependenceKind::Scope:
-      Printer << "scope lifetime dependence: ";
-      break;
-    }
-    print(Node->getChild(1), depth + 1);
-    Printer << " ";
-    print(Node->getChild(2), depth + 1);
-    return nullptr;
-  }
   case Node::Kind::NonObjCAttribute:
     Printer << "@nonobjc ";
     return nullptr;
@@ -1987,6 +2006,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::BuiltinTupleType:
     Printer << "Builtin.TheTupleType";
     return nullptr;
+  case Node::Kind::BuiltinFixedArray:
+    Printer << "Builtin.FixedArray<";
+    print(Node->getChild(0), depth + 1);
+    Printer << ", ";
+    print(Node->getChild(1), depth + 1);
+    Printer << ">";
+    return nullptr;
   case Node::Kind::Number:
     Printer << Node->getIndex();
     return nullptr;
@@ -2082,10 +2108,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
   case Node::Kind::KeyPathSetterThunkHelper:
+  case Node::Kind::KeyPathUnappliedMethodThunkHelper:
+  case Node::Kind::KeyPathAppliedMethodThunkHelper:
     if (Node->getKind() == Node::Kind::KeyPathGetterThunkHelper)
       Printer << "key path getter for ";
-    else
+    else if (Node->getKind() == Node::Kind::KeyPathSetterThunkHelper)
       Printer << "key path setter for ";
+    else if (Node->getKind() == Node::Kind::KeyPathUnappliedMethodThunkHelper)
+      Printer << "key path unapplied method ";
+    else if (Node->getKind() == Node::Kind::KeyPathAppliedMethodThunkHelper)
+      Printer << "key path applied method ";
 
     print(Node->getChild(0), depth + 1);
     Printer << " : ";
@@ -2736,9 +2768,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ReadAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "read");
+  case Node::Kind::Read2Accessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "read2");
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
+  case Node::Kind::Modify2Accessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "modify2");
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");
@@ -2759,6 +2797,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        /*hasName*/ false,
                        isClassType(Node->getChild(0)) ? "__deallocating_deinit"
                                                       : "deinit");
+  case Node::Kind::IsolatedDeallocator:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/ false,
+                       isClassType(Node->getChild(0))
+                           ? "__isolated_deallocating_deinit"
+                           : "deinit");
   case Node::Kind::IVarInitializer:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/ false, "__ivar_initializer");
@@ -3082,6 +3126,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::IsolatedAnyFunctionType:
     Printer << "@isolated(any) ";
     return nullptr;
+  case Node::Kind::NonIsolatedCallerFunctionType:
+    Printer << "@execution(caller) ";
+    return nullptr;
   case Node::Kind::SendingResultFunctionType:
     Printer << "sending ";
     return nullptr;
@@ -3244,6 +3291,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     Printer << "]";
     return nullptr;
+  case Node::Kind::SugaredInlineArray: {
+    Printer << "[";
+    print(Node->getChild(0), depth + 1);
+    Printer << " x ";
+    print(Node->getChild(1), depth + 1);
+    Printer << "]";
+    return nullptr;
+  }
   case Node::Kind::SugaredDictionary:
     Printer << "[";
     print(Node->getChild(0), depth + 1);
@@ -3437,6 +3492,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << signedValue;
     return nullptr;
   }
+  case Node::Kind::CoroFunctionPointer:
+    Printer << "coro function pointer to ";
+    return nullptr;
+  case Node::Kind::DefaultOverride:
+    Printer << "default override of ";
+    return nullptr;
   }
 
   printer_unreachable("bad node kind!");

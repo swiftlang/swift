@@ -46,7 +46,16 @@ struct StaticInitCloner<Context: MutatingContext> {
       return getClonedValue(of: value)
     }
 
+    if let beginAccess = value as? BeginAccessInst {
+      // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
+      let clonedOperand = clone(beginAccess.address)
+      bridged.recordFoldedValue(beginAccess.bridged, clonedOperand.bridged)
+      return clonedOperand
+    }
+
     let inst = value.definingInstruction!
+    assert(!(inst is ScopedInstruction), "global init value must not contain a scoped instruction")
+
     for op in inst.operands {
       _ = clone(op.value)
     }

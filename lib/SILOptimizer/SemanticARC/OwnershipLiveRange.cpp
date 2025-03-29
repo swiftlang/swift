@@ -281,7 +281,6 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::Phi: {
     auto *phiArg = cast<SILPhiArgument>(introducer.value);
     phiArg->setOwnershipKind(OwnershipKind::Guaranteed);
-    phiArg->setReborrow(computeIsReborrow(phiArg));
     return phiArg;
   }
   case OwnedValueIntroducerKind::Struct: {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown -swift-version 4
+// RUN: %target-swift-frontend -typecheck -verify -print-diagnostic-groups -primary-file %s %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown -swift-version 4
 
 var hasher = Hasher()
 
@@ -276,7 +276,7 @@ struct OldSchoolStruct: Hashable {
     return true
   }
   var hashValue: Int { return 42 }
-  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolStruct' to 'Hashable' by implementing 'hash(into:)' instead}}
+  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolStruct' to 'Hashable' by implementing 'hash(into:)' instead [DeprecatedDeclaration]}}
 }
 enum OldSchoolEnum: Hashable {
   case foo
@@ -286,14 +286,14 @@ enum OldSchoolEnum: Hashable {
     return true
   }
   var hashValue: Int { return 23 }
-  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolEnum' to 'Hashable' by implementing 'hash(into:)' instead}}
+  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolEnum' to 'Hashable' by implementing 'hash(into:)' instead [DeprecatedDeclaration]}}
 }
 class OldSchoolClass: Hashable {
   static func ==(left: OldSchoolClass, right: OldSchoolClass) -> Bool {
     return true
   }
   var hashValue: Int { return -9000 }
-  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolClass' to 'Hashable' by implementing 'hash(into:)' instead}}
+  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolClass' to 'Hashable' by implementing 'hash(into:)' instead [DeprecatedDeclaration]}}
 }
 
 // However, it's okay to implement `hashValue` as long as `hash(into:)` is also

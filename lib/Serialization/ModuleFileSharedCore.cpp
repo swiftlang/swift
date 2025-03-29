@@ -14,6 +14,9 @@
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFileCoreTableInfo.h"
+#include "ModuleFormat.h"
+#include "SerializationFormat.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Parse/ParseVersion.h"
@@ -145,6 +148,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       case PluginSearchOptionKind::LoadPluginExecutable:
         optKind = PluginSearchOption::Kind::LoadPluginExecutable;
         break;
+      case PluginSearchOptionKind::ResolvedPluginConfig:
+        optKind = PluginSearchOption::Kind::ResolvedPluginConfig;
+        break;
       }
       extendedInfo.addPluginSearchOption({optKind, blobData});
       break;
@@ -208,6 +214,18 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       break;
     case options_block::SERIALIZE_PACKAGE_ENABLED:
       extendedInfo.setSerializePackageEnabled(true);
+      break;
+    case options_block::PUBLIC_MODULE_NAME:
+      extendedInfo.setPublicModuleName(blobData);
+      break;
+    case options_block::SWIFT_INTERFACE_COMPILER_VERSION:
+      extendedInfo.setSwiftInterfaceCompilerVersion(blobData);
+      break;
+    case options_block::STRICT_MEMORY_SAFETY:
+      extendedInfo.setStrictMemorySafety(true);
+      break;
+    case options_block::EXTENSIBLE_ENUMS:
+      extendedInfo.setSupportsExtensibleEnums(true);
       break;
     default:
       // Unknown options record, possibly for use by a future version of the
@@ -982,6 +1000,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Conformances, scratch);
         break;
+      case index_block::ABSTRACT_CONFORMANCE_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(AbstractConformances, scratch);
+        break;
       case index_block::PACK_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(PackConformances, scratch);
@@ -1020,9 +1042,9 @@ ModuleFileSharedCore::readGroupTable(ArrayRef<uint64_t> Fields,
                                      StringRef BlobData) const {
   auto pMap = std::make_unique<llvm::DenseMap<unsigned, StringRef>>();
   auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
-  unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
+  unsigned GroupCount = readNext<uint32_t>(Data);
   for (unsigned I = 0; I < GroupCount; ++I) {
-    auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
+    auto RawSize = readNext<uint32_t>(Data);
     auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
     Data += RawSize;
     (*pMap)[I] = RawText;
@@ -1122,6 +1144,22 @@ getActualImportControl(unsigned rawValue) {
     return ModuleDecl::ImportFilterKind::InternalOrBelow;
   case static_cast<unsigned>(serialization::ImportControl::PackageOnly):
     return ModuleDecl::ImportFilterKind::PackageOnly;
+  default:
+    return std::nullopt;
+  }
+}
+
+static std::optional<ExternalMacroPlugin::Access>
+getActualMacroAccess(unsigned rawValue) {
+  // We switch on the raw value rather than the enum in order to handle future
+  // values.
+  switch (rawValue) {
+  case static_cast<unsigned>(serialization::AccessLevel::Public):
+    return ExternalMacroPlugin::Public;
+  case static_cast<unsigned>(serialization::AccessLevel::Package):
+    return ExternalMacroPlugin::Package;
+  case static_cast<unsigned>(serialization::AccessLevel::Internal):
+    return ExternalMacroPlugin::Internal;
   default:
     return std::nullopt;
   }
@@ -1469,11 +1507,16 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.CXXStdlibKind = static_cast<uint8_t>(extInfo.getCXXStdlibKind());
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
+      Bits.StrictMemorySafety = extInfo.strictMemorySafety();
+      Bits.SupportsExtensibleEnums = extInfo.supportsExtensibleEnums();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
+      PublicModuleName = extInfo.getPublicModuleName();
+      SwiftInterfaceCompilerVersion =
+          extInfo.getSwiftInterfaceCompilerVersion();
 
       hasValidControlBlock = true;
       break;
@@ -1548,13 +1591,31 @@ ModuleFileSharedCore::ModuleFileSharedCore(
         }
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
+          bool isStaticLibrary;
           bool shouldForceLink;
           input_block::LinkLibraryLayout::readRecord(scratch, rawKind,
-                                                     shouldForceLink);
-          if (Bits.IsStaticLibrary)
-            shouldForceLink = false;
+                                                     isStaticLibrary, shouldForceLink);
+
+          // FIXME: the propagation of the static library is a problem as it
+          // causes over-linkage of the dependencies and hinders DCE. This
+          // results in significant code size increase on Windows.
+          //
+          // We propogate it on Darwin as ld64 has special handling for
+          // preserving the Swift conformances. The `_swift_FORCE_LOAD_$_`
+          // symbols will force the static library to be scanned for inclusion.
+          // The other platforms do not have this special handling and so this
+          // will only slow down the linker and not guarantee any conformances
+          // to be preserved. The same behaviour is better achieved with `-(`,
+          // `-)` to preserve the whole archive.
+          //
+          // When using dynamic libraries, the force load symbol will force the
+          // shared library to be loaded and register the conformances.
+          bool EmitForceLinkSymbol = shouldForceLink;
+          if (!llvm::Triple(TargetTriple).isOSDarwin())
+            EmitForceLinkSymbol = !isStaticLibrary && shouldForceLink;
           if (auto libKind = getActualLibraryKind(rawKind))
-            LinkLibraries.push_back({blobData, *libKind, shouldForceLink});
+            LinkLibraries.emplace_back(blobData, *libKind, isStaticLibrary,
+                                       EmitForceLinkSymbol);
           // else ignore the dependency...it'll show up as a linker error.
           break;
         }
@@ -1584,7 +1645,21 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           break;
         }
         case input_block::MODULE_INTERFACE_PATH: {
+          input_block::ModuleInterfaceLayout::readRecord(
+              scratch, IsModuleInterfaceSDKRelative);
           ModuleInterfacePath = blobData;
+          break;
+        }
+        case input_block::EXTERNAL_MACRO: {
+          uint8_t rawKind;
+          input_block::ExternalMacroLayout::readRecord(scratch, rawKind);
+          auto accessKind = getActualMacroAccess(rawKind);
+          if (!accessKind) {
+            info.status = error(Status::Malformed);
+            return;
+          }
+
+          MacroModuleNames.push_back({blobData.str(), *accessKind});
           break;
         }
         default:
@@ -1794,10 +1869,12 @@ bool ModuleFileSharedCore::hasSourceInfo() const {
 std::string ModuleFileSharedCore::resolveModuleDefiningFilePath(const StringRef SDKPath) const {
   if (!ModuleInterfacePath.empty()) {
     std::string interfacePath = ModuleInterfacePath.str();
-    if (llvm::sys::path::is_relative(interfacePath)) {
-      SmallString<128> absoluteInterfacePath(SDKPath);
-      llvm::sys::path::append(absoluteInterfacePath, interfacePath);
-      return absoluteInterfacePath.str().str();
+    if (IsModuleInterfaceSDKRelative &&
+        !ModuleInterfacePath.starts_with(SDKPath) &&
+        llvm::sys::path::is_relative(interfacePath)) {
+      SmallString<128> resolvedPath(SDKPath);
+      llvm::sys::path::append(resolvedPath, interfacePath);
+      return resolvedPath.str().str();
     } else
       return interfacePath;
   } else
@@ -1810,6 +1887,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           bool importNonPublicDependencies,
                                           bool isPartialModule,
                                           StringRef packageName,
+                                          bool resolveInPackageModuleDependencies,
                                           bool forTestable) const {
   if (isPartialModule) {
     // Keep the merge-module behavior for legacy support. In that case
@@ -1849,6 +1927,9 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   }
 
   if (dependency.isPackageOnly()) {
+    if (!resolveInPackageModuleDependencies)
+      return ModuleLoadingBehavior::Ignored;
+
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||

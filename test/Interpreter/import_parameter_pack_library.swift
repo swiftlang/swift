@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(variadic_generic_library)) -Xfrontend -disable-availability-checking  -enable-library-evolution %S/Inputs/variadic_generic_library.swift -emit-module -emit-module-path %t/variadic_generic_library.swiftmodule -module-name variadic_generic_library
+// RUN: %target-build-swift-dylib(%t/%target-library-name(variadic_generic_library)) -target %target-swift-5.9-abi-triple  -enable-library-evolution %S/Inputs/variadic_generic_library.swift -emit-module -emit-module-path %t/variadic_generic_library.swiftmodule -module-name variadic_generic_library
 // RUN: %target-codesign %t/%target-library-name(variadic_generic_library)
 
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -lvariadic_generic_library -I %t -L %t -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift %s -target %target-swift-5.9-abi-triple -lvariadic_generic_library -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(variadic_generic_library)

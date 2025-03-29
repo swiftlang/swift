@@ -39,8 +39,8 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
-  return dyn_cast_or_null<OpenedArchetypeType>(getLocalArchetypeOf(Ty));
+CanExistentialArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+  return dyn_cast_or_null<ExistentialArchetypeType>(getLocalArchetypeOf(Ty));
 }
 CanLocalArchetypeType swift::getLocalArchetypeOf(CanType Ty) {
   if (!Ty)
@@ -157,6 +157,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
   if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
@@ -168,6 +169,13 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
+  if (auto bfa = getAs<BuiltinFixedArrayType>()) {
+    if (auto size = bfa->getFixedInhabitedSize()) {
+      return size == 0;
+    }
+  }
+
   return false;
 }
 
@@ -199,7 +207,7 @@ Lifetime SILType::getLifetime(const SILFunction &F) const {
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 
@@ -414,7 +422,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
   addFieldSubstitutionsIfNeeded(TC, *this, elt, origEltType);
 
   auto substEltTy = getASTType()->getTypeOfMember(
-      elt, elt->getArgumentInterfaceType());
+      elt, elt->getPayloadInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
@@ -778,12 +786,11 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
 
 bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
                            CanType formalType) {
+  formalType =
+      substOpaqueTypesWithUnderlyingTypes(formalType, context)
+        ->getCanonicalType();
+
   SILType loweredType = *this;
-  if (formalType->hasOpaqueArchetype() &&
-      context.shouldLookThroughOpaqueTypeArchetypes() &&
-      loweredType.getASTType() ==
-          Mod.Types.getLoweredRValueType(context, formalType))
-    return true;
 
   // Optional lowers its contained type.
   SILType loweredObjectType = loweredType.getOptionalObjectType();
@@ -1100,23 +1107,6 @@ SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   return tl.getLoweredType();
 }
 
-MetatypeRepresentation SILType::getRepresentationOfMetatype(SILFunction *function) const {
-  auto metaType = castTo<MetatypeType>();
-  return metaType->getRepresentation();
-}
-
-bool SILType::isOrContainsObjectiveCClass() const {
-  return getASTType().findIf([](Type ty) {
-    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
-      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
-        return true;
-    }
-    if (ty->is<ProtocolCompositionType>())
-      return true;
-    return false;
-  });
-}
-
 static bool hasImmortalAttr(NominalTypeDecl *nominal) {
   if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
     if (semAttr->Value == semantics::ARC_IMMORTAL) {
@@ -1156,6 +1146,13 @@ bool SILType::isMarkedAsImmortal() const {
     }
   }
   return false;
+}
+
+bool SILType::isAddressableForDeps(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto &tl = function.getTypeLowering(contextType);
+  return tl.getRecursiveProperties().isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
@@ -1254,6 +1251,38 @@ SILType SILType::removingAnyMoveOnlyWrapping(const SILFunction *fn) {
 
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType();
+}
+
+Type SILType::getRawLayoutSubstitutedLikeType() const {
+  auto rawLayout = getRawLayout();
+
+  if (!rawLayout)
+    return Type();
+
+  if (rawLayout->getSizeAndAlignment())
+    return Type();
+
+  auto structDecl = getStructOrBoundGenericStruct();
+  auto likeType = rawLayout->getResolvedLikeType(structDecl);
+  auto astT = getASTType();
+  auto subs = astT->getContextSubstitutionMap();
+  return likeType.subst(subs);
+}
+
+Type SILType::getRawLayoutSubstitutedCountType() const {
+  auto rawLayout = getRawLayout();
+
+  if (!rawLayout)
+    return Type();
+
+  if (rawLayout->getSizeAndAlignment() || rawLayout->getScalarLikeType())
+    return Type();
+
+  auto structDecl = getStructOrBoundGenericStruct();
+  auto countType = rawLayout->getResolvedCountType(structDecl);
+  auto astT = getASTType();
+  auto subs = astT->getContextSubstitutionMap();
+  return countType.subst(subs);
 }
 
 std::optional<DiagnosticBehavior>

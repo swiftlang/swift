@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -parse-as-library -Xllvm -sil-print-types -emit-sil -Onone %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$s19opaque_values_Onone16generic_identity1txx_tlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $*T):

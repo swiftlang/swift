@@ -21,7 +21,7 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/nomacro.swift -o %t/deps1.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t/plugins#%swift-plugin-server
 // RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps1.json MyApp casFSRootID > %t/no_macro_fs.casid
-// RUN: llvm-cas -cas %t/cas -ls-tree-recursive @%t/no_macro_fs.casid | %FileCheck %s --check-prefix=NO-MACRO
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/no_macro_fs.casid | %FileCheck %s --check-prefix=NO-MACRO
 // NO-MACRO-NOT: MacroDefinition
 
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
@@ -29,7 +29,7 @@
 // RUN:   %t/macro.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t/plugins#%swift-plugin-server
 
 // RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
-// RUN: llvm-cas -cas %t/cas -ls-tree-recursive @%t/fs.casid | %FileCheck %s --check-prefix=FS
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
 

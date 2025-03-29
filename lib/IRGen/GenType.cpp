@@ -236,7 +236,7 @@ llvm::Value *FixedTypeInfo::getIsTriviallyDestroyable(IRGenFunction &IGF, SILTyp
 }
 llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                                isBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakable);
+      getBitwiseTakable(ResilienceExpansion::Maximal) >= IsBitwiseTakableOnly);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
@@ -1378,11 +1378,6 @@ namespace {
                                const llvm::Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                                llvm::Value *capacity,
-                                const Twine &name) const override {
-      llvm_unreachable("should not call on an immovable opaque type");
-    }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                          SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1490,7 +1485,7 @@ bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(decl->getASTContext());
   return Mangler.mangleTypeAsContextUSR(decl);
 }
 
@@ -1547,7 +1542,7 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   // metadata update callback when realizing a Swift class referenced from
   // Objective-C.
   auto deploymentAvailability =
-    AvailabilityContext::forDeploymentTarget(IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   bool supportsObjCMetadataUpdateCallback =
     deploymentAvailability.isContainedIn(
         IGM.Context.getObjCMetadataUpdateCallbackAvailability());
@@ -2313,9 +2308,15 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
     return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
   }
+  case TypeKind::BuiltinUnboundGeneric:
+    llvm_unreachable("not a real type");
+    
+  case TypeKind::BuiltinFixedArray: {
+    return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
+  }
 
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::ElementArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
@@ -2369,7 +2370,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
-    llvm_unreachable("implement me");
+    llvm_unreachable("should not be asking for the type info an IntegerType");
   }
   }
   llvm_unreachable("bad type kind");
@@ -2484,7 +2485,7 @@ namespace {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
 
-        if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
+        if (visit(elt->getPayloadInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;
@@ -2746,7 +2747,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleTypeForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
@@ -2758,7 +2759,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 /// distinguish different cases.
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleProtocolForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }

@@ -311,7 +311,7 @@ void MinimalConformances::collectConformanceRules() {
         rule.isSubstitutionSimplified())
       continue;
 
-    if (rule.containsUnresolvedSymbols())
+    if (rule.containsNameSymbols())
       continue;
 
     if (!rule.isAnyConformanceRule())
@@ -426,7 +426,7 @@ void RewriteSystem::computeCandidateConformancePaths(
     if (lhs.isRHSSimplified() ||
         lhs.isSubstitutionSimplified() ||
         lhs.isIdentityConformanceRule() ||
-        lhs.containsUnresolvedSymbols())
+        lhs.containsNameSymbols())
       continue;
 
     if (!lhs.isAnyConformanceRule() &&
@@ -505,7 +505,7 @@ void RewriteSystem::computeCandidateConformancePaths(
         if (rhs.isRHSSimplified() ||
             rhs.isSubstitutionSimplified() ||
             rhs.isIdentityConformanceRule() ||
-            rhs.containsUnresolvedSymbols())
+            rhs.containsNameSymbols())
           return;
 
         if (!rhs.isAnyConformanceRule() &&
@@ -951,7 +951,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       continue;
     }
 
-    if (rule.containsUnresolvedSymbols()) {
+    if (rule.containsNameSymbols()) {
       llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dumpMinimalConformanceEquations(llvm::errs());

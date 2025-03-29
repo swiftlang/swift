@@ -11,6 +11,13 @@ enum E {
   case B(String)
 }
 
+enum E2 {
+  case int(Int)
+  case str(String)
+}
+
+sil @useit : $@convention(thin) (@owned E2) -> ()
+
 // CHECK-LABEL: sil @forward_enum_data
 // CHECK:         return %0
 // CHECK:       } // end sil function 'forward_enum_data'
@@ -82,5 +89,35 @@ bb0(%0 : @owned $String):
   debug_value %1 : $E, let, name "e"
   %3 = unchecked_enum_data %1 : $E, #E.B!enumelt
   return %3 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_replacement
+// CHECK:       bb1({{.*}}:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value %2
+// CHECK:         apply {{%[0-9]+}}(%1)
+// CHECK:       } // end sil function 'trivial_replacement'
+sil [ossa] @trivial_replacement : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $E2, #E2.int!enumelt, %0 : $Int
+  %2 = enum $Optional<E2>, #Optional.some!enumelt, %1 : $E2, forwarding: @owned
+  %3 = begin_borrow %2 : $Optional<E2>
+  switch_enum %3 : $Optional<E2>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : @guaranteed $E2):
+  end_borrow %3 : $Optional<E2>
+  %7 = unchecked_enum_data %2 : $Optional<E2>, #Optional.some!enumelt
+  %8 = function_ref @useit : $@convention(thin) (@owned E2) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned E2) -> ()
+  br bb3
+  
+bb2:
+  end_borrow %3 : $Optional<E2>
+  destroy_value %2 : $Optional<E2>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
 }
 

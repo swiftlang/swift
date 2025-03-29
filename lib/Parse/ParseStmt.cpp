@@ -16,7 +16,9 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -369,35 +371,31 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
     if (Tok.is(tok::pound_if) && !isStartOfSwiftDecl()) {
+      SmallVector<ASTNode, 16> activeElements;
       auto IfConfigResult = parseIfConfig(
           IfConfigContext::BraceItems,
-          [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-            parseBraceItems(Elements, Kind,
+          [&](bool IsActive) {
+            SmallVector<ASTNode, 16> elements;
+            parseBraceItems(elements, Kind,
                             IsActive
                                 ? BraceItemListKind::ActiveConditionalBlock
                                 : BraceItemListKind::InactiveConditionalBlock,
                             IsFollowingGuard);
+
+            if (IsActive)
+              activeElements.append(elements);
           });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
         consumeDecl(BeginParserPosition, IsTopLevel);
         return IfConfigResult;
       }
       BraceItemsStatus |= IfConfigResult;
-      if (auto ICD = IfConfigResult.getPtrOrNull()) {
-        Result = ICD;
-        // Add the #if block itself
-        Entries.push_back(ICD);
-
-        for (auto &Entry : ICD->getActiveClauseElements()) {
-          if (Entry.is<Decl *>() && isa<IfConfigDecl>(Entry.get<Decl *>()))
-            // Don't hoist nested '#if'.
-            continue;
-          Entries.push_back(Entry);
-        }
-      } else {
+      if (IfConfigResult.isError()) {
         NeedParseErrorRecovery = true;
         continue;
       }
+
+      Entries.append(activeElements);
     } else if (Tok.is(tok::pound_line)) {
       ParserStatus Status = parseLineDirective(true);
       BraceItemsStatus |= Status;
@@ -408,7 +406,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
     } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
-      ParserResult<Decl> DeclResult =
+      ParserStatus DeclResult =
           parseDecl(IsAtStartOfLineOrPreviousHadSemi,
                     /*IfConfigsAreDeclAttrs=*/true, [&](Decl *D) {
                       TmpDecls.push_back(D);
@@ -423,7 +421,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                           FD->setHasTopLevelLocalContextCaptures();
                     });
       BraceItemsStatus |= DeclResult;
-      if (DeclResult.isParseErrorOrHasCompletion()) {
+      if (DeclResult.isErrorOrHasCompletion()) {
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isIDEInspectionFirstPass()) {
@@ -431,8 +429,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           return DeclResult;
         }
       }
-      Result = DeclResult.getPtrOrNull();
       Entries.append(TmpDecls.begin(), TmpDecls.end());
+
+      // HACK: If any declarations were parsed, make the last one the "result".
+      // We should know whether this was in an #if or not.
+      if (!TmpDecls.empty()) {
+        Result = TmpDecls.back();
+      }
+
     } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
@@ -531,15 +535,8 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 }
 
 /// parseStmt
-///
-/// \param fromASTGen If true , this function in called from ASTGen as the
-/// fallback, so do not attempt a callback to ASTGen.
-ParserResult<Stmt> Parser::parseStmt(bool fromASTGen) {
+ParserResult<Stmt> Parser::parseStmt() {
   AssertParserMadeProgressBeforeLeavingScopeRAII apmp(*this);
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen)
-    return parseStmtFromSyntaxTree();
-#endif
 
   // If this is a label on a loop/switch statement, consume it and pass it into
   // parsing logic below.
@@ -1293,84 +1290,20 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 /// removing specs for unrecognized platforms.
 static void
 validateAvailabilitySpecList(Parser &P,
-                             SmallVectorImpl<AvailabilitySpec *> &Specs,
+                             const SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
-  llvm::SmallSet<PlatformKind, 4> Platforms;
-  std::optional<SourceLoc> OtherPlatformSpecLoc = std::nullopt;
-
-  if (Specs.size() == 1 &&
-      isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
-    // @available(swift N) and @available(_PackageDescription N) are allowed
-    // only in isolation; they cannot be combined with other availability specs
-    // in a single list.
+  if (Source != Parser::AvailabilitySpecSource::Macro)
     return;
-  }
 
-  SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
+  std::optional<SourceLoc> WildcardSpecLoc;
   for (auto *Spec : Specs) {
-    RecognizedSpecs.push_back(Spec);
-    if (auto *OtherPlatSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-      OtherPlatformSpecLoc = OtherPlatSpec->getStarLoc();
-      continue;
-    }
-
-    if (auto *PlatformAgnosticSpec =
-         dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      P.diagnose(PlatformAgnosticSpec->getPlatformAgnosticNameLoc(),
-                 diag::availability_must_occur_alone,
-                 PlatformAgnosticSpec->isLanguageVersionSpecific() 
-                   ? "swift" 
-                   : "_PackageDescription");
-      continue;
-    }
-
-    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-    // We keep specs for unrecognized platforms around for error recovery
-    // during parsing but remove them once parsing is completed.
-    if (VersionSpec->isUnrecognizedPlatform()) {
-      RecognizedSpecs.pop_back();
-      continue;
-    }
-
-    bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
-    if (!Inserted) {
-      // Rule out multiple version specs referring to the same platform.
-      // For example, we emit an error for
-      /// #available(OSX 10.10, OSX 10.11, *)
-      PlatformKind Platform = VersionSpec->getPlatform();
-      P.diagnose(VersionSpec->getPlatformLoc(),
-                 diag::availability_query_repeated_platform,
-                 platformString(Platform));
+    if (Spec->isWildcard()) {
+      WildcardSpecLoc = Spec->getStartLoc();
     }
   }
 
-  switch (Source) {
-  case Parser::AvailabilitySpecSource::Available: {
-    if (OtherPlatformSpecLoc == std::nullopt) {
-      SourceLoc InsertWildcardLoc = P.PreviousLoc;
-      P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
-        .fixItInsertAfter(InsertWildcardLoc, ", *");
-    }
-    break;
-  }
-  case Parser::AvailabilitySpecSource::Unavailable: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
-      P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
-        .fixItRemove(Loc);
-    }
-    break;
-  }
-  case Parser::AvailabilitySpecSource::Macro: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
-      P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
-    }
-    break;
-  }
-  }
-
-  Specs = RecognizedSpecs;
+  if (WildcardSpecLoc)
+    P.diagnose(*WildcardSpecLoc, diag::attr_availability_wildcard_in_macro);
 }
 
 // #available(...)
@@ -1405,18 +1338,6 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   SmallVector<AvailabilitySpec *, 5> Specs;
   ParserStatus Status = parseAvailabilitySpecList(Specs, Source);
 
-  for (auto *Spec : Specs) {
-    if (auto *PlatformAgnostic =
-          dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
-               PlatformAgnostic->isLanguageVersionSpecific()
-                   ? diag::pound_available_swift_not_allowed
-                   : diag::pound_available_package_description_not_allowed,
-               getTokenText(MainToken));
-      Status.setIsParseError();
-    }
-  }
-
   SourceLoc RParenLoc;
   if (parseMatchingToken(tok::r_paren, RParenLoc,
                          diag::avail_query_expected_rparen, LParenLoc))
@@ -1436,11 +1357,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
   auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
                                             RParenLoc, isUnavailability);
+  if (Status.isError())
+    result->setInvalid();
+
   return makeParserResult(Status, result);
 }
 
-ParserStatus
-Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
+ParserStatus Parser::parseAvailabilityMacroDefinition(
+    std::string &Name, llvm::VersionTuple &Version,
+    SmallVectorImpl<AvailabilitySpec *> &Specs) {
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
@@ -1451,23 +1376,23 @@ Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
     return makeParserError();
   }
 
-  Result.Name = Tok.getText();
+  Name = Tok.getText();
   consumeToken();
 
   if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
     SourceRange VersionRange;
-    if (parseVersionTuple(Result.Version, VersionRange,
+    if (parseVersionTuple(Version, VersionRange,
                           diag::avail_query_expected_version_number)) {
       return makeParserError();
     }
   }
 
   if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::attr_availability_expected_colon_macro, Result.Name);
+    diagnose(Tok, diag::attr_availability_expected_colon_macro, Name);
     return makeParserError();
   }
 
-  return parseAvailabilitySpecList(Result.Specs, AvailabilitySpecSource::Macro);
+  return parseAvailabilitySpecList(Specs, AvailabilitySpecSource::Macro);
 }
 
 ParserStatus
@@ -1548,21 +1473,15 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
           // If this was preceded by a single platform version constraint, we
           // can guess that the intention was to treat it as 'introduced' and
           // suggest a fix-it to combine them.
-          if (Specs.size() == 1 &&
-              PlatformVersionConstraintAvailabilitySpec::classof(Previous) &&
-              Text != "introduced") {
-            auto *PlatformSpec =
-                cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
+          if (Specs.size() == 1 && Text != "introduced") {
+            auto PlatformNameEndLoc = Lexer::getLocForEndOfToken(
+                SourceManager, Previous->getStartLoc());
 
-            auto PlatformNameEndLoc =
-              Lexer::getLocForEndOfToken(SourceManager,
-                                         PlatformSpec->getPlatformLoc());
-
-            diagnose(PlatformSpec->getPlatformLoc(),
+            diagnose(Previous->getStartLoc(),
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
-
+          consumeToken();
           Status.setIsParseError();
           break;
         }
@@ -2449,6 +2368,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   auto StartOfControl = Tok.getLoc();
   SourceLoc AwaitLoc;
   SourceLoc TryLoc;
+  SourceLoc UnsafeLoc;
 
   if (Tok.isContextualKeyword("await")) {
     AwaitLoc = consumeToken();
@@ -2459,10 +2379,15 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
+  if (Tok.isContextualKeyword("unsafe") &&
+      !peekToken().isAny(tok::colon, tok::kw_in)) {
+    UnsafeLoc = consumeToken();
+  }
+  
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeForEachPatternBeginning(
-          TryLoc.isValid(), AwaitLoc.isValid());
+          TryLoc.isValid(), AwaitLoc.isValid(), UnsafeLoc.isValid());
     }
     consumeToken(tok::code_complete);
     // Since 'completeForeachPatternBeginning' is a keyword only completion,
@@ -2576,7 +2501,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, pattern.get(), InLoc,
+      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
+                                pattern.get(), InLoc,
                                 Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }
@@ -2603,7 +2529,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
 
   SourceLoc lBraceLoc;
   SourceLoc rBraceLoc;
-  SmallVector<ASTNode, 8> cases;
+  SmallVector<CaseStmt *, 8> cases;
 
   if (Status.isErrorOrHasCompletion()) {
     return makeParserResult(
@@ -2625,9 +2551,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   // We cannot have additional cases after a default clause. Complain on
   // the first offender.
   bool hasDefault = false;
-  for (auto Element : cases) {
-    if (!Element.is<Stmt*>()) continue;
-    auto *CS = cast<CaseStmt>(Element.get<Stmt*>());
+  for (auto *CS : cases) {
     if (hasDefault) {
       diagnose(CS->getLoc(), diag::case_after_default);
       break;
@@ -2646,8 +2570,8 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
                                  /*EndLoc=*/rBraceLoc, Context));
 }
 
-ParserStatus
-Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
+ParserStatus Parser::parseStmtCases(SmallVectorImpl<CaseStmt *> &cases,
+                                    bool IsActive) {
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
@@ -2660,32 +2584,17 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
       // '#if' in 'case' position can enclose one or more 'case' or 'default'
       // clauses.
       auto IfConfigResult =
-          parseIfConfig(IfConfigContext::SwitchStmt,
-                        [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
-                          parseStmtCases(Elements, IsActive);
-                        });
+          parseIfConfig(IfConfigContext::SwitchStmt, [&](bool IsActive) {
+            SmallVector<CaseStmt *, 16> elements;
+            parseStmtCases(elements, IsActive);
+
+            if (IsActive) {
+              cases.append(elements);
+            }
+          });
       Status |= IfConfigResult;
-      if (auto ICD = IfConfigResult.getPtrOrNull()) {
-        cases.emplace_back(ICD);
-
-        for (auto &Entry : ICD->getActiveClauseElements()) {
-          if (Entry.is<Decl*>() && 
-              (isa<IfConfigDecl>(Entry.get<Decl*>())))
-            // Don't hoist nested '#if'.
-            continue;
-
-          assert((Entry.is<Stmt*>() && isa<CaseStmt>(Entry.get<Stmt*>())) ||
-                 (Entry.is<Decl*>() && 
-                   isa<PoundDiagnosticDecl>(Entry.get<Decl*>())));
-          cases.push_back(Entry);
-        }
-      }
     } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
-      auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
-      Status |= PoundDiagnosticResult;
-      if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
-        cases.emplace_back(PDD);
-      }
+      Status |= parseDeclPoundDiagnostic();
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeCaseStmtKeyword();

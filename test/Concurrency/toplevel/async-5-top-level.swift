@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -enable-experimental-async-top-level -swift-version 5 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level -swift-version 5 %s -verify
 
 // enable-experimental-async-top-level is passed and an await is used in the
 // top-level, so the top-level code is a concurrent context. Variables are

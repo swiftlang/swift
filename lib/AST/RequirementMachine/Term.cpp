@@ -113,7 +113,7 @@ void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     id.AddPointer(symbol.getOpaquePointer());
 }
 
-bool Term::containsUnresolvedSymbols() const {
+bool Term::containsNameSymbols() const {
   for (auto symbol : *this) {
     if (symbol.getKind() == Symbol::Kind::Name)
       return true;

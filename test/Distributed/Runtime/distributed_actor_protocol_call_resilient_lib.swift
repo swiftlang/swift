@@ -3,7 +3,7 @@
 
 /// Build the fake actor systems lib
 // RUN: %target-build-swift                                                    \
-// RUN:     -Xfrontend -disable-availability-checking                          \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
 // RUN:     -parse-as-library -emit-library                                    \
 // RUN:     -emit-module-path %t/FakeDistributedActorSystems.swiftmodule       \
 // RUN:     -module-name FakeDistributedActorSystems                           \
@@ -13,7 +13,7 @@
 
 /// Build the Lib
 // RUN: %target-build-swift                                                    \
-// RUN:     -Xfrontend -disable-availability-checking                          \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
 // RUN:     -parse-as-library -emit-library                                    \
 // RUN:     -emit-module-path %t/ResilientLib.swiftmodule                      \
 // RUN:     -module-name ResilientLib                                          \
@@ -25,7 +25,7 @@
 
 /// Build the ActorLib
 // RUN: %target-build-swift                                                    \
-// RUN:     -Xfrontend -disable-availability-checking                          \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
 // RUN:     -parse-as-library -emit-library                                    \
 // RUN:     -emit-module-path %t/ResilientActorLib.swiftmodule                 \
 // RUN:     -module-name ResilientActorLib                                     \
@@ -39,7 +39,7 @@
 
 /// Build the client
 // RUN: %target-build-swift                                                    \
-// RUN:     -Xfrontend -disable-availability-checking                          \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
 // RUN:     -parse-as-library                                                  \
 // RUN:     -lFakeDistributedActorSystems                                      \
 // RUN:     -lResilientLib                                                     \

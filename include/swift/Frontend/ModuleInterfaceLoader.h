@@ -318,10 +318,11 @@ class ExplicitModuleMapParser {
 public:
   ExplicitModuleMapParser(llvm::BumpPtrAllocator &Allocator) : Saver(Allocator) {}
 
-  std::error_code
-  parseSwiftExplicitModuleMap(llvm::MemoryBufferRef BufferRef,
-                              llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
-                              llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
+  std::error_code parseSwiftExplicitModuleMap(
+      llvm::MemoryBufferRef BufferRef,
+      llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
+      llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap,
+      llvm::StringMap<std::string> &moduleAliases) {
     using namespace llvm::yaml;
     // Use a new source manager instead of the one from ASTContext because we
     // don't want the JSON file to be persistent.
@@ -331,7 +332,8 @@ public:
       assert(DI != Stream.end() && "Failed to read a document");
       if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
         for (auto &entry : *MN) {
-          if (parseSingleModuleEntry(entry, swiftModuleMap, clangModuleMap)) {
+          if (parseSingleModuleEntry(entry, swiftModuleMap, clangModuleMap,
+                                     moduleAliases)) {
             return std::make_error_code(std::errc::invalid_argument);
           }
         }
@@ -359,16 +361,19 @@ private:
       llvm_unreachable("Unexpected JSON value for isFramework");
   }
 
-  bool parseSingleModuleEntry(llvm::yaml::Node &node,
-                              llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
-                              llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
+  bool parseSingleModuleEntry(
+      llvm::yaml::Node &node,
+      llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
+      llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap,
+      llvm::StringMap<std::string> &moduleAliases) {
     using namespace llvm::yaml;
     auto *mapNode = dyn_cast<MappingNode>(&node);
     if (!mapNode)
       return true;
     StringRef moduleName;
     std::optional<std::string> swiftModulePath, swiftModuleDocPath,
-        swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey;
+        swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey,
+        moduleAlias;
     std::optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
     bool isFramework = false, isSystem = false,
@@ -405,6 +410,8 @@ private:
           clangModuleCacheKey = val.str();
         } else if (key == "isBridgingHeaderDependency") {
           isBridgingHeaderDependency = parseBoolValue(val);
+        } else if (key == "moduleAlias") {
+          moduleAlias = val.str();
         } else {
           // Being forgiving for future fields.
           continue;
@@ -414,6 +421,7 @@ private:
     if (moduleName.empty())
       return true;
 
+    bool didInsert;
     if (swiftModulePath.has_value()) {
       assert((clangModuleMapPath.empty() &&
               clangModulePath.empty()) &&
@@ -425,7 +433,7 @@ private:
                                          isFramework,
                                          isSystem,
                                          swiftModuleCacheKey);
-      swiftModuleMap.try_emplace(moduleName, std::move(entry));
+      didInsert = swiftModuleMap.try_emplace(moduleName, std::move(entry)).second;
     } else {
       assert((!clangModuleMapPath.empty() ||
               !clangModulePath.empty()) &&
@@ -436,10 +444,13 @@ private:
                                          isSystem,
                                          isBridgingHeaderDependency,
                                          clangModuleCacheKey);
-      clangModuleMap.try_emplace(moduleName, std::move(entry));
+      didInsert = clangModuleMap.try_emplace(moduleName, std::move(entry)).second;
     }
-
-    return false;
+    if (didInsert && moduleAlias.has_value()) {
+      moduleAliases[*moduleAlias] = moduleName;
+    }
+    // Prevent duplicate module names.
+    return !didInsert;
   }
 
   llvm::StringSaver Saver;
@@ -627,7 +638,22 @@ struct SwiftInterfaceInfo {
   std::optional<version::Version> CompilerToolsVersion;
 };
 
-struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
+namespace SwiftInterfaceModuleOutputPathResolution {
+struct ResultTy {
+  llvm::SmallString<256> outputPath;
+
+  // Hash points to a segment of outputPath.
+  StringRef hash;
+};
+
+using ArgListTy = std::vector<std::string>;
+
+void setOutputPath(ResultTy &outputPath, const StringRef &moduleName,
+                   const StringRef &interfacePath, const StringRef &sdkPath,
+                   const CompilerInvocation &CI, const ArgListTy &extraArgs);
+} // namespace SwiftInterfaceModuleOutputPathResolution
+
+struct InterfaceSubContextDelegateImpl : InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
 public:
@@ -646,16 +672,19 @@ private:
     return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
-  inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+  inheritOptionsForBuildingInterface(FrontendOptions::ActionType requestedAction,
+                                     const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
+                                           DiagnosticEngine &subInstanceDiags,
                                            SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
+
 public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
@@ -684,14 +713,16 @@ public:
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef sdkPath,
+                                  std::optional<StringRef> sysroot,
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
-                                       ArrayRef<StringRef>, ArrayRef<StringRef>,
+                                       ArrayRef<StringRef>,
                                        StringRef, StringRef)> action) override;
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,
                                            StringRef sdkPath,
+                                           std::optional<StringRef> sysroot,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
                                            bool silenceErrors,
@@ -699,14 +730,12 @@ public:
 
   ~InterfaceSubContextDelegateImpl() = default;
 
-  /// includes a hash of relevant key data.
-  StringRef computeCachedOutputPath(StringRef moduleName,
-                                    StringRef UseInterfacePath,
-                                    StringRef sdkPath,
-                                    llvm::SmallString<256> &OutPath,
-                                    StringRef &CacheHash);
-  std::string getCacheHash(StringRef useInterfacePath, StringRef sdkPath);
+  /// resolvedOutputPath includes a hash of relevant key data.
+  void getCachedOutputPath(
+      SwiftInterfaceModuleOutputPathResolution::ResultTy &resolvedOutputPath,
+      StringRef moduleName, StringRef interfacePath, StringRef sdkPath);
 };
-}
+
+} // namespace swift
 
 #endif

@@ -132,8 +132,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramList,
-                              /*GenericParams=*/nullptr, parentDC,
-                              /*LifetimeDependentTypeRepr*/ nullptr);
+                              /*GenericParams=*/nullptr, parentDC);
 
   initDecl->setImplicit();
 
@@ -210,7 +209,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                              SourceLoc());
   } else {
-    SmallVector<ASTNode, 4> cases;
+    SmallVector<CaseStmt *, 4> cases;
     for (auto *elt : elements) {
       auto *pat = EnumElementPattern::createImplicit(enumType, elt,
                                                      /*subPattern*/ nullptr,
@@ -271,11 +270,11 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   }
 
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto *elt : elements) {
     // Skip the cases that would return unavailable elements since those can't
     // be instantiated at runtime.
-    if (elt->getAttrs().isUnavailable(C))
+    if (elt->isUnavailable())
       continue;
 
     auto *litExpr = new (C) StringLiteralExpr(elt->getNameStr(), SourceRange(),

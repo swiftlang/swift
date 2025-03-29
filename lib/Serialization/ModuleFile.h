@@ -127,6 +127,9 @@ private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
 
+  /// External macro modules.
+  SmallVector<ExternalMacroPlugin, 4> MacroModuleNames;
+
 public:
   template <typename T>
   class Serialized {
@@ -258,6 +261,9 @@ private:
 
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
+
+  /// Abstract conformances referenced by this module.
+  MutableArrayRef<Serialized<AbstractConformance *>> AbstractConformances;
 
   /// Pack conformances referenced by this module.
   MutableArrayRef<Serialized<PackConformance *>> PackConformances;
@@ -504,7 +510,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+  llvm::Expected<GenericParamList *> maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
@@ -587,6 +593,10 @@ public:
     return Core->ModuleExportAsName;
   }
 
+  StringRef getPublicModuleName() const {
+    return Core->PublicModuleName;
+  }
+
   /// The ABI name of the module.
   StringRef getModuleABIName() const {
     return Core->ModuleABIName;
@@ -594,6 +604,10 @@ public:
 
   llvm::VersionTuple getUserModuleVersion() const {
     return Core->UserModuleVersion;
+  }
+
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return Core->SwiftInterfaceCompilerVersion;
   }
 
   ArrayRef<StringRef> getAllowableClientNames() const {
@@ -680,6 +694,10 @@ public:
   /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
   bool allowCompilerErrors() const;
 
+  /// Allow recovering from errors that could be unsafe when compiling
+  /// the binary. Useful for the debugger and IDE support tools.
+  bool enableExtendedDeserializationRecovery() const;
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
@@ -692,6 +710,14 @@ public:
 
   /// \c true if this module was built with complete checking for concurrency.
   bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
+
+  /// \c true if this module was built with strict memory safety.
+  bool strictMemorySafety() const { return Core->strictMemorySafety(); }
+
+  /// \c true if this module was built with `ExtensibleEnums` feature enabled.
+  bool supportsExtensibleEnums() const {
+    return Core->supportsExtensibleEnums();
+  }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -752,7 +778,8 @@ public:
   ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
-  void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
+  void lookupValue(DeclName name, OptionSet<ModuleLookupFlags> flags,
+                   SmallVectorImpl<ValueDecl*> &results);
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);
@@ -779,6 +806,8 @@ public:
   /// Adds any imported modules to the given vector.
   void getImportedModules(SmallVectorImpl<ImportedModule> &results,
                           ModuleDecl::ImportFilter filter);
+
+  void getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros);
 
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
 
@@ -1080,9 +1109,8 @@ public:
   maybeReadLifetimeDependence(unsigned numParams);
 
   // Reads lifetime dependence specifier from decl if present
-  bool maybeReadLifetimeDependenceSpecifier(
-      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
-      unsigned numDeclParams, bool hasSelf);
+  bool maybeReadLifetimeEntry(SmallVectorImpl<LifetimeEntry> &specifierList,
+                              unsigned numDeclParams, bool hasSelf);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadInlinableBodyText();

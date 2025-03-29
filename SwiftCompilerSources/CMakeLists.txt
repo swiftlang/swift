@@ -177,17 +177,31 @@ function(add_swift_compiler_modules_library name)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND swift_compile_options "-static")
     list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+    # For "swift/shims/*.h".
+    list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib")
 
     # Workaround a crash in the LoadableByAddress pass
     # https://github.com/apple/swift/issues/73254
     list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
 
-    # The STL in VS 17.10 requires Clang 17 or higher, but bootstrapping generally uses toolchains with older versions
-    # versions of Clang. Swift 6 toolchains are the first to include Clang 17, so if we are on Windows and using an
-    # earlier toolchain, we need to relax to relax this requirement with ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
-    if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0)
+    # MSVC 14.40 (VS 17.10, MSVC_VERSION 1940) added a requirement for Clang 17 or higher.
+    # Swift 6.0 is the first version to include Clang 17.
+    # MSVC 14.43 (VS 17.13, MSVC_VERSION 1943) added a requirement for Clang 18 or higher.
+    # Swift 6.1 is the first version to include Clang 18.
+    # These requirements can be found in `include/yvals_core.h` in the MSVC headers.
+    # Bootstrapping generally uses toolchains with older versions of Clang, so if we are on Windows
+    # and using an earlier toolchain, we need to relax this requirement by setting
+    # `_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH`.
+    if((CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0 AND MSVC_VERSION VERSION_GREATER_EQUAL 1940) OR
+       (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.1 AND MSVC_VERSION VERSION_GREATER_EQUAL 1943))
       list(APPEND swift_compile_options "-Xcc" "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
     endif()
+
+    # Make 'offsetof()' a const value.
+    list(APPEND swift_compile_options "-Xcc" "-D_CRT_USE_BUILTIN_OFFSETOF")
+
+    # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+    list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
   else()
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
   endif()

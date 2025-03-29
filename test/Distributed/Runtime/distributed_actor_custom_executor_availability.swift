@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -parse-as-library -target %target-swift-abi-5.7-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift %S/../Inputs/CustomSerialExecutorAvailability.swift -o %t/a.out
+// RUN: %target-build-swift -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift %S/../Inputs/CustomSerialExecutorAvailability.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 

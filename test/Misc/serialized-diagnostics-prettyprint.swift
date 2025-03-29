@@ -8,7 +8,7 @@
 var x = String.init // expected-error{{ambiguous use of 'init'}}
 // CHECK: {{.*[/\\]}}serialized-diagnostics-prettyprint.swift:[[@LINE-1]]:16: error: ambiguous use of 'init'
 
-// CHECK: Swift.String:2:23: note: found this candidate
-// CHECK: CONTENTS OF FILE Swift.String:
-// CHECK: extension String {
+// CHECK: Swift.String.init:2:19: note: found this candidate
+// CHECK: CONTENTS OF FILE Swift.String.init:
+// CHECK: struct String {
 // CHECK:    public init(_ content: Substring.UnicodeScalarView)

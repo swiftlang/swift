@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+#if !$Embedded
+
 /// A clock that measures time that always increments but stops incrementing 
 /// while the system is asleep. 
 ///
@@ -57,7 +59,7 @@ extension SuspendingClock: Clock {
   public static var now: SuspendingClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
-    _getTime(
+    unsafe _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.suspending.rawValue)
@@ -71,7 +73,7 @@ extension SuspendingClock: Clock {
   public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
-    _getClockRes(
+    unsafe _getClockRes(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.suspending.rawValue)
@@ -179,3 +181,4 @@ extension SuspendingClock.Instant: InstantProtocol {
   }
 }
 
+#endif

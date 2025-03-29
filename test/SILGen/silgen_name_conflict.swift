@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen %s -enable-experimental-feature Extern -verify
 
+// REQUIRES: swift_feature_Extern
+
 @_silgen_name("my_extern_func")
 func my_extern_func1() // expected-note {{function declared here}}
 

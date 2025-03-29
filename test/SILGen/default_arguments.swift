@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name default_arguments -Xllvm -sil-full-demangle -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil [ossa] @main

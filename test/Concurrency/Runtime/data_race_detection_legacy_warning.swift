@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %import-libdispatch -Xfrontend -disable-availability-checking -enable-actor-data-race-checks -parse-as-library %s -o %t/a.out -module-name main
+// RUN: %target-build-swift %import-libdispatch -target %target-swift-5.1-abi-triple -enable-actor-data-race-checks -parse-as-library %s -o %t/a.out -module-name main
 // RUN: %target-codesign %t/a.out
 
 // We specifically test for legacy behavior here, apps compiled against old SDKs
 // will be able to have this behavior, however new apps will not. We use the
 // overrides to test the logic for legacy code remains functional.
 //
-// RUN: %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out 2>&1 | %FileCheck %s
+// RUN: %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out 2>&1 | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

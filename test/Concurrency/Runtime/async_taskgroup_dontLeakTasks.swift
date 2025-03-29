@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library) | %FileCheck %s
 // TODO: move to target-run-simple-leaks-swift once CI is using at least Xcode 14.3
 
 // Task group addTask is not supported in freestanding mode

@@ -13,6 +13,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILGlobalVariable.h"
 
@@ -637,17 +638,24 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              PoisonRefs_t poisonRefs,
                                              UsesMoveableValueDebugInfo_t moved,
-                                             bool trace) {
+                                             bool trace, bool overrideLoc) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
 
   llvm::SmallString<4> Name;
 
-  // Debug location overrides cannot apply to debug value instructions.
-  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
-  return insert(DebugValueInst::create(
-      getSILDebugLocation(Loc, true), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, moved, trace));
+  SILDebugLocation DebugLoc;
+  if (overrideLoc) {
+    // Debug location overrides cannot apply to debug value instructions.
+    DebugLocOverrideRAII LocOverride{*this, std::nullopt};
+    DebugLoc = getSILDebugLocation(Loc, true);
+  } else {
+    DebugLoc = getSILDebugLocation(Loc, true);
+  }
+
+  return insert(DebugValueInst::create(DebugLoc, src, getModule(),
+                                       *substituteAnonymousArgs(Name, Var, Loc),
+                                       poisonRefs, moved, trace));
 }
 
 DebugValueInst *SILBuilder::createDebugValueAddr(
@@ -679,6 +687,36 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
   // If we actually inserted a borrowing operation... insert the end_borrow.
   if (value != original)
     createEndBorrow(loc, value);
+}
+
+EndBorrowInst *SILBuilder::createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+  ASSERT(!SILArgument::isTerminatorResult(borrowedValue) &&
+             "terminator results do not have end_borrow");
+  ASSERT(!isa<SILFunctionArgument>(borrowedValue) &&
+         "Function arguments should never have an end_borrow");
+  updateReborrowFlags(borrowedValue);
+  return insert(new (getModule())
+                    EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
+}
+
+
+SILPhiArgument *SILBuilder::createSwitchOptional(
+                                SILLocation loc, SILValue operand,
+                                SILBasicBlock *someBB, SILBasicBlock *noneBB,
+                                ValueOwnershipKind forwardingOwnershipKind,
+                                ProfileCounter someCount,
+                                ProfileCounter noneCount) {
+  ProfileCounter counts[] = {someCount, noneCount};
+  std::optional<ArrayRef<ProfileCounter>> countsArg = std::nullopt;
+  if (someCount || noneCount) countsArg = counts;
+
+  auto &ctx = getASTContext();
+  auto sei = createSwitchEnum(loc, operand, /*default*/ nullptr,
+                              {{ctx.getOptionalSomeDecl(), someBB},
+                               {ctx.getOptionalNoneDecl(), noneBB}},
+                              countsArg, /*default*/ProfileCounter(),
+                              forwardingOwnershipKind);
+  return sei->createResult(someBB, operand->getType().unwrapOptionalType());
 }
 
 /// Attempt to propagate ownership from \p operand to the returned forwarding
@@ -741,19 +779,24 @@ SwitchEnumInst *SILBuilder::createSwitchEnum(
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILLocation Loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ProfileCounter target1Count,
     ProfileCounter target2Count) {
   auto forwardingOwnership =
       deriveForwardingOwnership(op, destLoweredTy, getFunction());
   return createCheckedCastBranch(
-      Loc, isExact, op, srcFormalTy, destLoweredTy, destFormalTy, successBB,
+      Loc, isExact, isolatedConformances, op, srcFormalTy, destLoweredTy,
+      destFormalTy, successBB,
       failureBB, forwardingOwnership, target1Count, target2Count);
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILLocation Loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ValueOwnershipKind forwardingOwnershipKind,
     ProfileCounter target1Count, ProfileCounter target2Count) {
@@ -762,9 +805,29 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
          "failureBB's argument doesn't match incoming argument type");
 
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op, srcFormalTy, destLoweredTy,
-      destFormalTy, successBB, failureBB, getFunction(), target1Count,
-      target2Count, forwardingOwnershipKind));
+      getSILDebugLocation(Loc), isExact, isolatedConformances, op, srcFormalTy,
+      destLoweredTy, destFormalTy, successBB, failureBB, getFunction(),
+      target1Count, target2Count, forwardingOwnershipKind));
+}
+
+BuiltinInst *SILBuilder::createZeroInitAddr(SILLocation loc, SILValue addr) {
+  assert(addr->getType().isAddress());
+  auto &C = getASTContext();
+  auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+  return createBuiltin(loc, zeroInit->getBaseIdentifier(),
+                       SILType::getEmptyTupleType(C),
+                       SubstitutionMap(),
+                       addr);
+}
+
+SILValue SILBuilder::createZeroInitValue(SILLocation loc, SILType loweredTy) {
+  assert(loweredTy.isObject());
+  auto &C = getASTContext();
+  auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+  return createBuiltin(loc, zeroInit->getBaseIdentifier(),
+                       loweredTy,
+                       SubstitutionMap(),
+                       {});
 }
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,

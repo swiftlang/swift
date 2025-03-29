@@ -3,16 +3,59 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature LifetimeDependence
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(copy source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, mutating source: inout U
+) -> T {
+  dependent
+}
 
 struct MutableSpan : ~Escapable, ~Copyable {
   let base: UnsafeMutableRawPointer
   let count: Int
 
-  init(_ p: UnsafeMutableRawPointer, _ c: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeMutableRawPointer, _ c: Int) {
     self.base = p
     self.count = c
   }
@@ -33,7 +76,8 @@ struct MutableSpan : ~Escapable, ~Copyable {
     var base: UnsafeMutableRawPointer
     var count: Int
 
-    init(base: UnsafeMutableRawPointer, count: Int) -> dependsOn(base) Self {
+    @lifetime(borrow base)
+    init(base: UnsafeMutableRawPointer, count: Int) {
       self.base = base
       self.count = count
     }
@@ -47,7 +91,10 @@ struct MutableSpan : ~Escapable, ~Copyable {
     }
   }
 
-  var iterator: Iter { Iter(base: base, count: count) }
+  var iterator: Iter {
+    @lifetime(copy self)
+    get { Iter(base: base, count: count) }
+  }
 }
 
 extension Array where Element == Int {
@@ -55,7 +102,8 @@ extension Array where Element == Int {
   mutating func mutspan() -> /* dependsOn(scoped self) */ MutableSpan {
     /* not the real implementation */
     let p = self.withUnsafeMutableBufferPointer { $0.baseAddress! }
-    return MutableSpan(p, count)
+    let span = MutableSpan(p, count)
+    return _overrideLifetime(span, mutating: &self)
   }
 }
 
@@ -64,7 +112,8 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  mutating func getMutableSpan() -> dependsOn(self) MutableSpan {
+  @lifetime(borrow self)
+  mutating func getMutableSpan() -> MutableSpan {
     MutableSpan(p, c)
   }
 }

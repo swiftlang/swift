@@ -3,8 +3,7 @@
 // Check that accessing an imported enum doesn't trigger stack protection.
 
 // CHECK-LABEL: sil @$s4test6testityyF : $@convention(thin) () -> () {
-// CHECK:        address_to_pointer %{{[0-9]+}}
-// CHECK:        address_to_pointer %{{[0-9]+}}
+// CHECK-NOT:     stack_protection
 // CHECK:      } // end sil function '$s4test6testityyF'
 public func testit() {
   var s = S()

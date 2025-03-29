@@ -23,6 +23,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
@@ -49,11 +50,16 @@ class SILModule::SerializationCallback final
 
   void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
     updateLinkage(var);
-    
-    // For globals we currently do not support available_externally.
-    // In the interpreter it would result in two instances for a single global:
-    // one in the imported module and one in the main module.
-    var->setDeclaration(true);
+
+    if (!M->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // For globals we currently do not support available_externally.
+      // In the interpreter it would result in two instances for a single
+      // global: one in the imported module and one in the main module.
+      //
+      // We avoid that in Embedded Swift where we do actually link globals from
+      // other modules into the client module.
+      var->setDeclaration(true);
+    }
   }
 
   void didDeserialize(ModuleDecl *M, SILVTable *vtable) override {
@@ -236,9 +242,8 @@ SILWitnessTable *
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
-  auto rootC = C->getRootConformance();
   // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableMap.find(rootC);
+  auto found = WitnessTableMap.find(C);
   if (found == WitnessTableMap.end())
     return nullptr;
 
@@ -249,7 +254,7 @@ SILDefaultWitnessTable *
 SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
                                      bool deserializeLazily) {
   // Note: we only ever look up default witness tables in the translation unit
-  // that is currently being compiled, since they SILGen generates them when it
+  // that is currently being compiled, since SILGen generates them when it
   // visits the protocol declaration, and IRGen emits them when emitting the
   // protocol descriptor metadata for the protocol.
 
@@ -284,6 +289,38 @@ void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   getSILLoader()->invalidateWitnessTable(Wt);
   WitnessTableMap.erase(Conf);
   witnessTables.erase(Wt);
+}
+
+SILDefaultOverrideTable *SILModule::createDefaultOverrideTableDefinition(
+    const ClassDecl *decl, SILLinkage linkage,
+    ArrayRef<SILDefaultOverrideTable::Entry> entries) {
+  return SILDefaultOverrideTable::define(*this, linkage, decl, entries);
+}
+
+SILDefaultOverrideTable *
+SILModule::lookUpDefaultOverrideTable(const ClassDecl *decl,
+                                      bool deserializeLazily) {
+  // Note: we only ever look up default override tables in the translation unit
+  // that is currently being compiled, since SILGen generates them when it
+  // visits the class declaration, and IRGen emits them when emitting the
+  // class descriptor metadata for the class.
+
+  auto found = DefaultOverrideTableMap.find(decl);
+  if (found == DefaultOverrideTableMap.end()) {
+    if (deserializeLazily) {
+      SILLinkage linkage = getSILLinkage(getDeclLinkage(decl), ForDefinition);
+      SILDefaultOverrideTable *otable =
+          SILDefaultOverrideTable::declare(*this, linkage, decl);
+      otable = getSILLoader()->lookupDefaultOverrideTable(otable);
+      if (otable)
+        DefaultOverrideTableMap[decl] = otable;
+      return otable;
+    }
+
+    return nullptr;
+  }
+
+  return found->second;
 }
 
 const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
@@ -532,6 +569,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
 std::pair<SILFunction *, SILWitnessTable *>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Requirement,
+                                        bool lookupInSpecializedWitnessTable,
                                         SILModule::LinkingMode linkingMode) {
   if (!C.isConcrete())
     return {nullptr, nullptr};
@@ -540,7 +578,15 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }
-  SILWitnessTable *wt = lookUpWitnessTable(C.getConcrete());
+  ProtocolConformance *conf = C.getConcrete();
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf))
+    conf = inheritedC->getInheritedConformance();
+
+  if (!isa<SpecializedProtocolConformance>(conf) || !lookupInSpecializedWitnessTable) {
+    conf = conf->getRootConformance();
+  }
+
+  SILWitnessTable *wt = lookUpWitnessTable(conf);
 
   if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
@@ -649,7 +695,7 @@ SILModule::lookUpDifferentiabilityWitness(StringRef name) {
 
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return lookUpDifferentiabilityWitness(
       mangler.mangleSILDifferentiabilityWitness(
           key.originalFunctionName, key.kind, key.config));
@@ -912,7 +958,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   SmallVector<ModuleDecl *, 8> importedModules;
   // Add the Swift module.
   if (!isStdlibModule()) {
-    auto *SwiftStdlib = getASTContext().getStdlibModule(true);
+    auto *SwiftStdlib = getASTContext().getStdlibModule();
     if (SwiftStdlib)
       importedModules.push_back(SwiftStdlib);
   }
@@ -939,6 +985,26 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
     }
   }
   prespecializedFunctionDeclsImported = true;
+}
+
+void SILModule::moveBefore(SILModule::iterator moveAfter, SILFunction *fn) {
+  assert(&fn->getModule() == this);
+  assert(&moveAfter->getModule() == this);
+  assert(moveAfter != end() &&
+         "We assume that moveAfter must not be end since nothing is after end");
+
+  getFunctionList().remove(fn->getIterator());
+  getFunctionList().insert(moveAfter, fn);
+}
+
+void SILModule::moveAfter(SILModule::iterator moveAfter, SILFunction *fn) {
+  assert(&fn->getModule() == this);
+  assert(&moveAfter->getModule() == this);
+  assert(moveAfter != end() &&
+         "We assume that moveAfter must not be end since nothing is after end");
+
+  getFunctionList().remove(fn->getIterator());
+  getFunctionList().insertAfter(moveAfter, fn);
 }
 
 SILProperty *
@@ -991,4 +1057,26 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   // If the root class was implemented in Objective-C, use Objective-C's
   // allocation methods because they may have been overridden.
   return theClass->getObjectModel() == ReferenceCounting::ObjC;
+}
+
+bool Lowering::needsIsolatingDestructor(DestructorDecl *dd) {
+  auto ai = swift::getActorIsolation(dd);
+  if (!ai.isActorIsolated()) {
+    return false;
+  }
+  DestructorDecl *firstIsolated = dd;
+  while (true) {
+    DestructorDecl *next = firstIsolated->getSuperDeinit();
+    if (!next)
+      break;
+    auto ai = swift::getActorIsolation(next);
+    if (!ai.isActorIsolated())
+      break;
+    firstIsolated = next;
+  }
+
+  // If isolation was introduced in ObjC code, then we assume that ObjC code
+  // also overrides retain/release to make sure that dealloc is called on the
+  // correct executor in the first place.
+  return firstIsolated->getClangNode().isNull();
 }

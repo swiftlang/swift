@@ -454,6 +454,96 @@ class TestGithubIssue70089 {
         }
       }
     }
+
+    func testClosuresInsideWeakSelfNotUnwrapped() {
+      // https://forums.swift.org/t/nested-weak-capture-and-implicit-self-in-swift-6/77230/1
+      doVoidStuff { [weak self] in
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [weak self] in
+          doVoidStuff { [weak self] in
+            guard let self else { return }
+            doVoidStuff { [weak self] in
+              doVoidStuff { [weak self] in
+                guard let self else { return }
+                x += 1
+              }
+            }
+          }
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          doVoidStuff { [self] in
+            doVoidStuff { [self] in
+              doVoidStuff { [weak self] in
+                guard let self else { return }
+                x += 1
+              }
+            }
+          }
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}}
+          // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+          // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+          x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}}
+          // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+          // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+          self.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          self?.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          guard let self else { return }
+          self.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          guard let self else { return }
+          x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
+        doVoidStuff { [self] in
+          guard let self else { return } // expected-error{{initializer for conditional binding must have Optional type, not 'TestGithubIssue70089'}}
+          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        }
+      }
+    }
 }
 
 class TestGithubIssue69911 {
@@ -522,9 +612,9 @@ class TestGithubIssue69911 {
           self.x += 1
         }
 
-        doVoidStuffNonEscaping {
+        doVoidStuffNonEscaping { // expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}}
           doVoidStuffNonEscaping {
-            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}}
             self.x += 1
           }
         }
@@ -670,7 +760,7 @@ final class AutoclosureTests {
     doVoidStuff { [weak self] in
       doVoidStuff { [self] in
         guard let self else { return }
-        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        method()
       }
     }
   
@@ -698,13 +788,6 @@ final class AutoclosureTests {
       }
 
       doVoidStuff { [self] in
-        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-      }
-    }
-
-    doVoidStuff { [weak self] in
-      doVoidStuff { [self] in
-        guard let self else { return }
         method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
     }
@@ -841,6 +924,121 @@ class rdar129475277 {
     // expected-warning@-1 {{'guard' condition is always true, body is unreachable}}
     doVoidStuffNonEscaping {
       method() // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note {{reference 'self?.' explicitly}}
+    }
+  }
+}
+
+class TestExtensionOnOptionalSelf {
+  init() {}
+  func bar() {}
+}
+
+extension TestExtensionOnOptionalSelf? {
+  func foo() {
+    _ = { [weak self] in
+      foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
+    }
+
+    _ = {
+      foo()
+      self.foo()
+      self?.bar()
+    }
+
+    _ = { [weak self] in
+      _ = {
+        foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
+        self.foo()
+        self?.bar()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in
+        foo()
+        self.foo()
+        self?.bar()
+      }
+    }
+  }
+}
+
+// non-optional self in this extension, but on a type with members defined on optional self
+extension TestExtensionOnOptionalSelf {
+  func foo() {
+    _ = { [weak self] in
+      foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
+      self.foo()
+      self?.bar()
+    }
+
+    _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+      foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+      self.foo()
+    }
+
+    _ = { [weak self] in
+      _ = {
+        foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
+        self.foo()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in
+        foo()
+        self.foo()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in
+        _ = { [self] in
+          foo()
+          self.foo()
+        }
+      }
+    }
+
+    _ = { [weak self] in
+      doVoidStuffNonEscaping {
+        _ = { [self] in
+          foo()
+          self.foo()
+        }
+      }
+    }
+
+    _ = { [weak self] in
+      guard case let self = self else { return }
+      _ = { [self] in
+        foo()
+      }
+    }
+  }
+}
+
+actor TestActor {
+    func setUp() {
+        doVoidStuff { [weak self] in
+            Task { [weak self] in
+                guard let self else { return }
+                await test()
+            }
+        }
+    }
+
+    @MainActor
+    func test() { }
+}
+
+class C {
+  func foo() {
+    _ = { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}}
+      guard case let self = C() else { return }
+      _ = { [self] in
+        foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      }
     }
   }
 }

@@ -28,7 +28,22 @@ let ignored3: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAva
 
 // Functions without annotations should reflect the minimum deployment target.
 func functionWithoutAvailability() {
-      // expected-note@-1 2{{add @available attribute to enclosing global function}}
+      // expected-note@-1 5{{add @available attribute to enclosing global function}}
+
+  defer {
+    let _: Int = globalFuncAvailableOn10_9()
+    let _: Int = globalFuncAvailableOn51() // expected-error {{'globalFuncAvailableOn51()' is only available in macOS 51 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+
+    if #available(OSX 51, *) {
+      let _: Int = globalFuncAvailableOn10_9()
+      let _: Int = globalFuncAvailableOn51()
+      let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    }
+  }
 
   let _: Int = globalFuncAvailableOn10_9()
 
@@ -45,7 +60,7 @@ func functionAvailableOn51() {
   let _: Int = globalFuncAvailableOn10_9()
   let _: Int = globalFuncAvailableOn51()
 
-  // Nested functions should get their own refinement context.
+  // Nested functions should get their own availability scopes.
   @available(OSX, introduced: 52)
   func innerFunctionAvailableOn52() {
     let _: Int = globalFuncAvailableOn10_9()
@@ -62,6 +77,13 @@ func functionAvailableOn51() {
 var deprecatedGlobalInScriptMode: Int = 5
 
 if #available(OSX 51, *) {
+  let _: Int = globalFuncAvailableOn51()
+  let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+}
+
+// FIXME: This is weird, but it's already accepted. It should probably be diagnosed.
+if #available(*, OSX 51) {
   let _: Int = globalFuncAvailableOn51()
   let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
@@ -114,6 +136,34 @@ func overloadedFunction(_ on1010: Int) {}
 overloadedFunction()
 overloadedFunction(0) // expected-error {{'overloadedFunction' is only available in macOS 51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
+
+@available(OSX, deprecated, introduced: 51)
+func globalFuncDeprecatedAndAvailableOn51() -> Int { return 51 }
+
+@available(OSX, introduced: 51, deprecated: 52)
+func globalFuncAvailableOn51Deprecated52() -> Int { return 51 }
+
+@available(OSX, introduced: 51, obsoleted: 52)
+func globalFuncAvailableOn51Obsoleted52() -> Int { return 51 }
+
+@available(OSX, unavailable, introduced: 51)
+func globalFuncUnavailableAndIntroducedOn51() -> Int { return 51 } // expected-note 2 {{'globalFuncUnavailableAndIntroducedOn51()' has been explicitly marked unavailable here}}
+
+let _ = globalFuncDeprecatedAndAvailableOn51() // expected-error {{'globalFuncDeprecatedAndAvailableOn51()' is only available in macOS 51 or newer}}
+// expected-note@-1 {{add 'if #available' version check}}
+// expected-warning@-2 {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
+let _ = globalFuncAvailableOn51Deprecated52() // expected-error {{'globalFuncAvailableOn51Deprecated52()' is only available in macOS 51 or newer}}
+// expected-note@-1 {{add 'if #available' version check}}
+let _ = globalFuncAvailableOn51Obsoleted52() // expected-error {{'globalFuncAvailableOn51Obsoleted52()' is only available in macOS 51 or newer}}
+// expected-note@-1 {{add 'if #available' version check}}
+let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
+
+if #available(OSX 51, *) {
+  let _ = globalFuncDeprecatedAndAvailableOn51() // expected-warning {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
+  let _ = globalFuncAvailableOn51Deprecated52()
+  let _ = globalFuncAvailableOn51Obsoleted52()
+  let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
+}
 
 // Potentially unavailable methods
 
@@ -223,7 +273,7 @@ protocol BaseProto {
 
   var property: A { get set } // expected-note {{overridden declaration is here}}
 
-  @available(OSX 10.51, *)
+  @available(OSX 51, *)
   var newProperty: A { get set } // expected-note {{overridden declaration is here}}
 
   func method() // expected-note {{overridden declaration is here}}
@@ -232,24 +282,24 @@ protocol BaseProto {
 protocol RefinesBaseProto_AsAvailableOverrides: BaseProto {
   var property: A { get set }
 
-  @available(OSX 10.51, *)
+  @available(OSX 51, *)
   var newProperty: A { get set }
 
   func method()
 }
 
 protocol RefinesBaseProto_LessAvailableOverrides: BaseProto {
-  @available(OSX 10.52, *)
+  @available(OSX 52, *)
   var property: A { get set } // expected-error {{overriding 'property' must be as available as declaration it overrides}}
 
-  @available(OSX 10.52, *)
+  @available(OSX 52, *)
   var newProperty: A { get set } // expected-error {{overriding 'newProperty' must be as available as declaration it overrides}}
 
-  @available(OSX 10.52, *)
+  @available(OSX 52, *)
   func method()  // expected-error {{overriding 'method' must be as available as declaration it overrides}}
 }
 
-@available(OSX 10.52, *)
+@available(OSX 52, *)
 protocol RefinesBaseProto_LessAvailable: BaseProto {
   var property: A { get set }
   var newProperty: A { get set }
@@ -630,7 +680,7 @@ func useEnums() {
         markUsed("WithAvailableByEnumElementPayload")
 
         // For the moment, we do not incorporate enum element availability into 
-        // TRC construction. Perhaps we should?
+        // scope construction. Perhaps we should?
         functionTakingEnumIntroducedOn52(p)  // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
           
           // expected-note@-2 {{add 'if #available' version check}}
@@ -754,7 +804,7 @@ func classViaTypeParameter() {
 // Potentially unavailable class used in declarations
 
 class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
-      // expected-note@-1 6{{add @available attribute to enclosing class}}
+      // expected-note@-1 5{{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 51)
   init() {}
@@ -808,8 +858,7 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
   
   @available(OSX, unavailable)
   func unavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
-    let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType() // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
+    let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType()
   }
 }
 
@@ -875,6 +924,57 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
     @available(OSX, introduced: 51)
     get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     set(newVal) {}
+  }
+}
+
+extension ClassAvailableOn10_9 {
+  class NestedSubWithLimitedMemberAvailability: SuperWithAlwaysAvailableMembers {
+    @available(OSX, introduced: 10.9)
+    override func shouldAlwaysBeAvailableMethod() {}
+
+    @available(OSX, introduced: 10.9)
+    override var shouldAlwaysBeAvailableProperty: Int {
+      get { return 10 }
+      set(newVal) {}
+    }
+
+    override var setterShouldAlwaysBeAvailableProperty: Int {
+      get { return 9 }
+      @available(OSX, introduced: 10.9)
+      set(newVal) {}
+    }
+
+    override var getterShouldAlwaysBeAvailableProperty: Int {
+      @available(OSX, introduced: 10.9)
+      get { return 9 }
+      set(newVal) {}
+    }
+  }
+}
+
+@available(OSX, introduced: 51)
+extension ClassAvailableOn51 {
+  class NestedSubWithLimitedMemberAvailability: SuperWithAlwaysAvailableMembers {
+    @available(OSX, introduced: 51)
+    override func shouldAlwaysBeAvailableMethod() {}
+
+    @available(OSX, introduced: 51)
+    override var shouldAlwaysBeAvailableProperty: Int {
+      get { return 10 }
+      set(newVal) {}
+    }
+
+    override var setterShouldAlwaysBeAvailableProperty: Int {
+      get { return 9 }
+      @available(OSX, introduced: 51)
+      set(newVal) {}
+    }
+
+    override var getterShouldAlwaysBeAvailableProperty: Int {
+      @available(OSX, introduced: 51)
+      get { return 9 }
+      set(newVal) {}
+    }
   }
 }
 
@@ -1119,9 +1219,14 @@ extension ClassToExtend : ProtocolAvailableOn51 {
 }
 
 @available(OSX, introduced: 51)
-extension ClassToExtend { // expected-note {{enclosing scope requires availability of macOS 51 or newer}}
+extension ClassToExtend { // expected-note 2 {{enclosing scope requires availability of macOS 51 or newer}}
   @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func extensionMethod10_9() { }
+
+  struct Nested {
+    @available(OSX, introduced: 10.9) // expected-warning {{instance method cannot be more available than enclosing scope}}
+    func nestedTypeMethod10_9() { }
+  }
 }
 
 func usePotentiallyUnavailableExtension() {
@@ -1195,7 +1300,7 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
   }
 
   if #available(OSX 51, *) {
-    // Similarly do not want '*' to generate a warning in a refined TRC.
+    // Similarly do not want '*' to generate a warning in a refined scope.
     if #available(iOS 8.0, *) {
     }
   }
@@ -1729,8 +1834,16 @@ func funcWithMultipleShortFormAnnotationsForTheSamePlatform() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
+// FIXME: This is weird, but it's already accepted. It should probably be diagnosed.
+@available(iOS 14, *, OSX 51)
+func funcWithWeirdShortFormAvailableOn51() {
+  let _ = ClassWithShortFormAvailableOn51()
+  let _ = ClassWithShortFormAvailableOn54() // expected-error {{'ClassWithShortFormAvailableOn54' is only available in macOS 54 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
+
 func useShortFormAvailable() {
-  // expected-note@-1 4{{add @available attribute to enclosing global function}}
+  // expected-note@-1 5{{add @available attribute to enclosing global function}}
 
   funcWithShortFormAvailableOn10_9()
 
@@ -1747,6 +1860,9 @@ func useShortFormAvailable() {
 
   funcWithMultipleShortFormAnnotationsForTheSamePlatform() // expected-error {{'funcWithMultipleShortFormAnnotationsForTheSamePlatform()' is only available in macOS 53 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
+
+  funcWithWeirdShortFormAvailableOn51() // expected-error {{'funcWithWeirdShortFormAvailableOn51()' is only available in macOS 51 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
 }
 
 // Unavailability takes precedence over availability and is inherited
@@ -1800,4 +1916,31 @@ class StoredPropertiesWithAvailabilityInClosures {
 
     return 0
   }()
+}
+
+struct PropertyObservers {
+  var hasPotentiallyUnavailableObservers: Int {
+    @available(macOS 51, *) // expected-error {{willSet observer for property cannot be marked potentially unavailable with '@available'}}
+    willSet { }
+
+    @available(macOS 51, *) // expected-error {{didSet observer for property cannot be marked potentially unavailable with '@available'}}
+    didSet { }
+  }
+
+  var hasObsoletedObservers: Int {
+    @available(macOS, obsoleted: 10.9) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    willSet { }
+
+    @available(macOS, obsoleted: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    didSet { }
+  }
+
+  var hasSPIAvailableObservers: Int {
+    @_spi_available(macOS, introduced: 10.9) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    willSet { }
+
+    @_spi_available(macOS, introduced: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    didSet { }
+  }
+
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s
 
 // High-level tests that silgen properly emits code for failable and throwing
 // initializers.
@@ -1086,6 +1086,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB2]](
+  // CHECK-NEXT: ignored_use
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]

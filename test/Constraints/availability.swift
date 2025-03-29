@@ -64,3 +64,25 @@ extension Box where T == Int {
   // memberwise initializer.
   _ = Box(value: 42)
 }
+
+// rdar://87403752 - ambiguity with member declared in unavailable extension
+struct HasUnavailableExtesion {
+}
+
+@available(*, unavailable)
+extension HasUnavailableExtesion {
+  static var foo: Self = HasUnavailableExtesion()
+}
+
+func test_contextual_member_with_unavailable_extension() {
+  struct A {
+    static var foo: A = A()
+  }
+
+  struct Test {
+    init(_: A) {}
+    init(_: HasUnavailableExtesion) {}
+  }
+
+  _ = Test(.foo) // Ok `A.foo` since `foo` from `HasUnavailableExtesion` is unavailable
+}

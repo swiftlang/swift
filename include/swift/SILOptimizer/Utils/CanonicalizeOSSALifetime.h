@@ -96,7 +96,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -238,6 +237,8 @@ private:
   /// copies.
   const MaximizeLifetime_t maximizeLifetime;
 
+  SILFunction *function;
+
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
   // before such an access scope is fine regardless.)
@@ -279,8 +280,28 @@ private:
   /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  /// Visited set for general def-use traversal that prevents revisiting values.
-  GraphNodeWorklist<SILValue, 8> defUseWorklist;
+  struct Def {
+    enum Kind {
+      Root,
+      Copy,
+      BorrowedFrom,
+      Reborrow,
+    };
+    const Kind kind;
+    const SILValue value;
+    static Def root(SILValue value) { return {Root, value}; }
+    static Def copy(CopyValueInst *cvi) { return {Copy, cvi}; }
+    static Def borrowedFrom(BorrowedFromInst *bfi) {
+      return {BorrowedFrom, bfi};
+    }
+    static Def reborrow(SILArgument *argument) { return {Reborrow, argument}; }
+
+  private:
+    Def(Kind kind, SILValue value) : kind(kind), value(value) {}
+  };
+
+  /// The defs derived from currentDef whose uses are added to liveness.
+  SmallVector<Def, 8> discoveredDefs;
 
   /// The blocks that were discovered by PrunedLiveness.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
@@ -335,7 +356,7 @@ public:
       DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
       BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis),
+        function(function), accessBlockAnalysis(accessBlockAnalysis),
         deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
@@ -349,9 +370,7 @@ public:
     currentDef = def;
     currentLexicalLifetimeEnds = lexicalLifetimeEnds;
 
-    if (maximizeLifetime || respectsDeinitBarriers()) {
-      liveness->initializeDiscoveredBlocks(&discoveredBlocks);
-    }
+    liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     liveness->initializeDef(getCurrentDef());
   }
 
@@ -480,6 +499,7 @@ private:
                             PrunedLivenessBoundary &boundary);
 
   void extendLivenessToDeadEnds();
+  void extendLexicalLivenessToDeadEnds();
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);

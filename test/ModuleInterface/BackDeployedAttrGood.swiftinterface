@@ -1,0 +1,16 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags:
+
+// RUN: %target-swift-typecheck-module-from-interface(%s) -module-name Test
+// REQUIRES: OS=macosx
+
+// Since the following declarations are only back deployed on iOS, their bodies
+// should be missing in a `.swiftinterface` compiled for macOS
+
+@available(iOS 17.4, *)
+@backDeployed(before: iOS 18.0)
+public func backDeployedFuncOniOSWithoutBody()
+
+@available(iOS 17.4, *)
+@backDeployed(before: iOS 18.0)
+public var backDeployedVarWithoutBody: Int

@@ -38,6 +38,7 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 
   MAP(CChar, "char", false);
   MAP(CWideChar, "wchar_t", false);
+  MAP(CChar8, "char8_t", false);
   MAP(CChar16, "char16_t", false);
   MAP(CChar32, "char32_t", false);
 

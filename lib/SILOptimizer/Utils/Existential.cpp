@@ -119,11 +119,6 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
         if (SingleWrite)
           return nullptr;
         SingleWrite = store;
-        // When we support OSSA here, we need to insert a new copy of the value
-        // before `store` (and make sure that the copy is destroyed when
-        // replacing the apply operand).
-        assert(store->getOwnershipQualifier() ==
-               StoreOwnershipQualifier::Unqualified);
       }
       continue;
     }
@@ -222,13 +217,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -237,7 +232,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
+    OpenedArchetype = cast<ExistentialArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
@@ -278,7 +273,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         auto iter =
             llvm::find_if(ExistentialConformances,
                           [&](const ProtocolConformanceRef &conformance) {
-                            return conformance.getRequirement() == proto;
+                            return conformance.getProtocol() == proto;
                           });
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;
@@ -290,7 +285,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!ConcreteType->isOpenedExistential())
+  if (!isa<ExistentialArchetypeType>(ConcreteType))
     return;
 
   assert(isValid());

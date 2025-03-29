@@ -102,19 +102,21 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_DEFAULT_OVERRIDE_TABLE_NAMES,
+    SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCVBR<16>,  // table offset within the blob
     BCBlob      // map from identifier strings to IDs.
   >;
 
   using OffsetLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCArray<BitOffsetField>
   >;
 
@@ -155,6 +157,8 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
     SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -174,6 +178,14 @@ namespace sil_block {
     SIL_PACK_ELEMENT_GET,
     SIL_PACK_ELEMENT_SET,
     SIL_TYPE_VALUE,
+    SIL_THUNK,
+    SIL_VALUES,
+    SIL_DEBUG_SCOPE,
+    SIL_DEBUG_SCOPE_REF,
+    SIL_SOURCE_LOC,
+    SIL_SOURCE_LOC_REF,
+    SIL_DEBUG_VALUE_DELIMITER,
+    SIL_DEBUG_VALUE,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -236,8 +248,8 @@ namespace sil_block {
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
-    TypeIDField, // ID of associated type
-    DeclIDField, // ID of ProtocolDecl
+    TypeIDField, // ID of requirement subject type
+    TypeIDField, // ID of substituted subject type
     ProtocolConformanceIDField
   >;
 
@@ -262,6 +274,19 @@ namespace sil_block {
 
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
+  >;
+
+  using DefaultOverrideTableLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    DeclIDField,  // ID of ClassDecl
+    SILLinkageField  // Linkage
+    // Default override table entries will be serialized after.
+  >;
+
+  using DefaultOverrideTableEntryLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef(method) + SILDeclRef(original)
   >;
 
   using SILGlobalVarLayout = BCRecordLayout<
@@ -289,6 +314,55 @@ namespace sil_block {
     BCArray<ValueIDField>       // Parameter and result indices
   >;
 
+  using SILDebugScopeRefLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE_REF,
+    ValueIDField
+  >;
+
+  using SILDebugScopeLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE,
+    BCFixed<1>,
+    ValueIDField, /// Parent.
+    ValueIDField, /// InlinedCallSite.
+    ValueIDField, /// SourceLoc Row.
+    ValueIDField, /// Column.
+    ValueIDField, /// FName.
+    TypeIDField,
+    SILTypeCategoryField 
+  >;
+
+  using SILDebugValueLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE,
+
+    SILTypeCategoryField, /// operand type category
+    SILTypeCategoryField, /// debug var type category
+    BCFixed<11>,          /// poison, movableValueDebuginfo, trace,
+                          /// hasDebugVar, isLet, isDenseMapSingleton(two
+                          /// bits), hasSource, hasLoc, hasExpr
+    BCArray<ValueIDField> /// operand info: operand, type, debug var info:
+                          /// name, argno, optional stuff: typeid
+  >;
+
+  using DebugValueDelimiterLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE_DELIMITER
+    >;
+
+  using SourceLocLayout = BCRecordLayout<
+    SIL_SOURCE_LOC,
+    ValueIDField,
+    ValueIDField,
+    ValueIDField,
+    BCFixed<3>, /// LocationKind
+    BCFixed<1> /// Implicit
+  >;
+
+  using SourceLocRefLayout = BCRecordLayout<
+    SIL_SOURCE_LOC_REF,
+    ValueIDField,
+    BCFixed<3>,
+    BCFixed<1> /// Implicit
+  >;
+
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
@@ -311,6 +385,7 @@ namespace sil_block {
                      BCFixed<1>,  // is distributed
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
+                     BCFixed<1>,  // only referenced by debug info
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
@@ -412,6 +487,17 @@ namespace sil_block {
     BCFixed<1>,                   // options
     BCArray<BCFixed<32>>          // operand id and categories.
   >;
+
+  /// A SILInstruction without a result and N operands.
+  using SILValuesLayout = BCRecordLayout<
+    SIL_VALUES,
+    SILInstOpCodeField, // opcode
+    BCArray<BCFixed<32>> // (value, type).
+  >;
+
+  static_assert(sizeof(DeclID) == sizeof(ValueID) &&
+                sizeof(DeclID) == sizeof(TypeID) &&
+                "SILValuesLayout assumes that DeclID is the same as ValueID and TypeID");
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,
@@ -595,6 +681,15 @@ namespace sil_block {
     TypeIDField,          // Value type
     SILTypeCategoryField,
     TypeIDField           // Generic type
+  >;
+
+  using SILThunkLayout = BCRecordLayout<
+    SIL_THUNK,
+    BCFixed<4>, // Kind
+    TypeIDField, // Input Function Type
+    SILTypeCategoryField, // Input Function Value Category
+    ValueIDField, // Input Function Value
+    SubstitutionMapIDField  // Substitution map;
   >;
 
 // clang-format on

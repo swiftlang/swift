@@ -173,13 +173,13 @@ constraints and present the final type checked solution, e.g.:
 
 Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type Variables:
-   ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
+   ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
 Inactive Constraints:
   $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
   (Potential Binding(s): 
-    ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int])
+    ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int])
   (attempting type variable $T0 := Int
     (considering: $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
       (simplification result:
@@ -218,6 +218,26 @@ passing the flag `-Xfrontend -debug-constraints`:
 
     $ swift repl -Xfrontend -debug-constraints
     1> let foo = 1
+
+### Debugging Evaluator Cycles
+
+When triggering code in the type checker, one can by mistake cause a cycle in
+the request evaluator. The error looks as follows:
+
+```
+<unknown>:0: error: circular reference
+file.swift:18:22: note: through reference here
+16 | 
+17 | extension MyType {
+18 |   public static func test() -> MyType { ... }
+   |                      `- note: through reference here
+19 | }
+20 | 
+```
+
+To determine the actual circular request that is occuring, one can pass in the
+flag `-debug-cycles` to the compiler which will cause the compiler to dump out
+the linear chain of requests that led to the cycle.
 
 ## Debugging on SIL Level
 

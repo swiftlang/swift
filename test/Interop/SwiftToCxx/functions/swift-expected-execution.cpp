@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -Xcc -fno-exceptions -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/swift-functions-errors.swift -module-name Functions -Xcc -fno-exceptions -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -typecheck -verify -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -fno-exceptions -o %t/swift-expected-execution.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
 // RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-expected-execution -Xlinker %t/swift-expected-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
@@ -9,11 +9,9 @@
 // RUN: %target-run %t/swift-expected-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: CPU=arm64e
-
-// for experimental feature GenerateBindingsForThrowingFunctionsInCXX:
-// REQUIRES: asserts
 
 #include <cassert>
 #include <cstdio>

@@ -501,7 +501,7 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
-    if (rule.containsUnresolvedSymbols())
+    if (rule.containsNameSymbols())
       return true;
 
     return false;
@@ -611,10 +611,11 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
     if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
 
-    if (!rule.isRedundant() &&
-        !rule.isProtocolTypeAliasRule() &&
-        rule.containsUnresolvedSymbols())
-      result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+    if (!rule.isRedundant()) {
+      if (!rule.isProtocolTypeAliasRule() &&
+          rule.containsNameSymbols())
+        result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+    }
 
     if (rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
@@ -624,12 +625,9 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
         if (property->getKind() == Symbol::Kind::ConcreteConformance)
           result |= GenericSignatureErrorFlags::HasConcreteConformances;
 
-        if (property->hasSubstitutions()) {
-          for (auto t : property->getSubstitutions()) {
-            if (t.containsUnresolvedSymbols())
-              result |= GenericSignatureErrorFlags::HasInvalidRequirements;
-          }
-        }
+        if (property->hasSubstitutions() &&
+            property->containsNameSymbols())
+          result |= GenericSignatureErrorFlags::HasInvalidRequirements;
       }
     }
   }
@@ -661,10 +659,20 @@ RewriteSystem::getMinimizedProtocolRules() const {
     if (!isInMinimizationDomain(proto))
       continue;
 
-    if (rule.isProtocolTypeAliasRule())
+    if (rule.isProtocolTypeAliasRule()) {
+      if (auto property = rule.isPropertyRule()) {
+        if (property->containsNameSymbols())
+          continue;
+      } else if (rule.getRHS().containsNameSymbols()) {
+        continue;
+      }
       rules[proto].TypeAliases.push_back(ruleID);
-    else if (!rule.containsUnresolvedSymbols())
+    } else {
+      if (rule.containsNameSymbols())
+        continue;
+
       rules[proto].Requirements.push_back(ruleID);
+    }
   }
 
   return rules;
@@ -687,7 +695,7 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
     if (rule.isPermanent() ||
         rule.isRedundant() ||
         rule.isConflicting() ||
-        rule.containsUnresolvedSymbols()) {
+        rule.containsNameSymbols()) {
       continue;
     }
 
@@ -793,7 +801,7 @@ void RewriteSystem::verifyMinimizedRules(
         rule.isAnyConformanceRule() &&
         !rule.isRHSSimplified() &&
         !rule.isSubstitutionSimplified() &&
-        !rule.containsUnresolvedSymbols() &&
+        !rule.containsNameSymbols() &&
         !redundantConformances.count(ruleID)) {
       llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";
       dump(llvm::errs());

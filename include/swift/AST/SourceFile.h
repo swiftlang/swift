@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCEFILE_H
 #define SWIFT_AST_SOURCEFILE_H
 
+#include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -20,13 +21,16 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
-
+class ASTScope;
+class AvailabilityScope;
 class PersistentParserState;
+struct SourceFileExtras;
+class Token;
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -48,6 +52,15 @@ enum class RestrictedImportKind {
 
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
+
+/// Language options only for use with a specific SourceFile.
+///
+/// Vended by SourceFile::getLanguageOptions().
+struct SourceFileLangOptions {
+  /// If unset, no value was provided. If a Type, that type is the type of the
+  /// isolation. If set to an empty type, nil was specified explicitly.
+  std::optional<Type> defaultIsolation;
+};
 
 /// A file containing Swift source code.
 ///
@@ -97,6 +110,9 @@ public:
 
     /// Validate the new SwiftSyntax parser diagnostics.
     ValidateNewParserDiagnostics = 1 << 6,
+
+    /// Consider every #if ... #endif region active.
+    PoundIfAllActive = 1 << 7,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -137,10 +153,10 @@ private:
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// The root TypeRefinementContext for this SourceFile.
+  /// The root AvailabilityScope for this SourceFile.
   ///
   /// This is set during type checking.
-  TypeRefinementContext *TRC = nullptr;
+  AvailabilityScope *RootAvailabilityScope = nullptr;
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
@@ -153,12 +169,10 @@ private:
   /// this source file.
   ///
   /// We only collect interface hash for primary input files.
-  std::optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> InterfaceHash;
 
   /// The ID for the memory buffer containing this file's source.
-  ///
-  /// May be -1, to indicate no association with a buffer.
-  int BufferID;
+  unsigned BufferID;
 
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
@@ -244,6 +258,9 @@ private:
   /// The cached computation of which import flags are present in the file.
   /// Storage for \c HasImportsMatchingFlagRequest.
   ImportOptions cachedImportOptions;
+
+  /// Extra information for the source file, allocated as needed.
+  SourceFileExtras *extras = nullptr;
 
   friend ASTContext;
 
@@ -370,7 +387,12 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, std::optional<unsigned> bufferID,
+  /// Retrieve "extra" information associated with this source file, which is
+  /// lazily and separately constructed. Use this for scratch information
+  /// that isn't needed for all source files.
+  SourceFileExtras &getExtras() const;
+
+  SourceFile(ModuleDecl &M, SourceFileKind K, unsigned bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -507,11 +529,6 @@ public:
     MissingImportForMemberDiagnostics[decl].push_back(loc);
   }
 
-  /// Returns true if there is a pending missing import diagnostic for \p decl.
-  bool hasDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl) const {
-    return MissingImportForMemberDiagnostics.contains(decl);
-  }
-
   DelayedMissingImportForMemberDiags
   takeDelayedMissingImportForMemberDiagnostics() {
     DelayedMissingImportForMemberDiags diags;
@@ -554,6 +571,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  /// File level language options.
+  SourceFileLangOptions getLanguageOptions() const;
+
 protected:
   virtual void
   lookupOperatorDirect(Identifier name, OperatorFixity fixity,
@@ -583,6 +603,9 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
@@ -595,11 +618,11 @@ public:
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  std::optional<unsigned> getBufferID() const {
-    if (BufferID == -1)
-      return std::nullopt;
+  unsigned getBufferID() const {
     return BufferID;
   }
+
+  const GeneratedSourceInfo *getGeneratedSourceFileInfo() const;
 
   /// For source files created to hold the source code created by expanding
   /// a macro, this is the AST node that describes the macro expansion.
@@ -647,6 +670,9 @@ public:
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
 
+  /// Retrieve the source text buffer.
+  StringRef getBuffer() const;
+
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
 
@@ -676,7 +702,12 @@ public:
   }
 
   SWIFT_DEBUG_DUMP;
-  void dump(raw_ostream &os, bool parseIfNeeded = false) const;
+  void
+  dump(raw_ostream &os,
+       ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None) const;
+
+  /// Dumps this source file's AST in JSON format to the given output stream.
+  void dumpJSON(raw_ostream &os, ASTDumpMemberLoading memberLoading) const;
 
   /// Pretty-print the contents of this source file.
   ///
@@ -743,33 +774,28 @@ public:
     return ImportedUnderlyingModule->findUnderlyingClangModule();
   }
 
-  /// Get the root refinement context for the file. The root context may be
-  /// null if the context hierarchy has not been built yet. Use
-  /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
-  /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext() const;
+  /// Get the root availability scope for the file. The root scope may be
+  /// null if the scope tree has not been built yet. Use
+  /// `AvailabilityScope::getOrBuildForSourceFile()` to get a built
+  /// root of the tree.
+  AvailabilityScope *getAvailabilityScope() const;
 
-  /// Set the root refinement context for the file.
-  void setTypeRefinementContext(TypeRefinementContext *TRC);
+  /// Set the root availability scope for the file.
+  void setAvailabilityScope(AvailabilityScope *scope);
 
   /// Whether this file can compute an interface hash.
   bool hasInterfaceHash() const {
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  /// Retrieve a fingerprint value that summarizes the declarations in this
-  /// source file.
+  /// Retrieve a fingerprint value that summarizes the top-level declarations in
+  /// this source file.
   ///
   /// Note that the interface hash merely summarizes the top-level declarations
   /// in this file. Type body fingerprints are currently implemented such that
   /// they divert tokens away from the hasher used for fingerprints. That is,
   /// changes to the bodies of types and extensions will not result in a change
-  /// to the interface hash.
-  ///
-  /// In order for the interface hash to be enabled, this source file must be a
-  /// primary and the compiler must be set in incremental mode. If this is not
-  /// the case, this function will try to signal with an assert. It is useful
-  /// to guard requests for the interface hash with \c hasInterfaceHash().
+  /// to the source file interface hash.
   Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
@@ -811,6 +837,22 @@ public:
 
   ArrayRef<TypeDecl *> getLocalTypeDecls() const;
 
+  /// Uniquely identifies a source file without exposing its full file path.
+  ///
+  /// A valid file ID should always be of the format "modulename/filename.swift"
+  struct FileIDStr {
+    StringRef moduleName;
+    StringRef fileName;
+
+    /// Parse a string as a SourceFile::FileIDStr.
+    ///
+    /// Returns \c nullopt if \param fileID could not be parsed.
+    static std::optional<FileIDStr> parse(StringRef fileID);
+
+    /// Whether this SourceFile::FileID matches that of the given \param file.
+    bool matches(const SourceFile *file) const;
+  };
+
 private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
@@ -824,8 +866,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
 }
 
 inline SourceFile &ModuleDecl::getMainSourceFile() const {
-  assert(!Files.empty() && "No files added yet");
-  return *cast<SourceFile>(Files.front());
+  assert(!getFiles().empty() && "No files in module");
+  return *cast<SourceFile>(getFiles().front());
 }
 
 inline FileUnit *ModuleDecl::EntryPointInfoTy::getEntryPointFile() const {

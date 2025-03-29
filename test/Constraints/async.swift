@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift 
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: concurrency
 
@@ -179,4 +179,43 @@ struct OverloadInImplicitAsyncClosure {
   }
 
   init(int: Int) throws { }
+}
+
+@available(SwiftStdlib 5.5, *)
+func test(_: Int) async throws {}
+
+@discardableResult
+@available(SwiftStdlib 5.5, *)
+func test(_: Int) -> String { "" }
+
+@available(SwiftStdlib 5.5, *)
+func compute(_: @escaping () -> Void) {}
+
+@available(SwiftStdlib 5.5, *)
+func test_sync_in_closure_context() {
+  compute {
+    test(42) // Ok (select sync overloads and discards the result)
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+func test_async_calls_in_async_context(v: Int) async {
+  final class Test : Sendable {
+    init(_: Int) {}
+    init(_: Int) async {}
+
+    func test(_: Int) {}
+    func test(_: Int) async {}
+
+    static func test(_: Int) {}
+    static func test(_: Int) async {}
+  }
+
+  // Only implicit `.init` should be accepted with a warning due type-checker previously picking an incorrect overload.
+  // FIXME: This should produce a warning once type-checker performance hacks are removed.
+  _ = Test(v) // Temporary okay
+  _ = Test.init(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
+
+  Test.test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
+  Test(v).test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
 }

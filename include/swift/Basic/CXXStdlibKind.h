@@ -13,6 +13,10 @@
 #ifndef SWIFT_BASIC_CXX_STDLIB_KIND_H
 #define SWIFT_BASIC_CXX_STDLIB_KIND_H
 
+#include "llvm/Support/ErrorHandling.h"
+#include <stdint.h>
+#include <string>
+
 namespace swift {
 
 enum class CXXStdlibKind : uint8_t {

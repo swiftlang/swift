@@ -74,6 +74,9 @@ class ModuleFileSharedCore {
   /// Empty if this module didn't come from an interface file.
   StringRef ModuleInterfacePath;
 
+  /// true if this module interface was serialized relative to the SDK path.
+  bool IsModuleInterfaceSDKRelative = false;
+
   /// The module interface path if this module is adjacent to such an interface
   /// or it was itself compiled from an interface. Empty otherwise.
   StringRef CorrespondingInterfacePath;
@@ -99,6 +102,14 @@ class ModuleFileSharedCore {
 
   /// Module name to use when referenced in clients module interfaces.
   StringRef ModuleExportAsName;
+
+  /// Name to use in public facing diagnostics and documentation.
+  StringRef PublicModuleName;
+
+  /// The version of the Swift compiler used to produce swiftinterface
+  /// this module is based on. This is the most precise version possible
+  /// - a compiler tag or version if this is a development compiler.
+  version::Version SwiftInterfaceCompilerVersion;
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
@@ -181,6 +192,9 @@ private:
   /// modules.
   std::vector<serialization::SearchPath> SearchPaths;
 
+  /// The external macro plugins from the macro definition inside the module.
+  SmallVector<ExternalMacroPlugin, 4> MacroModuleNames;
+
   /// Info for the (lone) imported header for this module.
   struct {
     off_t fileSize;
@@ -227,6 +241,9 @@ private:
 
   /// Protocol conformances referenced by this module.
   ArrayRef<RawBitOffset> Conformances;
+
+  /// Abstract conformances referenced by this module.
+  ArrayRef<RawBitOffset> AbstractConformances;
 
   /// Pack conformances referenced by this module.
   ArrayRef<RawBitOffset> PackConformances;
@@ -401,8 +418,14 @@ private:
     /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
+    /// Whether this module enabled strict memory safety.
+    unsigned StrictMemorySafety : 1;
+
+    /// Whether this module enabled has `ExtensibleEnums` feature enabled.
+    unsigned SupportsExtensibleEnums : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 1;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -584,7 +607,7 @@ public:
 
   /// Outputs information useful for diagnostics to \p out
   void outputDiagnosticInfo(llvm::raw_ostream &os) const;
-  
+
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFileSharedCore();
 
@@ -631,6 +654,17 @@ public:
     return UserModuleVersion;
   }
 
+  /// Get external macro names.
+  ArrayRef<ExternalMacroPlugin> getExternalMacros() const {
+    return MacroModuleNames;
+  }
+
+  /// Get embedded bridging header.
+  std::string getEmbeddedHeader() const {
+    // Don't include the '\0' in the end.
+    return importedHeaderInfo.contents.drop_back().str();
+  }
+
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
   /// resolve it to be absolute to the specified SDK.
   std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
@@ -647,6 +681,10 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
+
+  bool supportsExtensibleEnums() const { return Bits.SupportsExtensibleEnums; }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///
@@ -665,7 +703,8 @@ public:
   /// those non-public dependencies.
   ModuleLoadingBehavior getTransitiveLoadingBehavior(
       const Dependency &dependency, bool importNonPublicDependencies,
-      bool isPartialModule, StringRef packageName, bool forTestable) const;
+      bool isPartialModule, StringRef packageName,
+      bool resolveInPackageModuleDependencies, bool forTestable) const;
 };
 
 template <typename T, typename RawData>

@@ -2,19 +2,19 @@
 /// skipping some function bodies. rdar://82269657
 
 /// Default build mode reading everything
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -target %target-cpu-apple-macos10.10 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES,TRC-FULL
 
 /// Emit-module-separately mode / for LLDB
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies-without-types 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies-without-types 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES,TRC-FULL-NOT
 
 /// InstallAPI mode
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -target %target-cpu-apple-macos10.10 -experimental-skip-non-inlinable-function-bodies 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE,TRC-WITHTYPES-NOT,TRC-FULL-NOT
 
 /// Index build mode
-// RUN: %target-swift-frontend -typecheck -dump-type-refinement-contexts %s -target %target-cpu-apple-macos10.10 -experimental-skip-all-function-bodies 2>&1 \
+// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -target %target-cpu-apple-macos10.10 -experimental-skip-all-function-bodies 2>&1 \
 // RUN:    | %FileCheck %s --check-prefixes TRC-API,TRC-INLINABLE-NOT,TRC-WITHTYPES-NOT,TRC-FULL-NOT
 
 // REQUIRES: OS=macosx

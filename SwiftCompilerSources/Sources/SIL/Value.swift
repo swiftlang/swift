@@ -37,6 +37,8 @@ public protocol Value : AnyObject, CustomStringConvertible {
 
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
   var hasTrivialNonPointerType: Bool { get }
+
+  var isLexical: Bool { get }
 }
 
 public enum Ownership {
@@ -136,6 +138,31 @@ extension Value {
     default:
       fatalError("unsupported ownership")
     }
+  }
+
+  /// Return true if the object type conforms to Escapable.
+  ///
+  /// Note: noescape function types conform to Escapable, use mayEscape instead to exclude them.
+  public var isEscapable: Bool {
+    type.objectType.isEscapable(in: parentFunction)
+  }
+
+  /// Return true only if this value's lifetime is unconstrained by an outer lifetime. Requires all of the following:
+  /// - the object type conforms to Escapable
+  /// - the type is not a noescape function
+  /// - the value is not the direct result of a partial_apply with a noescape (inout_aliasable) capture.
+  public var mayEscape: Bool {
+    if !type.objectType.mayEscape(in: parentFunction) {
+      return false
+    }
+    // A noescape partial_apply has an escaping function type if it has not been promoted to on_stack, but it's value
+    // still cannot "escape" its captures.
+    //
+    // TODO: This would be much more robust if pai.hasNoescapeCapture simply implied !pai.type.isEscapable
+    if let pai = self as? PartialApplyInst {
+      return pai.mayEscape
+    }
+    return true
   }
 
   public var definingInstructionOrTerminator: Instruction? {
@@ -269,6 +296,8 @@ public final class Undef : Value {
   /// Undef has not parent function, therefore the default `hasTrivialNonPointerType` does not work.
   /// Return the conservative default in this case.
   public var hasTrivialNonPointerType: Bool { false }
+
+  public var isLexical: Bool { false }
 }
 
 final class PlaceholderValue : Value {
@@ -277,6 +306,8 @@ final class PlaceholderValue : Value {
   public var parentBlock: BasicBlock {
     fatalError("PlaceholderValue has no defining block")
   }
+
+  public var isLexical: Bool { false }
 
   public var parentFunction: Function { bridged.PlaceholderValue_getParentFunction().function }
 }

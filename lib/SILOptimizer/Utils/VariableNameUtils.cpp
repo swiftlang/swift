@@ -260,7 +260,7 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     }
 
     TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
-      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+      if (isa<StoreBorrowInst>(use->getUser()))
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }
@@ -642,6 +642,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue) ||
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
+        isa<MarkDependenceInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||

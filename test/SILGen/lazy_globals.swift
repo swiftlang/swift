@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library %s | %FileCheck %s
 
 // CHECK: sil private [global_init_once_fn] [ossa] @[[T:.*]]WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK:   alloc_global @$s12lazy_globals1xSiv

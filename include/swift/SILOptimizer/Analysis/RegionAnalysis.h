@@ -36,7 +36,7 @@ static inline bool shouldAbortOnUnknownPatternMatchError() {
   return AbortOnUnknownPatternMatchError;
 }
 
-using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
+using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
 using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
@@ -74,15 +74,15 @@ class BlockPartitionState {
   /// block.
   std::vector<PartitionOp> blockPartitionOps = {};
 
-  TransferringOperandSetFactory &ptrSetFactory;
+  SendingOperandSetFactory &ptrSetFactory;
 
-  TransferringOperandToStateMap &transferringOpToStateMap;
+  SendingOperandToStateMap &sendingOpToStateMap;
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory,
+                      SendingOperandSetFactory &ptrSetFactory,
                       IsolationHistory::Factory &isolationHistoryFactory,
-                      TransferringOperandToStateMap &transferringOpToStateMap);
+                      SendingOperandToStateMap &sendingOpToStateMap);
 
 public:
   bool getLiveness() const { return isLive; }
@@ -295,12 +295,51 @@ private:
   /// into this map
   llvm::DenseMap<RepresentativeValue, TrackableValueState>
       equivalenceClassValuesToState;
+
+  /// The inverse map of equivalenceClassValuesToState.
   llvm::DenseMap<unsigned, RepresentativeValue> stateIndexToEquivalenceClass;
+
+  /// State that the value -> representative computation yields to us.
+  struct UnderlyingTrackedValueInfo {
+    SILValue value;
+
+    /// Only used for addresses.
+    std::optional<ActorIsolation> actorIsolation;
+
+    explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
+
+    UnderlyingTrackedValueInfo() : value(), actorIsolation() {}
+
+    UnderlyingTrackedValueInfo(const UnderlyingTrackedValueInfo &newVal)
+        : value(newVal.value), actorIsolation(newVal.actorIsolation) {}
+
+    UnderlyingTrackedValueInfo &
+    operator=(const UnderlyingTrackedValueInfo &newVal) {
+      value = newVal.value;
+      actorIsolation = newVal.actorIsolation;
+      return *this;
+    }
+
+    UnderlyingTrackedValueInfo(SILValue value,
+                               std::optional<ActorIsolation> actorIsolation)
+        : value(value), actorIsolation(actorIsolation) {}
+
+    operator bool() const { return value; }
+  };
+
+  /// A map from a SILValue to its equivalence class representative.
+  llvm::DenseMap<SILValue, UnderlyingTrackedValueInfo> valueToEquivalenceClass;
 
   SILFunction *fn;
 
 public:
   RegionAnalysisValueMap(SILFunction *fn) : fn(fn) { }
+
+  /// Maps a value to its representative value if one exists. Return an empty
+  /// representative value if we do not find one.
+  SILValue getRepresentative(SILValue value) const {
+    return getUnderlyingTrackedValue(value).value;
+  }
 
   /// Returns the value for this instruction if it isn't a fake "represenative
   /// value" to inject actor isolatedness. Asserts in such a case.
@@ -354,13 +393,36 @@ private:
   /// {TrackableValue(), false}.
   std::pair<TrackableValue, bool>
   initializeTrackableValue(SILValue value, SILIsolationInfo info) const;
+
+  /// A helper function that performs the actual getUnderlyingTrackedValue
+  /// computation that is cached in getUnderlyingTrackedValue(). Please never
+  /// call this directly! Only call it from getUnderlyingTrackedValue.
+  UnderlyingTrackedValueInfo
+  getUnderlyingTrackedValueHelper(SILValue value) const;
+
+  UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) const {
+    // Use try_emplace so we only construct underlying tracked value info on
+    // success and only lookup once in the hash table.
+    auto *self = const_cast<RegionAnalysisValueMap *>(this);
+    auto iter = self->valueToEquivalenceClass.try_emplace(
+        value, UnderlyingTrackedValueInfo());
+
+    // Didn't insert... we have a value!
+    if (!iter.second)
+      return iter.first->getSecond();
+
+    // Otherwise, update with the actual tracked value info.
+    iter.first->getSecond() = getUnderlyingTrackedValueHelper(value);
+
+    // And return the value.
+    return iter.first->getSecond();
+  }
 };
 
 class RegionAnalysisFunctionInfo {
   using BlockPartitionState = regionanalysisimpl::BlockPartitionState;
   using PartitionOpTranslator = regionanalysisimpl::PartitionOpTranslator;
-  using TransferringOperandSetFactory =
-      regionanalysisimpl::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = regionanalysisimpl::SendingOperandSetFactory;
   using BasicBlockData = BasicBlockData<BlockPartitionState>;
 
   llvm::BumpPtrAllocator allocator;
@@ -373,11 +435,11 @@ class RegionAnalysisFunctionInfo {
   // allocator when we allocate everything.
   PartitionOpTranslator *translator;
 
-  TransferringOperandSetFactory ptrSetFactory;
+  SendingOperandSetFactory ptrSetFactory;
 
   IsolationHistory::Factory isolationHistoryFactory;
 
-  TransferringOperandToStateMap transferringOpToStateMap;
+  SendingOperandToStateMap sendingOperandToStateMap;
 
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
@@ -464,7 +526,7 @@ public:
   reverse_range getReverseRange() { return {rbegin(), rend()}; }
   const_reverse_range getReverseRange() const { return {rbegin(), rend()}; }
 
-  TransferringOperandSetFactory &getOperandSetFactory() {
+  SendingOperandSetFactory &getOperandSetFactory() {
     assert(supportedFunction && "Unsupported Function?!");
     return ptrSetFactory;
   }
@@ -479,14 +541,16 @@ public:
     return isolationHistoryFactory;
   }
 
-  TransferringOperandToStateMap &getTransferringOpToStateMap() {
+  SendingOperandToStateMap &getSendingOperandToStateMap() {
     assert(supportedFunction && "Unsupported Function?!");
-    return transferringOpToStateMap;
+    return sendingOperandToStateMap;
   }
 
   bool isClosureCaptured(SILValue value, Operand *op);
 
-  static SILValue getUnderlyingTrackedValue(SILValue value);
+  SILValue getUnderlyingTrackedValue(SILValue value) {
+    return getValueMap().getRepresentative(value);
+  }
 
 private:
   void runDataflow();

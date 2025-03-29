@@ -94,7 +94,7 @@ TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
     if (proto == nullptr)
       return nullptr;
 
-    auto name = Ctx.getIdentifier(node->getChild(1)->getText());
+    auto name = getIdentifier(node->getChild(1)->getText());
     return proto->getAssociatedType(name);
   }
 
@@ -110,10 +110,9 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
 
     StringRef strippedName =
         builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
-    Ctx.TheBuiltinModule->lookupValue(Ctx.getIdentifier(strippedName),
-                                      NLKind::QualifiedLookup,
-                                      decls);
-    
+    Ctx.TheBuiltinModule->lookupValue(getIdentifier(strippedName),
+                                      NLKind::QualifiedLookup, decls);
+
     if (decls.size() == 1 && isa<TypeDecl>(decls[0]))
       return cast<TypeDecl>(decls[0])->getDeclaredInterfaceType();
   }
@@ -155,7 +154,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
     return Type();
 
   // If the declaration is generic, fail.
-  if (auto list = nominalDecl->getGenericParams())
+  if (nominalDecl->isGeneric())
     return Type();
 
   // Imported types can be renamed to be members of other (non-generic)
@@ -256,7 +255,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto definingDecl = opaqueDescriptor->getChild(0);
     auto definingGlobal = Factory.createNode(Node::Kind::Global);
     definingGlobal->addChild(definingDecl, Factory);
-    auto mangling = mangleNode(definingGlobal);
+    auto mangling = mangleNode(definingGlobal, ManglingFlavor);
     if (!mangling.isSuccess())
       return Type();
     auto mangledName = mangling.result();
@@ -305,29 +304,29 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return BoundGenericType::get(nominalDecl, parent, args);
 
+  auto *aliasDecl = cast<TypeAliasDecl>(decl);
+  auto *dc = aliasDecl->getDeclContext();
+
+  SmallVector<Type, 2> subs;
+
   // Combine the substitutions from our parent type with our generic
   // arguments.
-  TypeSubstitutionMap subs;
-  if (parent)
-    subs = parent->getContextSubstitutions(decl->getDeclContext());
-
-  auto *aliasDecl = cast<TypeAliasDecl>(decl);
-
-  auto genericSig = aliasDecl->getGenericSignature();
-  for (unsigned i = 0, e = args.size(); i < e; ++i) {
-    auto origTy = genericSig.getInnermostGenericParams()[i];
-    auto substTy = args[i];
-
-    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
-      substTy;
+  if (dc->isLocalContext()) {
+    for (auto *param : dc->getGenericSignatureOfContext().getGenericParams()) {
+      subs.push_back(param);
+    }
+  } else if (parent) {
+    auto parentSubs = parent->getContextSubstitutionMap(
+        dc).getReplacementTypes();
+    subs.append(parentSubs.begin(), parentSubs.end());
   }
 
-  auto subMap = SubstitutionMap::get(genericSig,
-                                     QueryTypeSubstitutionMap{subs},
-                                     LookUpConformanceInModule());
-  if (!subMap)
-    return Type();
+  auto genericSig = aliasDecl->getGenericSignature();
+  ASSERT(genericSig.getInnermostGenericParams().size() == args.size());
+  subs.append(args.begin(), args.end());
 
+  auto subMap = SubstitutionMap::get(genericSig, subs,
+                                     LookUpConformanceInModule());
   return aliasDecl->getDeclaredInterfaceType().subst(subMap);
 }
 
@@ -348,7 +347,7 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> la
   for (unsigned i : indices(eltTypes)) {
     Identifier label;
     if (!labels[i].empty())
-      label = Ctx.getIdentifier(labels[i]);
+      label = getIdentifier(labels[i]);
     elements.emplace_back(eltTypes[i], label);
   }
 
@@ -408,7 +407,7 @@ Type ASTBuilder::createFunctionType(
     if (!type->isMaterializable())
       return Type();
 
-    auto label = Ctx.getIdentifier(param.getLabel());
+    auto label = getIdentifier(param.getLabel());
     auto flags = param.getFlags();
     auto ownership =
       ParamDecl::getParameterSpecifierForValueOwnership(asValueOwnership(flags.getOwnership()));
@@ -460,6 +459,8 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
+  } else if (extFlags.isNonIsolatedCaller()) {
+    isolation = FunctionTypeIsolation::forNonIsolatedCaller();
   }
 
   auto noescape =
@@ -582,6 +583,8 @@ getCoroutineKind(ImplCoroutineKind kind) {
     return SILCoroutineKind::None;
   case ImplCoroutineKind::YieldOnce:
     return SILCoroutineKind::YieldOnce;
+  case ImplCoroutineKind::YieldOnce2:
+    return SILCoroutineKind::YieldOnce2;
   case ImplCoroutineKind::YieldMany:
     return SILCoroutineKind::YieldMany;
   }
@@ -644,9 +647,9 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
-  auto isolation = SILFunctionTypeIsolation::Unknown;
+  auto isolation = SILFunctionTypeIsolation::forUnknown();
   if (flags.hasErasedIsolation())
-    isolation = SILFunctionTypeIsolation::Erased;
+    isolation = SILFunctionTypeIsolation::forErased();
 
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.
@@ -675,6 +678,10 @@ Type ASTBuilder::createImplFunctionType(
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
     auto options = *getResultOptions(result.getOptions());
+    // We currently set sending result at the function level, but we set sending
+    // result on each result.
+    if (flags.hasSendingResult())
+      options |= SILResultInfo::IsSending;
     funcResults.emplace_back(type, conv, options);
   }
 
@@ -843,6 +850,11 @@ void ASTBuilder::pushGenericParams(ArrayRef<std::pair<unsigned, unsigned>> param
 void ASTBuilder::popGenericParams() {
   ParameterPacks = ParameterPackStack.back();
   ParameterPackStack.pop_back();
+
+  if (!ValueParametersStack.empty()) {
+    ValueParameters = ValueParametersStack.back();
+    ValueParametersStack.pop_back();
+  }
 }
 
 Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
@@ -855,12 +867,23 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
     }
   }
 
+  if (!ValueParameters.empty()) {
+    for (auto tuple : ValueParameters) {
+      auto pair = std::get<std::pair<unsigned, unsigned>>(tuple);
+      auto type = std::get<Type>(tuple);
+
+      if (pair.first == depth && pair.second == index) {
+        return GenericTypeParamType::getValue(depth, index, type, Ctx);
+      }
+    }
+  }
+
   return GenericTypeParamType::getType(depth, index, Ctx);
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base) {
-  auto identifier = Ctx.getIdentifier(member);
+  auto identifier = getIdentifier(member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
       if (Type memberType = archetype->getNestedTypeByName(identifier))
@@ -877,7 +900,7 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
 Type ASTBuilder::createDependentMemberType(StringRef member,
                                            Type base,
                                            ProtocolDecl *protocol) {
-  auto identifier = Ctx.getIdentifier(member);
+  auto identifier = getIdentifier(member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
     if (auto assocType = protocol->getAssociatedType(identifier))
@@ -1031,12 +1054,12 @@ Type ASTBuilder::createArrayType(Type base) {
   return ArraySliceType::get(base);
 }
 
-Type ASTBuilder::createDictionaryType(Type key, Type value) {
-  return DictionaryType::get(key, value);
+Type ASTBuilder::createInlineArrayType(Type count, Type element) {
+  return InlineArrayType::get(count, element);
 }
 
-Type ASTBuilder::createParenType(Type base) {
-  return ParenType::get(Ctx, base);
+Type ASTBuilder::createDictionaryType(Type key, Type value) {
+  return DictionaryType::get(key, value);
 }
 
 Type ASTBuilder::createIntegerType(intptr_t value) {
@@ -1045,6 +1068,11 @@ Type ASTBuilder::createIntegerType(intptr_t value) {
 
 Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
   return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
+}
+
+Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
+  return BuiltinFixedArrayType::get(size->getCanonicalType(),
+                                    element->getCanonicalType());
 }
 
 GenericSignature
@@ -1116,7 +1144,7 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
 
 DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
-    NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+    NotionalDC = ModuleDecl::createEmpty(getIdentifier(".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
   }
   return NotionalDC;
@@ -1195,9 +1223,18 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   // we introduce the parameter packs from the nominal's generic signature.
   ParameterPackStack.push_back(ParameterPacks);
   ParameterPacks.clear();
+
+  ValueParametersStack.push_back(ValueParameters);
+  ValueParameters.clear();
   for (auto *paramTy : baseGenericSig.getGenericParams()) {
     if (paramTy->isParameterPack())
       ParameterPacks.emplace_back(paramTy->getDepth(), paramTy->getIndex());
+
+    if (paramTy->isValue()) {
+      auto pair = std::make_pair(paramTy->getDepth(), paramTy->getIndex());
+      auto tuple = std::make_tuple(pair, paramTy->getValueType());
+      ValueParameters.emplace_back(tuple);
+    }
   }
   SWIFT_DEFER { popGenericParams(); };
 
@@ -1258,7 +1295,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangling = Demangle::mangleNode(node);
+      auto mangling = Demangle::mangleNode(node, ManglingFlavor);
       if (!mangling.isSuccess())
         return nullptr;
       auto mangledName = mangling.result();
@@ -1280,7 +1317,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
                  Demangle::Node::Kind::PrivateDeclName) {
       name = declNameNode->getChild(1)->getText();
       privateDiscriminator =
-        Ctx.getIdentifier(declNameNode->getChild(0)->getText());
+          getIdentifier(declNameNode->getChild(0)->getText());
 
     } else if (declNameNode->getKind() ==
                  Demangle::Node::Kind::RelatedEntityDeclName) {
@@ -1308,14 +1345,14 @@ ASTBuilder::findDeclContext(NodePointer node) {
         return nullptr;
 
       for (auto *module : potentialModules)
-        if (auto typeDecl = findTypeDecl(module, Ctx.getIdentifier(name),
+        if (auto typeDecl = findTypeDecl(module, getIdentifier(name),
                                          privateDiscriminator, node->getKind()))
           return typeDecl;
       return nullptr;
     }
 
     if (auto *dc = findDeclContext(child))
-      if (auto typeDecl = findTypeDecl(dc, Ctx.getIdentifier(name),
+      if (auto typeDecl = findTypeDecl(dc, getIdentifier(name),
                                        privateDiscriminator, node->getKind()))
         return typeDecl;
 
@@ -1514,7 +1551,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                     found);
       break;
     }
-    importer->lookupValue(Ctx.getIdentifier(name), consumer);
+    importer->lookupValue(getIdentifier(name), consumer);
     if (consumer.Result)
       consumer.Result = getAcceptableTypeDeclCandidate(consumer.Result, kind);
     break;
@@ -1523,4 +1560,29 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
   }
 
   return consumer.Result;
+}
+
+Identifier ASTBuilder::getIdentifier(StringRef name) {
+  if (name.size() > 1 && name.front() == '`' && name.back() == '`') {
+    // Raw identifiers have backticks affixed before mangling. We need to
+    // remove those before creating the Identifier for the AST, which doesn't
+    // encode the backticks.
+    std::string fixedName;
+    for (size_t i = 1; i < name.size() - 1; ++i) {
+      unsigned char ch = name[i];
+      // Raw identifiers have the space (U+0020) replaced with a non-breaking
+      // space (U+00A0, UTF-8: 0xC2 0xA0) in their mangling so that parts of
+      // the runtime that use space as a delimiter remain compatible with
+      // these identifiers. Flip it back.
+      if (ch == 0xc2 && i < name.size() - 2 &&
+          (unsigned char)name[i + 1] == 0xa0) {
+        fixedName.push_back(' ');
+        ++i;
+      } else {
+        fixedName.push_back(ch);
+      }
+    }
+    return Ctx.getIdentifier(fixedName);
+  }
+  return Ctx.getIdentifier(name);
 }

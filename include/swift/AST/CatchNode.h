@@ -45,6 +45,11 @@ public:
   /// needs to be inferred.
   Type getExplicitCaughtType(ASTContext &ctx) const;
 
+  /// Returns the explicitly-specified type error that will be caught by this
+  /// catch node, or `nullopt` if it has not yet been computed. This should only
+  /// be used for dumping.
+  std::optional<Type> getCachedExplicitCaughtType(ASTContext &ctx) const;
+
   friend llvm::hash_code hash_value(CatchNode catchNode) {
     using llvm::hash_value;
     return hash_value(catchNode.getOpaqueValue());

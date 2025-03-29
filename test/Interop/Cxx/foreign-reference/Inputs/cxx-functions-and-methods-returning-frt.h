@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 // FRT or SWIFT_SHARED_REFERENCE type
 struct FRTStruct {
@@ -158,28 +159,79 @@ struct
       __attribute__((swift_attr("returns_unretained")));
 };
 
+// A c++ struct not annotated with SWIFT_SHARED_REFERENCE,
+// SWIFT_IMMORTAL_REFERENCE or SWIFT_UNSAFE_REFERENCE
 struct NonFRTStruct {};
+
+// A c++ struct annotated with SWIFT_IMMORTAL_REFERENCE
+struct ImmortalRefStruct {
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")));
+
+// A c++ struct annotated with SWIFT_UNSAFE_REFERENCE
+struct UnsafeRefStruct {
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")))
+__attribute__((swift_attr("unsafe")));
+
+// C++ APIs returning cxx frts (for testing diagnostics)
+struct StructWithAPIsReturningCxxFrt {
+  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt();
+  static FRTStruct *_Nonnull StaticMethodReturningCxxFrtWithAnnotation()
+      __attribute__((swift_attr("returns_retained")));
+};
+
+FRTStruct *_Nonnull global_function_returning_cxx_frt();
+FRTStruct *_Nonnull global_function_returning_cxx_frt_with_annotations()
+    __attribute__((swift_attr("returns_retained")));
+
+// C++ APIs returning non-cxx-frts (for testing diagnostics)
+struct StructWithAPIsReturningNonCxxFrt {
+  static NonFRTStruct *_Nonnull StaticMethodReturningNonCxxFrt();
+  static NonFRTStruct *_Nonnull StaticMethodReturningNonCxxFrtWithAnnotation()
+      __attribute__((swift_attr("returns_retained")));
+};
+
+NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt();
+NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt_with_annotations()
+    __attribute__((swift_attr("returns_retained")));
+
+// C++ APIs returning SWIFT_IMMORTAL_REFERENCE types (for testing diagnostics)
+struct StructWithAPIsReturningImmortalReference {
+  static ImmortalRefStruct *_Nonnull StaticMethodReturningImmortalReference();
+  static ImmortalRefStruct
+      *_Nonnull StaticMethodReturningImmortalReferenceWithAnnotation()
+          __attribute__((swift_attr("returns_retained")));
+};
+
+ImmortalRefStruct *_Nonnull global_function_returning_immortal_reference();
+ImmortalRefStruct
+    *_Nonnull global_function_returning_immortal_reference_with_annotations()
+        __attribute__((swift_attr("returns_retained")));
+
+// C++ APIs returning SWIFT_UNSAFE_REFERENCE types (for testing diagnostics)
+struct StructWithAPIsReturningUnsafeReference {
+  static UnsafeRefStruct *_Nonnull StaticMethodReturningUnsafeReference();
+  static UnsafeRefStruct
+      *_Nonnull StaticMethodReturningUnsafeReferenceWithAnnotation()
+          __attribute__((swift_attr("returns_retained")));
+};
+
+UnsafeRefStruct *_Nonnull global_function_returning_unsafe_reference();
+UnsafeRefStruct
+    *_Nonnull global_function_returning_unsafe_reference_with_annotations()
+        __attribute__((swift_attr("returns_retained")));
 
 // Global/free C++ functions returning non-FRT
 NonFRTStruct *_Nonnull global_function_returning_non_FRT();
-NonFRTStruct
-    *_Nonnull global_function_returning_non_FRT_with_attr_returns_retained()
-        __attribute__((swift_attr("returns_retained")));
-NonFRTStruct
-    *_Nonnull global_function_returning_non_FRT_with_attr_returns_unretained()
-        __attribute__((swift_attr("returns_unretained")));
 NonFRTStruct *_Nonnull global_function_returning_non_FRT_create();
 NonFRTStruct *_Nonnull global_function_returning_non_FRT_copy();
 
 // Struct having static method returning non-FRT
 struct StructWithStaticMethodsReturningNonFRT {
   static NonFRTStruct *_Nonnull StaticMethodReturningNonFRT();
-  static NonFRTStruct
-      *_Nonnull StaticMethodReturningNonFRTWithAttrReturnsRetained()
-          __attribute__((swift_attr("returns_retained")));
-  static NonFRTStruct
-      *_Nonnull StaticMethodReturningNonFRTWithAttrReturnsUnretained()
-          __attribute__((swift_attr("returns_unretained")));
   static NonFRTStruct *_Nonnull StaticMethodReturningNonFRT_create();
   static NonFRTStruct *_Nonnull StaticMethodReturningNonFRT_copy();
 };
@@ -229,3 +281,48 @@ template <typename T>
 FRTStruct
     *_Nonnull global_templated_function_returning_FRT_create_with_attr_returns_unretained(
         T a) __attribute__((swift_attr("returns_unretained")));
+
+template <typename T>
+T global_function_returning_templated_retrun_frt(T);
+
+template <typename T>
+T global_function_returning_templated_retrun_frt_owned(T)
+    __attribute__((swift_attr("returns_retained")));
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retain_FRTOverloadedOperators")))
+__attribute__((swift_attr(
+    "release:release_FRTOverloadedOperators"))) FRTOverloadedOperators {
+
+public:
+  FRTOverloadedOperators *_Nonnull
+  operator+(const FRTOverloadedOperators &other)
+      __attribute__((swift_attr("returns_unretained")));
+  FRTOverloadedOperators *_Nonnull
+  operator-(const FRTOverloadedOperators &other);
+};
+
+FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators();
+
+void retain_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
+void release_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
+
+using FunctionVoidToFRTStruct =
+    std::function<FRTStruct *_Nonnull(void)> __attribute__((
+        swift_attr("returns_retained")));
+
+struct Base {
+public:
+  virtual FRTStruct *_Nonnull VirtualMethodReturningFRTOwned()
+      __attribute__((swift_attr("returns_retained")));
+  virtual FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned()
+      __attribute__((swift_attr("returns_unretained")));
+};
+
+struct Derived : Base {
+public:
+  FRTStruct *_Nonnull VirtualMethodReturningFRTOwned() override
+      __attribute__((swift_attr("returns_retained")));
+  FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned() override
+      __attribute__((swift_attr("returns_unretained")));
+};

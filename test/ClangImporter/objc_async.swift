@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 import Foundation
 import ObjCConcurrency
@@ -137,22 +137,22 @@ func testSendableAttrs(
 
   doSomethingConcurrently {
     print(sendableClass)               // no-error
-    print(nonSendableClass)            // expected-warning{{capture of 'nonSendableClass' with non-sendable type 'NonSendableClass' in a `@Sendable` closure}}
+    print(nonSendableClass)            // expected-warning{{capture of 'nonSendableClass' with non-sendable type 'NonSendableClass' in a '@Sendable' closure}}
 
     print(sendableEnum)                // no-error
-    print(nonSendableEnum)             // expected-warning{{capture of 'nonSendableEnum' with non-sendable type 'NonSendableEnum' in a `@Sendable` closure}}
+    print(nonSendableEnum)             // expected-warning{{capture of 'nonSendableEnum' with non-sendable type 'NonSendableEnum' in a '@Sendable' closure}}
 
     print(sendableOptions)             // no-error
-    print(nonSendableOptions)          // expected-warning{{capture of 'nonSendableOptions' with non-sendable type 'NonSendableOptions' in a `@Sendable` closure}}
+    print(nonSendableOptions)          // expected-warning{{capture of 'nonSendableOptions' with non-sendable type 'NonSendableOptions' in a '@Sendable' closure}}
 
     print(sendableError)               // no-error
     print(nonSendableError)            // no-error--we don't respect `@_nonSendable` on `ns_error_domain` types because all errors are Sendable
 
     print(sendableStringEnum)          // no-error
-    print(nonSendableStringEnum)       // expected-warning{{capture of 'nonSendableStringEnum' with non-sendable type 'NonSendableStringEnum' in a `@Sendable` closure}}
+    print(nonSendableStringEnum)       // expected-warning{{capture of 'nonSendableStringEnum' with non-sendable type 'NonSendableStringEnum' in a '@Sendable' closure}}
 
     print(sendableStringStruct)        // no-error
-    print(nonSendableStringStruct)     // expected-warning{{capture of 'nonSendableStringStruct' with non-sendable type 'NonSendableStringStruct' in a `@Sendable` closure}}
+    print(nonSendableStringStruct)     // expected-warning{{capture of 'nonSendableStringStruct' with non-sendable type 'NonSendableStringStruct' in a '@Sendable' closure}}
   }
 }
 
@@ -298,7 +298,6 @@ class BarFrame: PictureFrame {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrame: NotIsolatedPictureFrame {
-// expected-note@-1 2 {{class 'BazFrame' does not conform to the 'Sendable' protocol}}
   init() {
     super.init(size: 0)
   }
@@ -322,12 +321,10 @@ func check() async {
   _ = await BarFrame()
   _ = await FooFrame()
   _ = await BazFrame()
-  // expected-warning@-1 {{non-sendable result type 'BazFrame' cannot be sent from global actor 'SomeGlobalActor'-isolated context in call to initializer 'init()'; this is an error in the Swift 6 language mode}}
 
   _ = await BarFrame(size: 0)
   _ = await FooFrame(size: 0)
   _ = await BazFrame(size: 0)
-  // expected-warning@-1 {{non-sendable result type 'BazFrame' cannot be sent from global actor 'SomeGlobalActor'-isolated context in call to initializer 'init(size:)'; this is an error in the Swift 6 language mode}}
 }
 
 @available(SwiftStdlib 5.5, *)

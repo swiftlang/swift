@@ -111,12 +111,13 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Refcounting.cpp
     Stdlib.cpp
     StackAllocator.cpp
+    TypeLayoutChecks.cpp
     ${PLATFORM_SOURCES}
 
     # The runtime tests link to internal runtime symbols, which aren't exported
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
-    $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftRuntimeCore${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )

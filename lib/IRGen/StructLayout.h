@@ -285,7 +285,7 @@ private:
   bool IsFixedLayout = true;
   bool IsLoadable = true;
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
-  IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
+  IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakableAndBorrowable;
   IsCopyable_t IsKnownCopyable = IsCopyable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
 public:

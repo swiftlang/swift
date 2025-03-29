@@ -247,13 +247,16 @@ protected:
     if (canSILUseScalarCheckedCastInstructions(B.getModule(),
                                                sourceType, targetType)) {
       emitIndirectConditionalCastWithScalar(
-          B, SwiftMod, loc, inst->getConsumptionKind(), src, sourceType, dest,
+          B, SwiftMod, loc, inst->getIsolatedConformances(),
+          inst->getConsumptionKind(), src, sourceType, dest,
           targetType, succBB, failBB, TrueCount, FalseCount);
       return;
     }
 
     // Otherwise, use the indirect cast.
-    B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(loc,
+                                  inst->getIsolatedConformances(),
+                                  inst->getConsumptionKind(),
                                   src, sourceType,
                                   dest, targetType,
                                   succBB, failBB);
@@ -383,7 +386,7 @@ protected:
       return ParentFunction;
 
     // Clone the function with the substituted type for the debug info.
-    Mangle::GenericSpecializationMangler Mangler(ParentFunction,
+    Mangle::GenericSpecializationMangler Mangler(M.getASTContext(), ParentFunction,
                                                  IsNotSerialized);
     std::string MangledName =
       Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);

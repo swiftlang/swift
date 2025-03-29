@@ -28,6 +28,7 @@ class AsyncTask;
 class DefaultActor;
 class Job;
 class SerialExecutorWitnessTable;
+struct SwiftError;
 class TaskExecutorWitnessTable;
 
 /// An unmanaged reference to a serial executor.
@@ -76,6 +77,10 @@ class SerialExecutorRef {
     /// Executor that may need to participate in complex "same context" checks,
     /// by invoking `isSameExclusiveExecutionContext` when comparing execution contexts.
     ComplexEquality = 0b01,
+    /// Mark this executor as the one used by `Task.startSynchronously`,
+    /// It cannot participate in switching.
+    // TODO: Perhaps make this a generic "cannot switch" rather than start synchronously specific.
+    StartSynchronously = 0b10,
   };
 
   static_assert(static_cast<uintptr_t>(ExecutorKind::Ordinary) == 0);
@@ -98,6 +103,16 @@ public:
   static SerialExecutorRef forDefaultActor(DefaultActor *actor) {
     assert(actor);
     return SerialExecutorRef(actor, 0);
+  }
+
+  static SerialExecutorRef forSynchronousStart() {
+    auto wtable = reinterpret_cast<uintptr_t>(nullptr) |
+                  static_cast<uintptr_t>(ExecutorKind::StartSynchronously);
+    return SerialExecutorRef(nullptr, wtable);
+  }
+  bool isForSynchronousStart() const {
+    return getIdentity() == nullptr &&
+           getExecutorKind() == ExecutorKind::StartSynchronously;
   }
 
   /// Given a pointer to a serial executor and its SerialExecutor
@@ -126,7 +141,7 @@ public:
 
   const char* getIdentityDebugName() const {
     return isMainExecutor() ? " (MainActorExecutor)"
-           : isGeneric()    ? " (GenericExecutor)"
+           : isGeneric()    ? (isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)" : " (GenericExecutor)")
                             : "";
   }
 
@@ -295,6 +310,7 @@ using ThrowingTaskFutureWaitContinuationFunction =
   SWIFT_CC(swiftasync)
   void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
+using DeinitWorkFunction = SWIFT_CC(swift) void(void *);
 
 template <class AsyncSignature>
 class AsyncFunctionPointer;

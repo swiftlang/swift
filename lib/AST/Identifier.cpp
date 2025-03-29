@@ -78,16 +78,10 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
   return OS;
 }
 
-bool Identifier::isOperatorSlow() const {
-  StringRef data = str();
-  auto *s = reinterpret_cast<llvm::UTF8 const *>(data.begin()),
-  *end = reinterpret_cast<llvm::UTF8 const *>(data.end());
-  llvm::UTF32 codePoint;
-  llvm::ConversionResult res =
-    llvm::convertUTF8Sequence(&s, end, &codePoint, llvm::strictConversion);
-  assert(res == llvm::conversionOK && "invalid UTF-8 in identifier?!");
-  (void)res;
-  return !empty() && isOperatorStartCodePoint(codePoint);
+bool Identifier::isOperatorSlow() const { return Lexer::isOperator(str()); }
+
+bool Identifier::mustAlwaysBeEscaped() const {
+  return Lexer::identifierMustAlwaysBeEscaped(str());
 }
 
 int Identifier::compare(Identifier other) const {
@@ -104,6 +98,11 @@ int Identifier::compare(Identifier other) const {
 }
 
 int DeclName::compare(DeclName other) const {
+  // Fast equality comparsion.
+  if (getOpaqueValue() == other.getOpaqueValue())
+    return 0;
+
+
   // Compare base names.
   if (int result = getBaseName().compare(other.getBaseName()))
     return result;
@@ -117,10 +116,13 @@ int DeclName::compare(DeclName other) const {
       return result;
   }
 
-  if (argNames.size() == otherArgNames.size())
-    return 0;
+  if (argNames.size() != otherArgNames.size())
+    return argNames.size() < otherArgNames.size() ? -1 : 1;
 
-  return argNames.size() < otherArgNames.size() ? -1 : 1;
+  // Order based on if it is compound name or not.
+  assert(isSimpleName() != other.isSimpleName() &&
+         "equality should be covered by opaque value comparsion");
+  return isSimpleName() ? -1 : 1;
 }
 
 static bool equals(ArrayRef<Identifier> idents, ArrayRef<StringRef> strings) {

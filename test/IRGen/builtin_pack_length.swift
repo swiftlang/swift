@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name builtins -enable-builtin-module -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module -disable-availability-checking -O | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -enable-builtin-module -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module -target %target-swift-5.9-abi-triple -O | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 

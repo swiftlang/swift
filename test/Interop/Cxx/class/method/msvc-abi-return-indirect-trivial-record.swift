@@ -57,7 +57,7 @@ public func test(_ result: VecStr) -> CInt {
 }
 
 // CHECK: swiftcc i32 @"$s4Test4testys5Int32VSo0014vecstr_yuJCataVF"({{.*}} %[[RESULT:.*]])
-// CHECK: call void @"?begin@?$vec@Vstr@@@@QEBA?AVIt@@XZ"(ptr %[[RESULT]], ptr sret{{.*}}
+// CHECK: call void @"?begin@?$vec@Vstr@@@@QEBA?AVIt@@XZ"(ptr %[[RESULT]], ptr {{.*}} sret{{.*}}
 
 public func passTempForIndirectRetToVoidCall() {
     var lhs = LoadableIntWrapper(value: 2)
@@ -65,7 +65,7 @@ public func passTempForIndirectRetToVoidCall() {
     lhs += rhs
 }
 
-// CHECK: void @"$sSo18LoadableIntWrapperV2peoiyyABz_ABtFZ"(ptr
-// CHECK: %[[OPRESULT:.*]] = alloca %struct.LoadableIntWrapper, align 16
-// CHECK-x86_64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr sret(%struct.LoadableIntWrapper) %[[OPRESULT]], i32
-// CHECK-aarch64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr sret(%struct.LoadableIntWrapper) %[[OPRESULT]], i64
+// CHECK: i32 @"$sSo18LoadableIntWrapperV2peoiyA2Bz_ABtFZ"(ptr
+// CHECK: %[[OPRESULT:.*]] = alloca %TSo18LoadableIntWrapperV, align 4
+// CHECK-x86_64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) %[[OPRESULT]], i32
+// CHECK-aarch64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) %[[OPRESULT]], i64

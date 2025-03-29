@@ -53,6 +53,8 @@ struct HeapObject {
   /// This is always a valid pointer to a metadata object.
   HeapMetadata const *__ptrauth_objc_isa_pointer metadata;
 
+#if !SWIFT_RUNTIME_EMBEDDED
+
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 
 #ifndef __swift__
@@ -70,11 +72,40 @@ struct HeapObject {
   : metadata(newMetadata)
   , refCounts(InlineRefCounts::Immortal)
   { }
+#endif // __swift__
 
+#else // SWIFT_RUNTIME_EMBEDDED
+  uintptr_t embeddedRefcount;
+
+  // Note: The immortal refcount value is also hard-coded in IRGen in
+  // `irgen::emitConstantObject`, and in EmbeddedRuntime.swift.
+#if __POINTER_WIDTH__ == 64
+  static const uintptr_t EmbeddedImmortalRefCount = 0x7fffffffffffffffull;
+#elif __POINTER_WIDTH__ == 32
+  static const uintptr_t EmbeddedImmortalRefCount = 0x7fffffff;
+#elif __POINTER_WIDTH__ == 16
+  static const uintptr_t EmbeddedImmortalRefCount = 0x7fff;
+#endif
+
+#ifndef __swift__
+  HeapObject() = default;
+
+  // Initialize a HeapObject header as appropriate for a newly-allocated object.
+  constexpr HeapObject(HeapMetadata const *newMetadata)
+      : metadata(newMetadata), embeddedRefcount(1) {}
+
+  // Initialize a HeapObject header for an immortal object
+  constexpr HeapObject(HeapMetadata const *newMetadata,
+                       InlineRefCounts::Immortal_t immortal)
+      : metadata(newMetadata), embeddedRefcount(EmbeddedImmortalRefCount) {}
+#endif // __swift__
+
+#endif // SWIFT_RUNTIME_EMBEDDED
+
+#ifndef __swift__
 #ifndef NDEBUG
   void dump() const SWIFT_USED;
 #endif
-
 #endif // __swift__
 };
 

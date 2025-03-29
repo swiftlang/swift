@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -performance-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -performance-constant-propagation | %FileCheck %s
 
 sil_stage canonical
 

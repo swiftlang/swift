@@ -69,7 +69,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   assert(!cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal())->hasCases());
 
   SmallVector<ASTNode, 1> statements;
-  SmallVector<ASTNode, 0> cases;
+  SmallVector<CaseStmt *, 0> cases;
 
   // switch (a, b) { }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
@@ -163,7 +163,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   unsigned elementCount = 0;
 
   // For each enum element, generate a case statement matching a pair containing
@@ -410,6 +410,7 @@ deriveEquatable_eq(
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
+  eqDecl->setSynthesized();
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
@@ -427,7 +428,7 @@ deriveEquatable_eq(
     return nullptr;
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, eqDecl);
+  addNonIsolatedToSynthesized(derived, eqDecl);
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
@@ -546,12 +547,13 @@ deriveHashable_hashInto(
       /*Async=*/false,
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
+  hashDecl->setSynthesized();
   hashDecl->setBodySynthesizer(bodySynthesizer);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
   // The derived hash(into:) for an actor must be non-isolated.
-  if (!addNonIsolatedToSynthesized(derived.Nominal, hashDecl) &&
+  if (!addNonIsolatedToSynthesized(derived, hashDecl) &&
       derived.Nominal->isActor())
     hashDecl->getAttrs().add(
         new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
@@ -685,7 +687,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
   unsigned index = 0;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
 
   // For each enum element, generate a case statement that binds the associated
   // values so that they can be fed to the hasher.
@@ -827,23 +829,20 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto substitutions = SubstitutionMap::get(
       hashFunc->getGenericSignature(),
       [&](SubstitutableType *dependentType) {
-        if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
-          if (gp->getDepth() == 0 && gp->getIndex() == 0)
-            return selfType;
-        }
-
-        return Type(dependentType);
+        auto gp = cast<GenericTypeParamType>(dependentType);
+        ASSERT(gp->getDepth() == 0 && gp->getIndex() == 0);
+        return selfType;
       },
       LookUpConformanceInModule());
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
 
-  Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
+  auto *hashFuncType = hashFunc->getInterfaceType()->castTo<GenericFunctionType>()
+      ->substGenericArgs(substitutions);
   auto hashExpr = new (C) DeclRefExpr(hashFuncRef, DeclNameLoc(),
                                       /*implicit*/ true,
                                       AccessSemantics::Ordinary,
                                       hashFuncType);
-  Type hashFuncResultType =
-      hashFuncType->castTo<AnyFunctionType>()->getResult();
+  Type hashFuncResultType = hashFuncType->getResult();
   auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
   auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
@@ -911,7 +910,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
 
   // The derived hashValue of an actor must be nonisolated.
-  if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&
+  if (!addNonIsolatedToSynthesized(derived, hashValueDecl) &&
       derived.Nominal->isActor())
     hashValueDecl->getAttrs().add(
         new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));

@@ -28,13 +28,11 @@ function(_add_host_swift_compile_options name)
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
   endif()
 
-  # Same for backtracing
-  if (SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
-    target_compile_options(${name} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>")
-  endif()
+  # Emitting module seprately doesn't give us any benefit.
+  target_compile_options(${name} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:-no-emit-module-separately-wmo>")
 
-   if(SWIFT_ANALYZE_CODE_COVERAGE)
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
      set(_cov_flags $<$<COMPILE_LANGUAGE:Swift>:-profile-generate -profile-coverage-mapping>)
      target_compile_options(${name} PRIVATE ${_cov_flags})
      target_link_options(${name} PRIVATE ${_cov_flags})
@@ -69,7 +67,6 @@ function(_add_host_swift_compile_options name)
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-tools-directory;${tools_path};>)
     endif()
   endif()
-  _add_host_variant_swift_sanitizer_flags(${name})
 
   target_compile_options(${name} PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
@@ -79,6 +76,39 @@ function(_add_host_swift_compile_options name)
     target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -UNDEBUG>")
   else()
     target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -DNDEBUG>")
+  endif()
+endfunction()
+
+# Set compile options for C/C++ interop
+function(_set_swift_cxx_interop_options name)
+  target_compile_options(${name} PRIVATE
+    "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
+
+    # FIXME: Needed to work around an availability issue with CxxStdlib
+    "SHELL: -Xfrontend -disable-target-os-checking"
+
+    # Necessary to avoid treating IBOutlet and IBAction as keywords
+    "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+  )
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    target_compile_options(${name} PRIVATE
+      # Make 'offsetof()' a const value.
+      "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
+      # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+      "SHELL:-Xcc -Xclang -Xcc -fmodule-format=raw"
+    )
+  endif()
+
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    target_compile_options(${name} PRIVATE
+      "SHELL:-Xfrontend -enable-experimental-cxx-interop"
+    )
+  else()
+    target_compile_options(${name} PRIVATE
+      "-cxx-interoperability-mode=default"
+    )
   endif()
 endfunction()
 
@@ -171,6 +201,9 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
+# CXX_INTEROP
+#   Use C++ interop.
+#
 # EMIT_MODULE
 #   Emit '.swiftmodule' to
 #
@@ -196,6 +229,7 @@ function(add_pure_swift_host_library name)
   set(options
         SHARED
         STATIC
+        CXX_INTEROP
         EMIT_MODULE)
   set(single_parameter_options
         PACKAGE_NAME)
@@ -223,6 +257,9 @@ function(add_pure_swift_host_library name)
   add_library(${name} ${libkind} ${APSHL_SOURCES})
   _add_host_swift_compile_options(${name})
   _set_pure_swift_package_options(${name} "${APSHL_PACKAGE_NAME}")
+  if(APSHL_CXX_INTEROP)
+    _set_swift_cxx_interop_options(${name})
+  endif()
 
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)

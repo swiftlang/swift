@@ -4,7 +4,7 @@
 // RUN: %empty-directory(%t/Modules)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -o %t/Modules/MyModule.swiftmodule -module-name MyModule %t/MyModule.swift  -disable-availability-checking
+// RUN: %target-swift-frontend -emit-module -o %t/Modules/MyModule.swiftmodule -module-name MyModule %t/MyModule.swift  -target %target-swift-5.1-abi-triple
 
 // RUN: %sourcekitd-test -req=cursor -pos=1:15 %t/MyModule.swift -- %t/MyModule.swift -target %target-triple  | %FileCheck -check-prefix=ACTOR %s
 // RUN: %sourcekitd-test -req=cursor -pos=2:15 %t/MyModule.swift -- %t/MyModule.swift -target %target-triple  | %FileCheck -check-prefix=FUNC %s

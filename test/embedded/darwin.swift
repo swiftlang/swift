@@ -8,10 +8,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
-
-// The Darwin SDK overlay module in the macOS SDK cannot be imported in
-// embedded Swift mode.
-// XFAIL: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 import Darwin
 

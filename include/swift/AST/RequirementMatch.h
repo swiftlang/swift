@@ -103,7 +103,7 @@ enum class MatchKind : uint8_t {
   EnumCaseWithAssociatedValues,
 
   /// The witness did not match due to _const/non-_const differences.
-  CompileTimeConstConflict,
+  CompileTimeLiteralConflict,
 };
 
 // Describes the kind of optional adjustment performed when
@@ -255,19 +255,19 @@ struct RequirementCheck {
 
   /// The required availability, if the check failed due to the
   /// witness being less available than the requirement.
-  AvailabilityContext RequiredAvailability;
+  AvailabilityRange RequiredAvailability;
 
   RequirementCheck(CheckKind kind)
-    : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-      RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
+      : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
+        RequiredAvailability(AvailabilityRange::alwaysAvailable()) {}
 
   RequirementCheck(CheckKind kind, AccessScope requiredAccessScope)
-    : Kind(kind), RequiredAccessScope(requiredAccessScope),
-      RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
+      : Kind(kind), RequiredAccessScope(requiredAccessScope),
+        RequiredAvailability(AvailabilityRange::alwaysAvailable()) {}
 
-  RequirementCheck(CheckKind kind, AvailabilityContext requiredAvailability)
-    : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-      RequiredAvailability(requiredAvailability) { }
+  RequirementCheck(CheckKind kind, AvailabilityRange requiredAvailability)
+      : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
+        RequiredAvailability(requiredAvailability) {}
 };
 
 
@@ -357,7 +357,7 @@ struct RequirementMatch {
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
-    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::CompileTimeLiteralConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:
@@ -394,7 +394,7 @@ struct RequirementMatch {
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
-    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::CompileTimeLiteralConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:
@@ -430,7 +430,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::StaticNonStaticConflict:
-    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::CompileTimeLiteralConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:

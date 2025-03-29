@@ -69,11 +69,10 @@ bb0:
 // CHECK:      {{musttail call swifttailcc|tail call swiftcc}} void @swift_continuation_await(ptr %0)
 // CHECK-NEXT: ret void
 
-// CHECK: define {{.*}} void @async_continuation.0(ptr %0, ptr %1){{.*}}!dbg ![[DBG:[0-9]+]]
+// CHECK: define {{.*}} void @async_continuation.0(ptr %0, ptr %1)
 // CHECK-NOT: define
 // CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(ptr swiftasync %1)
 // CHECK-NEXT:  ret void
-// CHECK: ![[DBG]] = distinct !DISubprogram(linkageName: "async_continuation"
 
 sil @async_continuation : $@async () -> () {
 entry:

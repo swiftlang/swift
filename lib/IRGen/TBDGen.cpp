@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -89,15 +88,18 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
 getAllMovedPlatformVersions(Decl *D) {
+  StringRef Name = D->getDeclContext()->getParentModule()->getName().str();
+
   std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.has_value()) {
+      if (Active.has_value() && Active->LinkerModuleName != Name) {
         Results.push_back(*Active);
       }
     }
   }
+
   return Results;
 }
 
@@ -325,16 +327,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     if (*IntroVer >= Ver.Version)
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
-    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
+    auto It = previousInstallNameMap->find(Ver.LinkerModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
@@ -455,7 +457,7 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(VD->getASTContext());
   addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
             SymbolFlags::Data);
 }
@@ -485,7 +487,7 @@ void TBDGenVisitor::addObjCMethod(AbstractFunctionDecl *AFD) {
 
 void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
                                             ValueDecl *requirementDecl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(requirementDecl->getASTContext());
 
   std::string decorated = Mangler.mangleWitnessThunk(C, requirementDecl);
   // FIXME: We should have a SILDeclRef SymbolSource for this.
@@ -497,6 +499,11 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
       if (AFD->hasAsync())
         addSymbol(decorated + "Tu", SymbolSource::forUnknown(),
                   SymbolFlags::Text);
+    auto *accessor = dyn_cast<AccessorDecl>(PWT);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+      addSymbol(decorated + "Twc", SymbolSource::forUnknown(),
+                SymbolFlags::Text);
   }
 }
 
@@ -771,20 +778,18 @@ private:
     std::string introduced, obsoleted;
     bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
-    for (auto *attr : decl->getAttrs()) {
-      if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->Platform == PlatformKind::none) {
-          hasFallbackUnavailability = ava->isUnconditionallyUnavailable();
-          continue;
-        }
-        if (ava->Platform != platform)
-          continue;
-        unavailable = ava->isUnconditionallyUnavailable();
-        if (ava->Introduced)
-          introduced = ava->Introduced->getAsString();
-        if (ava->Obsoleted)
-          obsoleted = ava->Obsoleted->getAsString();
+    for (auto attr : decl->getSemanticAvailableAttrs()) {
+      if (!attr.isPlatformSpecific()) {
+        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
+        continue;
       }
+      if (attr.getPlatform() != platform)
+        continue;
+      unavailable = attr.isUnconditionallyUnavailable();
+      if (attr.getIntroduced())
+        introduced = attr.getIntroduced()->getAsString();
+      if (attr.getObsoleted())
+        obsoleted = attr.getObsoleted()->getAsString();
     }
     return {introduced, obsoleted,
             unavailable.value_or(hasFallbackUnavailability)};

@@ -47,6 +47,10 @@
 namespace swift {
 
 class AliasAnalysis;
+class SILCombineCanonicalize;
+namespace test {
+struct SILCombinerProcessInstruction;
+}
 
 /// This is a class which maintains the state of the combiner and simplifies
 /// many operations such as removing/adding instructions and syncing them with
@@ -131,6 +135,8 @@ public:
               bool removeCondFails, bool enableCopyPropagation);
 
   bool runOnFunction(SILFunction &F);
+
+  bool shouldRemoveCondFail(CondFailInst &);
 
   void clear() {
     Iteration = 0;
@@ -240,9 +246,7 @@ public:
 
   /// Instruction visitors.
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
-  SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
-  SILInstruction *visitTryApplyInst(TryApplyInst *AI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
@@ -252,20 +256,15 @@ public:
   // NOTE: The load optimized in this method is a load [trivial].
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
-  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
-  SILInstruction *visitUnconditionalCheckedCastInst(
-                    UnconditionalCheckedCastInst *UCCI);
   SILInstruction *
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
@@ -282,7 +281,6 @@ public:
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
-  SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
@@ -292,7 +290,7 @@ public:
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
-  SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
+  SILInstruction *visitMarkDependenceAddrInst(MarkDependenceAddrInst *MDI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
@@ -306,11 +304,12 @@ public:
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
-#define PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_SILCOMBINE_PASS(INST) \
+#define INSTRUCTION_SIMPLIFICATION(INST) \
   SILInstruction *visit##INST(INST *);
-#include "swift/SILOptimizer/PassManager/Passes.def"
+#define INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(INST) \
+  SILInstruction *visit##INST(INST *);          \
+  SILInstruction *legacyVisit##INST(INST *);
+#include "Simplifications.def"
 
   /// Instruction visitor helpers.
 
@@ -368,8 +367,6 @@ public:
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
 
-  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
-
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 
 private:
@@ -417,6 +414,11 @@ private:
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
+
+  void processInstruction(SILInstruction *instruction,
+                          SILCombineCanonicalize &scCanonicalize,
+                          bool &MadeChange);
+  friend test::SILCombinerProcessInstruction;
 
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.

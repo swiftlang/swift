@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 @_semantics("arc.immortal")
@@ -35,9 +36,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     hasher.combine(ObjectIdentifier(self))
   }
 
+  public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
+
+  public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
   
@@ -54,7 +59,21 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
   /// and this outside its module
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
-  public var loweredFunctionType: BridgedASTType { bridged.getLoweredFunctionTypeInContext() }
+  public var loweredFunctionType: CanonicalType {
+    CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
+  }
+
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
+  }
+
+  public var forwardingSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getForwardingSubstitutionMap())
+  }
+
+  public func mapTypeIntoContext(_ type: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: bridged.mapTypeIntoContext(type.bridged))
+  }
 
   /// Returns true if the function is a definition and not only an external declaration.
   ///
@@ -159,8 +178,26 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
-  public func canBeInlinedIntoCaller(_ kind: SerializedKind) -> Bool {
-    bridged.canBeInlinedIntoCaller(serializedKindBridged(kind))
+  public func canBeInlinedIntoCaller(withSerializedKind callerSerializedKind: SerializedKind) -> Bool {
+    switch serializedKind {
+    // If both callee and caller are not_serialized, the callee can be inlined into the caller
+    // during SIL inlining passes even if it (and the caller) might contain private symbols.
+    case .notSerialized:
+      return callerSerializedKind == .notSerialized;
+
+    // If Package-CMO is enabled, we serialize package, public, and @usableFromInline decls as
+    // [serialized_for_package].
+    // Their bodies must not, however, leak into @inlinable functons (that are [serialized])
+    // since they are inlined outside of their defining module.
+    //
+    // If this callee is [serialized_for_package], the caller must be either non-serialized
+    // or [serialized_for_package] for this callee's body to be inlined into the caller.
+    // It can however be referenced by [serialized] caller.
+    case .serializedForPackage:
+      return callerSerializedKind != .serialized;
+    case .serialized:
+      return true;
+    }
   }
 
   public func hasValidLinkageForFragileRef(_ kind: SerializedKind) -> Bool {
@@ -233,6 +270,29 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         fatalError()
     }
   }
+
+  public enum SourceFileKind {
+    case library         /// A normal .swift file.
+    case main            /// A .swift file that can have top-level code.
+    case sil             /// Came from a .sil file.
+    case interface       /// Came from a .swiftinterface file, representing another module.
+    case macroExpansion  /// Came from a macro expansion.
+    case defaultArgument /// Came from default argument at caller side
+  };
+
+  public var sourceFileKind: SourceFileKind? {
+    switch bridged.getSourceFileKind() {
+    case .Library: return .library
+    case .Main: return .main
+    case .SIL: return .sil
+    case .Interface: return .interface
+    case .MacroExpansion: return .macroExpansion
+    case .DefaultArgument: return .defaultArgument
+    case .None: return nil
+    @unknown default:
+      fatalError("unknown enum case")
+    }
+  }
 }
 
 public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
@@ -274,10 +334,15 @@ extension Function {
 
   public var hasSelfArgument: Bool { argumentConventions.selfIndex != nil }
 
-  public var selfArgumentIndex: Int { argumentConventions.selfIndex! }
+  public var selfArgumentIndex: Int? { argumentConventions.selfIndex }
 
-  public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
-  
+  public var selfArgument: FunctionArgument? {
+    if let selfArgIdx = selfArgumentIndex {
+      return arguments[selfArgIdx]
+    }
+    return nil
+  }
+
   public var dynamicSelfMetadata: FunctionArgument? {
     if bridged.hasDynamicSelfMetadata() {
       return arguments.last!

@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=apply | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=apply | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECKONONE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=apply | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECKO
 
 // REQUIRES: swift_in_compiler
 
@@ -8,9 +9,21 @@ import Builtin
 import Swift
 import SwiftShims
 
-class Bar {
+protocol P {}
+
+class Bar: P {
   init()
   func foo() -> Int
+}
+
+class Derived: Bar {}
+
+struct S: P {
+  var x: Int
+}
+
+struct GenS<T> {
+  var x: Int
 }
 
 sil @cl : $@convention(thin) () -> Int
@@ -44,5 +57,111 @@ sil @bar_foo : $@convention(method) (@guaranteed Bar) -> Int
 
 sil_vtable Bar {
   #Bar.foo: @bar_foo
+}
+
+sil @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+sil @useGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
+sil @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> GenS<τ_0_0>
+
+// CHECK-LABEL: sil [ossa] @replace_archetype :
+// CHECKO:        [[E:%.*]] = init_existential_addr %0
+// CHECKO-DAG:    [[C:%.*]] = unchecked_addr_cast [[E]] to $*S
+// CHECKO-DAG:    [[M:%.*]] = metatype $@thick S.Type
+// CHECKO:        = apply %{{[0-9]+}}<S>([[C]], [[M]], %1)
+// CHECKONONE:    apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'replace_archetype'
+sil [ossa] @replace_archetype : $@convention(thin) (Int) -> @out any P {
+bb0(%0 : $*any P, %1 : $Int):
+  %2 = metatype $@thick S.Type
+  %3 = init_existential_metatype %2, $@thick any P.Type
+  %4 = open_existential_metatype %3 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %6 = function_ref @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+  %7 = init_existential_addr %0, $@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self
+  %8 = apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%7, %4, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_archetype_unknown_concrete_type1 :
+// CHECK:         apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'dont_replace_archetype_unknown_concrete_type1'
+sil [ossa] @dont_replace_archetype_unknown_concrete_type1 : $@convention(thin) (Int, @thick any P.Type) -> @out any P {
+bb0(%0 : $*any P, %1 : $Int, %2 : $@thick any P.Type):
+  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %6 = function_ref @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+  %7 = init_existential_addr %0, $@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self
+  %8 = apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%7, %4, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_archetype_unknown_concrete_type2 :
+// CHECK:         apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'dont_replace_archetype_unknown_concrete_type2'
+sil [ossa] @dont_replace_archetype_unknown_concrete_type2 : $@convention(thin) (Int, @thick Bar.Type) -> @out any P {
+bb0(%0 : $*any P, %1 : $Int, %2 : $@thick Bar.Type):
+  %3 = init_existential_metatype %2, $@thick any P.Type
+  %4 = open_existential_metatype %3 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %6 = function_ref @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+  %7 = init_existential_addr %0, $@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self
+  %8 = apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%7, %4, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type, Int) -> @out τ_0_0
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_embedded_archetype :
+// CHECK:         apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'dont_replace_embedded_archetype'
+sil [ossa] @dont_replace_embedded_archetype : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = metatype $@thick S.Type
+  %3 = init_existential_metatype %2, $@thick any P.Type
+  %4 = open_existential_metatype %3 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %5 = struct $GenS<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self> (%0)
+  %6 = function_ref @useGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
+  %8 = apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (GenS<τ_0_0>) -> ()
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_returned_embedded_archetype :
+// CHECK:         apply %{{[0-9]+}}<@opened
+// CHECK:       } // end sil function 'dont_replace_returned_embedded_archetype'
+sil [ossa] @dont_replace_returned_embedded_archetype : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = metatype $@thick S.Type
+  %3 = init_existential_metatype %2, $@thick any P.Type
+  %4 = open_existential_metatype %3 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %5 = struct $GenS<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self> (%0)
+  %6 = function_ref @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> GenS<τ_0_0>
+  %8 = apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> GenS<τ_0_0>
+  %11 = tuple ()
+  return %11
+}
+
+sil [_semantics "array.conditional_cast"] @cast_int_array : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+sil [_semantics "array.conditional_cast"] @cast_any_int_array : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
+
+// CHECK-LABEL: sil [ossa] @remove_array_cast :
+// CHECK:         %1 = copy_value %0
+// CHECK:         %2 = enum $Optional<Array<Int>>, #Optional.some!enumelt, %1
+// CHECK:         return %2
+// CHECK:       } // end sil function 'remove_array_cast'
+sil [ossa] @remove_array_cast : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>> {
+bb0(%0 : @guaranteed $Array<Int>):
+  %1 = function_ref @cast_int_array : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_array_cast :
+// CHECK:         %2 = apply
+// CHECK:         return %2
+// CHECK:       } // end sil function 'dont_remove_array_cast'
+sil [ossa] @dont_remove_array_cast : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>> {
+bb0(%0 : @guaranteed $Array<Any>):
+  %1 = function_ref @cast_any_int_array : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
+  return %2
 }
 

@@ -88,6 +88,7 @@ fileprivate import FileprivateLib
 // expected-note@-1 2 {{generic struct 'FileprivateImportWrapper' imported as 'fileprivate' from 'FileprivateLib' here}}
 // expected-note@-2 2 {{initializer 'init(wrappedValue:)' imported as 'fileprivate' from 'FileprivateLib' here}}
 // expected-note@-3 2 {{protocol 'FileprivateImportProto' imported as 'fileprivate' from 'FileprivateLib' here}}
+// expected-note@-4 2 {{property 'wrappedValue' imported as 'fileprivate' from 'FileprivateLib' here}}
 
 private import PrivateLib
 // expected-note@-1 10 {{struct 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
@@ -128,6 +129,7 @@ public struct GenericType<T, U> {}
 
   @FileprivateImportWrapper // expected-error {{initializer 'init(wrappedValue:)' is fileprivate and cannot be referenced from an '@inlinable' function}}
   // expected-error @-1 {{generic struct 'FileprivateImportWrapper' is fileprivate and cannot be referenced from an '@inlinable' function}}
+  // expected-error @-2 {{property 'wrappedValue' is fileprivate and cannot be referenced from an '@inlinable' function}}
   var wrappedFileprivate: PublicImportType
 
   let _: GenericType<PublicImportType, PublicImportType>
@@ -168,6 +170,7 @@ public struct GenericType<T, U> {}
 
   @FileprivateImportWrapper // expected-error {{initializer 'init(wrappedValue:)' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
   // expected-error @-1 {{generic struct 'FileprivateImportWrapper' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+  // expected-error @-2 {{property 'wrappedValue' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
   var wrappedFileprivate: PublicImportType
 
   let _: GenericType<PublicImportType, PublicImportType>

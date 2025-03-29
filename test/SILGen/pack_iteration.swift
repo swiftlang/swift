@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name pack_iteration %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name pack_iteration %s | %FileCheck %s
 
 //////////////////
 // Declarations //

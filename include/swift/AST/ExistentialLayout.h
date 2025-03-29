@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the ExistentialLayout struct.
+// The ExistentialLayout struct describes the in-memory layout of an existential
+// type.
+//
+// It flattens and canonicalizes protocol compositions, and also expands defaults
+// for invertible protocols.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,7 +37,6 @@ struct ExistentialLayout {
     hasExplicitAnyObject = false;
     containsObjCProtocol = false;
     containsSwiftProtocol = false;
-    containsParameterized = false;
     representsAnyObject = false;
   }
 
@@ -52,9 +55,6 @@ struct ExistentialLayout {
 
   /// Whether any protocol members require a witness table.
   bool containsSwiftProtocol : 1;
-
-  /// Whether any protocol members are parameterized.s
-  bool containsParameterized : 1;
 
   /// Whether this layout is the canonical layout for plain-old 'AnyObject'.
   bool representsAnyObject : 1;
@@ -105,14 +105,18 @@ struct ExistentialLayout {
   /// calling this on a temporary is likely to be incorrect.
   ArrayRef<ProtocolDecl*> getProtocols() const && = delete;
 
+  ArrayRef<ParameterizedProtocolType *> getParameterizedProtocols() const & {
+    return parameterized;
+  }
+  /// The returned ArrayRef points to internal storage, so
+  /// calling this on a temporary is likely to be incorrect.
+  ArrayRef<ProtocolDecl*> getParameterizedProtocols() const && = delete;
+
   LayoutConstraint getLayoutConstraint() const;
 
 private:
   SmallVector<ProtocolDecl *, 4> protocols;
-
-  /// Zero or more primary associated type requirements from a
-  /// ParameterizedProtocolType
-  ArrayRef<Type> sameTypeRequirements;
+  SmallVector<ParameterizedProtocolType *, 4> parameterized;
 };
 
 }

@@ -21,9 +21,10 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "DerivedConformances.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
@@ -331,8 +332,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -626,8 +626,7 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
     if (auto *parentDecl = classDecl->getInnermostDeclWithAvailability()) {
       asAvailableAs.push_back(parentDecl);
     }
-    AvailabilityInference::applyInferredAvailableAttrs(
-        ctor, asAvailableAs, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(ctor, asAvailableAs);
   }
 
   // Wire up the overrides.
@@ -667,7 +666,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
       .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
+  auto type = superclassCtor->getInitializerInterfaceType();
+  if (auto *genericFnType = type->getAs<GenericFunctionType>())
+    type = genericFnType->substGenericArgs(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);
@@ -818,17 +819,16 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
-  auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
+  auto implCtx = classDecl->getImplementationContext();
   auto ctor = new (ctx) ConstructorDecl(
-      superclassCtor->getName(), classDecl->getBraces().Start,
+      superclassCtor->getName(), implCtx->getBraces().Start,
       superclassCtor->isFailable(),
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/superclassCtor->hasAsync(),
       /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/superclassCtor->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType), bodyParams,
-      genericParams, implCtx,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      genericParams, implCtx->getAsGenericContext());
 
   ctor->setImplicit();
 
@@ -1178,7 +1178,7 @@ static void collectNonOveriddenSuperclassInits(
       continue;
 
     // Skip unavailable superclass initializers.
-    if (AvailableAttr::isUnavailable(superclassCtor))
+    if (superclassCtor->isUnavailable())
       continue;
 
     if (!overriddenInits.count(superclassCtor))
@@ -1335,9 +1335,8 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
     return false;
 
   // Don't add implicit constructors in module interfaces.
-  if (auto *SF = decl->getParentSourceFile())
-    if (SF->Kind == SourceFileKind::Interface)
-      return false;
+  if (decl->getDeclContext()->isInSwiftinterface())
+    return false;
 
   // Don't attempt if we know the decl is invalid.
   if (decl->isInvalid())
@@ -1693,11 +1692,6 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
-  FrontendStatsTracer StatsTracer(ctx.Stats,
-                                  "define-default-ctor", decl);
-  PrettyStackTraceDecl stackTrace("defining default constructor for",
-                                  decl);
-
   // Create the default constructor.
   auto ctorKind = decl->isDistributedActor() ?
       ImplicitConstructorKind::DefaultDistributedActor :
@@ -1732,6 +1726,15 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
+}
+
+bool swift::addNonIsolatedToSynthesized(DerivedConformance &derived,
+                                        ValueDecl *value) {
+  if (auto *conformance = derived.Conformance) {
+    if (conformance && conformance->isPreconcurrency())
+      return false;
+  }
+  return addNonIsolatedToSynthesized(derived.Nominal, value);
 }
 
 bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,

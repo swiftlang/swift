@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
 
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -341,6 +341,7 @@ func isolatedClosures() {
   }
 }
 
+// expected-warning@+3 {{global function 'allOfEm' has multiple actor-isolation attributes ('MainActor' and 'nonisolated')}}
 // expected-warning@+2 {{global function with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{12-24=}}
 // expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in the Swift 6 language mode}}{{1-12=}}
 @MainActor nonisolated func allOfEm(_ a: isolated A) {
@@ -483,7 +484,7 @@ actor A2 {
     await { (self: isolated Self) in }(self)
     // expected-typechecker-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
     await { (self: isolated Self?) in }(self)
-    // expected-typechecker-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self?'}}
+    // expected-typechecker-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
 #endif
   }
   nonisolated func f2() async -> Self {
@@ -541,6 +542,11 @@ func preciseIsolated(a: isolated MyActor) async {
   }
 }
 
+func testLValueIsolated() async {
+  var a = A() // expected-warning {{variable 'a' was never mutated}}
+  await sync(isolatedTo: a)
+}
+
 @MainActor func fromMain(ns: NotSendable) async -> NotSendable {
   await pass(value: ns, isolation: MainActor.shared)
 }
@@ -579,4 +585,9 @@ public actor MyActorIsolatedParameterMerge {
       await taskGroup.waitForAll()
     }
   }
+}
+
+// rdar://138394497
+class ClassWithIsolatedAsyncInitializer {
+    init(isolation: isolated (any Actor)? = #isolation) async {}
 }

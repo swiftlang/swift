@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Task Cancellation ------------------------------------------------------
 
@@ -68,7 +67,9 @@ import Swift
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
+#if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
+#endif
 public func withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,
@@ -76,8 +77,8 @@ public func withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -97,8 +98,8 @@ public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -125,8 +126,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
-     withUnsafeCurrentTask { task in
-       task?.isCancelled ?? false
+     unsafe withUnsafeCurrentTask { task in
+       unsafe task?.isCancelled ?? false
      }
   }
 }

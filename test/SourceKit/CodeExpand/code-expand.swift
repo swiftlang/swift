@@ -151,13 +151,9 @@ braced3({
   <#T##() -> Int#>
   #endif
 })
-// CHECK:      braced3({
-// CHECK-NEXT:   #if true
-// CHECK-NEXT:    {
-// CHECK-NEXT:      <#code#>
-// CHECK-NEXT:    }
-// CHECK-NEXT:    #endif
-// CHECK-NEXT:  })
+// CHECK:      braced3 {
+// CHECK-NEXT:   <#code#>
+// CHECK-NEXT: }
 
 func returnTrailing() -> Int {
   return withtrail(<#T##() -> ()#>)

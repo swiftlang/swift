@@ -38,12 +38,12 @@ enum class IntermoduleDepTrackingMode;
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
+public:
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::pair<std::string, bool /*testable*/>>
       ImplicitImportModuleNames;
 
-public:
   FrontendInputsAndOutputs InputsAndOutputs;
 
   void forAllOutputPaths(const InputFile &input,
@@ -53,6 +53,9 @@ public:
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
+
+  /// An Objective-C pch to import and make implicitly visible.
+  std::string ImplicitObjCPCHPath;
 
   /// The map of aliases and real names of imported or referenced modules.
   llvm::StringMap<StringRef> ModuleAliasMap;
@@ -69,6 +72,9 @@ public:
 
   /// Module name to use when referenced in clients module interfaces.
   std::string ExportAsName;
+
+  /// The public facing name of the module to build.
+  std::string PublicModuleName;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
@@ -97,6 +103,10 @@ public:
   /// dependency scanning.
   std::string ExplicitModulesOutputPath;
 
+  /// The path to output explicitly-built SDK module dependencies. Only relevant during
+  /// dependency scanning.
+  std::string ExplicitSDKModulesOutputPath;
+
   /// The path to look in to find backup .swiftinterface files if those found
   /// from SDKs are failing.
   std::string BackupModuleInterfaceDir;
@@ -106,6 +116,10 @@ public:
 
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
+
+  /// The Swift compiler version number that would be used to synthesize
+  /// swiftinterface files and subsequently their swiftmodules.
+  version::Version SwiftInterfaceCompilerVersion;
 
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
@@ -122,15 +136,13 @@ public:
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
 
+  bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
   /// specified in the swiftinterface.
   bool ExplicitInterfaceBuild = false;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
-
-  /// Emit a .casid file next to the object file if CAS Backend is used.
-  bool EmitCASIDFile = false;
 
   /// CacheReplay PrefixMap.
   std::vector<std::string> CacheReplayPrefixMap;
@@ -152,8 +164,8 @@ public:
     /// Parse and dump scope map.
     DumpScopeMaps,
 
-    /// Parse, type-check, and dump type refinement context hierarchy
-    DumpTypeRefinementContexts,
+    /// Parse, type-check, and dump availability scopes
+    DumpAvailabilityScopes,
 
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
@@ -175,20 +187,21 @@ public:
     Immediate, ///< Immediate mode
     REPL,      ///< REPL mode
 
-    EmitAssembly, ///< Emit assembly
-    EmitIRGen,    ///< Emit LLVM IR before LLVM optimizations
-    EmitIR,       ///< Emit LLVM IR after LLVM optimizations
-    EmitBC,       ///< Emit LLVM BC
-    EmitObject,   ///< Emit object file
+    EmitAssembly,   ///< Emit assembly
+    EmitLoweredSIL, ///< Emit lowered SIL before IRGen runs
+    EmitIRGen,      ///< Emit LLVM IR before LLVM optimizations
+    EmitIR,         ///< Emit LLVM IR after LLVM optimizations
+    EmitBC,         ///< Emit LLVM BC
+    EmitObject,     ///< Emit object file
 
     DumpTypeInfo, ///< Dump IRGen type info
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
-    ScanDependencies,        ///< Scan dependencies of Swift source files
-    PrintVersion,       ///< Print version information.
-    PrintFeature,       ///< Print supported feature of this compiler
+    ScanDependencies, ///< Scan dependencies of Swift source files
+    PrintVersion,     ///< Print version information.
+    PrintFeature,     ///< Print supported feature of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -224,6 +237,13 @@ public:
 
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
+
+  /// Whether to enable timers tracking individual requests. This adds some
+  /// runtime overhead.
+  bool FineGrainedTimers = false;
+
+  /// Whether we are printing all stats even if they are zero.
+  bool PrintZeroStats = false;
 
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
@@ -270,7 +290,7 @@ public:
 
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
   /// by the Clang importer as part of semantic analysis.
-  bool SerializeBridgingHeader = false;
+  bool ModuleHasBridgingHeader = false;
 
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
@@ -350,15 +370,26 @@ public:
   /// Load and re-use a prior serialized dependency scanner cache.
   bool ReuseDependencyScannerCache = false;
 
+  /// Upon loading a prior serialized dependency scanner cache, filter out
+  /// dependency module information which is no longer up-to-date with respect
+  /// to input files of every given module.
+  bool ValidatePriorDependencyScannerCache = false;
+
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
 
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
 
+  /// The path at which the dependency scanner can write generated files.
+  std::string ScannerOutputDir;
+
+  /// If the scanner output is written directly to the disk for debugging.
+  bool WriteScannerOutput = false;
+
   /// Whether the dependency scanner invocation should resolve imports
   /// to filesystem modules in parallel.
-  bool ParallelDependencyScan = false;
+  bool ParallelDependencyScan = true;
 
   /// When performing an incremental build, ensure that cross-module incremental
   /// build metadata is available in any swift modules emitted by this frontend
@@ -373,7 +404,7 @@ public:
   /// are errors. The resulting serialized AST may include errors types and
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
-  
+
   /// Whether or not the compiler must be strict in ensuring that implicit downstream
   /// module dependency build tasks must inherit the parent compiler invocation's context,
   /// such as `-Xcc` flags, etc.
@@ -419,6 +450,17 @@ public:
   /// Line and column for each of the locations to be probed by
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
+
+  /// The possible output formats supported for dumping ASTs.
+  enum class ASTFormat {
+    Default,                ///< S-expressions for debugging
+    DefaultWithDeclContext, ///< S-expressions with DeclContext hierarchy
+    JSON,                   ///< Structured JSON for analysis
+    JSONZlib,               ///< Like JSON, but zlib-compressed
+  };
+
+  /// The output format generated by the `-dump-ast` flag.
+  ASTFormat DumpASTFormat = ASTFormat::Default;
 
   /// Determines whether the static or shared resource folder is used.
   /// When set to `true`, the default resource folder will be set to
@@ -503,7 +545,7 @@ public:
 
   /// Whether we're configured to track system intermodule dependencies.
   bool shouldTrackSystemDependencies() const;
-  
+
   /// Whether we are configured with -typecheck or -typecheck-module-from-interface actuin
   bool isTypeCheckAction() const;
 
@@ -519,7 +561,7 @@ public:
   ///
   /// \sa SymbolGraphASTWalker
   std::string SymbolGraphOutputDir;
-  
+
   /// Whether to emit doc comment information in symbol graphs for symbols
   /// which are inherited through classes or default implementations.
   bool SkipInheritedDocs = false;
@@ -549,6 +591,19 @@ public:
 
   /// All block list configuration files to be honored in this compilation.
   std::vector<std::string> BlocklistConfigFilePaths;
+
+  struct CustomAvailabilityDomains {
+    /// Domains defined with `-define-enabled-availability-domain=`.
+    llvm::SmallVector<std::string> EnabledDomains;
+    /// Domains defined with `-define-disabled-availability-domain=`.
+    llvm::SmallVector<std::string> DisabledDomains;
+    /// Domains defined with `-define-dynamic-availability-domain=`.
+    llvm::SmallVector<std::string> DynamicDomains;
+  };
+
+  /// The collection of AvailabilityDomain definitions specified as arguments.
+  CustomAvailabilityDomains AvailabilityDomains;
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);

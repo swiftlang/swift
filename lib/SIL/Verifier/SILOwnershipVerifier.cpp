@@ -277,10 +277,23 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // If our scoped operand is not also a borrow introducer, then we know that
     // we do not need to consider guaranteed phis and thus can just add the
-    // initial end scope instructions without any further work.
-    //
-    // Maybe: Is borrow scope non-local?
-    initialScopedOperand.getImplicitUses(nonLifetimeEndingUsers);
+    // initial end scope instructions without any further work. This avoids
+    // cubic complexity in the verifier.
+    auto addLeafUse = [&](Operand *endOp) {
+      nonLifetimeEndingUsers.push_back(endOp);
+      return true;
+    };
+    auto addUnknownUse = [&](Operand *endOp) {
+      // FIXME: This ignores mark_dependence base uses and borrowed_from base
+      // uses. Instead, recursively call gatherUsers.
+      // Note: we may have op == endOp.
+      nonLifetimeEndingUsers.push_back(endOp);
+      return true;
+    };
+    // FIXME: This ignores dead-end blocks. Instead, recursively call
+    // gatherUsers.
+    initialScopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
+
     if (initialScopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
       guaranteedPhiVerifier.verifyReborrows(
           cast<BeginBorrowInst>(op->getUser()));
@@ -391,7 +404,21 @@ bool SILValueOwnershipChecker::gatherUsers(
       if (auto scopedOperand = BorrowingOperand(op)) {
         assert(!scopedOperand.isReborrow());
 
-        scopedOperand.getImplicitUses(nonLifetimeEndingUsers);
+        auto addLeafUse = [&](Operand *endOp) {
+          nonLifetimeEndingUsers.push_back(endOp);
+          return true;
+        };
+        auto addUnknownUse = [&](Operand *endOp) {
+          // FIXME: This ignores mark_dependence base uses and borrowed_from
+          // base uses. Instead, recursively call gatherUsers.  Note: we may
+          // have op == endOp.
+          nonLifetimeEndingUsers.push_back(endOp);
+          return true;
+        };
+        // FIXME: This ignores dead-end blocks. Instead, recursively call
+        // gatherUsers.
+        scopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
+
         if (scopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
           guaranteedPhiVerifier.verifyReborrows(
               cast<BeginBorrowInst>(op->getUser()));
@@ -583,8 +610,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   // If we have a guaranteed value, make sure that all uses are before our
   // end_yield.
   SmallVector<Operand *, 4> coroutineEndUses;
-  for (auto *use : yield->getParent<BeginApplyInst>()->
-                     getTokenResult()->getUses()) {
+  for (auto *use : yield->getParent<BeginApplyInst>()->getEndApplyUses()) {
     coroutineEndUses.push_back(use);
   }
 
@@ -803,15 +829,24 @@ bool SILValueOwnershipChecker::checkUses() {
   return true;
 }
 
+bool disableOwnershipVerification(const SILModule &mod) {
+  if (DisableOwnershipVerification)
+    return true;
+  if (mod.getASTContext().blockListConfig.hasBlockListAction(
+          mod.getSwiftModule()->getRealName().str(),
+          BlockListKeyKind::ModuleName,
+          BlockListAction::ShouldDisableOwnershipVerification)) {
+    return true;
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
 void SILInstruction::verifyOperandOwnership(
     SILModuleConventions *silConv) const {
-  if (DisableOwnershipVerification)
-    return;
-
   if (isStaticInitializerInst())
     return;
 
@@ -832,11 +867,13 @@ void SILInstruction::verifyOperandOwnership(
       !getFunction()->shouldVerifyOwnership())
     return;
 
+  if (disableOwnershipVerification(getModule()))
+    return;
+
   // If we are testing the verifier, bail so we only print errors once when
   // performing a full verification, instead of additionally in the SILBuilder.
   if (IsSILOwnershipVerifierTestingEnabled)
     return;
-
   // If this is a terminator instruction, do not verify in SILBuilder. This is
   // because when building a new function, one must create the destination block
   // first which is an unnatural pattern and pretty brittle.
@@ -904,25 +941,9 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
 }
 
 void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-  if (DisableOwnershipVerification)
-    return;
-
   // Do not validate SILUndef values.
   if (isa<SILUndef>(*this))
     return;
-
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  //
-  // NOTE: We purposely return if we do can not look up a module here to ensure
-  // that if we run into something that we do not understand, we do not assert
-  // in user code even though we aren't going to actually verify (the default
-  // behavior when -sil-verify-all is disabled).
-  auto *mod = Value->getModule();
-  if (!mod || !mod->getOptions().VerifyAll)
-    return;
-#endif
 
   // Make sure that we are not a value of an instruction in a SILGlobalVariable
   // block.
@@ -932,17 +953,20 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     }
   }
 
+  // Since we do not have SILUndef, we now know that getFunction() should return
+  // a real function. Assert in case this assumption is no longer true.
+  auto *f = (*this)->getFunction();
+  assert(f && "Instructions and arguments should have a function");
+
+  if (disableOwnershipVerification(f->getModule()))
+    return;
+
   // If we are testing the verifier, bail so we only print errors once when
   // performing a full verification a function at a time by the
   // OwnershipVerifierStateDumper pass, instead of additionally in the
   // SILBuilder and in the actual SIL verifier that may be run by sil-opt.
   if (IsSILOwnershipVerifierTestingEnabled)
     return;
-
-  // Since we do not have SILUndef, we now know that getFunction() should return
-  // a real function. Assert in case this assumption is no longer true.
-  auto *f = (*this)->getFunction();
-  assert(f && "Instructions and arguments should have a function");
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
@@ -953,15 +977,8 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
 }
 
 void SILModule::verifyOwnership() const {
-  if (DisableOwnershipVerification)
+  if (disableOwnershipVerification(*this))
     return;
-
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  if (!getOptions().VerifyAll)
-    return;
-#endif
 
   for (const SILFunction &function : *this) {
     std::unique_ptr<DeadEndBlocks> deBlocks;
@@ -973,28 +990,22 @@ void SILModule::verifyOwnership() const {
   }
 }
 
+void SILFunction::verifyOwnership() const {
+  auto deBlocks =
+      std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(this));
+  verifyOwnership(deBlocks.get());
+}
+
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-  if (DisableOwnershipVerification)
-    return;
   if (!getModule().getOptions().VerifySILOwnership)
     return;
-
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  //
-  // NOTE: We purposely return if we do can not look up a module here to ensure
-  // that if we run into something that we do not understand, we do not assert
-  // in user code even though we aren't going to actually verify (the default
-  // behavior when -sil-verify-all is disabled).
-  auto *mod = &getModule();
-  if (!mod || !mod->getOptions().VerifyAll)
-    return;
-#endif
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
   if (!hasOwnership() || !shouldVerifyOwnership())
+    return;
+
+  if (disableOwnershipVerification(getModule()))
     return;
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;

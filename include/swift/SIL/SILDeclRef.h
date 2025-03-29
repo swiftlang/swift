@@ -16,10 +16,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILDeclRef_H
-#define SWIFT_SIL_SILDeclRef_H
+#ifndef SWIFT_SIL_SILDECLREF_H
+#define SWIFT_SIL_SILDECLREF_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AutoDiff.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/TypeAlignments.h"
@@ -36,7 +38,6 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
-  class AutoDiffDerivativeFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -53,7 +54,6 @@ namespace swift {
   enum class SILLinkage : uint8_t;
   class AnyFunctionRef;
   class GenericSignature;
-  class CustomAttr;
 
 /// How a method is dispatched.
 enum class MethodDispatch {
@@ -111,11 +111,11 @@ struct SILDeclRef {
     /// Initializer - this constant references the initializing constructor
     /// entry point of the class ConstructorDecl in loc.
     Initializer,
-    
+
     /// EnumElement - this constant references the injection function for
     /// an EnumElementDecl.
     EnumElement,
-    
+
     /// Destroyer - this constant references the destroying destructor for the
     /// DestructorDecl in loc.
     Destroyer,
@@ -123,7 +123,11 @@ struct SILDeclRef {
     /// Deallocator - this constant references the deallocating
     /// destructor for the DestructorDecl in loc.
     Deallocator,
-    
+
+    /// Deallocator - this constant references the isolated deallocating
+    /// destructor for the DestructorDecl in loc.
+    IsolatedDeallocator,
+
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
     GlobalAccessor,
@@ -339,7 +343,8 @@ struct SILDeclRef {
   }
   /// True if the SILDeclRef references a destructor entry point.
   bool isDestructor() const {
-    return kind == Kind::Destroyer || kind == Kind::Deallocator;
+    return kind == Kind::Destroyer || kind == Kind::Deallocator ||
+           kind == Kind::IsolatedDeallocator;
   }
   /// True if the SILDeclRef references an enum entry point.
   bool isEnumElement() const {
@@ -401,13 +406,6 @@ struct SILDeclRef {
 
   /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
-
-  /// Return the hash code for the SIL declaration.
-  friend llvm::hash_code hash_value(const SILDeclRef &ref) {
-    return llvm::hash_combine(
-        ref.loc.getOpaqueValue(), static_cast<int>(ref.kind), ref.isForeign,
-        ref.distributedThunk, ref.defaultArgIndex, ref.isAsyncLetClosure);
-  }
 
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() &&
@@ -554,7 +552,7 @@ struct SILDeclRef {
                                                     AbstractFunctionDecl *func);
 
   /// Returns the availability of the decl for computing linkage.
-  std::optional<AvailabilityContext> getAvailabilityForLinkage() const;
+  std::optional<AvailabilityRange> getAvailabilityForLinkage() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
@@ -607,6 +605,25 @@ struct SILDeclRef {
   }
   
   bool hasAsync() const;
+  bool isCalleeAllocatedCoroutine() const;
+
+  /// Return the hash code for the SIL declaration.
+  friend llvm::hash_code hash_value(swift::SILDeclRef ref) {
+    return llvm::hash_combine(
+        llvm::hash_value(ref.loc.getOpaqueValue()),
+        llvm::hash_value(unsigned(ref.kind)),
+        llvm::hash_value(
+            (ref.kind == swift::SILDeclRef::Kind::DefaultArgGenerator)
+                ? ref.defaultArgIndex
+                : 0),
+        llvm::hash_value(ref.isForeign),
+        llvm::hash_value(ref.pointer.getOpaqueValue()),
+        llvm::hash_value(ref.distributedThunk),
+        llvm::hash_value(unsigned(ref.backDeploymentKind)),
+        llvm::hash_value(ref.isKnownToBeLocal),
+        llvm::hash_value(ref.isRuntimeAccessible),
+        llvm::hash_value(ref.isAsyncLetClosure));
+  }
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
@@ -655,19 +672,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                       nullptr);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
-    unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
-    unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
-    unsigned h3 = (Val.kind == Kind::DefaultArgGenerator)
-                    ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
-                    : 0;
-    unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
-    unsigned h5 = PointerInfo::getHashValue(Val.pointer.getOpaqueValue());
-    unsigned h6 = UnsignedInfo::getHashValue(Val.distributedThunk);
-    unsigned h7 = UnsignedInfo::getHashValue(unsigned(Val.backDeploymentKind));
-    unsigned h8 = UnsignedInfo::getHashValue(Val.isKnownToBeLocal);
-    unsigned h9 = UnsignedInfo::getHashValue(Val.isRuntimeAccessible);
-    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11) ^ (h6 << 8) ^
-      (h7 << 10) ^ (h8 << 13) ^ (h9 << 15);
+    return hash_value(Val);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {

@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature RawLayout) | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_RawLayout
 
 @_rawLayout(like: T)
 struct Cell<T>: ~Copyable {}

@@ -1,8 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature DoExpressions -enable-experimental-feature ImplicitLastExprResults
 // RUN: %target-swift-emit-ir -enable-experimental-feature DoExpressions -enable-experimental-feature ImplicitLastExprResults %s
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DoExpressions
+// REQUIRES: swift_feature_ImplicitLastExprResults
 
 let a = do {
   print("hello")

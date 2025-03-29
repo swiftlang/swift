@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
+  AsyncCallerExecutionMigration.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
@@ -11,6 +12,7 @@ add_swift_host_library(swiftSema STATIC
   CSSimplify.cpp
   CSSolver.cpp
   CSStep.cpp
+  CSTrail.cpp
   CSFix.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
@@ -45,8 +47,10 @@ add_swift_host_library(swiftSema STATIC
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   SyntacticElementTarget.cpp
+  TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
+  TypeCheckAttrABI.cpp
   TypeCheckAvailability.cpp
   TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp
@@ -75,6 +79,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
+  TypeCheckUnsafe.cpp
   TypeChecker.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
@@ -92,7 +97,8 @@ target_link_libraries(swiftSema PRIVATE
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftSema PRIVATE
-    swiftASTGen)
+    swiftASTGen
+    swiftMacroEvaluation)
 endif()
 
 set_swift_llvm_is_available(swiftSema)

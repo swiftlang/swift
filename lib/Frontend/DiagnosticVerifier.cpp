@@ -103,11 +103,57 @@ struct ExpectedFixIt {
   std::string Text;
 };
 
+struct DiagLoc {
+  std::optional<unsigned> bufferID;
+  unsigned line;
+  unsigned column;
+  SourceLoc sourceLoc;
+
+  DiagLoc(SourceManager &diagSM, SourceManager &verifierSM,
+          SourceLoc initialSourceLoc, bool wantEnd = false)
+      : bufferID(std::nullopt), line(0), column(0), sourceLoc(initialSourceLoc)
+  {
+    if (sourceLoc.isInvalid())
+      return;
+
+    // Walk out of generated code for macros in default arguments so that we
+    // register diagnostics emitted in them at the call site instead.
+    while (true) {
+      bufferID = diagSM.findBufferContainingLoc(sourceLoc);
+      ASSERT(bufferID.has_value());
+
+      auto generatedInfo = diagSM.getGeneratedSourceInfo(*bufferID);
+      if (!generatedInfo || generatedInfo->originalSourceRange.isInvalid()
+            || generatedInfo->kind != GeneratedSourceInfo::DefaultArgument)
+        break;
+
+      if (wantEnd)
+        sourceLoc = generatedInfo->originalSourceRange.getEnd();
+      else
+        sourceLoc = generatedInfo->originalSourceRange.getStart();
+
+      ASSERT(sourceLoc.isValid());
+    }
+
+    // If this diagnostic came from a different SourceManager (as can happen
+    // while compiling a module interface), translate its SourceLoc to match the
+    // verifier's SourceManager.
+    if (&diagSM != &verifierSM) {
+      sourceLoc = verifierSM.getLocForForeignLoc(sourceLoc, diagSM);
+      bufferID = verifierSM.findBufferContainingLoc(sourceLoc);
+    }
+
+    // At this point, `bufferID` is filled in and `sourceLoc` is a location in
+    // that buffer.
+    if (sourceLoc.isValid())
+      std::tie(line, column) = verifierSM.getLineAndColumnInBuffer(sourceLoc);
+  }
+};
+
 } // end namespace swift
 
 const LineColumnRange &
-CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
-                                      unsigned BufferID) const {
+CapturedFixItInfo::getLineColumnRange(SourceManager &SM) const {
   if (LineColRange.StartLine != 0) {
     // Already computed.
     return LineColRange;
@@ -115,21 +161,13 @@ CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
 
   auto SrcRange = FixIt.getRange();
 
-  std::tie(LineColRange.StartLine, LineColRange.StartCol) =
-      SM.getPresumedLineAndColumnForLoc(SrcRange.getStart(), BufferID);
+  DiagLoc startLoc(*diagSM, SM, SrcRange.getStart());
+  LineColRange.StartLine = startLoc.line;
+  LineColRange.StartCol = startLoc.column;
 
-  // We don't have to compute much if the end location is on the same line.
-  if (SrcRange.getByteLength() == 0) {
-    LineColRange.EndLine = LineColRange.StartLine;
-    LineColRange.EndCol = LineColRange.StartCol;
-  } else if (SM.extractText(SrcRange, BufferID).find_first_of("\n\r") ==
-             StringRef::npos) {
-    LineColRange.EndLine = LineColRange.StartLine;
-    LineColRange.EndCol = LineColRange.StartCol + SrcRange.getByteLength();
-  } else {
-    std::tie(LineColRange.EndLine, LineColRange.EndCol) =
-        SM.getPresumedLineAndColumnForLoc(SrcRange.getEnd(), BufferID);
-  }
+  DiagLoc endLoc(*diagSM, SM, SrcRange.getEnd(), /*wantEnd=*/true);
+  LineColRange.EndLine = endLoc.line;
+  LineColRange.EndCol = endLoc.column;
 
   return LineColRange;
 }
@@ -223,13 +261,13 @@ renderEducationalNotes(llvm::SmallVectorImpl<std::string> &EducationalNotes) {
 /// Otherwise return \c CapturedDiagnostics.end() with \c false.
 static std::tuple<std::vector<CapturedDiagnosticInfo>::iterator, bool>
 findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
-               const ExpectedDiagnosticInfo &Expected, StringRef BufferName) {
+               const ExpectedDiagnosticInfo &Expected, unsigned BufferID) {
   auto fallbackI = CapturedDiagnostics.end();
 
   for (auto I = CapturedDiagnostics.begin(), E = CapturedDiagnostics.end();
        I != E; ++I) {
     // Verify the file and line of the diagnostic.
-    if (I->Line != Expected.LineNo || I->FileName != BufferName)
+    if (I->Line != Expected.LineNo || I->SourceBufferID != BufferID)
       continue;
 
     // If a specific column was expected, verify it.
@@ -363,7 +401,7 @@ bool DiagnosticVerifier::checkForFixIt(
       if (ActualFixIt.getText() != Expected.Text)
         continue;
 
-      auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+      auto &ActualRange = ActualFixIt.getLineColumnRange(SM);
 
       if (Expected.Range.StartCol != ActualRange.StartCol ||
           Expected.Range.EndCol != ActualRange.EndCol ||
@@ -394,7 +432,7 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
   interleave(
       ActualFixIts,
       [&](const CapturedFixItInfo &ActualFixIt) {
-        auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+        auto &ActualRange = ActualFixIt.getLineColumnRange(SM);
         OS << "{{";
 
         if (ActualRange.StartLine != DiagnosticLineNo)
@@ -566,7 +604,6 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
-  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
   // file order.
@@ -709,7 +746,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
-      Expected.LineNo = SM.getPresumedLineAndColumnForLoc(
+      Expected.LineNo = SM.getLineAndColumnInBuffer(
                               BufferStartLoc.getAdvancedLoc(MatchStart.data() -
                                                             InputFile.data()),
                               BufferID)
@@ -888,7 +925,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     // Check to see if we had this expected diagnostic.
     auto FoundDiagnosticInfo =
-        findDiagnostic(CapturedDiagnostics, expected, BufferName);
+        findDiagnostic(CapturedDiagnostics, expected, BufferID);
     auto FoundDiagnosticIter = std::get<0>(FoundDiagnosticInfo);
     if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
       // Diagnostic didn't exist.  If this is a 'mayAppear' diagnostic, then
@@ -1078,8 +1115,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     auto I = CapturedDiagnostics.begin();
     for (auto E = CapturedDiagnostics.end(); I != E; ++I) {
       // Verify the file and line of the diagnostic.
-      if (I->Line != expectedDiagIter->LineNo || I->FileName != BufferName ||
-          I->Classification != expectedDiagIter->Classification)
+      if (I->Line != expectedDiagIter->LineNo || I->SourceBufferID != BufferID
+            || I->Classification != expectedDiagIter->Classification)
         continue;
       
       // Otherwise, we found it, break out.
@@ -1167,7 +1204,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   bool HadUnexpectedDiag = false;
   auto CapturedDiagIter = CapturedDiagnostics.begin();
   while (CapturedDiagIter != CapturedDiagnostics.end()) {
-    if (CapturedDiagIter->FileName != BufferName) {
+    if (CapturedDiagIter->SourceBufferID != BufferID) {
       ++CapturedDiagIter;
       continue;
     }
@@ -1241,7 +1278,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                           const DiagnosticInfo &Info) {
   SmallVector<CapturedFixItInfo, 2> fixIts;
   for (const auto &fixIt : Info.FixIts) {
-    fixIts.emplace_back(fixIt);
+    fixIts.emplace_back(SM, fixIt);
   }
 
   llvm::SmallVector<std::string, 1> eduNotes;
@@ -1256,40 +1293,39 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                            Info.FormatArgs);
   }
 
-  if (Info.Loc.isValid()) {
-    const auto lineAndColumn = SM.getPresumedLineAndColumnForLoc(Info.Loc);
-    const auto fileName = SM.getDisplayNameForLoc(Info.Loc);
-    CapturedDiagnostics.emplace_back(message, fileName, Info.Kind, Info.Loc,
-                                     lineAndColumn.first, lineAndColumn.second,
-                                     fixIts, eduNotes);
-  } else {
-    CapturedDiagnostics.emplace_back(message, StringRef(), Info.Kind, Info.Loc,
-                                     0, 0, fixIts, eduNotes);
-  }
-
-  // If this diagnostic came from a different SourceManager (as can happen
-  // while compiling a module interface), translate its SourceLocs to match the
-  // verifier's SourceManager.
-  if (&SM != &(this->SM)) {
-    auto &capturedDiag = CapturedDiagnostics.back();
-    auto &correctSM = this->SM;
-
-    capturedDiag.Loc = correctSM.getLocForForeignLoc(capturedDiag.Loc, SM);
-    for (auto &fixIt : capturedDiag.FixIts) {
-      auto newStart =
-          correctSM.getLocForForeignLoc(fixIt.getSourceRange().getStart(), SM);
-      auto &mutableRange = fixIt.getSourceRange();
-      mutableRange =
-          CharSourceRange(newStart, fixIt.getSourceRange().getByteLength());
-    }
-  }
+  DiagLoc loc(SM, this->SM, Info.Loc);
+  CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
+                                   loc.sourceLoc, loc.line, loc.column, fixIts,
+                                   eduNotes);
 }
 
 /// Once all diagnostics have been captured, perform verification.
 bool DiagnosticVerifier::finishProcessing() {
   DiagnosticVerifier::Result Result = {false, false};
 
-  ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, AdditionalBufferIDs };
+  SmallVector<unsigned, 4> additionalBufferIDs;
+  for (auto path : AdditionalFilePaths) {
+    auto bufferID = SM.getIDForBufferIdentifier(path);
+    if (!bufferID) {
+      // Still need to scan this file for expectations.
+      auto result = SM.getFileSystem()->getBufferForFile(path);
+      if (!result) {
+        auto message = SM.GetMessage(
+           SourceLoc(), llvm::SourceMgr::DiagKind::DK_Error,
+           llvm::Twine("unable to open file in '-verify-additional-file ") +
+           path + "': " + result.getError().message(), {}, {});
+        printDiagnostic(message);
+        Result.HadError |= true;
+        continue;
+      }
+      bufferID = SM.addNewSourceBuffer(std::move(result.get()));
+    }
+    if (bufferID) {
+      additionalBufferIDs.push_back(*bufferID);
+    }
+  }
+
+  ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, additionalBufferIDs };
   for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
     for (auto &BufferID : BufferIDList) {
       DiagnosticVerifier::Result FileResult = verifyFile(BufferID);

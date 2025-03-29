@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 // Make sure that we are able to inline try-apply instructions.
 

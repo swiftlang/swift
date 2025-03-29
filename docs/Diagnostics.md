@@ -149,7 +149,7 @@ If the `-verify` frontend flag is used, the Swift compiler will check emitted di
   
 `-verify` parses all ordinary source files passed as inputs to the compiler to look for expectation comments. If you'd like to check for diagnostics in additional files, like swiftinterfaces or even Objective-C headers, specify them with `-verify-additional-file <filename>`. By default, `-verify` considers any diagnostic at `<unknown>:0` (that is, any diagnostic emitted with an invalid source location) to be unexpected; you can disable this by passing `-verify-ignore-unknown`.
 
-An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. It is followed by:
+An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. (You can use `-verify-additional-prefix <string>` to add expectations with additional prefixes, e.g. `-verify-additional-prefix foo-` will pick up both `expected-error` and `expected-foo-error`.) It is followed by:
 
 - (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well. `// expected-error@-1 ...` looks for an error on the previous line, `// expected-warning@+1:3 ...` looks for a warning on the next line at the third column, and `// expected-note@:7 ...` looks for a note on the same line at the seventh column.
 

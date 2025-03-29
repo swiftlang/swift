@@ -6,6 +6,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 @main
 struct Main {
@@ -29,7 +30,6 @@ struct Main {
 // The code uses String equality and hashing, should need the normalization, NFC, NFD tables, and not the others.
 // EXCLUDES-NOT: swift_stdlib_case
 // EXCLUDES-NOT: swift_stdlib_graphemeBreakProperties
-// EXCLUDES-NOT: swift_stdlib_linkingConsonant
 // EXCLUDES-NOT: swift_stdlib_mappings
 // EXCLUDES-NOT: swift_stdlib_names
 // INCLUDES:     swift_stdlib_nfc

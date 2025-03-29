@@ -45,7 +45,7 @@ public struct UInt128: Sendable {
   @_transparent
   public init(_low: UInt64, _high: UInt64) {
 #if _endian(little)
-    self = unsafeBitCast((_low, _high), to: Self.self)
+    self = unsafe unsafeBitCast((_low, _high), to: Self.self)
 #else
     self = unsafeBitCast((_high, _low), to: Self.self)
 #endif
@@ -280,7 +280,9 @@ extension UInt128 {
   public func dividedReportingOverflow(
     by other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    _precondition(other != .zero, "Division by zero")
+    if _slowPath(other == .zero) {
+      return (self, true)
+    }
     // Unsigned divide never overflows.
     return (Self(Builtin.udiv_Int128(self._value, other._value)), false)
   }
@@ -290,7 +292,9 @@ extension UInt128 {
   public func remainderReportingOverflow(
     dividingBy other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    _precondition(other != .zero, "Division by zero in remainder operation")
+    if _slowPath(other == .zero) {
+      return (self, true)
+    }
     // Unsigned divide never overflows.
     return (Self(Builtin.urem_Int128(self._value, other._value)), false)
   }
@@ -349,7 +353,11 @@ extension UInt128 {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public static func /(a: Self, b: Self) -> Self {
-    a.dividedReportingOverflow(by: b).partialValue
+    if _slowPath(b == .zero) {
+      _preconditionFailure("Division by zero")
+    }
+    // Unsigned divide never overflows.
+    return Self(Builtin.udiv_Int128(a._value, b._value))
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -361,7 +369,11 @@ extension UInt128 {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public static func %(a: Self, b: Self) -> Self {
-    a.remainderReportingOverflow(dividingBy: b).partialValue
+    if _slowPath(b == .zero) {
+      _preconditionFailure("Division by zero in remainder operation")
+    }
+    // Unsigned divide never overflows.
+    return Self(Builtin.urem_Int128(a._value, b._value))
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -520,8 +532,8 @@ extension UInt128.Words: RandomAccessCollection {
 #else
       let index = count - 1 - position
 #endif
-      return _withUnprotectedUnsafePointer(to: &value) {
-        $0.withMemoryRebound(to: UInt.self, capacity: count) { $0[index] }
+      return unsafe _withUnprotectedUnsafePointer(to: &value) {
+        unsafe $0.withMemoryRebound(to: UInt.self, capacity: count) { unsafe $0[index] }
       }
     }
   }

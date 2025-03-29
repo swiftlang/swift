@@ -43,7 +43,6 @@ _swift_complete()
       -disable-sil-ownership-verification \
       -dont-abort-on-memory-lifetime-errors \
       -enable-abc-hoisting \
-      -enable-abcopts \
       -enable-accessed-storage-dump-uses \
       -enable-copyforwarding \
       -enable-destroyhoisting \
@@ -68,7 +67,7 @@ _swift_complete()
       -optremarkgen-visit-implicit-autogen-funcs \
       -print-shortest-path-info \
       -print-swift-mangling-stats \
-      -sil-abcopts-report \
+      -sil-bcopts-report \
       -sil-aggressive-inline \
       -sil-assert-on-exclusivity-failure \
       -sil-break-on-function \

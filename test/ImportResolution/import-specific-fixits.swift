@@ -69,3 +69,10 @@ import typealias ambiguous.SomeStruct // expected-error{{ambiguous name 'SomeStr
 import class ambiguous.SomeStruct // expected-error{{ambiguous name 'SomeStruct' in module 'ambiguous'}}
 
 import func ambiguous.overloadedFunc // no-warning
+
+import protocol DeclsUsedWrongly.TopLevelProtocol  // no-warning
+import protocol DeclsUsedWrongly.AnyTopLevelProtocol // expected-error {{type alias 'AnyTopLevelProtocol' (aka 'any TopLevelProtocol') cannot be imported as 'protocol'}} {{8-16=typealias}}
+import typealias DeclsUsedWrongly.AnyTopLevelProtocol // no-warning
+import protocol DeclsUsedWrongly.NestedProtocol  // no-warning
+import typealias DeclsUsedWrongly.AnyNestedProtocol // no-warning
+import protocol DeclsUsedWrongly.AnyNestedProtocol // expected-error {{type alias 'AnyNestedProtocol' (aka 'any NamespaceStruct.NestedProtocol') cannot be imported as 'protocol'}} {{8-16=typealias}}

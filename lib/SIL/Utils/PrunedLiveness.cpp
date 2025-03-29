@@ -278,28 +278,26 @@ PrunedLiveRange<LivenessWithDefs>::updateForBorrowingOperand(Operand *operand) {
   // Note: Ownership liveness should follow reborrows that are dominated by the
   // ownership definition.
   auto innerBorrowKind = InnerBorrowKind::Contained;
-  if (!BorrowingOperand(operand).visitScopeEndingUses(
-        [&](Operand *end) {
-          if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-            innerBorrowKind = InnerBorrowKind::Reborrowed;
-          }
-          updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-          return true;
-        }, [&](Operand *unknownUse) {
-          updateForUse(unknownUse->getUser(), /*lifetimeEnding*/ false);
-          innerBorrowKind = InnerBorrowKind::Escaped;
-          return true;
-        })) {
-    // Handle dead borrows.
-    updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
-  }
+  BorrowingOperand(operand).visitScopeEndingUses(
+    [&](Operand *end) {
+      if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+        innerBorrowKind = InnerBorrowKind::Reborrowed;
+      }
+      updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+      return true;
+    }, [&](Operand *unknownUse) {
+      updateForUse(unknownUse->getUser(), /*lifetimeEnding*/ false);
+      innerBorrowKind = InnerBorrowKind::Escaped;
+      return true;
+    });
   return innerBorrowKind;
 }
 
 template <typename LivenessWithDefs>
 AddressUseKind PrunedLiveRange<LivenessWithDefs>::checkAndUpdateInteriorPointer(
     Operand *operand) {
-  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
+  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer
+         || operand->getOperandOwnership() == OperandOwnership::AnyInteriorPointer);
 
   if (auto scopedAddress = ScopedAddressValue::forUse(operand)) {
     scopedAddress.visitScopeEndingUses([this](Operand *end) {
@@ -364,6 +362,7 @@ LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(
       summary.meet(AddressUseKind::PointerEscape);
       break;
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
     case OperandOwnership::GuaranteedForwarding: {
@@ -860,7 +859,7 @@ void PrunedLiveRange<LivenessWithDefs>::computeBoundary(
   // Visit each post-dominating block as the starting point for a
   // backward CFG traversal.
   for (auto *block : postDomBlocks) {
-    blockWorklist.push(block);
+    blockWorklist.pushIfNotVisited(block);
   }
   while (auto *block = blockWorklist.pop()) {
     // Process each block that has not been visited and is not LiveOut.

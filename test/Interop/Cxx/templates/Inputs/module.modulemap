@@ -8,6 +8,11 @@ module ClassTemplateWithPrimitiveArgument {
   requires cplusplus
 }
 
+module ClassTemplateWithEnumParameter {
+  header "class-template-with-enum-parameter.h"
+  requires cplusplus
+}
+
 module ClassTemplateWithFunctionParameter {
   header "class-template-with-function-parameter.h"
   requires cplusplus

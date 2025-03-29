@@ -525,12 +525,12 @@ static ManagedValue createInputFunctionArgument(
     SILGenBuilder &B, SILType type, SILLocation loc, ValueDecl *decl = nullptr,
     bool isNoImplicitCopy = false,
     LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-    bool isClosureCapture = false,
-    bool isFormalParameterPack = false) {
+    bool isClosureCapture = false, bool isFormalParameterPack = false,
+    bool isImplicitParameter = false) {
   auto &SGF = B.getSILGenFunction();
   SILFunction &F = B.getFunction();
-  assert((F.isBare() || isFormalParameterPack || decl) &&
-         "Function arguments of non-bare functions must have a decl");
+  assert((F.isBare() || isFormalParameterPack || decl || isImplicitParameter) &&
+         "explicit function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
     if (!arg->getType().isMoveOnly()) {
@@ -585,11 +585,10 @@ static ManagedValue createInputFunctionArgument(
 ManagedValue SILGenBuilder::createInputFunctionArgument(
     SILType type, ValueDecl *decl, bool isNoImplicitCopy,
     LifetimeAnnotation lifetimeAnnotation, bool isClosureCapture,
-    bool isFormalParameterPack) {
-  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl,
-                                       isNoImplicitCopy, lifetimeAnnotation,
-                                       isClosureCapture,
-                                       isFormalParameterPack);
+    bool isFormalParameterPack, bool isImplicit) {
+  return ::createInputFunctionArgument(
+      *this, type, SILLocation(decl), decl, isNoImplicitCopy,
+      lifetimeAnnotation, isClosureCapture, isFormalParameterPack, isImplicit);
 }
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(
@@ -626,29 +625,33 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
-    SILLocation loc, ManagedValue op,
-    SILType destLoweredTy, CanType destFormalTy) {
+    SILLocation loc, CastingIsolatedConformances isolatedConformances,
+    ManagedValue op, SILType destLoweredTy, CanType destFormalTy) {
   SILValue result =
-      createUnconditionalCheckedCast(loc, op.forward(SGF),
+      createUnconditionalCheckedCast(loc, isolatedConformances,
+                                     op.forward(SGF),
                                      destLoweredTy, destFormalTy);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
-void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
-                                            ManagedValue op,
-                                            CanType sourceFormalTy,
-                                            SILType destLoweredTy,
-                                            CanType destFormalTy,
-                                            SILBasicBlock *trueBlock,
-                                            SILBasicBlock *falseBlock,
-                                            ProfileCounter Target1Count,
-                                            ProfileCounter Target2Count) {
+void SILGenBuilder::createCheckedCastBranch(
+    SILLocation loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    ManagedValue op,
+    CanType sourceFormalTy,
+    SILType destLoweredTy,
+    CanType destFormalTy,
+    SILBasicBlock *trueBlock,
+    SILBasicBlock *falseBlock,
+    ProfileCounter Target1Count,
+    ProfileCounter Target2Count) {
   // Casting a guaranteed value requires ownership preservation.
   if (!doesCastPreserveOwnershipForTypes(SGF.SGM.M, op.getType().getASTType(),
                                          destFormalTy)) {
     op = op.ensurePlusOne(SGF, loc);
   }
-  createCheckedCastBranch(loc, isExact, op.forward(SGF), sourceFormalTy,
+  createCheckedCastBranch(loc, isExact, isolatedConformances,
+                          op.forward(SGF), sourceFormalTy,
                           destLoweredTy, destFormalTy, trueBlock, falseBlock,
                           Target1Count, Target2Count);
 }
@@ -750,6 +753,31 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
     return SGF.B.copyOwnedObjectRValue(loc, cast,
                                        ManagedValue::ScopeKind::Lexical);
   }
+
+  // Otherwise, we forward the cleanup of the input value and place the cleanup
+  // on the cast value since unchecked_ref_cast is "forwarding".
+  value.forward(SGF);
+  return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::createUncheckedForwardingCast(SILLocation loc,
+                                                          ManagedValue value,
+                                                          SILType type) {
+  CleanupCloner cloner(*this, value);
+  SILValue cast = createUncheckedForwardingCast(loc, value.getValue(), type);
+  
+  // Currently createUncheckedBitCast only produces these
+  // instructions. We assert here to make sure if this changes, this code is
+  // updated.
+  assert((isa<UncheckedTrivialBitCastInst>(cast) ||
+          isa<UncheckedRefCastInst>(cast) ||
+          isa<UncheckedValueCastInst>(cast) ||
+          isa<ConvertFunctionInst>(cast)) &&
+         "SILGenBuilder is out of sync with SILBuilder.");
+
+  // If we have a trivial inst, just return early.
+  if (isa<UncheckedTrivialBitCastInst>(cast))
+    return ManagedValue::forObjectRValueWithoutOwnership(cast);
 
   // Otherwise, we forward the cleanup of the input value and place the cleanup
   // on the cast value since unchecked_ref_cast is "forwarding".
@@ -1055,6 +1083,18 @@ public:
     }
   }
 };
+}
+
+SILValue
+SILGenBuilder::emitBeginAccess(SILLocation loc,
+                               SILValue address,
+                               SILAccessKind kind,
+                               SILAccessEnforcement enforcement) {
+  auto access = createBeginAccess(loc, address,
+                                  kind, enforcement,
+                                  /*no nested conflict*/ false, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return access;
 }
 
 ManagedValue

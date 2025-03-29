@@ -34,15 +34,9 @@
 namespace {
 
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
-};
-
-static constexpr const char *const diagnosticNameStrings[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) " [" #ID "]",
-#include "swift/AST/DiagnosticsAll.def"
-    "<not a diagnostic>",
 };
 
 } // namespace
@@ -65,11 +59,11 @@ bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
 
   offset_type offset;
   {
-    llvm::support::endian::write<offset_type>(OS, 0, llvm::support::little);
+    llvm::support::endian::write<offset_type>(OS, 0, llvm::endianness::little);
     offset = generator.Emit(OS);
   }
   OS.seek(0);
-  llvm::support::endian::write(OS, offset, llvm::support::little);
+  llvm::support::endian::write(OS, offset, llvm::endianness::little);
   OS.close();
 
   return OS.has_error();
@@ -96,12 +90,6 @@ LocalizationProducer::getMessageOr(swift::DiagID id,
   auto localizedMessage = getMessage(id);
   if (localizedMessage.empty())
     return defaultMessage;
-  if (printDiagnosticNames) {
-    llvm::StringRef diagnosticName(diagnosticNameStrings[(unsigned)id]);
-    auto localizedDebugDiagnosticMessage =
-        localizationSaver.save(localizedMessage.str() + diagnosticName.str());
-    return localizedDebugDiagnosticMessage;
-  }
   return localizedMessage;
 }
 
@@ -110,14 +98,14 @@ LocalizationProducerState LocalizationProducer::getState() const {
 }
 
 SerializedLocalizationProducer::SerializedLocalizationProducer(
-    std::unique_ptr<llvm::MemoryBuffer> buffer, bool printDiagnosticNames)
-    : LocalizationProducer(printDiagnosticNames), Buffer(std::move(buffer)) {
-}
+    std::unique_ptr<llvm::MemoryBuffer> buffer)
+    : LocalizationProducer(), Buffer(std::move(buffer)) {}
 
 bool SerializedLocalizationProducer::initializeImpl() {
   auto base =
       reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
-  auto tableOffset = endian::read<offset_type>(base, little);
+  auto tableOffset =
+      llvm::support::endian::read<offset_type>(base, llvm::endianness::little);
   SerializedTable.reset(SerializedLocalizationTable::Create(
       base + tableOffset, base + sizeof(offset_type), base));
   return true;
@@ -132,8 +120,8 @@ SerializedLocalizationProducer::getMessage(swift::DiagID id) const {
 }
 
 std::unique_ptr<LocalizationProducer>
-LocalizationProducer::producerFor(llvm::StringRef locale, llvm::StringRef path,
-                                  bool printDiagnosticNames) {
+LocalizationProducer::producerFor(llvm::StringRef locale,
+                                  llvm::StringRef path) {
   llvm::SmallString<128> filePath(path);
   llvm::sys::path::append(filePath, locale);
   llvm::sys::path::replace_extension(filePath, ".db");
@@ -143,13 +131,13 @@ LocalizationProducer::producerFor(llvm::StringRef locale, llvm::StringRef path,
   if (llvm::sys::fs::exists(filePath)) {
     if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
       return std::make_unique<diag::SerializedLocalizationProducer>(
-          std::move(file.get()), printDiagnosticNames);
+          std::move(file.get()));
     }
   } else {
     llvm::sys::path::replace_extension(filePath, ".strings");
     if (llvm::sys::fs::exists(filePath)) {
       return std::make_unique<diag::StringsLocalizationProducer>(
-          filePath.str(), printDiagnosticNames);
+          filePath.str());
     }
   }
 
@@ -206,7 +194,7 @@ void StringsLocalizationProducer::forEachAvailable(
 void StringsLocalizationProducer::readStringsFile(
     llvm::MemoryBuffer *in, std::vector<std::string> &diagnostics) {
   std::map<std::string, unsigned> diagLocs;
-#define DIAG(KIND, ID, Options, Text, Signature)                               \
+#define DIAG(KIND, ID, Group, Options, Text, Signature)                        \
   diagLocs[#ID] = static_cast<unsigned>(LocalDiagID::ID);
 #include "swift/AST/DiagnosticsAll.def"
 #undef DIAG

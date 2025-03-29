@@ -13,6 +13,8 @@
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- Original.swift
 open class Clazz {}
 

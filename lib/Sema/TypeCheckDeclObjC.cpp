@@ -14,11 +14,12 @@
 // aspects of declarations.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeCheckObjC.h"
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckObjC.h"
 #include "TypeCheckProtocol.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -153,7 +154,12 @@ void ObjCReason::describe(const Decl *D) const {
 }
 
 void ObjCReason::setAttrInvalid() const {
-  if (requiresAttr(kind))
+  if (!requiresAttr(kind))
+    return;
+
+  if (kind == MemberOfObjCImplementationExtension)
+    cast<ObjCImplementationAttr>(getAttr())->setHasInvalidImplicitLangAttrs();
+  else
     getAttr()->setInvalid();
 }
 
@@ -499,6 +505,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;
@@ -517,20 +524,20 @@ static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
   return VersionRange::all();
 }
 
-static AvailabilityContext getObjCClassStubAvailability(ASTContext &ctx) {
+static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
   // FIXME: This should just be ctx.getSwift51Availability(), but that breaks
   // tests on arm64 arches.
-  return AvailabilityContext(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
+  return AvailabilityRange(getMinOSVersionForClassStubs(ctx.LangOpts.Target));
 }
 
 static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
   auto stubAvailability = getObjCClassStubAvailability(ctx);
 
-  auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
+  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
   if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 
-  auto declAvailability = AvailabilityInference::availableRange(decl, ctx);
+  auto declAvailability = AvailabilityInference::availableRange(decl);
   return declAvailability.isContainedIn(stubAvailability);
 }
 
@@ -577,12 +584,13 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           auto stubAvailability = getObjCClassStubAvailability(ctx);
           auto *ancestor = getResilientAncestor(mod, classDecl);
           softenIfAccessNote(value, reason.getAttr(),
-            value->diagnose(diag::objc_in_resilient_extension,
-                            value->getDescriptiveKind(),
-                            ancestor->getName(),
-                            ctx.getTargetPlatformStringForDiagnostics(),
-                            stubAvailability.getRawMinimumVersion())
-                .limitBehavior(behavior));
+                             value
+                                 ->diagnose(diag::objc_in_resilient_extension,
+                                            value->getDescriptiveKind(),
+                                            ancestor->getName(),
+                                            ctx.getTargetAvailabilityDomain(),
+                                            stubAvailability)
+                                 .limitBehavior(behavior));
           reason.describe(value);
           return true;
         }
@@ -642,6 +650,11 @@ bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention) {
+  auto abiRole = ABIRoleInfo(AFD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason,
+                                 asyncConvention, errorConvention);
+
   // Clear out the async and error conventions. They will be added later if
   // needed.
   asyncConvention = std::nullopt;
@@ -728,7 +741,9 @@ bool swift::isRepresentableInObjC(
       return false;
 
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
                             diag::objc_coroutine_accessor)
           .limitBehavior(behavior);
@@ -927,7 +942,7 @@ bool swift::isRepresentableInObjC(
         boolDecl = ctx.getBoolDecl();
 
       if (boolDecl == nullptr) {
-        AFD->diagnose(diag::broken_bool);
+        AFD->diagnose(diag::broken_stdlib_type, "Bool");
         return false;
       }
 
@@ -1094,6 +1109,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (VD->isInvalid())
     return false;
 
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
@@ -1150,6 +1169,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
 bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
+  auto abiRole = ABIRoleInfo(SD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   ASTContext &ctx = SD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
@@ -1257,17 +1280,39 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
 
 #pragma mark "@objc declaration handling"
 
-/// Whether this declaration is a member of a class extension marked @objc.
-static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
+enum class ObjCExtensionKind : uint8_t {
+  /// Not an @objc extension of any kind.
+  None,
+  /// This should be treated as an @objc @implementation extension.
+  ImplementationExtension,
+  /// This should be treated as an ordinary @objc extension.
+  NormalExtension,
+};
+
+static ObjCExtensionKind
+classifyObjCExtensionContext(const ValueDecl *VD, bool isEarlyAdopter) {
   auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  if (!ext) return false;
+  if (!ext || !ext->getSelfClassDecl())
+    return ObjCExtensionKind::None;
 
-  return ext->getSelfClassDecl() && ext->getAttrs().hasAttribute<ObjCAttr>();
-}
+  auto objCAttr = ext->getAttrs().getAttribute<ObjCAttr>();
+  if (!objCAttr)
+    return ObjCExtensionKind::None;
 
-static bool isMemberOfObjCImplementationExtension(const ValueDecl *VD) {
-  return isMemberOfObjCClassExtension(VD) &&
-      cast<ExtensionDecl>(VD->getDeclContext())->isObjCImplementation();
+  if (ext->isObjCImplementation()) {
+    // Only apply objcImpl-specific logic at this point in the algorithm if the
+    // user wrote the new syntax.
+    if (!isEarlyAdopter)
+      return ObjCExtensionKind::ImplementationExtension;
+
+    // Here's the tricky case: If the `@objc` attribute is implicit, then it was
+    // added by the parser when it saw the early adopter syntax, so we should
+    // pretend it isn't there!
+    if (objCAttr->isImplicit())
+      return ObjCExtensionKind::None;
+  }
+
+  return ObjCExtensionKind::NormalExtension;
 }
 
 /// Whether this declaration is a member of a class with the `@objcMembers`
@@ -1323,10 +1368,9 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 
       auto stubAvailability = getObjCClassStubAvailability(ctx);
       auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
-      swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_for_resilient_class,
-                                   ancestor->getName(),
-                                   ctx.getTargetPlatformStringForDiagnostics(),
-                                   stubAvailability.getRawMinimumVersion())
+      swift::diagnoseAndRemoveAttr(
+          CD, attr, diag::objc_for_resilient_class, ancestor->getName(),
+          ctx.getTargetAvailabilityDomain(), stubAvailability)
           .limitBehavior(behavior);
       reason.describe(CD);
     }
@@ -1385,8 +1429,9 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
-                                                  bool allowImplicit) {
+static std::optional<ObjCReason>
+shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
+                 ObjCImplementationAttr *implAttr, bool isImplEarlyAdopter) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
     return std::nullopt;
@@ -1431,7 +1476,9 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       switch (accessor->getAccessorKind()) {
       case AccessorKind::DidSet:
       case AccessorKind::Modify:
+      case AccessorKind::Modify2:
       case AccessorKind::Read:
+      case AccessorKind::Read2:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:
@@ -1488,6 +1535,13 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   }
 
+  // Emulating old logic:
+  // A member implementation of an @objcImplementation extension is @objc...
+  // for early adopters only. (There's new logic for non-early adopters below.)
+  if (isImplEarlyAdopter && VD->isObjCMemberImplementation())
+    return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension,
+                      implAttr);
+
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1496,21 +1550,28 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
         .hasAttribute<NonObjCAttr>()))
     return std::nullopt;
 
-  if (isMemberOfObjCImplementationExtension(VD)) {
-    // A `final` member of an @objc @implementation extension is not @objc.
-    if (VD->isFinal())
-      return std::nullopt;
-    // Other members get a special reason.
-    if (canInferImplicitObjC(/*allowAnyAccess*/true)) {
-      auto ext = VD->getDeclContext()->getAsDecl();
-      auto attr = ext->getAttrs()
-                   .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-      return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+  // Handle @objc extensions of various sorts.
+  // The `ImplementationExtension` case is only taken if we are *not* an early
+  // adopter, though which of the other two it will take instead is complicated.
+  switch (classifyObjCExtensionContext(VD, isImplEarlyAdopter)) {
+  case ObjCExtensionKind::None:
+    break;
+
+  case ObjCExtensionKind::ImplementationExtension:
+    // A non-`final` member of an @objc @implementation extension is @objc
+    // with a special reason.
+    if (!VD->isFinal() && canInferImplicitObjC(/*allowAnyAccess*/true)) {
+      if (!isImplEarlyAdopter)
+        return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension,
+                          implAttr);
     }
+    break;
+
+  case ObjCExtensionKind::NormalExtension:
+    if (canInferImplicitObjC(/*allowAnyAccess*/true))
+      return ObjCReason(ObjCReason::MemberOfObjCExtension);
+    break;
   }
-  else if (isMemberOfObjCClassExtension(VD) &&
-      canInferImplicitObjC(/*allowAnyAccess*/true))
-    return ObjCReason(ObjCReason::MemberOfObjCExtension);
 
   if (isMemberOfObjCMembersClass(VD) &&
       canInferImplicitObjC(/*allowAnyAccess*/false))
@@ -1528,6 +1589,113 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   }
 
   return std::nullopt;
+}
+
+static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+                                                  bool allowImplicit) {
+  // The real logic is in the four-argument version above. This wrapper just
+  // detects future `@objc @implementation` behavior changes and warns about
+  // them.
+
+  ObjCImplementationAttr *implAttr = nullptr;
+  if (auto ctxDecl = VD->getDeclContext()->getAsDecl())
+    implAttr = ctxDecl->getAttrs().getAttribute<ObjCImplementationAttr>(
+                                                 /*AllowInvalid=*/true);
+
+  bool isEarlyAdopter = implAttr ? implAttr->isEarlyAdopter() : false;
+
+  auto currentlyObjC = shouldMarkAsObjC(VD, allowImplicit,
+                                        implAttr, isEarlyAdopter);
+
+  // If we weren't an early adopter, there's no differences to detect.
+  if (!isEarlyAdopter)
+    return currentlyObjC;
+
+  // Re-run the logic, but with the early adopter flag forced to `false`.
+  auto eventuallyObjC = shouldMarkAsObjC(VD, allowImplicit,
+                                         implAttr, /*isEarlyAdopter=*/false);
+
+  // Would that have behaved differently? If so, warn about it so the developer
+  // knows they should update their code.
+  if (currentlyObjC.has_value() == eventuallyObjC.has_value())
+    return currentlyObjC;
+
+  bool suggestFinal = !isa<ConstructorDecl>(VD);
+
+  if (eventuallyObjC.has_value()) {
+    ASSERT(!currentlyObjC.has_value());
+
+    VD->diagnose(diag::objc_implementation_will_become_objc, VD, suggestFinal)
+      .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
+                   suggestFinal ? "final " : "@nonobjc ");
+
+    VD->diagnose(diag::make_decl_objc, VD->getDescriptiveKind())
+      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+  } else {
+    ASSERT(currentlyObjC.has_value());
+
+    VD->diagnose(diag::objc_implementation_will_become_nonobjc, VD)
+      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+
+    VD->diagnose(diag::fixit_add_nonobjc_or_final_for_objc_implementation,
+                 VD->getDescriptiveKind(), suggestFinal)
+      .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
+                   suggestFinal ? "final " : "@nonobjc ");
+  }
+
+  implAttr->setHasInvalidImplicitLangAttrs();
+
+  return currentlyObjC;
+}
+
+/// Emits a diagnostic for an invalid `@objc` name.
+static void diagnoseInvalidObjCName(ValueDecl *VD, ObjCAttr *attr) {
+  if (attr && !attr->getNameLocs().empty()) {
+    // Locate the diagnostic on the name itself if it was explicitly provided.
+    VD->getDiags().diagnose(attr->getNameLocs().front(),
+                            diag::objc_name_not_valid_identifier,
+                            VD->getDescriptiveKind());
+  } else {
+    switch (VD->getDescriptiveKind()) {
+    case DescriptiveDeclKind::Getter:
+    case DescriptiveDeclKind::Setter:
+      // If the name of the getter or setter isn't provided explicitly
+      // and the inferred name is invalid, then the property name must
+      // also be invalid and we'll diagnose that. Don't emit redundant
+      // diagnostics for the getter/setter.
+      break;
+    default:
+      VD->diagnose(diag::objc_cannot_infer_name_raw_identifier,
+                   VD->getDescriptiveKind());
+    }
+  }
+}
+
+// Returns true if all of the selector pieces are Obj-C compatible (i.e., no
+// raw identifiers with non-identifier characters).
+static bool isObjCSelectorValid(ObjCSelector selector) {
+  for (const auto &piece : selector.getSelectorPieces()) {
+    if (!piece.empty() && piece.mustAlwaysBeEscaped()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Checks whether the `@objc` name of a declaration is valid and emits a
+/// diagnostic if not.
+static void checkObjCNameValidity(ValueDecl *VD, ObjCAttr *attr) {
+  if (attr && attr->hasName()) {
+    // The name was explicitly provided by the attribute, so check that.
+    if (!isObjCSelectorValid(*attr->getName())) {
+      diagnoseInvalidObjCName(VD, attr);
+    }
+  } else {
+    // Check the original name of the declaration.
+    if (VD->getName().mustAlwaysBeEscaped()) {
+      diagnoseInvalidObjCName(VD, attr);
+    }
+  }
 }
 
 /// Determine whether the given type is a C integer type.
@@ -1572,7 +1740,8 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
   // FIXME: Use shouldMarkAsObjC once it loses it's TypeChecker argument.
 
   // If there is no @objc attribute, it's not @objc.
-  if (!enumDecl->getAttrs().hasAttribute<ObjCAttr>())
+  auto attr = enumDecl->getAttrs().getAttribute<ObjCAttr>();
+  if (!attr)
     return false;
 
   Type rawType = enumDecl->getRawType();
@@ -1601,7 +1770,8 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
   if (enumDecl->getAllElements().empty()) {
     enumDecl->diagnose(diag::empty_enum_raw_type);
   }
-  
+
+  checkObjCNameValidity(enumDecl, attr);
   return true;
 }
 
@@ -1612,6 +1782,11 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
+
+  // ABI-only decls inherit objc-ness from their API.
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isObjC();
 
   // Access notes may add attributes that affect this calculus.
   TypeChecker::applyAccessNote(VD);
@@ -1630,6 +1805,10 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Protocols and enums can also be @objc, but this is covered by the
     // isObjC() check at the beginning.
     isObjC = shouldMarkAsObjC(VD, /*allowImplicit=*/false);
+    if (isObjC) {
+      checkObjCNameValidity(classDecl,
+                            classDecl->getAttrs().getAttribute<ObjCAttr>());
+    }
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
@@ -1639,13 +1818,17 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
     // Enum elements can be @objc so long as the containing enum is @objc.
     if (enumElement->getParentEnum()->isObjC()) {
-      if (auto attr = enumElement->getAttrs().getAttribute<ObjCAttr>())
+      auto attr = enumElement->getAttrs().getAttribute<ObjCAttr>();
+      checkObjCNameValidity(enumElement, attr);
+      if (attr)
         isObjC = objCReasonForObjCAttr(attr);
       else
         isObjC = ObjCReason::ElementOfObjCEnum;
     }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
-    if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
+    auto attr = proto->getAttrs().getAttribute<ObjCAttr>();
+    if (attr) {
+      checkObjCNameValidity(proto, attr);
       isObjC = objCReasonForObjCAttr(attr);
 
       // If the protocol is @objc, it may only refine other @objc protocols and
@@ -1810,10 +1993,17 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
     }
   }
 
+  auto validateObjCSelector = [&](ObjCSelector selector) {
+    if (!isObjCSelectorValid(selector)) {
+      diagnoseInvalidObjCName(decl, attr);
+    }
+    return selector;
+  };
+
   // If the decl already has a name, do nothing; the protocol conformance
   // checker will handle any mismatches.
   if (attr && attr->hasName())
-    return *attr->getName();
+    return validateObjCSelector(*attr->getName());
 
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
@@ -1860,7 +2050,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
     return *requirementObjCName;
   }
 
-  return *decl->getObjCRuntimeName(true);
+  return validateObjCSelector(*decl->getObjCRuntimeName(true));
 }
 
 /// Mark the given declaration as being Objective-C compatible (or
@@ -2406,6 +2596,11 @@ bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
       if (attr->isInvalid())
         continue;
     }
+
+    // Skip declarations that are member implementations;
+    // ObjCImplmentationChecker will ensure they match a redeclared method.
+    if (method->isObjCMemberImplementation())
+      continue;
 
     auto classDecl = method->getDeclContext()->getSelfClassDecl();
     if (!classDecl)
@@ -3074,13 +3269,24 @@ class ObjCImplementationChecker {
 
   bool hasDiagnosed = false;
 
+  bool hasInvalidLangAttr(ValueDecl *cand) {
+    // If isObjC() found a problem, it will have set the invalid bit on either
+    // the candidate's ObjCAttr, if it has one, or the controlling
+    // ObjCImplementationAttr otherwise.
+    if (auto objc = cand->getAttrs()
+                            .getAttribute<ObjCAttr>(/*AllowInvalid=*/true))
+      return objc->isInvalid();
+
+    return getAttr()->hasInvalidImplicitLangAttrs() || getAttr()->isInvalid();
+  }
+
 public:
   ObjCImplementationChecker(Decl *D)
       : decl(D), hasDiagnosed(getAttr()->isInvalid())
   {
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
 
-    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (isa<AbstractFunctionDecl>(D)) {
       addCandidate(D);
       addRequirement(D->getImplementedObjCDecl());
 
@@ -3119,19 +3325,6 @@ public:
   }
 
 private:
-  static bool hasAsync(ValueDecl *member) {
-    if (!member)
-      return false;
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member))
-      return func->hasAsync();
-
-    if (auto storage = dyn_cast<AbstractStorageDecl>(member))
-      return hasAsync(storage->getEffectfulGetAccessor());
-
-    return false;
-  }
-
   static ValueDecl *getAsyncAlternative(ValueDecl *req) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(req)) {
       auto asyncFunc = func->getAsyncAlternative();
@@ -3158,18 +3351,11 @@ private:
       return;
 
     // Don't diagnose if we already diagnosed an unrelated ObjC interop issue,
-    // like an un-representable type. If there's an `@objc` attribute on the
-    // member, this will be indicated by its `isInvalid()` bit; otherwise we'll
-    // use the enclosing extension's `@_objcImplementation` attribute.
-    DeclAttribute *attr = afd->getAttrs()
-                              .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
-    if (!attr)
-      attr = member->getDeclContext()->getAsDecl()->getAttrs()
-                 .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
-    assert(attr && "expected @_objcImplementation on context of member checked "
-                   "by ObjCImplementationChecker");
-    if (attr->isInvalid())
+    // like an un-representable type.
+    if (hasInvalidLangAttr(member)) {
+      hasDiagnosed = true;
       return;
+    }
 
     if (auto init = dyn_cast<ConstructorDecl>(afd)) {
       if (!init->isObjC() && (init->isRequired() ||
@@ -3202,21 +3388,18 @@ private:
     if (!VD)
       return;
 
-    ASTContext &ctx = VD->getASTContext();
-
     // Also skip overrides, unless they override an unavailable decl, which
     // makes them not formally overrides anymore.
-    if (VD->getOverriddenDecl() &&
-          !VD->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
+    if (VD->getOverriddenDecl() && !VD->getOverriddenDecl()->isUnavailable())
       return;
 
     // Skip alternate Swift names for other language modes.
-    if (VD->getAttrs().isUnavailable(ctx))
+    if (VD->isUnavailable())
       return;
 
     // Skip async versions of members. We'll match against the completion
     // handler versions, hopping over to `getAsyncAlternative()` if needed.
-    if (hasAsync(VD))
+    if (VD->isAsync())
       return;
 
     auto inserted = unmatchedRequirements.insert(VD);
@@ -3254,6 +3437,9 @@ private:
         continue;
 
       if (auto VD = dyn_cast<ValueDecl>(member)) {
+        // Force isObjC() to make sure hasInvalidImplicitLangAttrs() is set.
+        (void)VD->isObjC();
+
         // Skip non-member implementations.
         // FIXME: Should we consider them if only rejected for access level?
         if (!VD->isObjCMemberImplementation()) {
@@ -3274,7 +3460,8 @@ private:
       return ObjCSelector(VD->getASTContext(), 0, { ident });
     }
     if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>())
-      return objcAttr->getName().value_or(ObjCSelector());
+      if (!objcAttr->isNameImplicit())
+        return objcAttr->getName().value_or(ObjCSelector());
     return ObjCSelector();
   }
 
@@ -3320,6 +3507,7 @@ private:
     WrongWritability,
     WrongRequiredAttr,
     WrongForeignErrorConvention,
+    WrongSendability,
 
     Match,
     MatchWithExplicitObjCName,
@@ -3506,70 +3694,93 @@ private:
     return lhs == rhs;
   }
 
-  static bool matchParamTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
+  static MatchOutcome matchParamTypes(Type reqTy, Type implTy,
+                                      ValueDecl *implDecl) {
     TypeMatchOptions matchOpts = {};
-
     // Try a plain type match.
     if (implTy->matchesParameter(reqTy, matchOpts))
-      return true;
+      return MatchOutcome::Match;
 
-    // If the implementation type is IUO, try unwrapping it.
-    if (auto unwrappedImplTy = implTy->getOptionalObjectType())
-      return implDecl->isImplicitlyUnwrappedOptional()
-                && unwrappedImplTy->matchesParameter(reqTy, matchOpts);
+    // Try to drop `@Sendable`.
+    {
+      auto ignoreSendable =
+          matchOpts | TypeMatchFlags::IgnoreFunctionSendability;
 
-    return false;
+      if (implTy->matchesParameter(reqTy, ignoreSendable))
+        return MatchOutcome::WrongSendability;
+    }
+
+    if (implDecl) {
+      // If the implementation type is IUO, try unwrapping it.
+      if (auto unwrappedImplTy = implTy->getOptionalObjectType())
+        return implDecl->isImplicitlyUnwrappedOptional() &&
+                       unwrappedImplTy->matchesParameter(reqTy, matchOpts)
+                   ? MatchOutcome::Match
+                   : MatchOutcome::WrongType;
+    }
+
+    return MatchOutcome::WrongType;
   }
 
-  static bool matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
+  static MatchOutcome matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
     TypeMatchOptions matchOpts = {};
 
     // Try a plain type match.
     if (reqTy->matches(implTy, matchOpts))
-      return true;
+      return MatchOutcome::Match;
 
     // If the implementation type is optional, try unwrapping it.
     if (auto unwrappedImplTy = implTy->getOptionalObjectType())
-      return implDecl->isImplicitlyUnwrappedOptional()
-                  && reqTy->matches(unwrappedImplTy, matchOpts);
+      return implDecl->isImplicitlyUnwrappedOptional() &&
+                     reqTy->matches(unwrappedImplTy, matchOpts)
+                 ? MatchOutcome::Match
+                 : MatchOutcome::WrongType;
 
     // Apply these rules to the result type and parameters if it's a function
     // type.
-    if (auto funcReqTy = reqTy->getAs<AnyFunctionType>())
-      if (auto funcImplTy = implTy->getAs<AnyFunctionType>())
-        return funcReqTy->matchesFunctionType(funcImplTy, matchOpts,
-                                              [=]() -> bool {
-          auto reqParams = funcReqTy->getParams();
-          auto implParams = funcImplTy->getParams();
-          if (reqParams.size() != implParams.size())
-            return false;
-
-          ParameterList *implParamList = nullptr;
-          if (auto afd = dyn_cast<AbstractFunctionDecl>(implDecl))
-            implParamList = afd->getParameters();
-
-          for (auto i : indices(reqParams)) {
-            const auto &reqParam = reqParams[i];
-            const auto &implParam = implParams[i];
-            if (implParamList) {
-              // Some of the parameters may be IUOs; apply special logic.
-              if (!matchParamTypes(reqParam.getOldType(),
-                                   implParam.getOldType(),
-                                   implParamList->get(i)))
+    if (auto funcReqTy = reqTy->getAs<AnyFunctionType>()) {
+      if (auto funcImplTy = implTy->getAs<AnyFunctionType>()) {
+        bool hasSendabilityMismatches = false;
+        bool isMatch = funcReqTy->matchesFunctionType(
+            funcImplTy, matchOpts, [=, &hasSendabilityMismatches]() -> bool {
+              auto reqParams = funcReqTy->getParams();
+              auto implParams = funcImplTy->getParams();
+              if (reqParams.size() != implParams.size())
                 return false;
-            } else {
-              // IUOs not allowed here; apply ordinary logic.
-              if (!reqParam.getOldType()->matchesParameter(
-                      implParam.getOldType(), matchOpts))
-                return false;
-            }
-          }
 
-          return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
-                            implDecl);
-        });
+              ParameterList *implParamList = nullptr;
+              if (auto afd = dyn_cast<AbstractFunctionDecl>(implDecl))
+                implParamList = afd->getParameters();
 
-    return false;
+              for (auto i : indices(reqParams)) {
+                const auto &reqParam = reqParams[i];
+                const auto &implParam = implParams[i];
+
+                auto outcome = matchParamTypes(
+                    reqParam.getOldType(), implParam.getOldType(),
+                    implParamList ? implParamList->get(i) : nullptr);
+
+                if (outcome == MatchOutcome::WrongSendability)
+                  hasSendabilityMismatches = true;
+
+                if (outcome < MatchOutcome::WrongSendability)
+                  return false;
+              }
+
+              return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
+                                implDecl) == MatchOutcome::Match;
+            });
+
+        if (isMatch) {
+          return hasSendabilityMismatches ? MatchOutcome::WrongSendability
+                                          : MatchOutcome::Match;
+        }
+
+        return MatchOutcome::WrongType;
+      }
+    }
+
+    return MatchOutcome::WrongType;
   }
 
   static Type getMemberType(ValueDecl *decl) {
@@ -3614,7 +3825,9 @@ private:
     if (cand->getKind() != req->getKind())
       return MatchOutcome::WrongDeclKind;
 
-    if (!matchTypes(getMemberType(req), getMemberType(cand), cand))
+    auto matchTypesOutcome =
+        matchTypes(getMemberType(req), getMemberType(cand), cand);
+    if (matchTypesOutcome == MatchOutcome::WrongType)
       return MatchOutcome::WrongType;
 
     if (auto reqVar = dyn_cast<AbstractStorageDecl>(req))
@@ -3635,6 +3848,15 @@ private:
     if (explicitObjCName)
       return MatchOutcome::MatchWithExplicitObjCName;
 
+    // Sendable mismatches are downgraded to warnings because ObjC
+    // declarations are `@preconcurrency`, we need to make sure
+    // that there are no other problems before returning `WrongSendability`.
+    if (matchTypesOutcome == MatchOutcome::WrongSendability)
+      return MatchOutcome::WrongSendability;
+
+    ASSERT(matchTypesOutcome == MatchOutcome::Match &&
+           "unexpected matchTypes() return");
+
     return MatchOutcome::Match;
   }
 
@@ -3642,7 +3864,7 @@ private:
                        ObjCSelector explicitObjCName) const {
     // If the candidate we're considering is async, see if the requirement has
     // an async alternate and try to match against that instead.
-    if (hasAsync(cand))
+    if (cand->isAsync())
       if (auto asyncAltReq = getAsyncAlternative(req))
         return matchesImpl(asyncAltReq, cand, explicitObjCName);
 
@@ -3651,6 +3873,13 @@ private:
 
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
+    // If the candidate was invalid, we've already diagnosed the likely cause of
+    // the mismatch. Don't dogpile.
+    if (hasInvalidLangAttr(cand)) {
+      hasDiagnosed = true;
+      return;
+    }
+
     auto reqObjCName = getObjCName(req);
 
     switch (outcome) {
@@ -3664,6 +3893,28 @@ private:
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
       return;
+
+    case MatchOutcome::WrongSendability: {
+      auto concurrencyLevel = req->getASTContext().LangOpts.StrictConcurrencyLevel;
+
+      DiagnosticBehavior behavior;
+      switch (concurrencyLevel) {
+      case StrictConcurrency::Complete:
+        behavior = DiagnosticBehavior::Warning;
+        break;
+
+      case StrictConcurrency::Targeted:
+      case StrictConcurrency::Minimal:
+        behavior = DiagnosticBehavior::Ignore;
+        break;
+      }
+
+      diagnose(cand, diag::objc_implementation_sendability_mismatch, cand,
+               getMemberType(cand), getMemberType(req))
+          .limitBehaviorWithPreconcurrency(behavior,
+                                           /*preconcurrency*/ true);
+      return;
+    }
 
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
@@ -3840,21 +4091,19 @@ public:
       }
 
       // Initializers can't be 'final', but they can be '@nonobjc'
-      if (isa<ConstructorDecl>(cand))
-        diagnose(cand, diag::fixit_add_nonobjc_for_objc_implementation,
-                 cand->getDescriptiveKind())
-            .fixItInsert(cand->getAttributeInsertionLoc(false), "@nonobjc ");
-      else
-        diagnose(cand, diag::fixit_add_final_for_objc_implementation,
-                 cand->getDescriptiveKind())
-            .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
+      bool suggestFinal = !isa<ConstructorDecl>(cand);
+      diagnose(cand, diag::fixit_add_nonobjc_or_final_for_objc_implementation,
+               cand->getDescriptiveKind(), suggestFinal)
+          .fixItInsert(cand->getAttributeInsertionLoc(suggestFinal),
+                       suggestFinal ? "final " : "@nonobjc ");
     }
   }
 
   void diagnoseEarlyAdopterDeprecation() {
     // Only encourage use of @implementation for early adopters, and only when
     // there are no mismatches that they might be working around with it.
-    if (hasDiagnosed || !getAttr()->isEarlyAdopter())
+    if (hasDiagnosed || !getAttr()->isEarlyAdopter()
+          || getAttr()->hasInvalidImplicitLangAttrs())
       return;
 
     // Only encourage adoption if the corresponding language feature is enabled.
@@ -3884,6 +4133,9 @@ public:
 
 evaluator::SideEffect TypeCheckObjCImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *D) const {
+  if (!ABIRoleInfo(D).providesAPI())
+    return evaluator::SideEffect();
+
   PrettyStackTraceDecl trace("checking member implementations of", D);
 
   // FIXME: Because we check extension-by-extension, candidates and requirements

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -18,7 +18,13 @@ enum Numerals {
   case Four
 }
 
+enum E2 {
+  case int(Int)
+  case str(String)
+}
+
 sil [ossa] @external_func: $@convention(thin) () -> ()
+sil @useit : $@convention(thin) (@owned E2) -> ()
 
 // CHECK-LABEL: sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 // CHECK-NOT: switch_enum_addr
@@ -141,11 +147,11 @@ bb0(%0 : $*G<T>):
 }
 
 // CHECK-LABEL: sil [ossa] @canonicalize_init_enum_data_addr
-// XHECK-NOT: init_enum_data_addr
-// XHECK-NOT: inject_enum_addr
-// XHECK: enum $Optional<Int32>, #Optional.some!enumelt
-// XHECK-NOT: inject_enum_addr
-// XHECK: return
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
 sil [ossa] @canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32, Optional<Int32>) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Optional<Int32>):
   %s1 = alloc_stack $Optional<Int32>
@@ -165,11 +171,11 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Optional<Int32>):
 }
 
 // CHECK-LABEL: sil [ossa] @canonicalize_init_enum_data_addr
-// XHECK-NOT: init_enum_data_addr
-// XHECK-NOT: inject_enum_addr
-// XHECK: enum $Optional<SomeClass>, #Optional.some!enumelt
-// XHECK-NOT: inject_enum_addr
-// XHECK: return
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<SomeClass>, #Optional.some!enumelt
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
 sil [ossa] @canonicalize_init_enum_data_addr_non_trivial : $@convention(thin) (@inout SomeClass, @owned Optional<SomeClass>) -> @owned Optional<SomeClass> {
 bb0(%0 : $*SomeClass, %2 : @owned $Optional<SomeClass>):
   %s1 = alloc_stack $Optional<SomeClass>
@@ -188,11 +194,11 @@ bb0(%0 : $*SomeClass, %2 : @owned $Optional<SomeClass>):
 }
 
 // CHECK-LABEL: sil [ossa] @canonicalize_init_enum_data_addr_diff_basic_blocks
-// XHECK-NOT: init_enum_data_addr
-// XHECK-NOT: inject_enum_addr
-// XHECK: enum $Optional<Int32>, #Optional.some!enumelt
-// XHECK-NOT: inject_enum_addr
-// XHECK: return
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
 sil [ossa] @canonicalize_init_enum_data_addr_diff_basic_blocks : $@convention(thin) (@inout Int32, Builtin.Int32, Optional<Int32>) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Optional<Int32>):
   %s1 = alloc_stack $Optional<Int32>
@@ -215,10 +221,10 @@ bb1:                                              // Preds: bb0
 }
 
 // CHECK-LABEL: sil [ossa] @fail_to_canonicalize_init_enum_data_addr_reach_entry
-// XHECK: init_enum_data_addr
-// XHECK: inject_enum_addr
-// XHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt
-// XHECK: return
+// CHECK: init_enum_data_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt
+// CHECK: return
 sil [ossa] @fail_to_canonicalize_init_enum_data_addr_reach_entry : $@convention(thin) (@inout Int32, Builtin.Int32, Builtin.Int1) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1):
   %s1 = alloc_stack $Optional<Int32>
@@ -249,10 +255,10 @@ bb2:                                              // Preds: bb0 bb1
 }
 
 // CHECK-LABEL: sil [ossa] @fail_to_canonicalize_init_enum_data_addr
-// XHECK: init_enum_data_addr
-// XHECK: inject_enum_addr
-// XHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt
-// XHECK: return
+// CHECK: init_enum_data_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt
+// CHECK: return
 sil [ossa] @fail_to_canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   %s1 = alloc_stack $Optional<Int32>
@@ -449,13 +455,13 @@ bb3(%14 : @owned $C):
 }
 
 // CHECK-LABEL: sil [ossa] @test_inject_tuple
-// XHECK:   [[A:%[0-9]+]] = alloc_stack $Optional<(Int, Int)>
-// XHECK:   [[T:%[0-9]+]] = tuple (%0 : $Int, %1 : $Int)
-// XHECK:   [[E:%[0-9]+]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt, [[T]] : $(Int, Int)
-// XHECK:   store [[E]] to [trivial] [[A]]
-// XHECK:   [[L:%[0-9]+]] = load [trivial] [[A]]
-// XHECK:   return [[L]]
-// XHECK: } // end sil function 'test_inject_tuple'
+// CHECK:   [[A:%[0-9]+]] = alloc_stack $Optional<(Int, Int)>
+// CHECK:   [[T:%[0-9]+]] = tuple (%0 : $Int, %1 : $Int)
+// CHECK:   [[E:%[0-9]+]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt, [[T]] : $(Int, Int)
+// CHECK:   store [[E]] to [trivial] [[A]]
+// CHECK:   [[L:%[0-9]+]] = load [trivial] [[A]]
+// CHECK:   return [[L]]
+// CHECK: } // end sil function 'test_inject_tuple'
 sil [ossa] @test_inject_tuple : $@convention(thin) (Int, Int) -> Optional<(Int, Int)> {
 bb0(%0 : $Int, %1 : $Int):
   %17 = alloc_stack $Optional<(Int, Int)>
@@ -480,14 +486,14 @@ sil [ossa] @take_t : $@convention(thin) (@in T) -> ()
 sil [ossa] @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
 
 // CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum1
-// XHECK:        [[A:%[0-9]+]] = alloc_stack $S
-// XHECK:      bb1:
-// XHECK-NEXT:   store %0 to [trivial] [[A]]
-// XHECK:      bb2:
-// XHECK-NEXT:   store %0 to [trivial] [[A]]
-// XHECK:      bb3:
-// XHECK:        apply {{%[0-9]+}}([[A]])
-// XHECK: } // end sil function 'expand_alloc_stack_of_enum1'
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [trivial] [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [trivial] [[A]]
+// CHECK:      bb3:
+// CHECK:        apply {{%[0-9]+}}([[A]])
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum1'
 sil [ossa] @expand_alloc_stack_of_enum1 : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
@@ -515,14 +521,14 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum_without_take
-// XHECK:        [[A:%[0-9]+]] = alloc_stack $S
-// XHECK:      bb1:
-// XHECK-NEXT:   store %0 to [trivial] [[A]]
-// XHECK:      bb2:
-// XHECK-NEXT:   store %0 to [trivial] [[A]]
-// XHECK:      bb3:
-// XHECK:        destroy_addr [[A]]
-// XHECK: } // end sil function 'expand_alloc_stack_of_enum_without_take'
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [trivial] [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [trivial] [[A]]
+// CHECK:      bb3:
+// CHECK:        destroy_addr [[A]]
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_without_take'
 sil [ossa] @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
@@ -548,15 +554,15 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum_multiple_cases
-// XHECK:        [[A:%[0-9]+]] = alloc_stack $T
-// XHECK:      bb1:
-// XHECK-NEXT:   [[COPY_ARG:%.*]] = copy_value %0
-// XHECK-NEXT:   store [[COPY_ARG]] to [init] [[A]]
-// XHECK:        apply {{%[0-9]+}}([[A]])
-// XHECK:      bb2:
-// XHECK-NEXT:   br bb3
-// XHECK:      bb3:
-// XHECK: } // end sil function 'expand_alloc_stack_of_enum_multiple_cases'
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $T
+// CHECK:      bb1:
+// CHECK-NEXT:   [[COPY_ARG:%.*]] = copy_value %0
+// CHECK-NEXT:   store [[COPY_ARG]] to [init] [[A]]
+// CHECK:        apply {{%[0-9]+}}([[A]])
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_multiple_cases'
 sil [ossa] @expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (@guaranteed T) -> () {
 bb0(%0 : @guaranteed $T):
   %1 = alloc_stack $X
@@ -584,8 +590,8 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases
-// XHECK:   alloc_stack $MP
-// XHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
+// CHECK:   alloc_stack $MP
+// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
 sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
@@ -611,8 +617,8 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases2
-// XHECK:   alloc_stack $X
-// XHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases2'
+// CHECK:   alloc_stack $X
+// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases2'
 sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases2 : $@convention(method) (@guaranteed T) -> () {
 bb0(%0 : @guaranteed $T):
   %1 = alloc_stack $X
@@ -637,8 +643,8 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_unknown_use
-// XHECK:   alloc_stack $MP
-// XHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_unknown_use'
+// CHECK:   alloc_stack $MP
+// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_unknown_use'
 sil [ossa] @dont_expand_alloc_stack_of_enum_unknown_use : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
@@ -651,5 +657,61 @@ bb0(%0 : $S):
   dealloc_stack %1 : $*MP
   %11 = tuple ()
   return %11 : $()
+}
+
+class Klass {}
+
+// CHECK-LABEL: sil [ossa] @test_nontrivial_enum_inject_enum_addr_opt
+// CHECK: [[VAL:%.*]] = enum $Optional<Klass>, #Optional.none!enumelt
+// CHECK: store [[VAL]] to [trivial] %0 : $*Optional<Klass>
+// CHECK: } // end sil function 'test_nontrivial_enum_inject_enum_addr_opt'
+sil [ossa] @test_nontrivial_enum_inject_enum_addr_opt : $@convention(method) (@inout Optional<Klass>) -> @owned Optional<Klass> {
+bb0(%0 : $*Optional<Klass>):
+  %1 = load [take] %0 : $*Optional<Klass>
+  inject_enum_addr %0 : $*Optional<Klass>, #Optional.none!enumelt
+  return %1 : $Optional<Klass>
+}
+
+struct NC : ~Copyable {}
+
+// CHECK-LABEL: sil [ossa] @test_noncopyable_enum_inject_enum_addr_opt
+// CHECK: [[VAL:%.*]] = enum $Optional<NC>, #Optional.none!enumelt
+// CHECK: store [[VAL]] to [init] %0 : $*Optional<NC>
+// CHECK: } // end sil function 'test_noncopyable_enum_inject_enum_addr_opt'
+sil [ossa] @test_noncopyable_enum_inject_enum_addr_opt : $@convention(method) (@inout Optional<NC>) -> @owned Optional<NC> {
+bb0(%0 : $*Optional<NC>):
+  %1 = load [take] %0 : $*Optional<NC>
+  inject_enum_addr %0 : $*Optional<NC>, #Optional.none!enumelt
+  return %1 : $Optional<NC>
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_replacement
+// CHECK:       bb1({{.*}}:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value %2
+// CHECK:         apply {{%[0-9]+}}(%1)
+// CHECK:       } // end sil function 'trivial_replacement'
+sil [ossa] @trivial_replacement : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $E2, #E2.int!enumelt, %0 : $Int
+  %2 = enum $Optional<E2>, #Optional.some!enumelt, %1 : $E2, forwarding: @owned
+  %3 = begin_borrow %2 : $Optional<E2>
+  switch_enum %3 : $Optional<E2>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : @guaranteed $E2):
+  end_borrow %3 : $Optional<E2>
+  %7 = unchecked_enum_data %2 : $Optional<E2>, #Optional.some!enumelt
+  %8 = function_ref @useit : $@convention(thin) (@owned E2) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned E2) -> ()
+  br bb3
+  
+bb2:
+  end_borrow %3 : $Optional<E2>
+  destroy_value %2 : $Optional<E2>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
 }
 

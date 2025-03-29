@@ -17,6 +17,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
@@ -302,24 +303,7 @@ ASTNode BraceStmt::findAsyncNode() {
 }
 
 static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
-  while (true) {
-    // Single element brace.
-    if (elts.size() == 1)
-      return true;
-
-    // See if we have a #if as the first element of a 2 element brace, if so we
-    // can recuse into its active clause. If so, the second element will be the
-    // active element.
-    if (elts.size() == 2) {
-      if (auto *D = elts.front().dyn_cast<Decl *>()) {
-        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-          elts = ICD->getActiveClauseElements();
-          continue;
-        }
-      }
-    }
-    return false;
-  }
+  return elts.size() == 1;
 }
 
 ASTNode BraceStmt::getSingleActiveElement() const {
@@ -635,6 +619,11 @@ PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                                            RParenLoc, isUnavailability);
 }
 
+SemanticAvailabilitySpecs PoundAvailableInfo::getSemanticAvailabilitySpecs(
+    const DeclContext *declContext) const {
+  return SemanticAvailabilitySpecs(getQueries(), declContext);
+}
+
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
@@ -787,7 +776,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   }
 
   MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
-                                       Bits.CaseStmt.NumPatterns};
+                                       static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
 
   // At the beginning mark all of our var decls as being owned by this
   // statement. In the typechecker we wireup the case stmt var decl list since
@@ -951,20 +940,10 @@ CaseStmt *CaseStmt::findNextCaseStmt() const {
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
-                               Expr *SubjectExpr,
-                               SourceLoc LBraceLoc,
-                               ArrayRef<ASTNode> Cases,
-                               SourceLoc RBraceLoc,
-                               SourceLoc EndLoc,
-                               ASTContext &C) {
-#ifndef NDEBUG
-  for (auto N : Cases)
-    assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && (isa<IfConfigDecl>(N.get<Decl*>()) ||
-                              isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
-#endif
-
-  void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
+                               Expr *SubjectExpr, SourceLoc LBraceLoc,
+                               ArrayRef<CaseStmt *> Cases, SourceLoc RBraceLoc,
+                               SourceLoc EndLoc, ASTContext &C) {
+  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
@@ -972,7 +951,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<ASTNode>());
+                          theSwitch->getTrailingObjects<CaseStmt *>());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 

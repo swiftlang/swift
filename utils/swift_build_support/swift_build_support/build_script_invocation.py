@@ -29,6 +29,8 @@ from swift_build_support.swift_build_support.host_specific_configuration \
     import HostSpecificConfiguration
 from swift_build_support.swift_build_support.productpipeline_list_builder \
     import ProductPipelineListBuilder
+from swift_build_support.swift_build_support.products.ninja \
+    import get_ninja_path
 from swift_build_support.swift_build_support.targets \
     import StdlibDeploymentTarget
 from swift_build_support.swift_build_support.utils import clear_log_time
@@ -52,24 +54,13 @@ class BuildScriptInvocation(object):
 
         clear_log_time()
 
+        self.toolchain.ninja = get_ninja_path(self.toolchain,
+                                              self.args,
+                                              self.workspace)
+
     @property
     def install_all(self):
         return self.args.install_all or self.args.infer_dependencies
-
-    def build_ninja(self):
-        if not os.path.exists(self.workspace.source_dir("ninja")):
-            fatal_error(
-                "can't find source directory for ninja "
-                "(tried %s)" % (self.workspace.source_dir("ninja")))
-
-        ninja_build = products.Ninja.new_builder(
-            args=self.args,
-            toolchain=self.toolchain,
-            workspace=self.workspace,
-            host=StdlibDeploymentTarget.get_target_for_name(
-                self.args.host_target))
-        ninja_build.build()
-        self.toolchain.ninja = ninja_build.ninja_bin_path
 
     def convert_to_impl_arguments(self):
         """convert_to_impl_arguments() -> (env, args)
@@ -138,6 +129,7 @@ class BuildScriptInvocation(object):
             '--build-swift-clang-overlays', str(
                 args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            "--swift-source-dirname", products.Swift.product_source_name(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -261,6 +253,20 @@ class BuildScriptInvocation(object):
                 args.extra_cmake_options.append(
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
+        if args.build_early_swift_driver:
+            configuration = 'release' if str(args.swift_build_variant) in [
+                'Release',
+                'RelWithDebInfo'
+            ] else 'debug'
+            directory = 'earlyswiftdriver-{}'.format(self.args.host_target)
+
+            swift_driver_build = os.path.join(self.workspace.build_root,
+                                              directory,
+                                              configuration,
+                                              'bin')
+            args.extra_cmake_options.append(
+                '-DSWIFT_EARLY_SWIFT_DRIVER_BUILD={}'.format(swift_driver_build))
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
@@ -275,7 +281,7 @@ class BuildScriptInvocation(object):
             (args.build_libdispatch, "libdispatch"),
             (args.build_libxml2, 'libxml2'),
             (args.build_zlib, 'zlib'),
-            (args.build_curl, 'curl')
+            (args.build_curl, 'curl'),
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -536,6 +542,11 @@ class BuildScriptInvocation(object):
                 # from the `build-script-impl`.
                 impl_env["HOST_VARIABLE_{}__{}".format(
                     host_target.replace("-", "_"), name)] = value
+
+        if args.verbose_build:
+            # This ensures all CMake builds (including the ones
+            # called with `ExternalProject`) have verbose output
+            impl_env["VERBOSE"] = "1"
 
         return (impl_env, impl_args)
 
@@ -891,20 +902,20 @@ class BuildScriptInvocation(object):
             build_dir=build_dir)
         if product.should_clean(host_target):
             log_message = "Cleaning %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.clean(host_target)
         if product.should_build(host_target):
             log_message = "Building %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.build(host_target)
         if product.should_test(host_target):
             log_message = "Running tests for %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.test(host_target)
-            print("--- Finished tests for %s ---" % product_name)
+            print("--- Finished tests for %s ---" % product_name, flush=True)
         # Install the product if it should be installed specifically, or
         # if it should be built and `install_all` is set to True.
         # The exception is select before_build_script_impl products
@@ -914,6 +925,6 @@ class BuildScriptInvocation(object):
            (self.install_all and product.should_build(host_target) and
            not product.is_ignore_install_all_product()):
             log_message = "Installing %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.install(host_target)

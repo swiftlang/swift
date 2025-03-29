@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enforce-exclusivity=checked %s | %FileCheck %s
 
 class C {}
 

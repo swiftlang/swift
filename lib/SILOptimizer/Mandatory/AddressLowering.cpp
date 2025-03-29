@@ -2682,8 +2682,8 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
       SILValue load =
           resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
       oldResult.replaceAllUsesWith(load);
-      for (auto *user : origCall->getTokenResult()->getUsers()) {
-        pass.getBuilder(user->getIterator())
+      for (auto *use : origCall->getEndApplyUses()) {
+        pass.getBuilder(use->getUser()->getIterator())
             .createEndBorrow(pass.genLoc(), load);
       }
     } else {
@@ -2924,7 +2924,8 @@ public:
     }
 
     termBuilder.createCheckedCastAddrBranch(
-        castLoc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        castLoc, ccb->getIsolatedConformances(),
+        CastConsumptionKind::TakeOnSuccess, srcAddr,
         ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
         successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
 
@@ -3020,7 +3021,8 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   }
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      uncondCheckedCast->getLoc(), uncondCheckedCast->getIsolatedConformances(),
+      srcAddr, srcAddr->getType().getASTType(),
       destAddr, destAddr->getType().getASTType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());

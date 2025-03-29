@@ -306,3 +306,12 @@ typedef NSPoint *NSPointPointer;
 @interface NSDocument (URL)
 @property (copy,nonnull) NSURL *URL;
 @end
+
+typedef NS_ENUM(NSUInteger, NSBezierPathElement) {
+    NSBezierPathElementMoveTo,
+    NSBezierPathElementLineTo,
+    NSBezierPathElementCubicCurveTo __attribute__((availability(macosx,introduced=52))),
+    NSBezierPathElementClosePath,
+    NSBezierPathElementQuadraticCurveTo __attribute__((availability(macosx,introduced=52))),
+    NSBezierPathElementCurveTo __attribute__((availability(macosx,introduced=51,deprecated=52,message="Use NSBezierPathElementCubicCurveTo"))) = NSBezierPathElementCubicCurveTo,
+};

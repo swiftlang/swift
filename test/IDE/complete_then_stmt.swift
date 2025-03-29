@@ -1,7 +1,6 @@
 // RUN: %batch-code-completion -enable-experimental-feature ThenStatements -debug-forbid-typecheck-prefix FORBIDDEN
 
-// Experimental feature requires asserts
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 enum E {
   case e

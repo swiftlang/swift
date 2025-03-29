@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
 @propertyWrapper
@@ -122,8 +122,8 @@ func accessSweaterOfSweater(cat : Cat) async -> Sweater {
 // CHECK:    [[GLOBAL_CAT:%[0-9]+]] = begin_borrow [[GLOBAL_CAT_REF]] : $Cat
 
 // CHECK:    hop_to_executor [[GLOBAL_CAT]] : $Cat
-// CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    end_borrow [[GLOBAL_CAT]] : $Cat
+// CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    destroy_value [[GLOBAL_CAT_REF]] : $Cat
 // CHECK:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK:    return [[THE_STRING]] : $String

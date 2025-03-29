@@ -148,3 +148,21 @@ bb0:
   return %16 : $Int
 }
 
+// CHECK-LABEL: sil [ossa] @test_dead_borrowed_from
+// CHECK:         borrowed {{.*}} from
+// CHECK:       } // end sil function 'test_dead_borrowed_from'
+sil [ossa] @test_dead_borrowed_from : $@convention(thin) (@guaranteed Buffer, @guaranteed Buffer) -> () {
+bb0(%0 : @guaranteed $Buffer, %1 : @guaranteed $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Buffer)
+
+bb2:
+  br bb3(%1 : $Buffer)
+
+bb3(%9 : @guaranteed $Buffer):
+  %10 = borrowed %9 : $Buffer from (%1 : $Buffer)
+  %r = tuple ()
+  return %r : $()
+}

@@ -57,7 +57,7 @@ public enum FooBuilder {
     public static func buildBlock(_ components: Component...) -> Component {
         return components.flatMap { $0 }
     }
-    
+
     public static func buildLimitedAvailability(_ component: Component) -> Component {
         return component
     }
@@ -104,16 +104,35 @@ public struct MyFooProviderInferred: FooProvider {
             Foo(name: "MyFooProviderInferred.foos.Array.\(i)")
         }
 
-        if (Bool.random()) {
+        if Bool.random() {
             Foo(name: "MyFooProviderInferred.foos.Optional")
         }
 
-        if #available(macOS 99, *) {
+        if #available(iOS 18.0, macOS 15.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
             Foo(name: "MyFooProviderInferred.foos.limitedAvailability.1")
             Foo(name: "MyFooProviderInferred.foos.limitedAvailability.2")
         } else {
             Foo(name: "MyFooProviderInferred.foos.limitedAvailability.else")
         }
+    }
+}
+
+public struct MyFooProviderInferredWithArrayInitialization: FooProvider {
+    public static var foos: [Foo] = [
+        Foo(name: "MyFooProviderInferredWithArrayInitialization.foos.1", baz: {
+            "Nested.Builder.1"
+            "Nested.Builder.2"
+        }),
+        Foo(name: "MyFooProviderInferredWithArrayInitialization.foos.2"),
+    ]
+}
+
+public struct MyFooProviderInferredWithArrayReturn: FooProvider {
+    public static var foos: [Foo] {
+        return [
+            Foo(name: "MyFooProviderInferredWithArrayReturn.foos.1"),
+            Foo(name: "MyFooProviderInferredWithArrayInitialization.foos.2"),
+        ]
     }
 }
 
@@ -127,6 +146,12 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {
@@ -238,6 +263,12 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {
@@ -328,6 +359,9 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": [
@@ -348,6 +382,9 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:                           ]
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                       }
+// CHECK-NEXT:                     },
+// CHECK-NEXT:                     {
+// CHECK-NEXT:                       "element": {}
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   ],
 // CHECK-NEXT:                   "elseElements": [
@@ -366,6 +403,9 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:                           ]
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                       }
+// CHECK-NEXT:                     },
+// CHECK-NEXT:                     {
+// CHECK-NEXT:                       "element": {}
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   ]
 // CHECK-NEXT:                 }
@@ -424,12 +464,37 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": []
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildLimitedAvailability",
+// CHECK-NEXT:               "availabilityAttributes": [
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "iOS",
+// CHECK-NEXT:                   "minVersion": "18.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "macOS",
+// CHECK-NEXT:                   "minVersion": "15.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "watchOS",
+// CHECK-NEXT:                   "minVersion": "11.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "tvOS",
+// CHECK-NEXT:                   "minVersion": "18.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "visionOS",
+// CHECK-NEXT:                   "minVersion": "2.0"
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ],
 // CHECK-NEXT:               "ifElements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {
@@ -465,6 +530,9 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:                 },
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {}
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": [
@@ -483,11 +551,156 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ]
 // CHECK-NEXT:             }
 // CHECK-NEXT:           ]
 // CHECK-NEXT:         }
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ]
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "typeName": "ExtractResultBuilders.MyFooProviderInferredWithArrayInitialization",
+// CHECK-NEXT:     "mangledTypeName": "21ExtractResultBuilders44MyFooProviderInferredWithArrayInitializationV",
+// CHECK-NEXT:     "kind": "struct",
+// CHECK-NEXT:     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:     "line": 120,
+// CHECK-NEXT:     "conformances": [
+// CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:     ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractResultBuilders.FooProvider",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
+// CHECK-NEXT:     "associatedTypeAliases": [],
+// CHECK-NEXT:     "properties": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "label": "foos",
+// CHECK-NEXT:         "type": "Swift.Array<ExtractResultBuilders.Foo>",
+// CHECK-NEXT:         "mangledTypeName": "n/a - deprecated",
+// CHECK-NEXT:         "isStatic": "true",
+// CHECK-NEXT:         "isComputed": "false",
+// CHECK-NEXT:         "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:         "line": 121,
+// CHECK-NEXT:         "valueKind": "Array",
+// CHECK-NEXT:         "value": [
+// CHECK-NEXT:           {
+// CHECK-NEXT:             "valueKind": "InitCall",
+// CHECK-NEXT:             "value": {
+// CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
+// CHECK-NEXT:               "arguments": [
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "label": "name",
+// CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "valueKind": "RawLiteral",
+// CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayInitialization.foos.1"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "label": "baz",
+// CHECK-NEXT:                   "type": "() -> Swift.String",
+// CHECK-NEXT:                   "valueKind": "Builder",
+// CHECK-NEXT:                   "value": {
+// CHECK-NEXT:                     "type": "",
+// CHECK-NEXT:                     "members": [
+// CHECK-NEXT:                       {
+// CHECK-NEXT:                         "kind": "buildExpression",
+// CHECK-NEXT:                         "element": {
+// CHECK-NEXT:                           "valueKind": "RawLiteral",
+// CHECK-NEXT:                           "value": "Nested.Builder.1"
+// CHECK-NEXT:                         }
+// CHECK-NEXT:                       },
+// CHECK-NEXT:                       {
+// CHECK-NEXT:                         "kind": "buildExpression",
+// CHECK-NEXT:                         "element": {
+// CHECK-NEXT:                           "valueKind": "RawLiteral",
+// CHECK-NEXT:                           "value": "Nested.Builder.2"
+// CHECK-NEXT:                         }
+// CHECK-NEXT:                       }
+// CHECK-NEXT:                     ]
+// CHECK-NEXT:                   }
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ]
+// CHECK-NEXT:             }
+// CHECK-NEXT:           },
+// CHECK-NEXT:           {
+// CHECK-NEXT:             "valueKind": "InitCall",
+// CHECK-NEXT:             "value": {
+// CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
+// CHECK-NEXT:               "arguments": [
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "label": "name",
+// CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "valueKind": "RawLiteral",
+// CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayInitialization.foos.2"
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ]
+// CHECK-NEXT:             }
+// CHECK-NEXT:           }
+// CHECK-NEXT:         ]
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ]
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "typeName": "ExtractResultBuilders.MyFooProviderInferredWithArrayReturn",
+// CHECK-NEXT:     "mangledTypeName": "21ExtractResultBuilders36MyFooProviderInferredWithArrayReturnV",
+// CHECK-NEXT:     "kind": "struct",
+// CHECK-NEXT:     "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:     "line": 130,
+// CHECK-NEXT:     "conformances": [
+// CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:     ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractResultBuilders.FooProvider",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
+// CHECK-NEXT:     "associatedTypeAliases": [],
+// CHECK-NEXT:     "properties": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "label": "foos",
+// CHECK-NEXT:         "type": "Swift.Array<ExtractResultBuilders.Foo>",
+// CHECK-NEXT:         "mangledTypeName": "n/a - deprecated",
+// CHECK-NEXT:         "isStatic": "true",
+// CHECK-NEXT:         "isComputed": "true",
+// CHECK-NEXT:         "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractResultBuilders.swift",
+// CHECK-NEXT:         "line": 131,
+// CHECK-NEXT:         "valueKind": "Array",
+// CHECK-NEXT:         "value": [
+// CHECK-NEXT:           {
+// CHECK-NEXT:             "valueKind": "InitCall",
+// CHECK-NEXT:             "value": {
+// CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
+// CHECK-NEXT:               "arguments": [
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "label": "name",
+// CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "valueKind": "RawLiteral",
+// CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayReturn.foos.1"
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ]
+// CHECK-NEXT:             }
+// CHECK-NEXT:           },
+// CHECK-NEXT:           {
+// CHECK-NEXT:             "valueKind": "InitCall",
+// CHECK-NEXT:             "value": {
+// CHECK-NEXT:               "type": "ExtractResultBuilders.Foo",
+// CHECK-NEXT:               "arguments": [
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "label": "name",
+// CHECK-NEXT:                   "type": "Swift.String",
+// CHECK-NEXT:                   "valueKind": "RawLiteral",
+// CHECK-NEXT:                   "value": "MyFooProviderInferredWithArrayInitialization.foos.2"
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ]
+// CHECK-NEXT:             }
+// CHECK-NEXT:           }
+// CHECK-NEXT:         ]
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ]
 // CHECK-NEXT:   }

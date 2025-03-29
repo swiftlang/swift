@@ -25,6 +25,12 @@ namespace swift {
 
 template<typename Derived>
 class TypeTransform {
+public:
+  ASTContext &ctx;
+
+  TypeTransform(ASTContext &ctx) : ctx(ctx) {}
+
+private:
   Derived &asDerived() { return *static_cast<Derived *>(this); }
 
   /// \param pos The variance position of the result type.
@@ -88,20 +94,16 @@ class TypeTransform {
 
 public:
   Type doIt(Type t, TypePosition pos) {
-    if (!isa<ParenType>(t.getPointer())) {
-      // Transform this type node.
-      if (std::optional<Type> transformed = asDerived().transform(t.getPointer(), pos))
-        return *transformed;
-
-      // Recur.
-    }
+    // Transform this type node.
+    if (std::optional<Type> transformed =
+            asDerived().transform(t.getPointer(), pos))
+      return *transformed;
 
     // Recur into children of this type.
     TypeBase *base = t.getPointer();
-    auto &ctx = base->getASTContext();
 
     switch (base->getKind()) {
-#define BUILTIN_TYPE(Id, Parent) \
+#define BUILTIN_CONCRETE_TYPE(Id, Parent) \
 case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
@@ -114,6 +116,31 @@ case TypeKind::Id:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
       return t;
+
+    case TypeKind::BuiltinFixedArray: {
+      auto bfaTy = cast<BuiltinFixedArrayType>(base);
+      
+      Type transSize = doIt(bfaTy->getSize(),
+                            TypePosition::Invariant);
+      if (!transSize) {
+        return Type();
+      }
+      
+      Type transElement = doIt(bfaTy->getElementType(),
+                               TypePosition::Invariant);
+      if (!transElement) {
+        return Type();
+      }
+      
+      CanType canTransSize = transSize->getCanonicalType();
+      CanType canTransElement = transElement->getCanonicalType();
+      if (canTransSize != bfaTy->getSize()
+          || canTransElement != bfaTy->getElementType()) {
+        return BuiltinFixedArrayType::get(canTransSize, canTransElement);
+      }
+      
+      return bfaTy;
+    }
 
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype: {
@@ -138,7 +165,7 @@ case TypeKind::Id:
                                           newSubMap);
     }
 
-    case TypeKind::OpenedArchetype: {
+    case TypeKind::ExistentialArchetype: {
       auto *local = cast<LocalArchetypeType>(base);
       if (auto result = asDerived().transformLocalArchetypeType(local, pos))
         return *result;
@@ -466,38 +493,62 @@ case TypeKind::Id:
       if (newParentType && newParentType->isExistentialType())
         return newUnderlyingTy;
 
-      auto oldSubMap = alias->getSubstitutionMap();
-      auto newSubMap = asDerived().transformSubMap(oldSubMap);
-      if (oldSubMap && !newSubMap)
-        return Type();
+      RecursiveTypeProperties substProps;
+      if (newParentType)
+        substProps = newParentType->getRecursiveProperties();
+
+      SmallVector<Type, 4> substArgs;
+      bool anyChanged = false;
+
+      const auto transformGenArg = [&](Type arg) -> bool {
+        Type substArg = doIt(arg, TypePosition::Invariant);
+        if (!substArg)
+          return true;
+        substProps |= substArg->getRecursiveProperties();
+        substArgs.push_back(substArg);
+        if (substArg.getPointer() != arg.getPointer())
+          anyChanged = true;
+
+        return false;
+      };
+
+      for (auto arg : alias->getDirectGenericArgs()) {
+        if (transformGenArg(arg))
+          return Type();
+      }
 
       if (oldParentType.getPointer() == newParentType.getPointer() &&
           oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer() &&
-          oldSubMap == newSubMap)
+          !anyChanged)
         return t;
+
+      // We leave the old behavior behind for ConstraintSystem::openType(), where
+      // preserving sugar introduces a performance penalty.
+      if (asDerived().shouldDesugarTypeAliases())
+        return newUnderlyingTy;
 
       // Don't leave local archetypes and type variables behind in sugar
       // if they don't appear in the underlying type, to avoid confusion.
-      auto props = newSubMap.getRecursiveProperties();
-      if (props.hasLocalArchetype() && !newUnderlyingTy->hasLocalArchetype())
+      if (substProps.hasLocalArchetype() != newUnderlyingTy->hasLocalArchetype())
         return newUnderlyingTy;
-      if (props.hasTypeVariable() && !newUnderlyingTy->hasTypeVariable())
+      if (substProps.hasTypeVariable() != newUnderlyingTy->hasTypeVariable())
         return newUnderlyingTy;
 
-      return TypeAliasType::get(alias->getDecl(), newParentType, newSubMap,
+      return TypeAliasType::get(alias->getDecl(), newParentType, substArgs,
                                 newUnderlyingTy);
     }
 
-    case TypeKind::Paren: {
-      auto paren = cast<ParenType>(base);
-      Type underlying = doIt(paren->getUnderlyingType(), pos);
-      if (!underlying)
+    case TypeKind::Locatable: {
+      auto locatable = cast<LocatableType>(base);
+      Type oldUnderlyingTy = Type(locatable->getSinglyDesugaredType());
+      Type newUnderlyingTy = doIt(oldUnderlyingTy, pos);
+      if (!newUnderlyingTy)
         return Type();
 
-      if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
+      if (oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer())
         return t;
 
-      return ParenType::get(ctx, underlying);
+      return LocatableType::get(locatable->getLoc(), newUnderlyingTy);
     }
 
     case TypeKind::ErrorUnion: {
@@ -684,14 +735,16 @@ case TypeKind::Id:
       if (!anyChanged)
         return t;
 
-      // Handle vanishing tuples -- If the transform would yield a singleton
-      // tuple, and we didn't start with one, flatten to produce the
-      // element type.
-      if (elements.size() == 1 &&
-          !elements[0].getType()->is<PackExpansionType>() &&
-          !(tuple->getNumElements() == 1 &&
-            !tuple->getElementType(0)->is<PackExpansionType>())) {
-        return elements[0].getType();
+      if (asDerived().shouldUnwrapVanishingTuples()) {
+        // Handle vanishing tuples -- If the transform would yield a singleton
+        // tuple, and we didn't start with one, flatten to produce the
+        // element type.
+        if (elements.size() == 1 &&
+            !elements[0].getType()->is<PackExpansionType>() &&
+            !(tuple->getNumElements() == 1 &&
+              !tuple->getElementType(0)->is<PackExpansionType>())) {
+          return elements[0].getType();
+        }
       }
 
       return TupleType::get(elements, ctx);
@@ -839,6 +892,25 @@ case TypeKind::Id:
         return t;
 
       return ArraySliceType::get(baseTy);
+    }
+
+    case TypeKind::InlineArray: {
+      auto ty = cast<InlineArrayType>(base);
+      auto countTy = doIt(ty->getCountType(), TypePosition::Invariant);
+      if (!countTy)
+        return Type();
+
+      // Currently the element type is invariant for InlineArray.
+      // FIXME: Should we allow covariance?
+      auto eltTy = doIt(ty->getElementType(), TypePosition::Invariant);
+      if (!eltTy)
+        return Type();
+
+      if (countTy.getPointer() == ty->getCountType().getPointer() &&
+          eltTy.getPointer() == ty->getElementType().getPointer())
+        return t;
+
+      return InlineArrayType::get(countTy, eltTy);
     }
 
     case TypeKind::Optional: {
@@ -1001,6 +1073,10 @@ case TypeKind::Id:
     auto sig = subs.getGenericSignature();
     return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
+
+  bool shouldUnwrapVanishingTuples() const { return true; }
+
+  bool shouldDesugarTypeAliases() const { return false; }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();

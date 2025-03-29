@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir -verify %s -parse-stdlib -enable-experimental-feature Embedded -wmo
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 public protocol Player {}
 struct Concrete: Player {}

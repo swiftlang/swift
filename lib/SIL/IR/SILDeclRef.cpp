@@ -230,8 +230,7 @@ ASTContext &SILDeclRef::getASTContext() const {
   return DC->getASTContext();
 }
 
-std::optional<AvailabilityContext>
-SILDeclRef::getAvailabilityForLinkage() const {
+std::optional<AvailabilityRange> SILDeclRef::getAvailabilityForLinkage() const {
   // Back deployment thunks and fallbacks don't have availability since they
   // are non-ABI.
   // FIXME: Generalize this check to all kinds of non-ABI functions.
@@ -317,6 +316,14 @@ bool SILDeclRef::hasUserWrittenCode() const {
       // Never has user-written code, is just a forwarding initializer.
       return false;
     default:
+      if (auto decl = getDecl()) {
+        // Declarations synthesized by ClangImporter by definition don't have
+        // user written code, but despite that they aren't always marked
+        // implicit.
+        auto moduleContext = decl->getDeclContext()->getModuleScopeContext();
+        if (isa<ClangModuleUnit>(moduleContext))
+          return false;
+      }
       // TODO: This checking is currently conservative, we ought to
       // exhaustively handle all the cases here, and use emitOrDelayFunction
       // in more cases to take advantage of it.
@@ -373,6 +380,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::EnumElement:
   case Kind::Destroyer:
   case Kind::Deallocator:
+  case Kind::IsolatedDeallocator:
   case Kind::GlobalAccessor:
   case Kind::DefaultArgGenerator:
   case Kind::IVarInitializer:
@@ -443,6 +451,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   using Kind = SILDeclRef::Kind;
 
   auto *d = constant.getDecl();
+  ASSERT(ABIRoleInfo(d).providesAPI() && "getLinkageLimit() for ABI decl?");
 
   // Back deployment thunks and fallbacks are emitted into the client.
   if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
@@ -469,7 +478,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::OnDemand;
   }
   
-  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+  if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
@@ -481,6 +490,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Allocator:
   case Kind::Initializer:
   case Kind::Deallocator:
+  case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
     // @_alwaysEmitIntoClient declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
@@ -818,6 +828,20 @@ bool SILDeclRef::isTransparent() const {
     case AutoClosureExpr::Kind::DoubleCurryThunk:
     case AutoClosureExpr::Kind::SingleCurryThunk:
       break;
+    }
+  }
+
+  // To support using metatypes as type hints in Embedded Swift. A default
+  // argument generator might be returning a metatype, which we normally don't
+  // support in Embedded Swift, but to still allow metatypes as type hints, we
+  // make the generator always inline to the callee by marking it transparent.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (isDefaultArgGenerator() && hasDecl()) {
+      auto *decl = getDecl();
+      auto *param = getParameterAt(decl, defaultArgIndex);
+      Type paramType = param->getTypeOfDefaultExpr();
+      if (paramType && paramType->is<MetatypeType>())
+        return true;
     }
   }
 
@@ -1175,7 +1199,7 @@ static std::string mangleClangDecl(Decl *decl, bool isForeign) {
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
-  ASTMangler mangler;
+  ASTMangler mangler(getASTContext());
 
   if (auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier()) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
@@ -1216,7 +1240,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     auto *funcDecl = cast<AbstractFunctionDecl>(getDecl());
     auto genericSig = funcDecl->getGenericSignature();
     return GenericSpecializationMangler::manglePrespecialization(
-        mangledNonSpecializedString, genericSig, getSpecializedSignature());
+        getASTContext(), mangledNonSpecializedString, genericSig, getSpecializedSignature());
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;
@@ -1243,6 +1267,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::Func:
     if (auto *ACE = getAbstractClosureExpr())
       return mangler.mangleClosureEntity(ACE, SKind);
+
+    ASSERT(ABIRoleInfo(getDecl()).providesAPI()
+              && "SILDeclRef mangling ABI decl directly?");
 
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry
@@ -1282,12 +1309,16 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::Deallocator:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                          /*isDeallocating*/ true,
-                                          SKind);
+                                          DestructorKind::Deallocating, SKind);
 
   case SILDeclRef::Kind::Destroyer:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                          /*isDeallocating*/ false,
+                                          DestructorKind::NonDeallocating,
+                                          SKind);
+
+  case SILDeclRef::Kind::IsolatedDeallocator:
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
+                                          DestructorKind::IsolatedDeallocating,
                                           SKind);
 
   case SILDeclRef::Kind::Allocator:
@@ -1814,4 +1845,15 @@ bool SILDeclRef::hasAsync() const {
     return false;
   }
   return getAbstractClosureExpr()->isBodyAsync();
+}
+
+bool SILDeclRef::isCalleeAllocatedCoroutine() const {
+  if (!hasDecl())
+    return false;
+
+  auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+  if (!accessor)
+    return false;
+
+  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
 }

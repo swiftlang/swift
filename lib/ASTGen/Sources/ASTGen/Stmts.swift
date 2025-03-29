@@ -12,7 +12,19 @@
 
 import ASTBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
+
+protocol DoStmtOrExprSyntax {
+  var doKeyword: TokenSyntax { get }
+  var throwsClause: ThrowsClauseSyntax? { get }
+  var body: CodeBlockSyntax { get }
+  var catchClauses: CatchClauseListSyntax { get }
+}
+extension DoStmtSyntax: DoStmtOrExprSyntax {}
+extension DoExprSyntax: DoStmtOrExprSyntax {
+  // FIXME: DoExprSyntax is missing throwsClause?
+  var throwsClause: ThrowsClauseSyntax? { return nil }
+}
 
 extension ASTGenVisitor {
   func generate(stmt node: StmtSyntax) -> BridgedStmt {
@@ -38,7 +50,7 @@ extension ASTGenVisitor {
     case .labeledStmt(let node):
       return self.generate(labeledStmt: node)
     case .missingStmt:
-      break
+      fatalError("unimplemented (missing statement)")
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node).asStmt
     case .returnStmt(let node):
@@ -51,42 +63,64 @@ extension ASTGenVisitor {
       return self.generate(whileStmt: node).asStmt
     case .yieldStmt(let node):
       return self.generate(yieldStmt: node).asStmt
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
-    return self.generateWithLegacy(node)
   }
 
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
+  func generate(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
-      return .decl(self.generate(decl: node))
+      if let node = node.as(MacroExpansionDeclSyntax.self) {
+        switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+        case .generated(let generated):
+          return generated
+        case .ignored:
+          // Fallback to normal macro expansion.
+          break
+        }
+      }
+      return self.generate(decl: node).map { .decl($0) }
     case .stmt(let node):
       return .stmt(self.generate(stmt: node))
     case .expr(let node):
+      if let node = node.as(MacroExpansionExprSyntax.self) {
+        switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+        case .generated(let generated):
+          return generated
+        case .ignored:
+          // Fallback to normal macro expansion.
+          break
+        }
+      }
       return .expr(self.generate(expr: node))
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   }
 
   @inline(__always)
-  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
+  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
     var allItems: [BridgedASTNode] = []
     visitIfConfigElements(
       node,
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { codeBlockItem in
-      allItems.append(self.generate(codeBlockItem: codeBlockItem).bridged)
+      guard let item = self.generate(codeBlockItem: codeBlockItem) else {
+        return
+      }
+      allItems.append(item)
+
+      // Hoist 'VarDecl' to the block.
+      if item.kind == .decl {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
+          allItems.append(.decl(d))
+        } call: { handle in
+          item.castToDecl().forEachDeclToHoist(handle)
+        }
+      }
     }
 
-    return allItems.lazy.bridgedArray(in: self)
+    return allItems
   }
 
   /// Function that splits a code block item into either an #if or the item.
@@ -105,18 +139,47 @@ extension ASTGenVisitor {
     BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: self.generateSourceLoc(node.leftBrace),
-      elements: self.generate(codeBlockItemList: node.statements),
+      elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
       rBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
   }
 
+  func generateHasSymbolStmtCondition(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedStmtConditionElement {
+    var args = node.arguments[...]
+    let symbol: BridgedExpr?
+    if let arg = args.popFirst() {
+      symbol = self.generate(expr: arg.expression)
+      if arg.label != nil {
+        // TODO: Diagnose
+        fatalError("unexpected label")
+      }
+      if !args.isEmpty {
+        // TODO: Diagnose
+        fatalError("extra args")
+      }
+    } else {
+      symbol = nil
+    }
+    return .createHasSymbol(
+      self.ctx,
+      poundLoc: self.generateSourceLoc(node.pound),
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      symbol: symbol.asNullable,
+      rParenLoc: self.generateSourceLoc(node.rightParen)
+    )
+  }
+
   func generate(conditionElement node: ConditionElementSyntax) -> BridgedStmtConditionElement {
-    // FIXME: _hasSymbol is not implemented in SwiftSyntax/SwiftParser.
     switch node.condition {
-    case .availability(_):
-      fatalError("unimplemented")
-      break
+    case .availability(let node):
+      return .createPoundAvailable(
+        info: self.generate(availabilityCondition: node)
+      )
     case .expression(let node):
+      if let node = node.as(MacroExpansionExprSyntax.self),
+         node.macroName.rawText == "_hasSymbol" {
+        return generateHasSymbolStmtCondition(macroExpansionExpr: node)
+      }
       return .createBoolean(
         expr: self.generate(expr: node)
       )
@@ -131,18 +194,25 @@ extension ASTGenVisitor {
       var pat = self.generate(pattern: node.pattern)
       let keywordLoc = self.generateSourceLoc(node.bindingSpecifier)
       let isLet = node.bindingSpecifier.keywordKind == .let
-      pat =
-        BridgedBindingPattern.createParsed(
-          self.ctx,
-          keywordLoc: keywordLoc,
-          isLet: isLet,
-          subPattern: pat
-        ).asPattern
+      pat = BridgedBindingPattern.createParsed(
+        self.ctx,
+        keywordLoc: keywordLoc,
+        isLet: isLet,
+        subPattern: pat
+      ).asPattern
 
       // NOTE: (From the comment in libParse) The let/var pattern is part of the
-      // statement. But since the statement doesn't have the information. But,
-      // I'm not sure this should really be implicit.
+      // statement. But since the statement doesn't have the information, I'm not
+      // sure this should really be implicit.
       pat.setImplicit()
+
+      if let typeAnnotation = node.typeAnnotation {
+        pat = BridgedTypedPattern.createParsed(
+          self.ctx,
+          pattern: pat,
+          type: self.generate(type: typeAnnotation.type)
+        ).asPattern
+      }
 
       let initializer: BridgedExpr
       if let initNode = node.initializer {
@@ -164,7 +234,7 @@ extension ASTGenVisitor {
           // FIXME: Implement.
           // For `if let foo.bar {`, diagnose and convert it to `if let _ =  foo.bar`
           // For `if let (a, b) {`, diagnose it and create an error expression.
-          fatalError("unimplemented")
+          fatalError("unimplemented (optional binding recovery)")
         }
       }
       return .createPatternBinding(
@@ -173,10 +243,6 @@ extension ASTGenVisitor {
         pattern: pat,
         initializer: initializer
       )
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   }
 
@@ -274,6 +340,13 @@ extension ASTGenVisitor {
   }
 
   func generate(doStmt node: DoStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedStmt {
+    return self.generate(doStmtOrExpr: node, labelInfo: labelInfo)
+  }
+
+  func generate(
+    doStmtOrExpr node: some DoStmtOrExprSyntax,
+    labelInfo: BridgedLabeledStmtInfo = nil
+  ) -> BridgedStmt {
     if node.catchClauses.isEmpty {
       // FIXME: Handle
       precondition(node.throwsClause == nil)
@@ -303,6 +376,7 @@ extension ASTGenVisitor {
       forLoc: self.generateSourceLoc(node.forKeyword),
       tryLoc: self.generateSourceLoc(node.tryKeyword),
       awaitLoc: self.generateSourceLoc(node.awaitKeyword),
+      unsafeLoc: self.generateSourceLoc(node.unsafeKeyword),
       // NOTE: The pattern can be either a refutable pattern after `case` or a
       // normal binding pattern. ASTGen doesn't care because it should be handled
       // by the parser.
@@ -338,10 +412,6 @@ extension ASTGenVisitor {
           return self.generate(codeBlock: node).asStmt
         case .ifExpr(let node):
           return self.generateIfStmt(ifExpr: node).asStmt
-#if RESILIENT_SWIFT_SYNTAX
-        @unknown default:
-          fatalError()
-#endif
         }
       }.asNullable
     )
@@ -459,15 +529,11 @@ extension ASTGenVisitor {
       )
       items = CollectionOfOne(item).bridgedArray(in: self)
       terminatorLoc = self.generateSourceLoc(node.colon)
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: nil,
-      elements: self.generate(codeBlockItemList: node.statements),
+      elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
       rBraceLoc: nil
     )
 
@@ -482,7 +548,7 @@ extension ASTGenVisitor {
   }
 
   func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
-    var allBridgedCases: [BridgedASTNode] = []
+    var allBridgedCases: [BridgedCaseStmt] = []
     visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -491,10 +557,10 @@ extension ASTGenVisitor {
         return .underlying(switchCase)
       }
     } body: { caseNode in
-      allBridgedCases.append(
-        ASTNode.stmt(self.generate(switchCase: caseNode).asStmt).bridged
-      )
+      allBridgedCases.append(self.generate(switchCase: caseNode))
     }
+
+    // TODO: Diagnose 'case' after 'default'.
 
     return allBridgedCases.lazy.bridgedArray(in: self)
   }
@@ -548,10 +614,6 @@ extension ASTGenVisitor {
       lParenLoc = nil
       rParenLoc = nil
       yields = CollectionOfOne(self.generate(expr: node)).bridgedArray(in: self)
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
     return .createParsed(
       self.ctx,

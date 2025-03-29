@@ -193,14 +193,6 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
   return target;
 }
 
-SyntacticElementTarget
-SyntacticElementTarget::forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                                           bool ignoreWhereClause,
-                                           GenericEnvironment *packElementEnv) {
-  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
-  return target;
-}
-
 SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SyntacticElementTarget target(initializer, dc, CTP_Initialization,
@@ -237,8 +229,8 @@ ContextualPattern SyntacticElementTarget::getContextualPattern() const {
   }
 
   if (isForEachPreamble()) {
-    return ContextualPattern::forRawPattern(forEachStmt.pattern,
-                                            forEachStmt.dc);
+    return ContextualPattern::forRawPattern(forEachPreamble.pattern,
+                                            forEachPreamble.dc);
   }
 
   auto ctp = getExprContextualTypePurpose();
@@ -403,7 +395,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     break;
   }
   case Kind::forEachPreamble: {
-    // We need to skip the where clause if requested, and we currently do not
+    // We need to skip the where clause, and we currently do not
     // type-check a for loop's BraceStmt as part of the SyntacticElementTarget,
     // so we need to skip it here.
     // TODO: We ought to be able to fold BraceStmt checking into the constraint
@@ -424,8 +416,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
       }
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-        // Ignore where clause if needed.
-        if (Target.ignoreForEachWhereClause() && E == ForStmt->getWhere())
+        if (E == ForStmt->getWhere())
           return Action::SkipNode(E);
 
         E = E->walk(Walker);
@@ -461,7 +452,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     ForEachWalker forEachWalker(walker, *this);
 
     if (auto *newStmt = getAsForEachStmt()->walk(forEachWalker)) {
-      result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
+      result.forEachPreamble.stmt = cast<ForEachStmt>(newStmt);
     } else {
       return std::nullopt;
     }

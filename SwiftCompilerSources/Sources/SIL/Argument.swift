@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 /// A basic block argument.
@@ -23,17 +24,19 @@ public class Argument : Value, Hashable {
     return bridged.getParent().block
   }
 
-  var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
-  
+  public var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
+
   public var index: Int {
     return parentBlock.arguments.firstIndex(of: self)!
   }
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
-  public var varDecl: VarDecl? { VarDecl(bridged: bridged.getVarDecl()) }
+  public var isLexical: Bool { false }
 
-  public var sourceLoc: SourceLoc? { varDecl?.sourceLoc }
+  public var varDecl: VarDecl? { bridged.getVarDecl().getAs(VarDecl.self) }
+
+  public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -47,6 +50,10 @@ public class Argument : Value, Hashable {
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
     parentFunction.argumentConventions[index]
+  }
+
+  public override var isLexical: Bool {
+    bridged.FunctionArgument_isLexical()
   }
 
   public var isSelf: Bool {
@@ -162,6 +169,18 @@ public struct Phi {
       }
     }
     return nil
+  }
+
+  // Returns true if the phi has an end_borrow or a re-borrowing branch as user.
+  // This should be consistent with the `isReborrow` flag.
+  public var hasBorrowEndingUse: Bool {
+    let phiValue: Value = borrowedFrom ?? value
+    return phiValue.uses.contains {
+      switch $0.ownership {
+        case .endBorrow, .reborrow: return true
+        default:                    return false
+      }
+    }
   }
 
   public static func ==(lhs: Phi, rhs: Phi) -> Bool {
@@ -295,8 +314,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public var description: String {
-    let origTy = convention.bridgedFunctionType
-    var str = String(taking: origTy.getDebugDescription())
+    var str = convention.functionType.description
     for idx in startIndex..<indirectSILResultCount {
       str += "\n[\(idx)]  indirect result: " + self[idx].description
     }
@@ -348,8 +366,7 @@ public struct YieldConventions : Collection, CustomStringConvertible {
   }
 
   public var description: String {
-    var str = String(
-      taking: convention.bridgedFunctionType.getDebugDescription())
+    var str = convention.functionType.description
     yields.forEach {
       str += "\n      yield: " + $0.description
     }
@@ -570,6 +587,19 @@ public enum ArgumentConvention : CustomStringConvertible {
       return "packGuaranteed"
     case .packOut:
       return "packOut"
+    }
+  }
+}
+
+extension BeginAccessInst.AccessKind {
+  public func isCompatible(with convention: ArgumentConvention) -> Bool {
+    switch self {
+    case .`init`, .deinit:
+      return false
+    case .read:
+      return convention.isIndirectIn
+    case .modify:
+      return convention.isInout
     }
   }
 }

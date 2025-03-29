@@ -159,6 +159,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RandomTree
     single-source/RandomValues
     single-source/RangeAssignment
+    single-source/RangeContains
     single-source/RangeIteration
     single-source/RangeOverlaps
     single-source/RangeReplaceableCollectionPlusDefault
@@ -210,6 +211,7 @@ set(SWIFT_BENCH_MODULES
     single-source/XorLoop
     cxx-source/CreateObjects
     cxx-source/CxxSetToCollection
+    cxx-source/CxxSpanTests
     cxx-source/CxxStringConversion
     cxx-source/CxxVectorSum
     # TODO: rdar://92120528

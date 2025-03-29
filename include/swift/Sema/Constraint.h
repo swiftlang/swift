@@ -19,7 +19,7 @@
 #define SWIFT_SEMA_CONSTRAINT_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/FunctionRefKind.h"
+#include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -85,6 +85,9 @@ enum class ConstraintKind : char {
   /// class type).
   SubclassOf,
   /// The first type must conform to the second type (which is a
+  /// protocol type) and the conformance must not be an isolated conformance.
+  NonisolatedConformsTo,
+  /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
   /// The first type describes a literal that conforms to the second
@@ -92,14 +95,6 @@ enum class ConstraintKind : char {
   LiteralConformsTo,
   /// A checked cast from the first type to the second.
   CheckedCast,
-  /// The first type can act as the Self type of the second type (which
-  /// is a protocol).
-  ///
-  /// This constraint is slightly looser than a conforms-to constraint, because
-  /// an existential can be used as the Self of any protocol within the
-  /// existential, even if it doesn't conform to that protocol (e.g., due to
-  /// the use of associated types).
-  SelfObjectOfProtocol,
   /// Both types are function types. The first function type's
   /// input is the value being passed to the function and its output
   /// is a type variable that describes the output. The second
@@ -163,12 +158,6 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
-  /// The second type is the type of a function parameter, and the first type
-  /// is the type of a reference to that function parameter within the body.
-  /// Once the second type has been fully determined (and mapped down to a
-  /// concrete type), this constraint will be treated like a 'BindParam'
-  /// constraint.
-  OneWayBindParam,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -344,7 +333,12 @@ enum RememberChoice_t : bool {
 
 /// A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
-    private llvm::TrailingObjects<Constraint, TypeVariableType *> {
+    private llvm::TrailingObjects<Constraint,
+                                  TypeVariableType *,
+                                  ConstraintFix *,
+                                  DeclContext *,
+                                  ContextualTypeInfo,
+                                  OverloadChoice> {
   friend TrailingObjects;
 
   /// The kind of constraint.
@@ -353,8 +347,16 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// The fix to be applied to the constraint before visiting it.
-  ConstraintFix *TheFix = nullptr;
+  /// The number of type variables referenced by this constraint.
+  ///
+  /// The type variables themselves are tail-allocated.
+  unsigned NumTypeVariables : 11;
+
+  /// Whether we have a tail-allocated fix.
+  unsigned HasFix : 1;
+
+  /// Whether we have a tail-allocated DeclContext.
+  unsigned HasDeclContext : 1;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -383,17 +385,18 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// the rest of the constraint system. Currently only applies to conjunctions.
   unsigned IsIsolated : 1;
 
-  /// The number of type variables referenced by this constraint.
-  ///
-  /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 11;
-
   /// The kind of function reference, for member references.
-  unsigned TheFunctionRefKind : 2;
+  unsigned TheFunctionRefInfo : 3;
 
   /// The trailing closure matching for an applicable function constraint,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.
   unsigned trailingClosureMatching : 2;
+
+  /// For a SyntacticElement constraint, identify whether the result of this
+  /// node is unused.
+  unsigned isDiscarded : 1;
+
+  // 22 bits remaining
 
   union {
     struct {
@@ -426,33 +429,30 @@ class Constraint final : public llvm::ilist_node<Constraint>,
         /// Used for ValueWitness constraints.
         ValueDecl *Ref;
       } Member;
-
-      /// The DC in which the use appears.
-      DeclContext *UseDC;
     } Member;
 
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
 
     struct {
-      /// The first type
+      /// The first type.
       Type First;
-
-      /// The overload choice
-      OverloadChoice Choice;
-
-      /// The DC in which the use appears.
-      DeclContext *UseDC;
     } Overload;
 
     struct {
       /// The node itself.
       ASTNode Element;
-      /// Contextual information associated with the element (if any).
-      ContextualTypeInfo Context;
-      /// Identifies whether result of this node is unused.
-      bool IsDiscarded;
     } SyntacticElement;
+
+    struct {
+      /// The function type that is being applied where parameters
+      /// represent argument types passed to callee and result type
+      /// represents result type of the application.
+      FunctionType *AppliedFn;
+      /// The type being called, primarily a function type, but could
+      /// be a metatype, a tuple or a nominal type.
+      Type Callee;
+    } Apply;
   };
 
   /// The locator that describes where in the expression this
@@ -479,14 +479,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
-             DeclContext *useDC, FunctionRefKind functionRefKind,
+             DeclContext *useDC, FunctionRefInfo functionRefInfo,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new value witness constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
              ValueDecl *requirement, DeclContext *useDC,
-             FunctionRefKind functionRefKind, ConstraintLocator *locator,
+             FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
@@ -509,9 +509,34 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
+  Constraint(FunctionType *appliedFn, Type calleeType,
+             unsigned trailingClosureMatching, DeclContext *useDC,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
     return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
+  }
+
+  size_t numTrailingObjects(OverloadToken<TypeVariableType *>) const {
+    return NumTypeVariables;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
+    return HasFix ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DeclContext *>) const {
+    return HasDeclContext ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ContextualTypeInfo>) const {
+    return Kind == ConstraintKind::SyntacticElement ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<OverloadChoice>) const {
+    return Kind == ConstraintKind::BindOverload ? 1 : 0;
   }
 
 public:
@@ -530,26 +555,26 @@ public:
   /// alternatives.
   static Constraint *createMemberOrOuterDisjunction(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-      DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclNameRef member, DeclContext *useDC, FunctionRefInfo functionRefInfo,
       ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
                                   Type first, Type second, DeclNameRef member,
                                   DeclContext *useDC,
-                                  FunctionRefKind functionRefKind,
+                                  FunctionRefInfo functionRefInfo,
                                   ConstraintLocator *locator);
 
   /// Create a new value witness constraint.
   static Constraint *createValueWitness(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
       ValueDecl *requirement, DeclContext *useDC,
-      FunctionRefKind functionRefKind, ConstraintLocator *locator);
+      FunctionRefInfo functionRefInfo, ConstraintLocator *locator);
 
-  /// Create an overload-binding constraint.
+  /// Create an overload-binding constraint, possibly with a fix.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
                                         OverloadChoice choice, 
-                                        DeclContext *useDC,
+                                        DeclContext *useDC, ConstraintFix *fix,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
@@ -562,13 +587,6 @@ public:
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                  ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
-
-  /// Create a bind overload choice with a fix.
-  /// Note: This constraint is going to be disabled by default.
-  static Constraint *createFixedChoice(ConstraintSystem &cs, Type type,
-                                       OverloadChoice choice,
-                                       DeclContext *useDC, ConstraintFix *fix,
-                                       ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
@@ -589,20 +607,20 @@ public:
 
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
-      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      ConstraintLocator *locator);
+      DeclContext *useDC, ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                            ASTNode node,
+                                            ConstraintLocator *locator,
+                                            bool isDiscarded = false);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ContextualTypeInfo context,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                            ASTNode node,
+                                            ContextualTypeInfo context,
+                                            ConstraintLocator *locator,
+                                            bool isDiscarded = false);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -616,7 +634,11 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  ConstraintFix *getFix() const { return TheFix; }
+  ConstraintFix *getFix() const {
+    if (HasFix)
+      return *getTrailingObjects<ConstraintFix *>();
+    return nullptr;
+}
 
   /// Whether this constraint is active, i.e., in the worklist.
   bool isActive() const { return IsActive; }
@@ -678,16 +700,15 @@ public:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::SubclassOf:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::CheckedCast:
-    case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OneWayEqual:
-    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -746,6 +767,9 @@ public:
     case ConstraintKind::SyntacticElement:
       llvm_unreachable("closure body element constraint has no type operands");
 
+    case ConstraintKind::ApplicableFunction:
+      return Apply.AppliedFn;
+
     default:
       return Types.First;
     }
@@ -764,6 +788,9 @@ public:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       return Member.Second;
+
+    case ConstraintKind::ApplicableFunction:
+      return Apply.Callee;
 
     default:
       return Types.Second;
@@ -798,14 +825,12 @@ public:
   }
 
   /// Determine the kind of function reference we have for a member reference.
-  FunctionRefKind getFunctionRefKind() const {
-    if (Kind == ConstraintKind::ValueMember ||
-        Kind == ConstraintKind::UnresolvedValueMember ||
-        Kind == ConstraintKind::ValueWitness)
-      return static_cast<FunctionRefKind>(TheFunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    ASSERT(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember ||
+           Kind == ConstraintKind::ValueWitness);
 
-    // Conservative answer: drop all of the labels.
-    return FunctionRefKind::Compound;
+    return FunctionRefInfo::fromOpaque(TheFunctionRefInfo);
   }
 
   /// Retrieve the set of constraints in a disjunction.
@@ -840,30 +865,20 @@ public:
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }
 
-  /// Whether this is a one-way constraint.
-  bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual ||
-        Kind == ConstraintKind::OneWayBindParam;
-  }
-
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
-    assert(Kind == ConstraintKind::BindOverload);
-    return Overload.Choice;
+    ASSERT(Kind == ConstraintKind::BindOverload);
+    return *getTrailingObjects<OverloadChoice>();
   }
 
-  /// Retrieve the DC in which the overload was used.
-  DeclContext *getOverloadUseDC() const {
-    assert(Kind == ConstraintKind::BindOverload);
-    return Overload.UseDC;
+  FunctionType *getAppliedFunctionType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.AppliedFn;
   }
 
-  /// Retrieve the DC in which the member was used.
-  DeclContext *getMemberUseDC() const {
-    assert(Kind == ConstraintKind::ValueMember ||
-           Kind == ConstraintKind::UnresolvedValueMember ||
-           Kind == ConstraintKind::ValueWitness);
-    return Member.UseDC;
+  Type getCalleeType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.Callee;
   }
 
   ASTNode getSyntacticElement() const {
@@ -872,13 +887,19 @@ public:
   }
 
   ContextualTypeInfo getElementContext() const {
-    assert(Kind == ConstraintKind::SyntacticElement);
-    return SyntacticElement.Context;
+    ASSERT(Kind == ConstraintKind::SyntacticElement);
+    return *getTrailingObjects<ContextualTypeInfo>();
   }
 
   bool isDiscardedElement() const {
     assert(Kind == ConstraintKind::SyntacticElement);
-    return SyntacticElement.IsDiscarded;
+    return isDiscarded;
+  }
+
+  /// Retrieve the DC in which the overload was used.
+  DeclContext *getDeclContext() const {
+    ASSERT(HasDeclContext);
+    return *getTrailingObjects<DeclContext *>();
   }
 
   /// For an applicable function constraint, retrieve the trailing closure
@@ -887,9 +908,6 @@ public:
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
-
-  /// Clone the given constraint.
-  Constraint *clone(ConstraintSystem &cs) const;
 
   /// Print constraint placed on type and constraint properties.
   ///

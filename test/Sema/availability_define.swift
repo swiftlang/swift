@@ -72,7 +72,7 @@ func client() {
     onMacOS51_0()
   }
 
-  if #available(_unknownMacro, *) { } // expected-error {{expected version number}}
+  if #available(_unknownMacro, *) { } // expected-warning {{unrecognized platform name '_unknownMacro'}}
 }
 
 public func doIt(_ closure: () -> ()) {

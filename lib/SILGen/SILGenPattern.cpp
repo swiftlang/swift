@@ -1430,7 +1430,8 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
               MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
               MarkUnresolvedNonCopyableValueInst::IsStrict);
 
-  SGF.VarLocs[var] = SILGenFunction::VarLoc::get(bindValue.getValue());
+  SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
+                                            SILAccessEnforcement::Unknown);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -2208,7 +2209,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
           sourceType
-              ->getTypeOfMember(elt, elt->getArgumentInterfaceType())
+              ->getTypeOfMember(elt, elt->getPayloadInterfaceType())
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -2470,7 +2471,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
         sourceType->getTypeOfMember(eltDecl,
-                                    eltDecl->getArgumentInterfaceType())
+                                    eltDecl->getPayloadInterfaceType())
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -3168,13 +3169,17 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           }
 
           // Ok, we found a match. Update the VarLocs for the case block.
-          auto v = SGF.VarLocs[vd];
-          SGF.VarLocs[expected] = v;
+          auto &expectedLoc = SGF.VarLocs[expected];
+          auto vdLoc = SGF.VarLocs.find(vd);
+          assert(vdLoc != SGF.VarLocs.end());
+          expectedLoc = SILGenFunction::VarLoc(vdLoc->second.value,
+                                               vdLoc->second.access,
+                                               vdLoc->second.box);
 
           // Emit a debug description for the variable, nested within a scope
           // for the pattern match.
           SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
-          SGF.B.emitDebugDescription(vd, v.value, dbgVar);
+          SGF.B.emitDebugDescription(vd, vdLoc->second.value, dbgVar);
         }
       }
     }
@@ -3274,7 +3279,7 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       continue;
     }
 
-    // Look through `try` and `await`.
+    // Look through `try`, `await`, and `unsafe`.
     if (auto tryExpr = dyn_cast<TryExpr>(subjectExpr)) {
       subjectExpr = tryExpr->getSubExpr();
       continue;
@@ -3283,7 +3288,11 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       subjectExpr = awaitExpr->getSubExpr();
       continue;
     }
-    
+    if (auto unsafeExpr = dyn_cast<UnsafeExpr>(subjectExpr)) {
+      subjectExpr = unsafeExpr->getSubExpr();
+      continue;
+    }
+
     break;
   }
   
@@ -3316,11 +3325,11 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
   }
   
   // Check the access strategy used to read the storage.
-  auto strategy = storage->getAccessStrategy(access,
-                                             AccessKind::Read,
-                                             SGF.SGM.SwiftModule,
-                                             SGF.F.getResilienceExpansion());
-                                             
+  auto strategy =
+      storage->getAccessStrategy(access, AccessKind::Read, SGF.SGM.SwiftModule,
+                                 SGF.F.getResilienceExpansion(),
+                                 /*useOldABI=*/false);
+
   switch (strategy.getKind()) {
   case AccessStrategy::Kind::Storage:
     // Accessing storage directly benefits from borrowing.
@@ -3335,7 +3344,9 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       // Get returns an owned value.
       return false;
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       // Read, modify, and addressors yield a borrowable reference.
@@ -3449,7 +3460,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Add a row for each label of each case.
   SmallVector<ClauseRow, 8> clauseRows;
-  clauseRows.reserve(S->getRawCases().size());
+  clauseRows.reserve(S->getCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
     // If the previous block falls through into this block or we have multiple
@@ -3825,8 +3836,9 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
         continue;
       }
 
-      auto varLoc = VarLocs[var];
+      auto &varLoc = VarLocs[var];
       SILValue value = varLoc.value;
+      SILValue box = varLoc.box;
 
       if (value->getType().isAddressOnly(F)) {
         context->Emission.emitAddressOnlyInitialization(expected, value);
@@ -3835,7 +3847,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
 
       SILLocation loc(var);
       loc.markAutoGenerated();
-      if (varLoc.box) {
+      if (box) {
         SILValue argValue =
             B.emitLoadValueOperation(loc, value, LoadOwnershipQualifier::Copy);
         args.push_back(argValue);
@@ -3888,13 +3900,17 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
             }
 
             // Ok, we found a match. Update the VarLocs for the case block.
-            auto v = VarLocs[vd];
-            VarLocs[expected] = v;
+            auto &expectedLoc = VarLocs[expected];
+            auto vdLoc = VarLocs.find(vd);
+            assert(vdLoc != VarLocs.end());
+            expectedLoc = VarLoc(vdLoc->second.value,
+                                 vdLoc->second.access,
+                                 vdLoc->second.box);
 
             // Emit a debug description of the incoming arg, nested within the scope
             // for the pattern match.
             SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
-            B.emitDebugDescription(vd, v.value, dbgVar);
+            B.emitDebugDescription(vd, vdLoc->second.value, dbgVar);
           }
         }
       }

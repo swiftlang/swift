@@ -88,12 +88,12 @@ func testImportedTypeParamRequirements() {
   let _ = PettableContainer<Rock>()
   let _ = PettableContainer<Porcupine>() // expected-error{{type 'Porcupine' does not conform to protocol 'Pettable'}}
   let _ = PettableContainer<Cat>()
-  let _ = AnimalContainer<Desk>() // expected-error{{'AnimalContainer' requires that 'Desk' inherit from 'Animal'}} expected-note{{requirement specified as 'T' : 'Animal' [with T = Desk]}}
-  let _ = AnimalContainer<Rock>() // expected-error{{'AnimalContainer' requires that 'Rock' inherit from 'Animal'}} expected-note{{requirement specified as 'T' : 'Animal' [with T = Rock]}}
+  let _ = AnimalContainer<Desk>() // expected-error{{'AnimalContainer' requires that 'Desk' inherit from 'Animal'}} // TODO: add test for note appearing in Obj-c header.
+  let _ = AnimalContainer<Rock>() // expected-error{{'AnimalContainer' requires that 'Rock' inherit from 'Animal'}} // TODO: add test for note appearing in Obj-c header.
   let _ = AnimalContainer<Porcupine>()
   let _ = AnimalContainer<Cat>()
-  let _ = PettableAnimalContainer<Desk>() // expected-error{{'PettableAnimalContainer' requires that 'Desk' inherit from 'Animal'}} expected-note{{requirement specified as 'T' : 'Animal' [with T = Desk]}}
-  let _ = PettableAnimalContainer<Rock>() // expected-error{{'PettableAnimalContainer' requires that 'Rock' inherit from 'Animal'}} expected-note{{requirement specified as 'T' : 'Animal' [with T = Rock]}}
+  let _ = PettableAnimalContainer<Desk>() // expected-error{{'PettableAnimalContainer' requires that 'Desk' inherit from 'Animal'}} // TODO: add test for note appearing in Obj-c header.
+  let _ = PettableAnimalContainer<Rock>() // expected-error{{'PettableAnimalContainer' requires that 'Rock' inherit from 'Animal'}} // TODO: add test for note appearing in Obj-c header.
   let _ = PettableAnimalContainer<Porcupine>() // expected-error{{type 'Porcupine' does not conform to protocol 'Pettable'}}
   let _ = PettableAnimalContainer<Cat>()
 }

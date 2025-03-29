@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -require-explicit-sendable -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -require-explicit-sendable -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 public protocol P { }
 

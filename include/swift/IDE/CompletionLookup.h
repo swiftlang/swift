@@ -185,6 +185,11 @@ private:
   /// \p selfTy must be a \c Self type of the context.
   static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD);
 
+  /// Retrieve the type to use as the base for a member completion.
+  Type getMemberBaseType() const {
+    return BaseType ? BaseType : ExprType;
+  }
+
 public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;
@@ -334,6 +339,8 @@ public:
 
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
+
+  void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
 
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
 
@@ -593,16 +600,19 @@ public:
 
   void getTypeCompletions(Type BaseType);
 
+  /// Add completions for types that can appear after a \c ~ prefix.
+  void getInvertedTypeCompletions();
+
   void getGenericRequirementCompletions(DeclContext *DC,
                                         SourceLoc CodeCompletionLoc);
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                    bool IsConcurrencyEnabled,
+                                    const LangOptions &langOpts,
                                     std::optional<DeclKind> DK, StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
 
   void getTypeAttributeKeywordCompletions(CompletionKind completionKind);
@@ -631,8 +641,6 @@ public:
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
 
   void getOptionalBindingCompletions(SourceLoc Loc);
-
-  void addWithoutConstraintTypes();
 };
 
 } // end namespace ide

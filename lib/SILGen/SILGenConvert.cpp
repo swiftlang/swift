@@ -190,7 +190,7 @@ ManagedValue
 SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                  ManagedValue optional,
                                                  bool isImplicitUnwrap) {
-  // Generate code to the optional is present, and if not, abort with a message
+  // Generate code to check if the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();
@@ -656,9 +656,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
   auto &ctx = getASTContext();
+  auto *nsErrorDecl = ctx.getNSErrorDecl();
   if (ctx.LangOpts.EnableObjCInterop && conformances.size() == 1 &&
-      conformances[0].getRequirement() == ctx.getErrorDecl() &&
-      ctx.getNSErrorDecl()) {
+      conformances[0].getProtocol() == ctx.getErrorDecl() &&
+      nsErrorDecl && referenceAllowed(nsErrorDecl)) {
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
     auto nsErrorType = ctx.getNSErrorType()->getCanonicalType();

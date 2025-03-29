@@ -368,28 +368,6 @@ namespace {
                                   ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
-    template <class Fn>
-    void forEachNonEmptyBase(Fn fn) const {
-      auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
-      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : cxxRecord->bases()) {
-          auto baseType = base.getType().getCanonicalType();
-
-          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-          auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-          if (baseCxxRecord->isEmpty())
-            continue;
-
-          auto offset = layout.getBaseClassOffset(baseCxxRecord);
-          auto size =
-              ClangDecl->getASTContext().getTypeSizeInChars(baseType);
-          fn(baseType, offset, size);
-        }
-      }
-    }
-
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                 unsigned explosionSize, llvm::Type *storageType,
@@ -446,10 +424,11 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      forEachNonEmptyBase([&](clang::QualType type, clang::CharUnits offset,
-                              clang::CharUnits) {
-        lowering.addTypedData(type, offset);
-      });
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
+        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
+          lowering.addTypedData(base.decl, base.offset.asCharUnits());
+        }
+      }
 
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
@@ -563,36 +542,29 @@ namespace {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              // rdar://106964356
-              // ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isMoveConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isMoveConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
@@ -1007,30 +979,23 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
-      auto decl = T.getASTType()->getStructOrBoundGenericStruct();
-      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
-
       // If we have a raw layout struct who is fixed size, it means the
       // layout of the struct is fully concrete.
-      if (rawLayout) {
+      if (auto rawLayout = T.getRawLayout()) {
         // Defer to this fixed type info for type layout if the raw layout
         // specifies size and alignment.
         if (rawLayout->getSizeAndAlignment()) {
           return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
         }
 
-        // The given struct type T that we're building is fully concrete, but
-        // our like type is still in terms of the potential archetype of the
-        // type.
-        auto subs = T.getASTType()->getContextSubstitutionMap(decl);
-        auto likeType = rawLayout->getResolvedLikeType(decl).subst(subs);
-        auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
+        auto likeType = T.getRawLayoutSubstitutedLikeType();
+        auto loweredLikeType = IGM.getLoweredType(likeType);
         auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
             .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
 
         // If we're an array, use the ArrayLayoutEntry.
-        if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
-          auto countType = likeArray->second.subst(subs)->getCanonicalType();
+        if (rawLayout->getArrayLikeTypeAndCount()) {
+          auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
           return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
                                                            loweredLikeType,
                                                            countType);
@@ -1133,29 +1098,22 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
-      auto decl = T.getASTType()->getStructOrBoundGenericStruct();
-      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
-
       // If we have a raw layout struct who is non-fixed size, it means the
       // layout of the struct is dependent on the archetype of the thing it's
       // like.
-      if (rawLayout) {
+      if (auto rawLayout = T.getRawLayout()) {
         // Note: We don't have to handle the size and alignment case here for
         // raw layout because those are always fixed, so only dependent layouts
         // will be non-fixed.
 
-        // The given struct type T that we're building is fully concrete, but
-        // our like type is still in terms of the potential archetype of the
-        // type.
-        auto subs = T.getASTType()->getContextSubstitutionMap(decl);
-        auto likeType = rawLayout->getResolvedLikeType(decl).subst(subs);
+        auto likeType = T.getRawLayoutSubstitutedLikeType();
         auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
         auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
             .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
 
         // If we're an array, use the ArrayLayoutEntry.
-        if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
-          auto countType = likeArray->second.subst(subs)->getCanonicalType();
+        if (rawLayout->getArrayLikeTypeAndCount()) {
+          auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
           return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
                                                            loweredLikeType,
                                                            countType);
@@ -1407,25 +1365,13 @@ private:
   }
 
   void collectBases(const clang::RecordDecl *decl) {
-    auto &layout = decl->getASTContext().getASTRecordLayout(decl);
     if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto baseOffset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
-        SubobjectAdjustment += baseOffset;
-        collectBases(baseCxxRecord);
-        collectStructFields(baseCxxRecord);
-        SubobjectAdjustment -= baseOffset;
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        SubobjectAdjustment += base.offset;
+        collectBases(base.decl);
+        collectStructFields(base.decl);
+        SubobjectAdjustment -= base.offset;
       }
     }
   }
@@ -1437,7 +1383,8 @@ private:
     auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
     // When collecting fields from the base subobjects, we do not have corresponding swift
     // stored properties.
-    if (decl != ClangDecl)
+    bool isBaseSubobject = decl != ClangDecl;
+    if (isBaseSubobject)
       sfi = swiftProperties.end();
 
     while (cfi != cfe) {
@@ -1489,10 +1436,14 @@ private:
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    Size objectTotalStride = Size(layout.getSize().getQuantity());
-    // We never take advantage of tail padding, because that would prevent
-    // us from passing the address of the object off to C, which is a pretty
-    // likely scenario for imported C types.
+    auto objectSize = isBaseSubobject ? layout.getDataSize() : layout.getSize();
+    Size objectTotalStride = Size(objectSize.getQuantity());
+    // Unless this is a base subobject of a C++ type, we do not take advantage
+    // of tail padding, because that would prevent us from passing the address
+    // of the object off to C, which is a pretty likely scenario for imported C
+    // types.
+    // In C++, fields of a derived class might get placed into tail padding of a
+    // base class, in which case we should not add extra padding here.
     assert(NextOffset <= SubobjectAdjustment + objectTotalStride);
     assert(SpareBits.size() <= SubobjectAdjustment.getValueInBits() +
                                    objectTotalStride.getValueInBits());
@@ -1504,6 +1455,7 @@ private:
   /// Place the next struct field at its appropriate offset.
   void addStructField(const clang::FieldDecl *clangField,
                       VarDecl *swiftField, const clang::ASTRecordLayout &layout) {
+    bool isZeroSized = clangField->isZeroSize(ClangContext);
     unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
     Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
@@ -1513,12 +1465,12 @@ private:
       auto &fieldTI = cast<FixedTypeInfo>(IGM.getTypeInfo(
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
-      addField(swiftField, offset, fieldTI);
+      addField(swiftField, offset, fieldTI, isZeroSized);
       return;
     }
 
     // Otherwise, add it as an opaque blob.
-    auto fieldSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldSize = isZeroSized ? clang::CharUnits::Zero() : ClangContext.getTypeSizeInChars(clangField->getType());
     return addOpaqueField(offset, Size(fieldSize.getQuantity()));
   }
 
@@ -1544,23 +1496,23 @@ private:
     if (fieldSize.isZero()) return;
 
     auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize, Alignment(1));
-    addField(nullptr, offset, opaqueTI);
+    addField(nullptr, offset, opaqueTI, false);
   }
 
   /// Add storage for an (optional) Swift field at the given offset.
   void addField(VarDecl *swiftField, Size offset,
-                const FixedTypeInfo &fieldType) {
-    assert(offset >= NextOffset && "adding fields out of order");
+                const FixedTypeInfo &fieldType, bool isZeroSized) {
+    assert(isZeroSized || offset >= NextOffset && "adding fields out of order");
 
     // Add a padding field if required.
-    if (offset != NextOffset)
+    if (!isZeroSized && offset != NextOffset)
       addPaddingField(offset);
 
-    addFieldInfo(swiftField, fieldType);
+    addFieldInfo(swiftField, fieldType, isZeroSized);
   }
 
   /// Add information to track a value field at the current offset.
-  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType) {
+  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType, bool isZeroSized) {
     bool isLoadableField = isa<LoadableTypeInfo>(fieldType);
     unsigned explosionSize = 0;
     if (isLoadableField)
@@ -1570,11 +1522,15 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
-    if (isEmpty)
-      layout.completeEmptyTailAllocatedCType(
-          fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
-    else
+    auto isEmpty = isZeroSized || fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
+    if (isEmpty) {
+      if (isZeroSized)
+        layout.completeEmpty(
+            fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+      else
+        layout.completeEmptyTailAllocatedCType(
+            fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+    } else
       layout.completeFixed(fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
 

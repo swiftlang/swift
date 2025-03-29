@@ -171,6 +171,29 @@ static AnyReturn copyFieldContents(OpaqueValue *fieldData,
   auto ownership = fieldType.getReferenceOwnership();
   auto *destContainer = type->allocateBoxForExistentialIn(&outValue.Buffer);
 
+  // If the field's type is a thin metatype, then there's no actual data at
+  // fieldData, and we need to obtain the metatype value from the field type.
+  if (auto *metatype = dyn_cast<MetatypeMetadata>(type)) {
+    switch (metatype->InstanceType->getKind()) {
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+    case MetadataKind::Optional:
+    case MetadataKind::Tuple:
+    case MetadataKind::Function:
+    case MetadataKind::Existential: {
+      // These kinds don't have subtypes and thus have thin representations.
+      auto asOpaque = const_cast<OpaqueValue *>(
+          reinterpret_cast<const OpaqueValue *>(&metatype->InstanceType));
+      type->vw_initializeWithCopy(destContainer, asOpaque);
+      return AnyReturn(outValue);
+    }
+
+    default:
+      // Other kinds have subtypes and will not have a thin representation.
+      break;
+    }
+  }
+
   if (ownership.isStrong()) {
     type->vw_initializeWithCopy(destContainer, fieldData);
   }
@@ -1151,7 +1174,11 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const char *swift_keyPath_copySymbolName(void *address) {
   if (auto info = SymbolInfo::lookup(address)) {
     if (info->getSymbolName()) {
+#if defined(_WIN32)
+      return _strdup(info->getSymbolName());
+#else
       return strdup(info->getSymbolName());
+#endif
     }
   }
   return nullptr;
@@ -1169,9 +1196,12 @@ SWIFT_RUNTIME_STDLIB_INTERNAL const
   std::string mangledName = keyPathSourceString(name, length);
   if (mangledName == "") {
     return 0;
-  } else {
-    return strdup(mangledName.c_str());
   }
+#if defined(_WIN32)
+  return _strdup(mangledName.c_str());
+#else
+  return strdup(mangledName.c_str());
+#endif
 }
 
 #endif  // SWIFT_ENABLE_REFLECTION

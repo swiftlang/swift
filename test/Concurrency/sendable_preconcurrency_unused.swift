@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -verify -emit-sil %s -o /dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency import NonStrictModule
 

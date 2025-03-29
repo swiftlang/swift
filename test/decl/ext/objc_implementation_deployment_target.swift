@@ -2,6 +2,7 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -target x86_64-apple-macosx10.14.3 -enable-experimental-feature ObjCImplementation
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_ObjCImplementation
 
 @objc @implementation extension ObjCImplSubclass {
   // expected-error@-1 {{'@implementation' of an Objective-C class requires a minimum deployment target of at least macOS 10.14.4}}

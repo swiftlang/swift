@@ -164,7 +164,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
 
-  if (Info.Category == "deprecation") {
+  if (Info.Category == "deprecation" ||
+      Info.Category.starts_with("Deprecated")) {
     SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
   } else if (Info.Category == "no-usage") {
     SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
@@ -745,10 +746,9 @@ public:
 
     BufferID = SM.addNewSourceBuffer(std::move(BufCopy));
 
-    Parser.reset(new ParserUnit(
-        SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
-        CompInv.getTypeCheckerOptions(), CompInv.getSILOptions(),
-        CompInv.getModuleName()));
+    Parser.reset(new ParserUnit(SM, SourceFileKind::Main, BufferID,
+                                CompInv.getLangOptions(),
+                                CompInv.getModuleName()));
 
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
@@ -973,6 +973,7 @@ public:
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::ReplacedFunctionBody:
       case GeneratedSourceInfo::PrettyPrinted:
+      case GeneratedSourceInfo::AttributeFromClang:
         break;
       }
     }
@@ -1000,7 +1001,7 @@ public:
       return true;
 
     // Do not annotate references to unavailable decls.
-    if (AvailableAttr::isUnavailable(D))
+    if (D->isUnavailable())
       return true;
 
     auto &SM = D->getASTContext().SourceMgr;
@@ -1102,11 +1103,7 @@ public:
       return;
     }
 
-    if (!AstUnit->getPrimarySourceFile().getBufferID().has_value()) {
-      LOG_WARN_FUNC("Primary SourceFile is expected to have a BufferID");
-      return;
-    }
-    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
+    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID();
 
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
     Annotator.walk(AstUnit->getPrimarySourceFile());
@@ -1457,9 +1454,8 @@ public:
     // We only report runtime name for classes and protocols with an explicitly
     // defined ObjC name, i.e. those that have @objc("SomeName")
     if (D && (isa<ClassDecl>(D) || isa<ProtocolDecl>(D))) {
-      auto *ObjCNameAttr = D->getAttrs().getAttribute<ObjCAttr>();
-      if (ObjCNameAttr && ObjCNameAttr->hasName())
-        return ObjCNameAttr->getName()->getString(Buf);
+      if (auto objcName = D->getExplicitObjCName())
+        return objcName->getString(Buf);
     }
     return StringRef();
   }
@@ -1603,22 +1599,6 @@ private:
       }
       return Action::Continue(E);
     }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-        // The base walker assumes the content of active IfConfigDecl clauses
-        // has been injected into the parent context and will be walked there.
-        // This doesn't hold for pre-typechecked ASTs and we need to find
-        // placeholders in inactive clauses anyway, so walk them here.
-        for (auto Clause: ICD->getClauses()) {
-          for (auto Elem: Clause.Elements) {
-            Elem.walk(*this);
-          }
-        }
-        return Action::SkipNode();
-      }
-      return Action::Continue();
-    }
   };
 
   class ClosureTypeWalker: public ASTWalker {
@@ -1727,12 +1707,12 @@ private:
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !checkCallExpr(E) && !EnclosingCallAndArg.first) {
-          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) &&
+          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) && !isa<UnsafeExpr>(E) &&
               !isa<PrefixUnaryExpr>(E)) {
             // We don't want to expand to trailing closures if the call is
             // nested inside another expression that has closing characters,
             // like a `)` for a function call. This is not the case for
-            // `try`, `await` and prefix operator applications.
+            // `try`, `await`, `unsafe` and prefix operator applications.
             OuterExpr = E;
           }
         }
@@ -1796,20 +1776,6 @@ private:
           }
         }
         return Action::Continue(S);
-      }
-
-      PreWalkAction walkToDeclPre(Decl *D) override {
-        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-          for (auto Clause : ICD->getClauses()) {
-            // Active clase elements are visited normally.
-            if (Clause.isActive)
-              continue;
-            for (auto Member : Clause.Elements)
-              Member.walk(*this);
-          }
-          return Action::SkipNode();
-        }
-        return Action::Continue();
       }
 
       ArgumentList *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
@@ -2400,7 +2366,7 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);
   SwiftDocumentStructureWalker Walker(SrcFile.getASTContext().SourceMgr,
-                                      *SrcFile.getBufferID(),
+                                      SrcFile.getBufferID(),
                                       Consumer);
   ModelContext.walk(Walker);
 }
@@ -2624,7 +2590,7 @@ void SwiftLangSupport::getSemanticTokens(
             "Unable to find input file"));
         return;
       }
-      SemanticAnnotator Annotator(CompIns.getSourceMgr(), *SF->getBufferID());
+      SemanticAnnotator Annotator(CompIns.getSourceMgr(), SF->getBufferID());
       Annotator.walk(SF);
       Receiver(
           RequestResult<SemanticTokensResult>::fromResult(Annotator.SemaToks));

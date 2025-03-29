@@ -3,7 +3,7 @@
 # RUN:     %swift_src_root \
 # RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \
-# RUN:       -F "%xcode-extra-frameworks-dir"
+# RUN:       %xcode-extra-frameworks-search-path
 
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
@@ -36,11 +36,16 @@ for module_file in os.listdir(sdk_overlay_dir):
     # TODO: fix the DifferentiationUnittest module.
     if module_name == "DifferentiationUnittest":
         continue
-    # Backtracing needs its own additional modules in the module path
-    if module_name == "_Backtracing":
+    # Runtime needs its own additional modules in the module path, and
+    # also needs C++ interop enabled
+    if module_name == "Runtime":
         extra_args = ["-I", os.path.join(source_dir, "stdlib",
-                                         "public", "Backtracing", "modules"),
-                      "-I", os.path.join(source_dir, "include")]
+                                         "public", "RuntimeModule", "modules"),
+                      "-I", os.path.join(source_dir, "include"),
+                      "--enable-experimental-cxx-interop"]
+        # TODO: Fix SIL verification error (probably due to a deserialization bug
+        # in sil-opt) rdar://143050566
+        continue
     # _Concurrency needs its own additional modules in the module path
     if module_name == "_Concurrency":
         extra_args = ["-I", os.path.join(source_dir, "stdlib",

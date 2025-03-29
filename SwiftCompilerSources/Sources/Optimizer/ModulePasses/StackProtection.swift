@@ -467,7 +467,7 @@ private extension AccessBase {
         return .decidedInCaller(arg)
       case .yield, .pointer:
         return .unknown
-      case .unidentified:
+      case .index, .unidentified:
         // In the rare case of an unidentified access, just ignore it.
         // This should not happen in regular SIL, anyway.
         return .no

@@ -194,16 +194,16 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
 
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType: {
-        bool containsUnresolvedSymbols = false;
+        bool containsNameSymbols = false;
         for (auto term : prop->getSubstitutions()) {
-          containsUnresolvedSymbols |= term.containsUnresolvedSymbols();
+          containsNameSymbols |= term.containsNameSymbols();
         }
 
         Type concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
-        if (containsUnresolvedSymbols || rule.isRecursive())
+        if (containsNameSymbols || rule.isRecursive())
           concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
         if (ReconstituteSugar)
@@ -302,7 +302,7 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
       // Requirements containing unresolved name symbols originate from
       // invalid code and should not appear in the generic signature.
       for (auto term : prop->getSubstitutions()) {
-        if (term.containsUnresolvedSymbols())
+        if (term.containsNameSymbols())
           continue;
       }
 

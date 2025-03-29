@@ -2,6 +2,8 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %t/extern_c.swift -I%t | %FileCheck %s --check-prefixes CHECK,CHECK-%target-cpu
 
+// REQUIRES: swift_feature_Extern
+
 //--- c_abi_types.h
 #include <stdbool.h>
 

@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-ir %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 @propertyWrapper
 @dynamicMemberLookup
@@ -39,6 +39,16 @@ public struct State<Wrapped> {
       })
     }
   }
+}
+
+public struct S<T> {
+  public private(set) subscript(x: Int) -> Int {
+     get {
+       return 27
+     }
+     mutating set {
+     }
+   }
 }
 
 // CHECK: define {{.*}}@main(

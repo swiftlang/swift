@@ -316,9 +316,6 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   for (auto &ESD : S->getElements()) {
     
     if (auto D = ESD.dyn_cast<Decl*>()) {
-      if (isa<IfConfigDecl>(D))
-        continue;
-
       // Hoisted declarations are emitted at the top level by emitSourceFile().
       if (D->isHoisted())
         continue;

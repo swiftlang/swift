@@ -427,13 +427,13 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
     auto conf = substitutionMap.lookupConformance(
         wmi->getLookupType()->mapTypeOutOfContext()->getCanonicalType(),
-        wmi->getConformance().getRequirement());
+        wmi->getConformance().getProtocol());
     if (conf.isInvalid())
       return getUnknown(evaluator, value,
                         UnknownReason::UnknownWitnessMethodConformance);
     auto &module = wmi->getModule();
     SILFunction *fn =
-        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(),
+        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(), wmi->isSpecialized(),
             SILModule::LinkingMode::LinkAll).first;
     // If we were able to resolve it, then we can proceed.
     if (fn)
@@ -1011,8 +1011,12 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumDirectSILResults() == 0 &&
            conventions.getNumIndirectSILResults() == 0 &&
            "unexpected Array.append(_:) signature");
-    // Get the element to be appended which is passed indirectly (@in).
-    SymbolicValue element = getConstAddrAndLoadResult(apply->getOperand(1));
+    // Get the element to be appended which is usually passed indirectly (@in),
+    // or directly (in Embedded Swift where Array.append can be specialized).
+    SymbolicValue element = getConstantValue(apply->getOperand(1));
+    if (element.getKind() == SymbolicValue::Address) {
+      element = getConstAddrAndLoadResult(apply->getOperand(1));
+    }
     if (!element.isConstant())
       return element;
 
@@ -1278,7 +1282,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     if (calleeFnType->getRepresentation() ==
         SILFunctionType::Representation::WitnessMethod) {
       auto protocol =
-          calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
+          calleeFnType->getWitnessMethodConformanceOrInvalid().getProtocol();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
       SubstitutionMap applySubstMap = apply->getSubstitutionMap();
@@ -1821,6 +1825,10 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     return computeCallResult(apply);
 
   if (isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst)) {
+    if (auto *sb = dyn_cast<StoreBorrowInst>(inst)) {
+      auto addr = getConstantValue(inst->getOperand(1));
+      setValue(sb, addr);
+    }
     auto stored = getConstantValue(inst->getOperand(0));
     if (!stored.isConstant())
       return stored;

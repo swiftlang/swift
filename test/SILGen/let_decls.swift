@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 

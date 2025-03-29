@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
+// RUN: %target-swift-frontend %t/use-cxx-types.swift -module-name UseCxxTy -typecheck -verify -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
+// RUN: cat %t/header.h >> %t/full-header.h
+// RUN: cat %t/UseCxxTy.h >> %t/full-header.h
+// RUN: %target-interop-build-clangxx -std=c++20 -c -xc++-header %t/full-header.h -o %t/o.o
 
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 
@@ -28,6 +31,11 @@ import CxxTest
 
 public func consumeSharedFRT(_ x: consuming SharedFRT) {}
 public func takeSharedFRT(_ x: SharedFRT) {}
+
+public func takeSharedFRTGeneric(_ x: [SharedFRT]) {}
+public func returnSharedFRTGeneric() -> [SharedFRT] { [] }
+public func takeSharedFRTOptional(_ x: SharedFRT?) {}
+public func returnSharedFRTOptional() -> SharedFRT? { nil }
 
 // CHECK: SWIFT_EXTERN void $s8UseCxxTy16consumeSharedFRTyySo0eF0VnF(SharedFRT *_Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // consumeSharedFRT(_:)
 

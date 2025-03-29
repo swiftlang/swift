@@ -55,5 +55,5 @@ func testIdentifier(notOkay: Stringified<String> = #stringify(myString)) {}
 // expected-error@+1{{only literals are permitted}}
 func testString(interpolated: Stringified<String> = #stringify("Hello \(0b10001)")) {}
 
-// expected-error@+1{{default argument value of type 'Stringified<Int>' (aka '(Int, String)') cannot be converted to type 'Int'}}
+// expected-error@+1{{default argument value of type '(Int, String)' cannot be converted to type 'Int'}}
 func testReturn(wrongType: Int = #stringify(0)) {}

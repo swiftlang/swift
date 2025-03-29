@@ -14,6 +14,7 @@
 
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LoadDynamicLibrary.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/Sandbox.h"
@@ -25,16 +26,6 @@
 
 #include <signal.h>
 
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include "llvm/Support/ConvertUTF.h"
-#include "llvm/Support/Windows/WindowsSupport.h"
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
-
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #elif defined(_WIN32)
@@ -42,46 +33,6 @@
 #endif
 
 using namespace swift;
-
-namespace {
-void *loadLibrary(const char *path, std::string *err);
-void *getAddressOfSymbol(void *handle, const char *symbol);
-
-#if defined(_WIN32)
-void *loadLibrary(const char *path, std::string *err) {
-  SmallVector<wchar_t, MAX_PATH> pathUnicode;
-  if (std::error_code ec = llvm::sys::windows::UTF8ToUTF16(path, pathUnicode)) {
-    SetLastError(ec.value());
-    llvm::MakeErrMsg(err, std::string(path) + ": Can't convert to UTF-16");
-    return nullptr;
-  }
-
-  HMODULE handle = LoadLibraryW(pathUnicode.data());
-  if (handle == NULL) {
-    llvm::MakeErrMsg(err, std::string(path) + ": Can't open");
-    return nullptr;
-  }
-  return (void *)handle;
-}
-
-void *getAddressOfSymbol(void *handle, const char *symbol) {
-  return (void *)uintptr_t(GetProcAddress((HMODULE)handle, symbol));
-}
-
-#else
-void *loadLibrary(const char *path, std::string *err) {
-  void *handle = ::dlopen(path, RTLD_LAZY | RTLD_LOCAL);
-  if (!handle)
-    *err = ::dlerror();
-  return handle;
-}
-
-void *getAddressOfSymbol(void *handle, const char *symbol) {
-  return ::dlsym(handle, symbol);
-}
-
-#endif
-} // namespace
 
 PluginRegistry::PluginRegistry() {
   dumpMessaging = ::getenv("SWIFT_DUMP_PLUGIN_MESSAGING") != nullptr;
@@ -108,7 +59,7 @@ InProcessPlugins::create(const char *serverPath) {
                                    "entry point not found in '%s'", serverPath);
   }
   return std::unique_ptr<InProcessPlugins>(new InProcessPlugins(
-      serverPath, server, reinterpret_cast<HandleMessageFunction>(funcPtr)));
+      serverPath, reinterpret_cast<HandleMessageFunction>(funcPtr)));
 }
 
 llvm::Error InProcessPlugins::sendMessage(llvm::StringRef message) {
@@ -223,16 +174,10 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
 
 llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
   if (Process) {
-    // See if the loaded one is still usable.
-    if (!Process->isStale)
-      return llvm::Error::success();
-
     // NOTE: We don't check the mtime here because 'stat(2)' call is too heavy.
     // PluginRegistry::loadExecutablePlugin() checks it and replace this object
     // itself if the plugin is updated.
-
-    // The plugin is stale. Discard the previously opened process.
-    Process.reset();
+    return llvm::Error::success();
   }
 
   // Create command line arguments.
@@ -358,8 +303,8 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) {
   size_t size = message.size();
 
   // Write header (message size).
-  uint64_t header = llvm::support::endian::byte_swap(
-      uint64_t(size), llvm::support::endianness::little);
+  uint64_t header = llvm::support::endian::byte_swap(uint64_t(size),
+                                                     llvm::endianness::little);
   writtenSize = Process->write(&header, sizeof(header));
   if (writtenSize != sizeof(header)) {
     setStale();
@@ -391,8 +336,8 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() {
                                    "failed to read plugin message header");
   }
 
-  size_t size = llvm::support::endian::read<uint64_t>(
-      &header, llvm::support::endianness::little);
+  size_t size =
+      llvm::support::endian::read<uint64_t>(&header, llvm::endianness::little);
 
   // Read message.
   std::string message;

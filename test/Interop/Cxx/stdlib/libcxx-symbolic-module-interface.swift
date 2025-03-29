@@ -8,8 +8,11 @@
 // RUN: %target-run %t/check-libcxx-version || %FileCheck %s --check-prefixes=CHECK,STRING --input-file=%t/result.txt
 // RUN: %target-run %t/check-libcxx-version || %FileCheck %s --check-prefixes=CHECK,MAP --input-file=%t/result.txt
 
-// REQUIRES: asserts
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_ImportSymbolicCXXDecls
+
+// Since this test runs check-libcxx-version, it requires execution.
+// REQUIRES: executable_test
 
 // CHECK: enum std {
 // CHECK: enum __1 {

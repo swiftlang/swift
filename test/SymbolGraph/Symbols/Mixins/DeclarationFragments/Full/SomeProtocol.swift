@@ -4,8 +4,12 @@
 // RUN: %FileCheck %s --input-file %t/SomeProtocol.symbols.json
 // RUN: %FileCheck %s --input-file %t/SomeProtocol.symbols.json --check-prefix MULTI
 
+// Note we use '-wmo' here to make sure the driver doesn't do merge-modules,
+// which would result in printing the Type instead of TypeRepr, leading to
+// inconsistency with the new driver. Once we switch to always using the new
+// driver, we can remove it.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name SomeProtocol -emit-module -emit-module-path %t/SomeProtocol.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/
+// RUN: %target-build-swift %s -module-name SomeProtocol -emit-module -wmo -emit-module-path %t/SomeProtocol.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/
 // RUN: %validate-json %t/SomeProtocol.symbols.json %t/SomeProtocol.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/SomeProtocol.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/SomeProtocol.formatted.symbols.json --check-prefix MULTI
@@ -19,7 +23,7 @@ public func doSomething(with param: some SomeProtocol) {}
 
 public protocol OtherProtocol {}
 
-public func doSomethingElse(with param: some SomeProtocol & OtherProtocol) {}
+public func doSomethingElse(with param: some OtherProtocol & SomeProtocol) {}
 
 // CHECK-LABEL:        "precise": "s:12SomeProtocol11doSomething4withyx_tA2ARzlF",
 

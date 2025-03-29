@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-upcoming-feature RegionBasedIsolation
 
+// REQUIRES: swift_feature_RegionBasedIsolation
+
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
 
@@ -660,7 +662,7 @@ actor Rain {
 }
 
 @available(SwiftStdlib 5.5, *)
-actor DeinitExceptionForSwift5 {
+actor NonIsolatedDeinitExceptionForSwift5 {
   var x: Int = 0
 
   func cleanup() { // expected-note {{calls to instance method 'cleanup()' from outside of its actor context are implicitly asynchronous}}
@@ -675,6 +677,22 @@ actor DeinitExceptionForSwift5 {
     x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in the Swift 6 language mode}}
   }
 }
+
+@available(SwiftStdlib 6.1, *)
+actor IsolatedDeinitExceptionForSwift5 {
+  var x: Int = 0
+
+  func cleanup() {
+    x = 0
+  }
+
+  isolated deinit {
+    cleanup() // ok
+
+    x = 1 // ok
+  }
+}
+
 
 @available(SwiftStdlib 5.5, *)
 actor OhBrother {

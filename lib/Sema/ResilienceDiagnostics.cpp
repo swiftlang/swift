@@ -279,8 +279,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   // Some diagnostics emitted with the `MemberImportVisibility` feature enabled
   // subsume these diagnostics.
   if (originKind == DisallowedOriginKind::MissingImport &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility) && SF &&
-      SF->hasDelayedMissingImportForMemberDiagnostic(D))
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility) && SF)
     return false;
 
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
@@ -301,7 +300,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        static_cast<unsigned>(originKind))
         .limitBehavior(limit);
 
-    D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+    D->diagnose(diag::kind_declared_here, D->getDescriptiveKind());
   } else {
     // Only implicitly imported decls should be reported as a warning,
     // and only for language versions below Swift 6.

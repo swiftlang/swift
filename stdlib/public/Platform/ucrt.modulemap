@@ -10,13 +10,40 @@
 //
 //===----------------------------------------------------------------------===//
 
-module _complex [system] {
+// The following modules have to be standalone top-level modules to deal with
+// version 10.0.26100 of the Windows SDK.
+module _malloc [system] [no_undeclared_includes] {
+  use corecrt
+  header "malloc.h"
+  export *
+}
+
+module _complex [system] [no_undeclared_includes] {
+  use corecrt
+  use std
   header "complex.h"
   export *
 }
 
+module _stddef [system] [no_undeclared_includes] {
+  header "stddef.h"
+  export *
+}
+
+module _stdlib [system] [no_undeclared_includes] {
+  use corecrt
+  header "stdlib.h"
+  export *
+}
+
 module ucrt [system] {
+  export _malloc
+
   module C {
+    export _complex
+    export _stddef
+    export _stdlib
+
     module ctype {
       header "ctype.h"
       export *
@@ -54,11 +81,6 @@ module ucrt [system] {
 
     module signal {
       header "signal.h"
-      export *
-    }
-
-    module stddef {
-      header "stddef.h"
       export *
     }
 
@@ -129,11 +151,6 @@ module ucrt [system] {
 
   module dos {
     header "dos.h"
-    export *
-  }
-
-  module malloc {
-    header "malloc.h"
     export *
   }
 

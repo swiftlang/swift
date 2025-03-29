@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -simplify-cfg %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -simplify-cfg %s | %FileCheck %s
 //
 // Make sure that we can successfully call simplify-cfg with that name via sil-opt.
 

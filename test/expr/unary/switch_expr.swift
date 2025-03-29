@@ -855,14 +855,14 @@ func returnBranches6PoundIf() -> Int {
 }
 
 func returnBranches6PoundIf2() -> Int {
-  // We don't allow multiple expressions.
+  // We don't allow multiple expressions, but inactive #ifs don't count.
   let i = switch Bool.random() {
   case true:
     #if false
     print("hello")
     0
     #endif
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
+    // expected-error@-1 {{expected expression in branch of 'switch' expression}}
   case false:
     1
   }
@@ -1071,7 +1071,7 @@ func testPoundIfBranch3() -> Int {
     #if false
     0
     #endif
-  // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
+  // expected-error@-1 {{expected expression in branch of 'switch' expression}}
   case false:
     0
   }
@@ -1092,27 +1092,26 @@ func testPoundIfBranch4() -> Int {
 }
 
 func testPoundIfBranch5() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Okay, inactive #ifs don't count.
   switch Bool.random() {
   case true:
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
+    0
   case false:
-    1 // expected-warning {{integer literal is unused}}
+    1
   }
 }
 
 func testPoundIfBranch6() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Okay, inactive #ifs don't count.
   let x = switch Bool.random() {
   case true:
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
+    0
   case false:
     1
   }

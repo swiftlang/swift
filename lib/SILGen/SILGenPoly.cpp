@@ -83,6 +83,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "silgen-poly"
+#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "FunctionInputGenerator.h"
 #include "Initialization.h"
@@ -94,6 +95,7 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -254,7 +256,7 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(inputType)
+    CanType openedType = ExistentialArchetypeType::getAny(inputType)
         ->getCanonicalType();
     SILType loweredOpenedType = getLoweredType(openedType);
 
@@ -292,6 +294,67 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
                    [&](SGFContext C) -> ManagedValue {
                      return manageOpaqueValue(input, loc, C);
                    });
+}
+
+// Convert T.TangentVector to Optional<T>.TangentVector.
+// Optional<T>.TangentVector is a struct wrapping Optional<T.TangentVector>
+// So we just need to call appropriate .init on it.
+ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
+    SILLocation loc, ManagedValue input, CanType wrappedType, CanType inputType,
+    CanType outputType, SGFContext ctxt) {
+  // Look up the `Optional<T>.TangentVector.init` declaration.
+  auto *constructorDecl = getASTContext().getOptionalTanInitDecl(outputType);
+
+  // `Optional<T.TangentVector>`
+  CanType optionalOfWrappedTanType = inputType.wrapInOptionalType();
+
+  const TypeLowering &optTL = getTypeLowering(optionalOfWrappedTanType);
+  auto optVal = emitInjectOptional(
+      loc, optTL, SGFContext(), [&](SGFContext objectCtxt) { return input; });
+
+  auto *diffProto = getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto diffConf = lookupConformance(wrappedType, diffProto);
+  assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+  ConcreteDeclRef initDecl(
+      constructorDecl,
+      SubstitutionMap::get(constructorDecl->getGenericSignature(),
+                           {wrappedType}, {diffConf}));
+  PreparedArguments args({AnyFunctionType::Param(optionalOfWrappedTanType)});
+  args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
+
+  auto result = emitApplyAllocatingInitializer(loc, initDecl, std::move(args),
+                                               Type(), ctxt);
+  return std::move(result).getScalarValue();
+}
+
+ManagedValue SILGenFunction::emitOptionalTangentVectorToTangentVector(
+    SILLocation loc, ManagedValue input, CanType wrappedType, CanType inputType,
+    CanType outputType, SGFContext ctxt) {
+  // Optional<T>.TangentVector should be a struct with a single
+  // Optional<T.TangentVector> `value` property. This is an implementation
+  // detail of OptionalDifferentiation.swift
+  // TODO: Maybe it would be better to have explicit getters / setters here that we can
+  // call and hide this implementation detail?
+  VarDecl *wrappedValueVar = getASTContext().getOptionalTanValueDecl(inputType);
+  // `Optional<T.TangentVector>`
+  CanType optionalOfWrappedTanType = outputType.wrapInOptionalType();
+
+  FormalEvaluationScope scope(*this);
+
+  auto sig = wrappedValueVar->getDeclContext()->getGenericSignatureOfContext();
+  auto *diffProto =
+      getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto diffConf = lookupConformance(wrappedType, diffProto);
+  assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+
+  auto wrappedVal = emitRValueForStorageLoad(
+      loc, input, inputType, /*super*/ false, wrappedValueVar,
+      PreparedArguments(), SubstitutionMap::get(sig, {wrappedType}, {diffConf}),
+      AccessSemantics::Ordinary, optionalOfWrappedTanType, SGFContext());
+
+  return emitCheckedGetOptionalValueFrom(
+      loc, std::move(wrappedVal).getScalarValue(),
+      /*isImplicitUnwrap*/ true, getTypeLowering(optionalOfWrappedTanType), ctxt);
 }
 
 /// Apply this transformation to an arbitrary value.
@@ -642,7 +705,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
     auto layout = instanceType.getExistentialLayout();
     if (layout.getSuperclass()) {
-      CanType openedType = OpenedArchetypeType::getAny(inputSubstType)
+      CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
           ->getCanonicalType();
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
@@ -673,6 +736,54 @@ ManagedValue Transform::transform(ManagedValue v,
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);
+  }
+
+  // - T.TangentVector to Optional<T>.TangentVector
+  // Optional<T>.TangentVector is a struct wrapping Optional<T.TangentVector>
+  // So we just need to call appropriate .init on it.
+  // However, we might have T.TangentVector == T, so we need to calculate all
+  // required types first.
+  {
+    CanType optionalTy = isa<NominalType>(outputSubstType)
+                             ? outputSubstType.getNominalParent()
+                             : CanType(); // `Optional<T>`
+    if (optionalTy && (bool)optionalTy.getOptionalObjectType()) {
+      CanType wrappedType = optionalTy.getOptionalObjectType(); // `T`
+      // Check that T.TangentVector is indeed inputSubstType (this also handles
+      // case when T == T.TangentVector).
+      // Also check that outputSubstType is an Optional<T>.TangentVector.
+      auto inputTanSpace =
+          wrappedType->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      auto outputTanSpace =
+          optionalTy->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      if (inputTanSpace && outputTanSpace &&
+          inputTanSpace->getCanonicalType() == inputSubstType &&
+          outputTanSpace->getCanonicalType() == outputSubstType)
+        return SGF.emitTangentVectorToOptionalTangentVector(
+            Loc, v, wrappedType, inputSubstType, outputSubstType, ctxt);
+    }
+  }
+
+  // - Optional<T>.TangentVector to T.TangentVector.
+  {
+    CanType optionalTy = isa<NominalType>(inputSubstType)
+                             ? inputSubstType.getNominalParent()
+                             : CanType(); // `Optional<T>`
+    if (optionalTy && (bool)optionalTy.getOptionalObjectType()) {
+      CanType wrappedType = optionalTy.getOptionalObjectType(); // `T`
+      // Check that T.TangentVector is indeed outputSubstType (this also handles
+      // case when T == T.TangentVector)
+      // Also check that inputSubstType is an Optional<T>.TangentVector
+      auto inputTanSpace =
+          optionalTy->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      auto outputTanSpace =
+          wrappedType->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      if (inputTanSpace && outputTanSpace &&
+          inputTanSpace->getCanonicalType() == inputSubstType &&
+          outputTanSpace->getCanonicalType() == outputSubstType)
+        return SGF.emitOptionalTangentVectorToTangentVector(
+            Loc, v, wrappedType, inputSubstType, outputSubstType, ctxt);
+    }
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -5290,6 +5401,11 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
                                          &SGF.F);
   auto thunkType = SGF.F.getLoweredFunctionType();
+  SWIFT_DEFER {
+    // If verify all is enabled, verify thunk bodies.
+    if (SGF.getASTContext().SILOpts.VerifyAll)
+      SGF.F.verify();
+  };
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
@@ -5327,6 +5443,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     switch (inputIsolation.getKind()) {
     // Synchronous nonisolated functions are called on the current executor.
     case FunctionTypeIsolation::Kind::NonIsolated:
+      break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      hopToIsolatedParameter = true;
       break;
 
     // For a function with parameter isolation, we'll have to dig the
@@ -5438,7 +5558,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  return buildSILFunctionThunkType(&F, sourceType, expectedType, inputSubstType, outputSubstType, genericEnv, interfaceSubs, dynamicSelfType, withoutActuallyEscaping);
+  return buildSILFunctionThunkType(
+      &F, sourceType, expectedType, inputSubstType, outputSubstType,
+      genericEnv, interfaceSubs, dynamicSelfType,
+      withoutActuallyEscaping);
 }
 
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
@@ -5905,7 +6028,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Get the thunk name.
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   std::string name;
   // If `self` is being reordered, it is an AD-specific self-reordering
   // reabstraction thunk.
@@ -6269,7 +6392,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   auto name = getASTContext()
       .getIdentifier(
           mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
@@ -6821,12 +6944,16 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> derivedYields;
-    auto tokenAndCleanup =
-        emitBeginApplyWithRethrow(loc, derivedRef,
-                                  SILType::getPrimitiveObjectType(derivedFTy),
-                                  subs, args, derivedYields);
+    auto tokenAndCleanups = emitBeginApplyWithRethrow(
+        loc, derivedRef, SILType::getPrimitiveObjectType(derivedFTy), subs,
+        args, derivedYields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
     auto overrideSubs = SubstitutionMap::getOverrideSubstitutions(
         base.getDecl(), derived.getDecl()).subst(subs);
 
@@ -6836,10 +6963,13 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     translateYields(*this, loc, derivedYields, derivedYieldInfo, baseYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
+    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
+    emitEndApplyWithRethrow(loc, token, allocation);
 
     result = B.createTuple(loc, {});
     break;
@@ -7209,23 +7339,29 @@ void SILGenFunction::emitProtocolWitness(
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> witnessYields;
-    auto tokenAndCleanup =
-      emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,
-                                args, witnessYields);
+    auto tokenAndCleanups = emitBeginApplyWithRethrow(
+        loc, witnessFnRef, witnessSILTy, witnessSubs, args, witnessYields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
-    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
-                            reqtSubs.subst(getForwardingSubstitutionMap()));
+    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy, reqtSubs);
 
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
+    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
+    emitEndApplyWithRethrow(loc, token, allocation);
 
     reqtResultValue = B.createTuple(loc, {});
     break;

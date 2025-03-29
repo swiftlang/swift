@@ -69,6 +69,11 @@ public:
     /// The actor isolation iss statically erased, as for a call to
     /// an isolated(any) function.  This is not possible for declarations.
     Erased,
+    /// Inherits isolation from the caller of the given function.
+    ///
+    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
+    /// want to inherit from their context the context's actor isolation.
+    CallerIsolationInheriting,
   };
 
 private:
@@ -100,11 +105,17 @@ public:
         silParsed(isSILParsed), parameterIndex(0) {}
 
   static ActorIsolation forUnspecified() {
-    return ActorIsolation(Unspecified, nullptr);
+    return ActorIsolation(Unspecified);
   }
 
   static ActorIsolation forNonisolated(bool unsafe) {
-    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
+    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
+  }
+
+  static ActorIsolation forCallerIsolationInheriting() {
+    // NOTE: We do not use parameter indices since the parameter is implicit
+    // from the perspective of the AST.
+    return ActorIsolation(CallerIsolationInheriting);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -133,6 +144,8 @@ public:
     return ActorIsolation(GlobalActor, globalActor);
   }
 
+  static ActorIsolation forMainActor(ASTContext &ctx);
+
   static ActorIsolation forErased() {
     return ActorIsolation(Erased);
   }
@@ -150,8 +163,11 @@ public:
                                             ActorIsolation::NonisolatedUnsafe))
             .Case("global_actor",
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
-            .Case("global_actor_unsafe", std::optional<ActorIsolation>(
-                                             ActorIsolation::GlobalActor))
+            .Case("global_actor_unsafe",
+                  std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
+            .Case("caller_isolation_inheriting",
+                  std::optional<ActorIsolation>(
+                      ActorIsolation::CallerIsolationInheriting))
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -178,8 +194,8 @@ public:
     return parameterIndex;
   }
 
-  /// Returns true if this actor-instance isolation applies to the self
-  /// parameter of a method.
+  /// Returns true if this is an actor-instance isolation that additionally
+  /// applies to the self parameter of a method.
   bool isActorInstanceForSelfParameter() const {
     return getActorInstanceParameter() == 0;
   }
@@ -196,6 +212,7 @@ public:
     case Unspecified:
     case Nonisolated:
     case NonisolatedUnsafe:
+    case CallerIsolationInheriting:
       return false;
     }
   }
@@ -215,6 +232,10 @@ public:
   bool isMainActor() const;
 
   bool isDistributedActor() const;
+
+  bool isCallerIsolationInheriting() const {
+    return getKind() == CallerIsolationInheriting;
+  }
 
   Type getGlobalActor() const {
     assert(isGlobalActor());

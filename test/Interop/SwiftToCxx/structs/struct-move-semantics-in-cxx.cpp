@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/large-structs-pass-return-indirect-in-cxx.swift -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %S/large-structs-pass-return-indirect-in-cxx.swift -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 
 // Link should fail by default when a move is
 // performed in C++.

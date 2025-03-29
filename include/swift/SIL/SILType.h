@@ -49,7 +49,7 @@ namespace swift {
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found opened archetype or empty type otherwise.
-CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
+CanExistentialArchetypeType getOpenedArchetypeOf(CanType Ty);
 CanLocalArchetypeType getLocalArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.
@@ -243,19 +243,16 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  SWIFT_IMPORT_UNSAFE
   ClassDecl *getClassOrBoundGenericClass() const {
     return getASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  SWIFT_IMPORT_UNSAFE
   StructDecl *getStructOrBoundGenericStruct() const {
     return getASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  SWIFT_IMPORT_UNSAFE
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
@@ -267,26 +264,8 @@ public:
     });
   }
 
-  bool isBuiltinInteger() const {
-    return is<BuiltinIntegerType>();
-  }
-
-  bool isBuiltinFixedWidthInteger(unsigned width) const {
-    BuiltinIntegerType *bi = getAs<BuiltinIntegerType>();
-    return bi && bi->isFixedWidth(width);
-  }
-
-  bool isBuiltinFloat() const {
-    return is<BuiltinFloatType>();
-  }
-
-  bool isBuiltinVector() const {
-    return is<BuiltinVectorType>();
-  }
-
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
-  SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -294,7 +273,6 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  SWIFT_IMPORT_UNSAFE
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
@@ -455,12 +433,6 @@ public:
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {
     return getASTType()->isClassExistentialType();
-  }
-
-  /// Returns true if the referenced type is an opened existential type
-  /// (which is actually a kind of archetype).
-  bool isOpenedExistential() const {
-    return getASTType()->isOpenedExistential();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
@@ -909,6 +881,12 @@ public:
     return sd->getAttrs().getAttribute<RawLayoutAttr>();
   }
 
+  /// If this is a raw layout type, returns the substituted like type.
+  Type getRawLayoutSubstitutedLikeType() const;
+
+  /// If this is a raw layout type, returns the substituted count type.
+  Type getRawLayoutSubstitutedCountType() const;
+
   /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
   /// SILType().
   ///
@@ -942,16 +920,16 @@ public:
 
   SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
-  MetatypeRepresentation getRepresentationOfMetatype(SILFunction *function) const;
-
-  bool isOrContainsObjectiveCClass() const;
-
   bool isCalleeConsumedFunction() const {
     auto funcTy = castTo<SILFunctionType>();
     return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
   }
 
   bool isMarkedAsImmortal() const;
+
+  /// True if a value of this type can have its address taken by a
+  /// lifetime-dependent value.
+  bool isAddressableForDeps(const SILFunction &function) const;
 
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed

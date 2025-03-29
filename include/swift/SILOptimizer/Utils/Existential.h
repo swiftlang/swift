@@ -33,7 +33,7 @@ namespace swift {
 /// When successful, ConcreteExistentialInfo can be used to determine the
 /// concrete type of the opened existential.
 struct OpenedArchetypeInfo {
-  OpenedArchetypeType *OpenedArchetype = nullptr;
+  ExistentialArchetypeType *OpenedArchetype = nullptr;
   // The opened value.
   SingleValueInstruction *OpenedArchetypeValue;
   // The existential value.
@@ -74,6 +74,9 @@ struct ConcreteExistentialInfo {
   SILValue ConcreteValue;
   // True if the ConcreteValue is copied from another stack location
   bool isConcreteValueCopied = false;
+  // True if the ConcreteValue should replace all uses of the opened
+  // existential.
+  bool ConcreteValueNeedsFixup = false;
   // When ConcreteType is itself an opened existential, record the type
   // definition. May be nullptr for a valid AppliedConcreteType.
   SingleValueInstruction *ConcreteTypeDef = nullptr;

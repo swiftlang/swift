@@ -15,13 +15,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/AssertImplements.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
+#include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -295,6 +299,14 @@ Operand *BeginBorrowInst::getSingleNonEndingUse() const {
     singleUse = use;
   }
   return singleUse;
+}
+
+bool BorrowedFromInst::isReborrow() const {
+  // The forwarded operand is either a phi or undef.
+  if (auto *phi = dyn_cast<SILPhiArgument>(getBorrowedValue())) {
+    return phi->isReborrow();
+  }
+  return false;
 }
 
 namespace {
@@ -858,6 +870,10 @@ namespace {
        return true;
     }
 
+    bool visitMarkDependenceAddrInst(const MarkDependenceAddrInst *RHS) {
+       return true;
+    }
+
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
       return true;
     }
@@ -893,6 +909,9 @@ namespace {
       return X->getElementType() == RHS->getElementType();
     }
 
+    bool visitTypeValueInst(const TypeValueInst *RHS) {
+      return true;
+    }
   private:
     const SILInstruction *LHS;
   };
@@ -996,6 +1015,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
       return BI->getArguments().size() > 0
         ? MemoryBehavior::MayWrite
         : MemoryBehavior::None;
+    } else if (BInfo.ID == BuiltinValueKind::WillThrow) {
+      return MemoryBehavior::MayRead;
     }
     if (BInfo.ID != BuiltinValueKind::None)
       return BInfo.isReadNone() ? MemoryBehavior::None
@@ -1075,6 +1096,12 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
+  if (auto mdi = MarkDependenceInstruction(this)) {
+    if (mdi.getBase()->getType().isAddress())
+      return MemoryBehavior::MayRead;
+    return MemoryBehavior::None;
+  }
+  
   // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
   // it is nondestructive. Setting this currently causes LICM to miscompile
   // because access paths do not account for enum projections.
@@ -1135,6 +1162,7 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StrongReleaseInst:
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::Name##ReleaseValueInst:
@@ -1187,6 +1215,7 @@ bool SILInstruction::mayRelease() const {
     if (auto Kind = BI->getBuiltinKind()) {
       switch (Kind.value()) {
         case BuiltinValueKind::CopyArray:
+        case BuiltinValueKind::WillThrow:
           return false;
         default:
           break;
@@ -1223,7 +1252,7 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
     return true;
   default:
     return mayRelease();
@@ -1263,7 +1292,6 @@ namespace {
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this) ||
-      isa<AllocVectorInst>(this) ||
       isa<AllocPackInst>(this) ||
       isa<AllocPackMetadataInst>(this))
     return true;
@@ -1283,6 +1311,10 @@ bool SILInstruction::isAllocatingStack() const {
       && !PA->getFunction()->hasOwnership();
   }
 
+  if (auto *BAI = dyn_cast<BeginApplyInst>(this)) {
+    return BAI->isCalleeAllocated();
+  }
+
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
         BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
@@ -1291,6 +1323,17 @@ bool SILInstruction::isAllocatingStack() const {
   }
 
   return false;
+}
+
+SILValue SILInstruction::getStackAllocation() const {
+  if (!isAllocatingStack()) {
+    return {};
+  }
+
+  if (auto *bai = dyn_cast<BeginApplyInst>(this)) {
+    return bai->getCalleeAllocationResult();
+  }
+  return cast<SingleValueInstruction>(this);
 }
 
 bool SILInstruction::isDeallocatingStack() const {
@@ -1409,11 +1452,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
     return !PA->isOnStack();
   }
-  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
-  // borrow scope. We currently assume that a set of dominated scope-ending uses
-  // can be found.
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
   if (auto *MD = dyn_cast<MarkDependenceInst>(this)) {
-    return !MD->isNonEscaping();
+    return !MD->isNonEscaping() || MD->getType().isAddress();
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
@@ -1464,12 +1507,31 @@ bool SILInstruction::isTriviallyDuplicatable() const {
       isa<GetAsyncContinuationInst>(this))
     return false;
 
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(this)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
+
   // If you add more cases here, you should also update SILLoop:canDuplicate.
 
   return true;
 }
 
 bool SILInstruction::mayTrap() const {
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (auto Kind = BI->getBuiltinKind()) {
+      if (Kind.value() == BuiltinValueKind::WillThrow) {
+        // We don't want willThrow instructions to be removed.
+        return true;
+      }
+    }
+  }
   switch(getKind()) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -1789,51 +1851,36 @@ bool SILInstruction::maySuspend() const {
   return false;
 }
 
-static bool
-visitRecursivelyLifetimeEndingUses(
-  SILValue i, bool &noUsers,
-  llvm::function_ref<bool(Operand *)> visitScopeEnd,
-  llvm::function_ref<bool(Operand *)> visitUnknownUse) {
-
-  for (Operand *use : i->getConsumingUses()) {
-    noUsers = false;
-    if (isa<DestroyValueInst>(use->getUser())) {
-      if (!visitScopeEnd(use)) {
-        return false;
+static SILValue lookThroughOwnershipAndForwardingInsts(SILValue value) {
+  auto current = value;
+  while (true) {
+    if (auto *inst = current->getDefiningInstruction()) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MoveValueInst:
+      case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::BeginBorrowInst:
+        current = inst->getOperand(0);
+        continue;
+      default:
+        break;
       }
+      auto forward = ForwardingOperation(inst);
+      Operand *op = nullptr;
+      if (forward && (op = forward.getSingleForwardingOperand())) {
+        current = op->get();
+        continue;
+      }
+    } else if (auto *result = SILArgument::isTerminatorResult(current)) {
+      auto *op = result->forwardedTerminatorResultOperand();
+      if (!op) {
+        break;
+      }
+      current = op->get();
       continue;
     }
-    if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
-      auto fnTy = ret->getFunction()->getLoweredFunctionType();
-      assert(!fnTy->getLifetimeDependencies().empty());
-      if (!visitScopeEnd(use)) {
-        return false;
-      }
-      continue;
-    }
-    // FIXME: Handle store to indirect result
-    
-    // There shouldn't be any dead-end consumptions of a nonescaping
-    // partial_apply that don't forward it along, aside from destroy_value.
-    //
-    // On-stack partial_apply cannot be cloned, so it should never be used by a
-    // BranchInst.
-    //
-    // This is a fatal error because it performs SIL verification that is not
-    // separately checked in the verifier. It is the only check that verifies
-    // the structural requirements of on-stack partial_apply uses.
-    auto *user = use->getUser();
-    if (user->getNumResults() == 0) {
-      return visitUnknownUse(use);
-    }
-    for (auto res : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, visitScopeEnd,
-                                              visitUnknownUse)) {
-        return false;
-      }
-    }
+    break;
   }
-  return true;
+  return current;
 }
 
 bool
@@ -1844,22 +1891,133 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
-  auto visitUnknownUse = [](Operand *unknownUse){
-    llvm::errs() << "partial_apply [on_stack] use:\n";
-    auto *user = unknownUse->getUser();
-    user->printInContext(llvm::errs());
-    if (isa<BranchInst>(user)) {
-      llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+  auto *function = getFunction();
+
+  SmallVector<SILBasicBlock *, 32> discoveredBlocks;
+  SSAPrunedLiveness liveness(function, &discoveredBlocks);
+  liveness.initializeDef(this);
+
+  StackList<SILValue> values(function);
+  values.push_back(this);
+
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (auto *use : value->getUses()) {
+      if (!use->isConsuming()) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+          values.push_back(cvi);
+        }
+        continue;
+      }
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
+        continue;
+      }
+      auto forward = ForwardingOperand(use);
+      if (!forward) {
+        // There shouldn't be any non-forwarding consumptions of a nonescaping
+        // partial_apply that don't forward it along, aside from destroy_value.
+        //
+        // On-stack partial_apply cannot be cloned, so it should never be used
+        // by a BranchInst.
+        //
+        // This is a fatal error because it performs SIL verification that is
+        // not separately checked in the verifier. It is the only check that
+        // verifies the structural requirements of on-stack partial_apply uses.
+        if (lookThroughOwnershipAndForwardingInsts(use->get()) !=
+            SILValue(this)) {
+          // Consumes of values which aren't "essentially" the
+          //   partial_apply [on_stack]
+          // are okay.  For example, a not-on_stack partial_apply that captures
+          // it.
+          continue;
+        }
+        llvm::errs() << "partial_apply [on_stack] use:\n";
+        auto *user = use->getUser();
+        user->printInContext(llvm::errs());
+        if (isa<BranchInst>(user)) {
+          llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+        }
+        llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                                 "forwarded to a destroy_value");
+      }
+      forward.visitForwardedValues([&values](auto value) {
+        values.push_back(value);
+        return true;
+      });
     }
-    llvm::report_fatal_error("partial_apply [on_stack] must be directly "
-                             "forwarded to a destroy_value");
-    return false;
-  };
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
-                                          visitUnknownUse)) {
-    return false;
+  }
+  PrunedLivenessBoundary boundary;
+  liveness.computeBoundary(boundary);
+
+  for (auto *inst : boundary.lastUsers) {
+    // Only destroy_values were added to liveness, so only destroy_values can be
+    // the last users.
+    auto *dvi = cast<DestroyValueInst>(inst);
+    auto keepGoing = func(&dvi->getOperandRef());
+    if (!keepGoing) {
+      return false;
+    }
   }
   return !noUsers;
+}
+
+namespace swift::test {
+FunctionTest PartialApplyPrintOnStackLifetimeEnds(
+    "partial_apply_print_on_stack_lifetime_ends",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      auto *pai = cast<PartialApplyInst>(inst);
+      function.print(llvm::outs());
+      auto result = pai->visitOnStackLifetimeEnds([](auto *operand) {
+        operand->print(llvm::outs());
+        return true;
+      });
+      const char *resultString = result ? "true" : "false";
+      llvm::outs() << "returned: " << resultString << "\n";
+    });
+} // end namespace swift::test
+
+static bool
+visitRecursivelyLifetimeEndingUses(
+  SILValue i, bool &noUsers,
+  llvm::function_ref<bool(Operand *)> visitScopeEnd,
+  llvm::function_ref<bool(Operand *)> visitUnknownUse) {
+
+  StackList<SILValue> values(i->getFunction());
+  values.push_back(i);
+
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (Operand *use : value->getConsumingUses()) {
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
+      }
+      if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
+        auto fnTy = ret->getFunction()->getLoweredFunctionType();
+        assert(!fnTy->getLifetimeDependencies().empty());
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
+      }
+      // FIXME: Handle store to indirect result
+
+      auto *user = use->getUser();
+      if (user->getNumResults() == 0) {
+        return visitUnknownUse(use);
+      }
+      for (auto res : use->getUser()->getResults()) {
+        values.push_back(res);
+      }
+    }
+  }
+  return true;
 }
 
 // FIXME: Rather than recursing through all results, this should only recurse
@@ -1868,9 +2026,13 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 // the dependent value.
 bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitScopeEnd,
-  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
+  assert(getType().isObject() && "lifetime ends only exist for values");
+  assert(getOwnershipKind() == OwnershipKind::Owned
+         && getType().isEscapable(*getFunction())
+         && "only correct for owned escapable values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {
@@ -1957,6 +2119,26 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   }
   
   return false;
+}
+
+SILInstructionContext SILInstructionContext::forFunctionInModule(SILFunction *F,
+                                                                 SILModule &M) {
+  if (F) {
+    assert(&F->getModule() == &M);
+    return forFunction(*F);
+  }
+  return forModule(M);
+}
+
+SILFunction *SILInstructionContext::getFunction() {
+  return *storage.dyn_cast<SILFunction *>();
+}
+
+SILModule &SILInstructionContext::getModule() {
+  if (auto *m = storage.dyn_cast<SILModule *>()) {
+    return **m;
+  }
+  return storage.get<SILFunction *>()->getModule();
 }
 
 #ifndef NDEBUG

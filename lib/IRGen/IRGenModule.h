@@ -112,6 +112,7 @@ namespace swift {
   class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
+  class SILDefaultOverrideTable;
   class SILProperty;
   class SILType;
   class SILVTable;
@@ -147,6 +148,7 @@ namespace irgen {
   class StructLayout;
   class IRGenDebugInfo;
   class IRGenFunction;
+  struct IRLinkage;
   class LinkEntity;
   class LoadableTypeInfo;
   class MetadataLayout;
@@ -463,6 +465,8 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  void ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot);
+
   llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
   metadataPrespecializationsForType(NominalTypeDecl *type) {
     return MetadataPrespecializationsForGenericTypes.lookup(type);
@@ -664,7 +668,7 @@ public:
   const llvm::Triple VariantTriple;
   std::unique_ptr<llvm::TargetMachine> TargetMachine;
   ModuleDecl *getSwiftModule() const;
-  AvailabilityContext getAvailabilityContext() const;
+  AvailabilityRange getAvailabilityRange() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
@@ -700,7 +704,7 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
-  llvm::Type *PtrTy;                   /// ptr
+  llvm::PointerType *PtrTy;            /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
@@ -788,6 +792,7 @@ public:
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
+  llvm::StructType *MethodDefaultOverrideDescriptorStructTy; /// %swift.method_default_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
@@ -828,6 +833,7 @@ public:
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorUnownedPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskNameTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
@@ -840,6 +846,15 @@ public:
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
+
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::PointerType *CoroFunctionPointerPtrTy;
+  llvm::PointerType *CoroAllocationTy;
+  llvm::FunctionType *CoroAllocateFnTy;
+  llvm::FunctionType *CoroDeallocateFnTy;
+  llvm::IntegerType *CoroAllocatorFlagsTy;
+  llvm::StructType *CoroAllocatorTy;
+  llvm::PointerType *CoroAllocatorPtrTy;
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -866,6 +881,7 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+  llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -888,6 +904,7 @@ public:
     return getPointerAlignment();
   }
   Alignment getAsyncContextAlignment() const;
+  Alignment getCoroStaticFrameAlignment() const;
 
   /// Return the offset, relative to the address point, of the start of the
   /// type-specific members of an enum metadata.
@@ -966,8 +983,6 @@ public:
   [[noreturn]]
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
-
-  bool useDllStorage();
 
   bool shouldPrespecializeGenericMetadata();
   
@@ -1119,8 +1134,10 @@ public:
 
   TypeExpansionContext getMaximalTypeExpansionContext() const;
 
-  bool isResilientConformance(const NormalProtocolConformance *conformance);
-  bool isResilientConformance(const RootProtocolConformance *root);
+  bool isResilientConformance(const NormalProtocolConformance *conformance,
+                              bool disableOptimizations = false);
+  bool isResilientConformance(const RootProtocolConformance *root,
+                              bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
   Alignment getCappedAlignment(Alignment alignment);
@@ -1135,6 +1152,8 @@ public:
   ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
+
+  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -1160,6 +1179,9 @@ public:
                                         bool willBeRelativelyAddressed = false,
                                         bool useOSLogSection = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
+  llvm::Constant *
+  getAddrOfGlobalIdentifierString(StringRef utf8,
+                                  bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
   std::string getObjCSelectorName(SILDeclRef method);
@@ -1204,22 +1226,24 @@ public:
 
   llvm::Constant *getConstantSignedCFunctionPointer(llvm::Constant *fn);
 
-  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
-                                           unsigned key,
-                                           llvm::Constant *addrDiscriminator,
-                                           llvm::Constant *otherDiscriminator);
+  llvm::Constant *
+  getConstantSignedPointer(llvm::Constant *pointer, unsigned key,
+                           llvm::Constant *storageAddress,
+                           llvm::ConstantInt *otherDiscriminator);
   llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
                                            const clang::PointerAuthSchema &schema,
                                            const PointerAuthEntity &entity,
                                            llvm::Constant *storageAddress);
 
-  llvm::Constant *getOrCreateHelperFunction(StringRef name,
-                                            llvm::Type *resultType,
-                                            ArrayRef<llvm::Type*> paramTypes,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline = false,
-                        bool forPrologue = false,
-                        bool isPerformanceConstraint = false);
+  llvm::Constant *getOrCreateHelperFunction(
+      StringRef name, llvm::Type *resultType, ArrayRef<llvm::Type *> paramTypes,
+      llvm::function_ref<void(IRGenFunction &IGF)> generate,
+      bool setIsNoInline = false, bool forPrologue = false,
+      bool isPerformanceConstraint = false,
+      IRLinkage *optionalLinkage = nullptr,
+      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt,
+      std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+          transformAttrs = std::nullopt);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1273,6 +1297,7 @@ private:
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
+  llvm::DenseMap<LinkEntity, llvm::Constant *> IndirectCoroFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
@@ -1368,7 +1393,7 @@ private:
     unsigned numExtraInhabitants;
     unsigned align: 16;
     unsigned pod: 1;
-    unsigned bitwiseTakable: 1;
+    unsigned bitwiseTakable: 2;
   };
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
@@ -1506,7 +1531,8 @@ public:
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
-  bool isStandardLibrary() const;
+  llvm::Constant *
+  getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1584,6 +1610,7 @@ public:
       StackProtectorMode stackProtect = StackProtectorMode::NoStackProtector);
   void setHasNoFramePointer(llvm::AttrBuilder &Attrs);
   void setHasNoFramePointer(llvm::Function *F);
+  void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
@@ -1640,6 +1667,15 @@ public:
                                              ConstantInit init);
   SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
 
+  llvm::Constant *getAddrOfCoroFunctionPointer(LinkEntity entity);
+  llvm::Constant *getAddrOfCoroFunctionPointer(SILFunction *function);
+  llvm::Constant *defineCoroFunctionPointer(LinkEntity entity,
+                                            ConstantInit init);
+  SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
+
+  llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
+
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
   void emitDispatchThunk(SILDeclRef declRef);
@@ -1658,7 +1694,8 @@ public:
   llvm::Constant *getAddrOfMethodDescriptor(SILDeclRef declRef,
                                             ForDefinition_t forDefinition);
   void emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
-                                         SILDeclRef declRef);
+                                         SILDeclRef declRef,
+                                         ClassDecl *classDecl);
 
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);
@@ -1673,9 +1710,6 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              ConstantInit init = ConstantInit());
-  llvm::Constant *
-  getAddrOfEffectiveValueWitnessTable(CanType concreteType,
-                                      ConstantInit init = ConstantInit());
   std::optional<llvm::Function *>
   getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer, bool isForeign,
                            ForDefinition_t forDefinition);
@@ -1819,6 +1853,16 @@ public:
                        bool isDynamicallyReplaceableImplementation = false,
                        bool shouldCallPreviousImplementation = false);
 
+  llvm::Function *
+  getAddrOfWitnessTableProfilingThunk(llvm::Function *witness,
+                                      const NormalProtocolConformance &C);
+
+  llvm::Function *
+  getAddrOfVTableProfilingThunk(llvm::Function *f, ClassDecl *decl);
+
+  llvm::Function *getOrCreateProfilingThunk(llvm::Function *f,
+                                            StringRef prefix);
+
   void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
 
   llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
@@ -1837,7 +1881,7 @@ public:
                                                const NormalProtocolConformance *C,
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfWitnessTable(const RootProtocolConformance *C,
+  llvm::Constant *getAddrOfWitnessTable(const ProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfWitnessTablePattern(
                                       const NormalProtocolConformance *C,
@@ -1904,6 +1948,8 @@ public:
 
   /// Add the swiftself attribute.
   void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
+
+  void addSwiftCoroAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   void addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                       unsigned argIndex);
@@ -2012,6 +2058,17 @@ public:
 
 /// Workaround to disable thumb-mode until debugger support is there.
 bool shouldRemoveTargetFeature(StringRef);
+
+struct CXXBaseRecordLayout {
+  const clang::CXXRecordDecl *decl;
+  Size offset;
+  Size size;
+};
+
+/// Retrieves the base classes of a C++ struct/class ordered by their offset in
+/// the derived type's memory layout.
+SmallVector<CXXBaseRecordLayout, 1>
+getBasesAndOffsets(const clang::CXXRecordDecl *decl);
 
 } // end namespace irgen
 } // end namespace swift

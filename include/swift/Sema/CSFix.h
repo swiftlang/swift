@@ -109,12 +109,6 @@ enum class FixKind : uint8_t {
   /// Fix up the generic arguments of two types so they match each other.
   GenericArgumentsMismatch,
 
-  /// Fix up @autoclosure argument to the @autoclosure parameter,
-  /// to for a call to be able to forward it properly, since
-  /// @autoclosure conversions are unsupported starting from
-  /// Swift version 5.
-  AutoClosureForwarding,
-
   /// Remove `!` or `?` because base is not an optional type.
   RemoveUnwrap,
 
@@ -415,7 +409,7 @@ enum class FixKind : uint8_t {
   AllowAssociatedValueMismatch,
 
   /// Produce an error for not getting a compile-time constant
-  NotCompileTimeConst,
+  NotCompileTimeLiteral,
 
   /// Ignore a type mismatch while trying to infer generic parameter type
   /// from default expression.
@@ -489,6 +483,13 @@ enum class FixKind : uint8_t {
   /// sending result, but is passed a function typed parameter without a sending
   /// result.
   AllowSendingMismatch,
+
+  /// Ignore when an 'InlineArray' literal has mismatched number of elements to
+  /// the type it's attempting to bind to.
+  AllowInlineArrayLiteralCountMismatch,
+
+  /// Ignore that a conformance is isolated but is not allowed to be.
+  IgnoreIsolatedConformance,
 };
 
 class ConstraintFix {
@@ -619,6 +620,10 @@ public:
   bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
     return diagnose(*commonFixes.front().first);
   }
+
+  /// Assess the impact this fix is going to have at the given location.
+  static unsigned assessImpact(ConstraintSystem &cs,
+                               ConstraintLocator *atLoc);
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -1212,33 +1217,6 @@ private:
 
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
-  }
-};
-
-/// Detect situations when argument of the @autoclosure parameter is itself
-/// marked as @autoclosure and is not applied. Form a fix which suggests a
-/// proper way to forward such arguments, e.g.:
-///
-/// ```swift
-/// func foo(_ fn: @autoclosure () -> Int) {}
-/// func bar(_ fn: @autoclosure () -> Int) {
-///   foo(fn) // error - fn should be called
-/// }
-/// ```
-class AutoClosureForwarding final : public ConstraintFix {
-  AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
-
-public:
-  std::string getName() const override { return "fix @autoclosure forwarding"; }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  static AutoClosureForwarding *create(ConstraintSystem &cs,
-                                       ConstraintLocator *locator);
-
-  static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::AutoClosureForwarding;
   }
 };
 
@@ -1926,14 +1904,11 @@ public:
 };
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
-  bool IsMissingImport;
-
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
                           ValueDecl *member, DeclNameRef name,
-                          ConstraintLocator *locator, bool isMissingImport)
+                          ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
-                              member, name, locator),
-        IsMissingImport(isMissingImport) {}
+                              member, name, locator) {}
 
 public:
   std::string getName() const override {
@@ -1948,8 +1923,7 @@ public:
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
-                                         ConstraintLocator *locator,
-                                         bool isMissingImport);
+                                         ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInaccessibleMember;
@@ -2026,33 +2000,43 @@ public:
 
 class AllowInvalidRefInKeyPath final : public ConstraintFix {
   enum RefKind {
-    // Allow a reference to a static member as a key path component.
+    // Allow invalid references to static members i.e. on instance of a type.
     StaticMember,
+    // Allow a reference to a static member as a key path component if it is
+    // declared in a module with built with Swift 6.0 compiler version or older.
+    UnsupportedStaticMember,
     // Allow a reference to a declaration with mutating getter as
     // a key path component.
     MutatingGetter,
-    // Allow a reference to a method (instance or static) as
-    // a key path component.
+    // Allow a reference to a mutating method.
     Method,
     // Allow a reference to a initializer instance as a key path
     // component.
     Initializer,
     // Allow a reference to an enum case as a key path component.
+    MutatingMethod,
+    // Allow a reference to an async or throwing method.
+    AsyncOrThrowsMethod,
+    // Allow a reference to an enum case as a key path component.
     EnumCase,
   } Kind;
 
   ValueDecl *Member;
+  Type BaseType;
 
-  AllowInvalidRefInKeyPath(ConstraintSystem &cs, RefKind kind,
+  AllowInvalidRefInKeyPath(ConstraintSystem &cs, Type baseType, RefKind kind,
                            ValueDecl *member, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowInvalidRefInKeyPath, locator),
-        Kind(kind), Member(member) {}
+        Kind(kind), Member(member), BaseType(baseType) {}
 
 public:
   std::string getName() const override {
     switch (Kind) {
     case RefKind::StaticMember:
-      return "allow reference to a static member as a key path component";
+      return "allow reference to a static member on invalid base in key path "
+             "context";
+    case RefKind::UnsupportedStaticMember:
+      return "allow unsupported static member reference";
     case RefKind::MutatingGetter:
       return "allow reference to a member with mutating getter as a key "
              "path component";
@@ -2062,6 +2046,11 @@ public:
       return "allow reference to an init method as a key path component";
     case RefKind::EnumCase:
       return "allow reference to an enum case as a key path component";
+    case RefKind::MutatingMethod:
+      return "allow reference to mutating method as a key path component";
+    case RefKind::AsyncOrThrowsMethod:
+      return "allow reference to async or throwing method as a key path "
+             "component";
     }
     llvm_unreachable("covered switch");
   }
@@ -2071,8 +2060,9 @@ public:
   bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   /// Determine whether give reference requires a fix and produce one.
-  static AllowInvalidRefInKeyPath *
-  forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+  static AllowInvalidRefInKeyPath *forRef(ConstraintSystem &cs, Type baseType,
+                                          ValueDecl *member,
+                                          ConstraintLocator *locator);
 
   bool isEqual(const ConstraintFix *other) const;
 
@@ -2081,8 +2071,8 @@ public:
   }
 
 private:
-  static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
-                                          ValueDecl *member,
+  static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, Type baseType,
+                                          RefKind kind, ValueDecl *member,
                                           ConstraintLocator *locator);
 };
 
@@ -2102,20 +2092,20 @@ public:
   }
 };
 
-class NotCompileTimeConst final : public ContextualMismatch {
-  NotCompileTimeConst(ConstraintSystem &cs, Type paramTy, ConstraintLocator *locator);
+class NotCompileTimeLiteral final : public ContextualMismatch {
+  NotCompileTimeLiteral(ConstraintSystem &cs, Type paramTy, ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "replace with an literal"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static NotCompileTimeConst *create(ConstraintSystem &cs,
-                                     Type paramTy,
-                                     ConstraintLocator *locator);
+  static NotCompileTimeLiteral *create(ConstraintSystem &cs,
+                                       Type paramTy,
+                                       ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::NotCompileTimeConst;
+    return fix->getKind() == FixKind::NotCompileTimeLiteral;
   }
 };
 
@@ -3236,7 +3226,7 @@ public:
 
   static SpecifyBaseTypeForOptionalUnresolvedMember *
   attempt(ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
-          DeclNameRef memberName, FunctionRefKind functionRefKind,
+          DeclNameRef memberName, FunctionRefInfo functionRefInfo,
           MemberLookupResult result, ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
@@ -3859,6 +3849,59 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreKeyPathSubscriptIndexMismatch;
+  }
+};
+
+class AllowInlineArrayLiteralCountMismatch final : public ConstraintFix {
+  Type lhsCount, rhsCount;
+
+  AllowInlineArrayLiteralCountMismatch(ConstraintSystem &cs, Type lhsCount,
+                                Type rhsCount, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInlineArrayLiteralCountMismatch, locator),
+        lhsCount(lhsCount), rhsCount(rhsCount) {}
+
+public:
+  std::string getName() const override {
+    return "allow vector literal count mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInlineArrayLiteralCountMismatch *
+  create(ConstraintSystem &cs, Type lhsCount, Type rhsCount,
+         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInlineArrayLiteralCountMismatch;
+  }
+};
+
+class IgnoreIsolatedConformance : public ConstraintFix {
+  ProtocolConformance *conformance;
+
+  IgnoreIsolatedConformance(ConstraintSystem &cs,
+                            ConstraintLocator *locator,
+                            ProtocolConformance *conformance)
+      : ConstraintFix(cs, FixKind::IgnoreIsolatedConformance, locator),
+        conformance(conformance) { }
+
+public:
+  std::string getName() const override {
+    return "ignore isolated conformance";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreIsolatedConformance *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator,
+                                           ProtocolConformance *conformance);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreIsolatedConformance;
   }
 };
 

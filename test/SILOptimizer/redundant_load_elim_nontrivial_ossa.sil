@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
 // REQUIRES: swift_in_compiler
@@ -812,7 +812,7 @@ bb0(%0 : $*Klass, %1 : $*Klass, %2 : @owned $Klass):
 // CHECK: load
 // CHECK-NOT: load
 // CHECK-LABEL: } // end sil function 'redundant_load_mark_dependence'
-sil [ossa] @redundant_load_mark_dependence : $@convention(thin) (@inout Klass, @guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
+sil [ossa] @redundant_load_mark_dependence : $@convention(thin) (@in Klass, @guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
 bb0(%0 : $*Klass, %1 : @guaranteed $Builtin.NativeObject):
   %2 = mark_dependence %0 : $*Klass on %1 : $Builtin.NativeObject
   %4 = load [copy] %2 : $*Klass

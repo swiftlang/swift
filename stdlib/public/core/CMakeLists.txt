@@ -57,6 +57,7 @@ split_embedded_sources(
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
+  EMBEDDED SwiftSettings.swift
   EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguouslyStored.swift
@@ -71,16 +72,17 @@ split_embedded_sources(
   EMBEDDED DictionaryCasting.swift
   EMBEDDED DictionaryStorage.swift
   EMBEDDED DictionaryVariant.swift
-    NORMAL DiscontiguousSlice.swift
-    NORMAL DropWhile.swift
+  EMBEDDED DiscontiguousSlice.swift
+  EMBEDDED DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
+  EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
   EMBEDDED ExistentialCollection.swift
-    NORMAL Filter.swift
-    NORMAL FlatMap.swift
-    NORMAL Flatten.swift
+  EMBEDDED Filter.swift
+  EMBEDDED FlatMap.swift
+  EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
@@ -92,10 +94,11 @@ split_embedded_sources(
   EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
+  EMBEDDED InlineArray.swift
   EMBEDDED InputStream.swift
-    NORMAL IntegerParsing.swift
+  EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
-    NORMAL Join.swift
+  EMBEDDED Join.swift
   EMBEDDED KeyPath.swift
   EMBEDDED KeyValuePairs.swift
   EMBEDDED LazyCollection.swift
@@ -104,7 +107,7 @@ split_embedded_sources(
   EMBEDDED LifetimeManager.swift
     NORMAL Macros.swift
   EMBEDDED ManagedBuffer.swift
-    NORMAL Map.swift
+  EMBEDDED Map.swift
   EMBEDDED MemoryLayout.swift
   EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
@@ -121,7 +124,7 @@ split_embedded_sources(
   EMBEDDED OutputStream.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
-    NORMAL PrefixWhile.swift
+  EMBEDDED PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
   EMBEDDED PtrAuth.swift
@@ -129,8 +132,8 @@ split_embedded_sources(
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
   EMBEDDED RangeReplaceableCollection.swift
-    NORMAL RangeSet.swift
-    NORMAL RangeSetRanges.swift
+  EMBEDDED RangeSet.swift
+  EMBEDDED RangeSetRanges.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
     NORMAL REPL.swift
@@ -154,6 +157,10 @@ split_embedded_sources(
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/MutableRawSpan.swift
+  EMBEDDED Span/MutableSpan.swift
+  EMBEDDED Span/RawSpan.swift
+  EMBEDDED Span/Span.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
   EMBEDDED Stride.swift
@@ -218,9 +225,9 @@ split_embedded_sources(
     ### "NON-ESSENTIAL" SOURCES, LAYERED ON TOP OF THE "ESSENTIAL" ONES
     ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   EMBEDDED Availability.swift
-    NORMAL CollectionDifference.swift
+  EMBEDDED CollectionDifference.swift
   EMBEDDED CollectionOfOne.swift
-    NORMAL Diffing.swift
+  EMBEDDED Diffing.swift
   EMBEDDED Duration.swift
   EMBEDDED DurationProtocol.swift
   EMBEDDED FloatingPointRandom.swift
@@ -228,11 +235,12 @@ split_embedded_sources(
   EMBEDDED Int128.swift
   EMBEDDED Mirror.swift
     NORMAL PlaygroundDisplay.swift
+  EMBEDDED SwiftifyImport.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
-    NORMAL StaticBigInt.swift
+  EMBEDDED StaticBigInt.swift
   EMBEDDED UInt128.swift
-    NORMAL UnfoldSequence.swift
+  EMBEDDED UnfoldSequence.swift
   EMBEDDED UnsafeBufferPointerSlice.swift
     NORMAL VarArgs.swift
   EMBEDDED Zip.swift
@@ -315,6 +323,10 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
+list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
@@ -324,17 +336,30 @@ else()
   set(swift_lib_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib")
 endif()
 
+# For `@DebugDescription`.
 list(APPEND swift_stdlib_compile_flags "-plugin-path" "${swift_lib_dir}/swift/host/plugins")
-list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "DebugDescriptionMacro")
 
 set(swift_core_incorporate_object_libraries)
-list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
+list(APPEND swift_core_incorporate_object_libraries swiftRuntimeCore)
 list(APPEND swift_core_incorporate_object_libraries swiftLLVMSupport)
 list(APPEND swift_core_incorporate_object_libraries swiftDemangling)
 list(APPEND swift_core_incorporate_object_libraries swiftStdlibStubs)
 list(APPEND swift_core_incorporate_object_libraries swiftThreading)
 if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
+endif()
+
+# Backward deployment of Span on Apple platforms is implemented via the
+# libswiftCompatibilitySpan.dylib shim.
+#
+# This flag ensures we emit the correct $ld$previous$ symbols in the standard
+# library. When building a binary for an older deployment target, we
+# pretend certain symbols are actually in libswiftCompatibilitySpan.dylib.
+#
+# Further discussion of libswiftCompatibilitySpan.dylib appears below.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-previous-module-installname-map-file" "-Xfrontend" "${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json")
 endif()
 
 set(swiftCore_common_options
@@ -396,17 +421,61 @@ if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
                     BOOTSTRAPPING 1)
 endif()
 
+set(tooling_stdlib_deps)
+if(TARGET libSwiftScan)
+  list(APPEND tooling_stdlib_deps libSwiftScan)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
                   ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
+                  DEPENDS ${tooling_stdlib_deps}
                   INSTALL_IN_COMPONENT
                     stdlib
                   MACCATALYST_BUILD_FLAVOR
                     zippered
                  )
+
+# When a binary built with an older deployment target is run with a new
+# standard library, the symbols that were previously in the backward
+# compatibility shim are now in the standard library. To ensure the
+# dynamic linker continues to find these symbols, the compatibility
+# shim must be replaced by a symlink to the standard library.
+#
+# Since we're building the "new" standard library here, we create this
+# symlink in the same directory, from libswiftCompatibilitySpan.dylib to
+# libswiftCore.dylib.
+#
+# The sources for the real libswiftCompatibilitySpan.dylib are found in
+# stdlib/toolchain/CompatibilitySpan. When running a binary with an old
+# standard library, this dynamic library must be present at run time.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  foreach(sdk ${SWIFT_SDKS})
+    set(lib_dir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(lib_path "${SWIFTLIB_DIR}/${lib_dir}")
+    set(compat_lib_name "${lib_path}/libswiftCompatibilitySpan.dylib")
+
+    # This doesn't depend on libswiftCore.dylib because we don't actually need
+    # for it to exist to create the symlink, nor is there any need to recreate
+    # the symlink if the dylib changes.
+    add_custom_command_target(unused_var
+                              CUSTOM_TARGET_NAME "swiftCompatibilitySpan-symlink-${lib_dir}"
+                              OUTPUT "${compat_lib_name}"
+                              COMMAND ${CMAKE_COMMAND} "-E" "create_symlink" "${lib_path}/libswiftCore.dylib" "${compat_lib_name}")
+    foreach(ARCH ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      add_dependencies("swiftCore-${lib_dir}-${ARCH}" "swiftCompatibilitySpan-symlink-${lib_dir}")
+    endforeach()
+
+    swift_install_symlink_component(stdlib
+      LINK_NAME libswiftCompatibilitySpan.dylib
+      TARGET libswiftCore.dylib
+      DESTINATION "lib/swift/${lib_dir}")
+  endforeach()
+endif()
 
 # Embedded standard library - embedded libraries are built as .swiftmodule only,
 # i.e. there is no .o or .a file produced (no binary code is actually produced)
@@ -420,6 +489,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(SWIFT_STDLIB_STABLE_ABI OFF)
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
+
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with very very old OS versions.
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, visionOS 1.0" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -444,6 +522,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}
+      DEPENDS ${tooling_stdlib_deps}
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${mod})

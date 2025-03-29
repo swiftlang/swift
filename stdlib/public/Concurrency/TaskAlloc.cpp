@@ -17,9 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Task.h"
+#include "swift/Runtime/Concurrency.h"
 
 #include <stdlib.h>
 
@@ -47,7 +47,7 @@ static TaskAllocator &allocator(AsyncTask *task) {
   static GlobalAllocator global;
   return global.allocator;
 #else
-  fprintf(stderr, "global allocator fallback not available\n");
+  puts("global allocator fallback not available\n");
   abort();
 #endif
 }
@@ -66,4 +66,8 @@ void swift::swift_task_dealloc(void *ptr) {
 
 void swift::_swift_task_dealloc_specific(AsyncTask *task, void *ptr) {
   allocator(task).dealloc(ptr);
+}
+
+void swift::swift_task_dealloc_through(void *ptr) {
+  allocator(swift_task_getCurrent()).deallocThrough(ptr);
 }

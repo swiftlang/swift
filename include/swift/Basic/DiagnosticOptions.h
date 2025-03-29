@@ -13,7 +13,10 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "swift/Basic/PrintDiagnosticNamesMode.h"
+#include "swift/Basic/WarningAsErrorRule.h"
 #include "llvm/ADT/Hashing.h"
+#include <vector>
 
 namespace swift {
 
@@ -58,16 +61,13 @@ public:
   /// Suppress all remarks
   bool SuppressRemarks = false;
 
-  /// Treat all warnings as errors
-  bool WarningsAsErrors = false;
+  /// Rules for escalating warnings to errors
+  std::vector<WarningAsErrorRule> WarningsAsErrorsRules;
 
-  /// When printing diagnostics, include the diagnostic name (diag::whatever) at
-  /// the end.
-  bool PrintDiagnosticNames = false;
-
-  /// If set to true, include educational notes in printed output if available.
-  /// Educational notes are documentation which supplement diagnostics.
-  bool PrintEducationalNotes = false;
+  /// When printing diagnostics, include either the diagnostic name
+  /// (diag::whatever) at the end or the associated diagnostic group.
+  PrintDiagnosticNamesMode PrintDiagnosticNames =
+      PrintDiagnosticNamesMode::None;
 
   /// Whether to emit diagnostics in the terse LLVM style or in a more
   /// descriptive style that's specific to Swift.

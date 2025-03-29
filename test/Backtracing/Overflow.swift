@@ -52,7 +52,7 @@ struct Overflow {
 // CHECK-NEXT: 5 [ra]               0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:15:3
 // CHECK-NEXT: 6 [ra]               0x{{[0-9a-f]+}} static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift:39:5
 // CHECK-NEXT: 7 [ra] [system]      0x{{[0-9a-f]+}} static Overflow.$main() + {{[0-9]+}} in Overflow at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 8 [ra]               0x{{[0-9a-f]+}} main + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
+// CHECK-NEXT: 8 [ra] [system]      0x{{[0-9a-f]+}} main + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
 
 // CHECK: Registers:
 

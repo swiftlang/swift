@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @$sSf4main7NumProtA2aBP5valueSdyFTW : $@convention(witness_method: NumProt) (@in_guaranteed Float) -> Double
 // CHECK-NOT: %1 = load %0 : $*Float

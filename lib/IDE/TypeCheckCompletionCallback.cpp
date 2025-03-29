@@ -24,7 +24,7 @@ using namespace swift::constraints;
 void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!GotCallback);
 
-  CompletionContextFinder finder(DC);
+  auto finder = CompletionContextFinder::forFallback(DC);
   if (!finder.hasCompletionExpr())
     return;
 
@@ -51,8 +51,10 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
   // Use the contextual type, unless it is still unresolved, in which case fall
   // back to getting the type from the expression.
   if (auto ContextualType = S.getContextualType(Node)) {
-    if (!ContextualType->hasUnresolvedType())
+    if (!ContextualType->hasUnresolvedType() &&
+        !ContextualType->hasUnboundGenericType()) {
       return ContextualType;
+    }
   }
 
   if (!S.hasType(Node)) {
@@ -134,10 +136,10 @@ Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
   // not part of the solution.
   // TODO: This can be removed once ExprPattern type-checking is fully part
   // of the constraint system.
-  if (auto T = S.getConstraintSystem().getVarType(MatchVar))
-    return T;
-
-  return getTypeForCompletion(S, MatchVar);
+  auto Ty = MatchVar->getTypeInContext();
+  if (Ty->hasError())
+    return Type();
+  return Ty;
 }
 
 void swift::ide::getSolutionSpecificVarTypes(

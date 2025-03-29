@@ -63,6 +63,11 @@ public:
                                                     bool noEscape,
                                                     bool considerParameterSources);
 
+  /// Collect the necessary bindings to be able to destroy a value inside of a
+  /// fixed-layout boxed allocation.
+  static NecessaryBindings forFixedBox(IRGenModule &IGM,
+                                       SILBoxType *box);
+
   void addRequirement(GenericRequirement requirement) {
     auto type = requirement.getTypeParameter().subst(SubMap);
     if (!type->hasArchetype())
@@ -86,7 +91,12 @@ public:
   Size getBufferSize(IRGenModule &IGM) const;
 
   /// Save the necessary bindings to the given buffer.
-  void save(IRGenFunction &IGF, Address buffer) const;
+  ///
+  /// If `replacementSubs` has a value, then the bindings saved are taken from
+  /// the given substitution map instead of the substitutions
+  void save(IRGenFunction &IGF, Address buffer,
+            std::optional<SubstitutionMap> replacementSubs = std::nullopt)
+            const;
 
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;

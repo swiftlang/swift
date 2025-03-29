@@ -361,7 +361,7 @@ private:
       if (component.getCheckpoint() == checkpoint) {
         auto arg = this->walkStr.str().slice(component.getArgumentStartIndex(),
                                              component.getArgumentEndIndex());
-        if (arg.equals(argumentStr)) {
+        if (arg == argumentStr) {
           return index;
         }
       }

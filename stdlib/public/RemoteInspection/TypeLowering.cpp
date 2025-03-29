@@ -217,6 +217,13 @@ public:
       stream << ")";
       return;
     }
+
+    case TypeInfoKind::Array: {
+      printHeader("array");
+      printBasic(TI);
+      stream << ")";
+      return;
+    }
     }
 
     swift_unreachable("Bad TypeInfo kind");
@@ -437,14 +444,26 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     // Mask the rest of the fields as usual...
     break;
   }
-  case RecordKind::ClassExistential:
-    // Class existential is a data pointer that does expose spare bits
-    // ... so we can fall through ...
+  case RecordKind::ClassExistential: {
+    // First pointer in a Class Existential is the class pointer
+    // itself, which can be tagged or have other mysteries on 64-bit, so
+    // it exposes no spare bits from the first word there...
+    auto pointerBytes = TC.targetPointerSize();
+    if (pointerBytes == 8) {
+      auto zeroPointerSizedMask = BitMask::zeroMask(pointerBytes);
+      mask.andMask(zeroPointerSizedMask, 0);
+    }
+    // Otherwise, it's the same as an Existential Metatype
+    SWIFT_FALLTHROUGH;
+  }
   case RecordKind::ExistentialMetatype: {
-    // Initial metadata pointer has spare bits
+    // All the pointers in an Existential Metatype expose spare bits...
+    auto pointerBytes = TC.targetPointerSize();
     auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-    mask.andMask(mpePointerSpareBits, 0);
-    mask.keepOnlyLeastSignificantBytes(TC.targetPointerSize());
+    auto mpePointerSpareBitMask = BitMask(pointerBytes, mpePointerSpareBits);
+    for (int offset = 0; offset < (int)getSize(); offset += pointerBytes) {
+      mask.andMask(mpePointerSpareBitMask, offset);
+    }
     return mask;
   }
   case RecordKind::ErrorExistential:
@@ -461,6 +480,26 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     }
   }
   return mask;
+}
+
+ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI)
+    : TypeInfo(TypeInfoKind::Array,
+               /* size */ elementTI->getStride() * size,
+               /* alignment */ elementTI->getAlignment(),
+               /* stride */ elementTI->getStride() * size,
+               /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
+               /* isBitwiseTakable */ elementTI->isBitwiseTakable()),
+      ElementTI(elementTI) {}
+
+bool ArrayTypeInfo::readExtraInhabitantIndex(
+    remote::MemoryReader &reader, remote::RemoteAddress address,
+    int *extraInhabitantIndex) const {
+  return ElementTI->readExtraInhabitantIndex(reader, address,
+                                             extraInhabitantIndex);
+}
+
+BitMask ArrayTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  return ElementTI->getSpareBits(TC, hasAddrOnly);
 }
 
 class UnsupportedEnumTypeInfo: public EnumTypeInfo {
@@ -1774,6 +1813,14 @@ public:
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return false;
   }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return false;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
+  }
 };
 
 bool TypeConverter::hasFixedSize(const TypeRef *TR) {
@@ -1909,6 +1956,14 @@ public:
   MetatypeRepresentation visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return MetatypeRepresentation::Unknown;
   }
+
+  MetatypeRepresentation visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
+  }
 };
 
 class EnumTypeInfoBuilder {
@@ -1984,12 +2039,21 @@ public:
           // We don't have typeinfo; something is very broken.
           Invalid = true;
           return nullptr;
+	} else if (Case.Indirect) {
+	  // An indirect case is non-empty (it stores a pointer)
+	  // and acts like a non-generic (because the pointer has spare bits)
+	  ++NonGenericNonEmptyPayloadCases;
+          LastPayloadCaseTR = CaseTR;
         } else if (Case.Generic) {
+	  // Otherwise, we never consider spare bits from generic cases
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (CaseTI->getSize() == 0) {
+	  // Needed to distinguish a "single-payload enum"
+	  // whose only case is empty.
           ++NonGenericEmptyPayloadCases;
         } else {
+	  // Finally, we consider spare bits from regular payloads
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
@@ -2196,6 +2260,34 @@ class LowerType
   TypeConverter &TC;
   remote::TypeInfoProvider *ExternalTypeInfo;
 
+  const TypeInfo *CFRefTypeInfo(const TypeRef *TR) {
+    if (auto N = dyn_cast<NominalTypeRef>(TR)) {
+      Demangler Dem;
+      auto Node = N->getDemangling(Dem);
+      if (Node->getKind() == Node::Kind::Type && Node->getNumChildren() == 1) {
+	auto Alias = Node->getChild(0);
+	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
+	  auto Module = Alias->getChild(0);
+	  auto Name = Alias->getChild(1);
+	  if (Module->getKind() == Node::Kind::Module
+	      && Module->hasText()
+	      && Module->getText() == "__C"
+	      && Name->getKind() == Node::Kind::Identifier
+	      && Name->hasText()) {
+	    auto CName = Name->getText();
+	    // Heuristic: Hopefully good enough.
+	    if (CName.starts_with("CF") && CName.ends_with("Ref")) {
+	      // A CF reference is essentially the same as a Strong ObjC reference
+	      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+					     ReferenceCounting::Unknown);
+	    }
+	  }
+	}
+      }
+    }
+    return nullptr;
+  }
+
 public:
   using TypeRefVisitor<LowerType, const TypeInfo *>::visit;
 
@@ -2264,6 +2356,11 @@ public:
         // If we still have no type info ask the external provider.
         if (auto External = QueryExternalTypeInfoProvider())
           return External;
+
+	// CoreFoundation types require some special handling
+	if (auto CFTypeInfo = CFRefTypeInfo(TR))
+	  return CFTypeInfo;
+
 
         // If the external provider also fails we're out of luck.
         DEBUG_LOG(fprintf(stderr, "No TypeInfo for nominal type: "); TR->dump());
@@ -2498,6 +2595,18 @@ public:
     // with additional information?
     DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
     return nullptr;
+  }
+
+  const TypeInfo *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    DEBUG_LOG(fprintf(stderr, "Can't lower integer TypeRef"));
+    return nullptr;
+  }
+
+  const TypeInfo *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto elementTI = visit(BA->getElementType());
+    auto size = cast<IntegerTypeRef>(BA->getSizeType())->getValue();
+
+    return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
   }
 };
 

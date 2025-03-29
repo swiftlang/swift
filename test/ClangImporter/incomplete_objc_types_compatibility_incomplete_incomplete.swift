@@ -11,6 +11,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 // Both libraries "IncompleteTypeConsumer1" and "IncompleteTypeConsumer2" forward declare an interface "ForwardDeclaredInterface"
 // and a protocol "ForwardDeclaredProtocol". This test verifies that the synthesized Swift declaration created to represent

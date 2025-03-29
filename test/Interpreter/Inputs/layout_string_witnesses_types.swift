@@ -617,6 +617,7 @@ public enum MultiPayloadError {
     case empty
     case error1(Int, Error)
     case error2(Int, Error)
+    case error3(Int, Error)
 }
 
 public enum TwoPayloadInner {
@@ -659,6 +660,17 @@ public enum OneExtraTagValue {
     case x3(E4, Int8, Int16, Int32)
     case y(SimpleClass)
     case z
+}
+
+public enum ErrorWrapper {
+    case x(Error)
+    case y(Error)
+}
+
+public enum MultiPayloadAnyObject {
+    case x(AnyObject)
+    case y(AnyObject)
+    case z(AnyObject)
 }
 
 @inline(never)
@@ -705,7 +717,7 @@ public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
 
 @inline(never)
 public func testDestroy<T>(_ ptr: UnsafeMutablePointer<T>) {
-    ptr.deinitialize(count: 1)
+    _ = ptr.move()
 }
 
 @inline(never)

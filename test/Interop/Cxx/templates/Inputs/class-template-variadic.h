@@ -25,6 +25,9 @@ struct IntWrapper {
   int getValue() const { return value; }
 };
 
+typedef Tuple<IntWrapper> Single;
 typedef Tuple<IntWrapper, IntWrapper> Pair;
+typedef Tuple<IntWrapper, IntWrapper, IntWrapper> Triple;
+typedef Tuple<Tuple<IntWrapper, IntWrapper>, Tuple<IntWrapper, IntWrapper>> Nested;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_VARIADIC_H

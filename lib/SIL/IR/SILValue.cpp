@@ -153,6 +153,13 @@ bool ValueBase::isLexical() const {
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
+
+  // TODO: This is only a workaround. Optimizations should look through such instructions to
+  // get the isLexical state, instead of doing it here.
+  // rdar://143577158
+  if (auto *eilr = dyn_cast<EndInitLetRefInst>(this))
+    return eilr->getOperand()->isLexical();
+
   return false;
 }
 
@@ -441,6 +448,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 //                                  Operand
 //===----------------------------------------------------------------------===//
 
+void Operand::updateReborrowFlags() {
+  if (isa<EndBorrowInst>(getUser())) {
+    swift::updateReborrowFlags(get());
+  }
+}
+
 void Operand::verify() const {
   if (isa<BorrowedFromInst>(getUser()) && getOperandNumber() == 0) {
     assert(isa<SILArgument>(get()) || isa<SILUndef>(get()));
@@ -551,6 +564,8 @@ StringRef OperandOwnership::asString() const {
     return "forwarding-consume";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
+  case OperandOwnership::AnyInteriorPointer:
+    return "any-interior-pointer";
   case OperandOwnership::GuaranteedForwarding:
     return "guaranteed-forwarding";
   case OperandOwnership::EndBorrow:

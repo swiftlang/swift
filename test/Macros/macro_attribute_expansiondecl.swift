@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser, OS=macosx
+// REQUIRES: swift_feature_FreestandingMacros
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/src

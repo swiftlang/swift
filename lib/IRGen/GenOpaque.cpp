@@ -624,8 +624,9 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
   // executed more than once).
   bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
   if (!isInEntryBlock) {
-    stackRestorePoint =
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::stacksave, {}, "spsave");
+    stackRestorePoint = Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::stacksave,
+        {IGM.DataLayout.getAllocaPtrType(IGM.getLLVMContext())}, {}, "spsave");
   }
 
   // Emit the dynamic alloca.
@@ -642,9 +643,15 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
-                                                bool allowTaskDealloc) {
+                                                bool allowTaskDealloc,
+                                                bool useTaskDeallocThrough) {
   // Async function use taskDealloc.
   if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
+    if (useTaskDeallocThrough) {
+      emitTaskDeallocThrough(
+          Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
+      return;
+    }
     emitTaskDealloc(
         Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
     return;
@@ -672,7 +679,8 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
   auto savedSP = address.getExtraInfo();
   if (savedSP == nullptr)
     return;
-  Builder.CreateIntrinsicCall(llvm::Intrinsic::stackrestore, savedSP);
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::stackrestore,
+                              {savedSP->getType()}, {savedSP});
 }
 
 /// Emit a call to do an 'initializeArrayWithCopy' operation.

@@ -32,10 +32,6 @@
 // Because of the use of 'sed' in this test.
 // REQUIRES: shell
 
-// rdar://133393259 fails in optimized tests.
-// UNSUPPORTED: swift_test_mode_optimize
-// UNSUPPORTED: swift_test_mode_optimize_size
-
 import Darwin
 import Foundation
 
@@ -141,71 +137,79 @@ func check(base: Int = 0, sub: Int = 0,
 }
 
 
-// CHECK: START
-print("START")
+// Specialization of the 'check' function may result in the closure being deleted, which breaks the test. Disabling
+// optimization of this calling function prevents closure specialization.
+@_optimize(none)
+func main() {
+  // CHECK: START
+  print("START")
+   
+  // Check that this whole setup works.
+  // CHECK-NEXT: init(swift:) Base
+  check(base: 1) { Base(swift: ()) }
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 1) { Sub(swift: ()) }
+  // CHECK-NEXT: init(objc:) Base
+  check(base: 1) { Base(objc: ()) }
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { Sub(objc: ()) }
+   
+  // CHECK-NEXT: init(swiftToSwift:) Sub
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 1) { Sub(swiftToSwift: ()) }
+  // CHECK-NEXT: init(objcToSwift:) Sub
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 2) { Sub(objcToSwift: ()) }
+  // CHECK-NEXT: init(swiftToObjC:) Sub
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { Sub(swiftToObjC: ()) }
+  // CHECK-NEXT: init(objcToObjC:) Sub
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { Sub(objcToObjC: ()) }
+   
+  // CHECK-NEXT: init(swiftToSwiftConvenience:) Sub
+  // CHECK-NEXT: init(swiftToSwift:) Sub
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 1) { Sub(swiftToSwiftConvenience: ()) }
+  // CHECK-NEXT: init(objcToSwiftConvenience:) Sub
+  // CHECK-NEXT: init(swiftToSwift:) Sub
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 2) { Sub(objcToSwiftConvenience: ()) }
+  // CHECK-NEXT: init(swiftToObjCConvenience:) Sub
+  // CHECK-NEXT: init(objcToObjC:) Sub
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { Sub(swiftToObjCConvenience: ()) }
+  // CHECK-NEXT: init(objcToObjCConvenience:) Sub
+  // CHECK-NEXT: init(objcToObjC:) Sub
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { Sub(objcToObjCConvenience: ()) }
+   
+  // Force ObjC dispatch without conforming Sub or Base to the protocol,
+  // because it's possible that `required` perturbs things and we want to test
+  // both ways.
+  let SubAsObjC = unsafeBitCast(Sub.self as AnyObject,
+                                to: ForceObjCDispatch.Type.self)
+   
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { SubAsObjC.init(objc: ()) }
+  // CHECK-NEXT: init(objcToSwift:) Sub
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 2) { SubAsObjC.init(objcToSwift: ()) }
+  // CHECK-NEXT: init(objcToObjC:) Sub
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { SubAsObjC.init(objcToObjC: ()) }
+  // CHECK-NEXT: init(objcToSwiftConvenience:) Sub
+  // CHECK-NEXT: init(swiftToSwift:) Sub
+  // CHECK-NEXT: init(swift:) Sub
+  check(sub: 2) { SubAsObjC.init(objcToSwiftConvenience: ()) }
+  // CHECK-NEXT: init(objcToObjCConvenience:) Sub
+  // CHECK-NEXT: init(objcToObjC:) Sub
+  // CHECK-NEXT: init(objc:) Sub
+  check(sub: 1) { SubAsObjC.init(objcToObjCConvenience: ()) }
 
-// Check that this whole setup works.
-// CHECK-NEXT: init(swift:) Base
-check(base: 1) { Base(swift: ()) }
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 1) { Sub(swift: ()) }
-// CHECK-NEXT: init(objc:) Base
-check(base: 1) { Base(objc: ()) }
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { Sub(objc: ()) }
+  // CHECK-NEXT: END
+  print("END")
+}
 
-// CHECK-NEXT: init(swiftToSwift:) Sub
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 1) { Sub(swiftToSwift: ()) }
-// CHECK-NEXT: init(objcToSwift:) Sub
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { Sub(objcToSwift: ()) }
-// CHECK-NEXT: init(swiftToObjC:) Sub
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { Sub(swiftToObjC: ()) }
-// CHECK-NEXT: init(objcToObjC:) Sub
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { Sub(objcToObjC: ()) }
+main()
 
-// CHECK-NEXT: init(swiftToSwiftConvenience:) Sub
-// CHECK-NEXT: init(swiftToSwift:) Sub
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 1) { Sub(swiftToSwiftConvenience: ()) }
-// CHECK-NEXT: init(objcToSwiftConvenience:) Sub
-// CHECK-NEXT: init(swiftToSwift:) Sub
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { Sub(objcToSwiftConvenience: ()) }
-// CHECK-NEXT: init(swiftToObjCConvenience:) Sub
-// CHECK-NEXT: init(objcToObjC:) Sub
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { Sub(swiftToObjCConvenience: ()) }
-// CHECK-NEXT: init(objcToObjCConvenience:) Sub
-// CHECK-NEXT: init(objcToObjC:) Sub
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { Sub(objcToObjCConvenience: ()) }
-
-// Force ObjC dispatch without conforming Sub or Base to the protocol,
-// because it's possible that `required` perturbs things and we want to test
-// both ways.
-let SubAsObjC = unsafeBitCast(Sub.self as AnyObject,
-                              to: ForceObjCDispatch.Type.self)
-
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { SubAsObjC.init(objc: ()) }
-// CHECK-NEXT: init(objcToSwift:) Sub
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { SubAsObjC.init(objcToSwift: ()) }
-// CHECK-NEXT: init(objcToObjC:) Sub
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { SubAsObjC.init(objcToObjC: ()) }
-// CHECK-NEXT: init(objcToSwiftConvenience:) Sub
-// CHECK-NEXT: init(swiftToSwift:) Sub
-// CHECK-NEXT: init(swift:) Sub
-check(sub: 2) { SubAsObjC.init(objcToSwiftConvenience: ()) }
-// CHECK-NEXT: init(objcToObjCConvenience:) Sub
-// CHECK-NEXT: init(objcToObjC:) Sub
-// CHECK-NEXT: init(objc:) Sub
-check(sub: 1) { SubAsObjC.init(objcToObjCConvenience: ()) }
-
-// CHECK-NEXT: END
-print("END")

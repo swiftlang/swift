@@ -1,29 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testMembersPostfix1 | %FileCheck %s -check-prefix=testMembersPostfix1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testMembersDot1 | %FileCheck %s -check-prefix=testMembersDot1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testMembersDot2 | %FileCheck %s -check-prefix=testMembersDot2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testMultipleSubscript1 | %FileCheck %s -check-prefix=testMultipleSubscript1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInherit1 | %FileCheck %s -check-prefix=testInherit1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInherit2 | %FileCheck %s -check-prefix=testInherit2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testShadow1 | %FileCheck %s -check-prefix=testShadow1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGeneric1 | %FileCheck %s -check-prefix=testGeneric1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericUnderconstrained1 | %FileCheck %s -check-prefix=testGenericUnderconstrained1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testExistential1 | %FileCheck %s -check-prefix=testGenericUnderconstrained1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testExistential2 | %FileCheck %s -check-prefix=testExistential2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testProtocolConform1 | %FileCheck %s -check-prefix=testProtocolConform1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OnSelf1 | %FileCheck %s -check-prefix=OnSelf1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testSelfExtension1 | %FileCheck %s -check-prefix=testSelfExtension1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid1 | %FileCheck %s -check-prefix=testInvalid1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid2 | %FileCheck %s -check-prefix=testInvalid2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid3 | %FileCheck %s -check-prefix=testInvalid3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid4 | %FileCheck %s -check-prefix=testInvalid4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericRoot1 | %FileCheck %s -check-prefix=testGenericRoot1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericResult1 | %FileCheck %s -check-prefix=testGenericResult1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAnyObjectRoot1 | %FileCheck %s -check-prefix=testAnyObjectRoot1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested1 | %FileCheck %s -check-prefix=testNested1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested2 | %FileCheck %s -check-prefix=testNested2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testCycle1 | %FileCheck %s -check-prefix=testCycle1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testCycle2 | %FileCheck %s -check-prefix=testCycle2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testSubscriptOnProtocolExt | %FileCheck %s -check-prefix=testSubscriptOnProtocolExt
+// RUN: %batch-code-completion
 
 struct Point {
   var x: Int
@@ -154,7 +129,7 @@ func testGenericUnderconstrained1<G: P>(r: G) {
 // testGenericUnderconstrained1-NOT: CurrNominal
 
 func testExistential1(r: P) {
-  r.#^testExistential1^#
+  r.#^testExistential1?check=testGenericUnderconstrained1^#
 }
 
 @dynamicMemberLookup
@@ -380,4 +355,18 @@ func testSubscriptOnProtocolExtension(dyn: DynamicLookupConcrete) {
 // testSubscriptOnProtocolExt: Keyword[self]/CurrNominal:          self[#DynamicLookupConcrete#];
 // testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+}
+
+// https://github.com/swiftlang/swift/issues/77035
+@dynamicMemberLookup
+struct HasSendableKeyPath<T> {
+  subscript<U>(dynamicMember keyPath: KeyPath<T, U> & Sendable) -> HasSendableKeyPath<U> {
+    fatalError()
+  }
+}
+
+func testSendableKeyPath(_ x: HasSendableKeyPath<Point>) {
+  x.#^SENDABLE_KEYPATH_POINT^#
+  // SENDABLE_KEYPATH_POINT-DAG: Decl[InstanceVar]/CurrNominal: x[#HasSendableKeyPath<Int>#]; name=x
+  // SENDABLE_KEYPATH_POINT-DAG: Decl[InstanceVar]/CurrNominal: y[#HasSendableKeyPath<Int>#]; name=y
 }

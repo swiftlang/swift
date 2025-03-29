@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 // REQUIRES: concurrency
 
@@ -87,4 +87,15 @@ actor NestedAsyncInSyncActor {
     }
     _ = middle
   }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+func outerFunction(_ a: any Actor) async {
+  // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+  func middleFunction(_ isolated: any Actor) async {
+    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF05innerE0L_yyYaF : $@convention(thin) @async () -> () {
+    func innerFunction() async {}
+  }
+
+  await middleFunction(a)
 }

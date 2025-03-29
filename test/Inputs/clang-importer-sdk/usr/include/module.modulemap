@@ -153,3 +153,7 @@ module IncompleteTypes {
   header "IncompleteTypes.h"
   export *
 }
+
+module CompletionHandlerGlobals {
+  header "completion_handler_globals.h"
+}

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // None of TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -113,7 +112,7 @@ import Swift
 ///
 ///           // child tasks execute on default executor (same as case 0):
 ///           async let x = ...
-///           await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///           await withTaskGroup(of: Int.self) { group in group.addTask { 7 } }
 ///         }
 ///       }
 ///     }
@@ -149,9 +148,9 @@ public func withTaskExecutorPreference<T, Failure>(
   let taskExecutorBuiltin: Builtin.Executor =
       taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
-    _popTaskExecutorPreference(record: record)
+    unsafe _popTaskExecutorPreference(record: record)
   }
 
   // No need to manually hop to the target executor, because as we execute
@@ -180,9 +179,9 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   let taskExecutorBuiltin: Builtin.Executor =
     taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
-    _popTaskExecutorPreference(record: record)
+    unsafe _popTaskExecutorPreference(record: record)
   }
 
   return try await operation()
@@ -191,6 +190,7 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
 /// Task with specified executor -----------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -240,7 +240,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -258,6 +258,7 @@ extension Task where Failure == Never {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -302,7 +303,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -322,6 +323,7 @@ extension Task where Failure == Error {
 // ==== Detached tasks ---------------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
@@ -362,7 +364,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -380,6 +382,7 @@ extension Task where Failure == Never {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
@@ -422,7 +425,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -442,6 +445,7 @@ extension Task where Failure == Error {
 // ==== Unsafe Current Task ----------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension UnsafeCurrentTask {
 
   /// The current ``TaskExecutor`` preference, if this task has one configured.
@@ -492,7 +496,7 @@ internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
   // Rather than call into the runtime to return the
   // `TaskExecutorRef::undefined()`` we this information to bitcast
   // and return it directly.
-  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+  unsafe unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

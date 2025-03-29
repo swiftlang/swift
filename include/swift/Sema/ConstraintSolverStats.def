@@ -18,6 +18,7 @@
 #  error #define CS_STATISTIC(Name, Description) before including
 #endif
 
+CS_STATISTIC(ASTBytesAllocated, "bytes allocated in solver arena")
 CS_STATISTIC(NumTypeVariablesBound, "# of type variables bound")
 CS_STATISTIC(NumTypeVariableBindings, "# of type variable bindings attempted")
 CS_STATISTIC(NumDisjunctions, "# of disjunctions explored")
@@ -26,6 +27,7 @@ CS_STATISTIC(NumConjunctionTerms, "# of conjunction terms explored")
 CS_STATISTIC(NumSimplifiedConstraints, "# of constraints simplified")
 CS_STATISTIC(NumUnsimplifiedConstraints, "# of constraints not simplified")
 CS_STATISTIC(NumSimplifyIterations, "# of simplification iterations")
-CS_STATISTIC(NumStatesExplored, "# of solution states explored")
+CS_STATISTIC(NumSolverScopes, "# of solution states explored")
+CS_STATISTIC(NumTrailSteps, "# of changes recorded in the trail")
 CS_STATISTIC(NumComponentsSplit, "# of connected components split")
 #undef CS_STATISTIC

@@ -32,6 +32,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
@@ -294,32 +295,18 @@ namespace {
       if (!cxxRecord)
         return;
 
-      auto &layout = cxxRecord->getASTContext().getASTRecordLayout(cxxRecord);
-
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto offset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
-        auto size = Size(cxxRecord->getASTContext().getTypeSizeInChars(baseType).getQuantity());
-
-        if (offset != CurSize) {
-          assert(offset > CurSize);
-          auto paddingSize = offset - CurSize;
-          auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        if (base.offset != CurSize) {
+          assert(base.offset > CurSize);
+          auto paddingSize = base.offset - CurSize;
+          auto &opaqueTI =
+              IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
           auto element = ElementLayout::getIncomplete(opaqueTI);
           addField(element, LayoutStrategy::Universal);
         }
 
-        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(size, Alignment(1));
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(base.size, Alignment(1));
         auto element = ElementLayout::getIncomplete(opaqueTI);
         addField(element, LayoutStrategy::Universal);
       }
@@ -711,7 +698,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
   case FieldAccess::NonConstantDirect: {
     std::string symbol =
-      LinkEntity::forFieldOffset(field).mangleAsString();
+      LinkEntity::forFieldOffset(field).mangleAsString(IGM.Context);
     return MemberAccessStrategy::getDirectGlobal(std::move(symbol),
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
@@ -1609,8 +1596,7 @@ namespace {
       std::optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
-        b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),
-                     IGM.Int8PtrTy);
+        b.add(IGM.getAddrOfTypeMetadata(*specializedGenericType));
       } else {
         //     const uint8_t *IvarLayout;
         // GC/ARC layout.  TODO.
@@ -2337,7 +2323,7 @@ namespace {
         llvm::raw_svector_ostream os(buffer);
         os << LinkEntity::forTypeMetadata(*prespecialization,
                                           TypeMetadataAddress::FullMetadata)
-                  .mangleAsString();
+                  .mangleAsString(IGM.Context);
         return os.str();
       }
 
@@ -2778,7 +2764,7 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
   // situation when both an objective c object and a swift object define the
   // protocol under the same symbol name.
   auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   bool canUseClangEmission = deploymentAvailability.isContainedIn(
     IGM.Context.getSwift58Availability());
 
@@ -2966,7 +2952,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
     auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
+        AvailabilityRange::forDeploymentTarget(Context);
     if (deploymentAvailability.isContainedIn(
           Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
@@ -3053,7 +3039,7 @@ llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
   assert(!method.getOverridden() && "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
-  auto mangled = entity.mangleAsString();
+  auto mangled = entity.mangleAsString(IGM.Context);
   auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
   return typeId;
 }
@@ -3108,6 +3094,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
+                   : methodType->isCalleeAllocatedCoroutine()
+                       ? IGF.getOptions().PointerAuth.CoroSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
@@ -3118,8 +3106,16 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
     llvm::Constant *secondaryValue = nullptr;
+    auto *accessor = dyn_cast<AccessorDecl>(method.getDecl());
     if (cast<AbstractFunctionDecl>(method.getDecl())->hasAsync()) {
       auto *silFn = IGF.IGM.getSILFunctionForAsyncFunctionPointer(
+          methodInfo.getDirectImpl());
+      secondaryValue = cast<llvm::Constant>(
+          IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
+    } else if (accessor &&
+               requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      assert(methodType->isCalleeAllocatedCoroutine());
+      auto *silFn = IGF.IGM.getSILFunctionForCoroFunctionPointer(
           methodInfo.getDirectImpl());
       secondaryValue = cast<llvm::Constant>(
           IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
@@ -3161,4 +3157,13 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   }
 
   return emitVirtualMethodValue(IGF, metadata, method, methodType);
+}
+
+void IRGenerator::ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot) {
+  if (!CurrentIGM)
+    return;
+
+  for (auto &entry : ot.getEntries()) {
+    forceLocalEmitOfLazyFunction(entry.impl);
+  }
 }

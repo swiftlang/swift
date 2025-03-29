@@ -26,11 +26,13 @@ using namespace ide;
 
 std::shared_ptr<SyntacticMacroExpansionInstance>
 SyntacticMacroExpansion::getInstance(ArrayRef<const char *> args,
+                                     llvm::MemoryBuffer *inputBuf,
                                      std::string &error) {
   // Create and configure a new instance.
   auto instance = std::make_shared<SyntacticMacroExpansionInstance>();
 
-  bool failed = instance->setup(SwiftExecutablePath, args, Plugins, error);
+  bool failed =
+      instance->setup(SwiftExecutablePath, args, inputBuf, Plugins, error);
   if (failed)
     return nullptr;
 
@@ -39,7 +41,8 @@ SyntacticMacroExpansion::getInstance(ArrayRef<const char *> args,
 
 bool SyntacticMacroExpansionInstance::setup(
     StringRef SwiftExecutablePath, ArrayRef<const char *> args,
-    std::shared_ptr<PluginRegistry> plugins, std::string &error) {
+    llvm::MemoryBuffer *inputBuf, std::shared_ptr<PluginRegistry> plugins,
+    std::string &error) {
   SmallString<256> driverPath(SwiftExecutablePath);
   llvm::sys::path::remove_filename(driverPath);
   llvm::sys::path::append(driverPath, "swiftc");
@@ -63,7 +66,8 @@ bool SyntacticMacroExpansionInstance::setup(
       invocation.getLangOptions(), invocation.getTypeCheckerOptions(),
       invocation.getSILOptions(), invocation.getSearchPathOptions(),
       invocation.getClangImporterOptions(), invocation.getSymbolGraphOptions(),
-      invocation.getCASOptions(), SourceMgr, Diags));
+      invocation.getCASOptions(), invocation.getSerializationOptions(),
+      SourceMgr, Diags));
   registerParseRequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
 
@@ -72,37 +76,17 @@ bool SyntacticMacroExpansionInstance::setup(
   pluginLoader->setRegistry(plugins.get());
   Ctx->setPluginLoader(std::move(pluginLoader));
 
-  // Create a module where SourceFiles reside.
+  // Create the ModuleDecl and SourceFile.
   Identifier ID = Ctx->getIdentifier(invocation.getModuleName());
-  TheModule = ModuleDecl::create(ID, *Ctx);
+  TheModule = ModuleDecl::create(ID, *Ctx,
+                                 [&](ModuleDecl *TheModule, auto addFile) {
+    SF = new (*Ctx) SourceFile(*TheModule, SourceFileKind::Main,
+                               SourceMgr.addMemBufferCopy(inputBuf));
+    SF->setImports({});
+    addFile(SF);
+  });
 
   return false;
-}
-
-SourceFile *
-SyntacticMacroExpansionInstance::getSourceFile(llvm::MemoryBuffer *inputBuf) {
-
-  // If there is a SourceFile with the same name and the content, use it.
-  // Note that this finds the generated source file that was created in the
-  // previous expansion requests.
-  if (auto bufID =
-          SourceMgr.getIDForBufferIdentifier(inputBuf->getBufferIdentifier())) {
-    if (inputBuf->getBuffer() == SourceMgr.getEntireTextForBuffer(*bufID)) {
-      SourceLoc bufLoc = SourceMgr.getLocForBufferStart(*bufID);
-      if (SourceFile *existing =
-              TheModule->getSourceFileContainingLocation(bufLoc)) {
-        return existing;
-      }
-    }
-  }
-
-  // Otherwise, create a new SourceFile.
-  SourceFile *SF = new (getASTContext()) SourceFile(
-      *TheModule, SourceFileKind::Main, SourceMgr.addMemBufferCopy(inputBuf));
-  SF->setImports({});
-  TheModule->addFile(*SF);
-
-  return SF;
 }
 
 MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
@@ -231,7 +215,7 @@ expandFreestandingMacro(MacroDecl *macro,
   SourceFile *expandedSource =
       swift::evaluateFreestandingMacro(expansion, discriminator);
   if (expandedSource)
-    bufferIDs.push_back(*expandedSource->getBufferID());
+    bufferIDs.push_back(expandedSource->getBufferID());
 
   return bufferIDs;
 }
@@ -254,7 +238,7 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     SourceFile *expandedSource = swift::evaluateAttachedMacro(
         macro, target, attr, passParent, role, discriminator);
     if (expandedSource)
-      bufferIDs.push_back(*expandedSource->getBufferID());
+      bufferIDs.push_back(expandedSource->getBufferID());
   };
 
   MacroRoles roles = macro->getMacroRoles();
@@ -424,13 +408,12 @@ public:
 } // namespace
 
 void SyntacticMacroExpansionInstance::expand(
-    SourceFile *SF, const MacroExpansionSpecifier &expansion,
-    SourceEditConsumer &consumer) {
+    const MacroExpansionSpecifier &expansion, SourceEditConsumer &consumer) {
 
   // Find the expansion at 'expansion.offset'.
   MacroExpansionFinder expansionFinder(
       SourceMgr,
-      SourceMgr.getLocForOffset(*SF->getBufferID(), expansion.offset));
+      SourceMgr.getLocForOffset(SF->getBufferID(), expansion.offset));
   SF->walk(expansionFinder);
   auto expansionNode = expansionFinder.getResult();
   if (!expansionNode)
@@ -474,13 +457,9 @@ void SyntacticMacroExpansionInstance::expand(
 }
 
 void SyntacticMacroExpansionInstance::expandAll(
-    llvm::MemoryBuffer *inputBuf, ArrayRef<MacroExpansionSpecifier> expansions,
+    ArrayRef<MacroExpansionSpecifier> expansions,
     SourceEditConsumer &consumer) {
-
-  // Create a source file.
-  SourceFile *SF = getSourceFile(inputBuf);
-
   for (const auto &expansion : expansions) {
-    expand(SF, expansion, consumer);
+    expand(expansion, consumer);
   }
 }

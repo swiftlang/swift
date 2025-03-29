@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DoExpressions
+// REQUIRES: swift_feature_ThenStatements
 
 @discardableResult
 func throwsError() throws -> Int { 0 }

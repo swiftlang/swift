@@ -483,7 +483,7 @@ extension Substring: StringProtocol {
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
-    self.init(String(cString: nullTerminatedUTF8))
+    unsafe self.init(String(cString: nullTerminatedUTF8))
   }
 
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -500,7 +500,7 @@ extension Substring: StringProtocol {
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
   ) {
-    self.init(
+    unsafe self.init(
       String(decodingCString: nullTerminatedCodeUnits, as: sourceEncoding))
   }
 
@@ -522,7 +522,7 @@ extension Substring: StringProtocol {
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(body)
+    return try unsafe String(self).withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -548,7 +548,7 @@ extension Substring: StringProtocol {
   ) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(encodedAs: targetEncoding, body)
+    return try unsafe String(self).withCString(encodedAs: targetEncoding, body)
   }
 }
 
@@ -621,7 +621,9 @@ extension Substring: CustomDebugStringConvertible {
 
 extension Substring: LosslessStringConvertible {
   public init(_ content: String) {
-    let range = Range(_uncheckedBounds: (content.startIndex, content.endIndex))
+    let range = unsafe Range(
+      _uncheckedBounds: (content.startIndex, content.endIndex)
+    )
     self.init(_unchecked: Slice(base: content, bounds: range))
   }
 }
@@ -708,7 +710,7 @@ extension Substring.UTF8View: BidirectionalCollection {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try _slice.withContiguousStorageIfAvailable(body)
+    return try unsafe _slice.withContiguousStorageIfAvailable(body)
   }
 
   @inlinable
@@ -767,7 +769,7 @@ extension Substring {
     // scalar aligned.
     let lower = content._wholeGuts.scalarAlign(content.startIndex)
     let upper = content._wholeGuts.scalarAlign(content.endIndex)
-    let bounds = Range(_uncheckedBounds: (lower, upper))
+    let bounds = unsafe Range(_uncheckedBounds: (lower, upper))
     self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
@@ -922,7 +924,7 @@ extension Substring {
     // scalar aligned.
     let lower = content._wholeGuts.scalarAlign(content.startIndex)
     let upper = content._wholeGuts.scalarAlign(content.endIndex)
-    let bounds = Range(_uncheckedBounds: (lower, upper))
+    let bounds = unsafe Range(_uncheckedBounds: (lower, upper))
     self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
@@ -965,7 +967,9 @@ extension Substring {
     internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
       let start = base._guts.scalarAlign(_bounds.lowerBound)
       let end = base._guts.scalarAlign(_bounds.upperBound)
-      _slice = Slice(base: base, bounds: Range(_uncheckedBounds: (start, end)))
+      _slice = Slice(
+        base: base, bounds: unsafe Range(_uncheckedBounds: (start, end))
+      )
     }
   }
 }
@@ -1233,7 +1237,7 @@ extension String {
     // we don't need to compare against the `endIndex` -- those aren't nearly as
     // critical.
     if r.lowerBound._encodedOffset == 0 {
-      r = Range(_uncheckedBounds:
+      r = unsafe Range(_uncheckedBounds:
         (r.lowerBound._characterAligned, r.upperBound))
     }
 

@@ -1,22 +1,22 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/expose.h
+// RUN: %target-swift-frontend %s -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/expose.h
 // RUN: %FileCheck %s < %t/expose.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/expose.h -Wno-error=unused-function)
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -module-name Expose -o %t
-// RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftmodule -typecheck -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/expose.h
+// RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftmodule -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/expose.h
 // RUN: %FileCheck %s < %t/expose.h
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -emit-module-interface-path %t/Expose.swiftinterface -module-name Expose
-// RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/expose.h
+// RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -module-name Expose -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/expose.h
 // RUN: %FileCheck %s < %t/expose.h
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -emit-module-interface-path %t/Expose.swiftinterface -module-name Expose
-// RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Expose -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/expose.h
+// RUN: %target-swift-frontend -parse-as-library %t/Expose.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -module-name Expose -clang-header-expose-decls=has-expose-attr-or-stdlib -typecheck -verify -emit-clang-header-path %t/expose.h
 // RUN: %FileCheck %s < %t/expose.h
 
 @_expose(Cxx)
@@ -98,11 +98,9 @@ public final class ExposedClass {
 // CHECK-NEXT:   _impl::$s6Expose8exposed1yyF();
 // CHECK-NEXT: }
 // CHECK-EMPTY:
-// CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK void exposed3() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   _impl::$s6Expose8exposed3yyF();
 // CHECK-NEXT: }
-// CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK void exposed4() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   _impl::$s6Expose15exposed4RenamedyyF();

@@ -12,6 +12,8 @@
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -verify
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- Lib.swift
 public struct SomeType {}
 

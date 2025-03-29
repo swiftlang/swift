@@ -48,6 +48,7 @@ class TransitiveAddressWalker {
   /// Whether we could tell if this address use didn't escape, did have a
   /// pointer escape, or unknown if we failed to understand something.
   AddressUseKind result = AddressUseKind::NonEscaping;
+  Operand *escapingUse = nullptr;
 
   unsigned didInvalidate = false;
 
@@ -83,6 +84,11 @@ protected:
     result = swift::meet(result, other);
   }
 
+  void recordEscape(Operand *op, AddressUseKind kind = AddressUseKind::PointerEscape) {
+    meet(kind);
+    escapingUse = op;
+  }
+
 private:
   /// Shim that actually calls visitUse and changes early exit.
   void callVisitUse(Operand *use) {
@@ -92,12 +98,16 @@ private:
   }
 
 public:
-  AddressUseKind walk(SILValue address) &&;
+  AddressUseKind walk(SILValue address);
+
+  // If the result of walk() is not NonEscaping, this returns a non-null
+  // operand that caused the escape or unknown use.
+  Operand *getEscapingUse() const { return escapingUse; }
 };
 
 template <typename Impl>
 inline AddressUseKind
-TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
+TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
   assert(!didInvalidate);
 
   // When we exit, set the result to be invalidated so we can't use this again.
@@ -155,7 +165,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
       case TermKind::CondBranchInst:
         // We could have an address phi. To be conservative, just treat this as
         // a point escape.
-        meet(AddressUseKind::PointerEscape);
+        recordEscape(op);
         for (auto succBlockArgList : ti->getSuccessorBlockArgumentLists()) {
           auto *succ = succBlockArgList[op->getOperandNumber()];
           for (auto *use : succ->getUses())
@@ -185,10 +195,13 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
       }
     }
 
-    // TODO: Partial apply should be NonEscaping, but then we need to consider
-    // the apply to be a use point.
-    if (isa<PartialApplyInst>(user) || isa<AddressToPointerInst>(user)) {
-      meet(AddressUseKind::PointerEscape);
+    if (isa<PartialApplyInst>(user)) {
+      recordEscape(op, AddressUseKind::Dependent);
+      callVisitUse(op);
+      continue;
+    }
+    if (isa<AddressToPointerInst>(user)) {
+      recordEscape(op);
       callVisitUse(op);
       continue;
     }
@@ -215,7 +228,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
-        isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user)) {
+        isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
+        isa<MergeIsolationRegionInst>(user)) {
       callVisitUse(op);
       continue;
     }
@@ -276,6 +290,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         case BuiltinValueKind::GetEnumTag:
         case BuiltinValueKind::InjectEnumTag:
         case BuiltinValueKind::AddressOfRawLayout:
+        case BuiltinValueKind::FlowSensitiveSelfIsolation:
+        case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
           callVisitUse(op);
           continue;
         default:
@@ -289,16 +305,25 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
       continue;
     }
 
-    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-      // If this is the base, just treat it as a liveness use.
-      if (op->get() == mdi->getBase()) {
+    if (auto mdi = MarkDependenceInstruction(user)) {
+      // TODO: continue walking the dependent value, which may not be an
+      // address. See AddressUtils.swift. Until that is implemented, this must
+      // be considered a pointer escape.
+      if (op->get() == mdi.getBase()) {
+        recordEscape(op, AddressUseKind::Dependent);
         callVisitUse(op);
         continue;
       }
-
-      // If we are the value use, look through it.
-      transitiveResultUses(op);
-      continue;
+      if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+        // If we are the value use of a forwarding markdep, look through it.
+        transitiveResultUses(op);
+        continue;
+      }
+      if (auto *mdi = dyn_cast<MarkDependenceAddrInst>(user)) {
+        // The address operand is simply a leaf use.
+        callVisitUse(op);
+        continue;
+      }
     }
 
     // We were unable to recognize this user, so set AddressUseKind to unknown

@@ -582,6 +582,7 @@ struct TargetMethodDescriptor {
   union {
     TargetCompactFunctionPointer<Runtime, void> Impl;
     TargetRelativeDirectPointer<Runtime, void> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void> CoroImpl;
   };
 
   // TODO: add method types or anything else needed for reflection.
@@ -589,6 +590,8 @@ struct TargetMethodDescriptor {
   void *getImpl() const {
     if (Flags.isAsync()) {
       return AsyncImpl.get();
+    } else if (Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
     } else {
       return Impl.get();
     }
@@ -651,6 +654,54 @@ using TargetRelativeProtocolRequirementPointer =
 using RelativeProtocolRequirementPointer =
   TargetRelativeProtocolRequirementPointer<InProcess>;
 
+/// An entry in the default override table, consisting of one of our methods
+/// `replacement` together with (1) another of our methods `original` which
+/// might have been overridden by a subclass and (2) an implementation of
+/// `replacement` to be used by such a subclass if it does not provide its own
+/// implementation.
+template <typename Runtime>
+struct TargetMethodDefaultOverrideDescriptor {
+  /// The method which replaced the original at call-sites.
+  TargetRelativeMethodDescriptorPointer<Runtime> Replacement;
+
+  /// The method originally called at such call sites.
+  TargetRelativeMethodDescriptorPointer<Runtime> Original;
+
+  union {
+    TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> CoroImpl;
+  };
+
+  bool isData() const {
+    auto *replacement = Replacement.get();
+    assert(replacement && "no replacement");
+    return replacement->Flags.isData();
+  }
+
+  void *getImpl() const {
+    auto *replacement = Replacement.get();
+    assert(replacement && "no replacement");
+    if (replacement->Flags.isAsync()) {
+      return AsyncImpl.get();
+    } else if (replacement->Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
+    } else {
+      return Impl.get();
+    }
+  }
+};
+
+/// Header for a table of default override descriptors.  Such a table is a
+/// variable-sized structure whose length is stored in this header which is
+/// followed by that many TargetMethodDefaultOverrideDescriptors.
+template <typename Runtime>
+struct TargetMethodDefaultOverrideTableHeader {
+  /// The number of TargetMethodDefaultOverrideDescriptor records following this
+  /// header in the class's nominal type descriptor.
+  uint32_t NumEntries;
+};
+
 /// An entry in the method override table, referencing a method from one of our
 /// ancestor classes, together with an implementation.
 template <typename Runtime>
@@ -665,6 +716,7 @@ struct TargetMethodOverrideDescriptor {
   union {
     TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
     TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> CoroImpl;
   };
 
   void *getImpl() const {
@@ -672,6 +724,8 @@ struct TargetMethodOverrideDescriptor {
     assert(baseMethod && "no base method");
     if (baseMethod->Flags.isAsync()) {
       return AsyncImpl.get();
+    } else if (baseMethod->Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
     } else {
       return Impl.get();
     }
@@ -1665,6 +1719,27 @@ struct TargetMetatypeMetadata : public TargetMetadata<Runtime> {
 };
 using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 
+/// The structure of `Builtin.FixedArray` type metadata.
+template <typename Runtime>
+struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  
+  StoredPointerDifference Count;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Element;
+  
+  // Returns the number of elements for which storage is reserved.
+  // A type that is instantiated with negative size cannot have values
+  // instantiated, so is laid out with zero size like an uninhabited type.
+  StoredPointerDifference getRealizedCount() const {
+    return Count < 0 ? 0 : Count;
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::FixedArray;
+  }
+};
+using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
+
 /// The structure of tuple type metadata.
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
@@ -2275,6 +2350,24 @@ public:
     if (!hasGeneralizationSignature()) return 0;
     return getGenSigHeader()->getArgumentLayoutSizeInWords();
   }
+  
+  bool isCopyable() const {
+    if (!hasGeneralizationSignature()) {
+      return true;
+    }
+    auto *reqts = getGenSigRequirements();
+    for (unsigned i = 0, e = getNumGenSigRequirements(); i < e; ++i) {
+      auto &reqt = reqts[i];
+      if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
+        continue;
+      }
+      if (reqt.getInvertedProtocols()
+              .contains(InvertibleProtocolKind::Copyable)) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 using ExtendedExistentialTypeShape
   = TargetExtendedExistentialTypeShape<InProcess>;
@@ -2695,6 +2788,21 @@ struct TargetResilientWitnessesHeader {
 };
 using ResilientWitnessesHeader = TargetResilientWitnessesHeader<InProcess>;
 
+/// Describes a reference to a global actor type and its conformance to the
+/// global actor protocol.
+template<typename Runtime>
+struct TargetGlobalActorReference {
+  /// The type of the global actor.
+  RelativeDirectPointer<const char, /*nullable*/ false> type;
+
+  /// The conformance of the global actor to the GlobalActor protocol.
+  TargetRelativeProtocolConformanceDescriptorPointer<Runtime> conformance;
+};
+
+/// Describes the context of a protocol conformance that is relevant when
+/// the conformance is used, such as global actor isolation.
+struct ConformanceExecutionContext;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2708,7 +2816,8 @@ struct TargetProtocolConformanceDescriptor final
              GenericPackShapeDescriptor,
              TargetResilientWitnessesHeader<Runtime>,
              TargetResilientWitness<Runtime>,
-             TargetGenericWitnessTable<Runtime>> {
+             TargetGenericWitnessTable<Runtime>,
+             TargetGlobalActorReference<Runtime>> {
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
@@ -2717,7 +2826,8 @@ struct TargetProtocolConformanceDescriptor final
                              GenericPackShapeDescriptor,
                              TargetResilientWitnessesHeader<Runtime>,
                              TargetResilientWitness<Runtime>,
-                             TargetGenericWitnessTable<Runtime>>;
+                             TargetGenericWitnessTable<Runtime>,
+                             TargetGlobalActorReference<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -2832,8 +2942,13 @@ public:
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
+  ///
+  /// The context will be populated with any information that needs to be
+  /// checked before this witness table can be used within a given execution
+  /// context.
   const swift::TargetWitnessTable<Runtime> *
-  getWitnessTable(const TargetMetadata<Runtime> *type) const;
+  getWitnessTable(const TargetMetadata<Runtime> *type,
+                  ConformanceExecutionContext &context) const;
 
   /// Retrieve the resilient witnesses.
   llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {
@@ -2851,6 +2966,40 @@ public:
       return nullptr;
 
     return this->template getTrailingObjects<GenericWitnessTable>();
+  }
+
+  /// Whether this conformance has any conditional requirements that need to
+  /// be evaluated.
+  bool hasGlobalActorIsolation() const {
+    return Flags.hasGlobalActorIsolation();
+  }
+
+  /// Retrieve the global actor type to which this conformance is isolated, if
+  /// any.
+  llvm::StringRef
+  getGlobalActorType() const {
+    if (!Flags.hasGlobalActorIsolation())
+      return llvm::StringRef();
+
+    return Demangle::makeSymbolicMangledNameStringRef(this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->type);
+  }
+
+  /// True if this is a conformance to 'SerialExecutor' which has a non-default
+  /// (i.e. not the stdlib's default implementation) witness. This means that
+  /// the developer has implemented this method explicitly and we should prefer
+  /// calling it.
+  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
+    return Flags.hasNonDefaultSerialExecutorIsIsolatingCurrentContext();
+  }
+
+  /// Retrieve the protocol conformance of the global actor type to the
+  /// GlobalActor protocol.
+  const TargetProtocolConformanceDescriptor<Runtime> *
+  getGlobalActorConformance() const {
+    if (!Flags.hasGlobalActorIsolation())
+      return nullptr;
+
+    return this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->conformance;
   }
 
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
@@ -2894,6 +3043,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<GenericWitnessTable>) const {
     return Flags.hasGenericWitnessTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char, /*nullable*/ true>>) const {
+    return Flags.hasGlobalActorIsolation() ? 1 : 0;
   }
 };
 using ProtocolConformanceDescriptor
@@ -3129,7 +3282,7 @@ private:
   using TrailingGenericContextObjects::numTrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<MangledContextName>) const {
-    return this->hasMangledNam() ? 1 : 0;
+    return this->hasMangledName() ? 1 : 0;
   }
 
 public:
@@ -3841,6 +3994,13 @@ struct TargetCanonicalSpecializedMetadatasCachingOnceToken {
 };
 
 template <typename Runtime>
+struct TargetSingletonMetadataPointer {
+  TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>,
+                              /*Nullable*/ false>
+      metadata;
+};
+
+template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(TypeContextDescriptor)
     TargetTypeContextDescriptor : public TargetContextDescriptor<Runtime> {
 public:
@@ -3892,7 +4052,15 @@ public:
   }
 
   bool hasCanonicalMetadataPrespecializations() const {
-    return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
+    return this->isGeneric() &&
+           getTypeContextDescriptorFlags()
+               .hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer();
+  }
+
+  bool hasSingletonMetadataPointer() const {
+    return !this->isGeneric() &&
+           getTypeContextDescriptorFlags()
+               .hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer();
   }
 
   bool hasLayoutString() const {
@@ -4084,9 +4252,12 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
                               TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                              InvertibleProtocolSet> {
+                              InvertibleProtocolSet,
+                              TargetSingletonMetadataPointer<Runtime>,
+                              TargetMethodDefaultOverrideTableHeader<Runtime>,
+                              TargetMethodDefaultOverrideDescriptor<Runtime>> {
 private:
-  using TrailingGenericContextObjects =
+  using TrailingGenericContextObjects = 
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                          TargetTypeGenericContextDescriptorHeader,
                                          TargetResilientSuperclass<Runtime>,
@@ -4101,7 +4272,10 @@ private:
                                          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                                         InvertibleProtocolSet>;
+                                         InvertibleProtocolSet,
+                                         TargetSingletonMetadataPointer<Runtime>,
+                                         TargetMethodDefaultOverrideTableHeader<Runtime>,
+                                         TargetMethodDefaultOverrideDescriptor<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4131,6 +4305,11 @@ public:
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
+  using DefaultOverrideTableHeader =
+      TargetMethodDefaultOverrideTableHeader<Runtime>;
+  using DefaultOverrideDescriptor =
+      TargetMethodDefaultOverrideDescriptor<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -4272,6 +4451,20 @@ private:
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DefaultOverrideTableHeader>) const {
+    return hasDefaultOverrideTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DefaultOverrideDescriptor>) const {
+    if (!hasDefaultOverrideTable())
+      return 0;
+    return getDefaultOverrideTable()->NumEntries;
+  }
+
 public:
   const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
   getResilientSuperclass() const {
@@ -4301,6 +4494,10 @@ public:
     }
 
     return FieldOffsetVectorOffset;
+  }
+
+  bool hasDefaultOverrideTable() const {
+    return getTypeContextDescriptorFlags().class_hasDefaultOverrideTable();
   }
 
   bool isActor() const {
@@ -4347,6 +4544,20 @@ public:
       return {};
     return {this->template getTrailingObjects<MethodOverrideDescriptor>(),
             numTrailingObjects(OverloadToken<MethodOverrideDescriptor>{})};
+  }
+
+  const DefaultOverrideTableHeader *getDefaultOverrideTable() const {
+    if (!hasDefaultOverrideTable())
+      return nullptr;
+    return this->template getTrailingObjects<DefaultOverrideTableHeader>();
+  }
+
+  llvm::ArrayRef<DefaultOverrideDescriptor> getDefaultOverrideDescriptors()
+      const {
+    if (!hasDefaultOverrideTable())
+      return {};
+    return {this->template getTrailingObjects<DefaultOverrideDescriptor>(),
+            numTrailingObjects(OverloadToken<DefaultOverrideDescriptor>{})};
   }
 
   /// Return the bounds of this class's metadata.
@@ -4451,6 +4662,14 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
   /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
@@ -4498,7 +4717,8 @@ class swift_ptrauth_struct_context_descriptor(StructDescriptor)
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                             TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            InvertibleProtocolSet> {
+                            InvertibleProtocolSet,
+                            TargetSingletonMetadataPointer<Runtime>> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
@@ -4512,6 +4732,7 @@ public:
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4522,7 +4743,8 @@ private:
                                            MetadataListCount,
                                            MetadataListEntry,
                                            MetadataCachingOnceToken,
-                                           InvertibleProtocolSet>;
+                                           InvertibleProtocolSet,
+                                           TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4554,6 +4776,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4609,6 +4835,14 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
   /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
@@ -4645,7 +4879,8 @@ class swift_ptrauth_struct_context_descriptor(EnumDescriptor)
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                             TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            InvertibleProtocolSet> {
+                            InvertibleProtocolSet,
+                            TargetSingletonMetadataPointer<Runtime>> {
 public:
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
@@ -4659,6 +4894,7 @@ public:
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4669,7 +4905,8 @@ private:
                                         MetadataListCount,
                                         MetadataListEntry, 
                                         MetadataCachingOnceToken,
-                                        InvertibleProtocolSet>;
+                                        InvertibleProtocolSet,
+                                        TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4701,6 +4938,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4767,6 +5008,14 @@ public:
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
+    return box->token.get();
+  }
+
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
     return box->token.get();
   }
 
@@ -4995,9 +5244,9 @@ struct DynamicReplacementKey {
   uint16_t getExtraDiscriminator() const {
     return flags & 0x0000FFFF;
   }
-  bool isAsync() const {
-    return ((flags >> 16 ) & 0x1);
-  }
+  bool isAsync() const { return ((flags >> 16) & 0x1); }
+  bool isCalleeAllocatedCoroutine() const { return ((flags >> 16) & 0x2); }
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
 };
 
 /// A record describing a dynamic function replacement.
@@ -5011,6 +5260,7 @@ class DynamicReplacementDescriptor {
   union {
     TargetCompactFunctionPointer<InProcess, void, false> replacementFunction;
     TargetRelativeDirectPointer<InProcess, void, false> replacementAsyncFunction;
+    TargetRelativeDirectPointer<InProcess, void, false> replacementCoroFunction;
   };
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;
@@ -5020,6 +5270,8 @@ class DynamicReplacementDescriptor {
   void *getReplacementFunction() const {
     if (replacedFunctionKey->isAsync()) {
       return replacementAsyncFunction.get();
+    } else if (replacedFunctionKey->isCalleeAllocatedCoroutine()) {
+      return replacementCoroFunction.get();
     } else {
       return replacementFunction.get();
     }

@@ -3,7 +3,7 @@
 
 @_spi_available(macOS 10.10, *)
 @available(iOS 8.0, *)
-public protocol MacOSSPIProto {} // expected-note {{type declared here}}
+public protocol MacOSSPIProto {} // expected-note {{protocol declared here}}
 
 @_spi_available(iOS 8.0, *)
 @available(macOS 10.10, *)

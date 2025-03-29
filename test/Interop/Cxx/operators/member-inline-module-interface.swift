@@ -243,6 +243,7 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
 // CHECK: struct AmbiguousOperatorStar2 {
@@ -254,6 +255,7 @@
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
 // CHECK: struct DerivedFromConstIterator {
@@ -261,14 +263,14 @@
 // TODO:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // TODO: `var pointee` should be printed here
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: struct DerivedFromConstIteratorPrivatelyWithUsingDecl {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   var pointee: Int32 { get }
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl {
 // CHECK-NEXT:   init()
@@ -277,7 +279,7 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: struct DerivedFromLoadableIntWrapperWithUsingDecl {
 // CHECK-NEXT:   init()
@@ -289,7 +291,7 @@
 // CHECK-NEXT:   mutating func __operatorPlusEqual(_ rhs: LoadableIntWrapper)
 // CHECK-NEXT:   func getValue() -> Int32
 // CHECK-NEXT:   mutating func setValue(_ v: Int32)
-// CHECK-NEXT: }
+// CHECK:      }
 
 // CHECK: struct HasOperatorCallWithDefaultArg {
 // CHECK:   func callAsFunction(_ x: Int32 = cxxDefaultArg) -> Int32
@@ -307,3 +309,7 @@
 // CHECK:   func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK:   func callAsFunction(_ x: Int32) -> Int32
 // CHECK: }
+
+// CHECK: struct HasStaticOperatorCallWithUnimportableCxxType {
+// CHECK-NEXT:  init()
+// CHECK-NEXT: }

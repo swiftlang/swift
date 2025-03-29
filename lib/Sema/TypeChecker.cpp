@@ -15,36 +15,39 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "CodeSynthesis.h"
+#include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
-#include "CodeSynthesis.h"
-#include "MiscDiagnostics.h"
 #include "swift/AST/ASTBridging.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Statistic.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallSet.h"
@@ -124,20 +127,20 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_INT_IDENTIFIER(NAME, STRING)                                     \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                                 \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
       return nullptr;
 
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -251,11 +254,11 @@ void swift::performTypeChecking(SourceFile &SF) {
   }
 
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
-                                 TypeCheckSourceFileRequest{&SF}, {});
+                                 TypeCheckPrimaryFileRequest{&SF}, {});
 }
 
 evaluator::SideEffect
-TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
+TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
          "Should not be re-typechecking this file!");
@@ -276,11 +279,13 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     FrontendStatsTracer tracer(Ctx.Stats,
                                "Type checking and Semantic analysis");
 
-    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
-      // Build the type refinement hierarchy for the primary
-      // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(*SF);
-    }
+    // Build the availability scope tree for the primary file before type
+    // checking.
+    (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
+
+    // Before we type check any of the top level code decls, generate the per
+    // file language options.
+    (void)SF->getLanguageOptions();
 
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
@@ -404,34 +409,13 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "load-derivative-configurations");
 
-  class DerivativeFinder : public ASTWalker {
-  public:
-    DerivativeFinder() {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
-          // Resolve derivative function configurations from `@derivative`
-          // attributes by type-checking them.
-          (void)derAttr->getOriginalFunction(D->getASTContext());
-        }
-      }
-
-      return Action::Continue();
-    }
-  };
-
   switch (SF.Kind) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
-    DerivativeFinder finder;
-    SF.walkContext(finder);
+    CustomDerivativesRequest request(&SF);
+    evaluateOrDefault(SF.getASTContext().evaluator, request, {});
     return;
   }
   case SourceFileKind::SIL:
@@ -539,7 +523,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, genericParams->getLAngleLoc(),
-      /*isExtension=*/false,
+      /*forExtension=*/nullptr,
       allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();
@@ -778,6 +762,7 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
     Evaluator &evaluator, SourceFile *sourceFile, SourceRange conditionRange,
     bool shouldEvaluate
 ) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
   // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
   ASTContext &ctx = sourceFile->getASTContext();
   auto &sourceMgr = ctx.SourceMgr;
@@ -798,4 +783,7 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
   bool isActive = (evalResult & 0x01) != 0;
   bool allowSyntaxErrors = (evalResult & 0x02) != 0;
   return std::pair(isActive, allowSyntaxErrors);
+#else
+  llvm_unreachable("Must not be used in C++-only build");
+#endif
 }

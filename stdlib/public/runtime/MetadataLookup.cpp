@@ -164,7 +164,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       break;
         
     default:
-      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+      if (isa<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;
@@ -1016,7 +1016,7 @@ _findContextDescriptor(Demangle::NodePointer node,
     return nullptr;
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1053,9 +1053,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   return foundContext;
 }
 
-void swift::_swift_registerConcurrencyStandardTypeDescriptors(
-    const ConcurrencyStandardTypeDescriptors *descriptors) {
+/// Function to check whether we're currently running on the given global
+/// actor.
+bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+        swift::_swift_task_isCurrentGlobalActorHook)(
+    const Metadata *, const WitnessTable *);
+
+void swift::_swift_registerConcurrencyRuntime(
+    const ConcurrencyStandardTypeDescriptors *descriptors,
+    IsCurrentGlobalActor isCurrentGlobalActor) {
   concurrencyDescriptors = descriptors;
+  _swift_task_isCurrentGlobalActorHook = isCurrentGlobalActor;
 }
 
 #pragma mark Protocol descriptor cache
@@ -1195,7 +1203,7 @@ _findProtocolDescriptor(NodePointer node,
   }
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1594,7 +1602,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -1829,6 +1838,9 @@ public:
         .getType();
   }
 
+  Mangle::ManglingFlavor getManglingFlavor() { 
+    return Mangle::ManglingFlavor::Default;
+  }
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   TypeLookupErrorOr<BuiltType>
@@ -2032,7 +2044,8 @@ public:
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -2431,6 +2444,12 @@ public:
     return BuiltType();
   }
 
+  TypeLookupErrorOr<BuiltType> createInlineArrayType(BuiltType count,
+                                                     BuiltType element) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDictionaryType(BuiltType key,
                                                     BuiltType value) {
     // Mangled types for building metadata don't contain sugared types
@@ -2453,6 +2472,13 @@ public:
 
   TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
     return BuiltType(value);
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
+                                                           BuiltType element) {
+    return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
+                                                     size.getValue(),
+                                                     element.getMetadata()));
   }
 };
 
@@ -2935,8 +2961,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  auto request = MetadataRequest(MetadataState::Complete);
+
+  NodePointer nodePointer = resultType->getFirstChild();
+  auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -2946,9 +2976,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
         return substFn.getWitnessTable(type, index);
       });
 
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+  if (typeInfoOrErr.isError()) {
+    return nullptr;
+  }
 
-  return decodeType(decoder, resultType->getFirstChild());
+  auto typeInfo = typeInfoOrErr.getType();
+  return typeInfo.getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
@@ -3031,7 +3064,8 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
-      });
+      },
+      nullptr);
 
   if (error) {
     return {/*ptr=*/nullptr, -1};
@@ -3248,12 +3282,14 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   return OldGetClassHook(typeName, outClass);
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor))
 static void installGetClassHook() {
   if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_getClass)) {
     SWIFT_RUNTIME_WEAK_USE(objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook));
   }
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 #endif
 
@@ -3705,7 +3741,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
         reinterpret_cast<void **>(&chainRoot->implementationFunction),
         reinterpret_cast<void *const *>(&previous->implementationFunction),
         replacedFunctionKey->getExtraDiscriminator(),
-        !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+        !replacedFunctionKey->isData(), /*allowNull*/ false);
   }
 
   // First populate the current replacement's chain entry.
@@ -3716,7 +3752,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 
   currentEntry->next = chainRoot->next;
 
@@ -3727,7 +3763,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
       reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isData());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -3752,7 +3788,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 }
 
 /// An automatic dynamic replacement entry.
@@ -3910,4 +3946,4 @@ void swift::swift_disableDynamicReplacementScope(
   DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

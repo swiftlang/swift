@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ClosureIsolation
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ClosureIsolation
 
 func foo<T, U>(a: () -> T, b: () -> U) {}
 

@@ -44,6 +44,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/Decl.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -313,6 +314,12 @@ namespace {
     }
 
     RecursiveProperties
+    getTrivialOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forTrivial());
+    }
+
+    RecursiveProperties
     getReferenceRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forReference());
@@ -356,6 +363,56 @@ namespace {
     IMPL(Integer, Trivial)
 
 #undef IMPL
+
+    RetTy visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive){
+      llvm_unreachable("not a real type");
+    }
+    
+    RecursiveProperties getBuiltinFixedArrayProperties(
+                                      CanBuiltinFixedArrayType type,
+                                      AbstractionPattern origType,
+                                      IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties props;
+      
+      // We get most of the type properties from the element type.
+      AbstractionPattern origElementType = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinFixedArrayType>()) {
+        origElementType = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getElementType());
+      }
+      
+      props.addSubobject(classifyType(origElementType, type->getElementType(),
+                                      TC, Expansion));
+      
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      
+      // Fixed array regions are implied to be addressable-for-dependencies,
+      // since the developer probably wants to be able to form Spans etc.
+      // over them.
+      props.setAddressableForDependencies();
+      
+      // If the size isn't a known literal, then the layout is also dependent,
+      // so make it address-only. If the size is massive, also treat it as
+      // address-only since there's little practical benefit to passing around
+      // huge amounts of data "directly".
+      auto fixedSize = type->getFixedInhabitedSize();
+      if (!type->isFixedNegativeSize()
+          && (!fixedSize.has_value()
+              || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
+        props.setAddressOnly();
+      }
+      return props;
+    }
+    
+    RetTy visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
+                                     AbstractionPattern origType,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAggregateByProperties(type,
+                  getBuiltinFixedArrayProperties(type, origType, isSensitive));
+    }
 
     RetTy visitPackType(CanPackType type,
                         AbstractionPattern origType,
@@ -598,19 +655,29 @@ namespace {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
-    Type getConcreteReferenceStorageReferent(Type type,
+    Type getConcreteReferenceStorageReferent(Type substType,
                                              AbstractionPattern origType) {
-      if (type->isTypeParameter()) {
-        auto genericSig = origType.getGenericSignature();
-        if (auto concreteType = genericSig->getConcreteType(type))
-          return concreteType;
-        if (auto superclassType = genericSig->getSuperclassBound(type))
-          return superclassType;
-        assert(genericSig->requiresClass(type));
+      substType = substType->getReferenceStorageReferent();
+      origType = origType.getReferenceStorageReferentType();
+
+      if (auto objectType = substType->getOptionalObjectType()) {
+        substType = objectType;
+        origType = origType.getOptionalObjectType();
+      }
+
+      if (substType->isTypeParameter()) {
+        if (auto genericSig = origType.getGenericSignature()) {
+          auto type = origType.getType();
+          if (auto concreteType = genericSig->getConcreteType(type))
+            return concreteType;
+          if (auto superclassType = genericSig->getSuperclassBound(type))
+            return superclassType;
+          assert(genericSig->requiresClass(type));
+        }
         return TC.Context.getAnyObjectType();
       }
 
-      return type;
+      return substType;
     }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -653,9 +720,7 @@ namespace {
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType, \
                                    IsTypeExpansionSensitive_t isSensitive) { \
-      auto referentType = \
-        type->getReferentType()->lookThroughSingleOptionalType(); \
-      auto concreteType = getConcreteReferenceStorageReferent(referentType, origType); \
+      auto concreteType = getConcreteReferenceStorageReferent(type, origType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
         return asImpl().visitLoadable##Name##StorageType(type, origType, \
@@ -694,11 +759,11 @@ namespace {
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
           return asImpl().handleTrivial(
-              type, getTrivialRecursiveProperties(isSensitive));
+              type, getTrivialOpaqueRecursiveProperties(isSensitive));
         }
 
         if (LayoutInfo->isAddressOnlyTrivial()) {
-          auto properties = getTrivialRecursiveProperties(isSensitive);
+          auto properties = getTrivialOpaqueRecursiveProperties(isSensitive);
           properties.setAddressOnly();
           return asImpl().handleAddressOnly(type, properties);
         }
@@ -1359,7 +1424,7 @@ namespace {
       forEachNonTrivialChild(B, loc, aggValue, Fn);
     }
   };
-
+  
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
@@ -1762,6 +1827,44 @@ namespace {
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  TypeExpansionKind style) const override {
       emitDestroyValue(B, loc, value);
+    }
+  };
+
+  /// A class for nonspecific loadable nontrivial types.
+  class MiscNontrivialTypeLowering : public LeafLoadableTypeLowering {
+  public:
+    MiscNontrivialTypeLowering(SILType type, RecursiveProperties properties,
+                          TypeExpansionContext forExpansion)
+        : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                                   forExpansion) {}
+
+    MiscNontrivialTypeLowering(CanType type, RecursiveProperties properties,
+                            TypeExpansionContext forExpansion)
+      : MiscNontrivialTypeLowering(SILType::getPrimitiveObjectType(type),
+                                   properties, forExpansion)
+    {}
+
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
+        return value;
+
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.createReleaseValue(loc, value, B.getDefaultAtomicity());
     }
   };
 
@@ -2342,6 +2445,14 @@ namespace {
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
                                                                     properties);
     }
+    
+    TypeLowering *visitBuiltinFixedArrayType(CanBuiltinFixedArrayType faType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      
+      return handleAggregateByProperties<MiscNontrivialTypeLowering>(faType,
+                 getBuiltinFixedArrayProperties(faType, origType, isSensitive));
+    }
 
     bool handleResilience(CanType type, NominalTypeDecl *D,
                           RecursiveProperties &properties) {
@@ -2351,13 +2462,8 @@ namespace {
         // The same should happen if the type was resilient and serialized in
         // another module in the same package with package-cmo enabled, which
         // treats those modules to be in the same resilience domain.
-        auto declModule = D->getModuleContext();
-        bool sameModule = (declModule == &TC.M);
-        bool serializedPackage = declModule != &TC.M &&
-                                 declModule->inSamePackage(&TC.M) &&
-                                 declModule->isResilient() &&
-                                 declModule->serializePackageEnabled();
-        auto inSameResilienceDomain = sameModule || serializedPackage;
+        auto inSameResilienceDomain = D->getModuleContext() == &TC.M ||
+                                      D->bypassResilienceInPackage(&TC.M);
         if (inSameResilienceDomain)
           properties.addSubobject(RecursiveProperties::forResilient());
 
@@ -2412,9 +2518,19 @@ namespace {
       }
 
       if (D->isCxxNonTrivial()) {
+        properties.setAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+      }
+
+      if (auto *clangDecl = D->getClangDecl()) {
+        if (auto *recordDecl = dyn_cast<clang::RecordDecl>(clangDecl)) {
+          // C unions are imported as opaque types. Therefore we have to assume
+          // that a union contains a pointer.
+          if (recordDecl->isOrContainsUnion())
+            properties.setIsOrContainsRawPointer();
+        }
       }
 
       // [is_or_contains_pack_unsubstituted] Visit the fields of the
@@ -2432,6 +2548,7 @@ namespace {
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
         properties.setAddressOnly();
+        properties.setAddressableForDependencies();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleMoveOnlyAddressOnly(structType, properties);
@@ -2442,6 +2559,10 @@ namespace {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
+      }
+      
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
       }
 
       auto subMap = structType->getContextSubstitutionMap();
@@ -2513,6 +2634,10 @@ namespace {
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
 
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
+      }
+
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
       // unsubstituted type to find pack types which would be substituted away.
       for (auto elt : D->getAllElements()) {
@@ -2559,11 +2684,11 @@ namespace {
         }
         
         auto substEltType =
-          elt->getArgumentInterfaceType().subst(subMap)
+          elt->getPayloadInterfaceType().subst(subMap)
              ->getCanonicalType();
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
-                              elt->getArgumentInterfaceType()
+                              elt->getPayloadInterfaceType()
                                  ->getReducedType(D->getGenericSignature()),
                               subMap);
         properties.addSubobject(classifyType(origEltType, substEltType,
@@ -2909,6 +3034,7 @@ bool TypeConverter::visitAggregateLeaves(
     return isa<SILPackType>(ty) ||
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
+           isa<BuiltinFixedArrayType>(ty) ||
            ty.getEnumOrBoundGenericEnum() ||
            ty.getStructOrBoundGenericStruct();
   };
@@ -2920,6 +3046,9 @@ bool TypeConverter::visitAggregateLeaves(
     std::optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
     assert(!field || !index && "both field and index!?");
+    if (auto origEltTy = origTy.getVanishingTupleElementPatternType()) {
+      origTy = *origEltTy;
+    }
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
       if (auto packTy = dyn_cast<SILPackType>(ty)) {
         for (auto packIndex : indices(packTy->getElementTypes())) {
@@ -2945,6 +3074,9 @@ bool TypeConverter::visitAggregateLeaves(
         insertIntoWorklist(expansion.getPatternType(),
                            origTy.getPackExpansionPatternType(),
                            field, index);
+      } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
+        insertIntoWorklist(array->getElementType(),
+                           AbstractionPattern::getOpaque(), field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
@@ -2968,11 +3100,11 @@ bool TypeConverter::visitAggregateLeaves(
           // TODO: Callback for indirect elements.
           if (element->isIndirect())
             continue;
-          auto substElementType = element->getArgumentInterfaceType()
+          auto substElementType = element->getPayloadInterfaceType()
                                       .subst(subMap)
                                       ->getCanonicalType();
           auto origElementTy = origTy.unsafeGetSubstFieldType(
-              element, element->getArgumentInterfaceType()->getReducedType(
+              element, element->getPayloadInterfaceType()->getReducedType(
                            decl->getGenericSignature()), subMap);
 
           insertIntoWorklist(substElementType, origElementTy, element,
@@ -3092,19 +3224,17 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
-    if (module) {
-      if (module->isBuiltFromInterface()) {
+    if (module && module->isBuiltFromInterface()) {
         // Don't verify for types in modules built from interfaces; the feature
         // may not have been enabled in them.
         return;
-      }
-      auto *file = dyn_cast_or_null<FileUnit>(module->getModuleScopeContext());
-      if (file && file->getKind() == FileUnitKind::Source) {
-        auto sourceFile = nominal->getParentSourceFile();
-        if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
-          // Don't verify for types in SIL files.
-          return;
-        }
+    }
+    auto *file = nominal->getParentSourceFile();
+    if (file && file->getKind() == FileUnitKind::Source) {
+      auto sourceFile = nominal->getParentSourceFile();
+      if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
+        // Don't verify for types in SIL files.
+        return;
       }
     }
   }
@@ -4055,10 +4185,11 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
 
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator:
     return getDestructorInterfaceType(cast<DestructorDecl>(vd),
-                                      c.kind == SILDeclRef::Kind::Deallocator,
+                                      c.kind != SILDeclRef::Kind::Destroyer,
                                       c.isForeign);
-  
+
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
     assert(var->hasStorage() &&
@@ -4097,7 +4228,8 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:
-  case SILDeclRef::Kind::Deallocator: {
+  case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator: {
     auto captureInfo = getLoweredLocalCaptures(c);
     return ::getGenericSignatureWithCapturedEnvironments(
       *c.getAnyFunctionRef(), captureInfo);
@@ -4287,6 +4419,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // Captured pack element environments.
   llvm::SetVector<GenericEnvironment *> genericEnv;
 
+  // Captured types.
+  SmallVector<CapturedType, 4> capturedTypes;
+  llvm::SmallDenseSet<CanType, 4> alreadyCapturedTypes;
+
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
@@ -4386,6 +4522,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadImplKind::Read:
             collectAccessorCaptures(AccessorKind::Read);
             break;
+          case ReadImplKind::Read2:
+            collectAccessorCaptures(AccessorKind::Read2);
+            break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
           }
@@ -4407,6 +4546,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case WriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
+          case WriteImplKind::Modify2:
+            collectAccessorCaptures(AccessorKind::Modify2);
+            break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
           }
@@ -4423,6 +4565,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadWriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
+            break;
+          case ReadWriteImplKind::Modify2:
+            collectAccessorCaptures(AccessorKind::Modify2);
             break;
           case ReadWriteImplKind::StoredWithDidSet:
             // We've already processed the didSet operation.
@@ -4472,6 +4617,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
       // Collect non-function captures.
       recordCapture(capture);
+    }
+
+    for (const auto &capturedType : captureInfo.getCapturedTypes()) {
+      if (alreadyCapturedTypes.insert(capturedType.getType()->getCanonicalType())
+              .second) {
+        capturedTypes.push_back(capturedType);
+      }
     }
   };
 
@@ -4550,7 +4702,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // Cache the result.
   CaptureInfo info(Context, resultingCaptures,
                    capturesDynamicSelf, capturesOpaqueValue,
-                   capturesGenericParams, genericEnv.getArrayRef());
+                   capturesGenericParams, genericEnv.getArrayRef(),
+                   capturedTypes);
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;
@@ -5028,7 +5181,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
       enumDecl->getGenericSignature());
 
   if (boxSignature == CanGenericSignature()) {
-    auto eltIntfTy = elt->getArgumentInterfaceType();
+    auto eltIntfTy = elt->getPayloadInterfaceType();
     auto boxVarTy = getLoweredRValueType(context, eltIntfTy);
     auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true),
                                  /*captures generics*/ false);
@@ -5039,7 +5192,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   auto boundEnum = enumType.getRawASTType();
 
   // Lower the enum element's argument in the box's context.
-  auto eltIntfTy = elt->getArgumentInterfaceType();
+  auto eltIntfTy = elt->getPayloadInterfaceType();
 
   auto boxVarTy = getLoweredRValueType(context,
                                        getAbstractionPattern(elt), eltIntfTy);
@@ -5162,6 +5315,16 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     }
     return;
   }
+
+  if (auto fixedArrayTy = Ty.getAs<BuiltinFixedArrayType>()) {
+    auto fixedSize = fixedArrayTy->getFixedInhabitedSize();
+    if (fixedSize.has_value() && !fixedArrayTy->isFixedNegativeSize() )
+      fieldsCount += *fixedSize;
+    else
+      fieldsCount += 1;
+    return;
+  }
+
   if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
     if (enumDecl->isIndirect()) {
       return;

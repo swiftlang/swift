@@ -335,9 +335,11 @@ struct PlatformIntroVersion {
   StringRef ios;
   StringRef tvos;
   StringRef watchos;
+  StringRef visionos;
   StringRef swift;
   bool hasOSAvailability() const {
-    return !macos.empty() || !ios.empty() || !tvos.empty() || !watchos.empty();
+    return !macos.empty() || !ios.empty() || !tvos.empty() ||
+      !watchos.empty() || !visionos.empty();
   }
 };
 

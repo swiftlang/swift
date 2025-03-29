@@ -65,8 +65,9 @@ protected:
                    IsABIAccessible_t isABIAccessible,
                    SpecialTypeInfoKind stik = SpecialTypeInfoKind::Loadable)
       : FixedTypeInfo(type, size, spareBits, align, pod,
-                      // All currently implemented loadable types are bitwise-takable.
-                      IsBitwiseTakable,
+                      // All currently implemented loadable types are
+                      // bitwise-takable and -borrowable.
+                      IsBitwiseTakableAndBorrowable,
                       copy, alwaysFixedSize, isABIAccessible, stik) {
     assert(isLoadable());
   }
@@ -80,8 +81,9 @@ protected:
                    IsABIAccessible_t isABIAccessible,
                    SpecialTypeInfoKind stik = SpecialTypeInfoKind::Loadable)
       : FixedTypeInfo(type, size, std::move(spareBits), align, pod,
-                      // All currently implemented loadable types are bitwise-takable.
-                      IsBitwiseTakable,
+                      // All currently implemented loadable types are
+                      // bitwise-takable and borrowable.
+                      IsBitwiseTakableAndBorrowable,
                       copy, alwaysFixedSize, isABIAccessible, stik) {
     assert(isLoadable());
   }

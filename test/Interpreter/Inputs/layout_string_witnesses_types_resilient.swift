@@ -19,6 +19,18 @@ public struct GenericResilient<C, T> {
     }
 }
 
+public struct GenericResilientWithUnmanagedAndWeak<T> {
+    public let b: Bool = false
+    public unowned(unsafe) var y: AnyObject?
+    public let z: Bool = false
+    public let x: T
+    public weak var w: AnyObject?
+
+    public init(x: T) {
+        self.x = x
+    }
+}
+
 public enum ResilientSinglePayloadEnumGeneric<T> {
     case empty0
     case empty1

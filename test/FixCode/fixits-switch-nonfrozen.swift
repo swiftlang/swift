@@ -219,14 +219,14 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 
   switch value {
-  // expected-error@-1 {{switch must be exhaustive}}
+  // expected-warning@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '.b'}} {{+4:3-3=case .b:\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
   switch value {
-  // expected-error@-1 {{switch must be exhaustive}}
+  // expected-warning@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}}
   // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}}
   // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
@@ -350,7 +350,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 
   switch payload {
-  // expected-error@-1 {{switch must be exhaustive}}
+  // expected-warning@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '.b(_)'}} {{+4:3-3=case .b(_):\n<#code#>\n}}
   case .a: break
   @unknown case _: break
@@ -366,7 +366,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 
   switch payload {
-  // expected-error@-1 {{switch must be exhaustive}}
+  // expected-warning@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '.b(true)'}} {{+5:3-3=case .b(true):\n<#code#>\n}}
   case .a: break
   case .b(false): break

@@ -12,9 +12,10 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftIfConfig
 @_spi(RawSyntax) import SwiftSyntax
 
-protocol BridgedNullable: ExpressibleByNilLiteral {
+public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
   init(raw: RawPtr?)
 }
@@ -24,18 +25,23 @@ extension BridgedNullable {
   }
 }
 
-extension BridgedSourceLoc: BridgedNullable {}
-extension BridgedIdentifier: BridgedNullable {}
-extension BridgedNullableExpr: BridgedNullable {}
-extension BridgedNullableStmt: BridgedNullable {}
-extension BridgedNullableTypeRepr: BridgedNullable {}
-extension BridgedNullablePattern: BridgedNullable {}
-extension BridgedNullableGenericParamList: BridgedNullable {}
-extension BridgedNullableTrailingWhereClause: BridgedNullable {}
-extension BridgedNullableParameterList: BridgedNullable {}
-extension BridgedNullablePatternBindingInitializer: BridgedNullable {}
+extension BridgedSourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedIdentifier: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableStmt: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableTypeRepr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullablePattern: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableGenericParamList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableTrailingWhereClause: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDefaultArgumentInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 
-extension BridgedIdentifier: Equatable {
+extension BridgedIdentifier: /*@retroactive*/ Swift.Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.raw == rhs.raw
   }
@@ -58,6 +64,9 @@ extension Optional where Wrapped: BridgedHasNullable {
 extension BridgedStmt: BridgedHasNullable {
   typealias Nullable = BridgedNullableStmt
 }
+extension BridgedDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDecl
+}
 extension BridgedExpr: BridgedHasNullable {
   typealias Nullable = BridgedNullableExpr
 }
@@ -79,6 +88,18 @@ extension BridgedParameterList: BridgedHasNullable {
 extension BridgedPatternBindingInitializer: BridgedHasNullable {
   typealias Nullable = BridgedNullablePatternBindingInitializer
 }
+extension BridgedDefaultArgumentInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDefaultArgumentInitializer
+}
+extension BridgedCustomAttributeInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullableCustomAttributeInitializer
+}
+extension BridgedArgumentList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableArgumentList
+}
+extension BridgedVarDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableVarDecl
+}
 
 public extension BridgedSourceLoc {
   /// Form a source location at the given absolute position in `buffer`.
@@ -91,7 +112,7 @@ public extension BridgedSourceLoc {
   }
 }
 
-extension BridgedLabeledStmtInfo: ExpressibleByNilLiteral {
+extension BridgedLabeledStmtInfo: /*@retroactive*/ Swift.ExpressibleByNilLiteral {
   public init(nilLiteral: ()) {
     self.init()
   }
@@ -105,7 +126,7 @@ extension String {
     )
   }
 
-  mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
+  public mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
@@ -119,7 +140,7 @@ extension SyntaxText {
 }
 
 /// Allocate a copy of the given string as a null-terminated UTF-8 string.
-func allocateBridgedString(
+public func allocateBridgedString(
   _ string: String
 ) -> BridgedStringRef {
   var string = string
@@ -143,15 +164,28 @@ public func freeBridgedString(bridged: BridgedStringRef) {
   bridged.data?.deallocate()
 }
 
-extension BridgedStringRef {
-  var isEmptyInitialized: Bool {
-    return self.data == nil && self.count == 0
+extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
+  public init(stringLiteral str: StaticString) {
+    self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
   }
 }
 
-extension BridgedStringRef: ExpressibleByStringLiteral {
-  public init(stringLiteral str: StaticString) {
-    self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
+extension VersionTuple {
+  var bridged: BridgedVersionTuple {
+    switch self.components.count {
+    case 4:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]), CUnsignedInt(components[3]))
+    case 3:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]))
+    case 2:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]))
+    case 1:
+      return BridgedVersionTuple(CUnsignedInt(components[0]))
+    case 0:
+      return BridgedVersionTuple()
+    default:
+      fatalError("unsuported version form")
+    }
   }
 }
 
@@ -237,6 +271,12 @@ extension BridgedSourceRange {
   }
 }
 
+extension Fingerprint {
+  var bridged: BridgedFingerprint {
+    BridgedFingerprint(v1: self.core.0, v2: self.core.1)
+  }
+}
+
 /// Helper collection type that lazily concatenates two collections.
 struct ConcatCollection<C1: Collection, C2: Collection> where C1.Element == C2.Element {
   let c1: C1
@@ -277,4 +317,29 @@ extension ConcatCollection: LazyCollectionProtocol {
     case .c2(let i): return c2[i]
     }
   }
+}
+
+extension BridgedArrayRef {
+  public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
+    let start = data?.assumingMemoryBound(to: ty)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
+    return c(buffer)
+  }
+}
+
+/// Utility to pass Swift closure to C/C++ bridging API.
+///
+/// C/C++ API can call the closure via `BridgedSwiftClosure::operator()` which
+/// calls `bridgedSwiftClosureCall_1(_:_:)` function below.
+func withBridgedSwiftClosure(closure: (UnsafeRawPointer?) -> Void, call: (BridgedSwiftClosure) -> Void) {
+  withoutActuallyEscaping(closure) { escapingClosure in
+    withUnsafePointer(to: escapingClosure) { ptr in
+      call(BridgedSwiftClosure(closure: ptr))
+    }
+  }
+}
+
+@_cdecl("swift_ASTGen_bridgedSwiftClosureCall_1")
+func bridgedSwiftClosureCall_1(_ bridged: BridgedSwiftClosure, _ arg: UnsafeRawPointer?) {
+  bridged.closure.assumingMemoryBound(to: ((UnsafeRawPointer?) -> Void).self).pointee(arg)
 }

@@ -75,8 +75,9 @@ createMacroConstant(ClangImporter::Implementation &Impl,
                     bool isStatic,
                     ClangNode ClangN) {
   Impl.ImportedMacroConstants[macro] = {value, type};
-  return SwiftDeclSynthesizer(Impl).createConstant(
-      name, dc, type, value, convertKind, isStatic, ClangN);
+  return SwiftDeclSynthesizer(Impl).createConstant(name, dc, type, value,
+                                                   convertKind, isStatic,
+                                                   ClangN, AccessLevel::Public);
 }
 
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
@@ -203,9 +204,9 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!unicode::isWellFormedUTF8(text))
     return nullptr;
 
-  return SwiftDeclSynthesizer(Impl).createConstant(name, DC, importTy, text,
-                                                   ConstantConvertKind::None,
-                                                   /*static*/ false, ClangN);
+  return SwiftDeclSynthesizer(Impl).createConstant(
+      name, DC, importTy, text, ConstantConvertKind::None,
+      /*static*/ false, ClangN, AccessLevel::Public);
 }
 
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
@@ -262,9 +263,9 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
   // We use a dummy type since we don't have a convenient type for 'nil'.  Any
   // use of this will be an error anyway.
   auto type = TupleType::getEmpty(Impl.SwiftContext);
-  return Impl.createUnavailableDecl(name, DC, type,
-                                    "use 'nil' instead of this imported macro",
-                                    /*isStatic=*/false, clangN);
+  return Impl.createUnavailableDecl(
+      name, DC, type, "use 'nil' instead of this imported macro",
+      /*isStatic=*/false, clangN, AccessLevel::Public);
 }
 
 static bool isSignToken(const clang::Token &tok) {
@@ -301,6 +302,8 @@ builtinTypeForToken(const clang::Token &tok, const clang::ASTContext &context) {
     return clang::QualType(context.WCharTy);
   case clang::tok::kw_bool:
     return clang::QualType(context.BoolTy);
+  case clang::tok::kw_char8_t:
+    return clang::QualType(context.Char8Ty);
   case clang::tok::kw_char16_t:
     return clang::QualType(context.Char16Ty);
   case clang::tok::kw_char32_t:
@@ -400,10 +403,9 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
   // Handle tokens starting with a type cast
   bool castTypeIsId = false;
-  if (numTokens > 3 &&
-      tokenI[0].is(clang::tok::l_paren) &&
+  if (numTokens > 3 && tokenI[0].is(clang::tok::l_paren) &&
       (tokenI[1].is(clang::tok::identifier) ||
-        impl.getClangSema().isSimpleTypeSpecifier(tokenI[1].getKind())) &&
+       tokenI[1].isSimpleTypeSpecifier(impl.getClangSema().getLangOpts())) &&
       tokenI[2].is(clang::tok::r_paren)) {
     if (!castType.isNull()) {
       // this is a nested cast
@@ -777,10 +779,11 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   PrettyStackTraceStringAction stackRAII{"importing macro", name.str()};
 
   // Look for macros imported with the same name.
-  auto known = ImportedMacros.find(name);
-  if (known == ImportedMacros.end()) {
+  auto [known, inserted] = ImportedMacros.try_emplace(
+      name, SmallVector<std::pair<const clang::MacroInfo *, ValueDecl *>, 2>{});
+  if (inserted) {
     // Push in a placeholder to break circularity.
-    ImportedMacros[name].push_back({macro, nullptr});
+    known->getSecond().push_back({macro, nullptr});
   } else {
     // Check whether this macro has already been imported.
     for (const auto &entry : known->second) {

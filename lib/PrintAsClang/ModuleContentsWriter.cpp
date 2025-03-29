@@ -31,9 +31,11 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/Strings.h"
 
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
@@ -115,6 +117,260 @@ public:
     ty.walk(ReferencedTypeFinder(callback));
   }
 };
+
+namespace compare_detail {
+
+enum : int {
+  Ascending = -1,
+  Equivalent = 0,
+  Descending = 1,
+};
+
+static StringRef getNameString(const Decl *D) {
+  if (auto VD = dyn_cast<ValueDecl>(D))
+    return VD->getBaseName().userFacingName();
+
+  if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+    auto baseClass = ED->getSelfClassDecl();
+    if (!baseClass)
+      return ED->getExtendedNominal()->getName().str();
+    return baseClass->getName().str();
+  }
+  llvm_unreachable("unknown top-level ObjC decl");
+}
+
+static std::string getLocString(const Decl *afd) {
+  std::string res;
+  llvm::raw_string_ostream os(res);
+  afd->getLoc().print(os, afd->getASTContext().SourceMgr);
+  return std::move(os.str());
+}
+
+static std::string getMangledNameString(const Decl *D) {
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD && isa<ExtensionDecl>(D))
+    VD = cast<ExtensionDecl>(D)->getExtendedNominal();
+  if (!VD)
+    return std::string();
+  Mangle::ASTMangler mangler(VD->getASTContext());
+  return mangler.mangleAnyDecl(VD, /*prefix=*/true,
+                               /*respectOriginallyDefinedIn=*/true);
+}
+
+static std::string getTypeString(const ValueDecl *VD) {
+  return VD->getInterfaceType().getString();
+}
+
+static std::string getGenericSignatureString(const Decl *VD) {
+  if (auto gc = VD->getAsGenericContext())
+    return gc->getGenericSignature().getAsString();
+  return "";
+}
+
+enum class TypeMatch {
+  Disfavored,
+  Neutral,
+  Favored
+};
+
+/// Implements a type check where one declaration must belong to \p FavoredType
+/// and the other must belong to \p DisfavoredType , with \p FavoredType
+/// sorting later (printing first).
+template <typename FavoredType, typename DisfavoredType>
+TypeMatch areTypes(Decl *D) {
+  if (isa<FavoredType>(D))
+    return TypeMatch::Favored;
+  if (isa<DisfavoredType>(D))
+    return TypeMatch::Disfavored;
+  return TypeMatch::Neutral;
+}
+
+/// Implements a type check where one declaration must belong to \p FavoredType
+/// and the other must not.
+template <typename FavoredType>
+TypeMatch isType(Decl *D) {
+  if (isa<FavoredType>(D))
+    return TypeMatch::Favored;
+  return TypeMatch::Disfavored;
+}
+
+static int reverseCompare(TypeMatch lhs, TypeMatch rhs) {
+  if (rhs == TypeMatch::Disfavored && lhs == TypeMatch::Favored)
+    return Descending;
+  if (lhs == TypeMatch::Disfavored && rhs == TypeMatch::Favored)
+    return Ascending;
+  return Equivalent;
+}
+
+static int reverseCompare(bool lhs, bool rhs) {
+  if (!rhs && lhs)
+    return Descending;
+  if (rhs && !lhs)
+    return Ascending;
+  return Equivalent;
+}
+
+template<typename T,
+         typename std::enable_if<std::is_integral<T>::value>::type * = nullptr>
+static int reverseCompare(const T &lhs, const T &rhs) {
+  if (lhs != rhs)
+    return lhs < rhs ? Descending : Ascending;
+  return Equivalent;
+}
+
+static int reverseCompare(StringRef lhs, StringRef rhs) {
+  return rhs.compare(lhs);
+}
+
+static int lastDitchSort(Decl *lhs, Decl *rhs, bool suppressDiagnostic) {
+  int result = reverseCompare(reinterpret_cast<uintptr_t>(lhs),
+                              reinterpret_cast<uintptr_t>(rhs));
+
+  // Sorting with yourself shouldn't happen (but implement consistent behavior
+  // if this assert is disabled).
+  ASSERT(result != Equivalent && "sorting should not compare decl to itself");
+
+  // Warn that this isn't stable across different compilations.
+  if (!suppressDiagnostic) {
+    auto earlier = (result == Ascending) ? lhs : rhs;
+    auto later = (result == Ascending) ? rhs : lhs;
+
+    earlier->diagnose(diag::objc_header_sorting_arbitrary, earlier, later);
+    later->diagnose(diag::objc_header_sorting_arbitrary_other, earlier, later);
+    earlier->diagnose(diag::objc_header_sorting_arbitrary_please_report);
+  }
+
+  return result;
+}
+
+} // end namespace compare_detail
+
+/// Comparator for use with \c llvm::array_pod_sort() . This sorts decls into
+/// reverse order since they will be pushed onto a stack.
+static int reverseCompareDecls(Decl * const *lhs, Decl * const *rhs) {
+  using namespace compare_detail;
+
+  assert(*lhs != *rhs && "duplicate top-level decl");
+
+  /// Run the LHS and RHS expressions through an appropriate overload of
+  /// `compare_detail::reverseCompare()`, returning if they are unequal or
+  /// continuing if they are equal.
+#define COMPARE(LHS, RHS) do {\
+  int result = reverseCompare((LHS), (RHS)); \
+  if (result != 0) \
+    return result; \
+} while (0)
+
+  // When we visit a function, we might also generate a thunk that calls into the
+  // implementation of structs/enums to get the opaque pointers. To avoid
+  // referencing these methods before we see the definition for the generated
+  // classes, we want to visit function definitions last.
+  COMPARE((areTypes<NominalTypeDecl, AbstractFunctionDecl>(*lhs)),
+          (areTypes<NominalTypeDecl, AbstractFunctionDecl>(*rhs)));
+
+  // Sort by names.
+  COMPARE(getNameString(*lhs), getNameString(*rhs));
+
+  // Two overloaded functions can have the same name when emitting C++.
+  if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs)) {
+    // Sort top level functions with the same C++ name by their location to
+    // have stable sorting that depends on users source but not on the
+    // compiler invocation.
+    // FIXME: This is pretty suspect; PrintAsClang sometimes operates on
+    //        serialized modules which don't have SourceLocs, so this sort
+    //        rule may be applied in some steps of a build but not others.
+    if ((*rhs)->getLoc().isValid() && (*lhs)->getLoc().isValid()) {
+      COMPARE(getLocString(*lhs), getLocString(*rhs));
+    }
+  }
+
+  // A function and a global variable can have the same name in C++,
+  // even when the variable might not actually be emitted by the emitter.
+  // In that case, order the function before the variable.
+  COMPARE((areTypes<AbstractFunctionDecl, VarDecl>(*lhs)),
+          (areTypes<AbstractFunctionDecl, VarDecl>(*rhs)));
+
+  // Prefer value decls to extensions.
+  COMPARE(isType<ValueDecl>(*lhs), isType<ValueDecl>(*rhs));
+
+  // Last-ditch ValueDecl tiebreaker: Compare mangled names. This captures
+  // *tons* of context and detail missed by the previous checks, but the
+  // resulting sort makes little sense to humans.
+  // FIXME: It'd be nice to share the mangler or even memoize mangled names,
+  //        but we'd have to stop using `llvm::array_pod_sort()` so that we
+  //        could capture some outside state.
+  COMPARE(getMangledNameString(*lhs), getMangledNameString(*rhs));
+
+  // Mangled names ought to distinguish all value decls, leaving only
+  // extensions of the same nominal type beyond this point.
+  if (!isa<ExtensionDecl>(*lhs) || !isa<ExtensionDecl>(*rhs))
+    return lastDitchSort(*lhs, *rhs, /*suppressDiagnostic=*/false);
+
+  // Break ties in extensions by putting smaller extensions last (in reverse
+  // order).
+  auto lhsMembers = cast<ExtensionDecl>(*lhs)->getAllMembers();
+  auto rhsMembers = cast<ExtensionDecl>(*rhs)->getAllMembers();
+  COMPARE(lhsMembers.size(), rhsMembers.size());
+
+  // Or the extension with fewer protocols.
+  auto lhsProtos = cast<ExtensionDecl>(*lhs)->getLocalProtocols();
+  auto rhsProtos = cast<ExtensionDecl>(*rhs)->getLocalProtocols();
+  COMPARE(lhsProtos.size(), rhsProtos.size());
+
+  // If that fails, arbitrarily pick the extension whose protocols are
+  // alphabetically first.
+  {
+    auto mismatch =
+      std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
+                    [] (const ProtocolDecl *nextLHSProto,
+                        const ProtocolDecl *nextRHSProto) {
+      return nextLHSProto->getName() == nextRHSProto->getName();
+    });
+    if (mismatch.first != lhsProtos.end()) {
+      COMPARE(getNameString(*mismatch.first), getNameString(*mismatch.second));
+    }
+  }
+
+  // Still nothing? Fine, we'll look for a difference between the members.
+  {
+    // First pass: compare names
+    for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
+      auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
+           *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
+      if (!lhsMember && !rhsMember)
+        continue;
+
+      COMPARE((bool)lhsMember, (bool)rhsMember);
+
+      ASSERT(lhsMember && rhsMember);
+
+      COMPARE(getNameString(lhsMember), getNameString(rhsMember));
+    }
+
+    // Second pass: compare other traits.
+    for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
+      auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
+           *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
+      if (!lhsMember || !rhsMember)
+        continue;
+
+      COMPARE(getTypeString(lhsMember), getTypeString(rhsMember));
+      COMPARE(getGenericSignatureString(lhsMember),
+              getGenericSignatureString(rhsMember));
+      COMPARE(getMangledNameString(lhsMember), getMangledNameString(rhsMember));
+    }
+  }
+
+  // Tough customer. Maybe they have different generic signatures?
+  COMPARE(getGenericSignatureString(*lhs), getGenericSignatureString(*rhs));
+
+  // Nothing, sadly.
+  bool bothEmpty = lhsMembers.empty() && rhsMembers.empty()
+                      && lhsProtos.empty() && rhsProtos.empty();
+  return lastDitchSort(*lhs, *rhs, /*suppressDiagnostic=*/bothEmpty);
+
+#undef COMPARE
+}
 
 class ModuleWriter {
   enum class EmissionState { NotYetDefined = 0, DefinitionRequested, Defined };
@@ -218,7 +474,10 @@ public:
     return state.first == EmissionState::Defined;
   }
 
-  bool require(const TypeDecl *D) {
+  bool require(const TypeDecl *D) { return requireTypes(D, declsToWrite); }
+
+  template <typename T>
+  bool requireTypes(const TypeDecl *D, T &types) {
     if (addImport(D)) {
       seenTypes[D] = { EmissionState::Defined, true };
       return true;
@@ -229,7 +488,7 @@ public:
     case EmissionState::NotYetDefined:
     case EmissionState::DefinitionRequested:
       state.first = EmissionState::DefinitionRequested;
-      declsToWrite.push_back(D);
+      types.push_back(D);
       return false;
     case EmissionState::Defined:
       return true;
@@ -281,10 +540,20 @@ public:
   }
 
   void emitReferencedClangTypeMetadata(const TypeDecl *typeDecl) {
-    if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
+    const auto *clangDecl = typeDecl->getClangDecl();
+    if (const auto *objCInt = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+      auto clangType = clangDecl->getASTContext()
+                           .getObjCInterfaceType(objCInt)
+                           .getCanonicalType();
+      auto it = seenClangTypes.insert(clangType.getTypePtr());
+      if (it.second)
+        ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M,
+                                                                printer);
+      return;
+    }
+    if (!isa<clang::TypeDecl>(clangDecl))
       return;
     // Get the underlying clang type from a type alias decl or record decl.
-    auto clangDecl = typeDecl->getClangDecl();
     auto clangType = clangDecl->getASTContext()
                          .getTypeDeclType(cast<clang::TypeDecl>(clangDecl))
                          .getCanonicalType();
@@ -310,6 +579,9 @@ public:
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
+        else if (const auto *cd = dyn_cast<ClassDecl>(TD))
+          if (cd->isObjC() || cd->isForeignReferenceType())
+            emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
         if (TAD->hasClangNode())
           emitReferencedClangTypeMetadata(TAD);
@@ -346,7 +618,8 @@ public:
     }
   }
 
-  bool forwardDeclareMemberTypes(DeclRange members, const Decl *container) {
+  bool forwardDeclareMemberTypes(ArrayRef<Decl *> members,
+                                 const Decl *container) {
     PrettyStackTraceDecl
         entry("printing forward declarations needed by members of", container);
     switch (container->getKind()) {
@@ -364,7 +637,7 @@ public:
     }
 
     bool hadAnyDelayedMembers = false;
-    SmallVector<ValueDecl *, 4> nestedTypes;
+    SmallVector<const ValueDecl *, 4> nestedTypes;
     for (auto member : members) {
       PrettyStackTraceDecl loopEntry("printing for member", member);
       auto VD = dyn_cast<ValueDecl>(member);
@@ -372,15 +645,23 @@ public:
         continue;
 
       // Catch nested types and emit their definitions /after/ this class.
-      if (isa<TypeDecl>(VD)) {
-        // Don't emit nested types that are just implicitly @objc.
-        // You should have to opt into this, since they are even less
-        // namespaced than usual.
-        if (std::any_of(VD->getAttrs().begin(), VD->getAttrs().end(),
-                        [](const DeclAttribute *attr) {
-                          return isa<ObjCAttr>(attr) && !attr->isImplicit();
-                        })) {
-          nestedTypes.push_back(VD);
+      if (const auto *TD = dyn_cast<TypeDecl>(VD)) {
+        if (outputLangMode == OutputLanguageMode::Cxx) {
+          if (!isa<TypeAliasDecl>(TD) && !isStringNestedType(VD, "UTF8View") &&
+              !isStringNestedType(VD, "Index")) {
+            forwardDeclareType(TD);
+            requireTypes(TD, nestedTypes);
+          }
+        } else {
+          // Don't emit nested types that are just implicitly @objc.
+          // You should have to opt into this, since they are even less
+          // namespaced than usual.
+          if (std::any_of(VD->getAttrs().begin(), VD->getAttrs().end(),
+                          [](const DeclAttribute *attr) {
+                            return isa<ObjCAttr>(attr) && !attr->isImplicit();
+                          })) {
+            nestedTypes.push_back(VD);
+          }
         }
         continue;
       }
@@ -468,14 +749,13 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    (void)forwardDeclareMemberTypes(CD->getMembers(), CD);
+    (void)forwardDeclareMemberTypes(CD->getAllMembers(), CD);
     auto [it, inserted] =
         seenTypes.try_emplace(CD, EmissionState::NotYetDefined, false);
     if (outputLangMode == OutputLanguageMode::Cxx &&
         (inserted || !it->second.second))
       ClangValueTypePrinter::forwardDeclType(os, CD, printer);
     it->second = {EmissionState::Defined, true};
-    os << '\n';
     printer.print(CD);
     return true;
   }
@@ -494,7 +774,6 @@ public:
           forwardDeclareType(TD);
         });
 
-    os << '\n';
     printer.print(FD);
     return true;
   }
@@ -503,10 +782,10 @@ public:
     if (addImport(SD))
       return true;
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      (void)forwardDeclareMemberTypes(SD->getMembers(), SD);
+      (void)forwardDeclareMemberTypes(SD->getAllMembers(), SD);
       for (const auto *ed :
            printer.getInteropContext().getExtensionsForNominalType(SD)) {
-        (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
+        (void)forwardDeclareMemberTypes(ed->getAllMembers(), SD);
       }
       forwardDeclareCxxValueTypeIfNeeded(SD);
     }
@@ -533,11 +812,10 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    if (!forwardDeclareMemberTypes(PD->getMembers(), PD))
+    if (!forwardDeclareMemberTypes(PD->getAllMembers(), PD))
       return false;
 
     seenTypes[PD] = { EmissionState::Defined, true };
-    os << '\n';
     printer.print(PD);
     return true;
   }
@@ -560,10 +838,9 @@ public:
     // This isn't rolled up into the previous set of requirements because
     // it /also/ prints forward declarations, and the header is a little
     // prettier if those are as close as possible to the necessary extension.
-    if (!forwardDeclareMemberTypes(ED->getMembers(), ED))
+    if (!forwardDeclareMemberTypes(ED->getAllMembers(), ED))
       return false;
 
-    os << '\n';
     printer.print(ED);
     return true;
   }
@@ -573,7 +850,7 @@ public:
       return true;
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      forwardDeclareMemberTypes(ED->getMembers(), ED);
+      forwardDeclareMemberTypes(ED->getAllMembers(), ED);
       forwardDeclareCxxValueTypeIfNeeded(ED);
     }
 
@@ -605,7 +882,7 @@ public:
 
   void write() {
     SmallVector<Decl *, 64> decls;
-    M.getTopLevelDecls(decls);
+    M.getTopLevelDeclsWithAuxiliaryDecls(decls);
     llvm::DenseSet<const ValueDecl *> removedValueDecls;
 
     auto newEnd =
@@ -637,7 +914,7 @@ public:
         if (!ext ||
             ext->getExtendedNominal() != M.getASTContext().getStringDecl())
           continue;
-        for (auto *m : ext->getMembers()) {
+        for (auto *m : ext->getAllMembers()) {
           if (auto *sd = dyn_cast<StructDecl>(m)) {
             if (sd->getBaseIdentifier().str() == "UTF8View" ||
                 sd->getBaseIdentifier().str() == "Index") {
@@ -650,165 +927,7 @@ public:
     }
 
     // REVERSE sort the decls, since we are going to copy them onto a stack.
-    llvm::array_pod_sort(decls.begin(), decls.end(),
-                         [](Decl * const *lhs, Decl * const *rhs) -> int {
-      enum : int {
-        Ascending = -1,
-        Equivalent = 0,
-        Descending = 1,
-      };
-
-      assert(*lhs != *rhs && "duplicate top-level decl");
-
-      auto getSortName = [](const Decl *D) -> StringRef {
-        if (auto VD = dyn_cast<ValueDecl>(D))
-          return VD->getBaseName().userFacingName();
-
-        if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-          auto baseClass = ED->getSelfClassDecl();
-          if (!baseClass)
-              return ED->getExtendedNominal()->getName().str();
-          return baseClass->getName().str();
-        }
-        llvm_unreachable("unknown top-level ObjC decl");
-      };
-
-      // When we visit a function, we might also generate a thunk that calls into the
-      // implementation of structs/enums to get the opaque pointers. To avoid
-      // referencing these methods before we see the definition for the generated
-      // classes, we want to visit function definitions last.
-      if (isa<AbstractFunctionDecl>(*rhs) && isa<NominalTypeDecl>(*lhs))
-        return Descending;
-      if (isa<AbstractFunctionDecl>(*lhs) && isa<NominalTypeDecl>(*rhs))
-        return Ascending;
-
-      // Sort by names.
-      int result = getSortName(*rhs).compare(getSortName(*lhs));
-      if (result != 0)
-        return result;
-      // Two overloaded functions can have the same name when emitting C++.
-      if (isa<AbstractFunctionDecl>(*rhs) && isa<AbstractFunctionDecl>(*lhs)) {
-        // Sort top level functions with the same C++ name by their location to
-        // have stable sorting that depends on users source but not on the
-        // compiler invocation.
-        // FIXME: This is pretty suspect; PrintAsClang sometimes operates on
-        //        serialized modules which don't have SourceLocs, so this sort
-        //        rule may be applied in some steps of a build but not others.
-        if ((*rhs)->getLoc().isValid() && (*lhs)->getLoc().isValid()) {
-          auto getLocText = [](const Decl *afd) {
-            std::string res;
-            llvm::raw_string_ostream os(res);
-            afd->getLoc().print(os, afd->getASTContext().SourceMgr);
-            return std::move(os.str());
-          };
-
-          result = getLocText(*rhs).compare(getLocText(*lhs));
-          if (result != 0)
-            return result;
-        }
-      }
-
-      // A function and a global variable can have the same name in C++,
-      // even when the variable might not actually be emitted by the emitter.
-      // In that case, order the function before the variable.
-      if (isa<AbstractFunctionDecl>(*rhs) && isa<VarDecl>(*lhs))
-        return Descending;
-      if (isa<AbstractFunctionDecl>(*lhs) && isa<VarDecl>(*rhs))
-        return Ascending;
-
-      // Prefer value decls to extensions.
-      if (isa<ValueDecl>(*lhs) && !isa<ValueDecl>(*rhs))
-        return Descending;
-      if (!isa<ValueDecl>(*lhs) && isa<ValueDecl>(*rhs))
-        return Ascending;
-
-      // Last-ditch ValueDecl tiebreaker: Compare mangled names. This captures
-      // *tons* of context and detail missed by the previous checks, but the
-      // resulting sort makes little sense to humans.
-      // FIXME: It'd be nice to share the mangler or even memoize mangled names,
-      //        but we'd have to stop using `llvm::array_pod_sort()` so that we
-      //        could capture some outside state.
-      Mangle::ASTMangler mangler;
-      auto getMangledName = [&](const Decl *D) {
-        auto VD = dyn_cast<ValueDecl>(D);
-        if (!VD && isa<ExtensionDecl>(D))
-          VD = cast<ExtensionDecl>(D)->getExtendedNominal();
-        if (!VD)
-          return std::string();
-        return mangler.mangleAnyDecl(VD, /*prefix=*/true,
-                                     /*respectOriginallyDefinedIn=*/true);
-      };
-      result = getMangledName(*rhs).compare(getMangledName(*lhs));
-      if (result != 0)
-        return result;
-
-      // Mangled names ought to distinguish all value decls, leaving only
-      // extensions of the same nominal type beyond this point.
-      assert(isa<ExtensionDecl>(*lhs) && isa<ExtensionDecl>(*rhs));
-
-      // Break ties in extensions by putting smaller extensions last (in reverse
-      // order).
-      // FIXME: This will end up taking linear time.
-      auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
-      auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
-      unsigned numLHSMembers = std::distance(lhsMembers.begin(),
-                                             lhsMembers.end());
-      unsigned numRHSMembers = std::distance(rhsMembers.begin(),
-                                             rhsMembers.end());
-      if (numLHSMembers != numRHSMembers)
-        return numLHSMembers < numRHSMembers ? Descending : Ascending;
-
-      // Or the extension with fewer protocols.
-      auto lhsProtos = cast<ExtensionDecl>(*lhs)->getLocalProtocols();
-      auto rhsProtos = cast<ExtensionDecl>(*rhs)->getLocalProtocols();
-      if (lhsProtos.size() != rhsProtos.size())
-        return lhsProtos.size() < rhsProtos.size() ? Descending : Ascending;
-
-      // If that fails, arbitrarily pick the extension whose protocols are
-      // alphabetically first.
-      {
-        auto mismatch =
-          std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
-                        [] (const ProtocolDecl *nextLHSProto,
-                            const ProtocolDecl *nextRHSProto) {
-          return nextLHSProto->getName() != nextRHSProto->getName();
-        });
-        if (mismatch.first != lhsProtos.end()) {
-          StringRef lhsProtoName = (*mismatch.first)->getName().str();
-          return lhsProtoName.compare((*mismatch.second)->getName().str());
-        }
-      }
-
-      // Still nothing? Fine, we'll pick the one with the alphabetically first
-      // member instead.
-      {
-        auto mismatch =
-          std::mismatch(cast<ExtensionDecl>(*lhs)->getMembers().begin(),
-                        cast<ExtensionDecl>(*lhs)->getMembers().end(),
-                        cast<ExtensionDecl>(*rhs)->getMembers().begin(),
-                        [] (const Decl *nextLHSDecl, const Decl *nextRHSDecl) {
-          if (isa<ValueDecl>(nextLHSDecl) && isa<ValueDecl>(nextRHSDecl)) {
-            return cast<ValueDecl>(nextLHSDecl)->getName() !=
-                     cast<ValueDecl>(nextRHSDecl)->getName();
-          }
-          return isa<ValueDecl>(nextLHSDecl) != isa<ValueDecl>(nextRHSDecl);
-        });
-        if (mismatch.first != cast<ExtensionDecl>(*lhs)->getMembers().end()) {
-          auto *lhsMember = dyn_cast<ValueDecl>(*mismatch.first),
-               *rhsMember = dyn_cast<ValueDecl>(*mismatch.second);
-          if (!rhsMember && lhsMember)
-            return Descending;
-          if (lhsMember && !rhsMember)
-            return Ascending;
-          if (lhsMember && rhsMember)
-            return rhsMember->getName().compare(lhsMember->getName());
-        }
-      }
-
-      // Hopefully two extensions with identical conformances and member names
-      // will be interchangeable enough not to matter.
-      return Equivalent;
-    });
+    llvm::array_pod_sort(decls.begin(), decls.end(), &reverseCompareDecls);
 
     assert(declsToWrite.empty());
     declsToWrite.assign(decls.begin(), decls.end());
@@ -826,6 +945,7 @@ public:
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
       bool success = true;
+      auto posBefore = os.tell();
 
       if (auto ED = dyn_cast<EnumDecl>(D)) {
         success = writeEnum(ED);
@@ -856,7 +976,10 @@ public:
 
       if (success) {
         assert(declsToWrite.back() == D);
-        os << "\n";
+        // If we actually wrote something to the file, add a newline after it.
+        // (As opposed to, for instance, an extension we decided to skip.)
+        if (posBefore != os.tell())
+          os << "\n";
         declsToWrite.pop_back();
       }
     }
@@ -940,14 +1063,17 @@ public:
 
       // Emit an unavailable stub for a Swift type.
       if (auto *nmtd = dyn_cast<NominalTypeDecl>(vd)) {
-        auto representation = cxx_translation::getDeclRepresentation(vd);
+        auto representation = cxx_translation::getDeclRepresentation(
+            vd, [this](const NominalTypeDecl *decl) {
+              return printer.isZeroSized(decl);
+            });
         if (nmtd->isGeneric()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
-          ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+          ClangSyntaxPrinter(nmtd->getASTContext(), os).printGenericSignature(genericSignature);
         }
         os << "class ";
-        ClangSyntaxPrinter(os).printBaseName(vd);
+        ClangSyntaxPrinter(nmtd->getASTContext(), os).printBaseName(vd);
         os << " { } SWIFT_UNAVAILABLE_MSG(\"";
 
         auto diag =
@@ -960,8 +1086,8 @@ public:
                       const_cast<ValueDecl *>(vd));
         // Emit a specific unavailable message when we know why a decl can't be
         // exposed, or a generic message otherwise.
-        auto diagString = M.getASTContext().Diags.diagnosticStringFor(
-            diag.getID(), /*PrintDiagnosticNames=*/false);
+        auto diagString =
+            M.getASTContext().Diags.getFormatStringForDiagnostic(diag.getID());
         DiagnosticEngine::formatDiagnosticText(os, diagString, diag.getArgs(),
                                                DiagnosticFormatOptions());
         os << "\");\n";
@@ -1006,7 +1132,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#undef SWIFT_SYMBOL\n";
   os << "#endif\n";
   os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
-  ClangSyntaxPrinter(os).printBaseName(&M);
+  ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
   os << "\", usrValue)\n";
 
   // FIXME: Use getRequiredAccess once @expose is supported.
@@ -1022,7 +1148,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#endif\n";
     os << "#include <new>\n";
     // Embed an overlay for the standard library.
-    ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
+    ClangSyntaxPrinter(M.getASTContext(), moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
     // Ignore typos in Swift stdlib doc comments.
     os << "#pragma clang diagnostic push\n";
@@ -1043,9 +1169,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
-    ClangSyntaxPrinter(os).printBaseName(&M);
+    ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
     os << " SWIFT_PRIVATE_ATTR";
-    ClangSyntaxPrinter(os).printSymbolUSRAttribute(&M);
+    ClangSyntaxPrinter(M.getASTContext(), os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -1060,11 +1186,14 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "}\n";
   }
 
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-Wreserved-identifier\"\n";
   // Construct a C++ namespace for the module.
-  ClangSyntaxPrinter(os).printNamespace(
-      [&](raw_ostream &os) { ClangSyntaxPrinter(os).printBaseName(&M); },
+  ClangSyntaxPrinter(M.getASTContext(), os).printNamespace(
+      [&](raw_ostream &os) { ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
+  os << "#pragma clang diagnostic pop\n";
 
   if (M.isStdlibModule()) {
     os << "#pragma clang diagnostic pop\n";

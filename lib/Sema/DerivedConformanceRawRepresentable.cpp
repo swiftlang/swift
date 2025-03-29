@@ -16,17 +16,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformances.h"
+#include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
 #include "TypeChecker.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/APInt.h"
-#include "DerivedConformances.h"
-#include "TypeCheckDecl.h"
 
 using namespace swift;
 
@@ -111,7 +114,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   Type enumType = parentDC->getDeclaredTypeInContext();
 
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto *pat = EnumElementPattern::createImplicit(
         enumType, elt, /*subPattern*/ nullptr, /*DC*/ toRawDecl);
@@ -198,17 +201,16 @@ struct RuntimeVersionCheck {
   /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
-    auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
-                            Platform, SourceLoc(),
-                            Version, Version, SourceLoc()
-                        );
+    auto platformSpec = AvailabilitySpec::createForDomain(
+        C, AvailabilityDomain::forPlatform(Platform), SourceLoc(), Version,
+        SourceLoc());
 
-    // otherSpec = "*"
-    auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
+    // wildcardSpec = "*"
+    auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
 
-    // availableInfo = "#available(\(platformSpec), \(otherSpec))"
+    // availableInfo = "#available(\(platformSpec), \(wildcardSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc(),
+        C, SourceLoc(), SourceLoc(), {platformSpec, wildcardSpec}, SourceLoc(),
         false);
 
     // This won't be filled in by TypeCheckAvailability because we have
@@ -236,38 +238,38 @@ struct RuntimeVersionCheck {
 /// information about the runtime check needed to ensure it is available to
 /// \c versionCheck and returns true.
 static bool
-checkAvailability(const EnumElementDecl *elt, ASTContext &C,
+checkAvailability(const EnumElementDecl *elt,
+                  AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
-  auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
+  auto &C = elt->getASTContext();
+  auto constraint = getAvailabilityConstraintsForDecl(elt, availabilityContext)
+                        .getPrimaryConstraint();
 
   // Is it always available?
-  if (!attr)
+  if (!constraint)
     return true;
-
-  // For type-checking purposes, iOS availability is inherited for visionOS
-  // targets. However, it is not inherited for the sake of code-generation
-  // of runtime availability queries, and is assumed to be available.
-  if ((attr->Platform == PlatformKind::iOS ||
-       attr->Platform == PlatformKind::iOSApplicationExtension) &&
-      C.LangOpts.Target.isXROS())
-    return true;
-
-  AvailableVersionComparison availability = attr->getVersionAvailability(C);
-
-  assert(availability != AvailableVersionComparison::Available &&
-         "DeclAttributes::getPotentiallyUnavailable() shouldn't "
-         "return an available attribute");
 
   // Is it never available?
-  if (availability != AvailableVersionComparison::PotentiallyUnavailable)
+  if (constraint->isUnavailable())
     return false;
 
-  // It's conditionally available; create a version constraint and return true.
-  assert(attr->getPlatformAgnosticAvailability() ==
-             PlatformAgnosticAvailabilityKind::None &&
-         "can only express #available(somePlatform version) checks");
-  versionCheck.emplace(attr->Platform, *attr->Introduced);
+  // Some constraints are active for type checking but can't translate to
+  // runtime restrictions.
+  if (!constraint->isActiveForRuntimeQueries(C))
+    return true;
 
+  auto domain = constraint->getDomain();
+
+  // Only platform version constraints are supported currently.
+  // FIXME: [availability] Support non-platform domain availability checks
+  if (!domain.isPlatform())
+    return true;
+
+  // It's conditionally available; create a version constraint and return true.
+  auto range = constraint->getPotentiallyUnavailableRange(C);
+
+  ASSERT(range);
+  versionCheck.emplace(domain.getPlatformKind(), range->getRawMinimumVersion());
   return true;
 }
 
@@ -294,6 +296,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
+  auto availabilityContext = AvailabilityContext::forDeploymentTarget(C);
 
   auto nominalTypeDecl = parentDC->getSelfNominalTypeDecl();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
@@ -308,8 +311,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   auto selfDecl = cast<ConstructorDecl>(initDecl)->getImplicitSelfDecl();
-  
-  SmallVector<ASTNode, 4> cases;
+
+  SmallVector<CaseStmt *, 4> cases;
   unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
     // First, check case availability. If the case will definitely be
@@ -317,7 +320,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // information about that check in versionCheck and keep processing this
     // element.
     std::optional<RuntimeVersionCheck> versionCheck(std::nullopt);
-    if (!checkAvailability(elt, C, versionCheck))
+    if (!checkAvailability(elt, availabilityContext, versionCheck))
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
@@ -432,8 +435,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramList,
-                              /*GenericParams=*/nullptr, parentDC,
-                              /*LifetimeDependentTypeRepr*/ nullptr);
+                              /*GenericParams=*/nullptr, parentDC);
 
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);

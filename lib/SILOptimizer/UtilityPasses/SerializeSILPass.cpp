@@ -114,7 +114,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:
@@ -167,6 +166,8 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
@@ -184,7 +185,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
@@ -332,6 +333,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::TuplePackElementAddrInst:
   case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
     // Handle by operand and result check.
     break;
 
@@ -360,6 +362,15 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
       }
     });
     return wouldChange;
+  }
+
+  case SILInstructionKind::ThunkInst: {
+    auto subs = cast<ThunkInst>(&inst)->getSubstitutionMap();
+    for (auto ty : subs.getReplacementTypes()) {
+      if (opaqueArchetypeWouldChange(context, ty->getCanonicalType()))
+        return true;
+    }
+    break;
   }
 
   case SILInstructionKind::ApplyInst:

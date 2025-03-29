@@ -19,12 +19,13 @@
 
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Version.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Sema/Sema.h"
 
 namespace swift {
@@ -230,12 +231,16 @@ class ImportedName {
 
     unsigned hasAsyncAlternateInfo: 1;
 
+    /// Whether this declaration had a custom name that was ignored because it
+    /// was invalid.
+    unsigned hasInvalidCustomName : 1;
+
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
           accessorKind(ImportedAccessorKind::None), hasCustomName(false),
           droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
           hasErrorInfo(false), hasAsyncInfo(false),
-          hasAsyncAlternateInfo(false) {}
+          hasAsyncAlternateInfo(false), hasInvalidCustomName(false) {}
   } info;
 
 public:
@@ -312,6 +317,10 @@ public:
   /// swift_name attribute.
   bool hasCustomName() const { return info.hasCustomName; }
   void setHasCustomName() { info.hasCustomName = true; }
+
+  /// Whether this declaration had a custom name that was ignored because it
+  /// was invalid.
+  bool hasInvalidCustomName() const { return info.hasInvalidCustomName; }
 
   /// Whether this was one of a special class of Objective-C
   /// initializers for which we drop the variadic argument rather
@@ -416,13 +425,16 @@ class NameImporter {
 
   bool importSymbolicCXXDecls;
 
+  ClangImporter::Implementation *importerImpl;
+
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema)
+               clang::Sema &cSema, ClangImporter::Implementation *importerImpl)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
         enumInfos(clangSema.getPreprocessor()),
         importSymbolicCXXDecls(
-            ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)) {}
+            ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)),
+        importerImpl(importerImpl) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -458,6 +470,7 @@ public:
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+  ClangImporter::Implementation *getImporterImpl() { return importerImpl; }
 
   Identifier getIdentifier(StringRef name) {
     return swiftCtx.getIdentifier(name);
@@ -488,6 +501,10 @@ public:
   inline void enableSymbolicImportFeature(bool isEnabled) {
     importSymbolicCXXDecls = isEnabled;
   }
+
+  /// Retrieve a purported custom name even if it is invalid.
+  static std::optional<StringRef>
+  findCustomName(const clang::Decl *decl, ImportNameVersion version);
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }

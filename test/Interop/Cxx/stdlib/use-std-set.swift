@@ -75,6 +75,51 @@ StdSetTestSuite.test("UnorderedSetOfCInt.init()") {
     expectTrue(s.contains(3))
 }
 
+StdSetTestSuite.test("SetOfCInt as ExpressibleByArrayLiteral") {
+    let s: SetOfCInt = [1, 3, 5]
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    func takesSetOfCInt(_ s: SetOfCInt) {
+        expectTrue(s.contains(1))
+        expectTrue(s.contains(2))
+        expectFalse(s.contains(3))
+    }
+
+    takesSetOfCInt([1, 2])
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt as ExpressibleByArrayLiteral") {
+    let s: UnorderedSetOfCInt = [1, 3, 5]
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    func takesUnorderedSetOfCInt(_ s: UnorderedSetOfCInt) {
+        expectTrue(s.contains(1))
+        expectTrue(s.contains(2))
+        expectFalse(s.contains(3))
+    }
+
+    takesUnorderedSetOfCInt([1, 2])
+}
+
+StdSetTestSuite.test("MultisetOfCInt as ExpressibleByArrayLiteral") {
+    let s: MultisetOfCInt = [1, 1, 3]
+    expectTrue(s.contains(1))
+    expectFalse(s.contains(2))
+    expectTrue(s.contains(3))
+
+    func takesMultisetOfCInt(_ s: MultisetOfCInt) {
+        expectTrue(s.contains(1))
+        expectTrue(s.contains(2))
+        expectFalse(s.contains(3))
+    }
+
+    takesMultisetOfCInt([1, 1, 2])
+}
+
 StdSetTestSuite.test("SetOfCInt.insert") {
     var s = SetOfCInt()
     expectFalse(s.contains(123))
@@ -116,6 +161,24 @@ StdSetTestSuite.test("UnorderedSetOfCInt.erase") {
     s.erase(2)
     expectFalse(s.contains(2))
     s.erase(2)
+    expectFalse(s.contains(2))
+}
+
+StdSetTestSuite.test("SetOfCInt.remove") {
+    var s = initSetOfCInt()
+    expectTrue(s.contains(1))
+    expectEqual(s.remove(1), 1)
+    expectFalse(s.contains(1))
+    expectEqual(s.remove(1), nil)
+    expectFalse(s.contains(1))
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
+    var s = initUnorderedSetOfCInt()
+    expectTrue(s.contains(2))
+    expectEqual(s.remove(2), 2)
+    expectFalse(s.contains(2))
+    expectEqual(s.remove(2), nil)
     expectFalse(s.contains(2))
 }
 

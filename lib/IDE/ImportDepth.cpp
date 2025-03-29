@@ -15,6 +15,8 @@
 #include "swift/Basic/Assertions.h"
 #include "clang/Basic/Module.h"
 
+#include <deque>
+
 using namespace swift;
 using namespace swift::ide;
 
@@ -64,7 +66,7 @@ ImportDepth::ImportDepth(ASTContext &context,
 
     // Add imports to the worklist.
     SmallVector<ImportedModule, 16> imports;
-    module->getImportedModules(imports);
+    module->getImportedModules(imports, ModuleDecl::ImportFilterKind::Exported);
     for (auto &import : imports) {
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
 

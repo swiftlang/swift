@@ -1,10 +1,11 @@
-// RUN: %target-sil-opt -update-borrowed-from -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
 //
 // REQUIRES: swift_in_compiler
 
-sil_stage raw
+sil_stage canonical
 
 import Builtin
+import Swift
 
 struct Trivial {
   var value: Builtin.Int32
@@ -126,21 +127,16 @@ none(%phi : @guaranteed $FakeOptional<C>):
   return %retval : $()
 }
 
-// An unreachable phi currently looks like a reborrow.
-//
-// TODO: When we have a reborrow flag, an unreachable phi can be
-// either a reborrow or forwarded, as long as it has no end_borrow.
+// An unreachable phi can be either a reborrow or forwarded, as long as it has no end_borrow.
 
 // CHECK-LABEL: introducer_unreachable: find_borrow_introducers with: %phiCycle
 // CHECK: } // end sil function 'introducer_unreachable'
 // CHECK: Introducers:
-// CHECK-NEXT: argument of bb1 : $C
 // CHECK-NEXT: introducer_unreachable: find_borrow_introducers with: %phiCycle
 
 // CHECK-LABEL: introducer_unreachable: borrow_introducers with: %phiCycle
 // CHECK: } // end sil function 'introducer_unreachable'
 // CHECK: Borrow introducers for: %1 = argument of bb1 : $C
-// CHECK-NEXT: argument of bb1 : $C
 // CHECK-NEXT: introducer_unreachable: borrow_introducers with: %phiCycle
 sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
 entry:
@@ -206,7 +202,7 @@ exit:
 // paths, but should only appear in the introducer list once.
 //
 // CHECK-LABEL: introducer_revisit_reborrow: find_borrow_introducers with: %aggregate2
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_revisit_reborrow'
 // CHECK: Introducers:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -214,7 +210,7 @@ exit:
 // CHECK-NEXT: introducer_revisit_reborrow: find_borrow_introducers with: %aggregate2
 
 // CHECK-LABEL: introducer_revisit_reborrow: borrow_introducers with: %aggregate2
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_revisit_reborrow'
 // CHECK: Borrow introducers for:  %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
@@ -245,7 +241,7 @@ exit:
 // CHECK-LABEL: introducer_multiple_borrow: find_borrow_introducers with: %aggregate2
 // CHECK: begin_borrow %0 : $C  
 // CHECK: [[BORROW2:%.*]] = begin_borrow %0 : $C
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_multiple_borrow'
 // CHECK: Introducers:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -256,7 +252,7 @@ exit:
 // CHECK-LABEL: introducer_multiple_borrow: borrow_introducers with: %aggregate2
 // CHECK: begin_borrow %0 : $C  
 // CHECK: [[BORROW2:%.*]] = begin_borrow %0 : $C
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_multiple_borrow'
 // CHECK: Borrow introducers for: %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
@@ -435,3 +431,21 @@ bb4(%outer0 : @owned $C, %outer1 : @owned $C, %inner : @guaranteed $C):
   %99 = tuple()
   return %99 : $()
 }
+
+// CHECK-LABEL: Borrow introducers for:   %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  end running test 1 of 2 on testUncheckedOwnershipConversion: borrow_introducers with: %3
+// CHECK-LABEL: Enclosing values for:   %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  end running test 2 of 2 on testUncheckedOwnershipConversion: enclosing_values with: %3
+sil [ossa] @testUncheckedOwnershipConversion : $@convention(thin) (Unmanaged<C>) -> () {
+bb0(%0 : $Unmanaged<C>):
+  %1 = struct_extract %0, #Unmanaged._value
+  %2 = unmanaged_to_ref %1 to $C
+  %3 = unchecked_ownership_conversion %2, @unowned to @guaranteed
+  specify_test "borrow_introducers %3"
+  specify_test "enclosing_values %3"
+  end_borrow %3
+  %8 = tuple ()
+  return %8
+}
+

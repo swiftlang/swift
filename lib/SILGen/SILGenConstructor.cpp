@@ -578,21 +578,10 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   return;
 }
 
-// FIXME: the callers of ctorHopsInjectedByDefiniteInit is not correct (rdar://87485045)
-// we must still set the SGF.ExpectedExecutor field to say that we must
-// hop to the executor after every apply in the constructor. This seems to
-// happen for the main actor isolated async inits, but not for the plain ones,
-// where 'self' is not going to directly be the instance. We have to extend the
-// ExecutorBreadcrumb class to detect whether it needs to do a load or not
-// in it's emit method.
-//
-// So, the big problem right now is that for a delegating async actor init,
-// after calling an async function, no hop-back is being emitted.
-
 /// Returns true if the given async constructor will have its
 /// required actor hops injected later by definite initialization.
 static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
-                                           ActorIsolation const& isolation) {
+                                           ActorIsolation isolation) {
   // must be async, but we can assume that.
   assert(ctor->hasAsync());
 
@@ -603,19 +592,20 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   if (!selfClassDecl || !selfClassDecl->isAnyActor())
     return false;
 
-  // must be instance isolated
+  // must be self-isolated
   switch (isolation) {
-    case ActorIsolation::ActorInstance:
-      return true;
+  case ActorIsolation::ActorInstance:
+    return isolation.getActorInstanceParameter() == 0;
 
-    case ActorIsolation::Erased:
-      llvm_unreachable("constructor cannot have erased isolation");
+  case ActorIsolation::Erased:
+    llvm_unreachable("constructor cannot have erased isolation");
 
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::GlobalActor:
-      return false;
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::CallerIsolationInheriting:
+    return false;
   }
 }
 
@@ -684,15 +674,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   AllocatorMetatype = emitConstructorMetatypeArg(*this, ctor);
 
   // Make sure we've hopped to the right global actor, if any.
-  if (ctor->hasAsync()) {
-    auto isolation = getActorIsolation(ctor);
-    // if it's not injected by definite init, we do it in the prologue now.
-    if (!ctorHopsInjectedByDefiniteInit(ctor, isolation)) {
-      SILLocation prologueLoc(selfDecl);
-      prologueLoc.markAsPrologue();
-      emitConstructorPrologActorHop(prologueLoc, isolation);
-    }
-  }
+  emitConstructorExpectedExecutorProlog();
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
@@ -757,15 +739,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
       // Raw memory is not directly decomposable, but we still want to mark
       // it as initialized. Use a zero initializer.
-      auto &C = ctor->getASTContext();
-      auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
-      B.createBuiltin(ctor, zeroInit->getBaseIdentifier(),
-                      SILType::getEmptyTupleType(C),
-                      SubstitutionMap::get(zeroInit->getInnermostDeclContext()
-                                               ->getGenericSignatureOfContext(),
-                                           {selfDecl->getTypeInContext()},
-                                           LookUpConformanceInModule()),
-                      selfLV.getLValueAddress());
+      B.createZeroInitAddr(ctor, selfLV.getLValueAddress());
     } else if (isa<StructDecl>(nominal)
                && lowering.getLoweredType().isMoveOnly()
                && nominal->getStoredProperties().empty()) {
@@ -791,15 +765,14 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     auto cleanupLoc = CleanupLocation(ctor);
 
+    if (selfLV.getType().isMoveOnly()) {
+      selfLV = B.createMarkUnresolvedNonCopyableValueInst(
+        cleanupLoc, selfLV,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::
+        AssignableButNotConsumable);
+    }
     if (!F.getConventions().hasIndirectSILResults()) {
       // Otherwise, load and return the final 'self' value.
-      if (selfLV.getType().isMoveOnly()) {
-        selfLV = B.createMarkUnresolvedNonCopyableValueInst(
-            cleanupLoc, selfLV,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                AssignableButNotConsumable);
-      }
-
       selfValue = lowering.emitLoad(B, cleanupLoc, selfLV.getValue(),
                                     LoadOwnershipQualifier::Copy);
 
@@ -1148,15 +1121,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     selfClassDecl->isDistributedActor() && !isDelegating;
 
   // Make sure we've hopped to the right global actor, if any.
-  if (ctor->hasAsync()) {
-    auto isolation = getActorIsolation(ctor);
-    // if it's not injected by definite init, we do it in the prologue now.
-    if (!ctorHopsInjectedByDefiniteInit(ctor, isolation)) {
-      SILLocation prologueLoc(selfDecl);
-      prologueLoc.markAsPrologue();
-      emitConstructorPrologActorHop(prologueLoc, isolation);
-    }
-  }
+  emitConstructorExpectedExecutorProlog();
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
@@ -1200,7 +1165,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
             MarkUnresolvedNonCopyableValueInst::CheckKind::
                 ConsumableAndAssignable);
       }
-      VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
+      VarLocs[selfDecl] = VarLoc(selfArg.getValue(),
+                                 SILAccessEnforcement::Static);
     }
   }
 
@@ -1422,7 +1388,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
       selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
     SILValue slot;
 
-    if (auto *structDecl = dyn_cast<StructDecl>(field->getDeclContext())) {
+    if (isa<StructDecl>(field->getDeclContext())) {
       slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
                                            fieldTy.getAddressType());
     } else {
@@ -1585,6 +1551,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
       break;
 
     case ActorIsolation::Erased:
@@ -1722,7 +1689,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);
   assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
-  VarLocs[selfDecl] = VarLoc::get(selfArg);
+  VarLocs[selfDecl] = VarLoc(selfArg, SILAccessEnforcement::Unknown);
 
   auto cleanupLoc = CleanupLocation(loc);
   prepareEpilog(cd, std::nullopt, std::nullopt, cleanupLoc);
@@ -1753,11 +1720,11 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
     loc.markAutoGenerated();
 
     SILValue argValue = F.begin()->createFunctionArgument(type, arg);
-    VarLocs[arg] =
-        markUninitialized
-            ? VarLoc::get(B.createMarkUninitializedOut(loc, argValue))
-            : VarLoc::get(argValue);
-
+    if (markUninitialized) {
+      argValue = B.createMarkUninitializedOut(loc, argValue);
+    }
+    
+    VarLocs[arg] = VarLoc(argValue, SILAccessEnforcement::Static);
     InitAccessorArgumentMappings[property] = arg;
   };
 

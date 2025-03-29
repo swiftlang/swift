@@ -1,0 +1,2 @@
+#!/bin/zsh
+exec "$0:A:h/swift-xcodegen/swift-xcodegen" "$@"

@@ -4,6 +4,8 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -I %t
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-upcoming-feature NonfrozenEnumExhaustivity -I %t
 
+// REQUIRES: swift_feature_NonfrozenEnumExhaustivity
+
 import exhaustive_switch_testable_helper
 
 func foo(a: Int?, b: Int?) -> Int {
@@ -1485,5 +1487,32 @@ do {
       case nil, (e: .x, b: _)?: break
       case (e: .y, b: false)?: break
       case (e: .y, b: true)?: break
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/61817
+do {
+  let a: Bool? = true
+  switch a {
+    case true: break
+    case false: break
+    case nil: break
+  }
+
+  let result = {
+    switch a {
+      case true: true
+      case false: true
+      case nil: true
+    }
+  }
+  _ = result()
+
+  let b: Bool?? = true
+  switch b {
+    case true: break
+    case false: break
+    case nil: break
+    case nil?: break
   }
 }

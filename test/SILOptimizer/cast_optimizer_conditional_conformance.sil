@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -wmo -performance-constant-propagation -simplify-cfg -sil-combine -jumpthread-simplify-cfg -sil-combine -devirtualizer -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -wmo -performance-constant-propagation -simplify-cfg -sil-combine -jumpthread-simplify-cfg -sil-combine -devirtualizer -generic-specializer %s | %FileCheck %s
 //
 // <rdar://problem/46322928> Failure to devirtualize a protocol method applied to an opened existential blocks implementation of
 // DataProtocol.
@@ -399,7 +399,7 @@ sil_witness_table hidden <T where T == UInt8> S1<T>: HasFoo module tot {
 
 sil_witness_table hidden <T where T : P> S2<T>: HasFoo module tot {
   method #HasFoo.foo: <Self where Self : HasFoo> (Self) -> () -> () : @witnessS2
-  conditional_conformance (T: P): dependent
+  conditional_conformance (T: P): dependent T
 }
 
 sil_witness_table hidden IsP: P module tot {

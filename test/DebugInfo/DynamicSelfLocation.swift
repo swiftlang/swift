@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-irgen -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-irgen -g -o - | %FileCheck %s
 // REQUIRES: concurrency
 
 func some_func(_: () -> Void) async {}

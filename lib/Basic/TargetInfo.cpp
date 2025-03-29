@@ -16,6 +16,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -52,9 +53,11 @@ static void printCompatibilityLibrary(
   printedAny = true;
 }
 
+namespace swift {
+namespace targetinfo {
 /// Print information about the selected target in JSON.
-void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
-                                 llvm::raw_ostream &out) {
+void printTargetInfo(const CompilerInvocation &invocation,
+                     llvm::raw_ostream &out) {
   out << "{\n";
 
   // Compiler version, as produced by --version.
@@ -67,12 +70,12 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
     invocation.getIRGenOptions().AutolinkRuntimeCompatibilityLibraryVersion;
   auto &langOpts = invocation.getLangOptions();
   out << "  \"target\": ";
-  printTripleInfo(langOpts.Target, runtimeVersion, out);
+  printTripleInfo(invocation, langOpts.Target, runtimeVersion, out);
   out << ",\n";
 
   if (auto &variant = langOpts.TargetVariant) {
     out << "  \"targetVariant\": ";
-    printTripleInfo(*variant, runtimeVersion, out);
+    printTripleInfo(invocation, *variant, runtimeVersion, out);
     out << ",\n";
   }
 
@@ -112,9 +115,10 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
 }
 
 // Print information about the target triple in JSON.
-void targetinfo::printTripleInfo(
-    const llvm::Triple &triple,
-    std::optional<llvm::VersionTuple> runtimeVersion, llvm::raw_ostream &out) {
+void printTripleInfo(const CompilerInvocation &invocation,
+                     const llvm::Triple &triple,
+                     std::optional<llvm::VersionTuple> runtimeVersion,
+                     llvm::raw_ostream &out) {
   out << "{\n";
 
   out << "    \"triple\": \"";
@@ -129,6 +133,23 @@ void targetinfo::printTripleInfo(
   writeEscaped(getTargetSpecificModuleTriple(triple).getTriple(), out);
   out << "\",\n";
 
+  out << "    \"platform\": \"" << getPlatformNameForTriple(triple) << "\",\n";
+  out << "    \"arch\": \"" << swift::getMajorArchitectureName(triple)
+      << "\",\n";
+
+  clang::DiagnosticsEngine DE{new clang::DiagnosticIDs(),
+                              new clang::DiagnosticOptions(),
+                              new clang::IgnoringDiagConsumer()};
+  std::shared_ptr<clang::TargetOptions> TO =
+      std::make_shared<clang::TargetOptions>();
+  TO->Triple = triple.str();
+  clang::TargetInfo *TI = clang::TargetInfo::CreateTargetInfo(DE, TO);
+  out << "    \"pointerWidthInBits\": "
+      << TI->getPointerWidth(clang::LangAS::Default) << ",\n";
+  out << "    \"pointerWidthInBytes\": "
+      << TI->getPointerWidth(clang::LangAS::Default) / TI->getCharWidth()
+      << ",\n";
+
   if (runtimeVersion) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
     writeEscaped(runtimeVersion->getAsString(), out);
@@ -137,15 +158,14 @@ void targetinfo::printTripleInfo(
     // Compatibility libraries that need to be linked.
     out << "    \"compatibilityLibraries\": [";
     bool printedAnyCompatibilityLibrary = false;
-    #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad)   \
-      printCompatibilityLibrary(                                           \
-        *runtimeVersion, llvm::VersionTuple Version, #Filter, LibraryName, \
-        ForceLoad, printedAnyCompatibilityLibrary, out);
-    #include "swift/Frontend/BackDeploymentLibs.def"
+#define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad)           \
+  printCompatibilityLibrary(*runtimeVersion, llvm::VersionTuple Version,       \
+                            #Filter, LibraryName, ForceLoad,                   \
+                            printedAnyCompatibilityLibrary, out);
+#include "swift/Frontend/BackDeploymentLibs.def"
 
-    if (printedAnyCompatibilityLibrary) {
+    if (printedAnyCompatibilityLibrary)
       out << "\n   ";
-    }
     out << " ],\n";
   } else {
     out << "    \"compatibilityLibraries\": [ ],\n";
@@ -157,3 +177,5 @@ void targetinfo::printTripleInfo(
 
   out << "  }";
 }
+} // namespace targetinfo
+} // namespace swift

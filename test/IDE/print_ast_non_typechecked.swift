@@ -13,13 +13,4 @@ func baz() {}
 func qux() {}
 #endif
 
-// CHECK1: {{^}}#if /* condition */
-// CHECK1: {{^}}  func bar() {
-// CHECK1: {{^}}  }
-// CHECK1: {{^}}#elseif /* condition */
-// CHECK1: {{^}}  func baz() {
-// CHECK1: {{^}}  }
-// CHECK1: {{^}}#else
-// CHECK1: {{^}}  func qux() {
-// CHECK1: {{^}}  }
-// CHECK1: {{^}}#endif
+// CHECK1-NOT: #if

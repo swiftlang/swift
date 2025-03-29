@@ -8,6 +8,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 //--- file1.swift
 
@@ -17,6 +18,8 @@ func foo() {
 
 @main
 struct Main {
+    var someClass = SomeClass()
+
     static func main() {
         foo()
     }
@@ -24,9 +27,9 @@ struct Main {
 
 //--- file2.swift
 
-func bar<T>(_ T: T.Type) {
-    
-}
+final class SomeClass {}
+
+func bar<T>(_ T: T.Type) {}
 
 // CHECK:      {
 // CHECK-NEXT:   key.diagnostics: [

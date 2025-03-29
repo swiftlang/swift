@@ -13,9 +13,9 @@ sil @coro_ret_pair : $@yield_once @convention(thin) () -> (@yields Builtin.Int64
 // CHECK-SAME:  [[CORO_ATTRIBUTES:#[0-9]+]]
 sil @test_simple : $@yield_once () -> (Builtin.Int64) {
 entry:
-  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$sBi64_IetAd_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
-  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$sBi64_IetAd_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
-  // CHECK-NEXT:    [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
+  // CHECK-32:      [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$sBi64_IetAd_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+  // CHECK-64:      [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$sBi64_IetAd_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+  // CHECK-NEXT: [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
 
   // CHECK-NEXT:    call swiftcc void @marker(i64 1000)
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int64) -> ()
@@ -98,8 +98,8 @@ entry:
 // CHECK-SAME: ptr{{.*}} [[CTX:%.*]], ptr{{.*}} [[INDIRECT_RET:%.*]], ptr{{.*}} [[ARG:%.*]], ptr{{.*}} [[TYPE:%.*]])
 sil @coro_ret_indirect : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T, @out T) {
 bb0(%outt : $*T, %t : $*T):
-  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr [[CTX]], ptr @"$sxxxlIetAirYi_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
-  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr [[CTX]], ptr @"$sxxxlIetAirYi_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+  // CHECK-32:      [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr [[CTX]], ptr @"$sxxxlIetAirYi_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
+  // CHECK-64: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr [[CTX]], ptr @"$sxxxlIetAirYi_TC{{(.ptrauth)?}}", ptr @malloc, ptr @free)
 
   // CHECK:    [[IS_UNWIND:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[ARG]])
   // CHECK:    br i1 [[IS_UNWIND]], label %[[UNWIND_BB:.*]], label %[[RESUME_BB:.*]]

@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
-// Because of -enable-experimental-feature TupleConformances
-// REQUIRES: asserts
+// REQUIRES: swift_feature_TupleConformances
 
 extension () {
   // expected-error@-1 {{tuple extension must be written as extension of '(repeat each Element)'}}

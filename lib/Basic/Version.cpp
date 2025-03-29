@@ -339,5 +339,17 @@ unsigned getUpcomingCxxInteropCompatVersion() {
   return SWIFT_VERSION_MAJOR + 1;
 }
 
+std::string getCompilerVersion() {
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+
+ // TODO: This should print SWIFT_COMPILER_VERSION when
+ // available, but to do that we need to switch from
+ // llvm::VersionTuple to swift::Version.
+ OS << SWIFT_VERSION_STRING;
+
+  return OS.str();
+}
+
 } // end namespace version
 } // end namespace swift

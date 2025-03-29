@@ -503,7 +503,7 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
     }
   }
 
-  if (IGM.IRGen.Opts.shouldOptimize()) {
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
     // will merge these blocks back together again. We emit an empty asm
@@ -553,6 +553,13 @@ Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
 
 void IRGenFunction::emitTaskDealloc(Address address) {
   auto *call = Builder.CreateCall(IGM.getTaskDeallocFunctionPointer(),
+                                  {address.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+}
+
+void IRGenFunction::emitTaskDeallocThrough(Address address) {
+  auto *call = Builder.CreateCall(IGM.getTaskDeallocThroughFunctionPointer(),
                                   {address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
@@ -888,7 +895,8 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   // If our deployment target doesn't contain the new swift_clearSensitive,
   // fall back to memset_s
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(IGM.Context);
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   auto clearSensitiveAvail = IGM.Context.getClearSensitiveAvailability();
   if (!deploymentAvailability.isContainedIn(clearSensitiveAvail)) {
     Builder.CreateCall(IGM.getMemsetSFunctionPointer(),

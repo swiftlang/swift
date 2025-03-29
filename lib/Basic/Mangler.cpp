@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/Punycode.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CommandLine.h"
 #include <algorithm>
@@ -122,7 +123,15 @@ void Mangler::beginManglingWithoutPrefix() {
 
 void Mangler::beginMangling() {
   beginManglingWithoutPrefix();
-  Buffer << MANGLING_PREFIX_STR;
+
+  switch (Flavor) {
+  case ManglingFlavor::Default:
+    Buffer << MANGLING_PREFIX_STR;
+    break;
+  case ManglingFlavor::Embedded:
+    Buffer << MANGLING_PREFIX_EMBEDDED_STR;
+    break;
+  }
 }
 
 /// Finish the mangling of the symbol and return the mangled name.
@@ -132,8 +141,16 @@ std::string Mangler::finalize() {
   Storage.clear();
 
 #ifndef NDEBUG
-  if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
-    verify(result);
+  switch (Flavor) {
+  case ManglingFlavor::Default:
+    if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
+      verify(result, Flavor);
+    break;
+  case ManglingFlavor::Embedded:
+    if (StringRef(result).starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+      verify(result, Flavor);
+    break;
+  }
 #endif
 
   return result;
@@ -158,16 +175,25 @@ static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
   return false;
 }
 
-void Mangler::verify(StringRef nameStr) {
-#ifndef NDEBUG
+void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
   SmallString<128> buffer;
   if (!nameStr.starts_with(MANGLING_PREFIX_STR) &&
+      !nameStr.starts_with(MANGLING_PREFIX_EMBEDDED_STR) &&
       !nameStr.starts_with("_Tt") &&
       !nameStr.starts_with("_S")) {
     // This list is the set of prefixes recognized by Demangler::demangleSymbol.
     // It should be kept in sync.
     assert(StringRef(MANGLING_PREFIX_STR) != "_S" && "redundant check");
-    buffer += MANGLING_PREFIX_STR;
+
+    switch (Flavor) {
+    case ManglingFlavor::Default:
+      buffer += MANGLING_PREFIX_STR;
+      break;
+    case ManglingFlavor::Embedded:
+      buffer += MANGLING_PREFIX_EMBEDDED_STR;
+      break;
+    }
+
     buffer += nameStr;
     nameStr = buffer.str();
   }
@@ -178,7 +204,7 @@ void Mangler::verify(StringRef nameStr) {
     llvm::errs() << "Can't demangle: " << nameStr << '\n';
     abort();
   }
-  auto mangling = mangleNode(Root);
+  auto mangling = mangleNode(Root, Flavor);
   if (!mangling.isSuccess()) {
     llvm::errs() << "Can't remangle: " << nameStr << '\n';
     abort();
@@ -191,10 +217,9 @@ void Mangler::verify(StringRef nameStr) {
                   "original     = " << nameStr << "\n"
                   "remangled    = " << Remangled << "\n";
   abort();
-#endif
 }
 
-void Mangler::appendIdentifier(StringRef ident) {
+void Mangler::appendIdentifier(StringRef ident, bool allowRawIdentifiers) {
   auto Iter = StringSubstitutions.find(ident);
   if (Iter != StringSubstitutions.end())
     return mangleSubstitution(Iter->second);
@@ -202,9 +227,37 @@ void Mangler::appendIdentifier(StringRef ident) {
   size_t OldPos = Storage.size();
   addSubstitution(ident);
 
-  mangleIdentifier(*this, ident);
+  if (allowRawIdentifiers && Lexer::identifierMustAlwaysBeEscaped(ident)) {
+    llvm::SmallString<256> escaped;
+    appendRawIdentifierForRuntime(ident, escaped);
+    mangleIdentifier(*this, escaped);
+  } else {
+    mangleIdentifier(*this, ident);
+  }
 
   recordOpStat("<identifier>", OldPos);
+}
+
+void Mangler::appendRawIdentifierForRuntime(
+    StringRef ident, llvm::SmallVectorImpl<char> &buffer) {
+  // SE-0451: Raw identifiers retain their backticks as part of their
+  // mangling. Additionally, the runtime has historically used spaces
+  // (U+0020) as delimiters in some metadata (e.g., tuple element labels
+  // and protocol associated type names). If one of these names is a raw
+  // identifier, it may also contain U+0020. To address this in a
+  // backwards-compatible fashion, we replace any occurrences of U+0020 in
+  // the name with U+00A0 (UTF-8: 0xC2 0xA0), since U+00A0 is not permitted
+  // in raw identifiers.
+  buffer.push_back('`');
+  for (auto ch : ident) {
+    if (ch == ' ') {
+      buffer.push_back(0xc2);
+      buffer.push_back(0xa0);
+    } else {
+      buffer.push_back(ch);
+    }
+  }
+  buffer.push_back('`');
 }
 
 void Mangler::dump() const {

@@ -1,8 +1,8 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs/custom-modules
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -print-diagnostic-groups -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -print-diagnostic-groups -parse-as-library -I %S/Inputs/custom-modules
 
 import ObjcAsync
 
@@ -89,15 +89,26 @@ func defaultedParamsEnd4(newArg: Int, arg: Int = 0) async { }
 @available(macOS, deprecated: 12, renamed: "manyAttrsOld()")
 @available(*, deprecated)
 func manyAttrs(completionHandler: @escaping () -> Void) { }
+
 // expected-note@+2 {{'manyAttrsNew()' declared here}}
 @available(SwiftStdlib 5.5, *)
 func manyAttrsNew() async { }
 
-@available(macOS, introduced: 12, renamed: "platformOnlyNew()")
-func platformOnly(completionHandler: @escaping () -> Void) { }
-// expected-note@+2 {{'platformOnlyNew()' declared here}}
 @available(SwiftStdlib 5.5, *)
-func platformOnlyNew() async { }
+func manyAttrsNewOther() async { }
+
+@available(macOS, introduced: 12, renamed: "macOSOnlyNew()")
+func macOSOnly(completionHandler: @escaping () -> Void) { }
+// expected-note@+2 {{'macOSOnlyNew()' declared here}}
+@available(SwiftStdlib 5.5, *)
+func macOSOnlyNew() async { }
+
+@available(iOS, introduced: 15, renamed: "iOSOnlyNew()")
+func iOSOnly(completionHandler: @escaping () -> Void) { }
+// expected-note@+2 {{'iOSOnlyNew()' declared here}}
+@available(SwiftStdlib 5.5, *)
+func iOSOnlyNew() async { }
+
 
 @available(SwiftStdlib 5.5, *)
 struct AnotherStruct {
@@ -275,10 +286,12 @@ func asyncContext(t: HandlerTest) async {
   // expected-warning@+1{{consider using asynchronous alternative function}}
   defaultedParamsEnd4(arg: 1) { }
   // expected-warning@+2{{consider using asynchronous alternative function}}
-  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated}}
+  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated [DeprecatedDeclaration]}}
   manyAttrs() { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
-  platformOnly() { }
+  macOSOnly() { }
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  iOSOnly() { }
 
   // These don't get the warning because we failed to resolve the name to a
   // single async decl

@@ -74,9 +74,10 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-enable-experimental-feature" "RawLayout"
   "-enable-experimental-feature" "StaticExclusiveOnly"
   "-enable-experimental-feature" "Extern"
+  "-strict-memory-safety"
 )
 
-add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
   ${SWIFT_SYNCHRONIZATION_SOURCES}
 
   GYB_SOURCES

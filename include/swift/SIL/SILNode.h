@@ -127,7 +127,9 @@ public:
   enum { NumMarkDependenceKindBits = 2 };
 
   enum { numCustomBits = 20 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 protected:
   friend class SILInstruction;
@@ -283,8 +285,8 @@ protected:
                  pointerEscape : 1,
                  fromVarDecl : 1);
 
-    SHARED_FIELD(MarkDependenceInst, uint8_t
-                 dependenceKind : NumMarkDependenceKindBits);
+    SHARED_TEMPLATE2_FIELD(SILInstructionKind, typename, MarkDependenceInstBase,
+                           uint8_t dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
@@ -317,6 +319,7 @@ protected:
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
                  parameterPack : 1);
+    SHARED_FIELD(MergeRegionIsolationInst, uint32_t numOperands);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;

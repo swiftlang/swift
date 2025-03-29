@@ -4,6 +4,7 @@
 
 // Fails without optimized stdlib (rdar://119899895)
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // The `StaticString("hello").utf8Start` test fails on 32 bit
 // UNSUPPORTED: PTRSIZE=32

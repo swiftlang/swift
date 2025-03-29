@@ -32,14 +32,10 @@ namespace swift {
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   llvm::raw_ostream &Stream;
   bool ForceColors = false;
-  bool PrintEducationalNotes = false;
   bool EmitMacroExpansionFiles = false;
   bool DidErrorOccur = false;
   DiagnosticOptions::FormattingStyle FormattingStyle =
       DiagnosticOptions::FormattingStyle::LLVM;
-  // Educational notes which are buffered until the consumer is finished
-  // constructing a snippet.
-  SmallVector<std::string, 1> BufferedEducationalNotes;
   bool SuppressOutput = false;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -63,10 +59,6 @@ public:
   void forceColors() {
     ForceColors = true;
     llvm::sys::Process::UseANSIEscapeCodes(true);
-  }
-
-  void setPrintEducationalNotes(bool ShouldPrint) {
-    PrintEducationalNotes = ShouldPrint;
   }
 
   void setFormattingStyle(DiagnosticOptions::FormattingStyle style) {

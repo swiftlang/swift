@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -43,7 +44,19 @@ extension Context {
     }
   }
 
+  var currentModuleContext: ModuleDecl {
+    _bridged.getCurrentModuleContext().getAs(ModuleDecl.self)
+  }
+
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
+
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  var enableWMORequiredDiagnostics: Bool {
+    _bridged.enableWMORequiredDiagnostics()
+  }
 
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     _bridged.canMakeStaticObjectReadOnly(objectType.bridged)
@@ -59,6 +72,26 @@ extension Context {
     name._withBridgedStringRef {
       _bridged.lookupFunction($0).function
     }
+  }
+
+  func lookupWitnessTable(for conformance: Conformance) -> WitnessTable? {
+    return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
+  }
+
+  func lookupVTable(for classDecl: NominalTypeDecl) -> VTable? {
+    return _bridged.lookupVTable(classDecl.bridged).vTable
+  }
+
+  func lookupSpecializedVTable(for classType: Type) -> VTable? {
+    return _bridged.lookupSpecializedVTable(classType.bridged).vTable
+  }
+
+  func getSpecializedConformance(of genericConformance: Conformance,
+                                 for type: AST.`Type`,
+                                 substitutions: SubstitutionMap) -> Conformance
+  {
+    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
+    return Conformance(bridged: c)
   }
 
   func notifyNewFunction(function: Function, derivedFrom: Function) {
@@ -130,6 +163,12 @@ extension MutatingContext {
       }
     }
     erase(instruction: inst)
+  }
+
+  func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
+    for inst in instructions {
+      erase(instruction: inst)
+    }
   }
 
   func erase(instructionIncludingDebugUses inst: Instruction) {
@@ -206,6 +245,14 @@ extension MutatingContext {
     }
   }
 
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
+  }
+
   private func notifyNewInstructions(from: Instruction, to: Instruction) {
     var inst = from
     while inst != to {
@@ -221,7 +268,7 @@ extension MutatingContext {
   }
 
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
-    SubstitutionMap(_bridged.getContextSubstitutionMap(type.bridged))
+    SubstitutionMap(bridged: _bridged.getContextSubstitutionMap(type.bridged))
   }
 
   func notifyInstructionsChanged() {
@@ -274,7 +321,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   var swiftArrayDecl: NominalTypeDecl {
-    NominalTypeDecl(_bridged: _bridged.getSwiftArrayDecl())
+    _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
@@ -282,14 +329,6 @@ struct FunctionPassContext : MutatingContext {
       let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
       return _bridged.loadFunction(nameStr, loadCalleesRecursively).function
     }
-  }
-
-  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
-    if function.isDefinition {
-      return true
-    }
-    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
-    return function.isDefinition
   }
 
   /// Looks up a function in the `Swift` module.
@@ -311,14 +350,6 @@ struct FunctionPassContext : MutatingContext {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
   }
 
-  func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if _bridged.optimizeMemoryAccesses(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
-  }
-
   func eliminateDeadAllocations(in function: Function) -> Bool {
     if _bridged.eliminateDeadAllocations(function.bridged) {
       notifyInstructionsChanged()
@@ -327,15 +358,17 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
-  func specializeVTable(for type: Type, in function: Function) -> VTable? {
-    guard let vtablePtr = _bridged.specializeVTableForType(type.bridged, function.bridged) else {
-      return nil
-    }
-    return VTable(bridged: BridgedVTable(vTable: vtablePtr))
-  }
-
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
     if _bridged.specializeClassMethodInst(cm.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
+  func specializeWitnessMethodInst(_ wm: WitnessMethodInst) -> Bool {
+    if _bridged.specializeWitnessMethodInst(wm.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true
@@ -368,9 +401,9 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
+  func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, isPrivate)
+      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
     }
     return gv.globalVar
   }
@@ -398,6 +431,14 @@ struct FunctionPassContext : MutatingContext {
       defer { _bridged.deinitializedNestedPassContext() }
 
       return buildFn(specializedFunction, nestedFunctionPassContext)
+  }
+
+  /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
+  /// Inserts destroys in dead-end blocks if those are missing.
+  func completeLifetime(of value: Value) {
+    if _bridged.completeLifetime(value.bridged) {
+      notifyInstructionsChanged()
+    }
   }
 }
 
@@ -597,6 +638,13 @@ extension BasicBlock {
   }
 }
 
+extension Argument {
+  func set(reborrow: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setReborrow(reborrow)
+  }
+}
+
 extension AllocRefInstBase {
   func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
@@ -616,6 +664,12 @@ extension Sequence where Element == Operand {
 extension Operand {
   func set(to value: Value, _ context: some MutatingContext) {
     instruction.setOperand(at: index, to: value, context)
+  }
+
+  func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
   }
 }
 
@@ -689,6 +743,14 @@ extension LoadInst {
   }
 }
 
+extension PointerToAddressInst {
+  func set(alignment: Int?, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
+    context.notifyInstructionChanged(self)
+  }
+}
+
 extension TermInst {
   func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyBranchesChanged()
@@ -731,5 +793,11 @@ extension Function {
   func appendNewBlock(_ context: FunctionPassContext) -> BasicBlock {
     context.notifyBranchesChanged()
     return context._bridged.appendBlock(bridged).block
+  }
+}
+
+extension DeclRef {
+  func calleesAreStaticallyKnowable(_ context: some Context) -> Bool {
+    context._bridged.calleesAreStaticallyKnowable(bridged)
   }
 }

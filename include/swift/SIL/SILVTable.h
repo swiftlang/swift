@@ -205,6 +205,8 @@ public:
     NumEntries = std::distance(Entries.begin(), end);
   }
 
+  void replaceEntries(ArrayRef<Entry> newEntries);
+
   /// Verify that the vtable is well-formed for the given class.
   void verify(const SILModule &M) const;
 

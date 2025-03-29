@@ -13,7 +13,7 @@
 // RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t#%swift-plugin-server
 
 // RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
-// RUN: llvm-cas -cas %t/cas -ls-tree-recursive @%t/fs.casid | %FileCheck %s --check-prefix=FS
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
 // RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
@@ -49,12 +49,23 @@ public struct CallDeprecatedMacro: ExpressionMacro {
   }
 }
 
+public struct ToMyWarningMacro: ExpressionMacro {
+   public static func expansion(
+     of macro: some FreestandingMacroExpansionSyntax,
+     in context: some MacroExpansionContext
+   ) throws -> ExprSyntax {
+     return "#myWarning(\"\")"
+  }
+}
+
 //--- main.swift
 @freestanding(expression) macro myWarning(_ message: String) = #externalMacro(module: "MacroDefinition", type: "CallDeprecatedMacro")
+@freestanding(expression) macro toMyWarning(_ message: String) = #externalMacro(module: "MacroDefinition", type: "ToMyWarningMacro")
 
 @available(*, deprecated)
 func testDeprecated() {}
 
 func testDiscardableStringify(x: Int) {
+  #toMyWarning("this is a warning")
   #myWarning("this is a warning")
 }

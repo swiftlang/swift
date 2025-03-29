@@ -149,6 +149,12 @@ namespace swift {
     llvm::PreservedAnalyses run(llvm::Module &M,
                                 llvm::ModuleAnalysisManager &AM);
   };
+
+  struct AsyncEntryReturnMetadataPass
+      : public llvm::PassInfoMixin<AsyncEntryReturnMetadataPass> {
+    llvm::PreservedAnalyses run(llvm::Module &M,
+                                llvm::ModuleAnalysisManager &AM);
+  };
 } // end namespace swift
 
 #endif

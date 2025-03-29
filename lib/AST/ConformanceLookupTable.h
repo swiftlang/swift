@@ -21,6 +21,8 @@
 #define SWIFT_AST_CONFORMANCE_LOOKUP_TABLE_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/ConformanceAttributes.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -88,13 +90,9 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
     ConformanceEntryKind Kind;
 
-    /// The location of the "unchecked" attribute, if there is one.
-    SourceLoc uncheckedLoc;
+    ConformanceAttributes attributes;
 
-    /// The location of the "preconcurrency" attribute, if there is one.
-    SourceLoc preconcurrencyLoc;
-
-    ConformanceSource(void *ptr, ConformanceEntryKind kind) 
+    ConformanceSource(void *ptr, ConformanceEntryKind kind)
       : Storage(ptr), Kind(kind) { }
 
   public:
@@ -136,21 +134,31 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return ConformanceSource(dc, ConformanceEntryKind::PreMacroExpansion);
     }
 
-    /// Return a new conformance source with the given location of "@unchecked".
-    ConformanceSource withUncheckedLoc(SourceLoc uncheckedLoc) {
+    /// Return a new conformance source with the given conformance
+    /// attributes.
+    ConformanceSource withAttributes(ConformanceAttributes attributes) {
       ConformanceSource result(*this);
-      if (uncheckedLoc.isValid())
-        result.uncheckedLoc = uncheckedLoc;
+      result.attributes |= attributes;
       return result;
     }
 
-    /// Return a new conformance source with the given location of
-    /// "@preconcurrency".
-    ConformanceSource withPreconcurrencyLoc(SourceLoc preconcurrencyLoc) {
-      ConformanceSource result(*this);
-      if (preconcurrencyLoc.isValid())
-        result.preconcurrencyLoc = preconcurrencyLoc;
-      return result;
+    ConformanceAttributes getAttributes() const {
+      return attributes;
+    }
+
+    ProtocolConformanceOptions getOptions() const {
+      ProtocolConformanceOptions options;
+      if (getUncheckedLoc().isValid())
+        options |= ProtocolConformanceFlags::Unchecked;
+      if (getPreconcurrencyLoc().isValid())
+        options |= ProtocolConformanceFlags::Preconcurrency;
+      if (getUnsafeLoc().isValid())
+        options |= ProtocolConformanceFlags::Unsafe;
+      if (getNonisolatedLoc().isValid())
+        options |= ProtocolConformanceFlags::Nonisolated;
+      if (attributes.globalActorType)
+        options.setGlobalActorIsolation(attributes.globalActorType);
+      return options;
     }
 
     /// Retrieve the kind of conformance formed from this source.
@@ -193,11 +201,21 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
     /// The location of the @unchecked attribute, if any.
     SourceLoc getUncheckedLoc() const {
-      return uncheckedLoc;
+      return attributes.uncheckedLoc;
     }
 
     SourceLoc getPreconcurrencyLoc() const {
-      return preconcurrencyLoc;
+      return attributes.preconcurrencyLoc;
+    }
+
+    /// The location of the @unsafe attribute, if any.
+    SourceLoc getUnsafeLoc() const {
+      return attributes.unsafeLoc;
+    }
+
+    /// The location of the isolated modifier, if any.
+    SourceLoc getNonisolatedLoc() const {
+      return attributes.nonisolatedLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration

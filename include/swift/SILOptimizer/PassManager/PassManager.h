@@ -69,6 +69,8 @@ class SwiftPassInvocation {
   SILAnalysis::InvalidationKind changeNotifications =
       SILAnalysis::InvalidationKind::Nothing;
 
+  bool functionTablesChanged = false;
+
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
@@ -140,6 +142,8 @@ public:
 
   /// Called by the pass when changes are made to the SIL.
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
+
+  void notifyFunctionTablesChanged();
 
   /// Called by the pass manager before the pass starts running.
   void startModulePassRun(SILModuleTransform *transform);
@@ -248,7 +252,7 @@ class SILPassManager {
   /// A mask which has one bit for each pass. A one for a pass-bit means that
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
-  typedef std::bitset<(size_t)PassKind::AllPasses_Last + 1> CompletedPasses;
+  typedef std::bitset<(size_t)PassKind::numPasses> CompletedPasses;
   
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
@@ -440,11 +444,13 @@ public:
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
-  bool continueWithNextSubpassRun(SILInstruction *forInst, SILFunction *function,
-                                  SILTransform *trans);
+  using Transformee = llvm::PointerUnion<SILValue, SILInstruction *>;
+  bool continueWithNextSubpassRun(std::optional<Transformee> forTransformee,
+                                  SILFunction *function, SILTransform *trans);
 
   static bool isPassDisabled(StringRef passName);
   static bool isInstructionPassDisabled(StringRef instName);
+  static bool isAnyPassDisabled();
   static bool disablePassesForFunction(SILFunction *function);
 
   /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
@@ -512,6 +518,9 @@ inline void SwiftPassInvocation::
 notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
     changeNotifications = (SILAnalysis::InvalidationKind)
         (changeNotifications | invalidationKind);
+}
+inline void SwiftPassInvocation::notifyFunctionTablesChanged() {
+  functionTablesChanged = true;
 }
 
 } // end namespace swift

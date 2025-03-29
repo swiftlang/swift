@@ -29,6 +29,7 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -160,6 +161,7 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DefaultOverrideTableListType = llvm::ilist<SILDefaultOverrideTable>;
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
   using SILMoveOnlyDeinitListType = llvm::ArrayRef<SILMoveOnlyDeinit *>;
@@ -184,6 +186,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDefaultOverrideTable;
   friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
@@ -252,7 +255,7 @@ private:
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
-  llvm::DenseMap<const RootProtocolConformance *, SILWitnessTable *>
+  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;
 
   /// The list of SILWitnessTables in the module.
@@ -264,6 +267,12 @@ private:
 
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
+
+  /// Lookup table for SIL default override tables from classes.
+  llvm::DenseMap<const ClassDecl *, SILDefaultOverrideTable *>
+      DefaultOverrideTableMap;
+
+  DefaultOverrideTableListType defaultOverrideTables;
 
   /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
   llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
@@ -398,6 +407,10 @@ private:
   ActionCallback SerializeSILAction;
 
   BasicBlockNameMapType basicBlockNames;
+
+  // Specialization attributes which need to be added to a function once it is created.
+  // The key of this map is the function name.
+  llvm::StringMap<std::vector<SILSpecializeAttr *>> pendingSpecializeAttrs;
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
@@ -644,6 +657,13 @@ public:
     return {functions.begin(), functions.end()};
   }
 
+  /// Move \p fn to be in the function list before \p moveBefore.
+  void moveBefore(SILModule::iterator moveBefore, SILFunction *fn);
+
+  /// Move \p fn to be in the function list after \p moveAfter. It is assumed
+  /// that \p moveAfter is not end.
+  void moveAfter(SILModule::iterator moveAfter, SILFunction *fn);
+
   const_iterator zombies_begin() const { return zombieFunctions.begin(); }
   const_iterator zombies_end() const { return zombieFunctions.end(); }
 
@@ -704,6 +724,22 @@ public:
   }
   iterator_range<default_witness_table_const_iterator> getDefaultWitnessTables() const {
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
+  }
+
+  using default_override_table_iterator = DefaultOverrideTableListType::iterator;
+  using default_override_table_const_iterator = DefaultOverrideTableListType::const_iterator;
+  DefaultOverrideTableListType &getDefaultOverrideTableList() { return defaultOverrideTables; }
+  const DefaultOverrideTableListType &getDefaultOverrideTableList() const { return defaultOverrideTables; }
+  default_override_table_iterator default_override_table_begin() { return defaultOverrideTables.begin(); }
+  default_override_table_iterator default_override_table_end() { return defaultOverrideTables.end(); }
+  default_override_table_const_iterator default_override_table_begin() const { return defaultOverrideTables.begin(); }
+  default_override_table_const_iterator default_override_table_end() const { return defaultOverrideTables.end(); }
+  iterator_range<default_override_table_iterator> getDefaultOverrideTables() {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
+  }
+  iterator_range<default_override_table_const_iterator>
+  getDefaultOverrideTables() const {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
   }
 
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
@@ -846,6 +882,7 @@ public:
   std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                SILDeclRef Requirement,
+                               bool lookupInSpecializedWitnessTable,
                                SILModule::LinkingMode linkingMode);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
@@ -858,6 +895,12 @@ public:
   lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
                                       SILDeclRef Requirement,
                                       bool deserializeLazily=true);
+
+  /// Look up the SILDefaultOverrideTable containing the default overrides to be
+  /// applied to subclasses of a resilient class.
+  SILDefaultOverrideTable *
+  lookUpDefaultOverrideTable(const ClassDecl *decl,
+                             bool deserializeLazily = true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
@@ -901,6 +944,12 @@ public:
 
   /// Deletes a dead witness table.
   void deleteWitnessTable(SILWitnessTable *Wt);
+
+  /// Define a default override table for the indicated resilient class \p decl
+  /// consisting of the specified \p entries.
+  SILDefaultOverrideTable *createDefaultOverrideTableDefinition(
+      const ClassDecl *decl, SILLinkage linkage,
+      ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
   /// Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
@@ -1044,6 +1093,10 @@ public:
   /// See scheduledForDeletion for details.
   void flushDeletedInsts();
 
+  bool hasInstructionsScheduledForDeletion() const {
+    return !scheduledForDeletion.empty();
+  }
+
   /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
@@ -1073,6 +1126,10 @@ public:
   /// Gather prespecialized from extensions.
   void performOnceForPrespecializedImportedExtensions(
       llvm::function_ref<void(AbstractFunctionDecl *)> action);
+
+  void addPendingSpecializeAttr(StringRef functionName, SILSpecializeAttr *attr) {
+    pendingSpecializeAttrs[functionName].push_back(attr);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
@@ -1113,6 +1170,9 @@ namespace Lowering {
 /// Determine whether the given class will be allocated/deallocated using the
 /// Objective-C runtime, i.e., +alloc and -dealloc.
 LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
+/// Determine if isolating destructor is needed.
+LLVM_LIBRARY_VISIBILITY bool needsIsolatingDestructor(DestructorDecl *dd);
+
 } // namespace Lowering
 } // namespace swift
 

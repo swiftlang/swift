@@ -12,7 +12,9 @@
 
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -96,7 +98,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, getterType, importedDecl, clangNode);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setAccess(importedFieldDecl->getFormalAccess());
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
 
@@ -127,8 +129,9 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       params, voidTy, importedDecl, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
-  setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  setterDecl->setAccess(AccessLevel::Public);
+  if (!isa<ClassDecl>(importedDecl))
+    setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+  setterDecl->setAccess(importedFieldDecl->getFormalAccess());
 
   return setterDecl;
 }
@@ -192,9 +195,12 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
   }
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(
-    Identifier name, DeclContext *dc, Type type, const clang::APValue &value,
-    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN) {
+ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                                DeclContext *dc, Type type,
+                                                const clang::APValue &value,
+                                                ConstantConvertKind convertKind,
+                                                bool isStatic, ClangNode ClangN,
+                                                AccessLevel access) {
   auto &context = ImporterImpl.SwiftContext;
 
   // Create the integer literal value.
@@ -289,12 +295,16 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
   }
 
   assert(expr);
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN,
+                        access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(
-    Identifier name, DeclContext *dc, Type type, StringRef value,
-    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN) {
+ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                                DeclContext *dc, Type type,
+                                                StringRef value,
+                                                ConstantConvertKind convertKind,
+                                                bool isStatic, ClangNode ClangN,
+                                                AccessLevel access) {
   ASTContext &ctx = ImporterImpl.SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
@@ -304,7 +314,8 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
   expr->setBuiltinInitializer(ctx.getStringBuiltinInitDecl(stringDecl));
   expr->setType(literalType);
 
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN,
+                        access);
 }
 
 /// Synthesizer callback to synthesize the getter for a constant value.
@@ -381,15 +392,18 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
           /*isTypeChecked=*/true};
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(
-    Identifier name, DeclContext *dc, Type type, Expr *valueExpr,
-    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN) {
+ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                                DeclContext *dc, Type type,
+                                                Expr *valueExpr,
+                                                ConstantConvertKind convertKind,
+                                                bool isStatic, ClangNode ClangN,
+                                                AccessLevel access) {
   auto &C = ImporterImpl.SwiftContext;
 
   VarDecl *var = nullptr;
   if (ClangN) {
     var = ImporterImpl.createDeclWithClangNode<VarDecl>(
-        ClangN, AccessLevel::Public,
+        ClangN, access,
         /*IsStatic*/ isStatic, VarDecl::Introducer::Var, SourceLoc(), name, dc);
   } else {
     var = new (C) VarDecl(
@@ -494,10 +508,9 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
                       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                       /*ThrownType=*/TypeLoc(), emptyPL,
-                      /*GenericParams=*/nullptr, structDecl,
-                      /*LifetimeDependentTypeRepr*/ nullptr);
+                      /*GenericParams=*/nullptr, structDecl);
 
-  constructor->setAccess(AccessLevel::Public);
+  constructor->copyFormalAccessFrom(structDecl);
 
   // Mark the constructor transparent so that we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
@@ -625,10 +638,9 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                       /*ThrownType=*/TypeLoc(), paramList,
-                      /*GenericParams=*/nullptr, structDecl,
-                      /*LifetimeDependentTypeRepr*/ nullptr);
+                      /*GenericParams=*/nullptr, structDecl);
 
-  constructor->setAccess(AccessLevel::Public);
+  constructor->copyFormalAccessFrom(structDecl);
 
   // Make the constructor transparent so we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
@@ -738,7 +750,7 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
       computedVarName, structDecl);
   computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
-  computedVar->setAccess(AccessLevel::Public);
+  computedVar->copyFormalAccessFrom(structDecl);
   computedVar->setSetterAccess(AccessLevel::Private);
 
   // Create the getter for the computed value variable.
@@ -794,7 +806,7 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   std::tie(var, patternBinding) = createVarWithPattern(
       structDecl, ctx.Id_rawValue, underlyingType, introducer,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
-      AccessLevel::Public, setterAccess);
+      structDecl->getFormalAccess(), setterAccess);
 
   assert(var->hasStorage());
 
@@ -954,7 +966,7 @@ getAccessorDeclarationName(clang::ASTContext &Ctx, NominalTypeDecl *structDecl,
                            VarDecl *fieldDecl, const char *suffix) {
   std::string id;
   llvm::raw_string_ostream IdStream(id);
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(structDecl->getASTContext());
   IdStream << "$" << mangler.mangleDeclAsUSR(structDecl, "") << "$"
            << fieldDecl->getName() << "$" << suffix;
 
@@ -1273,10 +1285,9 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramPL,
-                              /*GenericParams=*/nullptr, enumDecl,
-                              /*LifetimeDependentTypeRepr*/ nullptr);
+                              /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
-  ctorDecl->setAccess(AccessLevel::Public);
+  ctorDecl->copyFormalAccessFrom(enumDecl);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
 }
@@ -1352,7 +1363,7 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
 
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->copyFormalAccessFrom(enumDecl);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
   ImporterImpl.makeComputed(rawValueDecl, getterDecl, nullptr);
 }
@@ -1416,7 +1427,7 @@ AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);
 
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->copyFormalAccessFrom(structDecl);
   getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
   return getterDecl;
 }
@@ -1696,7 +1707,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
       ctx, name, getterImpl->getLoc(), bodyParams, getterImpl->getLoc(),
       elementTy, dc, getterImpl->getGenericParams(),
       getterImpl->getClangNode());
-  subscript->setAccess(AccessLevel::Public);
+  subscript->copyFormalAccessFrom(getterImpl);
 
   AccessorDecl *getterDecl =
       AccessorDecl::create(ctx, getterImpl->getLoc(), getterImpl->getLoc(),
@@ -1704,7 +1715,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                            /*async*/ false, SourceLoc(),
                            /*throws*/ false, SourceLoc(),
                            /*ThrownType=*/TypeLoc(), bodyParams, elementTy, dc);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->copyFormalAccessFrom(subscript);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
@@ -1732,7 +1743,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
         /*async*/ false, SourceLoc(),
         /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
         setterParamList, TupleType::getEmpty(ctx), dc);
-    setterDecl->setAccess(AccessLevel::Public);
+    setterDecl->copyFormalAccessFrom(subscript);
     setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
@@ -1782,7 +1793,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
               getterImpl->getStartLoc(), ctx.getIdentifier("pointee"), dc);
   result->setInterfaceType(elementTy);
-  result->setAccess(AccessLevel::Public);
+  result->copyFormalAccessFrom(getterImpl);
 
   AccessorDecl *getterDecl = AccessorDecl::create(
       ctx, getterImpl->getLoc(), getterImpl->getLoc(),
@@ -1791,7 +1802,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
       /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
       ParameterList::createEmpty(ctx),
       useAddress ? elementTy->wrapInPointer(PTK_UnsafePointer) : elementTy, dc);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->copyFormalAccessFrom(getterImpl);
   if (isImplicit)
     getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
@@ -1830,7 +1841,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
         useAddress ? elementTy->wrapInPointer(PTK_UnsafeMutablePointer)
                    : TupleType::getEmpty(ctx),
         dc);
-    setterDecl->setAccess(AccessLevel::Public);
+    setterDecl->copyFormalAccessFrom(setterImpl);
     if (isImplicit)
       setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
@@ -1883,7 +1894,8 @@ synthesizeSuccessorFuncBody(AbstractFunctionDecl *afd, void *context) {
   std::tie(copyDecl, patternDecl) = SwiftDeclSynthesizer::createVarWithPattern(
       successorDecl, ctx.getIdentifier("__copy"), returnTy,
       VarDecl::Introducer::Var,
-      /*isImplicit*/ true, AccessLevel::Public, AccessLevel::Public);
+      /*isImplicit*/ true, successorDecl->getFormalAccess(),
+      successorDecl->getFormalAccess());
 
   auto copyRefLValueExpr = new (ctx) DeclRefExpr(copyDecl, DeclNameLoc(),
                                                  /*implicit*/ true);
@@ -1931,7 +1943,7 @@ FuncDecl *SwiftDeclSynthesizer::makeSuccessorFunc(FuncDecl *incrementFunc) {
       /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
       /*GenericParams*/ nullptr, params, returnTy, dc);
 
-  result->setAccess(AccessLevel::Public);
+  result->copyFormalAccessFrom(incrementFunc);
   result->setIsDynamic(false);
   result->setBodySynthesizer(synthesizeSuccessorFuncBody, incrementFunc);
 
@@ -2095,6 +2107,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   newMethod->setImplicit();
   newMethod->setImplicitlyInline();
   newMethod->setAccess(clang::AccessSpecifier::AS_public);
+  newMethod->addAttr(clang::NoDebugAttr::CreateImplicit(clangCtx));
   if (method->hasAttr<clang::CFReturnsRetainedAttr>()) {
     // Return an FRT field at +1 if the base method also follows this
     // convention.
@@ -2121,8 +2134,9 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
 
   // Construct the method's body.
-  clang::Expr *thisExpr = new (clangCtx) clang::CXXThisExpr(
-      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
+  clang::Expr *thisExpr = clang::CXXThisExpr::Create(
+      clangCtx, clang::SourceLocation(), newMethod->getThisType(),
+      /*IsImplicit=*/false);
   if (castThisToNonConstThis) {
     auto baseClassPtr =
         clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));
@@ -2213,7 +2227,11 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   newParams.push_back(lhsParam);
 
   for (auto param : *paramList) {
-    newParams.push_back(param);
+    auto clonedParam = ParamDecl::clone(ctx, param);
+    if (clonedParam->getParameterName().empty()) {
+      clonedParam->setName(ctx.getIdentifier("other"));
+    }
+    newParams.push_back(clonedParam);
   }
 
   auto oldArgNames = operatorMethod->getName().getArgumentNames();
@@ -2233,7 +2251,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
       genericParamList, ParameterList::create(ctx, newParams),
       operatorMethod->getResultInterfaceType(), parentCtx);
 
-  topLevelStaticFuncDecl->setAccess(AccessLevel::Public);
+  topLevelStaticFuncDecl->copyFormalAccessFrom(operatorMethod);
   topLevelStaticFuncDecl->setIsDynamic(false);
   topLevelStaticFuncDecl->setStatic();
   topLevelStaticFuncDecl->setBodySynthesizer(synthesizeOperatorMethodBody,
@@ -2343,7 +2361,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
       new (ctx) VarDecl(false, VarDecl::Introducer::Var, getter->getStartLoc(),
                         ctx.getIdentifier(importedName), dc);
   result->setInterfaceType(getter->getResultInterfaceType());
-  result->setAccess(AccessLevel::Public);
+  result->copyFormalAccessFrom(getter);
   result->setImplInfo(StorageImplInfo::getMutableComputed());
 
   AccessorDecl *getterDecl = AccessorDecl::create(
@@ -2352,7 +2370,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
       /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
       ParameterList::createEmpty(ctx),
       getter->getResultInterfaceType(), dc);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->copyFormalAccessFrom(getter);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
@@ -2377,7 +2395,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
         /*async*/ false, SourceLoc(),
         /*throws*/ false, SourceLoc(), /*thrownType*/ TypeLoc(),
         setterParamList, setter->getResultInterfaceType(), dc);
-    setterDecl->setAccess(AccessLevel::Public);
+    setterDecl->copyFormalAccessFrom(setter);
     setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
@@ -2504,7 +2522,7 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   auto declRefExpr = new (ctx)
       DeclRefExpr(ConcreteDeclRef(funcDecl), DeclNameLoc(), /*Implicit*/ true);
   declRefExpr->setType(funcDecl->getInterfaceType());
-  declRefExpr->setFunctionRefKind(FunctionRefKind::SingleApply);
+  declRefExpr->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
   auto callExpr = CallExpr::createImplicit(
       ctx, declRefExpr, ArgumentList::forImplicitUnlabeled(ctx, {}));

@@ -125,6 +125,18 @@ func test2() {
   // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
   _ = u2                // ok
+
+  // Array
+  var arr1: [String] // expected-note {{variable defined here}}
+  arr1.append("item") // expected-error {{variable 'arr1' used before being initialized}}
+  var arr2: [String] = []
+  arr2.append("item") // ok
+
+  // Dictionary
+  var d1: [String: Int] // expected-note {{variable defined here}}
+  d1["key"] = 1 // expected-error {{variable 'd1' used before being initialized}}
+  var d2: [String: Int] = [:]
+  d2["key"] = 1 // ok
 }
 
 
@@ -1483,8 +1495,7 @@ func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
             // expected-note@-2 {{constant defined here}}
 
   // note that here assignment to 'f' is a call to the setter.
-  x?.f = 0  // expected-error {{constant 'x' used before being initialized}}
-            // expected-error@-1 {{constant 'x' passed by reference before being initialized}}
+  x?.f = 0  // expected-error 2 {{constant 'x' used before being initialized}}
   return x  // expected-error {{constant 'x' used before being initialized}}
 }
 

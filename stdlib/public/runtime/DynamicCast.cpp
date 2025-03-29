@@ -87,7 +87,7 @@ typedef DynamicCastResult (tryCastFunctionType)(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances
 );
 
 // Forward-declare the main top-level `tryCast()` function
@@ -401,7 +401,7 @@ tryCastUnwrappingObjCSwiftValueSource(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
     id srcObject;
     memcpy(&srcObject, srcValue, sizeof(id));
@@ -422,7 +422,7 @@ tryCastUnwrappingObjCSwiftValueSource(
       destLocation, destType,
       const_cast<OpaqueValue *>(srcInnerValue), srcInnerType,
       destFailureType, srcFailureType,
-      /*takeOnSuccess=*/ false, mayDeferChecks);
+      /*takeOnSuccess=*/ false, mayDeferChecks, prohibitIsolatedConformances);
 }
 #else
 static DynamicCastResult
@@ -430,7 +430,7 @@ tryCastUnwrappingSwiftValueSource(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType->getKind() == MetadataKind::Class);
 
@@ -452,7 +452,7 @@ tryCastToSwiftClass(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Class);
@@ -496,7 +496,7 @@ tryCastToObjectiveCClass(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::ObjCClassWrapper);
@@ -546,7 +546,7 @@ tryCastToForeignClass(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
 #if SWIFT_OBJC_INTEROP
   assert(srcType != destType);
@@ -591,6 +591,17 @@ tryCastToForeignClass(
   return DynamicCastResult::Failure;
 }
 
+static DynamicCastResult tryCastToForeignReferenceType(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks,
+    bool prohibitIsolatedConformances) {
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::ForeignReferenceType);
+
+  return DynamicCastResult::Failure;
+}
+
 /******************************************************************************/
 /***************************** Enum Destination *******************************/
 /******************************************************************************/
@@ -600,7 +611,7 @@ tryCastToEnum(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   // Note: Optional is handled elsewhere
@@ -773,7 +784,7 @@ tryCastToAnyHashable(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
@@ -849,7 +860,7 @@ tryCastToArray(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
@@ -889,7 +900,7 @@ tryCastToDictionary(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
@@ -930,7 +941,7 @@ tryCastToSet(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
@@ -972,7 +983,7 @@ tryCastToString(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
@@ -1003,7 +1014,7 @@ tryCastToStruct(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Struct);
@@ -1026,7 +1037,7 @@ tryCastToOptional(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Optional);
@@ -1100,7 +1111,7 @@ tryCastUnwrappingOptionalBoth(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(destType->getKind() == MetadataKind::Optional);
   assert(srcType->getKind() == MetadataKind::Optional);
@@ -1124,7 +1135,8 @@ tryCastUnwrappingOptionalBoth(
     auto destInnerLocation = destLocation; // Single-payload enum layout
     auto subcastResult = tryCast(
       destInnerLocation, destInnerType, srcValue, srcInnerType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       destInnerType->vw_storeEnumTagSinglePayload(
         destLocation, /*case*/ 0, /*emptyCases*/ 1);
@@ -1143,7 +1155,7 @@ tryCastUnwrappingOptionalDestination(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(destType->getKind() == MetadataKind::Optional);
 
@@ -1152,7 +1164,8 @@ tryCastUnwrappingOptionalDestination(
   auto destInnerLocation = destLocation; // Single-payload enum layout
   auto subcastResult = tryCast(
     destInnerLocation, destInnerType, srcValue, srcType,
-    destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+    destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+    prohibitIsolatedConformances);
   if (isSuccess(subcastResult)) {
     destInnerType->vw_storeEnumTagSinglePayload(
       destLocation, /*case*/ 0, /*emptyCases*/ 1);
@@ -1169,7 +1182,7 @@ tryCastUnwrappingOptionalSource(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType->getKind() == MetadataKind::Optional);
 
@@ -1180,7 +1193,8 @@ tryCastUnwrappingOptionalSource(
   if (nonNil) {
     // Recurse with unwrapped source
     return tryCast(destLocation, destType, srcValue, srcInnerType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
   }
   return DynamicCastResult::Failure;
 }
@@ -1198,7 +1212,7 @@ tryCastToTuple(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Tuple);
@@ -1274,7 +1288,8 @@ tryCastToTuple(
       auto subcastResult = tryCast(destElt.findIn(destLocation), destElt.Type,
                                    srcElt.findIn(srcValue), srcElt.Type,
                                    destFailureType, srcFailureType,
-                                   false, mayDeferChecks);
+                                   false, mayDeferChecks,
+                                   prohibitIsolatedConformances);
       if (subcastResult == DynamicCastResult::Failure) {
         for (unsigned k = 0; k != j; ++k) {
           const auto &elt = destTupleType->getElement(k);
@@ -1300,7 +1315,7 @@ tryCastToFunction(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Function);
@@ -1362,7 +1377,8 @@ tryCastToFunction(
 static bool _conformsToProtocols(const OpaqueValue *value,
                                  const Metadata *type,
                                  const ExistentialTypeMetadata *existentialType,
-                                 const WitnessTable **conformances) {
+                                 const WitnessTable **conformances,
+                                 bool prohibitIsolatedConformances) {
   if (auto *superclass = existentialType->getSuperclassConstraint()) {
     if (!swift_dynamicCastMetatype(type, superclass))
       return false;
@@ -1374,7 +1390,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!swift::_conformsToProtocol(value, type, protocol, conformances))
+    if (!swift::_conformsToProtocolInContext(
+            value, type, protocol, conformances, prohibitIsolatedConformances))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
@@ -1391,7 +1408,7 @@ tryCastToUnconstrainedOpaqueExistential(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Existential);
@@ -1418,7 +1435,7 @@ tryCastToConstrainedOpaqueExistential(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Existential);
@@ -1432,10 +1449,12 @@ tryCastToConstrainedOpaqueExistential(
   // TODO (rdar://17033499) If the source is an existential, we should
   // be able to compare the protocol constraints more efficiently than this.
   if (_conformsToProtocols(srcValue, srcType, destExistentialType,
-                           destExistential->getWitnessTables())) {
+                           destExistential->getWitnessTables(),
+                           prohibitIsolatedConformances)) {
     return tryCastToUnconstrainedOpaqueExistential(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
   } else {
     return DynamicCastResult::Failure;
   }
@@ -1446,7 +1465,7 @@ tryCastToClassExistential(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Existential);
@@ -1469,7 +1488,8 @@ tryCastToClassExistential(
       auto value = reinterpret_cast<OpaqueValue *>(&tmp);
       auto type = reinterpret_cast<const Metadata *>(tmp);
       if (_conformsToProtocols(value, type, destExistentialType,
-                               destExistentialLocation->getWitnessTables())) {
+                               destExistentialLocation->getWitnessTables(),
+                               prohibitIsolatedConformances)) {
         auto object = *(reinterpret_cast<HeapObject **>(value));
         destExistentialLocation->Value = object;
         if (takeOnSuccess) {
@@ -1518,7 +1538,8 @@ tryCastToClassExistential(
     }
     if (_conformsToProtocols(srcValue, srcType,
                              destExistentialType,
-                             destExistentialLocation->getWitnessTables())) {
+                             destExistentialLocation->getWitnessTables(),
+                             prohibitIsolatedConformances)) {
       destExistentialLocation->Value = srcObject;
       if (takeOnSuccess) {
         return DynamicCastResult::SuccessViaTake;
@@ -1635,7 +1656,7 @@ tryCastToErrorExistential(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Existential);
@@ -1654,7 +1675,8 @@ tryCastToErrorExistential(
     assert(destExistentialType->NumProtocols == 1);
     const WitnessTable *errorWitness;
     if (_conformsToProtocols(
-          srcValue, srcType, destExistentialType, &errorWitness)) {
+            srcValue, srcType, destExistentialType, &errorWitness,
+            prohibitIsolatedConformances)) {
 #if SWIFT_OBJC_INTEROP
       // If it already holds an NSError, just use that.
       if (auto embedded = getErrorEmbeddedNSErrorIndirect(
@@ -1686,7 +1708,7 @@ tryCastUnwrappingExistentialSource(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(srcType->getKind() == MetadataKind::Existential);
@@ -1727,13 +1749,14 @@ tryCastUnwrappingExistentialSource(
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
                  takeOnSuccess && (srcInnerValue == srcValue),
-                 mayDeferChecks);
+                 mayDeferChecks, prohibitIsolatedConformances);
 }
 
 static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
     OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
     const Metadata *srcType, const Metadata *&destFailureType,
-    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks,
+    bool prohibitIsolatedConformances) {
   assert(srcType != destType);
   assert(srcType->getKind() == MetadataKind::ExtendedExistential);
 
@@ -1773,7 +1796,8 @@ static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
   srcFailureType = srcInnerType;
   return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks);
+                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks,
+                 prohibitIsolatedConformances);
 }
 
 static DynamicCastResult
@@ -1781,7 +1805,7 @@ tryCastUnwrappingExistentialMetatypeSource(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(srcType->getKind() == MetadataKind::ExistentialMetatype);
@@ -1796,14 +1820,15 @@ tryCastUnwrappingExistentialMetatypeSource(
                  srcInnerValue, srcInnerType,
                  destFailureType, srcFailureType,
                  takeOnSuccess && (srcInnerValue == srcValue),
-                 mayDeferChecks);
+                 mayDeferChecks, prohibitIsolatedConformances);
 }
 
 
 static DynamicCastResult tryCastToExtendedExistential(
     OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
     const Metadata *srcType, const Metadata *&destFailureType,
-    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks,
+    bool prohibitIsolatedConformances) {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::ExtendedExistential);
 
@@ -1856,6 +1881,7 @@ static DynamicCastResult tryCastToExtendedExistential(
                                                      allGenericArgsVec.data());
     // Verify the requirements in the requirement signature against the
     // arguments from the source value.
+    ConformanceExecutionContext context;
     auto requirementSig = destExistentialShape->getRequirementSignature();
     auto error = swift::_checkGenericRequirements(
         requirementSig.getParams(),
@@ -1869,8 +1895,16 @@ static DynamicCastResult tryCastToExtendedExistential(
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
-        });
+        },
+        &context);
     if (error)
+      return DynamicCastResult::Failure;
+
+    if (prohibitIsolatedConformances &&
+        context.globalActorIsolationType)
+      return DynamicCastResult::Failure;
+
+    if (!swift_isInConformanceExecutionContext(selfType, &context))
       return DynamicCastResult::Failure;
   }
 
@@ -1935,7 +1969,7 @@ tryCastToOpaque(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Opaque);
@@ -1974,7 +2008,7 @@ tryCastToMetatype(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::Metatype);
@@ -2007,7 +2041,8 @@ tryCastToMetatype(
       auto srcInnerValue = reinterpret_cast<OpaqueValue *>(&metatype);
       auto srcInnerType = swift_getMetatypeMetadata(metatype);
       return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
-        destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+        destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+        prohibitIsolatedConformances);
     }
 #endif
     return DynamicCastResult::Failure;
@@ -2024,7 +2059,7 @@ _dynamicCastMetatypeToExistentialMetatype(
   OpaqueValue *destLocation,  const ExistentialMetatypeMetadata *destType,
   const Metadata *srcMetatype,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   // The instance type of an existential metatype must be either an
   // existential or an existential metatype.
@@ -2041,7 +2076,7 @@ _dynamicCastMetatypeToExistentialMetatype(
       = destMetatype ? destMetatype->getWitnessTables() : nullptr;
     if (!_conformsToProtocols(nullptr, srcMetatype,
                               targetInstanceTypeAsExistential,
-                              conformance)) {
+                              conformance, prohibitIsolatedConformances)) {
       return DynamicCastResult::Failure;
     }
 
@@ -2080,7 +2115,7 @@ _dynamicCastMetatypeToExistentialMetatype(
     srcInstanceType,
     destFailureType,
     srcFailureType,
-    takeOnSuccess, mayDeferChecks);
+    takeOnSuccess, mayDeferChecks, prohibitIsolatedConformances);
 }
 
 // "ExistentialMetatype" is the metatype for an existential type.
@@ -2089,7 +2124,7 @@ tryCastToExistentialMetatype(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   assert(srcType != destType);
   assert(destType->getKind() == MetadataKind::ExistentialMetatype);
@@ -2106,7 +2141,7 @@ tryCastToExistentialMetatype(
       srcMetatype,
       destFailureType,
       srcFailureType,
-      takeOnSuccess, mayDeferChecks);
+      takeOnSuccess, mayDeferChecks, prohibitIsolatedConformances);
   }
 
   case MetadataKind::ObjCClassWrapper: {
@@ -2126,7 +2161,7 @@ tryCastToExistentialMetatype(
         metatype,
         destFailureType,
         srcFailureType,
-        takeOnSuccess, mayDeferChecks);
+        takeOnSuccess, mayDeferChecks, prohibitIsolatedConformances);
     }
 #endif
     return DynamicCastResult::Failure;
@@ -2187,6 +2222,8 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
     return tryCastToOptional;
   case MetadataKind::ForeignClass:
     return tryCastToForeignClass;
+  case MetadataKind::ForeignReferenceType:
+    return tryCastToForeignReferenceType;
   case MetadataKind::Opaque:
     return tryCastToOpaque;
   case MetadataKind::Tuple:
@@ -2244,7 +2281,7 @@ tryCast(
   OpaqueValue *destLocation, const Metadata *destType,
   OpaqueValue *srcValue, const Metadata *srcType,
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
-  bool takeOnSuccess, bool mayDeferChecks)
+  bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
   destFailureType = destType;
   srcFailureType = srcType;
@@ -2277,7 +2314,8 @@ tryCast(
     return DynamicCastResult::Failure;
   }
   auto castResult = tryCastToDestType(destLocation, destType, srcValue,
-    srcType, destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+    srcType, destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+    prohibitIsolatedConformances);
   if (isSuccess(castResult)) {
     return castResult;
   }
@@ -2294,7 +2332,8 @@ tryCast(
         srcFailureType = srcDynamicType;
         auto castResult = tryCastToDestType(
           destLocation, destType, srcValue, srcDynamicType,
-          destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+          destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+          prohibitIsolatedConformances);
         if (isSuccess(castResult)) {
           return castResult;
         }
@@ -2314,7 +2353,8 @@ tryCast(
     // Try unwrapping native __SwiftValue implementation
     auto subcastResult = tryCastUnwrappingSwiftValueSource(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2327,7 +2367,8 @@ tryCast(
     // Try unwrapping Obj-C __SwiftValue implementation
     auto subcastResult = tryCastUnwrappingObjCSwiftValueSource(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2361,7 +2402,8 @@ tryCast(
   case MetadataKind::Existential: {
     auto subcastResult = tryCastUnwrappingExistentialSource(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2371,7 +2413,8 @@ tryCast(
   case MetadataKind::ExistentialMetatype: {
     auto subcastResult = tryCastUnwrappingExistentialMetatypeSource(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2381,7 +2424,8 @@ tryCast(
   case MetadataKind::ExtendedExistential: {
     auto subcastResult = tryCastUnwrappingExtendedExistentialSource(
         destLocation, destType, srcValue, srcType, destFailureType,
-        srcFailureType, takeOnSuccess, mayDeferChecks);
+        srcFailureType, takeOnSuccess, mayDeferChecks,
+        prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2405,14 +2449,16 @@ tryCast(
     if (srcKind == MetadataKind::Optional) {
       auto subcastResult = tryCastUnwrappingOptionalBoth(
         destLocation, destType, srcValue, srcType,
-        destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+        destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+        prohibitIsolatedConformances);
       if (isSuccess(subcastResult)) {
         return subcastResult;
       }
     }
     auto subcastResult = tryCastUnwrappingOptionalDestination(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2421,7 +2467,8 @@ tryCast(
   if (srcKind == MetadataKind::Optional) {
     auto subcastResult = tryCastUnwrappingOptionalSource(
       destLocation, destType, srcValue, srcType,
-      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
+      destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks,
+      prohibitIsolatedConformances);
     if (isSuccess(subcastResult)) {
       return subcastResult;
     }
@@ -2565,6 +2612,11 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
   // actually accessed.
   bool mayDeferChecks = flags & DynamicCastFlags::Unconditional;
 
+  // Whether the compiler told us that we aren't allowed to use *any* isolated
+  // conformances, regardless of whether we are in that isolation domain.
+  bool prohibitIsolatedConformances =
+      flags & DynamicCastFlags::ProhibitIsolatedConformances;
+
   // Attempt the cast...
   const Metadata *destFailureType = destType;
   const Metadata *srcFailureType = srcType;
@@ -2572,7 +2624,7 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
     destLocation, destType,
     srcValue, srcType,
     destFailureType, srcFailureType,
-    takeOnSuccess, mayDeferChecks);
+    takeOnSuccess, mayDeferChecks, prohibitIsolatedConformances);
 
   switch (result) {
   case DynamicCastResult::Failure:
@@ -2594,4 +2646,4 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 }
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

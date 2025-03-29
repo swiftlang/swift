@@ -107,11 +107,6 @@
 using namespace swift;
 using namespace rewriting;
 
-Term RewriteContext::getTermForType(CanType paramType,
-                                    const ProtocolDecl *proto) {
-  return Term::get(getMutableTermForType(paramType, proto), *this);
-}
-
 /// Map an interface type to a term.
 ///
 /// If \p proto is null, this is a term relative to a generic

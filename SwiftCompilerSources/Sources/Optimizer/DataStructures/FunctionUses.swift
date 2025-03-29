@@ -128,22 +128,22 @@ struct FunctionUses {
 
     for vTable in context.vTables {
       for entry in vTable.entries {
-        markUnknown(entry.function)
+        markUnknown(entry.implementation)
       }
     }
 
     for witnessTable in context.witnessTables {
       for entry in witnessTable.entries {
-        if entry.kind == .Method, let f = entry.methodFunction {
-          markUnknown(f)
+        if case .method(_, let witness) = entry, let witness {
+          markUnknown(witness)
         }
       }
     }
 
     for witnessTable in context.defaultWitnessTables {
       for entry in witnessTable.entries {
-        if entry.kind == .Method, let f = entry.methodFunction {
-          markUnknown(f)
+        if case .method(_, let witness) = entry, let witness {
+          markUnknown(witness)
         }
       }
     }

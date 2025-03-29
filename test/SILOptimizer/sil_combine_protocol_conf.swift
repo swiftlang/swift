@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -wmo -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -wmo -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

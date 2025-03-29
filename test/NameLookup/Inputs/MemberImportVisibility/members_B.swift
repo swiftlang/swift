@@ -14,6 +14,13 @@ extension X {
   package struct NestedInB_package {}
 }
 
+// Members with the same names are also declared in C.
+extension X {
+  public init(_ x: Int) { self.init() }
+  public func ambiguous() -> Int { return 1 }
+  public func ambiguousDisfavored() -> Int { return 1 }
+}
+
 extension Y {
   public func YinB() { }
 

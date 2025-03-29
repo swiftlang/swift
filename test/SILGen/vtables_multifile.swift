@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -primary-file %S/Inputs/vtables_multifile_2.swift | %FileCheck %S/Inputs/vtables_multifile_2.swift
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -primary-file %S/Inputs/vtables_multifile_2.swift | %FileCheck %S/Inputs/vtables_multifile_2.swift
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -enable-library-evolution -emit-module-path %t/vtables_multifile.swiftmodule
-// RUN: %target-swift-emit-silgen %S/Inputs/vtables_multifile_3.swift -I %t | %FileCheck %S/Inputs/vtables_multifile_3.swift
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %S/Inputs/vtables_multifile_3.swift -I %t | %FileCheck %S/Inputs/vtables_multifile_3.swift
 
 
 open class Base<T> {
@@ -225,15 +225,15 @@ public final class FinalDerived : Base<Int> {
 // --
 
 // CHECK-LABEL: sil_vtable [serialized] MostDerived {
-// CHECK-NEXT:   #Base.privateMethod1: <T> (Base<T>) -> () -> () : @$s17vtables_multifile11MostDerivedC14privateMethod1yyFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyFTV [override]     // vtable thunk for Base.privateMethod1() dispatching to MostDerived.privateMethod1()
-// CHECK-NEXT:   #Base.privateMethod2: <T> (Base<T>) -> (AnyObject) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod2yyyXlSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyyXlFTV [override]    // vtable thunk for Base.privateMethod2(_:) dispatching to MostDerived.privateMethod2(_:)
-// CHECK-NEXT:   #Base.privateMethod3: <T> (Base<T>) -> (Int) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod3yySiSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyySiFTV [override]    // vtable thunk for Base.privateMethod3(_:) dispatching to MostDerived.privateMethod3(_:)
-// CHECK-NEXT:   #Base.privateMethod4: <T> (Base<T>) -> (T) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV [override] // vtable thunk for Base.privateMethod4(_:) dispatching to MostDerived.privateMethod4(_:)
+// CHECK-NEXT:   #Base.privateMethod1: <T> (Base<T>) -> () -> () : @$s17vtables_multifile11MostDerivedC14privateMethod1yyF
+// CHECK-NEXT:   #Base.privateMethod2: <T> (Base<T>) -> (AnyObject) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod2yyyXlSgF
+// CHECK-NEXT:   #Base.privateMethod3: <T> (Base<T>) -> (Int) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod3yySiSgF
+// CHECK-NEXT:   #Base.privateMethod4: <T> (Base<T>) -> (T) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod4yySiF
 // CHECK-NEXT:   #Base.init!allocator: <T> (Base<T>.Type) -> () -> Base<T> : @$s17vtables_multifile11MostDerivedCACycfC [override]   // MostDerived.__allocating_init()
-// CHECK-NEXT:   #Derived.privateMethod1: (Derived) -> () -> () : @$s17vtables_multifile11MostDerivedC14privateMethod1yyFAA0D0CADyyFTV [override]     // vtable thunk for Derived.privateMethod1() dispatching to MostDerived.privateMethod1()
-// CHECK-NEXT:   #Derived.privateMethod2: (Derived) -> (AnyObject?) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod2yyyXlSgFAA0D0CADyyAEFTV [override]    // vtable thunk for Derived.privateMethod2(_:) dispatching to MostDerived.privateMethod2(_:)
-// CHECK-NEXT:   #Derived.privateMethod3: (Derived) -> (Int?) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod3yySiSgFAA0D0CADyyAEFTV [override]   // vtable thunk for Derived.privateMethod3(_:) dispatching to MostDerived.privateMethod3(_:)
-// CHECK-NEXT:   #Derived.privateMethod4: (Derived) -> (Int) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod4yySiFAA0D0CADyySiFTV [override]      // vtable thunk for Derived.privateMethod4(_:) dispatching to MostDerived.privateMethod4(_:)
+// CHECK-NEXT:   #Derived.privateMethod1: (Derived) -> () -> () : @$s17vtables_multifile11MostDerivedC14privateMethod1yyF
+// CHECK-NEXT:   #Derived.privateMethod2: (Derived) -> (AnyObject?) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod2yyyXlSgF
+// CHECK-NEXT:   #Derived.privateMethod3: (Derived) -> (Int?) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod3yySiSgF
+// CHECK-NEXT:   #Derived.privateMethod4: (Derived) -> (Int) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod4yySiF
 // CHECK-NEXT:   #MoreDerived.privateMethod1: (MoreDerived) -> () -> () : @$s17vtables_multifile11MostDerivedC14privateMethod1yyF [override] // MostDerived.privateMethod1()
 // CHECK-NEXT:   #MoreDerived.privateMethod2: (MoreDerived) -> (AnyObject?) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod2yyyXlSgF [override] // MostDerived.privateMethod2(_:)
 // CHECK-NEXT:   #MoreDerived.privateMethod3: (MoreDerived) -> (Int?) -> () : @$s17vtables_multifile11MostDerivedC14privateMethod3yySiSgF [override] // MostDerived.privateMethod3(_:)

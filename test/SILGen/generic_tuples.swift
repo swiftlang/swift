@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name generic_tuples -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name generic_tuples -parse-as-library %s | %FileCheck %s
 
 
 func dup<T>(_ x: T) -> (T, T) { return (x,x) }

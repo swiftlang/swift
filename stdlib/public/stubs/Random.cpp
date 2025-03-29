@@ -62,19 +62,19 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 }
 
 #elif defined(_WIN32) && !defined(__CYGWIN__)
-#warning TODO: Test swift_stdlib_random on Windows
 
 SWIFT_RUNTIME_STDLIB_API
 void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
-    auto actual_nbytes = std::min(nbytes, (__swift_size_t)ULONG_MAX);
+    __swift_size_t actual_nbytes =
+        std::min(nbytes, static_cast<__swift_size_t>(ULONG_MAX));
     NTSTATUS status = BCryptGenRandom(nullptr,
                                       static_cast<PUCHAR>(buf),
                                       static_cast<ULONG>(actual_nbytes),
                                       BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-    if (!BCRYPT_SUCCESS(status)) {
-      fatalError(0, "Fatal error: 0x%lX in '%s'\n", status, __func__);
-    }
+    if (!BCRYPT_SUCCESS(status))
+      fatalError(0, "Fatal error: BCryptGenRandom returned 0x%lX in '%s'\n",
+                 status, __func__);
 
     buf = static_cast<uint8_t *>(buf) + actual_nbytes;
     nbytes -= actual_nbytes;

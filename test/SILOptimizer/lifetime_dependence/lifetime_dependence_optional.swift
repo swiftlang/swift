@@ -2,15 +2,16 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature LifetimeDependence
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
-  init(nilLiteral: ()) -> dependsOn(immortal) Self
+  @lifetime(immortal)
+  init(nilLiteral: ()) 
 }
 
 @frozen
@@ -19,9 +20,9 @@ public enum Nillable<Wrapped: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
   case some(Wrapped)
 }
 
-extension Nillable: Copyable where Wrapped: Copyable {}
+extension Nillable: Copyable where Wrapped: Copyable, Wrapped: ~Escapable {}
 
-extension Nillable: Escapable where Wrapped: Escapable {}
+extension Nillable: Escapable where Wrapped: Escapable, Wrapped: ~Copyable {}
 
 extension Nillable: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable { }
 
@@ -29,13 +30,15 @@ extension Nillable: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 extension Nillable: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
   @_transparent
-  public init(nilLiteral: ()) -> dependsOn(immortal) Self {
+  @lifetime(immortal)
+  public init(nilLiteral: ()) {
     self = .none
   }
 }
 
 extension Nillable where Wrapped: ~Copyable & ~Escapable {
   @_transparent
+  @lifetime(copy some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 

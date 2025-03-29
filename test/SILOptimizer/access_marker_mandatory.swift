@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -module-name access_marker_mandatory -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -module-name access_marker_mandatory -parse-as-library -Xllvm -sil-full-demangle -Xllvm -sil-print-types -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
 
 public struct S {
   var i: Int
@@ -17,9 +17,8 @@ public struct S {
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*S
 // CHECK: store %{{.*}} to [[WRITE]] : $*S
 // CHECK: end_access [[WRITE]]
-// CHECK: bb3:
+// CHECK: bb3([[RET:%.*]] : $S):
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
-// CHECK: [[RET:%.*]] = load [[READ]] : $*S
 // CHECK: end_access [[READ]]
 // CHECK: destroy_addr [[STK]]
 // CHECK: dealloc_stack [[STK]]

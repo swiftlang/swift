@@ -582,7 +582,8 @@ BUILTIN_MISC_OPERATION(IsConcrete, "isConcrete", "n", Special)
 /// IsBitwiseTakable has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
-/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+/// IsSameMetatype has type
+/// (any (~Copyable & ~Escapable).Type, any (~Copyable & ~Escapable).Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
@@ -638,6 +639,8 @@ BUILTIN_MISC_OPERATION(UnprotectedStackAlloc, "unprotectedStackAlloc", "", Speci
 /// Builtin.stackAlloc(), is deallocated from the stack.
 BUILTIN_MISC_OPERATION(StackDealloc, "stackDealloc", "", Special)
 
+// Obsolete: only there to be able to read old Swift.interface files which still
+// contain the builtin.
 /// allocVector<Element>(Element.Type, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocVector, "allocVector", "", Special)
 
@@ -716,9 +719,6 @@ BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
 /// Builtin.wordAtIndex_IntLiteral has type
 /// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
 BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
-
-/// zeroInitializer has type <T> () -> T
-BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
@@ -800,18 +800,6 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
 
-/// Create a task group.
-BUILTIN_MISC_OPERATION(CreateTaskGroup,
-                       "createTaskGroup", "", Special)
-
-/// Create a task group, with options.
-BUILTIN_MISC_OPERATION(CreateTaskGroupWithFlags,
-                       "createTaskGroupWithFlags", "", Special)
-
-/// Destroy a task group.
-BUILTIN_MISC_OPERATION(DestroyTaskGroup,
-                       "destroyTaskGroup", "", Special)
-
 /// Unchecked pointer alignment assertion. Allows the compiler to assume
 /// alignment of the pointer to emit more efficient code.
 ///
@@ -851,6 +839,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
+
+/// zeroInitializer has type <T> () -> T, but the SIL builtin has its
+/// own rules.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
 
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
@@ -964,7 +956,8 @@ BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBo
 /// createTask<T>(flags: Int,
 ///               initialSerialExecutor: (Builtin.Executor)? = nil,
 ///               taskGroup: Builtin.RawPointer? = nil,
-///               initialTaskExecutor: (Builtin.Executor)? = nil,
+///               initialTaskExecutorDeprecated: (Builtin.Executor)? = nil,
+///               initialTaskExecutorOwned: (any TaskExecutor)? = nil,
 ///               operation: sending @escaping () async throws -> T)
 ///  -> Builtin.NativeObject, Builtin.RawPointer)
 ///
@@ -1054,6 +1047,15 @@ BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroupWithExecutor,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
     "buildOrdinaryTaskExecutorRef", "n", Special)
 
+/// Create a task group.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateTaskGroup, "createTaskGroup", "", Special)
+
+/// Create a task group, with options.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateTaskGroupWithFlags, "createTaskGroupWithFlags", "", Special)
+
+/// Destroy a task group.
+BUILTIN_MISC_OPERATION(DestroyTaskGroup, "destroyTaskGroup", "", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
@@ -1128,6 +1130,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActor
 /// immutability. This builtin _must_ persist throughout all of SIL and must be
 /// lowered away at IRGen, no sooner.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n", Special)
+
+/// emplace<T>((Builtin.RawPointer) -> Void) -> T
+///
+/// Passes a pointer to an uninitialized result value to the given function,
+/// which must initialize the memory before finishing execution. The value in
+/// memory becomes the result of the call.
+BUILTIN_SIL_OPERATION(Emplace, "emplace", Special)
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION

@@ -6,7 +6,6 @@ target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementWMO.cpp
   AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
-  ArrayElementValuePropagation.cpp
   COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
@@ -35,5 +34,5 @@ target_sources(swiftSILOptimizer PRIVATE
   SpeculativeDevirtualizer.cpp
   StringOptimization.cpp
   TempLValueOpt.cpp
-  TempRValueElimination.cpp
-  VTableSpecializer.cpp)
+  TempRValueElimination.cpp)
+

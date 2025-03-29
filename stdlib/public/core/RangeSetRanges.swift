@@ -75,7 +75,7 @@ extension RangeSet {
           let newUpper = Swift.max(
             _storage[lastValid].upperBound,
             _storage[current].upperBound)
-          _storage[lastValid] = Range(
+          _storage[lastValid] = unsafe Range(
             uncheckedBounds: (_storage[lastValid].lowerBound, newUpper))
         } else {
           // Otherwise, this is a valid new range to add to the range set: 
@@ -420,6 +420,7 @@ extension RangeSet.Ranges: Hashable where Bound: Hashable {
 extension RangeSet.Ranges: Sendable where Bound: Sendable {}
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension RangeSet.Ranges: CustomStringConvertible {
   public var description: String {
     _makeCollectionDescription()

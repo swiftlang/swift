@@ -223,7 +223,7 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
+      "disable-sil-ownership-verifier",
       llvm::cl::desc(
           "Do not verify SIL ownership invariants during SIL verification"));
 
@@ -245,6 +245,15 @@ struct SILOptOptions {
   llvm::cl::opt<bool>
   DisableObjCInterop = llvm::cl::opt<bool>("disable-objc-interop",
                      llvm::cl::desc("Disable Objective-C interoperability."));
+
+  llvm::cl::opt<bool>
+  DisableImplicitModules = llvm::cl::opt<bool>("disable-implicit-swift-modules",
+                     llvm::cl::desc("Disable implicit swift modules."));
+
+  llvm::cl::opt<std::string>
+  ExplicitSwiftModuleMapPath = llvm::cl::opt<std::string>(
+    "explicit-swift-module-map-file",
+    llvm::cl::desc("Explict swift module map file path"));
 
   llvm::cl::list<std::string>
   ExperimentalFeatures = llvm::cl::list<std::string>("enable-experimental-feature",
@@ -294,12 +303,15 @@ struct SILOptOptions {
                      llvm::cl::desc("Enables optimization assumption that functions rarely throw errors."));
 
   llvm::cl::opt<bool>
+  EnableNoReturnCold = llvm::cl::opt<bool>("enable-noreturn-prediction",
+                     llvm::cl::desc("Enables optimization assumption that calls to no-return functions are cold."));
+
+  llvm::cl::opt<bool>
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
-  llvm::cl::opt<bool>
-  EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
+  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
+      "enable-ossa-modules", llvm::cl::init(true),
       llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                      "this is disabled we do not serialize in OSSA "
                      "form when optimizing."));
@@ -580,6 +592,14 @@ struct SILOptOptions {
       "swift-version",
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
+
+  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
+      "enable-address-dependencies",
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+
+  llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
+      "mergeable-traps",
+      llvm::cl::desc("Enable cond_fail merging."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -650,8 +670,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(options.ImportPaths);
-  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options.ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> FramePaths;
   for (const auto &path : options.FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
@@ -675,6 +699,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     = options.EnableLibraryEvolution;
   Invocation.getFrontendOptions().StrictImplicitModuleContext
     = options.StrictImplicitModuleContext;
+
+  Invocation.getFrontendOptions().DisableImplicitModules =
+    options.DisableImplicitModules;
+  Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath =
+    options.ExplicitSwiftModuleMapPath;
+
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
@@ -717,8 +747,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
-  Invocation.getDiagnosticOptions().PrintDiagnosticNames =
-      options.DebugDiagnosticNames;
+  if (options.DebugDiagnosticNames) {
+    Invocation.getDiagnosticOptions().PrintDiagnosticNames =
+        PrintDiagnosticNamesMode::Identifier;
+  }
 
   for (auto &featureName : options.UpcomingFeatures) {
     auto feature = getUpcomingFeature(featureName);
@@ -769,6 +801,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
@@ -852,12 +885,13 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
+  SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
-
+  SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
   }
@@ -882,6 +916,9 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
+
+  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)
@@ -1032,6 +1069,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
+    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

@@ -2,6 +2,7 @@
 // RUN:   -wmo -enable-experimental-feature Embedded
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: CODEGENERATOR=AVR
+// REQUIRES: swift_feature_Embedded
 
 import Swift
 

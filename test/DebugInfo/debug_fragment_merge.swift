@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
-// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-irgen -O -g | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -Xllvm -sil-print-types -emit-sil -O -g | %FileCheck %s --check-prefix CHECK-SIL
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -emit-irgen -O -g | %FileCheck %s
 
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=arm64e
 
@@ -31,12 +31,12 @@ func test(cond: Int, external: External) async {
 // CHECK-SIL: debug_value %{{.*}} : $String, let, (name "data", {{.*}}), type $Data, expr op_fragment:#Data.a
 // CHECK-SIL: debug_value %{{.*}} : $String, let, (name "data", {{.*}}), type $Data, expr op_fragment:#Data.b
 
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR:[0-9]+]], metadata !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} !dbg ![[LOC1]]
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} !dbg ![[LOC1]]
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} !dbg ![[LOC1]]
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} !dbg ![[LOC1]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} ![[LOC1]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} ![[LOC1]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} ![[LOC1]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} ![[LOC1]]
 //
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} !dbg ![[LOC2]]
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} !dbg ![[LOC2]]
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} !dbg ![[LOC2]]
-// CHECK-DAG: llvm.dbg.value{{.*}} metadata ![[VAR]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} !dbg ![[LOC2]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 192, 64){{.*}} ![[LOC2]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} ![[LOC2]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} ![[LOC2]]
+// CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} ![[LOC2]]

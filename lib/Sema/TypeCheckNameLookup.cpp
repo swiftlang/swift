@@ -32,6 +32,27 @@
 
 using namespace swift;
 
+void swift::simple_display(llvm::raw_ostream &out, NameLookupOptions options) {
+  using Flag = std::pair<NameLookupFlags, StringRef>;
+  Flag possibleFlags[] = {
+      {NameLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
+      {NameLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
+      {NameLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
+      {NameLookupFlags::ExcludeMacroExpansions, "ExcludeMacroExpansions"},
+      {NameLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+      {NameLookupFlags::ABIProviding, "ABIProviding"},
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
   /// data.
@@ -225,31 +246,42 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    newOptions |= UnqualifiedLookupFlags::ABIProviding;
 
   return newOptions;
+}
+
+/// HACK: Qualified lookup cannot be allowed to synthesize CodingKeys because
+/// it would lead to a number of egregious cycles through QualifiedLookupRequest
+/// when we resolve the protocol conformance. Codable's magic has pushed its way
+/// so deeply into the compiler, when doing unqualified lookup we have to
+/// pessimistically force every nominal context above this one to synthesize it
+/// in the event the user needs it from e.g. a non-primary input.
+///
+/// We can undo this if Codable's semantic content is divorced from its
+/// syntactic content - so we synthesize just enough to allow lookups to
+/// succeed, but don't force protocol conformances while we're doing it.
+static void synthesizeCodingKeysIfNeededForUnqualifiedLookup(ASTContext &ctx,
+                                                             DeclContext *dc,
+                                                             DeclNameRef name) {
+  if (name.getBaseIdentifier() != ctx.Id_CodingKeys)
+    return;
+
+  for (auto typeCtx = dc->getInnermostTypeContext(); typeCtx != nullptr;
+       typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+    if (auto *nominal = typeCtx->getSelfNominalTypeDecl())
+      nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
+  }
 }
 
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
-  // HACK: Qualified lookup cannot be allowed to synthesize CodingKeys because
-  // it would lead to a number of egregious cycles through
-  // QualifiedLookupRequest when we resolve the protocol conformance. Codable's
-  // magic has pushed its way so deeply into the compiler, we have to
-  // pessimistically force every nominal context above this one to synthesize
-  // it in the event the user needs it from e.g. a non-primary input.
-  // We can undo this if Codable's semantic content is divorced from its
-  // syntactic content - so we synthesize just enough to allow lookups to
-  // succeed, but don't force protocol conformances while we're doing it.
-  if (name.getBaseIdentifier() == ctx.Id_CodingKeys) {
-    for (auto typeCtx = dc->getInnermostTypeContext(); typeCtx != nullptr;
-         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
-      if (auto *nominal = typeCtx->getSelfNominalTypeDecl()) {
-        nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
-      }
-    }
-  }
+
+  // HACK: Synthesize CodingKeys if needed.
+  synthesizeCodingKeysIfNeededForUnqualifiedLookup(ctx, dc, name);
 
   auto ulOptions = convertToUnqualifiedLookupOptions(options);
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, ulOptions);
@@ -266,7 +298,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
     if (auto *typeDC = found.getDeclContext()) {
       if (!typeDC->isTypeContext()) {
         // If we don't have a type context this is an implicit 'self' reference.
-        if (auto *CE = dyn_cast<ClosureExpr>(typeDC)) {
+        if (isa<ClosureExpr>(typeDC)) {
           typeDC = typeDC->getInnermostTypeContext();
         } else {
           // Otherwise, we must have the method context.
@@ -291,6 +323,10 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
+
+  // HACK: Synthesize CodingKeys if needed.
+  synthesizeCodingKeysIfNeededForUnqualifiedLookup(ctx, dc, name);
+
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
                    UnqualifiedLookupFlags::TypeLookup;
   {
@@ -330,6 +366,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     subOptions |= NL_IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -430,6 +468,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     subOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
@@ -548,14 +588,15 @@ unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
     return 0;
   }
 
-  StringRef writtenBase = writtenName.getBaseName().userFacingName();
-  StringRef correctedBase = correctedName.getBaseName().userFacingName();
-
   // Don't typo-correct to a name with a leading underscore unless the typed
   // name also begins with an underscore.
-  if (correctedBase.starts_with("_") && !writtenBase.starts_with("_")) {
+  if (correctedName.getBaseIdentifier().hasUnderscoredNaming() &&
+      !writtenName.getBaseIdentifier().hasUnderscoredNaming()) {
     return UnreasonableCallEditDistance;
   }
+
+  StringRef writtenBase = writtenName.getBaseName().userFacingName();
+  StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
   unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 
@@ -809,7 +850,7 @@ public:
 static void diagnoseMissingImportForMember(const ValueDecl *decl,
                                            SourceFile *sf, SourceLoc loc) {
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContext();
+  auto definingModule = decl->getModuleContextForNameLookup();
   ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
                      decl->getDescriptiveKind(), decl->getName(),
                      definingModule);
@@ -823,7 +864,7 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   diagnoseMissingImportForMember(decl, sf, loc);
 
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContext();
+  auto definingModule = decl->getModuleContextForNameLookup();
   SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(decl, sf);
   if (!bestLoc.isValid())
     return;
@@ -874,8 +915,17 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
 bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
                                                 const DeclContext *dc,
                                                 SourceLoc loc) {
-  if (decl->findImport(dc))
+  if (dc->isDeclImported(decl))
     return false;
+
+  if (dc->getASTContext().LangOpts.EnableCXXInterop) {
+    // With Cxx interop enabled, there are some declarations that always belong
+    // to the Clang header import module which should always be implicitly
+    // visible. However, that module is not implicitly imported in source files
+    // so we need to special case it here and avoid diagnosing.
+    if (decl->getModuleContextForNameLookup()->isClangHeaderImportModule())
+      return false;
+  }
 
   auto sf = dc->getParentSourceFile();
   if (!sf)

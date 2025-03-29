@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifyable {
+extension BuiltinInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:
@@ -33,9 +33,8 @@ extension BuiltinInst : OnoneSimplifyable {
            .Alignof:
         optimizeTargetTypeConst(context)
       case .DestroyArray:
-        if let elementType = substitutionMap.replacementTypes[0],
-           elementType.isTrivial(in: parentFunction)
-        {
+        let elementType = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
+        if elementType.isTrivial(in: parentFunction) {
           context.erase(instruction: self)
           return
         }
@@ -48,7 +47,6 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
-           .AllocVector,
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
       case .ICMP_EQ:
@@ -63,7 +61,7 @@ extension BuiltinInst : OnoneSimplifyable {
   }
 }
 
-extension BuiltinInst : LateOnoneSimplifyable {
+extension BuiltinInst : LateOnoneSimplifiable {
   func simplifyLate(_ context: SimplifyContext) {
     if id == .IsConcrete {
       // At the end of the pipeline we can be sure that the isConcrete's type doesn't get "more" concrete.
@@ -129,47 +127,39 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
     let literal: IntegerLiteralInst
-    switch ty.canBeClass {
-    case .IsNot:
+    switch substitutionMap.replacementType.canonical.canBeClass {
+    case .isNot:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(0,  type: type)
-    case .Is:
+    case .is:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(1,  type: type)
-    case .CanBe:
+    case .canBe:
       return
-    default:
-      fatalError()
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
+    self.replace(with: literal, context)
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {
-    let literal: IntegerLiteralInst
-    switch context.options.assertConfiguration {
-    case .enabled:
+    // The values for the assert_configuration call are:
+    // 0: Debug
+    // 1: Release
+    // 2: Fast / Unchecked
+    let config = context.options.assertConfiguration
+    switch config {
+    case .debug, .release, .unchecked:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(1,  type: type)
-    case .disabled:
-      let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(0,  type: type)
-    default:
+      let literal = builder.createIntegerLiteral(config.integerValue, type: type)
+      uses.replaceAll(with: literal, context)
+      context.erase(instruction: self)
+    case .unknown:
       return
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
-    
+    let ty = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
     let value: Int?
     switch id {
     case .Sizeof:
@@ -203,13 +193,13 @@ private extension BuiltinInst {
       return
     }
 
-    guard type.representationOfMetatype(in: parentFunction) == .Thick else {
+    guard type.representationOfMetatype == .thick else {
       return
     }
     
-    let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
-    let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    let newMetatype = builder.createMetatype(ofInstanceType: type.canonicalType.instanceTypeOfMetatype,
+                                             representation: .thin)
     operands[argument].set(to: newMetatype, context)
   }
 
@@ -279,13 +269,11 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsMetatype = lhsExistential.metatype.type
-  let rhsMetatype = rhsExistential.metatype.type
-  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+  let lhsTy = lhsExistential.metatype.type.canonicalType.instanceTypeOfMetatype
+  let rhsTy = rhsExistential.metatype.type.canonicalType.instanceTypeOfMetatype
+  if lhsTy.isDynamicSelf != rhsTy.isDynamicSelf {
     return nil
   }
-  let lhsTy = lhsMetatype.loweredInstanceTypeOfMetatype(in: function)
-  let rhsTy = rhsMetatype.loweredInstanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
@@ -298,12 +286,18 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     //   ((Int, Int) -> ())
     //   (((Int, Int)) -> ())
     //
-    if lhsMetatype == rhsMetatype {
+    if lhsTy == rhsTy {
       return true
     }
     // Comparing types of different classes which are in a sub-class relation is not handled by the
     // cast optimizer (below).
     if lhsTy.isClass && rhsTy.isClass && lhsTy.nominal != rhsTy.nominal {
+      return false
+    }
+
+    // Failing function casts are not supported by the cast optimizer (below).
+    // (Reason: "Be conservative about function type relationships we may add in the future.")
+    if lhsTy.isFunction && rhsTy.isFunction && lhsTy != rhsTy && !lhsTy.hasArchetype && !rhsTy.hasArchetype {
       return false
     }
   }

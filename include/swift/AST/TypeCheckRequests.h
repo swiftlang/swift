@@ -20,6 +20,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Evaluator.h"
@@ -44,6 +45,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class AvailabilityScope;
 class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
@@ -68,7 +70,6 @@ class TypeAliasDecl;
 class TypeLoc;
 class Witness;
 class TypeResolution;
-class TypeRefinementContext;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -474,6 +475,28 @@ public:
   bool isCached() const { return true; }
 };
 
+class ConformanceIsolationRequest :
+    public SimpleRequest<ConformanceIsolationRequest,
+                         ActorIsolation(ProtocolConformance *),
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ActorIsolation
+  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<ActorIsolation> getCachedResult() const;
+  void cacheResult(ActorIsolation result) const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
@@ -712,12 +735,36 @@ public:
   bool isCached() const;
 };
 
+struct USRGenerationOptions {
+  /// @brief Whether to emit USRs using the Swift declaration when it is
+  /// synthesized from a Clang based declaration. Useful in cases where Swift
+  /// declarations are synthesized from Clang nodes but the caller actually
+  /// wants the USR of the Swift declaration.
+  bool distinguishSynthesizedDecls;
+
+  friend llvm::hash_code hash_value(const USRGenerationOptions &options) {
+    return llvm::hash_value(options.distinguishSynthesizedDecls);
+  }
+
+  friend bool operator==(const USRGenerationOptions &lhs,
+                         const USRGenerationOptions &rhs) {
+    return lhs.distinguishSynthesizedDecls == rhs.distinguishSynthesizedDecls;
+  }
+
+  friend bool operator!=(const USRGenerationOptions &lhs,
+                         const USRGenerationOptions &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const USRGenerationOptions &options);
+
 /// Generate the USR for the given declaration.
-class USRGenerationRequest :
-    public SimpleRequest<USRGenerationRequest,
-                         std::string(const ValueDecl*),
-                         RequestFlags::Cached>
-{
+class USRGenerationRequest
+    : public SimpleRequest<USRGenerationRequest,
+                           std::string(const ValueDecl *, USRGenerationOptions),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -725,7 +772,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  std::string evaluate(Evaluator &eval, const ValueDecl *d) const;
+  std::string evaluate(Evaluator &eval, const ValueDecl *d,
+                       USRGenerationOptions options) const;
 
 public:
   // Caching
@@ -753,6 +801,27 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const KnownProtocolKind);
+
+/// Pretty-print the given declaration into a buffer and return a source
+/// location that refers to the declaration in that buffer.
+class PrettyPrintDeclRequest
+   : public SimpleRequest<PrettyPrintDeclRequest,
+                          SourceLoc(const Decl *),
+                          RequestFlags::Cached>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SourceLoc evaluate(Evaluator &eval, const Decl *d) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
 
 // Find the type in the cache or look it up
 class DefaultTypeRequest
@@ -1916,10 +1985,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-class RequiresOpaqueModifyCoroutineRequest :
-    public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
-                         bool(AbstractStorageDecl *),
-                         RequestFlags::SeparatelyCached> {
+class RequiresOpaqueModifyCoroutineRequest
+    : public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
+                           bool(AbstractStorageDecl *, bool isUnderscored),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1927,8 +1996,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool
-  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl,
+                bool isUnderscored) const;
 
 public:
   // Separate caching.
@@ -2097,7 +2166,8 @@ class InferredGenericSignatureRequest :
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeBase *, 2>,
-                                                    SourceLoc, bool, bool),
+                                                    SourceLoc, ExtensionDecl *,
+                                                    bool),
                          RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2113,7 +2183,8 @@ private:
            WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeBase *, 2> inferenceSources,
-           SourceLoc loc, bool isExtension, bool allowInverses) const;
+           SourceLoc loc, ExtensionDecl *forExtension,
+           bool allowInverses) const;
 
 public:
   /// Inferred generic signature requests don't have source-location info.
@@ -2274,21 +2345,22 @@ public:
 
 /// Builds an opaque result type for a declaration.
 class OpaqueResultTypeRequest
-    : public SimpleRequest<OpaqueResultTypeRequest,
-                           OpaqueTypeDecl *(ValueDecl *),
-                           RequestFlags::Cached> {
+    : public SimpleRequest<
+          OpaqueResultTypeRequest, OpaqueTypeDecl *(ValueDecl *),
+          RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  OpaqueTypeDecl *
-  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+  OpaqueTypeDecl *evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
-  // Caching.
+  // Split caching.
   bool isCached() const { return true; }
+  std::optional<OpaqueTypeDecl *> getCachedResult() const;
+  void cacheResult(OpaqueTypeDecl *result) const;
 };
 
 /// Determines if a function declaration is 'static'.
@@ -3029,9 +3101,9 @@ public:
   void cacheResult(ProtocolConformanceRef value) const;
 };
 
-class BraceHasReturnRequest
-    : public SimpleRequest<BraceHasReturnRequest, bool(const BraceStmt *),
-                           RequestFlags::Cached> {
+class BraceHasExplicitReturnStmtRequest
+    : public SimpleRequest<BraceHasExplicitReturnStmtRequest,
+                           bool(const BraceStmt *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -3112,7 +3184,7 @@ public:
 /// Computes an initializer context for a parameter with a default argument.
 class DefaultArgumentInitContextRequest
     : public SimpleRequest<DefaultArgumentInitContextRequest,
-                           Initializer *(ParamDecl *),
+                           DefaultArgumentInitializer *(ParamDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3121,14 +3193,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Initializer * evaluate(Evaluator &evaluator,
-                                         ParamDecl *param) const;
+  DefaultArgumentInitializer *evaluate(Evaluator &evaluator,
+                                       ParamDecl *param) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<Initializer *> getCachedResult() const;
-  void cacheResult(Initializer *init) const;
+  std::optional<DefaultArgumentInitializer *> getCachedResult() const;
+  void cacheResult(DefaultArgumentInitializer *init) const;
 };
 
 /// Computes the fully type-checked default argument expression for a given
@@ -3276,9 +3348,9 @@ public:
   void cacheResult(evaluator::SideEffect value) const;
 };
 
-class TypeCheckSourceFileRequest
+class TypeCheckPrimaryFileRequest
     : public SimpleRequest<
-          TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),
+          TypeCheckPrimaryFileRequest, evaluator::SideEffect(SourceFile *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3908,6 +3980,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Run effects checking for an initializer expression.
+class CheckInitEffectsRequest
+    : public SimpleRequest<CheckInitEffectsRequest,
+                           evaluator::SideEffect(Initializer *, Expr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 Initializer *initCtx,
+                                 Expr *init) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Retrieves the primary source files in the main module.
 // FIXME: This isn't really a type-checking request, if we ever split off a
 // zone for more basic AST requests, this should be moved there.
@@ -3922,25 +4013,6 @@ private:
   friend SimpleRequest;
 
   ArrayRef<SourceFile *> evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
-
-public:
-  // Cached.
-  bool isCached() const { return true; }
-};
-
-/// Retrieve the file being used for code completion in the main module.
-// FIXME: This isn't really a type-checking request, if we ever split off a
-// zone for more basic AST requests, this should be moved there.
-class IDEInspectionFileRequest
-    : public SimpleRequest<IDEInspectionFileRequest,
-                           SourceFile *(ModuleDecl *), RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  SourceFile *evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
 
 public:
   // Cached.
@@ -4044,8 +4116,9 @@ public:
 
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
-                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
-                           RequestFlags::Cached> {
+                           ValueDecl *(const ValueDecl *,
+                                       const AvailableAttr *),
+                           RequestFlags::Cached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -4057,13 +4130,44 @@ private:
 
 public:
   bool isCached() const { return true; }
+  std::optional<ValueDecl *> getCachedResult() const;
+  void cacheResult(ValueDecl *value) const;
 };
 
-using AvailableAttrDeclPair = std::pair<const AvailableAttr *, const Decl *>;
+/// Describes the runtime availability of a declaration, which is a
+/// classification of whether a decl can be used at runtime (as opposed to
+/// compile time).
+///
+/// The elements of this enumeration must be ordered from most available to
+/// least available.
+enum class DeclRuntimeAvailability : uint8_t {
+  /// The decl is potentially available at runtime. If it is unavailable at
+  /// compile time in the current module, it may still be considered available
+  /// at compile time by other modules with different settings. For example, a
+  /// decl that is obsolete in Swift 5 is still available to other modules that
+  /// are compiled for an earlier language mode.
+  PotentiallyAvailable,
 
-class SemanticAvailableRangeAttrRequest
-    : public SimpleRequest<SemanticAvailableRangeAttrRequest,
-                           std::optional<AvailableAttrDeclPair>(const Decl *),
+  /// The decl is always unavailable at compile time in the current module and
+  /// all other modules, but it is still required to be present at load time to
+  /// maintain ABI compatibility. For example, when compiling for macOS a decl
+  /// with an `@available(macOS, unavailable)` attribute can never be invoked,
+  /// except in contexts that are also completely unavailable on macOS. This
+  /// means the declaration is unreachable by execution at runtime, but the
+  /// decl's symbols may still have been strongly linked by other binaries built
+  /// by older versions of the compiler which may have emitted unavailable code
+  /// with strong references. To preserve ABI stability, the decl must still be
+  /// emitted.
+  AlwaysUnavailableABICompatible,
+
+  /// The decl is always unavailable and should never be reachable at runtime
+  /// nor be required at load time.
+  AlwaysUnavailable,
+};
+
+class DeclRuntimeAvailabilityRequest
+    : public SimpleRequest<DeclRuntimeAvailabilityRequest,
+                           DeclRuntimeAvailability(const Decl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4071,27 +4175,8 @@ public:
 private:
   friend SimpleRequest;
 
-  std::optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
-                                                const Decl *decl) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
-class SemanticUnavailableAttrRequest
-    : public SimpleRequest<SemanticUnavailableAttrRequest,
-                           std::optional<AvailableAttrDeclPair>(
-                               const Decl *decl, bool ignoreAppExtensions),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  std::optional<AvailableAttrDeclPair>
-  evaluate(Evaluator &evaluator, const Decl *decl,
-           bool ignoreAppExtensions) const;
+  DeclRuntimeAvailability evaluate(Evaluator &evaluator,
+                                   const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -4629,7 +4714,7 @@ public:
 
 class ExpandBodyMacroRequest
     : public SimpleRequest<ExpandBodyMacroRequest,
-                           std::optional<unsigned>(AbstractFunctionDecl *),
+                           std::optional<unsigned>(AnyFunctionRef),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4638,7 +4723,7 @@ private:
   friend SimpleRequest;
 
   std::optional<unsigned> evaluate(Evaluator &evaluator,
-                                   AbstractFunctionDecl *fn) const;
+                                   AnyFunctionRef fn) const;
 
 public:
   bool isCached() const { return true; }
@@ -4828,11 +4913,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand the children of the given type refinement context.
-class ExpandChildTypeRefinementContextsRequest
-    : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           std::vector<TypeRefinementContext *>(
-                               TypeRefinementContext *),
+/// Expand the children of the given type availability scope.
+class ExpandChildAvailabilityScopesRequest
+    : public SimpleRequest<ExpandChildAvailabilityScopesRequest,
+                           evaluator::SideEffect(AvailabilityScope *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4840,14 +4924,14 @@ public:
 private:
   friend SimpleRequest;
 
-  std::vector<TypeRefinementContext *>
-  evaluate(Evaluator &evaluator, TypeRefinementContext *parentTRC) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 AvailabilityScope *parentScope) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<std::vector<TypeRefinementContext *>> getCachedResult() const;
-  void cacheResult(std::vector<TypeRefinementContext *> children) const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 class SerializeAttrGenericSignatureRequest
@@ -5067,23 +5151,72 @@ public:
   bool isCached() const { return true; }
 };
 
-class IsUnsafeRequest
-    : public SimpleRequest<IsUnsafeRequest,
-                           bool(Decl *decl),
-                           RequestFlags::SeparatelyCached> {
+struct RegexLiteralPatternInfo {
+  StringRef RegexToEmit;
+  Type RegexType;
+  size_t Version;
+  ArrayRef<RegexLiteralPatternFeature> Features;
+};
+
+/// Parses the regex pattern for a given regex literal using the
+/// compiler's regex parsing library, and returns the resulting info.
+class RegexLiteralPatternInfoRequest
+    : public SimpleRequest<RegexLiteralPatternInfoRequest,
+                           RegexLiteralPatternInfo(const RegexLiteralExpr *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
+  RegexLiteralPatternInfo evaluate(Evaluator &evaluator,
+                                   const RegexLiteralExpr *regex) const;
 
 public:
   bool isCached() const { return true; }
-  std::optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
 };
+
+/// The description for a given regex pattern feature. This is cached since
+/// the resulting string is allocated in the ASTContext for ease of bridging.
+class RegexLiteralFeatureDescriptionRequest
+    : public SimpleRequest<RegexLiteralFeatureDescriptionRequest,
+                           StringRef(RegexLiteralPatternFeatureKind,
+                                     ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  StringRef evaluate(Evaluator &evaluator, RegexLiteralPatternFeatureKind kind,
+                     ASTContext *ctx) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The availability range for a given regex pattern feature.
+class RegexLiteralFeatureAvailabilityRequest
+    : public SimpleRequest<RegexLiteralFeatureAvailabilityRequest,
+                           AvailabilityRange(RegexLiteralPatternFeatureKind,
+                                             ASTContext *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AvailabilityRange evaluate(Evaluator &evaluator,
+                             RegexLiteralPatternFeatureKind kind,
+                             ASTContext *ctx) const;
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    RegexLiteralPatternFeatureKind kind);
+SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
 
 class GenericTypeParamDeclGetValueTypeRequest
     : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
@@ -5099,6 +5232,85 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class CustomDerivativesRequest
+    : public SimpleRequest<CustomDerivativesRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *sf) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SemanticAvailableAttrRequest
+    : public SimpleRequest<SemanticAvailableAttrRequest,
+                           std::optional<SemanticAvailableAttr>(
+                               const AvailableAttr *, const Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<SemanticAvailableAttr> evaluate(Evaluator &evaluator,
+                                                const AvailableAttr *attr,
+                                                const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<SemanticAvailableAttr>> getCachedResult() const;
+  void cacheResult(std::optional<SemanticAvailableAttr> value) const;
+};
+
+class SemanticAvailabilitySpecRequest
+    : public SimpleRequest<SemanticAvailabilitySpecRequest,
+                           std::optional<SemanticAvailabilitySpec>(
+                               const AvailabilitySpec *, const DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<SemanticAvailabilitySpec>
+  evaluate(Evaluator &evaluator, const AvailabilitySpec *spec,
+           const DeclContext *declContext) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<SemanticAvailabilitySpec>>
+  getCachedResult() const;
+  void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
+};
+
+class SourceFileLangOptionsRequest
+    : public SimpleRequest<SourceFileLangOptionsRequest,
+                           SourceFileLangOptions(SourceFile *),
+                           RequestFlags::Cached> {
+
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  SourceFileLangOptions evaluate(Evaluator &evaluator,
+                                 SourceFile *sourceFile) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<SourceFileLangOptions> getCachedResult() const;
+  void cacheResult(SourceFileLangOptions value) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

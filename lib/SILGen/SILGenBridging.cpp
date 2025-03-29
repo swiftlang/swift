@@ -747,7 +747,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType);
+    auto openedType = ExistentialArchetypeType::get(nativeType);
 
     FormalEvaluationScope scope(SGF);
 
@@ -1985,8 +1985,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           auto param = completionTy->getParameters()[i];
           auto paramTy = param.getSILStorageInterfaceType();
           if (paramTy.isTrivial(F)) {
-            // If it's trivial, the value passed doesn't matter.
-            completionHandlerArgs.push_back(SILUndef::get(&F, paramTy));
+            // If it's trivial, pass a zero value of whatever the type is.
+            auto zero = B.createZeroInitValue(loc, paramTy);
+            completionHandlerArgs.push_back(zero);
           } else {
             // If it's not trivial, it must be a nullable class type. Pass
             // nil.
@@ -2090,6 +2091,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   if (nativeFnTy->isAsync()) {
     foreignAsync = fd->getForeignAsyncConvention();
     assert(foreignAsync && "couldn't find foreign async convention?!");
+
+    // We might switch to to the callee's actor as part of making the call,
+    // but we don't need to switch back afterwards because we're going to
+    // immediately return.
+    ExpectedExecutor.setUnnecessary();
   }
   std::optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {

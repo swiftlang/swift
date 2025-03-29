@@ -1,4 +1,10 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+
+// wasm currently disables aggressive reg2mem
+// UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
+// REQUIRES: PTRSIZE=64
 
 sil_stage canonical
 
@@ -363,4 +369,59 @@ bb0(%0 : $*X):
   %3 = load %1 : $*X
   dealloc_stack %1 : $*X
   throw %3 : $X
+}
+
+// CHECK: sil @test15
+// CHECK:  cond_br %1, bb1, bb2
+
+// CHECK: bb1:
+// CHECK:   copy_addr [take] {{.*}} to [init] [[PHI:%[0-9]+]] : $*X
+// CHECK:   br bb3
+
+// CHECK: bb2:
+// CHECK:   [[UNDEF:%.*]] = alloc_stack $X
+// CHECK:   copy_addr [take] [[UNDEF]] to [init] [[PHI]] : $*X
+// CHECK:   dealloc_stack [[UNDEF]] : $*X
+// CHECK:   br bb3
+// CHECK:} // end sil function 'test15'
+
+sil @test15 : $@convention(thin) (X, Builtin.Int1) -> () {
+bb0(%0: $X, %1: $Builtin.Int1):
+  %2 = alloc_stack $X
+cond_br %1, bb1, bb2
+
+bb1:
+ br bb3(%0 : $X)
+
+bb2:
+ br bb3(undef : $X)
+
+bb3(%4 : $X):
+  store %4 to %2: $*X
+
+  dealloc_stack %2 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @usei8 : $@convention(thin) (UInt8) -> ()
+
+// CHECK: sil @test16
+// CHECK: bb0(%0 : $member_id_t):
+// CHECK:   [[T0:%.*]] = alloc_stack $member_id_t
+// CHECK:   store %0 to [[T0]] : $*member_id_t
+// CHECK:   struct_element_addr [[T0]]
+// CHECK:} // end sil function 'test16'
+
+sil @test16 : $@convention(thin) (member_id_t) -> () {
+bb0(%0 : $member_id_t):
+  %2 = alloc_stack $X
+  %44 = struct_extract %0 : $member_id_t, #member_id_t.member_value // user: %45
+  %45 = unchecked_trivial_bit_cast %44 : $member_id_t.__Unnamed_union_member_value to $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  %46 = tuple_extract %45 : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), 0
+  %11 = function_ref @usei8 : $@convention(thin) (UInt8) -> ()
+  %12 = apply %11(%46) : $@convention(thin) (UInt8) -> ()
+  dealloc_stack %2 : $*X
+  %13 = tuple ()
+  return %13 : $()
 }

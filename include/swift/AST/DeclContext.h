@@ -20,6 +20,7 @@
 #define SWIFT_DECLCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -261,7 +262,8 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
   friend class Initializer; // uses setParent
   friend class AutoClosureExpr; // uses setParent
   friend class AbstractClosureExpr; // uses setParent
-  
+  friend class Decl; // uses setParent
+
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
   
@@ -515,12 +517,12 @@ public:
         const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
   }
 
-  /// Returns the innermost context that is a ClosureExpr, which defines how
-  /// self behaves, unless within a type context that redefines self.
+  /// Returns the innermost ClosureExpr context that can propagate its captures
+  /// to this DeclContext.
   LLVM_READONLY
-  ClosureExpr *getInnermostClosureForSelfCapture();
-  const ClosureExpr *getInnermostClosureForSelfCapture() const {
-    return const_cast<DeclContext *>(this)->getInnermostClosureForSelfCapture();
+  ClosureExpr *getInnermostClosureForCaptures();
+  const ClosureExpr *getInnermostClosureForCaptures() const {
+    return const_cast<DeclContext *>(this)->getInnermostClosureForCaptures();
   }
 
   /// Returns the semantic parent of this context.  A context has a
@@ -575,6 +577,11 @@ public:
   LLVM_READONLY
   SourceFile *getOutermostParentSourceFile() const;
 
+  /// Returns true if the source file that contains the context is a
+  /// `.swiftinterface` file.
+  LLVM_READONLY
+  bool isInSwiftinterface() const;
+
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
@@ -585,6 +592,10 @@ public:
   /// Determine whether this or any parent context is a `@_specialize` extension
   /// context.
   bool isInSpecializeExtensionContext() const;
+
+  /// Returns whether this declaration context is a protocol in an unsupported
+  /// context.
+  bool isUnsupportedNestedProtocol() const;
 
   /// Get the most optimal resilience expansion for code in this context.
   /// If the body is able to be inlined into functions in other resilience
@@ -657,6 +668,12 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
+  /// Look up the custom availability domains matching the given identifier that
+  /// are visible from this context.
+  void
+  lookupAvailabilityDomains(Identifier identifier,
+                            SmallVectorImpl<AvailabilityDomain> &results) const;
+
   /// Looks up an infix operator with a given \p name.
   ///
   /// This returns a vector of results, as it's possible to find multiple infix
@@ -679,6 +696,9 @@ public:
 
   /// Looks up a precedence group with a given \p name.
   PrecedenceGroupLookupResult lookupPrecedenceGroup(Identifier name) const;
+
+  /// Returns true if the parent module of \p decl is imported by this context.
+  bool isDeclImported(const Decl *decl) const;
 
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
@@ -795,6 +815,30 @@ class IterableDeclContext {
   /// while skipping the body of this context.
   unsigned HasNestedClassDeclarations : 1;
 
+  /// Whether we were inside a freestanding macro argument when we were parsed.
+  /// We must restore this when delayed parsing the body.
+  unsigned InFreestandingMacroArgument : 1;
+
+  /// Whether delayed parsing detect a possible custom derivative definition
+  /// while skipping the body of this context.
+  unsigned HasDerivativeDeclarations : 1;
+
+  /// Members of a decl are deserialized lazily. This is set when
+  /// deserialization of all members is done, regardless of errors.
+  unsigned DeserializedMembers : 1;
+
+  /// Deserialization errors are attempted to be recovered later or
+  /// silently dropped due to `EnableDeserializationRecovery` being
+  /// on by default. The following flag is set when deserializing
+  /// members fails regardless of the `EnableDeserializationRecovery`
+  /// value and is used to prevent decl containing such members from
+  /// being accessed non-resiliently.
+  unsigned HasDeserializeMemberError : 1;
+
+  /// Used to track whether members of this decl and their respective
+  /// members were checked for deserialization errors recursively.
+  unsigned CheckedForDeserializeMemberError : 1;
+
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
 
@@ -805,12 +849,20 @@ class IterableDeclContext {
   /// Retrieve the \c ASTContext in which this iterable context occurs.
   ASTContext &getASTContext() const;
 
+  void setCheckedForDeserializeMemberError(bool checked) { CheckedForDeserializeMemberError = checked; }
+  bool checkedForDeserializeMemberError() const { return CheckedForDeserializeMemberError; }
+
 public:
   IterableDeclContext(IterableDeclContextKind kind)
     : LastDeclAndKind(nullptr, kind) {
     AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
+    HasDerivativeDeclarations = 0;
     HasNestedClassDeclarations = 0;
+    InFreestandingMacroArgument = 0;
+    DeserializedMembers = 0;
+    HasDeserializeMemberError = 0;
+    CheckedForDeserializeMemberError = 0;
   }
 
   /// Determine the kind of iterable context we have.
@@ -818,7 +870,21 @@ public:
     return LastDeclAndKind.getInt();
   }
 
+  SourceRange getBraces() const;
+
   bool hasUnparsedMembers() const;
+
+  void setDeserializedMembers(bool deserialized) { DeserializedMembers = deserialized; }
+  bool didDeserializeMembers() const { return DeserializedMembers; }
+
+  void setHasDeserializeMemberError(bool hasError) { HasDeserializeMemberError = hasError; }
+  bool hasDeserializeMemberError() const { return HasDeserializeMemberError; }
+
+  /// This recursively checks whether members of this decl and their respective
+  /// members were deserialized correctly and emits a diagnostic in case of an error.
+  /// Requires accessing module and this decl's module are in the same package,
+  /// and this decl's module has package optimization enabled.
+  void checkDeserializeMemberErrorInPackage(ModuleDecl *accessingModule);
 
   bool maybeHasOperatorDeclarations() const {
     return HasOperatorDeclarations;
@@ -836,6 +902,24 @@ public:
   void setMaybeHasNestedClassDeclarations() {
     assert(hasUnparsedMembers());
     HasNestedClassDeclarations = 1;
+  }
+
+  bool inFreestandingMacroArgument() const {
+    return InFreestandingMacroArgument;
+  }
+
+  void setInFreestandingMacroArgument() {
+    assert(hasUnparsedMembers());
+    InFreestandingMacroArgument = 1;
+  }
+
+  bool maybeHasDerivativeDeclarations() const {
+    return HasDerivativeDeclarations;
+  }
+
+  void setMaybeHasDerivativeDeclarations() {
+    assert(hasUnparsedMembers());
+    HasDerivativeDeclarations = 1;
   }
 
   /// Retrieve the current set of members in this context.
@@ -1007,6 +1091,20 @@ namespace llvm {
 
     static inline ::swift::DeclContext *doCast(const FromTy &val) {
       return ::swift::DeclContext::castDeclToDeclContext(val);
+    }
+  };
+
+  template<class FromTy>
+  struct CastInfo<::swift::GenericContext, FromTy, std::enable_if_t<is_simple_type<FromTy>::value>>
+      : public CastIsPossible<::swift::GenericContext, FromTy>,
+        public DefaultDoCastIfPossible<::swift::GenericContext *, FromTy,
+                                       CastInfo<::swift::GenericContext, FromTy>> {
+    static inline ::swift::GenericContext *castFailed() { return nullptr; }
+
+    static inline ::swift::GenericContext *doCast(const FromTy &val) {
+      auto *genCtxt = val->getAsGenericContext();
+      assert(genCtxt);
+      return const_cast<::swift::GenericContext *>(genCtxt);
     }
   };
 

@@ -7,7 +7,6 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
-  AllocVectorLowering.swift
   AssumeSingleThreaded.swift
   AsyncDemotion.swift
   BooleanLiteralFolding.swift
@@ -15,8 +14,11 @@ swift_compiler_sources(Optimizer
   ClosureSpecialization.swift
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
+  CopyToBorrowOptimization.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
+  DestroyHoisting.swift
+  DiagnoseInfiniteRecursion.swift
   InitializeStaticGlobals.swift
   LetPropertyLowering.swift
   LifetimeDependenceDiagnostics.swift

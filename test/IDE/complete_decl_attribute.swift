@@ -111,7 +111,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
-// KEYWORD2-NOT:              Keyword
+// KEYWORD2-NEXT              Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
@@ -250,6 +250,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // ON_METHOD-DAG: Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // ON_METHOD-DAG: Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
+// ON_METHOD-DAG: Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -323,6 +324,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
 // ON_MEMBER_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding
 // ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
+// ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -394,6 +396,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
 // KEYWORD_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
 // KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
+// KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper

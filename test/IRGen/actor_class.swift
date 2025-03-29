@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -target %target-swift-5.1-abi-triple | %IRGenFileCheck %s
 // REQUIRES: concurrency
 
 

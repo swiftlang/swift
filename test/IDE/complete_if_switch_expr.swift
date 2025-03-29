@@ -252,15 +252,22 @@ func testSkipTypeChecking9() -> E {
 }
 
 func testSkipTypeChecking10() -> E {
-  // We only need to type-check the inner-most function for this.
+  // Similar to the above case, we need to type-check everything for this since
+  // the type-checking of 'takesArgAndClosure' is required to correctly handle
+  // any potential captures in 'foo'.
   if Bool.random() {
-    NO.TYPECHECK
+    .e
   } else {
-    takesArgAndClosure(NO.TYPECHECK) {
+    takesArgAndClosure(0) {
       func foo() {
+        // We can however skip unrelated elements in the local function.
+        let x = NO.TYPECHECK
+        if NO.TYPECHECK {
+          takesE(NO.TYPECHECK)
+        }
         takesE(.#^DOT21?check=DOT^#)
       }
-      return NO.TYPECHECK
+      return .e
     }
   }
 }
@@ -320,7 +327,7 @@ func testSkipTypeChecking14() -> E {
   }
 }
 
-func testSkipTypeChecking14() -> E {
+func testSkipTypeChecking15() -> E {
   switch Bool.random() {
   case true:
     .#^DOT26?check=DOT^#
@@ -336,7 +343,7 @@ func testSkipTypeChecking14() -> E {
   }
 }
 
-func testSkipTypechecking15(_ x: inout Int) -> E {
+func testSkipTypechecking16(_ x: inout Int) -> E {
   switch Bool.random() {
   case true:
     .#^DOT27?check=DOT^#

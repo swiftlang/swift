@@ -96,7 +96,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name) {
   if (Instance->setup(Invocation, InstanceSetupError))
     llvm_unreachable(InstanceSetupError.c_str());
 
-  unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().value();
+  unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID();
   SourceManager &SM = Instance->getSourceMgr();
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);

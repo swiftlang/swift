@@ -295,20 +295,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
     llvm::Value *groupFlags = nullptr;
-    // Claim metadata pointer.
-    (void)args.claimAll();
+    assert(args.size() == 0);
     out.add(emitCreateTaskGroup(IGF, substitutions, groupFlags));
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroupWithFlags) {
     auto groupFlags = args.claimNext();
-    // Claim the remaining metadata pointer.
-    if (args.size() == 1) {
-      (void)args.claimNext();
-    } else if (args.size() > 1) {
-      llvm_unreachable("createTaskGroupWithFlags expects 1 or 2 arguments");
-    }
+    assert(args.size() == 0);
     out.add(emitCreateTaskGroup(IGF, substitutions, groupFlags));
     return;
   }
@@ -1333,18 +1327,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
-    // Build a zero initializer of the result type.
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
-    
     if (args.size() > 0) {
+      auto valueType = argTypes[0];
+      auto &valueTI = IGF.IGM.getTypeInfo(valueType);
+
       // `memset` the memory addressed by the argument.
       auto address = args.claimNext();
-      IGF.Builder.CreateMemSet(valueTy.second.getAddressForPointer(address),
+      IGF.Builder.CreateMemSet(valueTI.getAddressForPointer(address),
                                llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
-                               valueTy.second.getSize(IGF, argTypes[0]));
+                               valueTI.getSize(IGF, valueType));
     } else {
-      auto schema = valueTy.second.getSchema();
+      auto &resultTI = cast<LoadableTypeInfo>(IGF.IGM.getTypeInfo(resultType));
+      auto schema = resultTI.getSchema();
       for (auto &elt : schema) {
         out.add(llvm::Constant::getNullValue(elt.getScalarType()));
       }
@@ -1482,8 +1476,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::AllocVector) {
+    // Obsolete: only there to be able to read old Swift.interface files which still
+    // contain the builtin.
     (void)args.claimAll();
-    IGF.emitTrap("escaped vector allocation", /*EmitUnreachable=*/true);
+    IGF.emitTrap("vector allocation not supported anymore", /*EmitUnreachable=*/true);
     out.add(llvm::UndefValue::get(IGF.IGM.Int8PtrTy));
     llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
     IGF.Builder.emitBlock(contBB);

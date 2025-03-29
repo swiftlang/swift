@@ -324,7 +324,7 @@ bool diagnoseNonSendableTypesInReference(
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, const DeclContext *fromDC);
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency);
 
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
@@ -378,12 +378,23 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
 /// Describes the context in which a \c Sendable check occurs.
 struct SendableCheckContext {
   const DeclContext * const fromDC;
+  bool preconcurrencyContext;
   const std::optional<SendableCheck> conformanceCheck;
 
   SendableCheckContext(
       const DeclContext *fromDC,
       std::optional<SendableCheck> conformanceCheck = std::nullopt)
-      : fromDC(fromDC), conformanceCheck(conformanceCheck) {}
+      : fromDC(fromDC),
+        preconcurrencyContext(false),
+        conformanceCheck(conformanceCheck) {}
+
+  SendableCheckContext(
+      const DeclContext *fromDC,
+      bool preconcurrencyContext,
+      std::optional<SendableCheck> conformanceCheck = std::nullopt)
+      : fromDC(fromDC),
+        preconcurrencyContext(preconcurrencyContext),
+        conformanceCheck(conformanceCheck) {}
 
   /// Determine the default diagnostic behavior for a missing/unavailable
   /// Sendable conformance in this context.
@@ -400,8 +411,8 @@ struct SendableCheckContext {
       Decl *decl,
       bool ignoreExplicitConformance = false) const;
 
-  /// Whether we are in an explicit conformance to Sendable.
-  bool isExplicitSendableConformance() const;
+  /// Whether to warn about a Sendable violation even in minimal checking.
+  bool warnInMinimalChecking() const;
 };
 
 /// Diagnose any non-Sendable types that occur within the given type, using
@@ -447,11 +458,14 @@ bool diagnoseNonSendableTypes(
   return diagnoseNonSendableTypes(
       type, fromContext, derivedConformance, typeLoc,
       [&](Type specificType, DiagnosticBehavior behavior) {
+        // FIXME: Reconcile preconcurrency declaration vs preconcurrency
+        // import behavior.
         auto preconcurrency =
           fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
 
         ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-            .limitBehaviorUntilSwiftVersion(behavior, 6)
+            .limitBehaviorWithPreconcurrency(behavior,
+                                             fromContext.preconcurrencyContext)
             .limitBehaviorIf(preconcurrency);
 
         return (behavior == DiagnosticBehavior::Ignore ||
@@ -550,6 +564,11 @@ checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
+/// Determine the actor isolation used when we are referencing the given
+/// declaration.
+ActorIsolation getActorIsolationForReference(ValueDecl *decl,
+                                             const DeclContext *fromDC);
+
 /// Adjust the type of the variable for concurrency.
 Type adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,
@@ -597,9 +616,6 @@ ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
 /// \returns nullptr iff we are not in such a declaration. Otherwise,
 ///          returns a pointer to the declaration.
 const AbstractFunctionDecl *isActorInitOrDeInitContext(const DeclContext *dc);
-
-/// Determine whether this declaration is always accessed asynchronously.
-bool isAsyncDecl(ConcreteDeclRef declRef);
 
 /// Determine whether this declaration can throw errors.
 bool isThrowsDecl(ConcreteDeclRef declRef);
@@ -679,6 +695,37 @@ void introduceUnsafeInheritExecutorReplacements(
 /// we route them to the @_unsafeInheritExecutor versions implicitly.
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
+
+/// Check for correct use of isolated conformances in the given reference.
+///
+/// This checks that any isolated conformances that occur in the given
+/// declaration reference match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the set given set of
+/// protocol conformances.
+///
+/// This checks that any isolated conformances that occur in the given
+/// declaration reference match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
+    const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the given substitution
+/// map.
+///
+/// This checks that any isolated conformances that occur in the given
+/// substitution map match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the given type.
+///
+/// This checks that any isolated conformances that occur in the given
+/// type match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    Type type, SourceLoc loc, const DeclContext *dc);
 
 } // end namespace swift
 

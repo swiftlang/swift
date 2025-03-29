@@ -17,7 +17,6 @@
 #ifndef SWIFT_ABI_TASK_H
 #define SWIFT_ABI_TASK_H
 
-#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -43,7 +42,14 @@ class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;
 
-extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
+// lldb knows about some of these internals. If you change things that lldb
+// knows about (or might know about in the future, as a future lldb might be
+// inspecting a process running an older Swift runtime), increment
+// _swift_concurrency_debug_internal_layout_version and add a comment describing
+// the new version.
+
+extern const HeapMetadata *jobHeapMetadataPtr;
+extern const HeapMetadata *taskHeapMetadataPtr;
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job :
@@ -101,14 +107,14 @@ public:
   };
 
   Job(JobFlags flags, JobInvokeFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata)
+      const HeapMetadata *metadata = jobHeapMetadataPtr)
       : HeapObject(metadata), Flags(flags), RunJob(invoke) {
     Voucher = voucher_copy();
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
   Job(JobFlags flags, TaskContinuationFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata,
+      const HeapMetadata *metadata = jobHeapMetadataPtr,
       bool captureCurrentVoucher = true)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
     if (captureCurrentVoucher)
@@ -292,7 +298,18 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[14];
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
+    static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
+#else
+    static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
+#endif
+
+    // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
+    // the ActiveTaskStatus, and a RecursiveMutex.
+    static constexpr size_t PrivateStorageSize =
+        6 * sizeof(void *) + 16 + ActiveTaskStatusSize + sizeof(RecursiveMutex);
+
+    void *Storage[PrivateStorageSize];
 
     /// Initialize this storage during the creation of a task.
     void initialize(JobPriority basePri);
@@ -414,6 +431,28 @@ public:
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const;
+
+  // ==== INITIAL TASK RECORDS =================================================
+  // A task may have a number of "initial" records set, they MUST be set in the
+  // following order to make the task-local allocation/deallocation's stack
+  // discipline easy to work out at the tasks destruction:
+  //
+  // - Initial TaskName
+  // - Initial ExecutorPreference
+
+  // ==== Task Naming ----------------------------------------------------------
+
+  /// At task creation a task may be assigned a name.
+  void pushInitialTaskName(const char* taskName);
+  void dropInitialTaskNameRecord();
+
+  /// Get the initial task name that was given to this task during creation,
+  /// or nullptr if the task has no name
+  const char* getTaskName();
+
+  bool hasInitialTaskNameRecord() const {
+    return Flags.task_hasInitialTaskName();
+  }
 
   // ==== Task Executor Preference ---------------------------------------------
 
@@ -727,13 +766,14 @@ private:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
-              "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 // Libc hardcodes this offset to extract the TaskID
 static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
               "AsyncTask::Id offset is wrong");
+#pragma clang diagnostic pop
 
 SWIFT_CC(swiftasync)
 inline void Job::runInFullyEstablishedContext() {

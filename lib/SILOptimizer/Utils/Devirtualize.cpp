@@ -619,6 +619,10 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
   // Forward the token.
   oldBAI->getTokenResult()->replaceAllUsesWith(newBAI->getTokenResult());
 
+  if (auto *allocation = oldBAI->getCalleeAllocationResult()) {
+    allocation->replaceAllUsesWith(newBAI->getCalleeAllocationResult());
+  }
+
   auto oldYields = oldBAI->getYieldedValues();
   auto newYields = newBAI->getYieldedValues();
   assert(oldYields.size() == newYields.size());
@@ -629,24 +633,23 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
     // Insert any end_borrow if the yielded value before the token's uses.
     SmallVector<SILInstruction *, 4> users(
       makeUserIteratorRange(oldYield->getUses()));
-    auto yieldCastRes = castValueToABICompatibleType(
-      &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
-      users);
-    oldYield->replaceAllUsesWith(yieldCastRes.first);
-    changedCFG |= yieldCastRes.second;
+    if (!users.empty()) {
+      auto yieldCastRes = castValueToABICompatibleType(
+        &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
+        users);
+      oldYield->replaceAllUsesWith(yieldCastRes.first);
+      changedCFG |= yieldCastRes.second;
+    }
   }
 
   if (newArgBorrows.empty())
     return {newBAI, changedCFG};
 
-  SILValue token = newBAI->getTokenResult();
-
-  // The token will only be used by end_apply and abort_apply. Use that to
-  // insert the end_borrows we need /after/ those uses.
-  for (auto *use : token->getUses()) {
+  // Insert the end_borrows after end_apply and abort_apply users.
+  for (auto *use : newBAI->getEndApplyUses()) {
     SILBuilderWithScope borrowBuilder(
-        &*std::next(use->getUser()->getIterator()),
-        builder.getBuilderContext());
+      &*std::next(use->getUser()->getIterator()),
+      builder.getBuilderContext());
     for (SILValue borrow : newArgBorrows) {
       borrowBuilder.createEndBorrow(loc, borrow);
     }
@@ -1239,8 +1242,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
     }
   }
 
-  std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
+  std::tie(f, wt) = lookUpFunctionInWitnessTable(wmi, SILModule::LinkingMode::LinkAll);
 
   if (!f)
     return false;
@@ -1351,8 +1353,7 @@ swift::tryDevirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite,
 
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
-  std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
-      wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
+  std::tie(f, wt) = lookUpFunctionInWitnessTable(wmi, SILModule::LinkingMode::LinkAll);
 
   return devirtualizeWitnessMethod(pm, applySite, f, wmi->getConformance(), ore);
 }

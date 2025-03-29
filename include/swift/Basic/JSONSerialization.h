@@ -443,21 +443,21 @@ public:
   template <typename T>
   void bitSetCase(T &Val, const char* Str, const T ConstVal) {
     if (bitSetMatch(Str, (Val & ConstVal) == ConstVal)) {
-      Val = Val | ConstVal;
+      Val = static_cast<T>(Val | ConstVal);
     }
   }
 
   template <typename T>
   void maskedBitSetCase(T &Val, const char *Str, T ConstVal, T Mask) {
     if (bitSetMatch(Str, (Val & Mask) == ConstVal))
-      Val = Val | ConstVal;
+      Val = static_cast<T>(Val | ConstVal);
   }
 
   template <typename T>
   void maskedBitSetCase(T &Val, const char *Str, uint32_t ConstVal,
                         uint32_t Mask) {
     if (bitSetMatch(Str, (Val & Mask) == ConstVal))
-      Val = Val | ConstVal;
+      Val = static_cast<T>(Val | ConstVal);
   }
 
   template <typename T>

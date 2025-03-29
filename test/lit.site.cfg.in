@@ -16,6 +16,7 @@ import sys
 import lit.util
 
 config.cmake = "@CMAKE_COMMAND@"
+config.cmake_binary_dir = "@CMAKE_BINARY_DIR@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
@@ -29,6 +30,8 @@ config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
+config.external_embedded_platform = "@VARIANT_EXTERNAL_EMBEDDED_PLATFORM@" == "TRUE"
+config.external_embedded_device = "@VARIANT_EXTERNAL_EMBEDDED_DEVICE@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
@@ -118,13 +121,6 @@ if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
 if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
     config.available_features.add('runtime_function_counters')
 
-if "@CMAKE_GENERATOR@" == "Xcode":
-    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
-                                 'bin')
-    lit_config.note('Adding to path: ' + xcode_bin_dir)
-    config.environment['PATH'] = \
-      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
-
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
 if "@SWIFT_ENABLE_MACCATALYST@" == "TRUE":
@@ -145,8 +141,6 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
-if "@SWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES@" == "TRUE":
-    config.available_features.add('nonescapable_types')
 if "@SWIFT_STDLIB_STATIC_PRINT@" == "TRUE":
     config.available_features.add('stdlib_static_print')
 if "@SWIFT_STDLIB_ENABLE_UNICODE_DATA" == "TRUE":
@@ -182,5 +176,6 @@ if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(lit.util.abs_path_preserve_drive(__file__))
+lit_config.load_config(config, os.path.join(config.test_exec_root, "lit.swift-features.cfg"))
 lit_config.load_config(
     config, os.path.join(config.swift_src_root, "test", "lit.cfg"))

@@ -100,7 +100,13 @@ protected:
     parsedExpr = Added<T *>(dyn_cast<T>(E));
     return result;
   }
-  
+
+  // Type-check parsedExpr. Note that parsedExpr could end up being changed to
+  // a different kind of expr by the type checker.
+  bool doTypeCheckExpr(ASTContext &Ctx, DeclContext *DC, Expr *&parsedExpr) {
+    return doTypeCheckImpl(Ctx, DC, parsedExpr);
+  }
+
 private:
   bool doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC, Expr * &parsedExpr);
 };

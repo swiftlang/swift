@@ -181,10 +181,10 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   }
   case SILInstructionKind::MarkDependenceInst: {
     auto mdi = cast<MarkDependenceInst>(user);
-    // If the user is the base operand of the MarkDependenceInst we can return
-    // true, because this would be the end of this dataflow chain
     if (mdi->getBase() == address) {
-      return true;
+      // We want to keep the original lifetime of the base. If we would eliminate
+      // the base alloc_stack, we risk to insert a destroy_addr too early.
+      return false;
     }
     // If the user is the value operand of the MarkDependenceInst we have to
     // transitively explore its uses until we reach a load or return false
@@ -210,8 +210,8 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
       // Register 'end_apply'/'abort_apply' as loads as well
       // 'checkNoSourceModification' should check instructions until
       // 'end_apply'/'abort_apply'.
-      for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
-        SILInstruction *tokenUser = tokenUse->getUser();
+      for (auto *tokenUse : beginApply->getEndApplyUses()) {
+        auto *tokenUser = tokenUse->getUser();
         if (tokenUser->getParent() != block)
           return false;
         loadInsts.insert(tokenUser);
@@ -640,8 +640,6 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
         // This copy_addr [take] will perform the final deinitialization.
         return false;
       }
-      assert(!tempObj->getType().isMoveOnly() &&
-             "introducing copy of move-only value!?");
       return true;
     }
     if (auto *li = dyn_cast<LoadInst>(lastLoadInst)) {
@@ -650,8 +648,6 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
         // This load [take] will perform the final deinitialization.
         return false;
       }
-      assert(!tempObj->getType().isMoveOnly() &&
-             "introducing copy of move-only value!?");
       return true;
     }
     return true;
@@ -958,15 +954,18 @@ void TempRValueOptPass::run() {
       simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks, &deBlocks);
     }
   }
-  if (!deadCopies.empty()) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-  }
 
   // Call the utlity to complete ossa lifetime.
+  bool completedAny = false;
   OSSALifetimeCompletion completion(function, da->get(function), deBlocks);
   for (auto it : valuesToComplete) {
-    completion.completeOSSALifetime(it,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
+    auto completed = completion.completeOSSALifetime(
+        it, OSSALifetimeCompletion::Boundary::Liveness);
+    completedAny = (completed == LifetimeCompletion::WasCompleted);
+  }
+
+  if (!deadCopies.empty() || completedAny) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 }
 

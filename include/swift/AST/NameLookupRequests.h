@@ -25,6 +25,7 @@
 #include "swift/AST/TypeOrExtensionDecl.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -997,6 +998,32 @@ private:
   ObjCCategoryNameMap evaluate(Evaluator &evaluator,
                                ClassDecl *classDecl,
                                ExtensionDecl *lastExtension) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct DeclABIRoleInfoResult {
+  llvm::PointerIntPair<Decl *, 2, uint8_t> storage;
+  DeclABIRoleInfoResult(Decl *counterpart, uint8_t roleValue)
+    : storage(counterpart, roleValue) {}
+};
+
+/// Return the ABI role info (role and counterpart) of a given declaration.
+class DeclABIRoleInfoRequest
+    : public SimpleRequest<DeclABIRoleInfoRequest,
+                           DeclABIRoleInfoResult(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  void recordABIOnly(Evaluator &evaluator, Decl *counterpart);
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  DeclABIRoleInfoResult evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

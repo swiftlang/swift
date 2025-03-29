@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -module-name ossa -o %t/ossa.swiftmodule %s
-// RUN: %target-sil-opt %t/ossa.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %t/ossa.swiftmodule | %FileCheck %s
 
 sil_stage canonical
 
@@ -24,7 +24,7 @@ bb0(%0 : @guaranteed $AnyObject):
 // CHECK-NEXT:    {{%.*}} = begin_borrow %0 : $X
 // CHECK:       bb2:
 // CHECK-NEXT:    {{%.*}} = begin_borrow %0 : $X
-// CHECK:       bb3([[ARG:%.*]] : @reborrow @guaranteed $X):
+// CHECK:       bb3([[ARG:%.*]] : @reborrow $X):
 // CHECK-NEXT:    {{%.*}} = borrowed [[ARG]] : $X from (%0 : $X)
 // CHECK:       } // end sil function 'reborrowTest'
 sil [serialized] [ossa] @reborrowTest : $@convention(thin) (@owned X) -> () {
@@ -39,7 +39,7 @@ bb2:
   %b2 = begin_borrow %0 : $X
   br bb3(%b2 : $X)
 
-bb3(%r : @reborrow @guaranteed $X):
+bb3(%r : @reborrow $X):
   %f = borrowed %r : $X from (%0 : $X)
   end_borrow %f : $X
   destroy_value %0 : $X

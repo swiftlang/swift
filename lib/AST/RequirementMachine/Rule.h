@@ -38,14 +38,6 @@ class Rule final {
   Term LHS;
   Term RHS;
 
-  /// The written requirement ID, which can be used to index into the
-  /// \c WrittenRequirements array in the rewrite system to retrieve
-  /// the structural requirement.
-  ///
-  /// This uses a biased representation where an ID of 0 means 'no ID',
-  /// otherwise the value is the actual ID plus one.
-  unsigned RequirementID : 16;
-
   /// A 'permanent' rule cannot be deleted by homotopy reduction. These
   /// do not correspond to generic requirements and are re-added when the
   /// rewrite system is built.
@@ -96,7 +88,6 @@ class Rule final {
 public:
   Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs) {
-    RequirementID = 0;
     Permanent = false;
     Explicit = false;
     LHSSimplified = false;
@@ -162,9 +153,9 @@ public:
     return Frozen;
   }
 
-  bool containsUnresolvedSymbols() const {
-    return (LHS.containsUnresolvedSymbols() ||
-            RHS.containsUnresolvedSymbols());
+  bool containsNameSymbols() const {
+    return (LHS.containsNameSymbols() ||
+            RHS.containsNameSymbols());
   }
 
   std::optional<Identifier> isProtocolTypeAliasRule() const;
@@ -228,7 +219,6 @@ public:
 
   void freeze() {
     Redundant = false;
-    RequirementID = 0;
     Frozen = true;
   }
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -target %target-swift-abi-5.0-triple -verify -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -target %target-swift-abi-5.0-triple -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -7,7 +7,6 @@
 
 @available(SwiftStdlib 5.1, *)
 struct NS1 { }
-// expected-note @-1 {{consider making struct 'NS1' conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
@@ -96,7 +95,7 @@ public actor MyActor: MyProto {
     await nonisolatedAsyncFunc1(ns1)
     // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
     // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
-    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable result type 'NS1' cannot be sent from nonisolated context in call to global function 'nonisolatedAsyncFunc2()'}}
+    _ = await nonisolatedAsyncFunc2()
   }
 }
 
@@ -132,7 +131,10 @@ protocol P {
   func foo2<T : Sendable>(x : T) async -> ()
 
   func bar2<T>(x : T) async -> ()
-  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{14-14=: Sendable}}
+
+  func bar3<T: Equatable>(x : T) async -> ()
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{25-25= & Sendable}}
 }
 
 // Make sure conformance to protocols checks sendability of
@@ -148,6 +150,9 @@ protocol P {
 
   func bar2<T>(x : T) -> () {}
   // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar2(x:)' into actor-isolated implementation}}
+
+  func bar3<T: Equatable>(x : T) -> () {}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar3(x:)' into actor-isolated implementation}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -164,7 +169,11 @@ class Super {
 
   @MainActor
   func bar2<T>(x: T) async {}
-  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{14-14=: Sendable}}
+
+  @MainActor
+  func bar3<T: Equatable>(x: T) async {}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{25-25= & Sendable}}
 }
 
 // Make sure isolation crossing overrides check sendability
@@ -180,6 +189,9 @@ class Sub : Super {
 
   override nonisolated func bar2<T>(x: T) async {}
   // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
+
+  override nonisolated func bar3<T>(x: T) async {}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar3(x:)' into nonisolated override}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -352,7 +364,7 @@ func testLocalCaptures() {
   @Sendable
   func a2() -> NonSendable {
     return ns
-    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a `@Sendable` local function}}
+    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' local function}}
   }
 }
 
@@ -434,7 +446,7 @@ struct DowngradeForPreconcurrency {
     preconcurrencyContext {
       Task {
         completion()
-        // expected-warning@-1 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a `@Sendable` closure}}
+        // expected-warning@-1 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
         // expected-warning@-2 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
@@ -495,3 +507,23 @@ func checkOpaqueType() -> some Sendable {
 class MainActorSub: MainActorSuper<MainActorSub.Nested> {
   struct Nested {}  // no cycle
 }
+
+@available(SwiftStdlib 5.9, *)
+struct SendablePack<each Element: Sendable>: Sendable {
+  let elements: (repeat each Element)
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+func sendablePacks<each Element: Sendable>(
+    _ element: repeat each Element
+) async {
+  { @Sendable in
+    repeat _ = each element
+  }()
+
+  await sendPack(repeat each element)
+}
+
+@available(SwiftStdlib 5.1, *)
+func sendPack<each Element>(_: repeat each Element) async {}

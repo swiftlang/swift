@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/create_string.swift -typecheck -module-name StringCreator -enable-experimental-cxx-interop -emit-clang-header-path %t/StringCreator.h
+// RUN: %target-swift-frontend %t/create_string.swift -module-name StringCreator -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/StringCreator.h
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fobjc-arc -c %t/string-to-nsstring.mm -I %t -o %t/swift-stdlib-execution.o
 // RUN: %target-build-swift %t/use_foundation.swift %t/create_string.swift -o %t/swift-stdlib-execution -Xlinker %t/swift-stdlib-execution.o -module-name StringCreator -Xfrontend -entry-point-function-name -Xfrontend swiftMain -lc++
