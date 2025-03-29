@@ -35,6 +35,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/STLCompatibility.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -1059,8 +1060,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Initialize the parent context pointer to null.
   initialContext->Parent = nullptr;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   // Initialize the resumption funclet pointer (async return address) to
   // the final funclet for completing the task.
 
@@ -1074,21 +1073,20 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // The final funclet shouldn't release the task or the task function.
   } else if (asyncLet) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTask);
+        std::bit_cast<TaskContinuationFunction *>(&completeTask);
 
   // If we have a non-null closure context and the task function is not
   // consumed by calling it, use a final funclet that releases both the
   // task and the closure context.
   } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskWithClosure);
+        std::bit_cast<TaskContinuationFunction *>(&completeTaskWithClosure);
 
   // Otherwise, just release the task.
   } else {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskAndRelease);
+        std::bit_cast<TaskContinuationFunction *>(&completeTaskAndRelease);
   }
-#pragma clang diagnostic pop
 
   // Initialize the task-local allocator and our other private runtime
   // state for the task.
