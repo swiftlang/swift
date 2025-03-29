@@ -287,6 +287,12 @@ final class CowTest {
   var container = CowContainer()
 }
 
+@Observable
+final class DeinitTriggeredObserver {
+  var property: Int = 3
+}
+
+
 @main
 struct Validator {
   @MainActor
@@ -509,6 +515,18 @@ struct Validator {
       expectEqual(subject.container.id, startId)
       subject.container.mutate()
       expectEqual(subject.container.id, startId)
+    }
+
+    suite.test("weak container observation") {
+      let changed = CapturedState(state: false)
+      var test: DeinitTriggeredObserver? = DeinitTriggeredObserver()
+      withObservationTracking {
+        _blackHole(test?.property)
+      } onChange: {
+        changed.state = true
+      }
+      test = nil
+      expectEqual(changed.state, true)
     }
 
     runAllTests()
