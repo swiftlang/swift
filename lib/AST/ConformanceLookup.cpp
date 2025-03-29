@@ -387,10 +387,10 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
     case KnownProtocolKind::Sendable:
-      // Metatypes are generally Sendable, but under StrictSendableMetatypes we
+      // Metatypes are generally Sendable, but with isolated conformances we
       // cannot assume that metatypes based on type parameters are Sendable.
       // Therefore, check for conformance to SendableMetatype.
-      if (ctx.LangOpts.hasFeature(Feature::StrictSendableMetatypes)) {
+      if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances)) {
         auto sendableMetatypeProto = 
             ctx.getProtocol(KnownProtocolKind::SendableMetatype);
         if (sendableMetatypeProto) {
