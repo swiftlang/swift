@@ -610,6 +610,12 @@ ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
 void ScopeCreator::addChildrenForParsedAccessors(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
   asd->visitParsedAccessors([&](AccessorDecl *ad) {
+    // Ignore accessors added by macro expansions.
+    // TODO: This ought to be the default behavior of `visitParsedAccessors`,
+    // we ought to have a different entrypoint for clients that care about
+    // the semantic set of "explicit" accessors.
+    if (ad->isInMacroExpansionInContext())
+      return;
     assert(asd == ad->getStorage());
     this->addToScopeTree(ad, parent);
   });
@@ -666,11 +672,16 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
   if (auto *var = patternBinding->getSingleVar())
     addChildrenForKnownAttributes(var, parentScope);
 
+  // Check to see if we have a local binding. Note we need to exclude bindings
+  // in `@abi` attributes here since they may be in a local DeclContext, but
+  // their scope shouldn't extend past the attribute.
   bool isLocalBinding = false;
-  for (auto i : range(patternBinding->getNumPatternEntries())) {
-    if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
-      isLocalBinding = varDecl->getDeclContext()->isLocalContext();
-      break;
+  if (!isa<ABIAttributeScope>(parentScope)) {
+    for (auto i : range(patternBinding->getNumPatternEntries())) {
+      if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
+        isLocalBinding = varDecl->getDeclContext()->isLocalContext();
+        break;
+      }
     }
   }
 
@@ -703,7 +714,7 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   child->parentAndWasExpanded.setPointer(this);
 
 #ifndef NDEBUG
-  // checkSourceRangeBeforeAddingChild(child, ctx);
+  checkSourceRangeBeforeAddingChild(child, ctx);
 #endif
 
   // If this is the first time we've added children, notify the ASTContext
