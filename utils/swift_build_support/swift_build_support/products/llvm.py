@@ -300,18 +300,43 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('LLVM_INCLUDE_DOCS:BOOL', 'TRUE')
         llvm_cmake_options.define('LLVM_ENABLE_LTO:STRING', self.args.lto_type)
         llvm_cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
+        # Swift expects the old layout for the runtime directory
+        llvm_cmake_options.define('LLVM_ENABLE_PER_TARGET_RUNTIME_DIR', 'OFF')
+        if host_target.startswith('linux'):
+            # This preserves the behaviour we had when using
+            # LLVM_BUILD_EXTERNAL COMPILER_RT --
+            # that is, having the linker not complaing if symbols used
+            # by TSan are undefined (namely the ones for Blocks Runtime)
+            # In the long term, we want to remove this and
+            # build Blocks Runtime before LLVM
+            llvm_cmake_options.define(
+                'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
+        if system() == "Darwin":
+            llvm_cmake_options.define('LLVM_BUILTIN_TARGETS', 'arm64-apple-darwin')
+            llvm_cmake_options.define('LLVM_RUNTIME_TARGETS', 'arm64-apple-darwin')
+            llvm_cmake_options.define('RUNTIMES_BUILD_ALLOW_DARWIN', 'ON')
+            llvm_cmake_options.define(
+                'RUNTIMES_arm64-apple-darwin_COMPILER_RT_SANITIZERS_TO_BUILD',
+                'asan;dfsan;msan;hwasan;tsan;safestack;cfi;scudo_standalone'
+                ';ubsan_minimal;gwp_asan;nsan;asan_abi')
 
         if self.args.build_embedded_stdlib and system() == "Darwin":
             # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
             llvm_cmake_options.define(
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:STRING',
                 'armv6 armv6m armv7 armv7m armv7em')
+            llvm_cmake_options.define(
+                'BUILTINS_arm64-apple-darwin_'
+                'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
+                'STRING', 'armv6 armv6m armv7 armv7m armv7em')
 
         llvm_enable_projects = ['clang']
+        llvm_enable_runtimes = []
 
         if self.args.build_compiler_rt and \
                 not self.is_cross_compile_target(host_target):
-            llvm_enable_projects.append('compiler-rt')
+            llvm_enable_runtimes.append('compiler-rt')
+            build_targets.append("runtimes")
 
         if self.args.build_clang_tools_extra:
             llvm_enable_projects.append('clang-tools-extra')
@@ -325,18 +350,20 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_lld:
             llvm_enable_projects.append('lld')
 
+        if self.args.test:
+            # LLVMTestingSupport is not built at part of `all`
+            # and is required by some Swift tests
+            build_targets.append('LLVMTestingSupport')
+
         llvm_cmake_options.define('LLVM_ENABLE_PROJECTS',
                                   ';'.join(llvm_enable_projects))
+        llvm_cmake_options.define('LLVM_ENABLE_RUNTIMES',
+                                  ';'.join(llvm_enable_runtimes))
 
-        # In the near future we are aiming to build compiler-rt with
-        # LLVM_ENABLE_RUNTIMES
-        # Until that happens, we need to unset this variable from
-        # LLVM CMakeCache.txt for two reasons
-        # * prevent PRs testing this variable to affect other runs landing
-        #   unrelated features
-        # * avoid fallouts should we land such change and then have to revert
-        #   it to account for unforeseen regressions
-        llvm_cmake_options.undefine('LLVM_ENABLE_RUNTIMES')
+        # This accounts for previous incremental runs that may have set
+        # those in the LLVM CMakeCache.txt
+        llvm_cmake_options.undefine('LLVM_TOOL_COMPILER_RT_BUILD')
+        llvm_cmake_options.undefine('LLVM_BUILD_EXTERNAL_COMPILER_RT')
 
         # NOTE: This is not a dead option! It is relied upon for certain
         # bots/build-configs!
@@ -500,9 +527,19 @@ class LLVM(cmake_product.CMakeProduct):
            self.args.llvm_install_components != 'all':
             install_targets = []
             components = self.args.llvm_install_components.split(';')
+            if 'compiler-rt' in components:
+                # This is a courtesy fallback to avoid breaking downstream presets
+                # we are not aware of
+                components.remove('compiler-rt')
+                components.append('builtins')
+                components.append('runtimes')
+                print('warning: replaced legacy LLVM component compiler-rt '
+                      'with builtins;runtimes -- consider updating your preset',
+                      flush=True)
+
             for component in components:
                 if self.is_cross_compile_target(host_target):
-                    if component == 'compiler-rt':
+                    if component in ['builtins', 'runtimes']:
                         continue
                 install_targets.append('install-{}'.format(component))
 
