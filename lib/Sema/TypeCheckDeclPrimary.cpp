@@ -691,8 +691,7 @@ static void checkRedeclaration(PrecedenceGroupDecl *group) {
 
 /// Check whether \c current is a redeclaration.
 evaluator::SideEffect
-CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
-                                    NominalTypeDecl *SelfNominalType) const {
+CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // Ignore invalid and anonymous declarations.
   if (current->isInvalid() || !current->hasName())
     return std::make_tuple<>();
@@ -728,6 +727,20 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
                                          flags);
       otherDefinitions.append(found.begin(), found.end());
+
+      // Look into the generics of the type. Value generic parameters can appear
+      // as static members of the type.
+      if (auto genericDC = static_cast<Decl *>(nominal)->getAsGenericContext()) {
+        auto gpList = genericDC->getGenericParams();
+
+        if (gpList && !current->getBaseName().isSpecial()) {
+          auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
+
+          if (gp && gp->isValue()) {
+            otherDefinitions.push_back(gp);
+          }
+        }
+      }
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
@@ -1136,6 +1149,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       break;
     }
   }
+
   return std::make_tuple<>();
 }
 
@@ -2351,11 +2365,7 @@ public:
       // Force some requests, which can produce diagnostics.
 
       // Check redeclaration.
-      (void)evaluateOrDefault(
-          Ctx.evaluator,
-          CheckRedeclarationRequest{
-              VD, VD->getDeclContext()->getSelfNominalTypeDecl()},
-          {});
+      (void)evaluateOrDefault(Ctx.evaluator, CheckRedeclarationRequest{VD}, {});
 
       // Compute access level.
       (void) VD->getFormalAccess();

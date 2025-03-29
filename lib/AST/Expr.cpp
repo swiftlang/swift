@@ -2445,7 +2445,15 @@ TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc,
                                             GenericTypeParamDecl *paramDecl) {
   auto &ctx = paramDecl->getASTContext();
   ASSERT(loc.isValid());
-  return new (ctx) TypeValueExpr(loc, paramDecl);
+  return new (ctx) TypeValueExpr(/*repr*/ nullptr, loc, paramDecl);
+}
+
+TypeValueExpr *TypeValueExpr::createForMemberDecl(TypeRepr *repr,
+                                                  DeclNameLoc loc,
+                                                  GenericTypeParamDecl *paramDecl) {
+  auto &ctx = paramDecl->getASTContext();
+  ASSERT(loc.isValid());
+  return new (ctx) TypeValueExpr(repr, loc, paramDecl);
 }
 
 ExistentialArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
