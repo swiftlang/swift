@@ -6,7 +6,49 @@
 func myFunc(_ ptr: UnsafePointer<CInt>?, _ len: CInt) {
 }
 
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)))
+func myFunc2(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) {
+}
+
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)))
+func myFunc3(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMutablePointer<CInt>?, _ len2: CInt) {
+}
+
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
 // CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr)
+// CHECK-NEXT: func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
+// CHECK-NEXT:     return unsafe if ptr == nil {
+// CHECK-NEXT:         unsafe myFunc2(nil, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT:     } else {
+// CHECK-NEXT:         unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
+// CHECK-NEXT:             return unsafe myFunc2(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT:         }
+// CHECK-NEXT:     }
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @lifetime(ptr2: copy ptr2)
+// CHECK-NEXT: func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) {
+// CHECK-NEXT:     return unsafe if ptr2 == nil {
+// CHECK-NEXT:         unsafe if ptr == nil {
+// CHECK-NEXT:             unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:         } else {
+// CHECK-NEXT:             unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
+// CHECK-NEXT:                 return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:             }
+// CHECK-NEXT:         }
+// CHECK-NEXT:     } else {
+// CHECK-NEXT:         unsafe ptr2!.withUnsafeMutableBufferPointer { _ptr2Ptr in
+// CHECK-NEXT:             return unsafe if ptr == nil {
+// CHECK-NEXT:                 unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:             } else {
+// CHECK-NEXT:                 unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
+// CHECK-NEXT:                     return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                 }
+// CHECK-NEXT:             }
+// CHECK-NEXT:         }
+// CHECK-NEXT:     }
 // CHECK-NEXT: }
