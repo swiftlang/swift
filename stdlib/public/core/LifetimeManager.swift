@@ -317,3 +317,22 @@ internal func _overrideLifetime<
   // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument.
+/// Return a value identical to `dependent` with a lifetime dependency
+/// on the caller's exclusive borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T,
+  mutating source: inout U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
