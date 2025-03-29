@@ -814,7 +814,7 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
-// Span-providing properties
+// SE-0456 Span-providing properties
 Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
 Added: _$sSW5bytess7RawSpanVvpMV
 Added: _$sSa4spans4SpanVyxGvpMV
@@ -825,6 +825,10 @@ Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
 Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
 Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC

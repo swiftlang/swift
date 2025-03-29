@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -746,6 +746,39 @@ extension Substring.UTF8View: BidirectionalCollection {
     // FIXME(strings): tests.
     let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF8View(_slice.base, _bounds: r)
+  }
+}
+
+extension Substring.UTF8View {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+#if _runtime(_ObjC)
+      // handle non-UTF8 Objective-C bridging cases here
+      if !_wholeGuts.isFastUTF8 && _wholeGuts._object.hasObjCBridgeableObject {
+        let base: String.UTF8View = self._base
+        let first = base._foreignDistance(from: base.startIndex, to: startIndex)
+        let count = base._foreignDistance(from: startIndex, to: endIndex)
+        let span = unsafe base.span._extracting(
+          unchecked: Range(_uncheckedBounds: (first, first &+ count))
+        )
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let first = _slice._startIndex._encodedOffset
+      let end = _slice._endIndex._encodedOffset
+      if _wholeGuts.isSmall {
+        fatalError("Span over the small string form is not supported yet.")
+      }
+      _internalInvariant(_wholeGuts.isFastUTF8)
+      let buffer = unsafe _wholeGuts._object.fastUTF8.extracting(
+        Range(_uncheckedBounds: (first, end))
+      )
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 
