@@ -446,10 +446,11 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
       let colon: TokenSyntax? = label != nil ? .colonToken() : nil
       return LabeledExprSyntax(label: label, colon: colon, expression: arg, trailingComma: comma)
     }
-    return ExprSyntax(
+    let call = ExprSyntax(
       FunctionCallExprSyntax(
         calledExpression: functionRef, leftParen: .leftParenToken(),
         arguments: LabeledExprListSyntax(labeledArgs), rightParen: .rightParenToken()))
+    return "unsafe \(call)"
   }
 }
 
@@ -492,8 +493,8 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
       // so unwrap it to an UnsafeMutableBufferPointer that we can cast
       let unwrappedCall = ExprSyntax(
         """
-          \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
-            return unsafe \(call)
+          unsafe \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
+            return \(call)
           }
         """)
       return unwrappedCall
@@ -530,7 +531,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
     } else {
       "MutableSpan"
     }
-    return "_cxxOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
+    return "unsafe _cxxOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
   }
 }
 
@@ -665,9 +666,25 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
     } else {
       "start"
     }
+    var cast = try newType
+    if nullable {
+      if let optType = cast.as(OptionalTypeSyntax.self) {
+        cast = optType.wrappedType
+      }
+      return """
+      { () in
+        let _resultValue = \(call)
+        if unsafe _resultValue == nil {
+          return nil
+        } else {
+          return unsafe \(raw: try cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
+        }
+      }()
+      """
+    }
     return
       """
-      \(raw: try newType)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
+      unsafe \(raw: try cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
       """
   }
 }
@@ -753,8 +770,8 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     }
     let unwrappedCall = ExprSyntax(
       """
-        \(ptrRef).\(raw: funcName) { \(unwrappedName) in
-          return unsafe \(call)
+        unsafe \(ptrRef).\(raw: funcName) { \(unwrappedName) in
+          return \(call)
         }
       """)
     return unwrappedCall
@@ -814,11 +831,11 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         nullArgs[index] = ExprSyntax(NilLiteralExprSyntax(nilKeyword: .keyword(.nil)))
         return ExprSyntax(
           """
-            if \(name) == nil {
-              unsafe \(try base.buildFunctionCall(nullArgs))
-            } else {
-              unsafe \(unwrappedCall)
-            }
+            { () in return if \(name) == nil {
+                \(try base.buildFunctionCall(nullArgs))
+              } else {
+                \(unwrappedCall)
+              } }()
           """)
       }
       return unwrappedCall
@@ -1363,7 +1380,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         item: CodeBlockItemSyntax.Item(
           ReturnStmtSyntax(
             returnKeyword: .keyword(.return, trailingTrivia: " "),
-            expression: ExprSyntax("unsafe \(try builder.buildFunctionCall([:]))"))))
+            expression: try builder.buildFunctionCall([:]))))
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
       let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
       let lifetimeAttrs = returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)

@@ -50,13 +50,15 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func nullableSpan(_ ptr: RawSpan?) {
-// CHECK-NEXT:     return unsafe if ptr == nil {
-// CHECK-NEXT:         unsafe nullableSpan(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
-// CHECK-NEXT:     } else {
-// CHECK-NEXT:         unsafe ptr!.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:             return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:     return { () in
+// CHECK-NEXT:         return if ptr == nil {
+// CHECK-NEXT:             unsafe nullableSpan(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:         } else {
+// CHECK-NEXT:             unsafe ptr!.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:                 return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:             }
 // CHECK-NEXT:         }
-// CHECK-NEXT:     }
+// CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient
