@@ -171,6 +171,16 @@ void printTripleInfo(const CompilerInvocation &invocation,
     out << "    \"compatibilityLibraries\": [ ],\n";
   }
 
+  if (tripleBTCFIByDefaultInOpenBSD(triple)) {
+#if SWIFT_OPENBSD_BTCFI
+     out << "    \"openbsdBTCFIEnabled\": true,\n";
+#else
+     out << "    \"openbsdBTCFIEnabled\": false,\n";
+#endif
+  } else {
+     out << "    \"openbsdBTCFIEnabled\": false,\n";
+  }
+
   out << "    \"librariesRequireRPath\": "
       << (tripleRequiresRPathForSwiftLibrariesInOS(triple) ? "true" : "false")
       << "\n";

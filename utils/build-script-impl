@@ -124,6 +124,9 @@ KNOWN_SETTINGS=(
     darwin-toolchain-require-use-os-runtime       "0"               "When setting up a plist for a toolchain, require the users of the toolchain to link against the OS instead of the packaged toolchain runtime. 0 for false, 1 for true"
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
+    ## OpenBSD options
+    openbsd-btcfi                                 ""                "enables BTCFI when possible. May cause stability problems."
+
     ## Runtime options
     min-runtime-version                ""                "Used to specify the minimum host runtime version when building the compiler on non-Darwin platforms"
 
@@ -877,6 +880,12 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
+
+    if [[ "${OPENBSD_BTCFI}" ]]; then
+        swift_cmake_options+=(
+            -DSWIFT_OPENBSD_BTCFI:BOOL=TRUE
+        )
+    fi
 }
 
 function configure_default_options() {
@@ -1383,7 +1392,9 @@ function swift_c_flags() {
             echo -n " -D_GNU_SOURCE -DHAVE_DECL_PROGRAM_INVOCATION_SHORT_NAME"
             ;;
         openbsd-aarch64)
-            echo -n " -Xclang=-msign-return-address=non-leaf -Xclang=-msign-return-address-key=a_key -Xclang=-mbranch-target-enforce"
+            if [[ "${OPENBSD_BTCFI}" ]]; then
+                echo -n " -Xclang=-msign-return-address=non-leaf -Xclang=-msign-return-address-key=a_key -Xclang=-mbranch-target-enforce"
+            fi
             ;;
     esac
 }
