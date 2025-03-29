@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature StrictSendableMetatypes
+// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature IsolatedConformances
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_StrictSendableMetatypes
+// REQUIRES: swift_feature_IsolatedConformances
 
 // This test checks for typecheck-only diagnostics involving non-sendable
 // metatypes.

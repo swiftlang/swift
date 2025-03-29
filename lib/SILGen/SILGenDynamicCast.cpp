@@ -308,16 +308,17 @@ namespace {
       if (!TargetType->isAnyExistentialType())
         return CastingIsolatedConformances::Allow;
 
-      // Only do this if isolated conformances are enabled.
-      ASTContext &ctx = TargetType->getASTContext();
-      if (!ctx.LangOpts.hasFeature(Feature::IsolatedConformances))
-        return CastingIsolatedConformances::Allow;
-
-      auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-
       // If there is a conformance to SendableMetatype, then this existential
       // can leave the current isolation domain. Prohibit isolated conformances.
-      if (proto && lookupConformance(TargetType, proto, /*allowMissing=*/false))
+      ASTContext &ctx = TargetType->getASTContext();
+      Type checkType;
+      if (auto existentialMetatype = TargetType->getAs<ExistentialMetatypeType>())
+        checkType = existentialMetatype->getInstanceType();
+      else
+        checkType = TargetType;
+
+      auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+      if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
         return CastingIsolatedConformances::Prohibit;
 
       return CastingIsolatedConformances::Allow;
