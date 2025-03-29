@@ -1250,7 +1250,12 @@ SILType SILType::removingAnyMoveOnlyWrapping(const SILFunction *fn) {
 }
 
 bool SILType::isSendable(SILFunction *fn) const {
-  return getASTType()->isSendableType();
+  switch (getCategory()) {
+  case SILValueCategory::Object:
+    return getASTType()->isSendableType();
+  case SILValueCategory::Address:
+    return false;
+  }
 }
 
 Type SILType::getRawLayoutSubstitutedLikeType() const {
