@@ -5453,9 +5453,11 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
 /// Check rules related to global actor attributes on a class declaration.
 ///
 /// \returns true if an error occurred.
-static bool checkClassGlobalActorIsolation(
-    ClassDecl *classDecl, ActorIsolation isolation) {
-  assert(isolation.isGlobalActor());
+static bool checkClassIsolation(ClassDecl *classDecl,
+                                ActorIsolation isolation) {
+  if (!isolation.isGlobalActor()) {
+    return false;
+  }
 
   // A class can only be annotated with a global actor if it has no
   // superclass, the superclass is annotated with the same global actor, or
@@ -5826,6 +5828,32 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
 
+/// Check that a global actor isolation on an accessor does not conflict with
+/// the storage's isolation.
+static void checkAccessorIsolation(const AccessorDecl *accessor,
+                                   const ActorIsolation &isolation) {
+  if (!isolation.isGlobalActor()) {
+    return;
+  }
+
+  auto *storage = accessor->getStorage();
+  auto storageIsolation = getInferredActorIsolation(storage);
+
+  if (isolation == storageIsolation.isolation) {
+    return;
+  }
+
+  auto *attr = accessor->getGlobalActorAttr().value().first;
+
+  // Complain about the isolation mismatch.
+  accessor
+      ->diagnose(diag::actor_isolation_accessor_vs_storage_mismatch, isolation,
+                 accessor, storageIsolation.isolation,
+                 storageIsolation.source.kind == IsolationSource::Explicit,
+                 storage)
+      .highlight(attr->getRangeWithAt());
+}
+
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -5891,8 +5919,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
         if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
                            mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
+          fd->diagnose(diag::main_function_must_be_mainActor);
         }
       }
       return {
@@ -5902,17 +5929,27 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     }
   }
 
-  // If this declaration has one of the actor isolation attributes, report
-  // that.
+  // If this declaration has one of the actor isolation attributes, consider
+  // reporting that.
   if (isolationFromAttr) {
-    // Classes with global actors have additional rules regarding inheritance.
-    if (isolationFromAttr->isGlobalActor()) {
-      if (auto classDecl = dyn_cast<ClassDecl>(value))
-        checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
+    auto *accessor = dyn_cast<AccessorDecl>(value);
+    if (!accessor) {
+      // Classes with global actors have additional rules regarding inheritance.
+      if (auto classDecl = dyn_cast<ClassDecl>(value)) {
+        checkClassIsolation(classDecl, *isolationFromAttr);
+      }
+
+      return {*isolationFromAttr,
+              IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
     }
 
-    return {*isolationFromAttr,
-            IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
+    checkAccessorIsolation(accessor, *isolationFromAttr);
+    // Proceed to grab the storage's isolation.
+  }
+
+  // For an accessor, use the actor isolation of its storage declaration.
+  if (auto *accessor = dyn_cast<AccessorDecl>(value)) {
+    return getInferredActorIsolation(accessor->getStorage());
   }
 
   InferredActorIsolation defaultIsolation;
@@ -6026,12 +6063,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
         };
       }
     }
-  }
-
-  // If this is an accessor, use the actor isolation of its storage
-  // declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    return getInferredActorIsolation(accessor->getStorage());
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {

@@ -43,6 +43,7 @@ class Type;
 }
 
 namespace swift {
+  class AccessorDecl;
   class ConstructorDecl;
   class ClosureExpr;
   class Decl;

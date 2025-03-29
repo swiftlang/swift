@@ -19,62 +19,6 @@ struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
 }
 
-// Global actor on global var/let accessors.
-
-var globalObserved: Int = 0 {
-  @GA1 willSet {}
-  // expected-warning@-1:8 {{willSet observer cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-note@-2:8 {{move global actor attribute to var 'globalObserved'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
-  @GA1 didSet {}
-  // expected-warning@-1:8 {{didSet observer cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-note@-2:8 {{move global actor attribute to var 'globalObserved'}}{{3-8=}}{{-4:1-1=@GA1 }}{{none}}
-}
-
-var globalComputed: Int {
-  @GA1 get {}
-  // expected-warning@-1:8 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-  // expected-note@-2:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
-  @GA1 set {}
-  // expected-warning@-1:8 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-note@-2:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-4:1-1=@GA1 }}{{none}}
-  @GA1 _modify {}
-  // expected-warning@-1:8 {{_modify accessor cannot have a global actor; this is an error in the Swift 6 language mode}}
-  // expected-note@-2:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-7:1-1=@GA1 }}{{none}}
-}
-
-var globalComputedRead: Int {
-  @GA1 _read {}
-  // expected-warning@-1:8 {{_read accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-note@-2:8 {{move global actor attribute to var 'globalComputedRead'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
-}
-
-// Global actor on local var/let accessors. No fix-it: global actor on local
-// var/let is not allowed.
-do {
-  var observed: Int = 0 {
-    @GA1 willSet {}
-    // expected-warning@-1:10 {{willSet observer cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-    @GA1 didSet {}
-    // expected-warning@-1:10 {{didSet observer cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  }
-  observed = 0
-  let _ = observed
-
-  var computed: Int {
-    @GA1 get {}
-    // expected-warning@-1:10 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-    @GA1 set {}
-    // expected-warning@-1:10 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-    @GA1 _modify {}
-    // expected-warning@-1:10 {{_modify accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  }
-
-  var computedRead: Int {
-    @GA1 _read {}
-    // expected-warning@-1:10 {{_read accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  }
-}
-
 // Global actor on property/subscript accessors.
 do {
   @GA1 struct S {
@@ -135,20 +79,6 @@ do {
 
     // No fix-it: storage explicitly isolated.
     @GA1 subscript(subscriptIsolated _: Int) -> Int {
-      @GA1 set {}
-      // expected-warning@-1 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      get {}
-    }
-
-    // No fix-it: storage explicitly isolated.
-    nonisolated var computedNonisolated: Int {
-      @GA1 set {}
-      // expected-warning@-1 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      get {}
-    }
-
-    // No fix-it: storage explicitly isolated.
-    nonisolated subscript(subscriptNonisolated _: Int) -> Int {
       @GA1 set {}
       // expected-warning@-1 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
       get {}
