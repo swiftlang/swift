@@ -1,11 +1,11 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 func testNonacceptedClosures() {
-  let fn = { @usableFromInline in // expected-error{{'usableFromInline' is not supported on a closure}}
+  let fn = { @usableFromInline in // expected-error{{attribute @usableFromInline is not supported on a closure}}
     "hello"
   }
 
-  let fn2: (Int) -> Int = { @usableFromInline x in  // expected-error{{'usableFromInline' is not supported on a closure}}
+  let fn2: (Int) -> Int = { @usableFromInline x in  // expected-error{{attribute @usableFromInline is not supported on a closure}}
     print("hello")
     return x
   }

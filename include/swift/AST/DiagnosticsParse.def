@@ -463,7 +463,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (StringRef))
+      "unexpected attribute %0 in operator declaration", (DeclAttribute))
 WARNING(operator_decl_remove_designated_types,none,
         "designated types are no longer used by the compiler; please remove "
         "the designated type list from this operator declaration", ())
@@ -1485,7 +1485,11 @@ ERROR(multiple_access_level_modifiers,none,
 NOTE(previous_access_level_modifier,none,
      "previous modifier specified here", ())
 ERROR(mutually_exclusive_attrs,none,
-      "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
+      "%0 contradicts previous %select{attribute|modifier}2 %1",
+      (DeclAttribute, DeclAttribute, bool))
+ERROR(mutually_exclusive_attr_names,none,
+      "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
+      (StringRef, StringRef, bool))
 
 ERROR(invalid_infix_on_func,none,
       "'infix' modifier is not required or allowed on func declarations", ())
@@ -1560,6 +1564,8 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
+      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
 // availability

@@ -3235,9 +3235,9 @@ void TypeAttrSet::diagnoseConflict(TypeAttrKind representativeKind,
   }
 
   // Generic conflict diagnostic
-  diagnose(secondAttr->getStartLoc(), diag::mutually_exclusive_attrs,
+  diagnose(secondAttr->getStartLoc(), diag::mutually_exclusive_attr_names,
            secondAttr->getAttrName(), firstAttr->getAttrName(),
-           /*modifier*/false);
+           /*modifier*/ false);
 }
 
 void TypeAttrSet::diagnoseUnclaimed(const TypeResolution &resolution,

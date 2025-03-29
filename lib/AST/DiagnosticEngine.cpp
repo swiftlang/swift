@@ -1083,17 +1083,28 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Stmt::getDescriptiveKindName(Arg.getAsDescriptiveStmtKind());
     break;
 
-  case DiagnosticArgumentKind::DeclAttribute:
+  case DiagnosticArgumentKind::DeclAttribute: {
+    auto *const attr = Arg.getAsDeclAttribute();
+    const auto printAttrName = [&] {
+      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
+        custom->getTypeRepr()->print(Out);
+      } else {
+        Out << attr->getAttrName();
+      }
+    };
+
     assert(Modifier.empty() &&
            "Improper modifier for DeclAttribute argument");
-    if (Arg.getAsDeclAttribute()->isDeclModifier())
-      Out << FormatOpts.OpeningQuotationMark
-          << Arg.getAsDeclAttribute()->getAttrName()
-          << FormatOpts.ClosingQuotationMark;
-    else
-      Out << '@' << Arg.getAsDeclAttribute()->getAttrName();
+    if (Arg.getAsDeclAttribute()->isDeclModifier()) {
+      Out << FormatOpts.OpeningQuotationMark;
+      printAttrName();
+      Out << FormatOpts.ClosingQuotationMark;
+    } else {
+      Out << '@';
+      printAttrName();
+    }
     break;
-
+  }
   case DiagnosticArgumentKind::AvailabilityDomain:
     assert(Modifier.empty() &&
            "Improper modifier for AvailabilityDomain argument");
