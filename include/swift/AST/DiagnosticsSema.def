@@ -148,7 +148,7 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| of type %2}3 cannot be used on"
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
-ERROR(could_not_use_member_on_existential,none,
+GROUPED_ERROR(could_not_use_member_on_existential,ExistentialMemberAccess,none,
       "member %1 cannot be used on value of type %0; consider using a"
       " generic constraint instead",
       (Type, DeclNameRef))
@@ -447,7 +447,7 @@ ERROR(cannot_convert_closure_result_global_actor,none,
 ERROR(cannot_convert_global_actor_mismatch_element,none,
       "cannot convert value actor-isolated to %0 to expected element type actor-isolated to %1",
       (Type,Type))
-ERROR(cannot_convert_global_actor_mismatch_dict_value,none,
+GROUPED_ERROR(cannot_convert_global_actor_mismatch_dict_value,TemporaryPointers,none,
       "cannot convert value actor-isolated to %0 to expected dictionary value type actor-isolated to %1",
       (Type,Type))
 ERROR(cannot_convert_global_actor_mismatch_tuple_element,none,
@@ -458,14 +458,14 @@ ERROR(ternary_expr_cases_global_actor_mismatch,none,
       (Type, Type))
 
 // @_nonEphemeral conversion diagnostics
-ERROR(cannot_pass_type_to_non_ephemeral,none,
+GROUPED_ERROR(cannot_pass_type_to_non_ephemeral,TemporaryPointers,none,
       "cannot pass %0 to parameter; argument %1 must be a pointer that "
       "outlives the call%select{| to %2}2",
       (Type, StringRef, const ValueDecl *))
-ERROR(cannot_use_inout_non_ephemeral,none,
+GROUPED_ERROR(cannot_use_inout_non_ephemeral,TemporaryPointers,none,
       "cannot use inout expression here; argument %0 must be a pointer that "
       "outlives the call%select{| to %1}1", (StringRef, const ValueDecl *))
-ERROR(cannot_construct_dangling_pointer,none,
+GROUPED_ERROR(cannot_construct_dangling_pointer,TemporaryPointers,none,
       "initialization of %0 results in a dangling %select{|buffer }1pointer",
       (Type, unsigned))
 NOTE(ephemeral_pointer_argument_conversion_note,none,
@@ -1647,7 +1647,8 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(closure_bad_param,none,
       "%select{|trailing }1closure passed to parameter of type %0 that does not "
       "accept a closure", (Type, bool))
-WARNING(unlabeled_trailing_closure_deprecated,Deprecation,
+GROUPED_WARNING(unlabeled_trailing_closure_deprecated,
+        TrailingClosureMatching,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
         (Identifier))
 NOTE(candidate_with_extraneous_args_closure,none,
@@ -1675,11 +1676,11 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
-ERROR(invalid_dynamic_callable_type,none,
+GROUPED_ERROR(invalid_dynamic_callable_type,DynamicCallable,none,
       "@dynamicCallable attribute requires %0 to have either a valid "
       "'dynamicallyCall(withArguments:)' method or "
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
-ERROR(missing_dynamic_callable_kwargs_method,none,
+GROUPED_ERROR(missing_dynamic_callable_kwargs_method,DynamicCallable,none,
       "@dynamicCallable type %0 cannot be applied with keyword arguments; "
       "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
 
@@ -2629,7 +2630,7 @@ ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
 
 // Extensions
-ERROR(non_nominal_extension,none,
+GROUPED_ERROR(non_nominal_extension,NominalTypes,none,
       "non-nominal type %0 cannot be extended", (Type))
 WARNING(composition_in_extended_type,none,
         "extending a protocol composition is not supported; extending %0 "
@@ -2721,7 +2722,7 @@ ERROR(type_cannot_conform_to_nsobject,none,
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
-ERROR(type_cannot_conform, none,
+GROUPED_ERROR(type_cannot_conform, ProtocolTypeNonConformance, none,
       "type %0 cannot conform to %1",
       (Type, Type))
 NOTE(only_concrete_types_conform_to_protocols,none,
@@ -3260,16 +3261,18 @@ NOTE(req_near_match_access,none,
      "warning", (DeclName, AccessLevel))
 
 // appendInterpolation methods
-ERROR(missing_append_interpolation,none,
+GROUPED_ERROR(missing_append_interpolation,StringInterpolationConformance,none,
       "type conforming to 'StringInterpolationProtocol' does not implement "
       "a valid 'appendInterpolation' method", ())
-WARNING(append_interpolation_static,none,
+GROUPED_WARNING(append_interpolation_static,StringInterpolationConformance,none,
       "'appendInterpolation' method will never be used because it is static",
       ())
-WARNING(append_interpolation_void_or_discardable,none,
+GROUPED_WARNING(append_interpolation_void_or_discardable,
+      StringInterpolationConformance,none,
       "'appendInterpolation' method does not return 'Void' or have a "
       "discardable result", ())
-WARNING(append_interpolation_access_control,none,
+GROUPED_WARNING(append_interpolation_access_control,
+      StringInterpolationConformance,none,
       "'appendInterpolation' method is %select{private|fileprivate|internal|package|"
       "public|open}0, but %1 is %select{private|fileprivate|internal|package|public|"
       "open}2",
@@ -3589,7 +3592,7 @@ ERROR(inheritance_from_protocol_with_superclass,none,
 WARNING(anyobject_class_inheritance_deprecated,Deprecation,
   "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
-ERROR(multiple_inheritance,none,
+GROUPED_ERROR(multiple_inheritance,MultipleInheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
@@ -5182,29 +5185,32 @@ WARNING(trailing_closure_requires_parens,none,
         " statement; pass as a parenthesized argument to silence this warning",
         ())
 
-ERROR(opaque_type_no_underlying_type_candidates,none,
+GROUPED_ERROR(opaque_type_no_underlying_type_candidates,OpaqueTypeInference,none,
       "function declares an opaque return type, but has no return statements "
       "in its body from which to infer an underlying type", ())
 NOTE(opaque_type_missing_return_last_expr_note,none,
      "did you mean to return the last expression?", ())
-ERROR(opaque_type_mismatched_underlying_type_candidates,none,
+GROUPED_ERROR(opaque_type_mismatched_underlying_type_candidates,
+      OpaqueTypeInference,none,
       "function declares an opaque return type %0, but the return statements "
       "in its body do not have matching underlying types", (TypeRepr *))
-ERROR(opaque_type_mismatched_underlying_type_candidates_named,none,
+GROUPED_ERROR(opaque_type_mismatched_underlying_type_candidates_named,
+      OpaqueTypeInference,none,
       "function declares an opaque return type %0, but the return statements "
       "in its body do not have matching underlying types", (Identifier))
 NOTE(opaque_type_underlying_type_candidate_here,none,
      "return statement has underlying type %0", (Type))
-ERROR(opaque_type_self_referential_underlying_type,none,
+GROUPED_ERROR(opaque_type_self_referential_underlying_type,
+      OpaqueTypeInference,none,
       "function opaque return type was inferred as %0, which defines the "
       "opaque type in terms of itself", (Type))
-ERROR(opaque_type_cannot_contain_dynamic_self,none,
+GROUPED_ERROR(opaque_type_cannot_contain_dynamic_self,OpaqueTypeInference,none,
       "function with opaque return type cannot return "
       "the covariant 'Self' type of a class", ())
-ERROR(opaque_type_var_no_init,none,
+GROUPED_ERROR(opaque_type_var_no_init,OpaqueTypeInference,none,
       "property declares an opaque return type, but has no initializer "
       "expression from which to infer an underlying type", ())
-ERROR(opaque_type_var_no_underlying_type,none,
+GROUPED_ERROR(opaque_type_var_no_underlying_type,OpaqueTypeInference,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
 
@@ -5584,10 +5590,10 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %kind1",
       (DeclName, const ValueDecl *))
-ERROR(actor_isolated_call,none,
+GROUPED_ERROR(actor_isolated_call,ActorIsolatedCall,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
-ERROR(actor_isolated_call_decl,none,
+GROUPED_ERROR(actor_isolated_call_decl,ActorIsolatedCall,none,
       "call to %0 %kind1 in a synchronous %2 context",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
 ERROR(actor_isolated_partial_apply,none,
@@ -5611,15 +5617,15 @@ ERROR(sendable_isolated_sync_function,none,
 ERROR(nonsendable_instance_method,none,
       "instance method of non-Sendable type %0 cannot be marked as '@Sendable'",
       (Type))
-ERROR(concurrent_access_of_local_capture,none,
+GROUPED_ERROR(concurrent_access_of_local_capture,SendableClosureCaptures,none,
       "%select{mutation of|reference to}0 captured %kind1 in "
       "concurrently-executing code",
       (bool, const ValueDecl *))
-ERROR(concurrent_access_of_inout_param,none,
+GROUPED_ERROR(concurrent_access_of_inout_param,SendableClosureCaptures,none,
       "mutable capture of 'inout' parameter %0 is not allowed in "
       "concurrently-executing code",
       (DeclName))
-ERROR(non_sendable_capture,none,
+GROUPED_ERROR(non_sendable_capture,SendableClosureCaptures,none,
       "capture of %1 with non-sendable type %0 in a '@Sendable' "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
@@ -5694,10 +5700,10 @@ NOTE(actor_mutable_state,none,
 ERROR(shared_mutable_state_access,none,
       "reference to %kind0 is not concurrency-safe because it involves shared "
       "mutable state", (const ValueDecl *))
-ERROR(shared_mutable_state_decl,none,
+GROUPED_ERROR(shared_mutable_state_decl,MutableGlobalVariable,none,
       "%kind0 is not concurrency-safe because it is nonisolated global shared "
       "mutable state", (const ValueDecl *))
-ERROR(shared_immutable_state_decl,none,
+GROUPED_ERROR(shared_immutable_state_decl,MutableGlobalVariable,none,
       "%kind1 is not concurrency-safe because non-'Sendable' type %0 may have "
       "shared mutable state",
       (Type, const ValueDecl *))
@@ -5714,11 +5720,11 @@ ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       (Type, Type))
 NOTE(protocol_isolated_to_global_actor_here,none,
      "%0 is isolated to global actor %1 here", (Type, Type))
-ERROR(conformance_mismatched_isolation,none,
+GROUPED_ERROR(conformance_mismatched_isolation,ConformanceIsolation,none,
       "conformance of %0 to %kind1 involves isolation mismatches "
       "and can cause data races",
       (Type, const ValueDecl *))
-ERROR(conformance_mismatched_isolation_common,none,
+GROUPED_ERROR(conformance_mismatched_isolation_common,ConformanceIsolation,none,
       "conformance of %0 to %kind1 crosses into %2 code and can cause "
       "data races", (Type, const ValueDecl *, ActorIsolation))
 NOTE(note_make_conformance_preconcurrency,none,
@@ -7329,31 +7335,31 @@ WARNING(executor_enqueue_unused_implementation, none,
 //------------------------------------------------------------------------------
 // MARK: property wrapper diagnostics
 //------------------------------------------------------------------------------
-ERROR(property_wrapper_no_value_property, none,
+GROUPED_ERROR(property_wrapper_no_value_property,PropertyWrappers,none,
   "property wrapper type %0 does not contain a non-static property "
   "named %1", (Type, Identifier))
-ERROR(property_wrapper_ambiguous_value_property, none,
+GROUPED_ERROR(property_wrapper_ambiguous_value_property,PropertyWrappers,none,
   "property wrapper type %0 has multiple non-static properties "
   "named %1", (Type, Identifier))
-ERROR(property_wrapper_wrong_initial_value_init, none,
+GROUPED_ERROR(property_wrapper_wrong_initial_value_init,PropertyWrappers,none,
       "%0 parameter type (%1) must be the same as its "
       "'wrappedValue' property type (%2) or an @autoclosure thereof",
       (DeclName, Type, Type))
-ERROR(property_wrapper_failable_init, none,
+GROUPED_ERROR(property_wrapper_failable_init,PropertyWrappers,none,
       "property wrapper initializer %0 cannot be failable", (DeclName))
-ERROR(property_wrapper_type_requirement_not_accessible,none,
+GROUPED_ERROR(property_wrapper_type_requirement_not_accessible,PropertyWrappers,none,
       "%select{private|fileprivate|internal|package|public|open}0 %kind1 cannot have "
       "more restrictive access than its enclosing property wrapper type %2 "
       "(which is %select{private|fileprivate|internal|package|public|open}3)",
       (AccessLevel, const ValueDecl *, Type, AccessLevel))
-ERROR(property_wrapper_ambiguous_enclosing_self_subscript, none,
+GROUPED_ERROR(property_wrapper_ambiguous_enclosing_self_subscript,PropertyWrappers,none,
       "property wrapper type %0 has multiple enclosing-self subscripts %1",
       (Type, DeclName))
-ERROR(property_wrapper_dynamic_self_type, none,
+GROUPED_ERROR(property_wrapper_dynamic_self_type,PropertyWrappers,none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))
 
-ERROR(property_wrapper_var_must_be_static, none,
+GROUPED_ERROR(property_wrapper_var_must_be_static,PropertyWrappers,none,
       "property %0, must be static because property wrapper %1 can only "
       "be applied to static properties",
       (Identifier, Type))
@@ -7505,15 +7511,18 @@ NOTE(result_builder_infer_add_return, none,
 NOTE(result_builder_infer_pick_specific, none,
      "apply result builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
-WARNING(result_builder_missing_limited_availability, none,
+GROUPED_WARNING(result_builder_missing_limited_availability,
+        ResultBuilderMethods, none,
         "result builder %0 does not implement 'buildLimitedAvailability'; "
         "this code may crash on earlier versions of the OS",
         (Type))
-ERROR(result_builder_static_buildblock_or_buildpartialblock, none,
+GROUPED_ERROR(result_builder_static_buildblock_or_buildpartialblock,
+      ResultBuilderMethods,none,
       "result builder must provide at least one static 'buildBlock' "
       "method, or both 'buildPartialBlock(first:)' and "
       "'buildPartialBlock(accumulated:next:)'", ())
-ERROR(result_builder_missing_available_buildpartialblock, none,
+GROUPED_ERROR(result_builder_missing_available_buildpartialblock,
+      ResultBuilderMethods, none,
       "result builder %0 does not implement any 'buildBlock' or a combination "
       "of 'buildPartialBlock(first:)' and "
       "'buildPartialBlock(accumulated:next:)' with sufficient availability for "

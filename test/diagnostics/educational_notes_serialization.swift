@@ -7,13 +7,13 @@
 
 typealias Fn = () -> ()
 extension Fn {}
-// CHECK: [[@LINE-1]]:1: error: non-nominal type 'Fn' (aka '() -> ()') cannot be extended [{{.*}}nominal-types.md] [nominal-types]
+// CHECK: [[@LINE-1]]:1: error: non-nominal type 'Fn' (aka '() -> ()') cannot be extended [{{.*}}nominal-types.md] [NominalTypes]
 
 
 // Shares the flag record with `Fn`
 typealias Dup = () -> ()
 extension Dup {}
-// CHECK: [[@LINE-1]]:1: error: non-nominal type 'Dup' (aka '() -> ()') cannot be extended [{{.*}}nominal-types.md] [nominal-types]
+// CHECK: [[@LINE-1]]:1: error: non-nominal type 'Dup' (aka '() -> ()') cannot be extended [{{.*}}nominal-types.md] [NominalTypes]
 
 do {
   func noNote(_: Int) {}
