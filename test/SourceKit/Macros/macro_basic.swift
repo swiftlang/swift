@@ -121,6 +121,14 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
   return Result.conjureValue()
 }
 
+@attached(extension, conformances: Equatable)
+macro AddEquatable() = #externalMacro(module: "MacroDefinition", type: "EquatableMacro")
+
+struct HasNestedType {
+  @AddEquatable
+  struct Inner {}
+}
+
 // REQUIRES: swift_swift_parser, executable_test, shell, asserts
 // REQUIRES: swift_feature_PreambleMacros
 
@@ -379,3 +387,10 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
 // BODY_EXPAND-NEXT: return try await remoteCall(function: "f", arguments: ["a": a, "b": b])
 // BODY_EXPAND-NEXT: }"
 // BODY_EXPAND-NEXT: source.edit.kind.active:
+
+// Make sure the extension is added at the top level.
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=128:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ADD_EQUATABLE_EXPAND %s
+// ADD_EQUATABLE_EXPAND: source.edit.kind.active:
+// ADD_EQUATABLE_EXPAND-NEXT: 130:2-130:2 (@__swiftmacro_9MacroUser13HasNestedTypeV5Inner12AddEquatablefMe_.swift) "extension HasNestedType.Inner: Equatable {
+// ADD_EQUATABLE_EXPAND-NEXT: }"
+// ADD_EQUATABLE_EXPAND-NEXT: source.edit.kind.active:
