@@ -672,7 +672,8 @@ private:
     return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
-  inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+  inheritOptionsForBuildingInterface(FrontendOptions::ActionType requestedAction,
+                                     const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,

@@ -1654,6 +1654,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 }
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
+    FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
     bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
@@ -1741,9 +1742,12 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   }
 
   // Inhibit warnings from the genericSubInvocation since we are assuming the user
-  // is not in a position to address them.
-  genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
-  GenericArgs.push_back("-suppress-warnings");
+  // is not in a position to address them. (Unless we're verifying, in which
+  // case they might.)
+  if (requestedAction != FrontendOptions::ActionType::Typecheck) {
+    genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
+    GenericArgs.push_back("-suppress-warnings");
+  }
   // Inherit the parent invocation's setting on whether to suppress remarks
   if (suppressRemarks) {
     genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
@@ -1871,8 +1875,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     RequireOSSAModules_t requireOSSAModules)
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
-  inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
-                                     clangImporterOpts, casOpts,
+  inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
+                                     langOpts, clangImporterOpts, casOpts,
                                      Diags->getSuppressRemarks(),
                                      requireOSSAModules);
   // Configure front-end input.
