@@ -236,6 +236,14 @@ public func addQueuedSourceFile(
   queuedDiagnostics.pointee.sourceFileIDs[bufferID] = allocatedSourceFileID
 }
 
+private struct BridgedFixItMessage: FixItMessage {
+  var message: String { "" }
+
+  var fixItID: MessageID {
+    .init(domain: "SwiftCompiler", id: "BridgedFixIt")
+  }
+}
+
 /// Add a new diagnostic to the queue.
 @_cdecl("swift_ASTGen_addQueuedDiagnostic")
 public func addQueuedDiagnostic(
@@ -247,7 +255,8 @@ public func addQueuedDiagnostic(
   categoryName: BridgedStringRef,
   documentationPath: BridgedStringRef,
   highlightRangesPtr: UnsafePointer<BridgedCharSourceRange>?,
-  numHighlightRanges: Int
+  numHighlightRanges: Int,
+  fixItsUntyped: BridgedArrayRef
 ) {
   let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
     to: QueuedDiagnostics.self
@@ -374,6 +383,33 @@ public func addQueuedDiagnostic(
     diagnosticState.pointee.referencedCategories.insert(category)
   }
 
+  // Map the Fix-Its
+  let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
+    fixIts.compactMap { fixIt in
+      guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
+            let endPos = sourceFile.position(
+              of: fixIt.replacementRange.start.advanced(
+                by: fixIt.replacementRange.byteLength)) else {
+        return nil
+      }
+
+      return FixIt.Change.replaceText(
+        range: startPos..<endPos,
+        with: String(bridged: fixIt.replacementText),
+        in: sourceFile.syntax
+      )
+    }
+  }
+
+  let fixIts: [FixIt] = fixItChanges.isEmpty
+      ? []
+      : [
+          FixIt(
+            message: BridgedFixItMessage(),
+            changes: fixItChanges
+          )
+        ]
+
   let diagnostic = Diagnostic(
     node: node,
     position: position,
@@ -382,7 +418,8 @@ public func addQueuedDiagnostic(
       severity: severity.asSeverity,
       category: category
     ),
-    highlights: highlights
+    highlights: highlights,
+    fixIts: fixIts
   )
 
   queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
