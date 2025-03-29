@@ -89,6 +89,14 @@ _swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
   return imp(obj, @selector(cStringUsingEncoding:), encoding);
 }
 
+const __swift_uint8_t *
+_swift_stdlib_NSStringUTF8StringTrampoline(id _Nonnull obj) {
+  typedef __swift_uint8_t * _Nullable (*utf8StrImplPtr)(id, SEL);
+  utf8StrImplPtr imp = (utf8StrImplPtr)class_getMethodImplementation([obj superclass],
+                                                                     @selector(UTF8String));
+  return imp(obj, @selector(UTF8String));
+}
+
 __swift_uint8_t
 _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
                                          _swift_shims_UInt8 *buffer,
@@ -110,6 +118,25 @@ __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
   return (SWIFT_RUNTIME_WEAK_CHECK(_dyld_is_objc_constant)
           && SWIFT_RUNTIME_WEAK_USE(_dyld_is_objc_constant(dyld_objc_string_kind, addr))) ? 1 : 0;
+}
+
+
+SWIFT_RUNTIME_STDLIB_API
+const void *
+_swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t *bytes,
+                                                _swift_shims_CFIndex len) {
+  Class cls = objc_lookUpClass("NSIndirectTaggedPointerString");
+  if (!cls) return NULL;
+  typedef const void * _Nullable (*createIndirectTaggedImplPtr)(id,
+                                              SEL,
+                                              const _swift_shims_UInt8 * _Nonnull,
+                                              _swift_shims_CFIndex);
+  SEL sel = @selector(newIndirectTaggedNSStringWithConstantNullTerminatedASCIIBytes_:length_:);
+  if (!sel) return NULL;
+  Method m = class_getClassMethod(cls, sel);
+  if (!m) return NULL;
+  createIndirectTaggedImplPtr imp = (createIndirectTaggedImplPtr)method_getImplementation(m);
+  return imp(cls, sel, bytes, len);
 }
 
 #endif

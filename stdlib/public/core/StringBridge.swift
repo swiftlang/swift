@@ -115,6 +115,13 @@ private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutab
   return unsafe UnsafeMutablePointer(mutating: str._fastCharacterContents())
 }
 
+private func _stdlib_binary_createIndirectTaggedPointerNSString(
+  ptr: UnsafePointer<UInt8>,
+  count: Int
+) -> UnsafeRawPointer? {
+  return _swift_stdlib_CreateIndirectTaggedPointerString(ptr, count);
+}
+
 @usableFromInline // @testable
 @_effects(readonly)
 internal func _stdlib_binary_CFStringGetCharactersPtr(
@@ -278,6 +285,12 @@ internal func _cocoaCStringUsingEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UnsafePointer<UInt8>? {
   return unsafe _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
+}
+
+@_effects(readonly)
+internal func _cocoaUTF8StringTrampoline(_ string: _CocoaString)
+  -> UnsafePointer<UInt8>? {
+  return unsafe _swift_stdlib_NSStringUTF8StringTrampoline(string)
 }
 
 @_effects(releasenone)
@@ -623,13 +636,24 @@ extension String {
         return copy._bridgeToObjectiveCImpl()
     }
     if _guts._object.isImmortal && !_guts._object.largeFastIsConstantCocoa {
-      // TODO: We'd rather emit a valid ObjC object statically than create a
-      // shared string class instance.
+      if _guts.isASCII && _guts._object.isFastZeroTerminated {
+        let ptr = _guts._object.fastUTF8.baseAddress!
+        let count = _guts.count //TODO: verify we don't want .utf8.count here
+        if let indirect = _stdlib_binary_createIndirectTaggedPointerNSString(
+          ptr: ptr, count: count
+        ) {
+          return unsafeBitCast(indirect, to: AnyObject.self)
+        }
+      }
       let gutsCountAndFlags = _guts._object._countAndFlags
+      let newCountAndFlags = _StringObject.CountAndFlags(
+        sharedCount: _guts.count,
+        isASCII: gutsCountAndFlags.isASCII,
+        isNullTerminated: gutsCountAndFlags.isNullTerminated
+      )
       return unsafe __SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,
-        countAndFlags: _StringObject.CountAndFlags(
-          sharedCount: _guts.count, isASCII: gutsCountAndFlags.isASCII))
+        countAndFlags: newCountAndFlags)
     }
 
     _internalInvariant(_guts._object.hasObjCBridgeableObject,
@@ -664,6 +688,21 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 
 @available(SwiftStdlib 6.1, *)
 @_spi(Foundation) public func _SwiftCreateImmortalString_ForFoundation(
+  buffer: UnsafeBufferPointer<UInt8>,
+  isASCII: Bool
+) -> String? {
+  switch unsafe validateUTF8(buffer) {
+  case .success(let extraInfo):
+    return unsafe String(
+      _StringGuts(nullTerminatedImmortal: buffer, isASCII: extraInfo.isASCII)
+    )
+  default:
+    return nil
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+@_spi(Foundation) public func _SwiftCreateNonTerminatedImmortalString_ForFoundation(
   buffer: UnsafeBufferPointer<UInt8>,
   isASCII: Bool
 ) -> String? {
