@@ -38,6 +38,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
@@ -96,7 +97,20 @@ Type FailureDiagnostic::getRawType(ASTNode node) const {
 
 Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
                                     bool wantRValue) const {
-  rawType = rawType.transformRec([&](Type type) -> std::optional<Type> {
+  class Transform : public TypeTransform<Transform> {
+    llvm::function_ref<std::optional<Type>(TypeBase *)> fn;
+
+  public:
+    explicit Transform(llvm::function_ref<std::optional<Type>(TypeBase *)> fn,
+                       ASTContext &ctx)
+        : TypeTransform(ctx), fn(fn) {}
+    std::optional<Type> transform(TypeBase *type, TypePosition position) {
+      return fn(type);
+    }
+    bool shouldUnwrapVanishingTuples() const { return false; }
+  };
+
+  rawType = Transform([&](Type type) -> std::optional<Type> {
     if (auto *typeVar = type->getAs<TypeVariableType>()) {
       auto resolvedType = S.simplifyType(typeVar);
 
@@ -131,7 +145,7 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
       return Type(type->getASTContext().TheUnresolvedType);
 
     return std::nullopt;
-  });
+  }, rawType->getASTContext()).doIt(rawType, TypePosition::Invariant);
 
   if (reconstituteSugar)
     rawType = rawType->reconstituteSugar(/*recursive*/ true);
