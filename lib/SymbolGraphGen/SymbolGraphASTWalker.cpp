@@ -335,6 +335,9 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     }
   }
 
+  // If this is a Clang typedef of an underlying type that is being hidden (e.g. `typedef struct
+  // _MyStruct { ... } MyStruct`) then copy in the child symbols from the underlying type to the
+  // type alias.
   if (const auto *TD = dyn_cast_or_null<TypeAliasDecl>(VD)) {
     const auto InnerType = TD->getUnderlyingType();
     if (NominalTypeDecl *NTD = InnerType->getAnyNominal()) {
@@ -342,8 +345,18 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       // otherwise isn't being shown
       if (isOurModule(NTD->getModuleContext()) &&
           !SG->canIncludeDeclAsNode(NTD)) {
-        PublicPrivateTypeAliases.insert_or_assign(NTD, TD);
-        synthesizeChildSymbols(NTD, TD);
+        // We specifically only want to look for underlying types that are "embedded" in the typedef
+        // definition, so let's pull out the Clang decl and check for that
+        if (NTD->hasClangNode()) {
+          if (const auto *ClangDecl = NTD->getClangNode().getAsDecl()) {
+            if (const auto *ClangTagDecl = dyn_cast<clang::TagDecl>(ClangDecl)) {
+              if (ClangTagDecl->isEmbeddedInDeclarator()) {
+                PublicPrivateTypeAliases.insert_or_assign(NTD, TD);
+                synthesizeChildSymbols(NTD, TD);
+              }
+            }
+          }
+        }
       }
     }
   }
