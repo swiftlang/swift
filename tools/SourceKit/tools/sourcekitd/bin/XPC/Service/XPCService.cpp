@@ -291,8 +291,7 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         } else {
           dispatch_async(requestQueue, handler);
         }
-      } else if (xpc_object_t contents =
-                     xpc_dictionary_get_value(event, "ping")) {
+      } else if (xpc_dictionary_get_value(event, "ping") != nullptr) {
         // Ping back.
         xpc_object_t reply = xpc_dictionary_create_reply(event);
         xpc_release(event);

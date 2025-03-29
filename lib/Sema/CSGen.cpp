@@ -194,7 +194,7 @@ namespace {
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (isa<VarDecl>(DRE->getDecl())) {
           if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
