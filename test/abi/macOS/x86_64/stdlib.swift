@@ -959,3 +959,11 @@ Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
 Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
 Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
 Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
+
+// CoroutineAccessors
+Added: _swift_coro_alloc
+Added: _swift_coro_dealloc
+
+// Shared string creation for Foundation, again
+Added: _$ss53_SwiftCreateNonTerminatedImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
+Added: __swift_stdlib_NSStringUTF8StringTrampoline

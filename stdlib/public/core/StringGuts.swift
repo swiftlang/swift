@@ -49,6 +49,16 @@ extension _StringGuts {
   internal init(_ smol: _SmallString) {
     self.init(_StringObject(smol))
   }
+  
+  @_alwaysEmitIntoClient @inline(__always)
+  internal init(
+    nullTerminatedImmortal bufPtr: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool
+  ) {
+    unsafe self.init(
+      _StringObject(nullTerminatedImmortal: bufPtr, isASCII: isASCII)
+    )
+  }
 
   @inlinable @inline(__always)
   internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
@@ -235,7 +245,12 @@ extension _StringGuts {
   internal func _slowWithCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
-    _internalInvariant(!_object.isFastZeroTerminated)
+    if _object.isFastZeroTerminated {
+      // This branch looks unreachable, but can be reached via `withCString`
+      // in binaries that haven't been recompiled since the termination flag
+      // was added to _StringObject. Retry the fast path if so.
+      return try unsafe withCString(body)
+    }
     return try String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
       return try unsafe body(ptr)
