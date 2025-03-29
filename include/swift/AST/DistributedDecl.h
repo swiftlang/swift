@@ -148,6 +148,10 @@ getDistributedSerializationRequirements(
     ProtocolDecl *protocol,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos);
 
+void injectAdHocDistributedSerializationRequirementForWitnessThunk(
+    const ValueDecl *requirementDecl, const FuncDecl *witnessDecl,
+    SmallVectorImpl<Requirement> &Requirements);
+
 /// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
 ///
 /// \param actorOrSystem distributed actor or actor system to get the

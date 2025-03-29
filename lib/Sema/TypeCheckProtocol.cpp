@@ -966,13 +966,13 @@ RequirementMatch swift::matchWitness(
 /// multiple protocols or conformances.
 static const RequirementEnvironment &getOrCreateRequirementEnvironment(
     WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-    DeclContext *dc, GenericSignature reqSig, ProtocolDecl *proto,
+    DeclContext *dc, ValueDecl *req, GenericSignature reqSig, ProtocolDecl *proto,
     ClassDecl *covariantSelf, RootProtocolConformance *conformance) {
   WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig.getPointer(),
                                                           covariantSelf);
   auto cacheIter = reqEnvCache.find(cacheKey);
   if (cacheIter == reqEnvCache.end()) {
-    RequirementEnvironment reqEnv(dc, reqSig, proto, covariantSelf,
+    RequirementEnvironment reqEnv(dc, req, reqSig, proto, covariantSelf,
                                   conformance);
     cacheIter = reqEnvCache.insert({cacheKey, std::move(reqEnv)}).first;
   }
@@ -1181,7 +1181,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   }
 
   const RequirementEnvironment &reqEnvironment =
-      getOrCreateRequirementEnvironment(reqEnvCache, dc, reqSig, proto,
+      getOrCreateRequirementEnvironment(reqEnvCache, dc, req, reqSig, proto,
                                         covariantSelf, conformance);
 
   // Set up the constraint system for matching.
@@ -5655,10 +5655,7 @@ void ConformanceChecker::resolveValueWitnesses() {
   // These protocol requirements are not expressible in Swift today, but as
   // the type system gains the required abilities, we should strive to move
   // them to plain-old protocol requirements.
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem) ||
-      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder) ||
-      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder) ||
-      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
+  if (Proto->hasMembersWithAdHocRequirements()) {
     checkDistributedActorSystemAdHocProtocolRequirements(
         Context, Proto, Conformance, Adoptee, /*diagnose=*/true);
   }

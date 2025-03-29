@@ -762,14 +762,11 @@ struct FakeInvocationEncoder_recordArgument_wrongType: DistributedTargetInvocati
   mutating func doneRecording() throws {}
 }
 struct FakeInvocationEncoder_recordArgument_missingMutating: DistributedTargetInvocationEncoder { 
-  //expected-error@-1{{type 'FakeInvocationEncoder_recordArgument_missingMutating' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-error@-1{{struct 'FakeInvocationEncoder_recordArgument_missingMutating' is missing witness for protocol requirement 'recordArgument'}}
   //expected-note@-2{{add stubs for conformance}}
-  //expected-error@-3{{struct 'FakeInvocationEncoder_recordArgument_missingMutating' is missing witness for protocol requirement 'recordArgument'}}
-  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  // expected-note@+1 {{candidate has non-matching type '<Value> (RemoteCallArgument<Value>) throws -> ()'}}
   func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}

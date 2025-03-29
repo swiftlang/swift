@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -33,7 +34,18 @@ using namespace swift;
 STATISTIC(NumRequirementEnvironments, "# of requirement environments");
 
 RequirementEnvironment::RequirementEnvironment(
+    DeclContext *conformanceDC,
+    GenericSignature reqSig,
+    ProtocolDecl *proto,
+    ClassDecl *covariantSelf,
+    RootProtocolConformance *conformance) {
+  RequirementEnvironment(conformanceDC, /*reqDecl=*/nullptr, reqSig, proto,
+                         covariantSelf, conformance);
+}
+
+RequirementEnvironment::RequirementEnvironment(
                                            DeclContext *conformanceDC,
+                                           ValueDecl* reqDecl,
                                            GenericSignature reqSig,
                                            ProtocolDecl *proto,
                                            ClassDecl *covariantSelf,
@@ -199,6 +211,7 @@ RequirementEnvironment::RequirementEnvironment(
                               conformanceToWitnessThunkConformanceFn);
       requirements.push_back(req);
     }
+    // TODO: maybe can add the requirement here
   }
 
   // Finally, add the generic parameters from the requirement.
@@ -224,6 +237,31 @@ RequirementEnvironment::RequirementEnvironment(
   for (auto &rawReq : reqSig.getRequirements()) {
     auto req = rawReq.subst(reqToWitnessThunkSigMap);
     requirements.push_back(req);
+  }
+
+  /// Detect and inject ad-hoc requirements
+  if (proto->hasMembersWithAdHocRequirements()) {
+    if (auto reqFunc = dyn_cast_or_null<FuncDecl>(reqDecl)) {
+      if (reqFunc->isDistributedWitnessWithAdHocSerializationRequirement(/*allowRequirement=*/true)) {
+        // This requirement is one of those that need ad-hoc requirements.
+        // Find the specific for this requirement and inject the ad-hoc
+        // requirement.
+        for (const auto witness: dyn_cast<NominalTypeDecl>(conformanceDC)->getMembers()) {
+          const auto witnessFunc = dyn_cast<FuncDecl>(witness);
+
+          if (witnessFunc &&
+              witnessFunc->isDistributedWitnessWithAdHocSerializationRequirement(/*allowRequirement=*/false)) {
+            injectAdHocDistributedSerializationRequirementForWitnessThunk(
+                reqDecl, witnessFunc, requirements);
+
+            // we injected the add hoc requirement to this witness thunk
+            // signature. Since there is at-most one witness, we can break out
+            // of the loop here.
+            break;
+          }
+        }
+      }
+    }
   }
 
   witnessThunkSig = buildGenericSignature(ctx, GenericSignature(),
