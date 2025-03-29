@@ -390,10 +390,12 @@ extension ASTGenVisitor {
   ///   @abi(func fn())
   ///   ```
   func generateABIAttr(attribute node: AttributeSyntax) -> BridgedABIAttr? {
-    guard
-      let arg = node.arguments?.as(ABIAttributeArgumentsSyntax.self)
-    else {
-      // TODO: diagnose
+    guard let arg = node.arguments else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return nil
+    }
+    guard let arg = arg.as(ABIAttributeArgumentsSyntax.self) else {
+      self.diagnose(.unexpectedArgumentsTypeInAttribute(node, arguments: arg, expected: ABIAttributeArgumentsSyntax.self))
       return nil
     }
 
@@ -436,24 +438,25 @@ extension ASTGenVisitor {
   ///   @_alignment(8)
   ///   ```
   func generateAlignmentAttr(attribute node: AttributeSyntax) -> BridgedAlignmentAttr? {
-    guard
-      let arg = node.arguments?.as(TokenSyntax.self)
-    else {
-      print("Not a token")
-      // TODO: Diagnose.
-      return nil
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let value: Int? = self.generateConsumingAttrOption(attribute: node, args: &args, label: nil) { expr in
+        guard let intExpr = expr.as(IntegerLiteralExprSyntax.self) else {
+          return nil
+        }
+        return intExpr.representedLiteralValue
+      }
+      guard let value, value > 0 else {
+        // TODO: Diagnose.
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        value: value
+      )
     }
-    let value: Int? = Int(String(syntaxText: arg.rawText))
-    guard let value, value > 0 else {
-      // TODO: Diagnose.
-      return nil
-    }
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
-      value: value
-    )
   }
 
   /// E.g.:
@@ -513,6 +516,7 @@ extension ASTGenVisitor {
     }
 
     return self.generateAvailableAttr(
+      attribute: node,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       attrName: attrName,
@@ -557,25 +561,18 @@ extension ASTGenVisitor {
   ///   @_cdecl("c_function_name")
   ///   ```
   func generateCDeclAttr(attribute node: AttributeSyntax) -> BridgedCDeclAttr? {
-    guard
-      // `@_cdecl` attribute has `.string(StringLiteralExprSyntax)` arguments.
-      let arg = node.arguments?.as(StringLiteralExprSyntax.self)
-    else {
-      // TODO: Diagnose.
-      return nil
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let name = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args) else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        name: name
+      )
     }
-    guard
-      let name = self.generateStringLiteralTextIfNotInterpolated(expr: arg)
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
-      name: name
-    )
   }
 
   struct GeneratedDerivativeOriginalDecl {
@@ -925,7 +922,7 @@ extension ASTGenVisitor {
     // FIXME: SwiftParser should parse the argument as LabeledExprListArguments
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       // Exposure kind.
-      let kind: BridgedExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      let kind: BridgedExposureKind? = self.generateConsumingPlainIdentifierAttrOption(attribute: node, args: &args) {
         switch $0.rawText {
         case "Cxx":
           return .cxx
@@ -940,13 +937,21 @@ extension ASTGenVisitor {
       }
 
       // Name.
-      let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) ?? ""
+      let name: BridgedStringRef?
+      if !args.isEmpty {
+        name = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args) ?? ""
+        guard name != nil else {
+          return nil
+        }
+      } else {
+        name = nil
+      }
 
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
         range: self.generateAttrSourceRange(node),
-        name: name,
+        name: name ?? BridgedStringRef(),
         kind: kind
       )
     }
@@ -960,7 +965,7 @@ extension ASTGenVisitor {
   ///   ```
   func generateExternAttr(attribute node: AttributeSyntax) -> BridgedExternAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      let kind: BridgedExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      let kind: BridgedExternKind? = self.generateConsumingPlainIdentifierAttrOption(attribute: node, args: &args, example: "c") {
         switch $0.rawText {
         case "c":
           return .C
@@ -980,12 +985,12 @@ extension ASTGenVisitor {
       switch kind {
       case .C:
         moduleName = nil
-        symbolName = args.isEmpty ? nil : self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+        symbolName = args.isEmpty ? nil : self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args)
       case .wasm:
-        guard let _moduleName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "module") else {
+        guard let _moduleName = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args, label: "module") else {
           return nil
         }
-        guard let _symbolName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "name") else {
+        guard let _symbolName = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args, label: "name") else {
           return nil
         }
 
@@ -1012,7 +1017,8 @@ extension ASTGenVisitor {
   ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      guard let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
+      guard let name = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args) else {
+        // TODO: Diagnose if nil.
         return nil
       }
 
@@ -1301,7 +1307,7 @@ extension ASTGenVisitor {
 
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       // Macro role.
-      let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      let role = self.generateConsumingPlainIdentifierAttrOption(attribute: node, args: &args) {
         BridgedMacroRole(from: $0.rawText.bridged)
       }
       guard let role = role else {
@@ -1605,27 +1611,21 @@ extension ASTGenVisitor {
   }
 
   func generatePrivateImportAttr(attribute node: AttributeSyntax) -> BridgedPrivateImportAttr? {
-    guard
-      // `@_private` has special argument list syntax
-      let args = node.arguments?.as(UnderscorePrivateAttributeArgumentsSyntax.self)
-    else {
-      // TODO: Diagnose
-      return nil
-    }
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let fileName = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args, label: "sourceFile")
+      guard let fileName else {
+        return nil
+      }
 
-    guard let fileName = self.generateStringLiteralTextIfNotInterpolated(expr: args.filename) else {
-      // TODO: Diagnose
-      return nil
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        attrNameLoc: self.generateSourceLoc(node.attributeName),
+        lParenLoc: self.generateSourceLoc(node.leftParen),
+        fileName: fileName,
+        rParenLoc: self.generateSourceLoc(node.rightParen)
+      )
     }
-
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      attrNameLoc: self.generateSourceLoc(node.attributeName),
-      lParenLoc: self.generateSourceLoc(node.leftParen),
-      fileName: fileName,
-      rParenLoc: self.generateSourceLoc(node.rightParen)
-    )
   }
 
   /// E.g.:
@@ -1707,7 +1707,7 @@ extension ASTGenVisitor {
       }
 
       func generateScalarLike() -> BridgedRawLayoutAttr? {
-        let tyR = self.generateConsumingAttrOption(args: &args, label: "like") {
+        let tyR = self.generateConsumingAttrOption(attribute: node, args: &args, label: "like") {
           self.generateTypeRepr(expr: $0)
         }
         guard let tyR else {
@@ -1728,7 +1728,7 @@ extension ASTGenVisitor {
       }
 
       func generateArrayLike() -> BridgedRawLayoutAttr? {
-        let tyR = self.generateConsumingAttrOption(args: &args, label: "likeArrayOf") {
+        let tyR = self.generateConsumingAttrOption(attribute: node, args: &args, label: "likeArrayOf") {
           self.generateTypeRepr(expr: $0)
         }
         guard let tyR else {
@@ -1736,7 +1736,7 @@ extension ASTGenVisitor {
         }
 
         // 'count:' can be integer literal or a generic parameter.
-        let count = self.generateConsumingAttrOption(args: &args, label: "count") {
+        let count = self.generateConsumingAttrOption(attribute: node, args: &args, label: "count") {
           self.generateValueOrType(expr: $0)
         }
         guard let count else {
@@ -1758,7 +1758,7 @@ extension ASTGenVisitor {
       }
 
       func generateConsumingIntegerLiteralOption(label: SyntaxText) -> Int? {
-        self.generateConsumingAttrOption(args: &args, label: label) {
+        self.generateConsumingAttrOption(attribute: node, args: &args, label: label) {
           guard let integerExpr = $0.as(IntegerLiteralExprSyntax.self) else {
             // TODO: Diagnose
             fatalError("expected integer literal for '\(String(syntaxText: label)):' in @_rawLayout")
@@ -1771,7 +1771,7 @@ extension ASTGenVisitor {
       }
 
       func generateConsumingMovesAsLike() -> Bool? {
-        self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        self.generateConsumingPlainIdentifierAttrOption(attribute: node, args: &args) {
           switch $0.rawText {
           case "movesAsLike":
             return true
@@ -1820,24 +1820,18 @@ extension ASTGenVisitor {
   ///   ```
   ///   @semantics("semantics_name")
   func generateSemanticsAttr(attribute node: AttributeSyntax) -> BridgedSemanticsAttr? {
-    guard
-      let arg = node.arguments?.as(StringLiteralExprSyntax.self)
-    else {
-      // TODO: Diagnose.
-      return nil
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let value = self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args) else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        value: value
+      )
     }
-    guard
-      let value = self.generateStringLiteralTextIfNotInterpolated(expr: arg)
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
-      value: value
-    )
   }
 
   /// E.g.:
@@ -1909,6 +1903,7 @@ extension ASTGenVisitor {
         targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName).name
       case .specializeAvailabilityArgument(let arg):
         availableAttrs = self.generateAvailableAttr(
+          attribute: node,
           atLoc: self.generateSourceLoc(arg.availabilityLabel),
           range: self.generateSourceRange(
             start: arg.availabilityArguments.firstToken(viewMode: .all)!,
@@ -2160,15 +2155,15 @@ extension ASTGenVisitor {
   ///   @_unavailableFromAsync(message: "use fooBar(_:) instead")
   ///   ```
   func generateUnavailableFromAsyncAttr(attribute node: AttributeSyntax) -> BridgedUnavailableFromAsyncAttr? {
+
     var message: BridgedStringRef? = nil
     if node.arguments != nil {
-      // FIXME: Should be normal LabeledExprListSyntax arguments.
-
-      guard let args = node.arguments?.as(UnavailableFromAsyncAttributeArgumentsSyntax.self) else {
-        // TODO: Diagnose.
+      message = self.generateWithLabeledExprListArguments(attribute: node) { args in
+        self.generateConsumingSimpleStringLiteralAttrOption(attribute: node, args: &args, label: "message")
+      }
+      guard message != nil else {
         return nil
       }
-      message = self.generateStringLiteralTextIfNotInterpolated(expr: args.message)
     }
     return .createParsed(
       self.ctx,
@@ -2209,7 +2204,7 @@ extension ASTGenVisitor {
     let initContext: BridgedCustomAttributeInitializer?
     if let args = node.arguments {
       guard let args = args.as(LabeledExprListSyntax.self) else {
-        // TODO: Diagnose?
+        self.diagnose(.unexpectedArgumentsTypeInAttribute(node, arguments: args, expected: LabeledExprListSyntax.self))
         return nil
       }
 
@@ -2256,9 +2251,8 @@ extension ASTGenVisitor {
     {
       return extractRawText(segments).bridged
     }
-    // TODO: Diagnose.
-    fatalError("expected string literal without interpolation")
-    // return nil
+    // Caller should diagnose.
+    return nil
   }
 
   /// Convenient method for processing an attribute with `LabeledExprListSyntax`.
@@ -2280,22 +2274,39 @@ extension ASTGenVisitor {
       return nil
     }
     if let extra = args.popFirst() {
-      self.diagnose(.extraneousArgumentsInAttribute(node, extra))
+      self.diagnose(.unexpectedArgumentInAttribute(node, extra))
     }
     return result
   }
 
   func generateConsumingAttrOption<R>(
+    attribute: AttributeSyntax,
     args: inout Slice<LabeledExprListSyntax>,
     label: SyntaxText?,
+    example: String? = nil,
     _ valueGeneratorFunction: (ExprSyntax) -> R?
   ) -> R? {
     guard let arg = args.first else {
+      if let example {
+        self.diagnose(.expectedOptionForAttribute(attribute, suchAs: example))
+      } else if let label {
+        self.diagnose(.expectedArgumentLabelInAttribute(
+          attribute,
+          label: String(syntaxText: label),
+          at: Syntax(attribute.rightParen) ?? Syntax(attribute)
+        ))
+      } else {
+        self.diagnose(.expectedArgumentsInAttribute(attribute))
+      }
       // TODO: Diagnose.
       return nil
     }
     guard arg.label?.rawText == label else {
-      // TODO: Diagnose.
+      if arg.label != nil {
+        self.diagnose(.unexpectedArgumentLabelInAttribute(attribute, at: arg))
+      } else {
+        self.diagnose(.expectedArgumentLabelInAttribute(attribute, label: String(syntaxText: label!), at: arg))
+      }
       return nil
     }
     // Label matched. Consume the argument even if the value is not valid.
@@ -2305,26 +2316,29 @@ extension ASTGenVisitor {
   }
 
   func generateConsumingPlainIdentifierAttrOption<R>(
+    attribute: AttributeSyntax,
     args: inout Slice<LabeledExprListSyntax>,
+    example: String? = nil,
     _ valueGeneratorFunction: (TokenSyntax) -> R?
   ) -> R? {
-    return generateConsumingAttrOption(args: &args, label: nil) {
-      guard
-        let declRefExpr = $0.as(DeclReferenceExprSyntax.self),
-        declRefExpr.argumentNames == nil
-      else {
-        // TODO: Diagnose.
-        return nil
+    return generateConsumingAttrOption(attribute: attribute, args: &args, label: nil, example: example) {
+      if let declRefExpr = $0.as(DeclReferenceExprSyntax.self), declRefExpr.argumentNames == nil {
+        return valueGeneratorFunction(declRefExpr.baseName)
+      } else if let discardExpr = $0.as(DiscardAssignmentExprSyntax.self) {
+        return valueGeneratorFunction(discardExpr.wildcard)
       }
-      return valueGeneratorFunction(declRefExpr.baseName)
+      self.diagnose(.expectedIdentifierOptionForAttribute(attribute, at: $0))
+      return nil
     }
   }
 
   func generateConsumingSimpleStringLiteralAttrOption(
+    attribute: AttributeSyntax,
     args: inout Slice<LabeledExprListSyntax>,
     label: SyntaxText? = nil
   ) -> BridgedStringRef? {
-    return self.generateConsumingAttrOption(args: &args, label: label) {
+    return self.generateConsumingAttrOption(attribute: attribute, args: &args, label: label) {
+      // TODO: Diagnose if 'nil'
       self.generateStringLiteralTextIfNotInterpolated(expr: $0)
     }
   }
@@ -2341,7 +2355,7 @@ extension ASTGenVisitor {
     _ valueGeneratorFunction: (TokenSyntax) -> Result?,
     valueIfOmitted: Result? = nil
   ) -> Result? {
-    guard node.leftParen != nil, let arguments = node.arguments else {
+    guard node.arguments != nil else {
       if let valueIfOmitted {
         return valueIfOmitted
       }
@@ -2349,13 +2363,9 @@ extension ASTGenVisitor {
       return nil
     }
 
-    if case .token(let tok) = arguments {
-      // Special case: was parsed as a token, not an an argument list
-      return valueGeneratorFunction(tok)
-    }
-
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       self.generateConsumingPlainIdentifierAttrOption(
+        attribute: node,
         args: &args,
         valueGeneratorFunction
       )
