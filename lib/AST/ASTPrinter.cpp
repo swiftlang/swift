@@ -1332,8 +1332,8 @@ void PrintAST::printAttributes(const Decl *D) {
 
       if (!Options.PrintForSIL) {
         // Don't print @_hasStorage if the value is simply stored, or the
-        // decl is resilient.
-        if (vd->isResilient() ||
+        // decl is resilient or in an `@objc @implementation` extension.
+        if (vd->isResilient() || isInObjCImpl(vd) ||
             (vd->getImplInfo().isSimpleStored() &&
              !hasLessAccessibleSetter(vd)))
           Options.ExcludeAttrList.push_back(DeclAttrKind::HasStorage);
