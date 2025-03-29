@@ -6279,7 +6279,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // are the only classes that need non-public members.)
   auto skipIfNonPublic =
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
-      importer::getPrivateFileIDAttrs(cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl())).empty();
+      importer::getPrivateFileIDAttrs(
+          cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()))
+          .empty();
 
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
