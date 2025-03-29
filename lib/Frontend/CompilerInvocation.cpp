@@ -2629,13 +2629,8 @@ static void configureDiagnosticEngine(
 
   std::string docsPath = Options.DiagnosticDocumentationPath;
   if (docsPath.empty()) {
-    // Default to a location relative to the compiler.
-    llvm::SmallString<128> docsPathBuffer(mainExecutablePath);
-    llvm::sys::path::remove_filename(docsPathBuffer); // Remove /swift
-    llvm::sys::path::remove_filename(docsPathBuffer); // Remove /bin
-    llvm::sys::path::append(docsPathBuffer, "share", "doc", "swift",
-                            "diagnostics");
-    docsPath = docsPathBuffer.str();
+    // Point at the latest Markdown documentation on GitHub.
+    docsPath = "https://github.com/swiftlang/swift/tree/main/userdocs/diagnostics";
   }
   Diagnostics.setDiagnosticDocumentationPath(docsPath);
 
