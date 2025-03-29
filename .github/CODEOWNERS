@@ -285,17 +285,20 @@
 
 # utils
 /utils/*windows*                                              @compnerd
+/utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
 /utils/generate-xcode                                         @hamishknight
 /utils/gyb_sourcekit_support/                                 @ahoppen @bnbarham @hamishknight @rintaro
 /utils/sourcekit_fuzzer/                                      @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift-xcodegen/                                        @hamishknight
+/utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal
 /utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/skstresstester.py         @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham @hamishknight @rintaro
-/utils/update-checkout*                                       @shahmishal
-/utils/update_checkout/                                       @shahmishal
+/utils/update-checkout*                                       @etcwilde @justice-adams-apple @shahmishal
+/utils/update_checkout/                                       @etcwilde @justice-adams-apple @shahmishal
+/utils/update_checkout/update-checkout-config.json            @shahmishal
 /utils/vim/                                                   @compnerd
 
 # validation-test
