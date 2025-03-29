@@ -791,7 +791,8 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
 void
 importer::addCommonInvocationArguments(
     std::vector<std::string> &invocationArgStrs,
-    ASTContext &ctx, bool ignoreClangTarget) {
+    ASTContext &ctx, bool requiresBuiltinHeadersInSystemModules,
+    bool ignoreClangTarget) {
   using ImporterImpl = ClangImporter::Implementation;
   llvm::Triple triple = ctx.LangOpts.Target;
   // Use clang specific target triple if given.
@@ -960,6 +961,16 @@ importer::addCommonInvocationArguments(
         invocationArgStrs.push_back("-I" + path.Path);
       }
     }
+  }
+
+  for (auto &overlay : searchPathOpts.VFSOverlayFiles) {
+    invocationArgStrs.push_back("-ivfsoverlay");
+    invocationArgStrs.push_back(overlay);
+  }
+
+  if (requiresBuiltinHeadersInSystemModules) {
+    invocationArgStrs.push_back("-Xclang");
+    invocationArgStrs.push_back("-fbuiltin-headers-in-system-modules");
   }
 }
 
@@ -1144,13 +1155,13 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
     getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx);
     break;
   }
-  addCommonInvocationArguments(invocationArgStrs, ctx, ignoreClangTarget);
+  addCommonInvocationArguments(invocationArgStrs, ctx,
+      requiresBuiltinHeadersInSystemModules, ignoreClangTarget);
   return invocationArgStrs;
 }
 
 std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
-    ClangImporter *importer, ASTContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+    ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     bool ignoreClangTarget) {
   std::unique_ptr<clang::CompilerInvocation> CI;
 
@@ -1165,7 +1176,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
       new clang::DiagnosticOptions};
   auto *tempDiagClient =
-      new ClangDiagnosticConsumer(importer->Impl, *tempDiagOpts,
+      new ClangDiagnosticConsumer(Impl, *tempDiagOpts,
                                   ctx.ClangImporterOpts.DumpClangDiagnostics);
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
       tempDiagOpts.get(), tempDiagClient,
@@ -1255,20 +1266,18 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   // resilient and provide a module even if there were building it.
   auto TempVFS = clang::createVFSFromCompilerInvocation(
       *CI, *clangDiags,
-      VFS ? VFS : importer->Impl.SwiftContext.SourceMgr.getFileSystem());
+      VFS ? VFS : Impl.SwiftContext.SourceMgr.getFileSystem());
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
     if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
       // There is no need to add any module map file here. Issue a warning and
       // drop the option.
-      importer->Impl.diagnose(SourceLoc(), diag::module_map_ignored,
-                              ModuleMapFile);
+      Impl.diagnose(SourceLoc(), diag::module_map_ignored, ModuleMapFile);
     } else if (TempVFS->exists(ModuleMapFile)) {
       FilteredModuleMapFiles.push_back(ModuleMapFile);
     } else {
-      importer->Impl.diagnose(SourceLoc(), diag::module_map_not_found,
-                              ModuleMapFile);
+      Impl.diagnose(SourceLoc(), diag::module_map_not_found, ModuleMapFile);
     }
   }
   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
@@ -1337,6 +1346,9 @@ ClangImporter::create(ASTContext &ctx,
   ClangInvocationFileMapping fileMapping =
     getClangInvocationFileMapping(ctx, nullptr, ignoreFileMapping);
 
+  importer->requiresBuiltinHeadersInSystemModules =
+      fileMapping.requiresBuiltinHeadersInSystemModules;
+
   // Avoid creating indirect file system when using include tree.
   if (!ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
     // Wrap Swift's FS to allow Clang to override the working directory
@@ -1377,13 +1389,10 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create a new Clang compiler invocation.
   {
-    if (auto ClangArgs = getClangCC1Arguments(importer.get(), ctx, VFS))
+    if (auto ClangArgs = importer->getClangCC1Arguments(ctx, VFS))
       importer->Impl.ClangArgs = *ClangArgs;
     else
       return nullptr;
-
-    if (fileMapping.requiresBuiltinHeadersInSystemModules)
-      importer->Impl.ClangArgs.push_back("-fbuiltin-headers-in-system-modules");
 
     ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
     if (importerOpts.DumpClangDiagnostics) {
@@ -1472,8 +1481,7 @@ ClangImporter::create(ASTContext &ctx,
   if (ctx.LangOpts.ClangTarget.has_value()) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangArgs =
-        getClangCC1Arguments(importer.get(), ctx, VFS, true);
+    auto swiftTargetClangArgs = importer->getClangCC1Arguments(ctx, VFS, true);
     if (!swiftTargetClangArgs)
       return nullptr;
     auto swiftTargetClangInvocation = createClangInvocation(

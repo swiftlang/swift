@@ -160,6 +160,8 @@ public:
 private:
   Implementation &Impl;
 
+  bool requiresBuiltinHeadersInSystemModules = false;
+
   ClangImporter(ASTContext &ctx,
                 DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
@@ -198,13 +200,17 @@ public:
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
 
-  static std::vector<std::string>
+  std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  static std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ClangImporter *importer, ASTContext &ctx,
+  std::optional<std::vector<std::string>>
+  getClangCC1Arguments(ASTContext &ctx,
                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                        bool ignoreClangTarget = false);
+
+  std::vector<std::string>
+  getClangDepScanningInvocationArguments(ASTContext &ctx,
+      std::optional<StringRef> sourceFileName = std::nullopt);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,

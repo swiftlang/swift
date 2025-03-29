@@ -85,10 +85,9 @@ static void addScannerPrefixMapperInvocationArguments(
 }
 
 /// Create the command line for Clang dependency scanning.
-static std::vector<std::string> getClangDepScanningInvocationArguments(
-    ASTContext &ctx, std::optional<StringRef> sourceFileName = std::nullopt) {
-  std::vector<std::string> commandLineArgs =
-      ClangImporter::getClangDriverArguments(ctx);
+std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
+    ASTContext &ctx, std::optional<StringRef> sourceFileName) {
+  std::vector<std::string> commandLineArgs = getClangDriverArguments(ctx);
   addScannerPrefixMapperInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
