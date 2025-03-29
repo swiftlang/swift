@@ -744,7 +744,7 @@ static bool parseDeclSILOptional(
       *specialPurpose = SILFunction::Purpose::GlobalInitOnceFunction;
     else if (isWeakImported && SP.P.Tok.getText() == "weak_imported") {
       if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
-        SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,
+        SP.P.diagnose(SP.P.Tok, diag::attr_name_unsupported_on_target,
                       SP.P.Tok.getText(),
                       M.getASTContext().LangOpts.Target.str());
       else

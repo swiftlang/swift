@@ -3797,9 +3797,8 @@ public:
       if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
-          Ctx.Diags.diagnose(
-              CDeclAttr->getLocation(), diag::attr_decl_async,
-              CDeclAttr->getAttrName(), FD->getDescriptiveKind());
+          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::attr_decl_async,
+                             CDeclAttr, FD);
         } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);

@@ -102,7 +102,7 @@ duplicateAttr(1) // expected-error{{argument passed to call that takes no argume
 
 // CHECK ALLOWED DECLS
 private import Swift
-private(set) infix operator ~~~ // expected-error {{unexpected attribute private in operator declaration}} {{1-14=}}
+private(set) infix operator ~~~ // expected-error {{unexpected attribute 'private' in operator declaration}} {{1-14=}}
 
 private typealias MyInt = Int
 
