@@ -361,7 +361,6 @@ LoadPluginExecutable("load-plugin-executable",
                llvm::cl::desc("load plugin executable"),
                llvm::cl::cat(Category));
 
-
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
