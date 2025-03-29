@@ -27,14 +27,14 @@ public:
   typedef int publTypedef;
   struct publStruct {};
 
-  enum publEnum { publEnumValue1 };
-  enum class publEnumClass { publEnumClassValue1 };
+  enum publEnum { variantPublEnum };
   enum { publEnumAnonValue1 };
+  enum class publEnumClass { variantPublEnumClass };
   enum publEnumClosed {
-    publEnumClosedValue1
+    variantPublEnumClosed
   } __attribute__((enum_extensibility(closed)));
   enum publEnumOpen {
-    publEnumOpenValue1
+    variantPublEnumOpen
   } __attribute__((enum_extensibility(open)));
   enum publEnumFlag {} __attribute__((flag_enum));
 
@@ -48,14 +48,14 @@ TEST_PRIVATE:
   typedef int privTypedef;
   struct privStruct {};
 
-  enum privEnum { privEnumValue1 };
-  enum class privEnumClass { privEnumClassValue1 };
+  enum privEnum { variantPrivEnum };
   enum { privEnumAnonValue1 };
+  enum class privEnumClass { variantPrivEnumClass };
   enum privEnumClosed {
-    privEnumClosedValue1
+    variantPrivEnumClosed
   } __attribute__((enum_extensibility(closed)));
   enum privEnumOpen {
-    privEnumOpenValue1
+    variantPrivEnumOpen
   } __attribute__((enum_extensibility(open)));
   enum privEnumFlag {} __attribute__((flag_enum));
 };

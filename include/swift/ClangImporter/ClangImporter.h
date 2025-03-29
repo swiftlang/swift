@@ -763,7 +763,7 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
 /// and should be parsed using swift::SourceFile::FileIDStr::parse().
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-getPrivateFileIDAttrs(const clang::Decl *decl);
+getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl);
 
 /// Use some heuristics to determine whether the clang::Decl associated with
 /// \a decl would not exist without C++ interop.

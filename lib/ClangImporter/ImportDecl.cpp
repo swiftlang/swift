@@ -10024,7 +10024,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   auto skipIfNonPublic =
       !swiftDecl->getASTContext().LangOpts.hasFeature(
           Feature::ImportNonPublicCxxMembers) &&
-      importer::getPrivateFileIDAttrs(swiftDecl->getClangDecl()).empty();
+      importer::getPrivateFileIDAttrs(cast<clang::CXXRecordDecl>(swiftDecl->getClangDecl())).empty();
 
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
