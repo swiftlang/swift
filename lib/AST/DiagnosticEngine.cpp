@@ -1618,6 +1618,7 @@ DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
   };
   switch (printDiagnosticNamesMode) {
   case PrintDiagnosticNamesMode::None:
+  case PrintDiagnosticNamesMode::Group:
     break;
   case PrintDiagnosticNamesMode::Identifier: {
     // If this diagnostic is a wrapper for another diagnostic, use the ID of
@@ -1632,13 +1633,6 @@ DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
     message = formatMessageWithName(message, diagnosticIDStringFor(diagID));
     break;
   }
-  case PrintDiagnosticNamesMode::Group:
-    auto groupID = diagnostic.getGroupID();
-    if (groupID != DiagGroupID::no_group) {
-      message =
-          formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);
-    }
-    break;
   }
 
   return message;

@@ -2559,8 +2559,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   }
   if (Args.hasArg(OPT_debug_diagnostic_names)) {
     Opts.PrintDiagnosticNames = PrintDiagnosticNamesMode::Identifier;
-  } else if (Args.hasArg(OPT_print_diagnostic_groups)) {
-    Opts.PrintDiagnosticNames = PrintDiagnosticNamesMode::Group;
   }
   if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
     Opts.DiagnosticDocumentationPath = A->getValue();
