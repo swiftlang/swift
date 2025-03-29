@@ -96,11 +96,11 @@ struct TestAttributeCollisions {
   }
 
   @MainActor @execution(concurrent) func testGlobalActor() async {}
-  // expected-warning @-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes ('MainActor' and 'execution(concurrent)')}}
+  // expected-warning @-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes (@MainActor and @execution(concurrent))}}
 
   @execution(caller) nonisolated func testNonIsolatedCaller() async {} // Ok
   @MainActor @execution(caller) func testGlobalActorCaller() async {}
-  // expected-warning@-1 {{instance method 'testGlobalActorCaller()' has multiple actor-isolation attributes ('MainActor' and 'execution(caller)')}}
+  // expected-warning@-1 {{instance method 'testGlobalActorCaller()' has multiple actor-isolation attributes (@MainActor and @execution(caller))}}
   @execution(caller) func testCaller(arg: isolated MainActor) async {}
   // expected-error@-1 {{cannot use '@execution' on instance method 'testCaller(arg:)' because it has an isolated parameter: 'arg'}}
   

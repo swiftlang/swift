@@ -2858,7 +2858,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     // Diagnose using access control in a local scope, which isn't meaningful.
     if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
     }
 
     AccessLevel access = llvm::StringSwitch<AccessLevel>(AttrName)
@@ -3067,7 +3067,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (CurDeclContext->isLocalContext()) {
       // Emit an error, but do not discard the attribute.  This enables
       // better recovery in the parser.
-      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
     }
 
     if (!DiscardAttribute) {
@@ -3132,7 +3132,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     // @_section in a local scope is not allowed.
     if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
     }
 
     if (!DiscardAttribute)
@@ -3619,7 +3619,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Derivative: {
     // `@derivative` in a local scope is not allowed.
     if (CurDeclContext->isLocalContext())
-      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope,
+               '@' + AttrName.str());
 
     auto Attr = parseDerivativeAttribute(AtLoc, Loc);
     Status |= Attr;
@@ -3631,7 +3632,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Transpose: {
     // `@transpose` in a local scope is not allowed.
     if (CurDeclContext->isLocalContext())
-      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope,
+               '@' + AttrName.str());
 
     auto Attr = parseTransposeAttribute(AtLoc, Loc);
     Status |= Attr;
@@ -5455,10 +5457,9 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   for (auto it = fixityAttrs.begin(); it != fixityAttrs.end(); ++it) {
     if (it != fixityAttrs.begin()) {
       auto *attr = *it;
-      P.diagnose(attr->getLocation(), diag::mutually_exclusive_attrs,
-                 attr->getAttrName(), fixityAttrs.front()->getAttrName(),
-                 attr->isDeclModifier())
-      .fixItRemove(attr->getRange());
+      P.diagnose(attr->getLocation(), diag::mutually_exclusive_attrs, attr,
+                 fixityAttrs.front(), attr->isDeclModifier())
+          .fixItRemove(attr->getRange());
       attr->setInvalid();
     }
   }
@@ -5475,8 +5476,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
       }
       auto *attr = *it;
       P.diagnose(attr->getLocation(),
-                 diag::operator_decl_should_not_contain_other_attributes,
-                 attr->getAttrName())
+                 diag::operator_decl_should_not_contain_other_attributes, attr)
           .fixItRemove(attr->getRange());
       attr->setInvalid();
     }
