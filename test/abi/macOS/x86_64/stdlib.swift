@@ -815,7 +815,19 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
-// Span-providing properties
+// SE-0467 MutableSpan and MutableRawSpan
+Added: _$ss11MutableSpanVMa
+Added: _$ss11MutableSpanVMn
+Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
+Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
+Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
+Added: _$ss14MutableRawSpanV6_countSivg
+Added: _$ss14MutableRawSpanV8_pointerSvSgvg
+Added: _$ss14MutableRawSpanVMa
+Added: _$ss14MutableRawSpanVMn
+Added: _$ss14MutableRawSpanVN
+
+// SE-0456 Span-providing properties
 Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
 Added: _$sSW5bytess7RawSpanVvpMV
 Added: _$sSa4spans4SpanVyxGvpMV
@@ -826,6 +838,11 @@ Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
 Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
 Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+
+// SE-0467 mutableSpan properties
+Added: _$sSa11mutableSpans07MutableB0VyxGvr
+Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
+Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
