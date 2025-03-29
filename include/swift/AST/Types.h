@@ -3800,6 +3800,12 @@ public:
   /// Return the function type without the throwing.
   AnyFunctionType *getWithoutThrowing() const;
 
+  /// Return the function type with the given \p isolation.
+  AnyFunctionType *getWithIsolation(FunctionTypeIsolation isolation) const;
+
+  /// Return the function type setting sendable to \p newValue.
+  AnyFunctionType *getWithSendable(bool newValue) const;
+
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
