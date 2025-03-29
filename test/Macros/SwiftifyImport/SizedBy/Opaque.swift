@@ -1,9 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2>&1 | %FileCheck --match-full-lines %s
-
-// FIXME: Waiting for optional to handle nonescapable types
-// RUN: not %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors
+// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors -dump-macro-expansions -verify 2>&1 | %FileCheck --match-full-lines %s
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
 func nonnullUnsafeRawBufferPointer(_ ptr: OpaquePointer, _ size: CInt) {
@@ -53,13 +50,15 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func nullableSpan(_ ptr: RawSpan?) {
-// CHECK-NEXT:     return unsafe if ptr == nil {
-// CHECK-NEXT:         unsafe nullableSpan(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
-// CHECK-NEXT:     } else {
-// CHECK-NEXT:         ptr!.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:             return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:     return { () in
+// CHECK-NEXT:         return if ptr == nil {
+// CHECK-NEXT:             unsafe nullableSpan(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:         } else {
+// CHECK-NEXT:             unsafe ptr!.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:                 return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:             }
 // CHECK-NEXT:         }
-// CHECK-NEXT:     }
+// CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient

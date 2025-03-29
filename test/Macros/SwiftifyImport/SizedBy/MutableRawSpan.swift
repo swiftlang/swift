@@ -7,9 +7,9 @@
 func myFunc(_ ptr: UnsafeMutableRawPointer, _ size: CInt) {
 }
 
-// Emits UnsafeMutableRawBufferPointer until MutableRawSpan has landed
-
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func myFunc(_ ptr: UnsafeMutableRawBufferPointer) {
-// CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, CInt(exactly: ptr.count)!)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr)
+// CHECK-NEXT: func myFunc(_ ptr: inout MutableRawSpan) {
+// CHECK-NEXT:     return unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
+// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.byteCount)!)
+// CHECK-NEXT:     }
 // CHECK-NEXT: }
