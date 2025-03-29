@@ -202,9 +202,6 @@ void InteriorLiveness::print(llvm::raw_ostream &OS) const {
   case AddressUseKind::Dependent:
     OS << "Incomplete liveness: Dependent value\n";
     break;
-  case AddressUseKind::Unknown:
-    OS << "Incomplete liveness: Unknown address use\n";
-    break;
   }
 }
 

@@ -761,9 +761,9 @@ BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 /// transitive uses of the load_borrow as uses. This is important when working
 /// with this in OSSA. If one wishes to avoid this behavior, call find
 /// transitive uses for address with ones own visitor.
-inline AddressUseKind findTransitiveUsesForAddress(
-    SILValue address, SmallVectorImpl<Operand *> *foundUses = nullptr,
-    std::function<void(Operand *)> *onError = nullptr) {
+inline AddressUseKind
+findTransitiveUsesForAddress(SILValue address,
+                             SmallVectorImpl<Operand *> *foundUses = nullptr) {
   // This is a version of TransitiveUseVisitor that visits inner transitive
   // guaranteed uses to determine if a load_borrow is an escape in OSSA. This
   // is OSSA specific behavior and we should probably create a different API
@@ -771,11 +771,9 @@ inline AddressUseKind findTransitiveUsesForAddress(
   struct BasicTransitiveAddressVisitor
       : TransitiveAddressWalker<BasicTransitiveAddressVisitor> {
     SmallVectorImpl<Operand *> *foundUses;
-    std::function<void(Operand *)> *onErrorFunc;
 
-    BasicTransitiveAddressVisitor(SmallVectorImpl<Operand *> *foundUses,
-                                  std::function<void(Operand *)> *onErrorFunc)
-        : foundUses(foundUses), onErrorFunc(onErrorFunc) {}
+    BasicTransitiveAddressVisitor(SmallVectorImpl<Operand *> *foundUses)
+        : foundUses(foundUses) {}
 
     bool visitUse(Operand *use) {
       if (!foundUses)
@@ -803,14 +801,9 @@ inline AddressUseKind findTransitiveUsesForAddress(
       foundUses->push_back(use);
       return true;
     }
-
-    void onError(Operand *use) {
-      if (onErrorFunc)
-        (*onErrorFunc)(use);
-    }
   };
 
-  BasicTransitiveAddressVisitor visitor(foundUses, onError);
+  BasicTransitiveAddressVisitor visitor(foundUses);
   return std::move(visitor).walk(address);
 }
 
@@ -1001,10 +994,8 @@ struct InteriorPointerOperand {
   /// requirements to ensure that the underlying class is alive at all use
   /// points.
   AddressUseKind
-  findTransitiveUses(SmallVectorImpl<Operand *> *foundUses = nullptr,
-                     std::function<void(Operand *)> *onError = nullptr) {
-    return findTransitiveUsesForAddress(getProjectedAddress(), foundUses,
-                                        onError);
+  findTransitiveUses(SmallVectorImpl<Operand *> *foundUses = nullptr) {
+    return findTransitiveUsesForAddress(getProjectedAddress(), foundUses);
   }
 
   Operand *operator->() { return operand; }
