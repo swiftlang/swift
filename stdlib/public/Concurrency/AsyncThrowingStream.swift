@@ -521,6 +521,16 @@ extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream.Continuation.YieldResult: Sendable where Element: Sendable { }
 
+@available(SwiftStdlib 9999, *)
+extension AsyncThrowingStream.Continuation: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    return hasher.combine(ObjectIdentifier(storage))
+  }
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.storage === rhs.storage
+  }
+}
+
 #else
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
