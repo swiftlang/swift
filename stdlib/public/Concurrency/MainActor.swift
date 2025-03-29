@@ -22,12 +22,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
@@ -137,7 +137,11 @@ extension MainActor {
     let executor: Builtin.Executor = unsafe Self.shared.unownedExecutor.executor
     guard _taskIsCurrentExecutor(executor) else {
       // TODO: offer information which executor we actually got
+      #if !$Embedded
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
+      #else
+      Builtin.int_trap()
+      #endif
     }
 
     // To do the unsafe cast, we have to pretend it's @escaping.
@@ -158,6 +162,6 @@ extension MainActor {
     try assumeIsolated(operation, file: file, line: line)
   }
 }
-#endif
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-#endif
+#endif // !$Embedded

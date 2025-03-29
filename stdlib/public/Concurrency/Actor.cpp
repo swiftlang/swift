@@ -25,6 +25,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
+#include "ExecutorBridge.h"
 #include "TaskPrivate.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
@@ -298,6 +299,46 @@ static bool isExecutingOnMainThread() {
   return Thread::onMainThread();
 #endif
 }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+
+extern "C" SWIFT_CC(swift)
+SerialExecutorRef _swift_getActiveExecutor() {
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking) {
+    SerialExecutorRef executor = currentTracking->getActiveExecutor();
+    // This might be an actor, in which case return nil ("generic")
+    if (executor.isDefaultActor())
+      return SerialExecutorRef::generic();
+    return executor;
+  }
+
+  // If there's no tracking and we're on the main thread, then the main
+  // executor is notionally active.
+  if (isExecutingOnMainThread())
+    return swift_getMainExecutor();
+
+  return SerialExecutorRef::generic();
+}
+
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _swift_getCurrentTaskExecutor() {
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking)
+    return currentTracking->getTaskExecutor();
+  return TaskExecutorRef::undefined();
+}
+
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _swift_getPreferredTaskExecutor() {
+  AsyncTask *task = swift_task_getCurrent();
+  if (!task)
+    return TaskExecutorRef::undefined();
+  return task->getPreferredTaskExecutor();
+}
+
+#pragma clang diagnostic pop
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY

@@ -559,6 +559,15 @@ public:
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 
+  /// Get the configured ExecutorFactory type.
+  Type getConfiguredExecutorFactory();
+
+  /// Get the DefaultExecutorFactory type.
+  Type getDefaultExecutorFactory();
+
+  /// Get the swift_createExecutors function.
+  FuncDecl *getCreateExecutors();
+
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);
 
