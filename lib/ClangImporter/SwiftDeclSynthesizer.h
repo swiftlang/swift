@@ -334,6 +334,13 @@ public:
                                 const swift::Type &swiftParamTy,
                                 SourceLoc paramLoc);
 
+  /// Synthesize a static factory method for a C++ foreign reference type,
+  /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
+  /// allocation function is not found.
+  static clang::CXXMethodDecl *synthesizeStaticFactoryForCXXForeignRef(
+      const clang::CXXRecordDecl *cxxRecordDecl, clang::ASTContext &clangCtx,
+      clang::Sema &clangSema);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
 };

@@ -462,6 +462,10 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
+/// Synthesize static factory methods for C++ foreign reference types and import
+/// them as Swift initializers.
+EXPERIMENTAL_FEATURE(CXXForeignReferenceTypeInitializers, true)
+
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
