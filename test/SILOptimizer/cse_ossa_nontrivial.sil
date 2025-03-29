@@ -13,6 +13,16 @@ class SuperKlass {}
 
 class Klass : SuperKlass {}
 
+extension Klass: Equatable {
+  static func ==(lhs: Klass, rhs: Klass) -> Bool {
+    true
+  }
+}
+
+extension Klass: Hashable {
+  func hash(into hasher: inout Hasher) {}
+}
+
 struct NonTrivialStruct {
   var val:Klass
 }
@@ -1125,4 +1135,88 @@ bb0:
   destroy_value %0 : $NonTrivialStruct
   %res = tuple ()
   return %res : $()
+}
+
+sil @get_nontrivialstruct_in : $@convention(thin) () -> @out NonTrivialStruct
+
+sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+
+// Check that we can trivially eliminate the stored property keypath 2nd use.
+//
+// CHECK-LABEL: sil [ossa] @keypath_test1 : $@convention(thin) () -> () {
+// CHECK:         keypath $KeyPath<NonTrivialStruct, Klass>
+// CHECK-NOT:     keypath
+// CHECK-LABEL: } // end sil function 'keypath_test1'
+sil [ossa] @keypath_test1 : $@convention(thin) () -> () {
+bb0:
+  %1 = keypath $KeyPath<NonTrivialStruct, Klass>, (root $NonTrivialStruct; stored_property #NonTrivialStruct.val : $Klass)
+  %2 = function_ref @get_nontrivialstruct_in : $@convention(thin) () -> @out NonTrivialStruct
+  %nts = alloc_stack $NonTrivialStruct
+  %3 = apply %2(%nts) : $@convention(thin) () -> @out NonTrivialStruct
+  %4 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %5 = alloc_stack $Klass
+  %6 = apply %4<NonTrivialStruct, Klass>(%5, %nts, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  destroy_addr %5 : $*Klass
+  dealloc_stack %5 : $*Klass
+  destroy_value %1 : $KeyPath<NonTrivialStruct, Klass>
+  %7 = keypath $KeyPath<NonTrivialStruct, Klass>, (root $NonTrivialStruct; stored_property #NonTrivialStruct.val : $Klass)
+  %8 = alloc_stack $Klass
+  %9 = apply %4<NonTrivialStruct, Klass>(%8, %nts, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  destroy_value %7 : $KeyPath<NonTrivialStruct, Klass>
+  destroy_addr %nts : $*NonTrivialStruct
+  dealloc_stack %nts : $*NonTrivialStruct
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil [thunk] [ossa] @keypath_subscript_getter : $@convention(keypath_accessor_getter) (@in_guaranteed NonTrivialStruct, @in_guaranteed Klass) -> @out Int64 {
+bb0(%0 : $*Int64, %1 : $*NonTrivialStruct, %2 : $*Klass):
+  %3 = integer_literal $Builtin.Int64, 123
+  %4 = struct $Int64 (%3)
+  store %4 to [trivial] %0
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil @get_bool : $@convention(thin) () -> Bool
+
+sil [thunk] @keypath_subscript_equals : $@convention(keypath_accessor_equals) (@in_guaranteed Klass, @in_guaranteed Klass) -> Bool {
+bb0(%0 : $*Klass, %1 : $*Klass):
+  %2 = function_ref @get_bool : $@convention(thin) () -> Bool
+  %3 = apply %2() : $@convention(thin) () -> Bool
+  return %3 : $Bool
+}
+
+sil @get_int : $@convention(thin) () -> Int
+
+sil [thunk] @keypath_subscript_hash : $@convention(keypath_accessor_hash) (@in_guaranteed Klass) -> Int {
+bb0(%0 : $*Klass):
+  %1 = function_ref @get_int : $@convention(thin) () -> Int
+  %2 = apply %1() : $@convention(thin) () -> Int
+  return %2 : $Int
+}
+
+// Cannot eliminate the 2nd keypath because we don't eliminate the separate
+// copies and keypath currently takes ownership of its operands.
+//
+// CHECK-LABEL: sil [ossa] @keypath_test2 : $@convention(thin) (@owned NonTrivialStruct) -> () {
+// CHECK:         keypath $KeyPath<NonTrivialStruct, Int64>
+// CHECK:         keypath $KeyPath<NonTrivialStruct, Int64>
+// CHECK-LABEL: } // end sil function 'keypath_test2'
+sil [ossa] @keypath_test2 : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %bb = begin_borrow %0
+  %klass_almost = struct_extract %bb, #NonTrivialStruct.val
+  %klass = copy_value %klass_almost : $Klass
+  %klass2 = copy_value %klass_almost : $Klass
+  end_borrow %bb
+  %kp = keypath $KeyPath<NonTrivialStruct, Int64>, (root $NonTrivialStruct; gettable_property $Int64, id @keypath_subscript_getter : $@convention(keypath_accessor_getter) (@in_guaranteed NonTrivialStruct, @in_guaranteed Klass) -> @out Int64, getter @keypath_subscript_getter : $@convention(keypath_accessor_getter) (@in_guaranteed NonTrivialStruct, @in_guaranteed Klass) -> @out Int64, indices [%$0 : $Klass : $Klass], indices_equals @keypath_subscript_equals : $@convention(keypath_accessor_equals) (@in_guaranteed Klass, @in_guaranteed Klass) -> Bool, indices_hash @keypath_subscript_hash : $@convention(keypath_accessor_hash) (@in_guaranteed Klass) -> Int) (%klass)
+  %kp2 = keypath $KeyPath<NonTrivialStruct, Int64>, (root $NonTrivialStruct; gettable_property $Int64, id @keypath_subscript_getter : $@convention(keypath_accessor_getter) (@in_guaranteed NonTrivialStruct, @in_guaranteed Klass) -> @out Int64, getter @keypath_subscript_getter : $@convention(keypath_accessor_getter) (@in_guaranteed NonTrivialStruct, @in_guaranteed Klass) -> @out Int64, indices [%$0 : $Klass : $Klass], indices_equals @keypath_subscript_equals : $@convention(keypath_accessor_equals) (@in_guaranteed Klass, @in_guaranteed Klass) -> Bool, indices_hash @keypath_subscript_hash : $@convention(keypath_accessor_hash) (@in_guaranteed Klass) -> Int) (%klass2)
+  destroy_value %kp2 : $KeyPath<NonTrivialStruct, Int64>
+  destroy_value %kp : $KeyPath<NonTrivialStruct, Int64>
+  destroy_value %0 : $NonTrivialStruct
+  %ret = tuple ()
+  return %ret : $()
 }
