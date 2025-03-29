@@ -121,6 +121,50 @@ inline ConstSpanOfInt mixedFuncWithSafeWrapper7(const int * __counted_by(len) p,
   return ConstSpanOfInt(p, len);
 }
 
+inline void FuncWithMutableSafeWrapper(SpanOfInt s [[clang::noescape]]) {}
+
+inline SpanOfInt FuncWithMutableSafeWrapper2(SpanOfInt s
+                                           [[clang::lifetimebound]]) {
+  return s;
+}
+
+inline SpanOfInt FuncWithMutableSafeWrapper3(VecOfInt &v
+                                           [[clang::lifetimebound]]) {
+  return SpanOfInt(v.data(), v.size());
+}
+
+struct Y {
+  inline void methodWithMutableSafeWrapper(SpanOfInt s [[clang::noescape]]) {}
+};
+
+inline SpanOfInt MixedFuncWithMutableSafeWrapper1(int * __counted_by(len) p
+                                           [[clang::lifetimebound]], int len) {
+  return SpanOfInt(p, len);
+}
+
+inline int * __counted_by(len) MixedFuncWithMutableSafeWrapper2(VecOfInt &v
+                                           [[clang::lifetimebound]], int len) {
+  if (v.size() <= len)
+    return v.data();
+  return nullptr;
+}
+
+inline void MixedFuncWithMutableSafeWrapper3(SpanOfInt s [[clang::noescape]],
+                                      int * __counted_by(len) p, int len) {}
+
+inline void MixedFuncWithMutableSafeWrapper4(SpanOfInt s [[clang::noescape]],
+                                      int * __counted_by(len) p [[clang::noescape]], int len) {}
+
+inline void MixedFuncWithMutableSafeWrapper5(SpanOfInt s,
+                                      int * __counted_by(len) p [[clang::noescape]], int len) {}
+
+inline void MixedFuncWithMutableSafeWrapper6(SpanOfInt s,
+                                      int * __counted_by(len) p, int len) {}
+
+inline SpanOfInt MixedFuncWithMutableSafeWrapper7(int * __counted_by(len) p, int len) {
+  return SpanOfInt(p, len);
+}
+
 struct SpanWithoutTypeAlias {
   std::span<const int> bar() [[clang::lifetimebound]];
   void foo(std::span<const int> s [[clang::noescape]]);
