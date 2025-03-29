@@ -23,6 +23,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2366,25 +2367,50 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                      [](const auto &arg) { return arg->hasPlaceholder(); }))
       continue;
 
+    auto describeType = [&](Type argType, const PrintOptions &PO) -> std::string {
+      std::string Result;
+      llvm::raw_string_ostream OS(Result);
+
+      OS << "'";
+      argType.print(OS, PO);
+      OS << "'";
+
+      if (auto *opaque = argType->getAs<OpaqueTypeArchetypeType>()) {
+        auto *decl = opaque->getDecl()->getNamingDecl();
+        OS << " (result type of '" << decl->getBaseName().userFacingName()
+           << "')";
+      } else if (auto archetype = argType->getAs<ArchetypeType>()) {
+        if (auto *GTD = getGenericTypeDecl(archetype))
+          OS << " (" << describeGenericType(GTD) << ")";
+      }
+
+      return OS.str();
+    };
+
+    llvm::SmallDenseMap<TypeBase *, std::string> descriptions;
+    llvm::StringMap<unsigned> descriptionCounts;
+    for (const auto &type : conflictingArguments) {
+      auto description = describeType(type, PrintOptions());
+      descriptions[type.getPointer()] = description;
+      descriptionCounts[description] += 1;
+    }
+
     llvm::SmallString<64> arguments;
     llvm::raw_svector_ostream OS(arguments);
 
     interleave(
         conflictingArguments,
         [&](Type argType) {
-          OS << "'" << argType << "'";
-
-          if (auto *opaque = argType->getAs<OpaqueTypeArchetypeType>()) {
-            auto *decl = opaque->getDecl()->getNamingDecl();
-            OS << " (result type of '" << decl->getBaseName().userFacingName()
-               << "')";
+          auto description = descriptions[argType.getPointer()];
+          if (descriptionCounts[description] == 1) {
+            OS << description;
             return;
           }
-
-          if (auto archetype = argType->getAs<ArchetypeType>()) {
-            if (auto *GTD = getGenericTypeDecl(archetype))
-              OS << " (" << describeGenericType(GTD) << ")";
-          }
+          // Two or more types have the exact same description. Fully-qualify
+          // the types to help the user disambiguate them.
+          auto PO = PrintOptions();
+          PO.FullyQualifiedTypes = true;
+          OS << describeType(argType, PO);
         },
         [&OS] { OS << " vs. "; });
 
@@ -2883,14 +2909,45 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
     if (genericParamInferredTypes.size() != 2)
       return false;
 
-    auto &DE = cs.getASTContext().Diags;
+    auto describeType = [&](Type argType, const PrintOptions &PO) -> std::string {
+      std::string Result;
+      llvm::raw_string_ostream OS(Result);
+
+      OS << "'";
+      argType.print(OS, PO);
+      OS << "'";
+
+      return OS.str();
+    };
+
+    llvm::SmallDenseMap<TypeBase *, std::string> descriptions;
+    llvm::StringMap<unsigned> descriptionCounts;
+    for (const auto &type : genericParamInferredTypes) {
+      auto description = describeType(type, PrintOptions());
+      descriptions[type.getPointer()] = description;
+      descriptionCounts[description] += 1;
+    }
+
     llvm::SmallString<64> arguments;
     llvm::raw_svector_ostream OS(arguments);
+
     interleave(
         genericParamInferredTypes,
-        [&](Type argType) { OS << "'" << argType << "'"; },
+        [&](Type argType) {
+          auto description = descriptions[argType.getPointer()];
+          if (descriptionCounts[description] == 1) {
+            OS << description;
+            return;
+          }
+          // Two or more types have the exact same description. Fully-qualify
+          // the types to help the user disambiguate them.
+          auto PO = PrintOptions();
+          PO.FullyQualifiedTypes = true;
+          OS << describeType(argType, PO);
+        },
         [&OS] { OS << " vs. "; });
 
+    auto &DE = cs.getASTContext().Diags;
     DE.diagnose(AE->getLoc(), diag::conflicting_arguments_for_generic_parameter,
                 GP, OS.str());
 
