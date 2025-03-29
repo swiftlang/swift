@@ -4761,6 +4761,8 @@ WARNING(use_of_void_pointer,none,
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
+NOTE(ambiguous_because_of_argument_mismatch,none,
+     "type mismatch between %0 and %1", (Type, Type))
 ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclNameRef))
 NOTE(ambiguous_because_of_trailing_closure,none,
