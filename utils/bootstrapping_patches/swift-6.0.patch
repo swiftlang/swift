@@ -1,0 +1,32 @@
+diff --git a/lib/Frontend/PrintingDiagnosticConsumer.cpp b/lib/Frontend/PrintingDiagnosticConsumer.cpp
+index fd3a41bdf8d..adbc848f54f 100644
+--- a/lib/Frontend/PrintingDiagnosticConsumer.cpp
++++ b/lib/Frontend/PrintingDiagnosticConsumer.cpp
+@@ -576,7 +576,9 @@ PrintingDiagnosticConsumer::PrintingDiagnosticConsumer(
+     : Stream(stream) {}
+ 
+ PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
++#if SWIFT_BUILD_SWIFT_SYNTAX
+   for (const auto &sourceFileSyntax : sourceFileSyntax) {
+     swift_ASTGen_destroySourceFile(sourceFileSyntax.second);
+   }
++#endif
+ }
+diff --git a/stdlib/cmake/modules/SwiftSource.cmake b/stdlib/cmake/modules/SwiftSource.cmake
+index 03e525f48c3..6b944af4aae 100644
+--- a/stdlib/cmake/modules/SwiftSource.cmake
++++ b/stdlib/cmake/modules/SwiftSource.cmake
+@@ -858,8 +858,11 @@ function(_compile_swift_files
+     # cross-compiling the compiler.
+     list(APPEND swift_compiler_tool_dep "swift-frontend${target_suffix}")
+ 
+-    # If we aren't cross compiling, also depend on SwiftMacros.
+-    list(APPEND swift_compiler_tool_dep SwiftMacros)
++    # If we aren't cross compiling and have swift-syntax, also depend on
++    # SwiftMacros.
++    if(SWIFT_BUILD_SWIFT_SYNTAX)
++      list(APPEND swift_compiler_tool_dep SwiftMacros)
++    endif()
+   endif()
+ 
+   # If there are more than one output files, we assume that they are specified

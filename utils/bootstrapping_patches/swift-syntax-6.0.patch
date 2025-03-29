@@ -1,0 +1,13 @@
+diff --git a/Sources/SwiftLibraryPluginProvider/LibraryPluginProvider.swift b/Sources/SwiftLibraryPluginProvider/LibraryPluginProvider.swift
+index eb06cca2..9f6e34ef 100644
+--- a/Sources/SwiftLibraryPluginProvider/LibraryPluginProvider.swift
++++ b/Sources/SwiftLibraryPluginProvider/LibraryPluginProvider.swift
+@@ -58,7 +58,6 @@ public class LibraryPluginProvider: PluginProvider {
+   private init() {}
+ 
+   /// Singleton.
+-  @MainActor
+   public static let shared: LibraryPluginProvider = LibraryPluginProvider()
+ 
+   public var features: [PluginFeature] {
+
