@@ -3298,9 +3298,6 @@ namespace {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available
         // independently.
-
-        // FIXME: This is gross. We shouldn't have to import
-        // everything to get at the individual constants.
         return nullptr;
       }
       }
