@@ -348,6 +348,10 @@ swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
   return std::make_pair(globalActorAttr, globalActorNominal);
 }
 
+static bool shouldIgnoreGlobalActorOnAccessor(const ASTContext &ctx) {
+  return ctx.isSwiftVersionAtLeast(6);
+}
+
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator,
@@ -452,11 +456,17 @@ GlobalActorAttributeRequest::evaluate(
     auto &ctx = accessor->getASTContext();
     const auto attrRange = globalActorAttr->getRangeWithAt();
     const unsigned langModeForError = accessor->isGetter() ? 7 : 6;
+    const bool isError = ctx.isSwiftVersionAtLeast(langModeForError);
 
     // Complain about a global actor attribute on an accessor.
     accessor->diagnose(diag::global_actor_disallowed, decl)
         .highlight(attrRange)
         .warnUntilSwiftVersion(langModeForError);
+
+    if (!isError && shouldIgnoreGlobalActorOnAccessor(ctx)) {
+      ctx.Diags.diagnose(attrRange.Start, diag::global_actor_attr_is_ignored)
+          .highlight(attrRange);
+    }
 
     auto *storage = accessor->getStorage();
 
@@ -476,7 +486,7 @@ GlobalActorAttributeRequest::evaluate(
     }
 
     // Fail if we emitted an error.
-    if (ctx.isSwiftVersionAtLeast(langModeForError))
+    if (isError)
       return std::nullopt;
 
   } else if (isa<ExtensionDecl>(decl) || isa<AbstractFunctionDecl>(decl)) {
@@ -5458,9 +5468,11 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
 /// Check rules related to global actor attributes on a class declaration.
 ///
 /// \returns true if an error occurred.
-static bool checkClassGlobalActorIsolation(
-    ClassDecl *classDecl, ActorIsolation isolation) {
-  assert(isolation.isGlobalActor());
+static bool checkClassIsolation(ClassDecl *classDecl,
+                                ActorIsolation isolation) {
+  if (!isolation.isGlobalActor()) {
+    return false;
+  }
 
   // A class can only be annotated with a global actor if it has no
   // superclass, the superclass is annotated with the same global actor, or
@@ -5900,8 +5912,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
         if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
                            mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
+          fd->diagnose(diag::main_function_must_be_mainActor);
         }
       }
       return {
@@ -5911,17 +5922,29 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     }
   }
 
-  // If this declaration has one of the actor isolation attributes, report
-  // that.
+  // If this declaration has one of the actor isolation attributes, consider
+  // reporting that.
   if (isolationFromAttr) {
-    // Classes with global actors have additional rules regarding inheritance.
-    if (isolationFromAttr->isGlobalActor()) {
-      if (auto classDecl = dyn_cast<ClassDecl>(value))
-        checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
-    }
+    if (isa<AccessorDecl>(value) && shouldIgnoreGlobalActorOnAccessor(ctx)) {
+      // Global actor attributes on accessors are deprecated, whereas other
+      // isolation attributes are unconditionally unapplicable to accessors.
+      //
+      // In Swift 6 mode and onward, disregard the global actor attribute and
+      // proceed to infer the isolation from the storage declaration.
+    } else {
+      // Classes with global actors have additional rules regarding inheritance.
+      if (auto classDecl = dyn_cast<ClassDecl>(value)) {
+        checkClassIsolation(classDecl, *isolationFromAttr);
+      }
 
-    return {*isolationFromAttr,
-            IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
+      return {*isolationFromAttr,
+              IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
+    }
+  }
+
+  // For an accessor, use the actor isolation of its storage declaration.
+  if (auto *accessor = dyn_cast<AccessorDecl>(value)) {
+    return getInferredActorIsolation(accessor->getStorage());
   }
 
   InferredActorIsolation defaultIsolation;
@@ -6035,12 +6058,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
         };
       }
     }
-  }
-
-  // If this is an accessor, use the actor isolation of its storage
-  // declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    return getInferredActorIsolation(accessor->getStorage());
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {

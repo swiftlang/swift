@@ -26,16 +26,17 @@ var globalComputed: Int {
   @GA1 get {}
   // expected-swift7-error@-1:8 {{getter cannot have a global actor}}{{none}}
   // expected-swift6-warning@-2:8 {{getter cannot have a global actor; this will be an error in a future Swift language mode}}{{none}}
-  // expected-swift5-warning@-3:8 {{getter cannot have a global actor; this will be an error in a future Swift language mode}}{{none}}
-  // expected-note@-4:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
+  // expected-swift6-note@-3:3 {{global actor attribute is ignored}}{{none}}
+  // expected-swift5-warning@-4:8 {{getter cannot have a global actor; this will be an error in a future Swift language mode}}{{none}}
+  // expected-note@-5:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
   @GA1 set {}
   // expected-swift6+-error@-1:8 {{setter cannot have a global actor}}{{none}}
   // expected-swift5-warning@-2:8 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-note@-3:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-6:1-1=@GA1 }}{{none}}
+  // expected-note@-3:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-7:1-1=@GA1 }}{{none}}
   @GA1 _modify {}
   // expected-swift6+-error@-1:8 {{_modify accessor cannot have a global actor}}{{none}}
   // expected-swift5-warning@-2:8 {{_modify accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-note@-3:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-10:1-1=@GA1 }}{{none}}
+  // expected-note@-3:8 {{move global actor attribute to var 'globalComputed'}}{{3-8=}}{{-11:1-1=@GA1 }}{{none}}
 }
 
 var globalComputedRead: Int {

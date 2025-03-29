@@ -33,16 +33,17 @@ var topLevelComputed: Int {
   @GA1 get {}
   // expected-swift7-error@-1:8 {{getter cannot have a global actor}}{{none}}
   // expected-swift6-warning@-2:8 {{getter cannot have a global actor; this will be an error in a future Swift language mode}}{{none}}
-  // expected-swift5-warning@-3:8 {{getter cannot have a global actor; this will be an error in a future Swift language mode}}{{none}}
-  // expected-swift5-note@-4:8 {{move global actor attribute to var 'topLevelComputed'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
+  // expected-swift6-note@-3:3 {{global actor attribute is ignored}}{{none}}
+  // expected-swift5-warning@-4:8 {{getter cannot have a global actor; this will be an error in a future Swift language mode}}{{none}}
+  // expected-swift5-note@-5:8 {{move global actor attribute to var 'topLevelComputed'}}{{3-8=}}{{-1:1-1=@GA1 }}{{none}}
   @GA1 set {}
   // expected-swift6+-error@-1:8 {{setter cannot have a global actor}}{{none}}
   // expected-swift5-warning@-2:8 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-swift5-note@-3:8 {{move global actor attribute to var 'topLevelComputed'}}{{3-8=}}{{-6:1-1=@GA1 }}{{none}}
+  // expected-swift5-note@-3:8 {{move global actor attribute to var 'topLevelComputed'}}{{3-8=}}{{-7:1-1=@GA1 }}{{none}}
   @GA1 _modify {}
   // expected-swift6+-error@-1:8 {{_modify accessor cannot have a global actor}}{{none}}
   // expected-swift5-warning@-2:8 {{_modify accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-  // expected-swift5-note@-3:8 {{move global actor attribute to var 'topLevelComputed'}}{{3-8=}}{{-10:1-1=@GA1 }}{{none}}
+  // expected-swift5-note@-3:8 {{move global actor attribute to var 'topLevelComputed'}}{{3-8=}}{{-11:1-1=@GA1 }}{{none}}
 }
 
 var topLevelComputedRead: Int {
@@ -70,7 +71,8 @@ do {
     @GA1 get {}
     // expected-swift7-error@-1:10 {{getter cannot have a global actor}}{{none}}
     // expected-swift6-warning@-2:10 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-    // expected-swift5-warning@-3:10 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
+    // expected-swift6-note@-3:5 {{global actor attribute is ignored}}{{none}}
+    // expected-swift5-warning@-4:10 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
     @GA1 set {}
     // expected-swift6+-error@-1:10 {{setter cannot have a global actor}}{{none}}
     // expected-swift5-warning@-2:10 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
@@ -104,36 +106,38 @@ do {
       @GA1 get {}
       // expected-swift7-error@-1:12 {{getter cannot have a global actor}}{{none}}
       // expected-swift6-warning@-2:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-swift5-warning@-3:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-note@-4:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
+      // expected-swift6-note@-3:7 {{global actor attribute is ignored}}{{none}}
+      // expected-swift5-warning@-4:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
+      // expected-note@-5:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
       @GA1 set {}
       // expected-swift6+-error@-1:12 {{setter cannot have a global actor}}{{none}}
       // expected-swift5-warning@-2:12 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      // expected-note@-3:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-6:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-7:5-5=@GA1 }}{{none}}
       @GA1 _modify {}
       // expected-swift6+-error@-1:12 {{_modify accessor cannot have a global actor}}{{none}}
       // expected-swift5-warning@-2:12 {{_modify accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      // expected-note@-3:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-10:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-11:5-5=@GA1 }}{{none}}
       @GA1 init {}
       // expected-swift6+-error@-1:12 {{init accessor cannot have a global actor}}{{none}}
       // expected-swift5-warning@-2:12 {{init accessor cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      // expected-note@-3:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-14:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to property 'computed'}}{{7-12=}}{{-15:5-5=@GA1 }}{{none}}
     }
 
     subscript(subscript _: Int) -> Int {
       @GA1 get {}
       // expected-swift7-error@-1:12 {{getter cannot have a global actor}}{{none}}
       // expected-swift6-warning@-2:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-swift5-warning@-3:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-note@-4:12 {{move global actor attribute to subscript 'subscript(subscript:)'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
+      // expected-swift6-note@-3:7 {{global actor attribute is ignored}}{{none}}
+      // expected-swift5-warning@-4:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
+      // expected-note@-5:12 {{move global actor attribute to subscript 'subscript(subscript:)'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
       @GA1 set {}
       // expected-swift6+-error@-1:12 {{setter cannot have a global actor}}{{none}}
       // expected-swift5-warning@-2:12 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      // expected-note@-3:12 {{move global actor attribute to subscript 'subscript(subscript:)'}}{{7-12=}}{{-6:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to subscript 'subscript(subscript:)'}}{{7-12=}}{{-7:5-5=@GA1 }}{{none}}
       @GA1 _modify {}
       // expected-swift6+-error@-1:12 {{_modify accessor cannot have a global actor}}
       // expected-swift5-warning@-2:12 {{_modify accessor cannot have a global actor; this is an error in the Swift 6 language mode}}
-      // expected-note@-3:12 {{move global actor attribute to subscript 'subscript(subscript:)'}}{{7-12=}}{{-10:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to subscript 'subscript(subscript:)'}}{{7-12=}}{{-11:5-5=@GA1 }}{{none}}
     }
 
     var computedRead: Int {
@@ -191,24 +195,26 @@ do {
       @GA1 get
       // expected-swift7-error@-1:12 {{getter cannot have a global actor}}{{none}}
       // expected-swift6-warning@-2:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-swift5-warning@-3:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-note@-4:12 {{move global actor attribute to property 'property'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
+      // expected-swift6-note@-3:7 {{global actor attribute is ignored}}{{none}}
+      // expected-swift5-warning@-4:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
+      // expected-note@-5:12 {{move global actor attribute to property 'property'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
       @GA1 set
       // expected-swift6+-error@-1:12 {{setter cannot have a global actor}}{{none}}
       // expected-swift5-warning@-2:12 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      // expected-note@-3:12 {{move global actor attribute to property 'property'}}{{7-12=}}{{-6:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to property 'property'}}{{7-12=}}{{-7:5-5=@GA1 }}{{none}}
     }
 
     subscript(_: Int) -> Int {
       @GA1 get
       // expected-swift7-error@-1:12 {{getter cannot have a global actor}}{{none}}
       // expected-swift6-warning@-2:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-swift5-warning@-3:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
-      // expected-note@-4:12 {{move global actor attribute to subscript 'subscript(_:)'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
+      // expected-swift6-note@-3:7 {{global actor attribute is ignored}}{{none}}
+      // expected-swift5-warning@-4:12 {{getter cannot have a global actor; this will be an error in a future Swift language}}{{none}}
+      // expected-note@-5:12 {{move global actor attribute to subscript 'subscript(_:)'}}{{7-12=}}{{-1:5-5=@GA1 }}{{none}}
       @GA1 set
       // expected-swift6+-error@-1:12 {{setter cannot have a global actor}}{{none}}
       // expected-swift5-warning@-2:12 {{setter cannot have a global actor; this is an error in the Swift 6 language mode}}{{none}}
-      // expected-note@-3:12 {{move global actor attribute to subscript 'subscript(_:)'}}{{7-12=}}{{-6:5-5=@GA1 }}{{none}}
+      // expected-note@-3:12 {{move global actor attribute to subscript 'subscript(_:)'}}{{7-12=}}{{-7:5-5=@GA1 }}{{none}}
     }
   }
 }

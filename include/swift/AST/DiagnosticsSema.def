@@ -6016,6 +6016,9 @@ ERROR(multiple_global_actors,none,
       (Identifier, Identifier))
 ERROR(global_actor_disallowed,none,
       "%kindonly0 cannot have a global actor", (const Decl *))
+NOTE(global_actor_attr_is_ignored,none,
+     "global actor attribute is ignored", ())
+
 ERROR(global_actor_on_actor_class,none,
       "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
