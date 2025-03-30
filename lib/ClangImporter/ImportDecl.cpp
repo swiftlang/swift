@@ -10515,3 +10515,13 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
   return &TF;
 }
+void addExplicitProtocolConformances(NominalTypeDecl *decl, 
+                                   const clang::CXXRecordDecl *clangDecl) {
+  for (auto *attr : clangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+    StringRef attrValue = attr->getAttribute();
+    if (attrValue.startswith("conforms_to:")) {
+      StringRef protocolName = attrValue.substr(strlen("conforms_to:"));
+      addProtocolConformance(decl, protocolName);
+    }
+  }
+}
