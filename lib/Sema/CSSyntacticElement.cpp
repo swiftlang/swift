@@ -1250,13 +1250,10 @@ private:
         }
       }
 
-      bool isDiscarded = false;
       auto contextInfo = cs.getContextualTypeInfo(element);
 
-      if (element.is<Expr *>() &&
-          !ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport) {
-        isDiscarded = !contextInfo || contextInfo->purpose == CTP_Unused;
-      }
+      auto isDiscarded = element.is<Expr *>() && !ctx.LangOpts.Playground &&
+                         !ctx.LangOpts.DebuggerSupport;
 
       elements.push_back(makeElement(
           element,
