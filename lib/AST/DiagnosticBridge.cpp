@@ -63,9 +63,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
       highlightRanges.push_back(range);
   }
 
-  StringRef documentationPath;
-  if (info.EducationalNotePaths.size() > 0)
-    documentationPath = info.EducationalNotePaths[0];
+  StringRef documentationPath = info.CategoryDocumentationURL;
 
   SmallVector<BridgedFixIt, 2> fixIts;
   for (const auto &fixIt : info.FixIts) {

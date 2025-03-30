@@ -175,7 +175,7 @@ CapturedFixItInfo::getLineColumnRange(SourceManager &SM) const {
 namespace {
 
 static constexpr StringLiteral fixitExpectationNoneString("none");
-static constexpr StringLiteral educationalNotesSpecifier("educational-notes=");
+static constexpr StringLiteral categoryDocFileSpecifier("documentation-file=");
 
 struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
@@ -209,16 +209,16 @@ struct ExpectedDiagnosticInfo {
   // Loc of {{none}}
   const char *noneMarkerStartLoc = nullptr;
 
-  /// Represents a specifier of the form '{{educational-notes=note1,note2}}'.
-  struct ExpectedEducationalNotes {
+  /// Represents a specifier of the form '{{documentation-file=note1}}'.
+  struct ExpectedDocumentationFile {
     const char *StartLoc, *EndLoc; // The loc of the {{ and }}'s.
-    llvm::SmallVector<StringRef, 1> Names; // Names of expected notes.
+    StringRef Name; // Name of expected documentation file.
 
-    ExpectedEducationalNotes(const char *StartLoc, const char *EndLoc,
-                             llvm::SmallVector<StringRef, 1> Names)
-        : StartLoc(StartLoc), EndLoc(EndLoc), Names(Names) {}
+    ExpectedDocumentationFile(const char *StartLoc, const char *EndLoc,
+                              StringRef Name)
+        : StartLoc(StartLoc), EndLoc(EndLoc), Name(Name) {}
   };
-  std::optional<ExpectedEducationalNotes> EducationalNotes;
+  std::optional<ExpectedDocumentationFile> DocumentationFile;
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
                          const char *ClassificationStart,
@@ -243,15 +243,12 @@ static std::string getDiagKindString(DiagnosticKind Kind) {
   llvm_unreachable("Unhandled DiagKind in switch.");
 }
 
-/// Render the verifier syntax for a given set of educational notes.
+/// Render the verifier syntax for a given documentation file.
 static std::string
-renderEducationalNotes(llvm::SmallVectorImpl<std::string> &EducationalNotes) {
+renderDocumentationFile(const std::string &documentationFile) {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  OS << "{{" << educationalNotesSpecifier;
-  interleave(EducationalNotes, [&](const auto &Note) { OS << Note; },
-             [&] { OS << ','; });
-  OS << "}}";
+  OS << "{{" << categoryDocFileSpecifier << documentationFile << "}}";
   return OS.str();
 }
 
@@ -810,30 +807,23 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         startNewAlternatives = true;
       }
 
-      // If this check starts with 'educational-notes=', check for one or more
-      // educational notes instead of a fix-it.
-      if (CheckStr.starts_with(educationalNotesSpecifier)) {
-        if (Expected.EducationalNotes.has_value()) {
+      // If this check starts with 'documentation-file=', check for a
+      // documentation file name instead of a fix-it.
+      if (CheckStr.starts_with(categoryDocFileSpecifier)) {
+        if (Expected.DocumentationFile.has_value()) {
           addError(CheckStr.data(),
                    "each verified diagnostic may only have one "
-                   "{{educational-notes=<#notes#>}} declaration");
+                   "{{documentation-file=<#notes#>}} declaration");
           continue;
         }
-        StringRef NotesStr = CheckStr.substr(
-            educationalNotesSpecifier.size()); // Trim 'educational-notes='.
-        llvm::SmallVector<StringRef, 1> names;
-        // Note names are comma-separated.
-        std::pair<StringRef, StringRef> split;
-        do {
-          split = NotesStr.split(',');
-          names.push_back(split.first);
-          NotesStr = split.second;
-        } while (!NotesStr.empty());
-        Expected.EducationalNotes.emplace(OpenLoc, CloseLoc, names);
+
+        // Trim 'documentation-file='.
+        StringRef name = CheckStr.substr(categoryDocFileSpecifier.size());
+        Expected.DocumentationFile = { OpenLoc, CloseLoc, name };
         continue;
       }
 
-      // This wasn't an educational notes specifier, so it must be a fix-it.
+      // This wasn't a documentation file specifier, so it must be a fix-it.
       // Special case for specifying no fixits should appear.
       if (CheckStr == fixitExpectationNoneString) {
         if (Expected.noneMarkerStartLoc) {
@@ -1066,29 +1056,27 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
                       replEndLoc, actualFixits);
     }
 
-    if (auto expectedNotes = expected.EducationalNotes) {
-      // Verify educational notes
-      for (auto &foundName : FoundDiagnostic.EducationalNotes) {
-        llvm::erase_if(expectedNotes->Names,
-                       [&](StringRef item) { return item == foundName; });
-      }
+    if (auto expectedDocFile = expected.DocumentationFile) {
+      // Verify diagnostic file.
+      if (FoundDiagnostic.CategoryDocFile == expectedDocFile->Name)
+        expectedDocFile = std::nullopt;
 
-      if (!expectedNotes->Names.empty()) {
-        if (FoundDiagnostic.EducationalNotes.empty()) {
-          addError(expectedNotes->StartLoc,
-                   "expected educational note(s) not seen");
+      if (expectedDocFile) {
+        if (FoundDiagnostic.CategoryDocFile.empty()) {
+          addError(expectedDocFile->StartLoc,
+                   "expected documentation file not seen");
         } else {
-          // If we had an incorrect expected note, render it and produce a fixit
-          // of our own.
+          // If we had an incorrect expected document file, render it and
+          // produce a fixit of our own.
           auto actual =
-              renderEducationalNotes(FoundDiagnostic.EducationalNotes);
-          auto replStartLoc = SMLoc::getFromPointer(expectedNotes->StartLoc);
-          auto replEndLoc = SMLoc::getFromPointer(expectedNotes->EndLoc);
+              renderDocumentationFile(FoundDiagnostic.CategoryDocFile);
+          auto replStartLoc = SMLoc::getFromPointer(expectedDocFile->StartLoc);
+          auto replEndLoc = SMLoc::getFromPointer(expectedDocFile->EndLoc);
 
           llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-          addError(expectedNotes->StartLoc,
-                   "expected educational note(s) not seen; actual educational "
-                   "note(s): " + actual, fix);
+          addError(expectedDocFile->StartLoc,
+                   "expected documentation file not seen; actual documentation "
+                   "file: " + actual, fix);
         }
       }
     }
@@ -1281,11 +1269,6 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
     fixIts.emplace_back(SM, fixIt);
   }
 
-  llvm::SmallVector<std::string, 1> eduNotes;
-  for (auto &notePath : Info.EducationalNotePaths) {
-    eduNotes.push_back(llvm::sys::path::stem(notePath).str());
-  }
-
   llvm::SmallString<128> message;
   {
     llvm::raw_svector_ostream Out(message);
@@ -1296,7 +1279,8 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   DiagLoc loc(SM, this->SM, Info.Loc);
   CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
                                    loc.sourceLoc, loc.line, loc.column, fixIts,
-                                   eduNotes);
+                                   llvm::sys::path::stem(
+                                      Info.CategoryDocumentationURL).str());
 }
 
 /// Once all diagnostics have been captured, perform verification.

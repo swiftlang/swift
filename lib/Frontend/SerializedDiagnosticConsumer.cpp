@@ -196,13 +196,12 @@ private:
   // Record identifier for the category.
   unsigned getEmitCategory(StringRef Category, StringRef CategoryURL);
 
-  /// Emit a flag record that contains a semi-colon separated
-  /// list of all of the educational notes associated with the
-  /// diagnostic or `0` if there are no notes.
+  /// Emit a flag record that contains the documentation URL associated with
+  /// a diagnostic or `0` if there is none.
   ///
   /// \returns a flag record identifier that could be embedded in
   /// other records.
-  unsigned emitEducationalNotes(const DiagnosticInfo &info);
+  unsigned emitDocumentationURL(const DiagnosticInfo &info);
 
   /// Add a source location to a record.
   void addLocToRecord(SourceLoc Loc,
@@ -335,19 +334,11 @@ unsigned SerializedDiagnosticConsumer::getEmitCategory(
 }
 
 unsigned
-SerializedDiagnosticConsumer::emitEducationalNotes(const DiagnosticInfo &Info) {
-  if (Info.EducationalNotePaths.empty())
+SerializedDiagnosticConsumer::emitDocumentationURL(const DiagnosticInfo &Info) {
+  if (Info.CategoryDocumentationURL.empty())
     return 0;
 
-  SmallString<32> scratch;
-  interleave(
-      Info.EducationalNotePaths,
-      [&scratch](const auto &notePath) { scratch += notePath; },
-      [&scratch] { scratch += ';'; });
-
-  StringRef paths = scratch.str();
-
-  unsigned &recordID = State->Flags[paths];
+  unsigned &recordID = State->Flags[Info.CategoryDocumentationURL];
   if (recordID)
     return recordID;
 
@@ -356,9 +347,9 @@ SerializedDiagnosticConsumer::emitEducationalNotes(const DiagnosticInfo &Info) {
   RecordData Record;
   Record.push_back(RECORD_DIAG_FLAG);
   Record.push_back(recordID);
-  Record.push_back(paths.size());
+  Record.push_back(Info.CategoryDocumentationURL.size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_DIAG_FLAG), Record,
-                                   paths);
+                                   Info.CategoryDocumentationURL);
   return recordID;
 }
 
@@ -610,21 +601,18 @@ emitDiagnosticMessage(SourceManager &SM,
 
   // Emit the category.
   if (!Info.Category.empty()) {
-    std::string categoryURL;
-    if (!Info.EducationalNotePaths.empty()) {
-      categoryURL = Info.EducationalNotePaths[0];
-    }
-    Record.push_back(getEmitCategory(Info.Category, categoryURL));
+    Record.push_back(
+        getEmitCategory(Info.Category, Info.CategoryDocumentationURL));
   } else {
     Record.push_back(0);
   }
 
-  // Use "flags" slot to emit a semi-colon separated list of
-  // educational notes. If there are no notes associated with
-  // this diagnostic `0` placeholder would be emitted instead.
-  // FIXME: This is a bit of a kludge. We're moving toward putting the
-  // educational note into the category field instead.
-  Record.push_back(emitEducationalNotes(Info));
+  // Use "flags" slot to emit the category documentation URL. If there is not
+  // such URL, the `0` placeholder would be emitted instead.
+  // FIXME: This is a kludge. The category documentation URL is part of the
+  // category description now, and we will switch back to using the flag field
+  // as intended once clients have had a chance to adopt the new place.
+  Record.push_back(emitDocumentationURL(Info));
 
   // Emit the message.
   Record.push_back(Text.size());

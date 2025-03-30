@@ -131,7 +131,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group_NoGroup) {
 }
 
 TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group) {
-  // Test that we embed the correct group in the format string.
+  // Test that we include the correct group.
   testCase(
       [](DiagnosticEngine &diags) {
         diags.setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode::Group);
@@ -141,7 +141,8 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group) {
         diags.diagnose(SourceLoc(), diagnostic);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
-        EXPECT_TRUE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
+        EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
+        EXPECT_TRUE(info.Category == "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }
@@ -160,7 +161,8 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group_WrappedDiag) {
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
-        EXPECT_TRUE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
+        EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
+        EXPECT_TRUE(info.Category == "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }

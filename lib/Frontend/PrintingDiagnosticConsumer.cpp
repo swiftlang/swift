@@ -59,6 +59,8 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 #endif
 
     // Fall through when we don't have the new diagnostics renderer available.
+    // This also happens if the location of the diagnostic is invalid, because
+    // the new rendered cannot cope with that.
     LLVM_FALLTHROUGH;
   }
 
@@ -134,6 +136,9 @@ void PrintingDiagnosticConsumer::printDiagnostic(SourceManager &SM,
     llvm::raw_svector_ostream Out(Text);
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
+
+    if (!Info.Category.empty())
+      Out << " [#" << Info.Category << "]";
   }
 
   auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts,
