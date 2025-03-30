@@ -349,13 +349,3 @@ func callSmallErrorLargerResult() {
     }
   }
 }
-
-struct SomeStruct {
-    let x: Int
-    let y: UInt32
-    let z: UInt32
-}
-
-func someFunc() async throws(SmallError) -> SomeStruct {
-    SomeStruct(x: 42, y: 23, z: 25)
-}
