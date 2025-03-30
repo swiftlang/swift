@@ -526,16 +526,16 @@ function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
 }
 
-function Get-PythonPath {
-  return [IO.Path]::Combine("$BinaryCache\", "Python$($BuildPlatform.Architecture.CMakeName)-$PythonVersion")
+function Get-PythonPath([Hashtable] $Platform) {
+  return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
 function Get-PythonExecutable {
-  return [IO.Path]::Combine((Get-PythonPath), "tools", "python.exe")
+  return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "python.exe")
 }
 
 function Get-PythonScriptsPath {
-  return [IO.Path]::Combine((Get-PythonPath), "tools", "Scripts")
+  return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "Scripts")
 }
 
 function Get-InstallDir([Hashtable] $Platform) {
@@ -636,22 +636,12 @@ enum Project {
   StaticFoundation
 }
 
-function Get-ProjectBinaryCache {
-  [CmdletBinding(PositionalBinding = $false)]
-  param
-  (
-    [Parameter(Position = 0, Mandatory = $true)]
-    [Hashtable] $Platform,
-    [Parameter(Position = 1, Mandatory = $true)]
-    [Project] $Project
-  )
-
+function Get-ProjectBinaryCache([Hashtable] $Platform, [Project] $Project) {
   if ($Project -eq [Project]::Compilers) {
     if ($Platform -eq $HostPlatform) { return "$BinaryCache\5" }
     if ($Platform -eq $BuildPlatform) { return "$BinaryCache\1" }
     throw "Building Compilers for $($Platform.Triple) currently unsupported."
   }
-
   return "$([IO.Path]::Combine("$BinaryCache\", $Platform.Triple, $Project.ToString()))"
 }
 
@@ -1724,154 +1714,155 @@ function Load-LitTestOverrides($Filename) {
   }
 }
 
-function Build-Compilers() {
-  [CmdletBinding(PositionalBinding = $false)]
-  param
-  (
-    [Parameter(Position = 0, Mandatory = $true)]
-    [hashtable]$Platform,
-    [switch]$TestClang = $false,
-    [switch]$TestLLD = $false,
-    [switch]$TestLLDB = $false,
-    [switch]$TestLLVM = $false,
-    [switch]$TestSwift = $false
-  )
+function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
+  $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
+  $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
+  $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
-  Invoke-IsolatingEnvVars {
-    $BuildTools = Join-Path -Path (Get-ProjectBinaryCache $BuildPlatform BuildTools) -ChildPath bin
-
-    if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
-      $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
-      $Targets = @()
-      $TestingDefines = @{
-        SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
-        SWIFT_BUILD_DYNAMIC_STDLIB = "YES";
-        SWIFT_BUILD_REMOTE_MIRROR = "YES";
-        SWIFT_NATIVE_SWIFT_TOOLS_PATH = "";
-      }
-
-      if ($TestLLVM) { $Targets += @("check-llvm") }
-      if ($TestClang) { $Targets += @("check-clang") }
-      if ($TestLLD) { $Targets += @("check-lld") }
-      if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
-      if ($TestLLDB) {
-        $Targets += @("check-lldb")
-
-        # Override test filter for known issues in downstream LLDB
-        Load-LitTestOverrides $PSScriptRoot/windows-llvm-lit-test-overrides.txt
-
-        # Transitive dependency of _lldb.pyd
-        $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-        Copy-Item $RuntimeBinaryCache\bin\swiftCore.dll "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
-
-        # Runtime dependencies of repl_swift.exe
-        $SwiftRTSubdir = "lib\swift\windows"
-        Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir'"
-        Copy-Item "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
-        Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
-        Copy-Item "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
-
-        $TestingDefines += @{
-          LLDB_INCLUDE_TESTS = "YES";
-          # Check for required Python modules in CMake
-          LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
-          # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
-          LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
-          # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
-          LLVM_LIT_ARGS = "-v --no-gtest-sharding --show-xfail";
-          # LLDB Unit tests link against this library
-          LLVM_UNITTEST_LINK_FLAGS = "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
-        }
-      }
-    } else {
-      $Targets = @("distribution", "install-distribution")
-      $TestingDefines = @{
-        SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
-        SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
-        SWIFT_BUILD_REMOTE_MIRROR = "NO";
-        SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
-      }
+  $TestDefines = if ($Test) {
+    @{
+      SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
+      SWIFT_BUILD_DYNAMIC_STDLIB = "YES";
+      SWIFT_BUILD_REMOTE_MIRROR = "YES";
+      SWIFT_NATIVE_SWIFT_TOOLS_PATH = "";
     }
-
-    $PythonRoot = "$BinaryCache\Python$($Platform.Architecture.CMakeName)-$PythonVersion\tools"
-    $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
-
-    # The STL in the latest versions of VS typically require a newer version of
-    # Clang than released Swift toolchains include. If bootstrapping with an
-    # older toolchain, we need to relax this requirement by defining
-    # _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH. Developer builds are (currently)
-    # up-to-date.
-    $SwiftFlags = @();
-    if ([System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
-      $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
+  } else {
+    @{
+      SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
+      SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
+      SWIFT_BUILD_REMOTE_MIRROR = "NO";
+      SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
     }
-
-    # Limit the number of parallel links to avoid OOM when debug info is enabled
-    $DebugOptions = @{}
-    if ($DebugInfo) {
-      $DebugOptions = @{ SWIFT_PARALLEL_LINK_JOBS = "4"; }
-    }
-
-    New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore
-    Build-CMakeProject `
-      -Src $SourceCache\llvm-project\llvm `
-      -Bin $(Get-ProjectBinaryCache $Platform Compilers) `
-      -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
-      -Platform $Platform `
-      -AddAndroidCMakeEnv:$Android `
-      -UseMSVCCompilers C,CXX `
-      -UsePinnedCompilers Swift `
-      -BuildTargets $Targets `
-      -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
-      -Defines ($TestingDefines + @{
-        CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
-        CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_FLAGS = $SwiftFlags;
-        LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\Windows\$($Platform.Architecture.LLVMName)\cmake\libxml2-2.11.5";
-        LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
-        LLDB_PYTHON_EXT_SUFFIX = ".pyd";
-        LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
-        LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
-        LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
-        LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
-        LLVM_ENABLE_ASSERTIONS = $(if ($Variant -eq "Asserts") { "YES" } else { "NO" })
-        LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
-        LLVM_HOST_TRIPLE = $BuildPlatform.Triple;
-        LLVM_NATIVE_TOOL_DIR = $BuildTools;
-        LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
-        LLVM_USE_HOST_TOOLS = "NO";
-        Python3_EXECUTABLE = (Get-PythonExecutable);
-        Python3_INCLUDE_DIR = "$PythonRoot\include";
-        Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
-        Python3_ROOT_DIR = $PythonRoot;
-        SWIFT_BUILD_SWIFT_SYNTAX = "YES";
-        SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
-        SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
-        SWIFT_ENABLE_SYNCHRONIZATION = "YES";
-        SWIFT_ENABLE_VOLATILE = "YES";
-        SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
-        SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-        SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
-        SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
-        SWIFT_STDLIB_ASSERTIONS = "NO";
-        SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
-        "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
-      } + $DebugOptions)
   }
+
+  # If DebugInfo is enabled limit the number of parallel links to avoid OOM.
+  $DebugDefines = if ($DebugInfo) { @{ SWIFT_PARALLEL_LINK_JOBS = "4"; } } else { @{} }
+
+  # In the latest versions of VS, STL typically requires a newer version of
+  # Clang than released Swift toolchains include. Relax this requirement when
+  # bootstrapping with an older toolchain. Note developer builds are (currently)
+  # up-to-date.
+  $SwiftFlags = @();
+  if ([System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
+    $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
+  }
+
+  return $TestDefines + $DebugDefines + @{
+    CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
+    CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+    CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+    CMAKE_Swift_FLAGS = $SwiftFlags;
+    LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\Windows\$($Platform.Architecture.LLVMName)\cmake\libxml2-2.11.5";
+    LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
+    LLDB_PYTHON_EXT_SUFFIX = ".pyd";
+    LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
+    LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
+    LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
+    LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
+    LLVM_ENABLE_ASSERTIONS = $(if ($Variant -eq "Asserts") { "YES" } else { "NO" })
+    LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
+    LLVM_HOST_TRIPLE = $BuildPlatform.Triple;
+    LLVM_NATIVE_TOOL_DIR = $BuildTools;
+    LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
+    LLVM_USE_HOST_TOOLS = "NO";
+    Python3_EXECUTABLE = (Get-PythonExecutable);
+    Python3_INCLUDE_DIR = "$PythonRoot\include";
+    Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
+    Python3_ROOT_DIR = $PythonRoot;
+    SWIFT_BUILD_SWIFT_SYNTAX = "YES";
+    SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
+    SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
+    SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
+    SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
+    SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
+    SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
+    SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+    SWIFT_ENABLE_SYNCHRONIZATION = "YES";
+    SWIFT_ENABLE_VOLATILE = "YES";
+    SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
+    SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
+    SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
+    SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
+    SWIFT_STDLIB_ASSERTIONS = "NO";
+    SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
+    "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
+  }
+}
+
+function Build-Compilers([Hashtable] $Platform) {
+  New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\llvm `
+    -Bin (Get-ProjectBinaryCache $Platform Compilers) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseMSVCCompilers C,CXX `
+    -UsePinnedCompilers Swift `
+    -BuildTargets @("install-distribution") `
+    -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
+    -Defines (Get-CompilersDefines $Platform)
 
   $Settings = @{
     FallbackLibrarySearchPaths = @("usr/bin")
     Identifier = "${ToolchainIdentifier}"
     Version = "${ProductVersion}"
   }
-
   Write-PList -Settings $Settings -Path "$($Platform.ToolchainInstallRoot)\ToolchainInfo.plist"
+}
+
+function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLVM, [switch] $TestSwift) {
+  Invoke-IsolatingEnvVars {
+    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
+    $TestingDefines = Get-CompilersDefines $Platform -Test
+    if ($TestLLVM) { $Targets += @("check-llvm") }
+    if ($TestClang) { $Targets += @("check-clang") }
+    if ($TestLLD) { $Targets += @("check-lld") }
+    if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
+    if ($TestLLDB) {
+      $Targets += @("check-lldb")
+
+      # Override test filter for known issues in downstream LLDB
+      Load-LitTestOverrides $PSScriptRoot/windows-llvm-lit-test-overrides.txt
+
+      # Transitive dependency of _lldb.pyd
+      $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
+      Copy-Item $RuntimeBinaryCache\bin\swiftCore.dll "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
+
+      # Runtime dependencies of repl_swift.exe
+      $SwiftRTSubdir = "lib\swift\windows"
+      Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir'"
+      Copy-Item "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
+      Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
+      Copy-Item "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
+
+      $TestingDefines += @{
+        LLDB_INCLUDE_TESTS = "YES";
+        # Check for required Python modules in CMake
+        LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
+        # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
+        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
+        # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
+        LLVM_LIT_ARGS = "-v --no-gtest-sharding --show-xfail";
+        # LLDB Unit tests link against this library
+        LLVM_UNITTEST_LINK_FLAGS = "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
+      }
+    }
+
+    if (-not $Targets) {
+      Write-Warning "Test-Compilers invoked without specifying test target(s)."
+    }
+
+    Build-CMakeProject `
+      -Src $SourceCache\llvm-project\llvm `
+      -Bin $(Get-ProjectBinaryCache $Platform Compilers) `
+      -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+      -Platform $Platform `
+      -UseMSVCCompilers C,CXX `
+      -UsePinnedCompilers Swift `
+      -BuildTargets $Targets `
+      -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
+      -Defines $TestingDefines
+  }
 }
 
 # Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
@@ -3301,7 +3292,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Build-Compilers $HostPlatform $Tests
+    Invoke-BuildStep Test-Compilers $HostPlatform $Tests
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
