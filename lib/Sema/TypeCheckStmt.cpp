@@ -1780,16 +1780,8 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     if (checkMacroExpansion())
       return;
 
-    auto &ctx = DC->getASTContext();
-
-    TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
-    bool isDiscarded =
-        (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
-    if (isDiscarded)
-      options |= TypeCheckExprFlags::IsDiscarded;
-
-    auto resultTy =
-        TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
+    TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{},
+                                     TypeCheckExprFlags::IsExprStmt);
 
     // Check for a freestanding macro expansion that produced declarations or
     // code items.
@@ -1876,8 +1868,8 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   DiagnosticSuppression suppression(ctor->getASTContext().Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(
-      r, ctor, /*contextualInfo=*/{}, TypeCheckExprFlags::IsDiscarded);
+  auto resultTy = TypeChecker::typeCheckExpression(r, ctor,
+                                                   /*contextualInfo=*/{});
   if (!resultTy)
     return nullptr;
   

@@ -93,8 +93,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // re-check.
   if (needClearType)
     expr->setType(Type());
-  SyntacticElementTarget target(expr, dc, CTP_Unused, Type(),
-                                /*isDiscarded=*/false);
+  SyntacticElementTarget target(expr, dc, CTP_Unused, Type());
 
   SmallVector<Solution, 2> viable;
   cs.solveForCodeCompletion(target, viable);
@@ -287,10 +286,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
     assert(fallback->E != expr);
     (void)expr;
   }
-  SyntacticElementTarget completionTarget(fallback->E, fallback->DC,
-                                          CTP_Unused,
-                                          /*contextualType=*/Type(),
-                                          /*isDiscarded=*/true);
+  SyntacticElementTarget completionTarget(fallback->E, fallback->DC, CTP_Unused,
+                                          /*contextualType=*/Type());
   typeCheckForCodeCompletion(completionTarget, fallback->SeparatePrecheck,
                              callback);
   return true;
@@ -300,8 +297,7 @@ static std::optional<Type>
 getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                Expr *&parsedExpr,
                                ConcreteDeclRef &referencedDecl) {
-  auto target = SyntacticElementTarget(parsedExpr, DC, CTP_Unused, Type(),
-                                       /*isDiscarded*/ true);
+  auto target = SyntacticElementTarget(parsedExpr, DC, CTP_Unused, Type());
   if (constraints::ConstraintSystem::preCheckTarget(target))
     return std::nullopt;
 

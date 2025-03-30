@@ -20,8 +20,7 @@ using namespace swift::constraints;
 
 static Expr *applySolution(ConstraintSystem &cs, Expr *expr,
                            Solution &solution) {
-  SyntacticElementTarget target(expr, cs.DC, CTP_Unused, Type(),
-                                /*isDiscarded=*/false);
+  SyntacticElementTarget target(expr, cs.DC, CTP_Unused, Type());
   auto result = cs.applySolution(solution, target);
   return result ? result->getAsExpr() : nullptr;
 }
@@ -205,8 +204,7 @@ TEST_F(SemaTest, TestMultiStmtClosureBodyParentAndDepth) {
     TupleExpr::createImplicit(Context, {}, {}), RS
   }));
 
-  SyntacticElementTarget target(closure, DC, ContextualTypeInfo(),
-                                /*isDiscarded*/ true);
+  SyntacticElementTarget target(closure, DC, ContextualTypeInfo());
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
   cs.solve(target);
@@ -238,8 +236,7 @@ TEST_F(SemaTest, TestIfExprLocator) {
   auto *ifExpr = SingleValueStmtExpr::createWithWrappedBranches(
       Context, ifStmt, DC, /*mustBeExpr*/ true);
 
-  SyntacticElementTarget target(ifExpr, DC, ContextualTypeInfo(),
-                                /*isDiscarded*/ true);
+  SyntacticElementTarget target(ifExpr, DC, ContextualTypeInfo());
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
   auto hadError = cs.generateConstraints(target);
@@ -311,8 +308,7 @@ TEST_F(SemaTest, TestSwitchExprLocator) {
   auto *switchExpr = SingleValueStmtExpr::createWithWrappedBranches(
       Context, switchStmt, DC, /*mustBeExpr*/ true);
 
-  SyntacticElementTarget target(switchExpr, DC, ContextualTypeInfo(),
-                                /*isDiscarded*/ true);
+  SyntacticElementTarget target(switchExpr, DC, ContextualTypeInfo());
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
   auto hadError = cs.generateConstraints(target);

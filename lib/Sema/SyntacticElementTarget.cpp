@@ -26,8 +26,7 @@ using namespace constraints;
 #define DEBUG_TYPE "SyntacticElementTarget"
 
 SyntacticElementTarget::SyntacticElementTarget(
-    Expr *expr, DeclContext *dc, ContextualTypeInfo contextualInfo,
-    bool isDiscarded) {
+    Expr *expr, DeclContext *dc, ContextualTypeInfo contextualInfo) {
   auto contextualPurpose = contextualInfo.purpose;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
@@ -56,7 +55,6 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.propertyWrapper.wrappedVar = nullptr;
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
-  expression.isDiscarded = isDiscarded;
   expression.bindPatternVarsOneWay = false;
   expression.initialization.patternBinding = nullptr;
   expression.initialization.patternBindingIndex = 0;
@@ -158,8 +156,7 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
   }
 
   ContextualTypeInfo contextInfo(contextualType, CTP_Initialization);
-  SyntacticElementTarget target(initializer, dc, contextInfo,
-                                /*isDiscarded=*/false);
+  SyntacticElementTarget target(initializer, dc, contextInfo);
   target.expression.pattern = pattern;
   target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
@@ -187,8 +184,7 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
   assert(contextTy);
   assert(returnStmt->hasResult() && "Must have result to be type-checked");
   ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
-  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo,
-                                /*isDiscarded*/ false);
+  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo);
   target.expression.parentReturnStmt = returnStmt;
   return target;
 }
@@ -196,8 +192,7 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
 SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SyntacticElementTarget target(initializer, dc, CTP_Initialization,
-                                wrappedVar->getTypeInContext(),
-                                /*isDiscarded=*/false);
+                                wrappedVar->getTypeInContext());
   target.expression.propertyWrapper.wrappedVar = wrappedVar;
   if (auto *patternBinding = wrappedVar->getParentPatternBinding()) {
     auto index = patternBinding->getPatternEntryIndexForVarDecl(wrappedVar);
@@ -216,7 +211,7 @@ SyntacticElementTarget::forExprPattern(ExprPattern *pattern) {
 
   // Result of ~= operator is always a `Bool`.
   SyntacticElementTarget target(pattern->getMatchExpr(), DC, CTP_ExprPattern,
-                                ctx.getBoolType(), /*isDiscarded*/ false);
+                                ctx.getBoolType());
   target.setPattern(pattern);
   return target;
 }
