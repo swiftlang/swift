@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-memory-safety -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
 // The feature flag should be enabled.
 #if !hasFeature(StrictMemorySafety)
@@ -91,9 +91,9 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
-  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}{{7-7=unsafe }}
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
-  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}{{7-7=unsafe }}
+  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
   for unsafe _ in unsafe uas { } // okay
 }

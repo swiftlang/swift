@@ -152,32 +152,6 @@ static constexpr const char *const fixItStrings[] = {
     "<not a fix-it>",
 };
 
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  static constexpr const char *const DIAG##_educationalNotes[] = {__VA_ARGS__, \
-                                                                  nullptr};
-#include "swift/AST/EducationalNotes.def"
-
-// NOTE: sadly, while GCC and Clang support array designators in C++, they are
-// not part of the standard at the moment, so Visual C++ doesn't support them.
-// This construct allows us to provide a constexpr array initialized to empty
-// values except in the cases that EducationalNotes.def are provided, similar to
-// what the C array would have looked like.
-template<int N>
-struct EducationalNotes {
-  constexpr EducationalNotes() : value() {
-    for (auto i = 0; i < N; ++i) value[i] = {};
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  value[static_cast<std::underlying_type_t<DiagID>>(DiagID::DIAG)] =           \
-      DIAG##_educationalNotes;
-#include "swift/AST/EducationalNotes.def"
-  }
-  const char *const *value[N];
-};
-
-static constexpr EducationalNotes<NumDiagIDs> _EducationalNotes =
-    EducationalNotes<NumDiagIDs>();
-static constexpr auto educationalNotes = _EducationalNotes.value;
-
 DiagnosticState::DiagnosticState() {
   // Initialize our ignored diagnostics to defaults
   ignoredDiagnostics.reserve(NumDiagIDs);
@@ -1403,7 +1377,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
 
   auto groupID = diagnostic.getGroupID();
   StringRef Category;
-  const char * const *associatedNotes = nullptr;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
@@ -1412,10 +1385,6 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     Category = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
     Category = "deprecation";
-  else if ((associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()]) &&
-           *associatedNotes) {
-    Category = llvm::sys::path::stem(*associatedNotes);
-  }
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1589,27 +1558,18 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
 
-    SmallVector<std::string, 1> educationalNotePaths;
-    auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
-    while (associatedNotes && *associatedNotes) {
-      SmallString<128> notePath(getDiagnosticDocumentationPath());
-      llvm::sys::path::append(notePath, *associatedNotes);
-      educationalNotePaths.push_back(notePath.str().str());
-      ++associatedNotes;
-    }
-
-    // Capture information about the diagnostic group along with the remaining
-    // educational notes.
+    // Capture information about the diagnostic group and its documentation
+    // URL.
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
-
-      SmallString<128> docPath(getDiagnosticDocumentationPath());
-      llvm::sys::path::append(docPath, diagGroup.documentationFile);
-      educationalNotePaths.push_back(docPath.str().str());
+      
+      std::string docURL(getDiagnosticDocumentationPath());
+      if (!docURL.empty() && docURL.back() != '/')
+        docURL += "/";
+      docURL += diagGroup.documentationFile;
+      info->CategoryDocumentationURL = std::move(docURL);
     }
-
-    info->EducationalNotePaths = educationalNotePaths;
 
     for (auto &consumer : Consumers) {
       consumer->handleDiagnostic(SourceMgr, *info);
@@ -1658,6 +1618,7 @@ DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
   };
   switch (printDiagnosticNamesMode) {
   case PrintDiagnosticNamesMode::None:
+  case PrintDiagnosticNamesMode::Group:
     break;
   case PrintDiagnosticNamesMode::Identifier: {
     // If this diagnostic is a wrapper for another diagnostic, use the ID of
@@ -1672,13 +1633,6 @@ DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
     message = formatMessageWithName(message, diagnosticIDStringFor(diagID));
     break;
   }
-  case PrintDiagnosticNamesMode::Group:
-    auto groupID = diagnostic.getGroupID();
-    if (groupID != DiagGroupID::no_group) {
-      message =
-          formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);
-    }
-    break;
   }
 
   return message;

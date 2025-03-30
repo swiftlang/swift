@@ -180,8 +180,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
-  for (auto notePath : Info.EducationalNotePaths)
-    SKInfo.EducationalNotePaths.push_back(notePath);
+  if (!Info.CategoryDocumentationURL.empty())
+    SKInfo.EducationalNotePaths.push_back(Info.CategoryDocumentationURL);
 
   std::optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {

@@ -970,10 +970,11 @@ NOTE(regionbasedisolation_type_is_non_sendable, none,
 //===
 // Use After Send Emitter
 
-ERROR(regionbasedisolation_named_send_yields_race, none,
+GROUPED_ERROR(regionbasedisolation_named_send_yields_race,
+      SendingRisksDataRace, none,
       "sending %0 risks causing data races",
       (Identifier))
-ERROR(regionbasedisolation_type_send_yields_race, none,
+GROUPED_ERROR(regionbasedisolation_type_send_yields_race, SendingRisksDataRace, none,
       "sending value of non-Sendable type %0 risks causing data races",
       (Type))
 NOTE(regionbasedisolation_type_use_after_send, none,

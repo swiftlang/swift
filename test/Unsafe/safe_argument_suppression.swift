@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-memory-safety -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
 @unsafe
 class NotSafe {
@@ -36,7 +36,7 @@ class NotSafeSubclass: NotSafe {
   _ = NotSafe[ns]
   NotSafe.doStatically(NotSafe.self)
 
-  ns.stillUnsafe() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}
+  ns.stillUnsafe() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
   // expected-note@-1{{reference to parameter 'ns' involves unsafe type 'NotSafe'}}
   // expected-note@-2{{reference to instance method 'stillUnsafe()' involves unsafe type 'NotSafe'}}
 }

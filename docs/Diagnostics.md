@@ -84,34 +84,35 @@ The correct spelling of this feature is "fix-it" rather than "fixit". In [camelc
 
   [camelcased]: https://en.wikipedia.org/wiki/Camel_case
 
-### Educational Notes ###
+### Diagnostic Groups ###
 
-Educational notes are short-form documentation attached to a diagnostic which explain relevant language concepts. They are intended to further Swift's goal of progressive disclosure by providing a learning resource at the point of use when encountering an error message for the first time. In very limited circumstances, they also allow the main diagnostic message to use precise terminology (e.g. nominal types) which would otherwise be too unfriendly for beginners.
+Diagnostic groups collect some number of diagnostics together under a common group name with short-form documentation to help explain relevant language concepts. For warnings, diagnostic groups also provide a way to control whether the warnings within that group are escalated to errors or not wit compiler flags such as `-Werror <groupname>` and `-Wwarning <groupname>`. They are intended to further Swift's goal of progressive disclosure by providing a learning resource at the point of use when encountering an error message for the first time. In very limited circumstances, they also allow the main diagnostic message to use precise terminology (e.g. nominal types) which would otherwise be too unfriendly for beginners.
 
-When outputting diagnostics on the command line, educational notes will be printed after the main diagnostic body if enabled using the `-print-educational-notes` driver option. When presented in an IDE, it's expected they will be collapsed under a disclosure arrow, info button, or similar to avoid cluttering output.
+When outputting diagnostics on the command line, diagnostic group names will be printed as `[#GroupName]` at the end of the main diagnostic, with a footnote that links to the corresponding documentation. When presented in an IDE, it's expected they will be collapsed under a disclosure arrow, info button, or similar to avoid cluttering output.
 
-Educational notes should:
-- Explain a single language concept. This makes them easy to reuse across related diagnostics and helps keep them clear, concise, and easy to understand.
+Diagnostic group documentation should:
+- Cover a single language concept. This helps keep them clear, concise, and easy to understand.
 - Be written in unabbreviated English. These are longer-form messages compared to the main diagnostic, so there's no need to omit needless words and punctuation.
-- Not generally exceed 3-4 paragraphs. Educational notes should be clear and easily digestible. Messages which are too long also have the potential to create UX issues on the command line.
-- Be accessible. Educational notes should be beginner friendly and avoid assuming unnecessary prior knowledge. The goal is not only to help users understand what a diagnostic is telling them, but also to turn errors and warnings into "teachable moments".
+- Not generally exceed 3-4 paragraphs. Diagnostic group documentation should be clear and easily digestible. Messages which are too long also have the potential to create UX issues on the command line.
+- Be accessible. Diagnostic group documentation should be beginner friendly and avoid assuming unnecessary prior knowledge. The goal is not only to help users understand what a diagnostic is telling them, but also to turn errors and warnings into "teachable moments".
 - Include references to relevant chapters of _The Swift Programming Language_.
 - Be written in Markdown, but avoid excessive markup which negatively impacts the terminal UX.
 
-### Quick-Start Guide for Contributing New Educational Notes ###
+### Quick-Start Guide for Contributing New Diagnostic Groups ###
 
-Adding new educational notes is a great way to get familiar with the process of contributing to Swift, while also making a big impact!
+Adding new diagnostic groups is a great way to get familiar with the process of contributing to Swift, while also making a big impact!
 
-To add a new educational note:
+To add a new diagnostics group:
 1. Follow the [directions in the README](https://github.com/swiftlang/swift#getting-sources-for-swift-and-related-projects) to checkout the Swift sources locally. Being able to build the Swift compiler is recommended, but not required, when contributing a new note.
-2. Identify a diagnostic to write an educational note for. To associate an educational note with a diagnostic name, you'll need to know its internal identifier. The easiest way to do this is to write a small program which triggers the diagnostic, and run it using the `-debug-diagnostic-names` compiler flag. This flag will cause the internal diagnostic identifier to be printed after the diagnostic message in square brackets.
+2. Identify a diagnostic to collect into a group. To find the diagnostic, you'll need to know its internal identifier. The easiest way to do this is to write a small program which triggers the diagnostic, and run it using the `-debug-diagnostic-names` compiler flag. This flag will cause the internal diagnostic identifier to be printed after the diagnostic message in square brackets.
 3. Find any closely related diagnostics. Sometimes, what appears to be one diagnostic from a user's perspective may have multiple variations internally. After determining a diagnostic's internal identifier, run a search for it in the compiler source. You should find:
     - An entry in a `Diagnostics*.def` file describing the diagnostic. If there are any closely related diagnostics the note should also be attached to, they can usually be found nearby.
     - Each point in the compiler source where the diagnostic is emitted. This can be helpful in determining the exact circumstances which cause it to be emitted.
-4. Add a new Markdown file in the `userdocs/diagnostics/` directory in the swift repository containing the contents of the note. When writing a note, keep the writing guidelines from the section above in mind. The existing notes in the directory are another useful guide.
-5. Associate the note with the appropriate diagnostics in `EducationalNotes.def`. An entry like `EDUCATIONAL_NOTES(property_wrapper_failable_init, "property-wrapper-requirements.md")` will associate the note with filename `property-wrapper-requirements.md` with the diagnostic having an internal identifier of `property_wrapper_failable_init`.
-6. If possible, rebuild the compiler and try recompiling your test program with `-print-educational-notes`. Your new note should appear after the diagnostic in the terminal.
-7. That's it! The new note is now ready to be submitted as a pull request on GitHub.
+4. Add a new Markdown file in the `userdocs/diagnostics/` directory in the swift repository containing the documentation. When writing a note, keep the writing guidelines from the section above in mind. The existing notes in the directory are another useful guide.
+5. Create a new entry in `DiagnosticGroups.def` that provides the name for your new diagnostic group along with the name of the file you added in step (4).
+6. Find each diagnostic you want to make part of this group in the various `Diagnostics*.def` files. For each diagnostic, replace the `ERROR` or `WARNING` with `GROUPED_ERROR` or `GROUPED_WARNING`, respectively, and put the diagnostic group name after the string literal for the diagnostic message.
+7. If possible, rebuild the compiler and try recompiling your test program. Your new diagnostic group should appear as `[#<group name>]` at the end of the diagnostic, with a link to the diagnostic file.
+8. That's it! The new diagnostic group is now ready to be submitted as a pull request on GitHub.
 
 If you run into any issues or have questions while following the steps above, feel free to post a question on the Swift forums or open a work-in-progress pull request on GitHub.
 
@@ -167,4 +168,4 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
 
   * If two (or more) expected fix-its are juxtaposed with nothing (or whitespace) between them, then both must be present for the verifier to match. If two (or more) expected fix-its have `||` between them, then one of them must be present for the verifier to match. `||` binds more tightly than juxtaposition: `{{1-1=a}} {{2-2=b}} || {{2-2=c}} {{3-3=d}} {{none}}` will only match if there is either a set of three fix-its that insert `a`, `b`, and `d`, or a set of three fix-its that insert `a`, `c`, and `d`. (Without the `{{none}}`, it would also permit all four fix-its, but only because one of the four would be unmatched and ignored.)
 
-- (Optional) Expected educational notes. These appear as a comma separated list after the expected message, enclosed in double curly braces and prefixed by 'educational-notes='. For example, `{{educational-notes=some-note,some-other-note}}` will verify the educational notes with filenames `some-note` and `some-other-note` appear. Do not include the file extension when specifying note names.
+- (Optional) Expected documentation file. These is the name of the documentation file, enclosed in double curly braces and prefixed by 'documentation-file='. For example, `{{documentation-file=some-file}}` will verify the documentation group with filename `some-note` appears. Do not include the file extension when specifying the name.

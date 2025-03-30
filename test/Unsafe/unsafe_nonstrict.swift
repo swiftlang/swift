@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift
 
 @unsafe func unsafeFunc() { }
 
