@@ -867,7 +867,9 @@ actor LazyActor {
 class SomeClassInActor {
   enum ID: String { case best }
 
-  func inActor() { } // expected-note{{calls to instance method 'inActor()' from outside of its actor context are implicitly asynchronous}}
+  func inActor() { }
+  // expected-note@-1 {{calls to instance method 'inActor()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from enclosing context}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -1029,7 +1031,9 @@ class SomeClassWithInits {
 
   static var shared = SomeClassWithInits() // expected-note 2{{static property declared here}}
 
-  init() { // expected-note{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  init() {
+  // expected-note@-1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from enclosing context}}
     self.mutableState = 42
     self.otherMutableState = 17
 
@@ -1043,8 +1047,11 @@ class SomeClassWithInits {
   }
 
   func isolated() { }
+  // expected-note@-1 {{main actor isolation inferred from enclosing context}}
 
-  static func staticIsolated() { // expected-note{{calls to static method 'staticIsolated()' from outside of its actor context are implicitly asynchronous}}
+  static func staticIsolated() {
+  // expected-note@-1 {{calls to static method 'staticIsolated()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from enclosing context}}
     _ = SomeClassWithInits.shared
   }
 
@@ -1482,6 +1489,7 @@ final class MainActorInit: Sendable {
   }
 
   func f() {}
+  // expected-note@-1 3 {{main actor isolation inferred from enclosing context}}
 }
 
 actor DunkTracker {

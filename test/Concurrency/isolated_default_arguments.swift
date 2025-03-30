@@ -123,6 +123,7 @@ func closureWithIsolatedParam(
   }
 ) {}
 
+// expected-note@+3 3 {{main actor isolation inferred from enclosing context}}
 // expected-note@+2 3 {{calls to initializer 'init(required:x:y:)' from outside of its actor context are implicitly asynchronous}}
 @MainActor
 struct S1 {
@@ -135,6 +136,7 @@ struct S1 {
   static var z: Int = requiresMainActor()
 }
 
+// expected-note@+3 3 {{global actor 'SomeGlobalActor' isolation inferred from enclosing context}}
 // expected-note@+2 3 {{calls to initializer 'init(required:x:y:)' from outside of its actor context are implicitly asynchronous}}
 @SomeGlobalActor
 struct S2 {

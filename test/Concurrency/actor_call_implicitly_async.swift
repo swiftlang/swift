@@ -571,6 +571,7 @@ func tryTheActorSubscripts(a : SubscriptA, t : SubscriptT, at : SubscriptAT) asy
 
 @MainActor
 final class IsolatedOperator: @preconcurrency Equatable {
+  // expected-note@+1 {{main actor isolation inferred from enclosing context}}
   static func == (lhs: IsolatedOperator, rhs: IsolatedOperator) -> Bool {
     lhs.num == rhs.num
   }

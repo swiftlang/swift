@@ -59,6 +59,7 @@ func testElsewhere(x: X) {
 @preconcurrency @MainActor class MyModelClass {
  func f() { }
   // expected-note@-1{{are implicitly asynchronous}}
+  // expected-note@-2 2 {{main actor isolation inferred from enclosing context}}
 }
 
 func testCalls(x: X) {

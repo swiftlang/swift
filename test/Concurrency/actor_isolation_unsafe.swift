@@ -59,6 +59,8 @@ struct S4_P1: P1 {
 protocol P2 {
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note@-2 {{main actor isolation inferred from enclosing context}}
+  // expected-note@-3 {{main actor isolation inferred from enclosing context}}
   nonisolated func g()
 }
 

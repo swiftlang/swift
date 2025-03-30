@@ -50,7 +50,8 @@ struct Value : @preconcurrency TestSendability {
   // expected-note@-1 2 {{property declared here}}
 
   func test(_: NonSendable?) -> [NonSendable] {
-    // expected-note@-1 2 {{calls to instance method 'test' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1 2 {{calls to instance method 'test' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 2 {{main actor isolation inferred from enclosing context}}
     []
   }
 }
