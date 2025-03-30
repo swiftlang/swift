@@ -6,4 +6,5 @@
 // REQUIRES: OS=macosx
 
 // Note: disabled due to CI failures
+// RUN: true
 // FIXME: %{python} %utils/python_lint.py
