@@ -1575,9 +1575,8 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
 
 /// Checks an "ignored" expression to see if it's okay for it to be ignored.
 void TypeChecker::checkIgnoredExpr(Expr *E) {
-  // Skip checking if there is no type, which presumably means there was a
-  // type error.
-  if (!E->getType()) {
+  // Skip checking if there is no type, or an error type.
+  if (!E->getType() || E->getType()->hasError()) {
     return;
   }
 
