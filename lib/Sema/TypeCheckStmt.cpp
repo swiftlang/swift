@@ -1788,8 +1788,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     if (checkMacroExpansion())
       return;
 
-    TypeChecker::checkIgnoredExprStmt(getASTContext(), E);
-
     node = E;
     return;
   }

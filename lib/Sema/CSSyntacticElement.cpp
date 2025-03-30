@@ -2026,7 +2026,6 @@ private:
       auto target = *cs.getTargetFor(expr);
       if (auto rewrittenTarget = rewriter.rewriteTarget(target)) {
         node = rewrittenTarget->getAsExpr();
-        TypeChecker::checkIgnoredExprStmt(cs.getASTContext(), castToExpr(node));
       } else {
         hadError = true;
       }
@@ -2128,77 +2127,17 @@ private:
 
       // It's possible to infer e.g. `Void?` for cases where
       // `return` doesn't have an expression. If contextual
-      // type is `Void` wrapped into N optional types, let's
-      // add an implicit `()` expression and let it be injected
+      // type is `Void` wrapped into N optional types, we'll have
+      // added an implicit `()` expression and let it be injected
       // into optional required number of times.
 
       assert(resultType->getOptionalObjectType() &&
              resultType->lookThroughAllOptionalTypes()->isVoid());
-
-      auto target = *cs.getTargetFor(returnStmt);
-      returnStmt->setResult(target.getAsExpr());
-    }
-
-    auto *resultExpr = returnStmt->getResult();
-
-    enum {
-      convertToResult,
-      coerceToVoid
-    } mode;
-
-    auto resultExprType =
-        solution.simplifyType(solution.getType(resultExpr))->getRValueType();
-    // A closure with a non-void return expression can coerce to a closure
-    // that returns Void.
-    // TODO: We probably ought to introduce an implicit conversion expr to Void
-    // and eliminate this case.
-    if (resultType->isVoid() && !resultExprType->isVoid()) {
-      mode = coerceToVoid;
-
-      // Normal rule is to coerce to the return expression to the closure type.
-    } else {
-      mode = convertToResult;
     }
 
     auto target = *cs.getTargetFor(returnStmt);
-
-    // If we're not converting to a result, unset the contextual type.
-    if (mode != convertToResult) {
-      target.setExprConversionType(Type());
-      target.setExprContextualTypePurpose(CTP_Unused);
-    }
-
-    if (auto newResultTarget = rewriter.rewriteTarget(target)) {
-      resultExpr = newResultTarget->getAsExpr();
-    }
-
-    switch (mode) {
-    case convertToResult:
-      // Record the coerced expression.
-      returnStmt->setResult(resultExpr);
-      return returnStmt;
-
-    case coerceToVoid: {
-      // Evaluate the expression, then produce a return statement that
-      // returns nothing.
-      TypeChecker::checkIgnoredExpr(resultExpr);
-
-      // For a single expression closure, we can just preserve the result expr,
-      // and leave the return as implied. This avoids neededing to jump through
-      // nested brace statements to dig out the single expression in
-      // ClosureExpr::getSingleExpressionBody.
-      if (context.isSingleExpressionClosure(cs))
-        return resultExpr;
-
-      auto &ctx = solution.getConstraintSystem().getASTContext();
-      auto *newReturnStmt = ReturnStmt::createImplicit(
-          ctx, returnStmt->getStartLoc(), /*result*/ nullptr);
-      ASTNode elements[2] = { resultExpr, newReturnStmt };
-      return BraceStmt::create(ctx, returnStmt->getStartLoc(),
-                               elements, returnStmt->getEndLoc(),
-                               /*implicit*/ true);
-    }
-    }
+    if (auto newResultTarget = rewriter.rewriteTarget(target))
+      returnStmt->setResult(newResultTarget->getAsExpr());
 
     return returnStmt;
   }
@@ -2219,12 +2158,6 @@ private:
       resultExpr = newResultTarget->getAsExpr();
 
     thenStmt->setResult(resultExpr);
-
-    // If the expression was typed as Void, its branches are effectively
-    // discarded, so treat them as ignored expressions.
-    if (ty->lookThroughAllOptionalTypes()->isVoid()) {
-      TypeChecker::checkIgnoredExpr(resultExpr);
-    }
     return thenStmt;
   }
 
