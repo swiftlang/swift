@@ -1796,20 +1796,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     if (checkMacroExpansion())
       return;
 
-    // If a closure expression is unused, the user might have intended to write
-    // "do { ... }".
-    auto *CE = dyn_cast<ClosureExpr>(E);
-    if (CE || isa<CaptureListExpr>(E)) {
-      ctx.Diags.diagnose(E->getLoc(), diag::expression_unused_closure);
-
-      if (CE && CE->hasAnonymousClosureVars() &&
-          CE->getParameters()->size() == 0) {
-        ctx.Diags.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
-            .fixItInsert(CE->getStartLoc(), "do ");
-      }
-    } else if (isDiscarded && resultTy) {
-      TypeChecker::checkIgnoredExpr(E);
-    }
+    TypeChecker::checkIgnoredExprStmt(getASTContext(), E);
 
     node = E;
     return;

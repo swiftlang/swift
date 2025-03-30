@@ -1812,6 +1812,32 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       .highlight(valueE->getSourceRange());
 }
 
+void TypeChecker::checkIgnoredExprStmt(ASTContext &ctx, Expr *E) {
+  // Expr-statements are never considered ignored in playgrounds and the
+  // debugger.
+  if (ctx.LangOpts.Playground || ctx.LangOpts.DebuggerSupport)
+    return;
+
+  // Skip checking if there is no type, or an error type.
+  if (!E->getType() || E->getType()->hasError())
+    return;
+
+  // If a closure expression is unused, the user might have intended to write
+  // "do { ... }".
+  auto *CE = dyn_cast<ClosureExpr>(E);
+  if (CE || isa<CaptureListExpr>(E)) {
+    ctx.Diags.diagnose(E->getLoc(), diag::expression_unused_closure);
+
+    if (CE && CE->hasAnonymousClosureVars() &&
+        CE->getParameters()->size() == 0) {
+      ctx.Diags.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
+        .fixItInsert(CE->getStartLoc(), "do ");
+    }
+    return;
+  }
+  checkIgnoredExpr(E);
+}
+
 /// Diagnose recursive use of properties within their own accessors
 static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   auto fn = dyn_cast<AccessorDecl>(DC);

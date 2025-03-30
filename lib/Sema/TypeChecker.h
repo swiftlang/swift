@@ -1075,6 +1075,9 @@ void checkConcurrencyAvailability(SourceRange ReferenceRange,
 /// expression or statement.
 void checkIgnoredExpr(Expr *E);
 
+/// Checks an ignored expression at the top-level of a BraceStmt.
+void checkIgnoredExprStmt(ASTContext &ctx, Expr *E);
+
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 

@@ -177,6 +177,14 @@ do {
   consume(111)
 }
 
+// Make sure the "did you mean to use a do statement" note applies in
+// closures too.
+_ = {
+  { 0 }
+  // expected-error@-1 {{closure expression is unused}}
+  // expected-note@-2 {{did you mean to use a 'do' statement?}}
+  return
+}
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
 func r22162441(_ lines: [String]) {

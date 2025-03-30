@@ -2036,9 +2036,7 @@ private:
       auto target = *cs.getTargetFor(expr);
       if (auto rewrittenTarget = rewriter.rewriteTarget(target)) {
         node = rewrittenTarget->getAsExpr();
-
-        if (target.isDiscardedExpr())
-          TypeChecker::checkIgnoredExpr(castToExpr(node));
+        TypeChecker::checkIgnoredExprStmt(cs.getASTContext(), castToExpr(node));
       } else {
         hadError = true;
       }
