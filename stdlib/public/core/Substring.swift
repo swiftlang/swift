@@ -761,9 +761,7 @@ extension Substring.UTF8View {
         let base: String.UTF8View = self._base
         let first = base._foreignDistance(from: base.startIndex, to: startIndex)
         let count = base._foreignDistance(from: startIndex, to: endIndex)
-        let span = unsafe base.span._extracting(
-          unchecked: Range(_uncheckedBounds: (first, first &+ count))
-        )
+        let span = unsafe base.span._extracting(first..<(first &+ count))
         return unsafe _overrideLifetime(span, borrowing: self)
       }
 #endif
@@ -778,10 +776,8 @@ extension Substring.UTF8View {
         return unsafe _overrideLifetime(span, borrowing: self)
       }
       _internalInvariant(_wholeGuts.isFastUTF8)
-      let buffer = unsafe _wholeGuts._object.fastUTF8.extracting(
-        Range(_uncheckedBounds: (first, end))
-      )
-      let span = unsafe Span(_unsafeElements: buffer)
+      var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
+      span = span._extracting(first..<end)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
