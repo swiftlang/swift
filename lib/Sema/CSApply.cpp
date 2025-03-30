@@ -9806,8 +9806,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
       resultExpr = Rewriter.coerceToType(
           resultExpr, solution.simplifyType(convertType), locator);
-    } else if (cs.getType(resultExpr)->hasLValueType() &&
-               !target.isDiscardedExpr()) {
+    } else if (cs.getType(resultExpr)->hasLValueType()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
           resultExpr, cs.getType(resultExpr)->getRValueType(),

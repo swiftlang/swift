@@ -144,3 +144,38 @@ func assign_bound_optional_computed_lvalue(_ co: inout ComputedOptional) {
 func assign_forced_optional_computed_lvalue(_ co: inout ComputedOptional) {
   co.computedOptional! = generate_int()
 }
+
+// Make sure we load the ignored lvalues here to evaluate the side effects.
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue17testIgnoredLValueyyF : $@convention(thin) () -> ()
+func testIgnoredLValue() {
+  var x: Int?
+  x!
+  // CHECK: function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+  // CHECK: unreachable
+
+  // CHECK-LABEL: sil private [ossa] @$s15optional_lvalue17testIgnoredLValueyyFyycfU_ : $@convention(thin) (@guaranteed { var Optional<Int> }) -> ()
+  let _: () -> Void = {
+    x!
+    // CHECK: function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+    // CHECK: unreachable
+  }
+  // CHECK-LABEL: sil private [ossa] @$s15optional_lvalue17testIgnoredLValueyyFyycfU0_ : $@convention(thin) (@guaranteed { var Optional<Int> }) -> ()
+  let _: () -> Void = {
+    x!
+    // CHECK: function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+    // CHECK: unreachable
+    ()
+  }
+}
+
+class C {}
+
+// We don't need to emit a load here.
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue16testNoLoadLValueyyF : $@convention(thin) () -> ()
+func testNoLoadLValue() {
+  var x: C?
+  x
+  // CHECK:      [[BOX:%[0-9]+]] = alloc_box ${ var Optional<C> }, var, name "x"
+  // CHECK-NOT:  load
+  // CHECK:      destroy_value [[BOX]]
+}

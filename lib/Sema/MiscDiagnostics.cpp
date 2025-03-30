@@ -1581,17 +1581,18 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  // Complain about l-values that are neither loaded nor stored.
   auto &Context = E->getType()->getASTContext();
   auto &DE = Context.Diags;
-  if (E->getType()->hasLValueType()) {
+
+  // Complain about unused l-values.
+  if (auto *LE = dyn_cast<LoadExpr>(E->getSemanticsProvidingExpr())) {
     // This must stay in sync with diag::expression_unused_lvalue.
     enum {
       SK_Variable = 0,
       SK_Property,
       SK_Subscript
     } storageKind = SK_Variable;
-    if (auto declRef = E->getReferencedDecl()) {
+    if (auto declRef = LE->getReferencedDecl()) {
       auto decl = declRef.getDecl();
       if (isa<SubscriptDecl>(decl)) {
         storageKind = SK_Subscript;
@@ -1599,8 +1600,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         storageKind = SK_Property;
       }
     }
-    DE.diagnose(E->getLoc(), diag::expression_unused_lvalue, storageKind)
-        .highlight(E->getSourceRange());
+    DE.diagnose(LE->getLoc(), diag::expression_unused_lvalue, storageKind)
+        .highlight(LE->getSourceRange());
     return;
   }
 

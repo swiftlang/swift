@@ -89,7 +89,7 @@ class C {
 
 	func act() {
 		a.dispatch({() -> Void in
-                  self.prop // expected-warning {{expression of type 'Int' is unused}}
+                  self.prop // expected-warning {{property is accessed but result is unused}}
                 })
 	}
 }
