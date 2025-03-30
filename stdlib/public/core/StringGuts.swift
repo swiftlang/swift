@@ -421,14 +421,16 @@ extension _StringGuts {
 extension _StringGuts {
 
   private static var associationKey: UnsafeRawPointer {
+    struct AssociationKey {}
     // We never dereference this, we only use this address as a unique key
-    unsafe unsafeBitCast(
-      ObjectIdentifier(__StringStorage.self),
+    return unsafe unsafeBitCast(
+      ObjectIdentifier(AssociationKey.self),
       to: UnsafeRawPointer.self
     )
   }
 
   internal func getAssociatedStorage() -> __StringStorage? {
+    _internalInvariant(_object.hasObjCBridgeableObject)
     let getter = unsafe unsafeBitCast(
       getGetAssociatedObjectPtr(),
       to: (@convention(c)(
@@ -436,7 +438,7 @@ extension _StringGuts {
         UnsafeRawPointer
       ) -> UnsafeRawPointer?).self
     )
-    _precondition(_object.hasObjCBridgeableObject)
+
     if let assocPtr = unsafe getter(
       _object.objCBridgeableObject,
       Self.associationKey
@@ -449,6 +451,7 @@ extension _StringGuts {
   }
 
   internal func setAssociatedStorage(_ storage: __StringStorage) {
+    _internalInvariant(_object.hasObjCBridgeableObject)
     let setter = unsafe unsafeBitCast(
       getSetAssociatedObjectPtr(),
       to: (@convention(c)(
@@ -468,7 +471,7 @@ extension _StringGuts {
   }
 
   internal func getOrAllocateAssociatedStorage() -> __StringStorage {
-    _precondition(_object.hasObjCBridgeableObject)
+    _internalInvariant(_object.hasObjCBridgeableObject)
     let unwrapped: __StringStorage
     // libobjc already provides the necessary memory barriers for
     // double checked locking to be safe, per comments on
@@ -482,8 +485,10 @@ extension _StringGuts {
         unwrapped = storage
       } else {
         var contents = String.UnicodeScalarView()
-        // always reserve a size larger than a small string
-        contents.reserveCapacity(Swift.max(_SmallString.capacity + 1, 1 + count + count >> 1))
+        // always reserve a capacity larger than a small string
+        contents.reserveCapacity(
+          Swift.max(_SmallString.capacity + 1, count + count >> 1)
+        )
         for c in String.UnicodeScalarView(self) {
           contents.append(c)
         }
