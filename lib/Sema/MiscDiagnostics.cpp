@@ -80,8 +80,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
-///   - SingleValueStmtExprs may only appear in certain places and has
-///     restrictions on the control flow allowed.
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
