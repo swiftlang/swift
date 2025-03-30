@@ -5129,8 +5129,7 @@ void AttributeChecker::checkBackDeployedAttrs(
 
     // Unavailable decls cannot be back deployed.
     auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
-    if (auto unavailableDomain =
-            availability.containsUnavailableDomain(backDeployedDomain)) {
+    if (availability.containsUnavailableDomain(backDeployedDomain)) {
       auto domainForDiagnostics = backDeployedDomain;
       llvm::VersionTuple ignoredVersion;
 
