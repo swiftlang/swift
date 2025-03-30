@@ -507,6 +507,7 @@ namespace {
     RValue visitIsExpr(IsExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
+    RValue visitIgnoredExpr(IgnoredExpr *E, SGFContext C);
     RValue visitUnreachableExpr(UnreachableExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
@@ -2430,6 +2431,11 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
   auto cast = SGF.B.createUncheckedBitCast(E, value,
                                            opaqueTL.getLoweredType());
   return RValue(SGF, E, cast);
+}
+
+RValue RValueEmitter::visitIgnoredExpr(IgnoredExpr *E, SGFContext C) {
+  SGF.emitIgnoredExpr(E->getSubExpr());
+  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
