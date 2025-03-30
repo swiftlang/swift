@@ -6174,10 +6174,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
       if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-        return {
-          inferredIsolation(*isolationFromAttr, onlyGlobal),
-          IsolationSource(ext, IsolationSource::Explicit)
-        };
+        return {inferredIsolation(*isolationFromAttr, onlyGlobal),
+                IsolationSource(ext, IsolationSource::LexicalContext)};
       }
     }
 
@@ -6197,8 +6195,15 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
           isolation = ActorIsolation::forCallerIsolationInheriting();
         }
 
-        return {inferredIsolation(isolation, onlyGlobal),
-                selfTypeIsolation.source};
+        // If the type context has explicit isolation, this one is inferred from
+        // context.
+        auto isolationSource = selfTypeIsolation.source;
+        if (isolationSource.kind == IsolationSource::Explicit) {
+          isolationSource =
+              IsolationSource(selfTypeDecl, IsolationSource::LexicalContext);
+        }
+
+        return {inferredIsolation(isolation, onlyGlobal), isolationSource};
       }
     }
   }
