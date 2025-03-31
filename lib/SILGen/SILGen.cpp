@@ -458,6 +458,10 @@ FuncDecl *SILGenModule::getDeinitOnExecutor() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_deinitOnExecutor");
 }
 
+FuncDecl *SILGenModule::getCreateExecutors() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_createExecutors");
+}
+
 FuncDecl *SILGenModule::getExit() {
   ASTContext &C = getASTContext();
 
@@ -505,6 +509,40 @@ FuncDecl *SILGenModule::getExit() {
   }
 
   return exitFunction;
+}
+
+Type SILGenModule::getConfiguredExecutorFactory() {
+  auto &ctx = getASTContext();
+
+  ModuleDecl *module;
+
+  // Parse the executor factory name
+  StringRef qualifiedName = *ctx.LangOpts.ExecutorFactory;
+  StringRef typeName;
+
+  auto parts = qualifiedName.split('.');
+
+  if (parts.second.empty()) {
+    // This was an unqualified name; assume it's relative to the main module
+    module = ctx.MainModule;
+    typeName = qualifiedName;
+  } else {
+    Identifier moduleName = ctx.getIdentifier(parts.first);
+    module = ctx.getModuleByIdentifier(moduleName);
+    typeName = parts.second;
+  }
+
+  return ctx.getNamedSwiftType(module, typeName);
+}
+
+Type SILGenModule::getDefaultExecutorFactory() {
+  auto &ctx = getASTContext();
+
+  ModuleDecl *module = ctx.getModuleByIdentifier(ctx.Id_Concurrency);
+  if (!module)
+    return Type();
+
+  return ctx.getNamedSwiftType(module, "DefaultExecutorFactory");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
