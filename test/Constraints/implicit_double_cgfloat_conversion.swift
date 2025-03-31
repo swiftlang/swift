@@ -349,8 +349,3 @@ func test_init_validation() {
     }
   }
 }
-
-// Optional-to-optional conversion
-func optional_to_optional(x: CGFloat?) -> Double? {
-  return x
-}
