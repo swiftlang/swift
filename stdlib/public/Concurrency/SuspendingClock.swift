@@ -128,6 +128,7 @@ extension SuspendingClock: Clock {
 }
 
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension SuspendingClock {
   @available(SwiftStdlib 5.7, *)
   @backDeployed(before: SwiftStdlib 9999)

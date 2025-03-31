@@ -140,6 +140,7 @@ extension ContinuousClock: Clock {
 }
 
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
   @backDeployed(before: SwiftStdlib 9999)
