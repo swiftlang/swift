@@ -140,6 +140,13 @@ extension ContinuousClock: Clock {
 }
 
 @available(SwiftStdlib 5.7, *)
+extension ContinuousClock {
+  @available(SwiftStdlib 5.7, *)
+  @backDeployed(before: SwiftStdlib 9999)
+  public var systemEpoch: Instant { Instant(_value: .seconds(0)) }
+}
+
+@available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }

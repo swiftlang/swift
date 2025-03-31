@@ -128,6 +128,13 @@ extension SuspendingClock: Clock {
 }
 
 @available(SwiftStdlib 5.7, *)
+extension SuspendingClock {
+  @available(SwiftStdlib 5.7, *)
+  @backDeployed(before: SwiftStdlib 9999)
+  public var systemEpoch: Instant { Instant(_value: .seconds(0)) }
+}
+
+@available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
 extension SuspendingClock.Instant: InstantProtocol {
   @available(SwiftStdlib 5.7, *)
