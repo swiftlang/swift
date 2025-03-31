@@ -1666,7 +1666,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       llvm::Module *M = IGM->getModule();
       auto collectReference = [&](llvm::GlobalValue &G) {
         if (G.isDeclaration()
-            && (G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
+            && (G.getLinkage() == GlobalValue::WeakODRLinkage ||
+                G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
                 G.getLinkage() == GlobalValue::ExternalLinkage)) {
           referencedGlobals.insert(G.getName());
           G.setLinkage(GlobalValue::ExternalLinkage);
@@ -1693,7 +1694,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       // definition (if it's not referenced in the same file).
       auto updateLinkage = [&](llvm::GlobalValue &G) {
         if (!G.isDeclaration()
-            && G.getLinkage() == GlobalValue::LinkOnceODRLinkage
+            && (G.getLinkage() == GlobalValue::WeakODRLinkage ||
+                G.getLinkage() == GlobalValue::LinkOnceODRLinkage)
             && referencedGlobals.count(G.getName()) != 0) {
           G.setLinkage(GlobalValue::WeakODRLinkage);
         }
