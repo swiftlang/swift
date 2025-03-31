@@ -11,6 +11,7 @@ add_library(swift_Concurrency
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorBridge.cpp
   ExecutorChecks.cpp
   GlobalExecutor.cpp
   Setup.cpp
@@ -47,6 +48,7 @@ add_library(swift_Concurrency
   CheckedContinuation.swift
   Clock.swift
   ContinuousClock.swift
+  CooperativeExecutor.swift
   Deque/_DequeBuffer.swift
   Deque/_DequeBufferHeader.swift
   Deque/_DequeSlot.swift
@@ -67,19 +69,27 @@ add_library(swift_Concurrency
   Deque/Deque+UnsafeHandle.swift
   Deque/UnsafeMutableBufferPointer+Utilities.swift
   DiscardingTaskGroup.swift
+  DummyExecutor.swift
   Errors.swift
   Executor.swift
   ExecutorAssertions.swift
+  ExecutorBridge.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
   PartialAsyncTask.swift
+  PlatformExecutorDarwin.swift
+  PlatformExecutorLinux.swift
+  PlatformExecutorWindows.swift
+  PriorityQueue.swift
   SourceCompatibilityShims.swift
   SuspendingClock.swift
   Task.swift
+  Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
+  TaskGroup+Embedded.swift
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
