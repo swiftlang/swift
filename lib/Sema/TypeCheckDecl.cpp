@@ -3011,17 +3011,20 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic, we're done: it's a pass-through alias.
   if (!nominalSig) return true;
 
-  // Check for inferred types.
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
+
+  // Check for inferred types.
   if (nominalGenericParams.size() != typealiasGenericParams.size())
-    return false;
+    return isTypeInferredByTypealias(typealias, nominal);
+
+  // Check that the type parameters are the same the whole way through.
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
                   typealiasGenericParams.begin(),
                   [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
                     return gp1->isEqual(gp2);
                   }))
-    return isTypeInferredByTypealias(typealias, nominal);
+    return false;
 
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
