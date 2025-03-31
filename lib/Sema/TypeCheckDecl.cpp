@@ -3036,6 +3036,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
                                             NominalTypeDecl *nominal) {
+  bool isInferredType = false;
   auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
                                      .getPointer()
                                      ->getAs<BoundGenericType>()
@@ -3049,7 +3050,6 @@ bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
     return false;
   }
 
-  bool supportedInferredType = false;
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
@@ -3060,14 +3060,14 @@ bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
 
     if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr &&
         dyn_cast<StructType>(typealiasBoundGenericType) != nullptr) {
-      supportedInferredType = true;
+      isInferredType = true;
     } else {
-      supportedInferredType = false;
+      isInferredType = false;
       break;
     }
   }
 
-  return supportedInferredType;
+  return isInferredType;
 }
 
 Type
