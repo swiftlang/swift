@@ -3011,7 +3011,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic, we're done: it's a pass-through alias.
   if (!nominalSig) return true;
 
-  // Check that the type parameters are the same the whole way through.
+  // Check for inferred types.
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
   if (nominalGenericParams.size() != typealiasGenericParams.size())
@@ -3021,7 +3021,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                   [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
                     return gp1->isEqual(gp2);
                   }))
-    return false;
+    return isTypeInferredByTypealias(typealias, nominal);
 
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
@@ -3103,9 +3103,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto underlyingType = aliasDecl->getUnderlyingType();
       if (auto extendedNominal = underlyingType->getAnyNominal()) {
-        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal) ||
-            TypeChecker::isTypeInferredByTypealias(aliasDecl,
-                                                   extendedNominal)) {
+        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal)) {
           return extendedType;
         } else {
           return extendedNominal->getDeclaredType();
