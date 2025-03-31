@@ -1086,7 +1086,7 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
   BridgedParsedLifetimeDependenceKindDefault,
-  BridgedParsedLifetimeDependenceKindScope,
+  BridgedParsedLifetimeDependenceKindBorrow,
   BridgedParsedLifetimeDependenceKindInherit,
   BridgedParsedLifetimeDependenceKindInout
 };

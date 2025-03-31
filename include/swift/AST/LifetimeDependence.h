@@ -38,7 +38,7 @@ class SILResultInfo;
 
 enum class ParsedLifetimeDependenceKind : uint8_t {
   Default = 0,
-  Scope,
+  Borrow,
   Inherit, // Only used with deserialized decls
   Inout
 };
@@ -208,11 +208,14 @@ public:
         result += ", ";
       }
       switch (source.getParsedLifetimeDependenceKind()) {
-      case ParsedLifetimeDependenceKind::Scope:
+      case ParsedLifetimeDependenceKind::Borrow:
         result += "borrow ";
         break;
       case ParsedLifetimeDependenceKind::Inherit:
         result += "copy ";
+        break;
+      case ParsedLifetimeDependenceKind::InOut:
+        result += "inout ";
         break;
       default:
         break;

@@ -77,7 +77,7 @@ filterEscapableLifetimeDependencies(GenericSignature sig,
 StringRef
 getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
   switch (kind) {
-  case ParsedLifetimeDependenceKind::Scope:
+  case ParsedLifetimeDependenceKind::Borrow:
     return "borrow";
   case ParsedLifetimeDependenceKind::Inherit:
     return "copy";
@@ -473,7 +473,7 @@ protected:
     auto loweredOwnership = ownership != ValueOwnership::Default
       ? ownership : getLoweredOwnership(afd);
 
-    if (kind == ParsedLifetimeDependenceKind::Scope) {
+    if (kind == ParsedLifetimeDependenceKind::Borrow) {
       return loweredOwnership == ValueOwnership::Shared;
     }
     assert(kind == ParsedLifetimeDependenceKind::Inout);
@@ -1166,7 +1166,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       auto loc = descriptor.getLoc();
       auto kind = descriptor.getParsedLifetimeDependenceKind();
 
-      if (kind == ParsedLifetimeDependenceKind::Scope &&
+      if (kind == ParsedLifetimeDependenceKind::Borrow &&
           isConsumedParameterInCallee(paramConvention)) {
         diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "_scope",
                        getStringForParameterConvention(paramConvention));
@@ -1181,7 +1181,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       if (kind == ParsedLifetimeDependenceKind::Inherit) {
         inheritLifetimeParamIndices.set(paramIndexToSet);
       } else {
-        assert(kind == ParsedLifetimeDependenceKind::Scope);
+        assert(kind == ParsedLifetimeDependenceKind::Borrow);
         scopeLifetimeParamIndices.set(paramIndexToSet);
       }
       return false;

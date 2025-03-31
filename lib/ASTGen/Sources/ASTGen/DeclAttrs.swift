@@ -1104,7 +1104,7 @@ extension ASTGenVisitor {
       lifetimeDependenceKind = .inherit
       descriptorExpr = copyExpr.expression
     } else if let borrowExpr = node.as(BorrowExprSyntax.self) {
-      lifetimeDependenceKind = .scope
+      lifetimeDependenceKind = .borrow
       descriptorExpr = borrowExpr.expression
     } else if let inoutExpr = node.as(InOutExprSyntax.self) {
       lifetimeDependenceKind = .inout
