@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_SOURCEMANAGER_H
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
@@ -305,6 +306,8 @@ public:
 
   /// Returns true if \c LHS is before \c RHS in the same source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
+    CONDITIONAL_ASSERT(findBufferContainingLoc(LHS) ==
+                       findBufferContainingLoc(RHS));
     return LHS.Value.getPointer() < RHS.Value.getPointer();
   }
 
