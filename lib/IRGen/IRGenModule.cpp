@@ -91,6 +91,11 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
+llvm::StructType *IRGenModule::createTransientStructType(
+    StringRef name, std::initializer_list<llvm::Type *> types, bool packed) {
+  return createStructType(*this, name, types, packed);
+}
+
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                       llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,

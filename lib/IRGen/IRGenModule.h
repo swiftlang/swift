@@ -861,6 +861,11 @@ public:
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
 
+  llvm::StructType *
+  createTransientStructType(StringRef name,
+                            std::initializer_list<llvm::Type *> types,
+                            bool packed = false);
+
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
   unsigned TailElemTypeID = 0;
