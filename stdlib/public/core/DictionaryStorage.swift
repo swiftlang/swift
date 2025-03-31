@@ -232,12 +232,14 @@ extension __RawDictionaryStorage {
     return unsafe keys[bucket.offset]
   }
 
+  @safe
   @_alwaysEmitIntoClient
   @inline(never)
   internal final func find<Key: Hashable>(_ key: Key) -> (bucket: _HashTable.Bucket, found: Bool) {
     return unsafe find(key, hashValue: key._rawHashValue(seed: _seed))
   }
 
+  @safe
   @_alwaysEmitIntoClient
   @inline(never)
   internal final func find<Key: Hashable>(_ key: Key, hashValue: Int) -> (bucket: _HashTable.Bucket, found: Bool) {
@@ -298,7 +300,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   }
 
   internal var asNative: _NativeDictionary<Key, Value> {
-    return _NativeDictionary(self)
+    return unsafe _NativeDictionary(self)
   }
 
 #if _runtime(_ObjC)
