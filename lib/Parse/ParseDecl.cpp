@@ -5021,6 +5021,11 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
                           tok::kw_self)) {
       return ParsedLifetimeDependenceKind::Scope;
     }
+    if (Tok.is(tok::amp_prefix) &&
+        peekToken().isAny(tok::identifier, tok::integer_literal,
+                          tok::kw_self)) {
+      return ParsedLifetimeDependenceKind::Inout;
+    }
     return std::nullopt;
   };
 

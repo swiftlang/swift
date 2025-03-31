@@ -8171,6 +8171,9 @@ ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of borrow dependence with consuming ownership",
       ())
+ERROR(lifetime_dependence_cannot_use_default_escapable_consuming, none,
+      "invalid lifetime dependence on an Escapable value with %0 ownership",
+      (StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_inout, none,
       "invalid use of borrow dependence on the same inout parameter",
       ())

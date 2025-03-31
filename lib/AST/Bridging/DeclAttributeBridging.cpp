@@ -474,6 +474,8 @@ unbridged(BridgedParsedLifetimeDependenceKind kind) {
     return swift::ParsedLifetimeDependenceKind::Scope;
   case BridgedParsedLifetimeDependenceKindInherit:
     return swift::ParsedLifetimeDependenceKind::Inherit;
+  case BridgedParsedLifetimeDependenceKindInout:
+    return swift::ParsedLifetimeDependenceKind::Inout;
   }
   llvm_unreachable("unhandled enum value");
 }

@@ -74,6 +74,20 @@ filterEscapableLifetimeDependencies(GenericSignature sig,
   return didRemoveLifetimeDependencies;
 }
 
+StringRef
+getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
+  switch (kind) {
+  case ParsedLifetimeDependenceKind::Scope:
+    return "borrow";
+  case ParsedLifetimeDependenceKind::Inherit:
+    return "copy";
+  case ParsedLifetimeDependenceKind::Inout:
+    return "inout";
+  default:
+    return "";
+  }
+}
+
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
   auto addressable = getAddressableIndices();
@@ -446,6 +460,26 @@ protected:
     }
   }
 
+  bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind, Type type,
+                                 ValueOwnership ownership) const {
+    if (kind == ParsedLifetimeDependenceKind::Inherit) {
+      return true;
+    }
+    // Lifetime dependence always propagates through temporary BitwiseCopyable
+    // values, even if the dependence is scoped.
+    if (isBitwiseCopyable(type, ctx)) {
+      return true;
+    }
+    auto loweredOwnership = ownership != ValueOwnership::Default
+      ? ownership : getLoweredOwnership(afd);
+
+    if (kind == ParsedLifetimeDependenceKind::Scope) {
+      return loweredOwnership == ValueOwnership::Shared;
+    }
+    assert(kind == ParsedLifetimeDependenceKind::Inout);
+    return loweredOwnership == ValueOwnership::InOut;
+  }
+
   bool isCompatibleWithOwnership(LifetimeDependenceKind kind, Type type,
                                  ValueOwnership ownership) const {
     if (kind == LifetimeDependenceKind::Inherit) {
@@ -456,16 +490,13 @@ protected:
     if (isBitwiseCopyable(type, ctx)) {
       return true;
     }
-    assert(kind == LifetimeDependenceKind::Scope);
     auto loweredOwnership = ownership != ValueOwnership::Default
-      ? ownership : getLoweredOwnership(afd);
+                                ? ownership
+                                : getLoweredOwnership(afd);
 
-    if (loweredOwnership == ValueOwnership::InOut ||
-        loweredOwnership == ValueOwnership::Shared) {
-      return true;
-    }
-    assert(loweredOwnership == ValueOwnership::Owned);
-    return false;
+    assert(kind == LifetimeDependenceKind::Scope);
+    return loweredOwnership == ValueOwnership::Shared ||
+           loweredOwnership == ValueOwnership::InOut;
   }
 
   struct TargetDeps {
@@ -541,44 +572,51 @@ protected:
   std::optional<LifetimeDependenceKind>
   getDependenceKindFromDescriptor(LifetimeDescriptor descriptor,
                                   ParamDecl *decl) {
-    auto loc = descriptor.getLoc();
-
-    auto ownership = decl->getValueOwnership();
+    auto loc = decl->getLoc();
     auto type = decl->getTypeInContext();
+    auto parsedLifetimeKind = descriptor.getParsedLifetimeDependenceKind();
+    auto ownership = decl->getValueOwnership();
+    auto loweredOwnership = ownership != ValueOwnership::Default
+                                ? ownership
+                                : getLoweredOwnership(afd);
 
-    LifetimeDependenceKind kind;
-    switch (descriptor.getParsedLifetimeDependenceKind()) {
-    case ParsedLifetimeDependenceKind::Default:
+    if (parsedLifetimeKind == ParsedLifetimeDependenceKind::Default) {
       if (type->isEscapable()) {
-        kind = LifetimeDependenceKind::Scope;
+        if (loweredOwnership == ValueOwnership::Shared ||
+            loweredOwnership == ValueOwnership::InOut) {
+          return LifetimeDependenceKind::Scope;
+        } else {
+          diagnose(
+              loc,
+              diag::lifetime_dependence_cannot_use_default_escapable_consuming,
+              getOwnershipSpelling(loweredOwnership));
+          return std::nullopt;
+        }
       } else if (useLazyInference()) {
-        kind = LifetimeDependenceKind::Inherit;
-      } else {
-        diagnose(loc, diag::lifetime_dependence_cannot_infer_kind,
-                 diagnosticQualifier(), descriptor.getString());
-        return std::nullopt;
+        return LifetimeDependenceKind::Inherit;
       }
-      break;
-    case ParsedLifetimeDependenceKind::Scope:
-      kind = LifetimeDependenceKind::Scope;
-      break;
-    case ParsedLifetimeDependenceKind::Inherit:
-      kind = LifetimeDependenceKind::Inherit;
-      break;
+      diagnose(loc, diag::lifetime_dependence_cannot_infer_kind,
+               diagnosticQualifier(), descriptor.getString());
+      return std::nullopt;
     }
-    // @lifetime(borrow x) is invalid for consuming parameters.
-    if (!isCompatibleWithOwnership(kind, type, ownership)) {
+
+    // @lifetime(borrow x) is valid only for borrowing parameters.
+    // @lifetime(inout x) is valid only for inout parameters.
+    if (!isCompatibleWithOwnership(parsedLifetimeKind, type, ownership)) {
       diagnose(loc,
                diag::lifetime_dependence_cannot_use_parsed_borrow_consuming);
       return std::nullopt;
     }
     // @lifetime(copy x) is only invalid for Escapable types.
-    if (kind == LifetimeDependenceKind::Inherit && type->isEscapable()) {
+    if (parsedLifetimeKind == ParsedLifetimeDependenceKind::Inherit &&
+        type->isEscapable()) {
       diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
                descriptor.getString());
       return std::nullopt;
     }
-    return kind;
+    return parsedLifetimeKind == ParsedLifetimeDependenceKind::Inherit
+               ? LifetimeDependenceKind::Inherit
+               : LifetimeDependenceKind::Scope;
   }
 
   // Finds the ParamDecl* and its index from a LifetimeDescriptor

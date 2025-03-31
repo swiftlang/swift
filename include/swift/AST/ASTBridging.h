@@ -1088,6 +1088,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
   BridgedParsedLifetimeDependenceKindDefault,
   BridgedParsedLifetimeDependenceKindScope,
   BridgedParsedLifetimeDependenceKindInherit,
+  BridgedParsedLifetimeDependenceKindInout
 };
 
 class BridgedLifetimeDescriptor {
