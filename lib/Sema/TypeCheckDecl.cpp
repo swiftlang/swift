@@ -3036,8 +3036,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
                                          NominalTypeDecl *nominal) {
-  auto nominalGenericArguments = ((nominal->getDeclaredInterfaceType().getPointer())->getAs<BoundGenericType>())->getGenericArgs();
-  auto typealiasGenericArguments = ((typealias->getUnderlyingType().getPointer())->getAs<BoundGenericType>())->getGenericArgs();
+  auto nominalGenericArguments = nominal->getDeclaredInterfaceType().getPointer()->getAs<BoundGenericType>()->getGenericArgs();
+  auto typealiasGenericArguments = typealias->getUnderlyingType().getPointer()->getAs<BoundGenericType>()->getGenericArgs();
 
   if (nominalGenericArguments.size() !=typealiasGenericArguments.size()) {
     //std::cerr << "Error: ArrayRefs must have the same size.\n";
