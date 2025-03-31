@@ -3046,10 +3046,6 @@ bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
                                        ->getAs<BoundGenericType>()
                                        ->getGenericArgs();
 
-  if (nominalGenericArguments.size() != typealiasGenericArguments.size()) {
-    return false;
-  }
-
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
