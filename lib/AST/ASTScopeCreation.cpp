@@ -713,9 +713,8 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   ASTScopeAssert(!child->getParent(), "child should not already have parent");
   child->parentAndWasExpanded.setPointer(this);
 
-#ifndef NDEBUG
-  checkSourceRangeBeforeAddingChild(child, ctx);
-#endif
+  if (CONDITIONAL_ASSERT_enabled())
+    checkSourceRangeBeforeAddingChild(child, ctx);
 
   // If this is the first time we've added children, notify the ASTContext
   // that there's a SmallVector that needs to be cleaned up.
