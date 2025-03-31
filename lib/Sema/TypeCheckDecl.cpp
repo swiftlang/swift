@@ -13,7 +13,7 @@
 // This file implements semantic analysis for declarations.
 //
 //===----------------------------------------------------------------------===//
-#include <type_traits>
+
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
