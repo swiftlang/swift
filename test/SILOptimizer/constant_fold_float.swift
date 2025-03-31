@@ -9,10 +9,12 @@ public func dont_fold_inf_cmp(_ f: Float) -> Bool {
   (f + 0) < .infinity
 }
 
-// CHECK-LABEL: sil @$s4test014dont_fold_inf_D4_cmpSbyF :
-// CHECK:         builtin "fcmp_olt_FPIEEE32"
-// CHECK:       } // end sil function '$s4test014dont_fold_inf_D4_cmpSbyF'
-public func dont_fold_inf_inf_cmp() -> Bool {
+// CHECK-LABEL: sil @$s4test09fold_inf_C4_cmpSbyF :
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[B:%.*]] = struct $Bool ([[ZERO]])
+// CHECK:         return [[B]]
+// CHECK:       } // end sil function '$s4test09fold_inf_C4_cmpSbyF'
+public func fold_inf_inf_cmp() -> Bool {
   0x1.0p128 < Float.infinity
 }
 
