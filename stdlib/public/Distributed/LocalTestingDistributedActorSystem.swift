@@ -238,7 +238,7 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 @available(SwiftStdlib 5.7, *)
 @safe
 fileprivate class _Lock {
-  #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
   private let underlying: UnsafeMutablePointer<os_unfair_lock>
   #elseif os(Windows)
   private let underlying: UnsafeMutablePointer<SRWLOCK>
@@ -251,7 +251,7 @@ fileprivate class _Lock {
   #endif
 
   init() {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     unsafe self.underlying.initialize(to: os_unfair_lock())
     #elseif os(Windows)
@@ -261,21 +261,21 @@ fileprivate class _Lock {
     // WASI environment has only a single thread
     #else
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    guard pthread_mutex_init(self.underlying, nil) == 0 else {
+    guard unsafe pthread_mutex_init(self.underlying, nil) == 0 else {
       fatalError("pthread_mutex_init failed")
     }
     #endif
   }
 
   deinit {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
     // `os_unfair_lock`s do not need to be explicitly destroyed
     #elseif os(Windows)
     // `SRWLOCK`s do not need to be explicitly destroyed
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    guard pthread_mutex_destroy(self.underlying) == 0 else {
+    guard unsafe pthread_mutex_destroy(self.underlying) == 0 else {
       fatalError("pthread_mutex_destroy failed")
     }
     #endif
@@ -289,27 +289,27 @@ fileprivate class _Lock {
 
   @discardableResult
   func withLock<T>(_ body: () -> T) -> T {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
     unsafe os_unfair_lock_lock(self.underlying)
     #elseif os(Windows)
     AcquireSRWLockExclusive(self.underlying)
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    guard pthread_mutex_lock(self.underlying) == 0 else {
+    guard unsafe pthread_mutex_lock(self.underlying) == 0 else {
       fatalError("pthread_mutex_lock failed")
     }
     #endif
 
     defer {
-      #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+      #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
       unsafe os_unfair_lock_unlock(self.underlying)    
       #elseif os(Windows)
       ReleaseSRWLockExclusive(self.underlying)
       #elseif os(WASI)
       // WASI environment has only a single thread
       #else
-      guard pthread_mutex_unlock(self.underlying) == 0 else {
+      guard unsafe pthread_mutex_unlock(self.underlying) == 0 else {
         fatalError("pthread_mutex_unlock failed")
       }
       #endif

@@ -404,6 +404,7 @@ UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
+UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
 static bool usesFeatureSwiftSettings(const Decl *decl) {
   // We just need to guard `#SwiftSettings`.

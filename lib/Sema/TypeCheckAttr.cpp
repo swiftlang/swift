@@ -2330,6 +2330,12 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
     return true;
   }
 
+  // Allow reserved symbols to be declared if the AllowRuntimeSymbolDeclarations
+  // experimental feature is enabled.
+  auto &ctx = fromModule->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::AllowRuntimeSymbolDeclarations))
+    return true;
+
   // Swift runtime functions are a private contract between the compiler and
   // runtime, and attempting to access them directly without going through
   // builtins or proper language features breaks the compiler in various hard
@@ -5129,8 +5135,7 @@ void AttributeChecker::checkBackDeployedAttrs(
 
     // Unavailable decls cannot be back deployed.
     auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
-    if (auto unavailableDomain =
-            availability.containsUnavailableDomain(backDeployedDomain)) {
+    if (availability.containsUnavailableDomain(backDeployedDomain)) {
       auto domainForDiagnostics = backDeployedDomain;
       llvm::VersionTuple ignoredVersion;
 
