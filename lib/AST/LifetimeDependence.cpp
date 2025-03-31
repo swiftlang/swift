@@ -37,6 +37,35 @@ LifetimeEntry::create(const ASTContext &ctx, SourceLoc startLoc,
   return new (mem) LifetimeEntry(startLoc, endLoc, sources, targetDescriptor);
 }
 
+std::string LifetimeEntry::getString() const {
+  std::string result = "@lifetime(";
+  if (targetDescriptor.has_value()) {
+    result += targetDescriptor->getString();
+    result += ": ";
+  }
+
+  bool firstElem = true;
+  for (auto source : getSources()) {
+    if (!firstElem) {
+      result += ", ";
+    }
+    auto lifetimeKind = source.getParsedLifetimeDependenceKind();
+    auto kindString = getNameForParsedLifetimeDependenceKind(lifetimeKind);
+    bool printSpace = (lifetimeKind == ParsedLifetimeDependenceKind::Borrow ||
+                       lifetimeKind == ParsedLifetimeDependenceKind::Inherit);
+    if (!kindString.empty()) {
+      result += kindString;
+    }
+    if (printSpace) {
+      result += " ";
+    }
+    result += source.getString();
+    firstElem = false;
+  }
+  result += ")";
+  return result;
+}
+
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
                          unsigned index) {
@@ -82,7 +111,7 @@ getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
   case ParsedLifetimeDependenceKind::Inherit:
     return "copy";
   case ParsedLifetimeDependenceKind::Inout:
-    return "inout";
+    return "&";
   default:
     return "";
   }
@@ -572,7 +601,7 @@ protected:
   std::optional<LifetimeDependenceKind>
   getDependenceKindFromDescriptor(LifetimeDescriptor descriptor,
                                   ParamDecl *decl) {
-    auto loc = decl->getLoc();
+    auto loc = descriptor.getLoc();
     auto type = decl->getTypeInContext();
     auto parsedLifetimeKind = descriptor.getParsedLifetimeDependenceKind();
     auto ownership = decl->getValueOwnership();
@@ -602,9 +631,12 @@ protected:
 
     // @lifetime(borrow x) is valid only for borrowing parameters.
     // @lifetime(inout x) is valid only for inout parameters.
-    if (!isCompatibleWithOwnership(parsedLifetimeKind, type, ownership)) {
+    if (!isCompatibleWithOwnership(parsedLifetimeKind, type,
+                                   loweredOwnership)) {
       diagnose(loc,
-               diag::lifetime_dependence_cannot_use_parsed_borrow_consuming);
+               diag::lifetime_dependence_cannot_use_parsed_borrow_consuming,
+               getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
+               getOwnershipSpelling(loweredOwnership));
       return std::nullopt;
     }
     // @lifetime(copy x) is only invalid for Escapable types.
