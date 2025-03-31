@@ -67,8 +67,9 @@ func canImportVersioned() {
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, _underlyingVersion: 113.33)
-  // Foo is an unversioned Swift module with no underlying clang module.
+#if canImport(Foo, _underlyingVersion: 113.33) // expected-warning {{cannot find user version number for Clang module 'Foo'; version number ignored}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Foo'; version number ignored}}
+  // Foo is a Swift module with no underlying clang module.
   let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
@@ -135,8 +136,9 @@ func canImportVersionedString() {
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, _underlyingVersion: "113.33")
-  // Foo is an unversioned Swift module with no underlying clang module.
+#if canImport(Foo, _underlyingVersion: "113.33") // expected-warning {{cannot find user version number for Clang module 'Foo'; version number ignored}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Foo'; version number ignored}}
+  // Foo is a Swift module with no underlying clang module.
   let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }

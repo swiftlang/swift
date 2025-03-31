@@ -1,4 +1,4 @@
-// REQUIRES: executable_test
+// REQUIRES: objc_interop
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/inputs)
 // RUN: %empty-directory(%t/module-cache)
@@ -49,9 +49,10 @@ public func Foo() {
 }
 
 //--- MyExe.swift
-#if canImport(MyLib, _version: 42)
+#if canImport(MyLib, _version: 42) // expected-warning {{cannot find user version number for module 'MyLib'; version number ignored}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for module 'MyLib'; version number ignored}}
   #warning("versioned canImport() of unversioned module is working")
-// expected-warning@-1{{versioned canImport() of unversioned module is working}}
+  // expected-warning@-1{{versioned canImport() of unversioned module is working}}
 #else
   #warning("versioned canImport() of unversioned module is broken")
 #endif
