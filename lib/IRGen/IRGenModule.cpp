@@ -705,7 +705,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
-    IntPtrTy              // Task.Status
   });
 
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
