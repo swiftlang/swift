@@ -1108,37 +1108,23 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
-  auto abstractRef = ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
-  
   auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
-  if (!archetype) {
-    if (maybeOpaqueType->isTypeParameter() ||
-        maybeOpaqueType->is<ArchetypeType>())
-      return abstractRef;
-    
-    // SIL type lowering may have already substituted away the opaque type, in
-    // which case we'll end up "substituting" the same type.
-    if (maybeOpaqueType->isEqual(replacementType)) {
-      return lookupConformance(replacementType, protocol);
-    }
-    
-    llvm_unreachable("origType should have been an opaque type or type parameter");
-  }
+  if (!archetype)
+    return lookupConformance(replacementType, protocol);
 
   auto *genericEnv = archetype->getGenericEnvironment();
   auto *decl = genericEnv->getOpaqueTypeDecl();
   auto outerSubs = genericEnv->getOuterSubstitutions();
 
   auto substitutionKind = shouldPerformSubstitution(decl);
-  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
-    return abstractRef;
-  }
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute)
+    return lookupConformance(replacementType, protocol);
 
   auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
-    return abstractRef;
+    return lookupConformance(replacementType, protocol);
 
   // Apply the underlying type substitutions to the interface type of the
   // archetype in question. This will map the inner generic signature of the
@@ -1159,7 +1145,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
               return true;
             return false;
           }))
-    return abstractRef;
+    return lookupConformance(replacementType, protocol);
 
   // Then apply the substitutions from the root opaque archetype, to specialize
   // for its type arguments. We perform this substitution after checking for
@@ -1168,7 +1154,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto substTy = partialSubstTy.subst(outerSubs);
 
   auto partialSubstRef =
-      abstractRef.subst(archetype->getInterfaceType(), *subs);
+      subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
+                              protocol);
   auto substRef =
       partialSubstRef.subst(partialSubstTy, outerSubs);
 
@@ -1181,7 +1168,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       // type back to the caller. This substitution will fail at runtime
       // instead.
       if (!alreadySeen->insert(seenKey).second) {
-        return abstractRef;
+        return lookupConformance(replacementType, protocol);
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
