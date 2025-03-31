@@ -22,7 +22,7 @@ public struct TestInitAccessors {
 
   public var x: Int {
     @storageRestrictions(initializes: _x)
-    init { // expected-note 2 {{init acecssor for property 'x' is not '@usableFromInline' or public}}
+    init { // expected-note 2 {{init accessor for property 'x' is not '@usableFromInline' or public}}
       self._x = newValue
     }
 
@@ -35,11 +35,11 @@ public struct TestInitAccessors {
 
    @_alwaysEmitIntoClient
    public init(x: Int) {
-     self.x = 0 // expected-error {{init acecssor for property 'x' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+     self.x = 0 // expected-error {{init accessor for property 'x' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
    }
 
    @inlinable
    public init() {
-     self.x = 0 // expected-error {{init acecssor for property 'x' is internal and cannot be referenced from an '@inlinable' function}}
+     self.x = 0 // expected-error {{init accessor for property 'x' is internal and cannot be referenced from an '@inlinable' function}}
    }
 }
