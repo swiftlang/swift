@@ -3040,7 +3040,6 @@ bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
   auto typealiasGenericArguments = typealias->getUnderlyingType().getPointer()->getAs<BoundGenericType>()->getGenericArgs();
 
   if (nominalGenericArguments.size() !=typealiasGenericArguments.size()) {
-    //std::cerr << "Error: ArrayRefs must have the same size.\n";
     return false;
   }
 
