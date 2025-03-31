@@ -982,7 +982,7 @@ extension _StringObject {
       }
     }
 #endif
-    return unsafe withSharedStorage { $0.start }
+    return unsafe withSharedStorage { unsafe $0.start }
   }
 
   @usableFromInline
