@@ -319,6 +319,17 @@ extension String.UTF8View {
 
 extension String.UTF8View {
 
+  /// A span over the UTF8 code units that make up this string.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property transcodes the code units the first time
+  /// it is called. The transcoded buffer is cached, and subsequent calls
+  /// to `span` can reuse the buffer.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this String.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings,
+  ///  amortized O(1) for bridged UTF16 Strings.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<UTF8.CodeUnit> {
     @lifetime(borrow self)
