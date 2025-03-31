@@ -36,7 +36,7 @@ public struct MutableSpan<Element: ~Copyable>
     _unchecked start: UnsafeMutableRawPointer?,
     count: Int
   ) {
-    _pointer = unsafe start
+    unsafe _pointer = start
     _count = count
   }
 }
@@ -54,7 +54,7 @@ extension MutableSpan where Element: ~Copyable {
   internal init(
     _unchecked elements: UnsafeMutableBufferPointer<Element>
   ) {
-    _pointer = .init(elements.baseAddress)
+    unsafe _pointer = .init(elements.baseAddress)
     _count = elements.count
   }
 
@@ -190,7 +190,7 @@ extension RawSpan {
   public init<Element: BitwiseCopyable>(
     _mutableSpan mutableSpan: borrowing MutableSpan<Element>
   ) {
-    let pointer = mutableSpan._pointer
+    let pointer = unsafe mutableSpan._pointer
     let byteCount = mutableSpan.count &* MemoryLayout<Element>.stride
     let buffer = unsafe UnsafeRawBufferPointer(start: pointer, count: byteCount)
     let rawSpan = unsafe RawSpan(_unsafeBytes: buffer)
@@ -203,7 +203,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var _description: String {
-    let addr = String(
+    let addr = unsafe String(
       UInt(bitPattern: _pointer), radix: 16, uppercase: false
     )
     return "(0x\(addr), \(_count))"
@@ -376,7 +376,7 @@ extension MutableSpan where Element: ~Copyable {
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    try Span(_mutableSpan: self).withUnsafeBufferPointer(body)
+    try unsafe Span(_mutableSpan: self).withUnsafeBufferPointer(body)
   }
 
   //FIXME: mark closure parameter as non-escaping
@@ -387,7 +387,7 @@ extension MutableSpan where Element: ~Copyable {
   >(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, count > 0 else {
+    guard let pointer = unsafe _pointer, count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     // bind memory by hand to sidestep alignment concerns
@@ -407,7 +407,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try RawSpan(_mutableSpan: self).withUnsafeBytes(body)
+    try unsafe RawSpan(_mutableSpan: self).withUnsafeBytes(body)
   }
 
   //FIXME: mark closure parameter as non-escaping
@@ -494,7 +494,7 @@ extension MutableSpan {
     unsafe _start().withMemoryRebound(
       to: Element.self, capacity: source.count
     ) { dest in
-      source.withUnsafeBufferPointer {
+      unsafe source.withUnsafeBufferPointer {
         unsafe dest.update(from: $0.baseAddress!, count: $0.count)
       }
     }
@@ -537,7 +537,7 @@ extension MutableSpan where Element: ~Copyable {
   ) -> Index {
 //    let source = OutputSpan(_initializing: source, initialized: source.count)
 //    return self.moveUpdate(fromContentsOf: source)
-    withUnsafeMutableBufferPointer {
+    unsafe withUnsafeMutableBufferPointer {
       unsafe $0.moveUpdate(fromContentsOf: source)
     }
   }
@@ -551,7 +551,7 @@ extension MutableSpan {
   public mutating func moveUpdate(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Index {
-    moveUpdate(fromContentsOf: unsafe .init(rebasing: source))
+    unsafe moveUpdate(fromContentsOf: .init(rebasing: source))
   }
 }
 
@@ -565,7 +565,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ) where Element: BitwiseCopyable {
     guard count > 0 else { return }
     // rebind _start manually in order to avoid assumptions about alignment.
-    let rp = _start()._rawValue
+    let rp = unsafe _start()._rawValue
     let binding = Builtin.bindMemory(rp, count._builtinWordValue, Element.self)
     let rebound = unsafe UnsafeMutablePointer<Element>(rp)
     unsafe rebound.update(repeating: repeatedValue, count: count)
@@ -630,7 +630,7 @@ extension MutableSpan where Element: BitwiseCopyable {
       source.count <= self.count,
       "destination span cannot contain every element from source."
     )
-    source.withUnsafeBufferPointer {
+    unsafe source.withUnsafeBufferPointer {
       unsafe _start().copyMemory(
         from: $0.baseAddress!,
         byteCount: $0.count &* MemoryLayout<Element>.stride
