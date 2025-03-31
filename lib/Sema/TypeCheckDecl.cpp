@@ -3102,13 +3102,10 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto underlyingType = aliasDecl->getUnderlyingType();
       if (auto extendedNominal = underlyingType->getAnyNominal()) {
-        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal)) {
-          return extendedType;
-        } else {
-          return extendedNominal->getDeclaredType();
-        }
-      }
-
+       return TypeChecker::isPassThroughTypealias(
+                   aliasDecl, extendedNominal)
+                   ? extendedType
+                   : extendedNominal->getDeclaredType();
       if (underlyingType->is<TupleType>()) {
         return extendedType;
       }
