@@ -4486,6 +4486,17 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
+AnyFunctionType *
+AnyFunctionType::withIsolation(FunctionTypeIsolation isolation) const {
+  auto info = getExtInfo().intoBuilder().withIsolation(isolation).build();
+  return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
+  auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
+  return withExtInfo(info);
+}
+
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())
@@ -4935,6 +4946,20 @@ SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
                           subs, SubstitutionMap(),
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           witnessConformance);
+}
+
+CanSILFunctionType SILFunctionType::withSendable(bool newValue) const {
+  return withExtInfo(getExtInfo().withSendable(newValue));
+}
+
+CanSILFunctionType SILFunctionType::withExtInfo(ExtInfo newExtInfo) const {
+  return SILFunctionType::get(
+      getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
+      getCalleeConvention(), getParameters(), getYields(), getResults(),
+      getOptionalErrorResult(), getPatternSubstitutions(),
+      getInvocationSubstitutions(),
+      const_cast<SILFunctionType *>(this)->getASTContext(),
+      getWitnessMethodConformanceOrInvalid());
 }
 
 APInt IntegerType::getValue() const {

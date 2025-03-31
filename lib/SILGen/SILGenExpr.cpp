@@ -487,6 +487,16 @@ namespace {
     }
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
+
+    /// Helper method for handling function conversion expr to
+    /// @execution(caller). Returns an empty RValue on failure.
+    RValue emitFunctionCvtToExecutionCaller(FunctionConversionExpr *E,
+                                            SGFContext C);
+    /// Helper method for handling function conversion expr to a global actor
+    /// from an @execution(caller) function.
+    RValue
+    emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
+                                                    SGFContext C);
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
     RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
@@ -1942,9 +1952,159 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
+RValue
+RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
+                                                SGFContext C) {
+  CanAnyFunctionType destType =
+      cast<FunctionType>(e->getType()->getCanonicalType());
+  assert(destType->getIsolation().isNonIsolatedCaller() &&
+         "Should only call this if destType is non isolated caller");
+
+  auto *subExpr = e->getSubExpr();
+  CanAnyFunctionType subExprType =
+      cast<FunctionType>(subExpr->getType()->getCanonicalType());
+
+  // We are pattern matching the following two patterns:
+  //
+  // Swift 6:
+  //
+  // (fn_cvt_expr type="@execution(caller) () async -> ()"
+  //   (fn_cvt_expr type="@execution(caller) @Sendable () async -> ()"
+  //      (declref_expr type="() async -> ()"
+  //
+  // Swift 5:
+  //
+  // (fn_cvt_expr type="@execution(caller) () async -> ()"
+  //   (declref_expr type="() async -> ()"
+  //
+  // The @Sendable in Swift 6 mode is due to us not representing
+  // @execution(caller) or @Sendable in the constraint evaluator.
+  //
+  // The reason why we need to evaluate this especially is that otherwise we
+  // generate multiple
+
+  bool needsSendableConversion = false;
+  if (auto *subCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
+    auto *subSubExpr = subCvt->getSubExpr();
+    CanAnyFunctionType subSubExprType =
+        cast<FunctionType>(subSubExpr->getType()->getCanonicalType());
+
+    if (subExprType->hasExtInfo() && subExprType->getExtInfo().isSendable() &&
+        subSubExprType->hasExtInfo() &&
+        !subExprType->getExtInfo().isSendable() &&
+        subExprType->withSendable(true) == subSubExprType) {
+      subExpr = subSubExpr;
+
+      // We changed our subExpr... so recompute our srcType.
+      subExprType = cast<FunctionType>(subExpr->getType()->getCanonicalType());
+      needsSendableConversion = true;
+    }
+  }
+
+  // Check if the only difference in between our destType and srcType is our
+  // isolation.
+  if (!subExprType->hasExtInfo() || !destType->hasExtInfo() ||
+      destType->withIsolation(subExprType->getIsolation()) != subExprType) {
+    return RValue();
+  }
+
+  // Ok, we know that our underlying types are the same. Lets try to emit.
+  auto *declRef = dyn_cast<DeclRefExpr>(subExpr);
+  if (!declRef)
+    return RValue();
+
+  auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
+  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+    return RValue();
+
+  // Ok, we found our target.
+  SILDeclRef silDeclRef(decl);
+  assert(silDeclRef.getParameterListCount() == 1);
+  auto substType = cast<AnyFunctionType>(destType);
+  auto typeContext = SGF.getFunctionTypeInfo(substType);
+  ManagedValue result = SGF.emitClosureValue(
+      e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
+  if (needsSendableConversion) {
+    auto funcType = cast<SILFunctionType>(result.getType().getASTType());
+    result = SGF.B.createConvertFunction(
+        e, result,
+        SILType::getPrimitiveObjectType(funcType->withSendable(true)));
+  }
+  return RValue(SGF, e, destType, result);
+}
+
+RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
+    FunctionConversionExpr *e, SGFContext C) {
+  // We are pattern matching a conversion sequence like the following:
+  //
+  // (fn_cvt_expr implicit type="@GlobalActor @Sendable () async -> ()
+  //    (fn_cvt_expr implicit type="@execution(caller) @Sendable () async -> ()"
+  //       (declref_expr type="() async -> ()"
+  //
+  // Where the declref referred to by the declref_expr has execution(caller)
+  // attached to it but lacks it in its interface type since we do not put
+  // execution(attr) in interface types when we run the constraint solver but
+  // fix it up later.
+  //
+  // What we want to emit first a direct reference to the caller as an
+  // @execution(caller) function, then we convert it to @execution(caller)
+  // @Sendable. Finally, we thunk @execution(caller) to @GlobalActor. The
+  // thunking is important so that we can ensure that @execution(caller) runs on
+  // that specific @GlobalActor.
+
+  CanAnyFunctionType destType =
+      cast<FunctionType>(e->getType()->getCanonicalType());
+  assert(destType->getIsolation().isGlobalActor() &&
+         "Should only call this if destType is a global actor");
+
+  auto *subCvt = dyn_cast<FunctionConversionExpr>(e->getSubExpr());
+  if (!subCvt)
+    return RValue();
+
+  CanAnyFunctionType subCvtType =
+      cast<FunctionType>(subCvt->getType()->getCanonicalType());
+
+  // Src type should be isNonIsolatedCaller and they should only differ in
+  // isolation.
+  if (!subCvtType->getIsolation().isNonIsolatedCaller() ||
+      subCvtType->withIsolation(destType->getIsolation()) != destType)
+    return RValue();
+
+  // Grab our decl ref/its decl and make sure that our decl is actually caller
+  // isolation inheriting (ignoring what it's interface type is).
+  auto *declRef = dyn_cast<DeclRefExpr>(subCvt->getSubExpr());
+  if (!declRef)
+    return RValue();
+  auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
+  if (!decl || !getActorIsolation(decl).isCallerIsolationInheriting())
+    return RValue();
+
+  // Make sure that subCvt/declRefType only differ by isolation and sendability.
+  CanAnyFunctionType declRefType =
+      cast<FunctionType>(declRef->getType()->getCanonicalType());
+  assert(!declRefType->getIsolation().isNonIsolatedCaller() &&
+         "This should not be represented in interface types");
+  if (declRefType->isSendable() || !subCvtType->isSendable())
+    return RValue();
+
+  // Ok, we found our target.
+  SILDeclRef silDeclRef(decl);
+  assert(silDeclRef.getParameterListCount() == 1);
+  auto substType = cast<AnyFunctionType>(destType);
+  auto typeContext = SGF.getFunctionTypeInfo(substType);
+  ManagedValue result = SGF.emitClosureValue(
+      e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
+  if (!result.getType().isSendable(&SGF.F)) {
+    auto funcType = cast<SILFunctionType>(result.getType().getASTType());
+    result = SGF.B.createConvertFunction(
+        e, result,
+        SILType::getPrimitiveObjectType(funcType->withSendable(true)));
+  }
+  return RValue(SGF, e, destType, result);
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
-                                                  SGFContext C)
-{
+                                                  SGFContext C) {
   CanAnyFunctionType srcType =
       cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
   CanAnyFunctionType destType =
@@ -2039,6 +2199,24 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       }
       return RValue(SGF, e, value);
     }
+  }
+
+  // Check if we are converting a function to an @execution(caller) from a
+  // declref that is also @execution(caller). In such a case, this was a case
+  // that was put in by Sema. We do not need a thunk, but just need to recognize
+  // this case and elide the conversion. The reason why we need to do this is
+  // that otherwise, we put in extra thunks that convert @execution(caller) to
+  // @execution(concurrent) back to @execution(caller). This is done b/c we do
+  // not represent @execution(caller) in interface types, so the actual decl ref
+  // will be viewed as @async () -> ().
+  if (destType->getIsolation().isNonIsolatedCaller()) {
+    if (RValue rv = emitFunctionCvtToExecutionCaller(e, C))
+      return rv;
+  }
+
+  if (destType->getIsolation().isGlobalActor()) {
+    if (RValue rv = emitFunctionCvtFromExecutionCallerToGlobalActor(e, C))
+      return rv;
   }
 
   // Break the conversion into three stages:
