@@ -6277,11 +6277,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // to import all non-public members by default; if that is disabled, we only
   // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
   // are the only classes that need non-public members.)
+  auto *cxxRecordDecl =
+      dyn_cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl());
   auto skipIfNonPublic =
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
-      importer::getPrivateFileIDAttrs(
-          cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()))
-          .empty();
+      cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
