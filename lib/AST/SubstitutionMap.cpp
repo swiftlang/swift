@@ -381,7 +381,7 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
         ProtocolConformanceRef(conformance.getConcrete()->subst(IFS)));
     } else {
       auto origType = req.getFirstType();
-      auto substType = origType.subst(*this, IFS.getOptions());
+      auto substType = origType.subst(*this);
 
       newConformances.push_back(conformance.subst(substType, IFS));
     }
