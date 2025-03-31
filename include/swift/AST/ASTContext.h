@@ -1184,7 +1184,7 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList,
+                           bool isSourceCanImport,
                            llvm::VersionTuple &foundVersion) const;
 
   /// Add successful canImport modules.

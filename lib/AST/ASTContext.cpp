@@ -2674,7 +2674,7 @@ void ASTContext::addSucceededCanImportModule(
 bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
                                      SourceLoc loc, llvm::VersionTuple version,
                                      bool underlyingVersion,
-                                     bool updateFailingList,
+                                     bool isSourceCanImport,
                                      llvm::VersionTuple &foundVersion) const {
   SmallString<64> FullModuleName;
   ModuleName.getString(FullModuleName);
@@ -2692,21 +2692,14 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     if (version.empty())
       return true;
 
-    if (underlyingVersion) {
-      if (!Found->second.UnderlyingVersion.empty())
-        return version <= Found->second.UnderlyingVersion;
-    } else {
-      if (!Found->second.Version.empty())
-        return version <= Found->second.Version;
-    }
-
-    // If the canImport information is coming from the command-line, then no
-    // need to continue the search, return false. For checking modules that are
-    // not passed from command-line, allow fallback to the module loading since
-    // this is not in a canImport request context that has already been resolved
-    // by scanner.
-    if (!SearchPathOpts.CanImportModuleInfo.empty())
-      return false;
+    if (underlyingVersion)
+      return Found->second.UnderlyingVersion.empty()
+                 ? true
+                 : version <= Found->second.UnderlyingVersion;
+    else
+      return Found->second.Version.empty()
+                 ? true
+                 : version <= Found->second.Version;
   }
 
   if (version.empty()) {
@@ -2720,7 +2713,7 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
         return true;
     }
 
-    if (updateFailingList)
+    if (isSourceCanImport)
       FailedModuleImportNames.insert(ModuleNameStr);
 
     return false;

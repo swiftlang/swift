@@ -68,8 +68,8 @@ func canImportVersioned() {
 #endif
 
 #if canImport(Foo, _underlyingVersion: 113.33)
-  // Foo is a Swift module with no underlying clang module.
-  let underlyingMinorSmaller = 1
+  // Foo is an unversioned Swift module with no underlying clang module.
+  let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Foo)
@@ -136,7 +136,7 @@ func canImportVersionedString() {
 #endif
 
 #if canImport(Foo, _underlyingVersion: "113.33")
-  // Foo is a Swift module with no underlying clang module.
-  let underlyingMinorSmaller = 1
+  // Foo is an unversioned Swift module with no underlying clang module.
+  let underlyingMinorSmaller = 1 // expected-warning {{initialization of immutable value 'underlyingMinorSmaller' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }
