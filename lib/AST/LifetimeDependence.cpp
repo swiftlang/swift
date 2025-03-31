@@ -138,16 +138,6 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   }
 }
 
-// Infer the kind of dependence that would be implied by assigning into a stored
-// property of 'sourceType'.
-static LifetimeDependenceKind
-inferLifetimeDependenceKindFromType(Type sourceType) {
-  if (sourceType->isEscapable()) {
-    return LifetimeDependenceKind::Scope;
-  }
-  return LifetimeDependenceKind::Inherit;
-}
-
 // Warning: this is incorrect for Setter 'newValue' parameters. It should only
 // be called for a Setter's 'self'.
 static ValueOwnership getLoweredOwnership(AbstractFunctionDecl *afd) {
@@ -829,15 +819,35 @@ protected:
         return;
       }
     }
-    auto kind = inferLifetimeDependenceKindFromType(selfTypeInContext);
-    auto selfOwnership = afd->getImplicitSelfDecl()->getValueOwnership();
-    if (!isCompatibleWithOwnership(kind, selfTypeInContext, selfOwnership)) {
+    auto kind = inferLifetimeDependenceKind(
+        selfTypeInContext, afd->getImplicitSelfDecl()->getValueOwnership());
+    if (!kind) {
       diagnose(returnLoc,
                diag::lifetime_dependence_cannot_infer_scope_ownership,
                "self", diagnosticQualifier());
       return;
     }
-    pushDeps(createDeps(resultIndex).add(selfIndex, kind));
+    pushDeps(createDeps(resultIndex).add(selfIndex, *kind));
+  }
+
+  std::optional<LifetimeDependenceKind>
+  inferLifetimeDependenceKind(Type sourceType, ValueOwnership ownership) {
+    if (!sourceType->isEscapable()) {
+      return LifetimeDependenceKind::Inherit;
+    }
+    // Lifetime dependence always propagates through temporary BitwiseCopyable
+    // values, even if the dependence is scoped.
+    if (isBitwiseCopyable(sourceType, ctx)) {
+      return LifetimeDependenceKind::Scope;
+    }
+    auto loweredOwnership = ownership != ValueOwnership::Default
+                                ? ownership
+                                : getLoweredOwnership(afd);
+    if (loweredOwnership != ValueOwnership::Shared &&
+        loweredOwnership != ValueOwnership::InOut) {
+      return std::nullopt;
+    }
+    return LifetimeDependenceKind::Scope;
   }
 
   // Infer implicit initialization. The dependence kind can be inferred, similar
@@ -861,16 +871,15 @@ protected:
       if (paramTypeInContext->hasError()) {
         continue;
       }
-      auto kind = inferLifetimeDependenceKindFromType(paramTypeInContext);
-      auto paramOwnership = param->getValueOwnership();
-      if (!isCompatibleWithOwnership(kind, paramTypeInContext, paramOwnership))
-      {
+      auto kind = inferLifetimeDependenceKind(paramTypeInContext,
+                                              param->getValueOwnership());
+      if (!kind) {
         diagnose(returnLoc,
                  diag::lifetime_dependence_cannot_infer_scope_ownership,
                  param->getParameterName().str(), diagnosticQualifier());
         continue;
       }
-      targetDeps = std::move(targetDeps).add(paramIndex, kind);
+      targetDeps = std::move(targetDeps).add(paramIndex, *kind);
     }
     pushDeps(std::move(targetDeps));
   }
@@ -954,9 +963,8 @@ protected:
       }
 
       candidateLifetimeKind =
-        inferLifetimeDependenceKindFromType(paramTypeInContext);
-      if (!isCompatibleWithOwnership(
-            *candidateLifetimeKind, paramTypeInContext, paramOwnership)) {
+          inferLifetimeDependenceKind(paramTypeInContext, paramOwnership);
+      if (!candidateLifetimeKind) {
         continue;
       }
       if (candidateParamIndex) {
@@ -1025,11 +1033,12 @@ protected:
       if (paramTypeInContext->hasError()) {
         return;
       }
-      auto kind = inferLifetimeDependenceKindFromType(paramTypeInContext);
+      auto kind = inferLifetimeDependenceKind(paramTypeInContext,
+                                              param->getValueOwnership());
 
       pushDeps(createDeps(selfIndex)
-               .add(selfIndex, LifetimeDependenceKind::Inherit)
-               .add(newValIdx, kind));
+                   .add(selfIndex, LifetimeDependenceKind::Inherit)
+                   .add(newValIdx, *kind));
       break;
     }
     default:
