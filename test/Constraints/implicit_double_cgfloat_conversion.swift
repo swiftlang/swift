@@ -349,3 +349,15 @@ func test_init_validation() {
     }
   }
 }
+
+func test_ternary_and_nil_coalescing() {
+  func test(_: Double?) {}
+
+  func ternary(v: CGFloat) {
+    test(true ? v : nil) // Ok
+  }
+
+  func test_nil_coalescing(v: CGFloat?) {
+    test(v ?? 0.0) // Ok
+  }
+}
