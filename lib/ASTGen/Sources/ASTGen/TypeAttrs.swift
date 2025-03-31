@@ -142,38 +142,49 @@ extension ASTGenVisitor {
       nameLoc: self.generateSourceLoc(node.attributeName)
     )
   }
-  
+
+  /// E.g.
+  ///   ```
+  ///   @convention(c)
+  ///   @convention(c, cType: "int (*)(int)")
+  ///   ```
   func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
-    // FIXME: This doesn't need custom attribute arguments syntax.
-    // FIXME: Support 'witness_method' argument.
-    guard let args = node.arguments?.as(ConventionAttributeArgumentsSyntax.self) else {
-      // TODO: Diangose.
-      return nil
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let nameAndLoc: (name: _, loc: _)? =  self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        (ctx.allocateCopy(string: $0.rawText.bridged), self.generateSourceLoc($0))
+      }
+      guard let nameAndLoc else {
+        return nil
+      }
+
+      let cTypeNameLoc: BridgedSourceLoc?
+      let cTypeName: BridgedStringRef?
+      if !args.isEmpty {
+        cTypeNameLoc = self.generateSourceLoc(args.first?.expression)
+        cTypeName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "cType")
+        guard cTypeName != nil else {
+          return nil
+        }
+      } else {
+        cTypeNameLoc = nil
+        cTypeName = nil
+      }
+
+      // `@convention(witness_method: <protocol-name>)` is for SIL only.
+      let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        nameLoc: self.generateSourceLoc(node.attributeName),
+        parensRange: self.generateAttrParensRange(attribute: node),
+        name: nameAndLoc.name,
+        nameLoc: nameAndLoc.loc,
+        witnessMethodProtocol: witnessMethodProtocol,
+        clangType: cTypeName ?? BridgedStringRef(),
+        clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
+      )
     }
-    
-    let cTypeName: BridgedStringRef?
-    let cTypeNameLoc: BridgedSourceLoc?
-    if let ctypeString = args.cTypeString {
-      cTypeName = self.generateStringLiteralTextIfNotInterpolated(expr: ctypeString)
-      cTypeNameLoc = cTypeName != nil ? self.generateSourceLoc(ctypeString) : nil
-    } else {
-      cTypeName = nil
-      cTypeNameLoc = nil
-    }
-    
-    let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
-    
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      name: ctx.allocateCopy(string: args.conventionLabel.rawText.bridged),
-      nameLoc: self.generateSourceLoc(args.conventionLabel),
-      witnessMethodProtocol: witnessMethodProtocol,
-      clangType: cTypeName ?? BridgedStringRef(),
-      clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
-    )
   }
 
   func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
@@ -284,35 +295,43 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.
+  ///   ```
+  ///   @_opaqueReturnTypeOf("$sMangledName", 4)
+  ///   ```
   func generateOpaqueReturnTypeOfTypeAttr(attribute node: AttributeSyntax) -> BridgedOpaqueReturnTypeOfTypeAttr? {
-    // FIXME: This doesn't need custom attribute arguments syntax.
-    guard let args = node.arguments?.as(OpaqueReturnTypeOfAttributeArgumentsSyntax.self) else {
-      // TODO: Diagnose
-      fatalError("expected arguments for @_opaqueReturnTypeOfType type attribute")
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let mangledLoc = self.generateSourceLoc(args.first?.expression)
+      let mangledName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+      guard let mangledName else {
+        return nil
+      }
+
+      let indexLoc = self.generateSourceLoc(args.first?.expression)
+      let index: Int? = self.generateConsumingAttrOption(args: &args, label: nil) { expr in
+        guard let intExpr = expr.as(IntegerLiteralExprSyntax.self) else {
+          // TODO: Diagnostics.
+          fatalError("expected integer literal")
+          // return nil
+        }
+        return intExpr.representedLiteralValue
+      }
+      guard let index else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        nameLoc: self.generateSourceLoc(node.attributeName),
+        parensRange: self.generateAttrParensRange(attribute: node),
+        mangled: mangledName,
+        mangledLoc: mangledLoc,
+        index: index,
+        indexLoc: indexLoc
+      )
     }
 
-    let mangledLoc = self.generateSourceLoc(args.mangledName)
-    guard let mangled = self.generateStringLiteralTextIfNotInterpolated(expr: args.mangledName) else {
-      // TODO: Diagnose
-      fatalError("expected string literal for @_opaqueReturnTypeOfType type attribute")
-    }
-    
-    let indexLoc = self.generateSourceLoc(args.ordinal)
-    let index =  Int(args.ordinal.text, radix: 10)
-    guard let index else {
-      // TODO: Diagnose
-      fatalError("expected integer literal for @_opaqueReturnTypeOfType type attribute")
-    }
-
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      mangled: mangled,
-      mangledLoc: mangledLoc,
-      index: index, indexLoc: indexLoc
-    )
   }
   
   func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
