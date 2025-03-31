@@ -39,7 +39,8 @@ class SILResultInfo;
 enum class ParsedLifetimeDependenceKind : uint8_t {
   Default = 0,
   Scope,
-  Inherit // Only used with deserialized decls
+  Inherit, // Only used with deserialized decls
+  Inout
 };
 
 enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
