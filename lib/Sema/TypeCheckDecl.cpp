@@ -3035,29 +3035,33 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 }
 
 bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
-                                         NominalTypeDecl *nominal) {
-  auto nominalGenericArguments = nominal->getDeclaredInterfaceType().getPointer()->getAs<BoundGenericType>()->getGenericArgs();
-  auto typealiasGenericArguments = typealias->getUnderlyingType().getPointer()->getAs<BoundGenericType>()->getGenericArgs();
+                                            NominalTypeDecl *nominal) {
+  auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
+                                     .getPointer()
+                                     ->getAs<BoundGenericType>()
+                                     ->getGenericArgs();
+  auto typealiasGenericArguments = typealias->getUnderlyingType()
+                                       .getPointer()
+                                       ->getAs<BoundGenericType>()
+                                       ->getGenericArgs();
 
-  if (nominalGenericArguments.size() !=typealiasGenericArguments.size()) {
+  if (nominalGenericArguments.size() != typealiasGenericArguments.size()) {
     return false;
   }
 
   bool supportedInferredType = false;
-  for (size_t i=0; i<nominalGenericArguments.size(); i++){
+  for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
-  if(nominalBoundGenericType.getPointer()->getKind() == typealiasBoundGenericType.getPointer()->getKind() )
-    {
-     continue;
+    if (nominalBoundGenericType.getPointer()->getKind() ==
+        typealiasBoundGenericType.getPointer()->getKind()) {
+      continue;
     }
 
-    if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr && dyn_cast<StructType>(typealiasBoundGenericType) != nullptr)
-    {
+    if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr &&
+        dyn_cast<StructType>(typealiasBoundGenericType) != nullptr) {
       supportedInferredType = true;
-    }
-    else
-    {
+    } else {
       supportedInferredType = false;
       break;
     }
@@ -3099,10 +3103,11 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto underlyingType = aliasDecl->getUnderlyingType();
       if (auto extendedNominal = underlyingType->getAnyNominal()) {
-        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal) || TypeChecker::isTypeInferredByTypealias(aliasDecl, extendedNominal)){
+        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal) ||
+            TypeChecker::isTypeInferredByTypealias(aliasDecl,
+                                                   extendedNominal)) {
           return extendedType;
-        }
-        else{
+        } else {
           return extendedNominal->getDeclaredType();
         }
       }

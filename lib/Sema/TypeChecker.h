@@ -361,8 +361,8 @@ Type substMemberTypeWithBase(TypeDecl *member, Type baseTy,
 /// \endcode
 bool isPassThroughTypealias(TypeAliasDecl *typealias, NominalTypeDecl *nominal);
 
-
-bool isTypeInferredByTypealias(TypeAliasDecl *typealias, NominalTypeDecl *nominal);
+bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
+                               NominalTypeDecl *nominal);
 
 /// Determine whether one type is a subtype of another.
 ///
