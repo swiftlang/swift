@@ -49,7 +49,7 @@ internal func _overrideLifetime<
 /// the `source` argument.
 @_unsafeNonescapableResult
 @_transparent
-@lifetime(borrow source)
+@lifetime(&source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -110,7 +110,7 @@ struct MutableSpan<T>: ~Escapable, ~Copyable {
   let base: UnsafeMutablePointer<T>
   let count: Int
 
-  @lifetime(borrow base)
+  @lifetime(&base)
   init(base: UnsafeMutablePointer<T>, count: Int) {
     self.base = base
     self.count = count
@@ -128,7 +128,7 @@ extension Array {
 }
 
 extension Array {
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutableSpan() -> MutableSpan<Element> {
     /* not the real implementation */
     let p = self.withUnsafeMutableBufferPointer { $0.baseAddress! }
@@ -263,7 +263,7 @@ struct MutableView: ~Escapable, ~Copyable {
     self.owner = copy owner // OK
   }
 
-  @lifetime(borrow mutableOwner)
+  @lifetime(&mutableOwner)
   init(mutableOwner: inout AnyObject) {
     // Initialization of a ~Escapable value is unenforced. So we can initialize
     // the `owner` property without locally borrowing `mutableOwner`.
@@ -432,13 +432,13 @@ func testGlobal(local: InnerTrivial) -> Span<Int> {
 // Scoped dependence on mutable values
 // =============================================================================
 
-@lifetime(borrow a)
+@lifetime(&a)
 func testInoutBorrow(a: inout [Int]) -> Span<Int> {
   a.span() // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1{{it depends on this scoped access to variable 'a'}}
 } // expected-note {{this use causes the lifetime-dependent value to escape}}
 
-@lifetime(borrow a)
+@lifetime(&a)
 func testInoutMutableBorrow(a: inout [Int]) -> MutableSpan<Int> {
   a.mutableSpan()
 }
@@ -460,7 +460,7 @@ extension Container {
     View(owner: self.owner) // OK
   }
 
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutableView() -> MutableView {
     // Reading 'self.owner' creates a local borrow scope. This new MutableView
     // depends on a the local borrow scope for 'self.owner', so it cannot be
@@ -469,7 +469,7 @@ extension Container {
     // expected-note @-1{{it depends on this scoped access to variable 'self'}}
   } // expected-note    {{this use causes the lifetime-dependent value to escape}}
 
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutableViewModifiesOwner() -> MutableView {
     // Passing '&self.owner' inout creates a nested exclusive access that must extend to all uses of the new
     // MutableView. This is allowed because the nested access is logically extended to the end of the function (without
@@ -477,7 +477,7 @@ extension Container {
     MutableView(mutableOwner: &self.owner)
   }
 
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutableSpan() -> MutableSpan<T> {
     // Reading 'self.pointer' creates a local borrow scope. The local borrow
     // scope is ignored because 'pointer' is a trivial value. Instead, the new
