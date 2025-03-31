@@ -148,7 +148,7 @@ static bool canSpecializeFunction(SILFunction *F,
   if (F->hasLocation()) {
     if (auto *funcDecl =
             dyn_cast_or_null<FuncDecl>(F->getLocation().getAsDeclContext())) {
-      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement(/*allowRequirement=*/false))
         return false;
     }
   }

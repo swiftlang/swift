@@ -5574,6 +5574,19 @@ public:
       EffectKind kind) const;
   bool hasPolymorphicEffect(EffectKind kind) const;
 
+  /// Returns `true` if this protocol contains requirements which have known
+  /// 'ad-hoc' requirements. For example, the protocol contains an associated
+  /// type which is used to constrain generic types of some of its members.
+  ///
+  /// Currently the only instance of such requirement is
+  /// 'SerializationRequirement' in the 'Distributed' module's protocols.
+  bool hasMembersWithAdHocRequirements() const {
+    return isSpecificProtocol(KnownProtocolKind::DistributedActorSystem) ||
+        isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder) ||
+        isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder) ||
+        isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler);
+  }
+
   /// Determine whether this is a "marker" protocol, meaning that is indicates
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
@@ -7978,7 +7991,7 @@ public:
   /// Determines whether this function is a 'remoteCall' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.
-  bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
+  bool isDistributedActorSystemRemoteCall(bool isVoidReturn, bool allowRequirement) const;
 
   /// Determines whether this function is a 'makeInvocationEncoder' function,
   /// which is used as ad-hoc protocol requirement by the
@@ -7988,42 +8001,42 @@ public:
   /// Determines if this function is a 'recordGenericSubstitution' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedTargetInvocationEncoder' protocol.
-  bool isDistributedTargetInvocationEncoderRecordGenericSubstitution() const;
+  bool isDistributedTargetInvocationEncoderRecordGenericSubstitution(bool allowRequirement) const;
 
   /// Determines if this function is a 'recordArgument' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedTargetInvocationEncoder' protocol.
-  bool isDistributedTargetInvocationEncoderRecordArgument() const;
+  bool isDistributedTargetInvocationEncoderRecordArgument(bool allowRequirement) const;
 
   /// Determines if this function is a 'recordReturnType' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedTargetInvocationEncoder' protocol.
-  bool isDistributedTargetInvocationEncoderRecordReturnType() const;
+  bool isDistributedTargetInvocationEncoderRecordReturnType(bool allowRequirement) const;
 
   /// Determines if this function is a 'recordErrorType' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedTargetInvocationEncoder' protocol.
-  bool isDistributedTargetInvocationEncoderRecordErrorType() const;
+  bool isDistributedTargetInvocationEncoderRecordErrorType(bool allowRequirement) const;
 
   /// Determines if this function is a 'decodeNextArgument' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedTargetInvocationDecoder' protocol.
-  bool isDistributedTargetInvocationDecoderDecodeNextArgument() const;
+  bool isDistributedTargetInvocationDecoderDecodeNextArgument(bool allowRequirement) const;
 
   /// Determines if this function is a 'onReturn' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedTargetInvocationResultHandler' protocol.
-  bool isDistributedTargetInvocationResultHandlerOnReturn() const;
+  bool isDistributedTargetInvocationResultHandlerOnReturn(bool allowRequirement) const;
 
   /// Determines whether this declaration is a witness to a
   /// protocol requirement with ad-hoc `SerializationRequirement`
   /// conformance.
-  bool isDistributedWitnessWithAdHocSerializationRequirement() const {
-    return isDistributedActorSystemRemoteCall(/*isVoidResult=*/false) ||
-           isDistributedTargetInvocationEncoderRecordArgument() ||
-           isDistributedTargetInvocationEncoderRecordReturnType() ||
-           isDistributedTargetInvocationDecoderDecodeNextArgument() ||
-           isDistributedTargetInvocationResultHandlerOnReturn();
+  bool isDistributedWitnessWithAdHocSerializationRequirement(bool allowRequirement) const {
+    return isDistributedActorSystemRemoteCall(/*isVoidResult=*/false, allowRequirement) ||
+           isDistributedTargetInvocationEncoderRecordArgument(allowRequirement) ||
+           isDistributedTargetInvocationEncoderRecordReturnType(allowRequirement) ||
+           isDistributedTargetInvocationDecoderDecodeNextArgument(allowRequirement) ||
+           isDistributedTargetInvocationResultHandlerOnReturn(allowRequirement);
   }
 
   /// For a method of a class, checks whether it will require a new entry in the

@@ -106,7 +106,7 @@ GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
 
   return findDistributedAdHocRequirement(
       decl, callId, [isVoidReturn](AbstractFunctionDecl *func) {
-        return func->isDistributedActorSystemRemoteCall(isVoidReturn);
+        return func->isDistributedActorSystemRemoteCall(isVoidReturn, /*allowRequirement=*/true);
       });
 }
 
@@ -117,7 +117,7 @@ GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest::evaluate(
 
   return findDistributedAdHocRequirement(
       decl, C.Id_recordArgument, [](AbstractFunctionDecl *func) {
-        return func->isDistributedTargetInvocationEncoderRecordArgument();
+        return func->isDistributedTargetInvocationEncoderRecordArgument(/*allowRequirement=*/true);
       });
 }
 
@@ -128,7 +128,7 @@ GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest::evaluate(
 
   return findDistributedAdHocRequirement(
       decl, C.Id_recordReturnType, [](AbstractFunctionDecl *func) {
-        return func->isDistributedTargetInvocationEncoderRecordReturnType();
+        return func->isDistributedTargetInvocationEncoderRecordReturnType(/*allowRequirement=*/true);
       });
 }
 
@@ -138,7 +138,7 @@ GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest::evaluate(
   auto &C = decl->getASTContext();
   return findDistributedAdHocRequirement(
       decl, C.Id_recordErrorType, [](AbstractFunctionDecl *func) {
-        return func->isDistributedTargetInvocationEncoderRecordErrorType();
+        return func->isDistributedTargetInvocationEncoderRecordErrorType(/*allowRequirement=*/true);
       });
 }
 
@@ -148,7 +148,7 @@ GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest::evaluate
   auto &C = decl->getASTContext();
   return findDistributedAdHocRequirement(
       decl, C.Id_decodeNextArgument, [](AbstractFunctionDecl *func) {
-        return func->isDistributedTargetInvocationDecoderDecodeNextArgument();
+        return func->isDistributedTargetInvocationDecoderDecodeNextArgument(/*allowRequirement*/true);
       });
 }
 
@@ -158,7 +158,7 @@ GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest::evaluate(
   auto &C = decl->getASTContext();
   return findDistributedAdHocRequirement(
       decl, C.Id_onReturn, [](AbstractFunctionDecl *func) {
-        return func->isDistributedTargetInvocationResultHandlerOnReturn();
+        return func->isDistributedTargetInvocationResultHandlerOnReturn(/*allowRequirement=*/true);
       });
 }
 

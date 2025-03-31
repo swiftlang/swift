@@ -503,7 +503,7 @@ public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
 }
 
 @available(SwiftStdlib 5.7, *)
-public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandler {
+public class FakeRoundtripResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
 
   let storeReturn: (any Any) -> Void
