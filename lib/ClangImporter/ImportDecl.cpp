@@ -9046,6 +9046,8 @@ public:
   clang::ASTContext &ctx;
   llvm::raw_ostream &out;
   bool firstParam = true;
+  llvm::StringMap<std::string> typeMapping;
+
   SwiftifyInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
       : ctx(ctx), out(out) {
     out << "@_SwiftifyImport(";
@@ -9091,14 +9093,24 @@ public:
     out << ")";
   }
 
-  void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
+  bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {
+    const auto *decl = clangType->getAsTagDecl();
+    if (decl && decl->isInStdNamespace() && decl->getName() == "span") {
+      typeMapping.insert(std::make_pair(
+          swiftType->getString(), swiftType->getDesugaredType()->getString()));
+      return true;
+    }
+    return false;
+  }
+
+  void printTypeMapping() {
     printSeparator();
     out << "typeMappings: [";
-    if (mapping.empty()) {
+    if (typeMapping.empty()) {
       out << ":]";
       return;
     }
-    llvm::interleaveComma(mapping, out, [&](const auto &entry) {
+    llvm::interleaveComma(typeMapping, out, [&](const auto &entry) {
       out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
     });
     out << "]";
@@ -9140,21 +9152,9 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   bool attachMacro = false;
   {
     llvm::raw_svector_ostream out(MacroString);
-    llvm::StringMap<std::string> typeMapping;
 
-    auto registerStdSpanTypeMapping =
-        [&typeMapping](Type swiftType, const clang::QualType clangType) {
-          const auto *decl = clangType->getAsTagDecl();
-          if (decl && decl->isInStdNamespace() && decl->getName() == "span") {
-            typeMapping.insert(
-                std::make_pair(swiftType->getString(),
-                               swiftType->getDesugaredType()->getString()));
-            return true;
-          }
-          return false;
-        };
     SwiftifyInfoPrinter printer(getClangASTContext(), out);
-    bool returnIsStdSpan = registerStdSpanTypeMapping(
+    bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         MappedDecl->getResultInterfaceType(), ClangDecl->getReturnType());
     if (auto CAT =
             ClangDecl->getReturnType()->getAs<clang::CountAttributedType>()) {
@@ -9176,7 +9176,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
         printer.printCountedBy(CAT, index);
         attachMacro = paramHasBoundsInfo = true;
       }
-      bool paramIsStdSpan = registerStdSpanTypeMapping(
+      bool paramIsStdSpan = printer.registerStdSpanTypeMapping(
           swiftParam->getInterfaceType(), clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
 
@@ -9197,7 +9197,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
     }
     if (returnIsStdSpan && returnHasLifetimeInfo)
       attachMacro = true;
-    printer.printTypeMapping(typeMapping);
+    printer.printTypeMapping();
   }
 
   if (attachMacro)
