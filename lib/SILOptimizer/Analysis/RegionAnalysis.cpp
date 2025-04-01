@@ -2539,11 +2539,16 @@ public:
     auto trackableDest = tryToTrackValue(dest);
     if (!trackableDest)
       return;
+
+    if (requireOperands)
+      builder.addRequire(trackableDest->getRepresentative().getValue());
+
     for (Operand *op : srcCollection) {
+      // If we have a trackable src, we need to require both if asked to and
+      // then merge the dest/src.
       if (auto trackableSrc = tryToTrackValue(op->get())) {
         if (requireOperands) {
           builder.addRequire(trackableSrc->getRepresentative().getValue());
-          builder.addRequire(trackableDest->getRepresentative().getValue());
         }
         builder.addMerge(trackableDest->getRepresentative().getValue(), op);
       }
@@ -2565,11 +2570,14 @@ public:
     auto trackableDest = tryToTrackValue(array.front().get());
     if (!trackableDest)
       return;
+
+    if (requireOperands)
+      builder.addRequire(trackableDest->getRepresentative().getValue());
+
     for (Operand &op : array.drop_front()) {
       if (auto trackableSrc = tryToTrackValue(op.get())) {
         if (requireOperands) {
           builder.addRequire(trackableSrc->getRepresentative().getValue());
-          builder.addRequire(trackableDest->getRepresentative().getValue());
         }
         builder.addMerge(trackableDest->getRepresentative().getValue(), &op);
       }
