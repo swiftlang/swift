@@ -2534,27 +2534,17 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
 
 // MARK: C++ foreign reference type constructors
 
-clang::CXXMethodDecl *
+llvm::SmallVector<clang::CXXMethodDecl *, 4>
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     const clang::CXXRecordDecl *cxxRecordDecl) {
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
   clang::Sema &clangSema = ImporterImpl.getClangSema();
-  clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
 
   clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
+  clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
 
-  // Todo: synthesize static factories for all available ctors
-  clang::CXXConstructorDecl *selectedCtorDecl = nullptr;
-  for (clang::CXXConstructorDecl *ctor : cxxRecordDecl->ctors()) {
-    if (!ctor->isDeleted() && ctor->getAccess() != clang::AS_private &&
-        ctor->getAccess() != clang::AS_protected) {
-      selectedCtorDecl = ctor;
-      break;
-    }
-  }
-  if (!selectedCtorDecl)
-    return nullptr;
+  llvm::SmallVector<clang::CXXMethodDecl *, 4> synthesizedFactories;
 
   clang::FunctionDecl *operatorNew = nullptr;
   clang::FunctionDecl *operatorDelete = nullptr;
@@ -2566,7 +2556,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   if (findingAllocFuncFailed || !operatorNew || operatorNew->isDeleted() ||
       operatorNew->getAccess() == clang::AS_private ||
       operatorNew->getAccess() == clang::AS_protected)
-    return nullptr;
+    return synthesizedFactories;
 
   clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
   // Adding `_Nonnull` to the return type of synthesized static factory
@@ -2579,113 +2569,132 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
          "static factory's return type");
 
   clang::IdentifierTable &clangIdents = clangCtx.Idents;
-  clang::IdentifierInfo *funcNameToSynthesize = &clangIdents.get(
-      ("__returns_" + cxxRecordDecl->getNameAsString()).c_str());
 
-  llvm::SmallVector<clang::QualType, 4> paramTypes;
-  for (const auto *param : selectedCtorDecl->parameters())
-    paramTypes.push_back(param->getType());
-  clang::FunctionProtoType::ExtProtoInfo EPI;
-  clang::QualType funcTypeToSynthesize =
-      clangCtx.getFunctionType(cxxRecordPtrTy, paramTypes, EPI);
+  for (clang::CXXConstructorDecl *selectedCtorDecl : cxxRecordDecl->ctors()) {
+    if (selectedCtorDecl->isDeleted() ||
+        selectedCtorDecl->getAccess() == clang::AS_private ||
+        selectedCtorDecl->getAccess() == clang::AS_protected ||
+        selectedCtorDecl->isCopyOrMoveConstructor())
+      continue;
 
-  clang::CXXMethodDecl *synthesizedCxxMethodDecl = clang::CXXMethodDecl::Create(
-      clangCtx, const_cast<clang::CXXRecordDecl *>(cxxRecordDecl),
-      cxxRecordDeclLoc,
-      clang::DeclarationNameInfo(funcNameToSynthesize, cxxRecordDeclLoc),
-      funcTypeToSynthesize,
-      clangCtx.getTrivialTypeSourceInfo(funcTypeToSynthesize), clang::SC_Static,
-      /*UsesFPIntrin=*/false, /*isInline=*/true,
-      clang::ConstexprSpecKind::Unspecified, cxxRecordDeclLoc);
-  synthesizedCxxMethodDecl->setAccess(clang::AccessSpecifier::AS_public);
+    unsigned int ctorParamCount = selectedCtorDecl->getNumParams();
+    std::string funcName = "__returns_" + cxxRecordDecl->getNameAsString();
+    if (ctorParamCount > 0)
+      funcName += "_" + std::to_string(ctorParamCount) + "_params";
+    clang::IdentifierInfo *funcNameToSynthesize = &clangIdents.get(funcName);
 
-  llvm::SmallVector<clang::ParmVarDecl *, 4> synthesizedParams;
-  for (unsigned int i = 0; i < selectedCtorDecl->getNumParams(); ++i) {
-    auto *origParam = selectedCtorDecl->getParamDecl(i);
-    auto *param = clang::ParmVarDecl::Create(
-        clangCtx, synthesizedCxxMethodDecl, cxxRecordDeclLoc, cxxRecordDeclLoc,
-        origParam->getIdentifier(), origParam->getType(),
-        clangCtx.getTrivialTypeSourceInfo(origParam->getType()), clang::SC_None,
-        nullptr);
-    synthesizedParams.push_back(param);
-  }
-  synthesizedCxxMethodDecl->setParams(synthesizedParams);
+    llvm::SmallVector<clang::QualType, 4> paramTypes;
+    for (const auto *param : selectedCtorDecl->parameters())
+      paramTypes.push_back(param->getType());
+    clang::FunctionProtoType::ExtProtoInfo EPI;
+    clang::QualType funcTypeToSynthesize =
+        clangCtx.getFunctionType(cxxRecordPtrTy, paramTypes, EPI);
 
-  if (!hasImmortalAttrs(cxxRecordDecl)) {
-    clang::SwiftAttrAttr *returnsRetainedAttrForSynthesizedCxxMethodDecl =
-        clang::SwiftAttrAttr::Create(clangCtx, "returns_retained");
+    clang::CXXMethodDecl *synthesizedCxxMethodDecl =
+        clang::CXXMethodDecl::Create(
+            clangCtx, const_cast<clang::CXXRecordDecl *>(cxxRecordDecl),
+            cxxRecordDeclLoc,
+            clang::DeclarationNameInfo(funcNameToSynthesize, cxxRecordDeclLoc),
+            funcTypeToSynthesize,
+            clangCtx.getTrivialTypeSourceInfo(funcTypeToSynthesize),
+            clang::SC_Static, /*UsesFPIntrin=*/false, /*isInline=*/true,
+            clang::ConstexprSpecKind::Unspecified, cxxRecordDeclLoc);
+    assert(
+        synthesizedCxxMethodDecl &&
+        "Unable to synthesize static factory for c++ foreign reference type");
+    synthesizedCxxMethodDecl->setAccess(clang::AccessSpecifier::AS_public);
+
+    llvm::SmallVector<clang::ParmVarDecl *, 4> synthesizedParams;
+    for (unsigned int i = 0; i < ctorParamCount; ++i) {
+      auto *origParam = selectedCtorDecl->getParamDecl(i);
+      auto *param = clang::ParmVarDecl::Create(
+          clangCtx, synthesizedCxxMethodDecl, cxxRecordDeclLoc,
+          cxxRecordDeclLoc, origParam->getIdentifier(), origParam->getType(),
+          clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
+          clang::SC_None, nullptr);
+      synthesizedParams.push_back(param);
+    }
+    synthesizedCxxMethodDecl->setParams(synthesizedParams);
+
+    if (!hasImmortalAttrs(cxxRecordDecl)) {
+      clang::SwiftAttrAttr *returnsRetainedAttrForSynthesizedCxxMethodDecl =
+          clang::SwiftAttrAttr::Create(clangCtx, "returns_retained");
+      synthesizedCxxMethodDecl->addAttr(
+          returnsRetainedAttrForSynthesizedCxxMethodDecl);
+    }
+
+    std::string swiftInitStr = "init(";
+    for (unsigned i = 0; i < ctorParamCount; ++i) {
+      swiftInitStr += "_:";
+    }
+    swiftInitStr += ")";
+    clang::SwiftNameAttr *swiftNameAttr =
+        clang::SwiftNameAttr::Create(clangCtx, swiftInitStr);
+    synthesizedCxxMethodDecl->addAttr(swiftNameAttr);
+
+    llvm::SmallVector<clang::Expr *, 8> ctorArgs;
+    for (auto *param : synthesizedParams) {
+      ctorArgs.push_back(clang::DeclRefExpr::Create(
+          clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+          param,
+          /*RefersToEnclosingVariableOrCapture=*/false, clang::SourceLocation(),
+          param->getType(), clang::VK_LValue));
+    }
+    llvm::SmallVector<clang::Expr *, 8> ctorArgsToAdd;
+    if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
+                                          ctorArgs, cxxRecordDeclLoc,
+                                          ctorArgsToAdd))
+      continue;
+
+    clang::ExprResult synthesizedConstructExprResult =
+        clangSema.BuildCXXConstructExpr(
+            cxxRecordDeclLoc, cxxRecordTy, selectedCtorDecl,
+            /*Elidable=*/false, ctorArgsToAdd,
+            /*HadMultipleCandidates=*/false,
+            /*IsListInitialization=*/false,
+            /*IsStdInitListInitialization=*/false,
+            /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
+            clang::SourceRange(cxxRecordDeclLoc, cxxRecordDeclLoc));
+    assert(!synthesizedConstructExprResult.isInvalid() &&
+           "Unable to synthesize constructor expression for c++ foreign "
+           "reference type");
+    clang::Expr *synthesizedConstructExpr =
+        synthesizedConstructExprResult.get();
+
+    clang::ExprResult synthesizedNewExprResult = clangSema.BuildCXXNew(
+        clang::SourceRange(), /*UseGlobal=*/false, clang::SourceLocation(), {},
+        clang::SourceLocation(), clang::SourceRange(), cxxRecordTy,
+        clangCtx.getTrivialTypeSourceInfo(cxxRecordTy), std::nullopt,
+        clang::SourceRange(cxxRecordDeclLoc, cxxRecordDeclLoc),
+        synthesizedConstructExpr);
+    assert(
+        !synthesizedNewExprResult.isInvalid() &&
+        "Unable to synthesize `new` expression for c++ foreign reference type");
+    clang::CXXNewExpr *synthesizedNewExpr =
+        cast<clang::CXXNewExpr>(synthesizedNewExprResult.get());
+
+    clang::ReturnStmt *synthesizedRetStmt = clang::ReturnStmt::Create(
+        clangCtx, cxxRecordDeclLoc, synthesizedNewExpr, nullptr);
+    assert(synthesizedRetStmt &&
+           "Unable to synthesize return statement for "
+           "static factory of c++ foreign reference type");
+
+    clang::CompoundStmt *synthesizedFuncBody = clang::CompoundStmt::Create(
+        clangCtx, {synthesizedRetStmt}, clang::FPOptionsOverride(),
+        cxxRecordDeclLoc, cxxRecordDeclLoc);
+    assert(synthesizedRetStmt &&
+           "Unable to synthesize function body for static "
+           "factory of c++ foreign reference type");
+
+    synthesizedCxxMethodDecl->setBody(synthesizedFuncBody);
     synthesizedCxxMethodDecl->addAttr(
-        returnsRetainedAttrForSynthesizedCxxMethodDecl);
+        clang::NoDebugAttr::CreateImplicit(clangCtx));
+
+    synthesizedCxxMethodDecl->setImplicit();
+    synthesizedCxxMethodDecl->setImplicitlyInline();
+
+    synthesizedFactories.push_back(synthesizedCxxMethodDecl);
   }
 
-  std::string swiftInitSig = "init(";
-  bool first = true;
-  for (auto *param : selectedCtorDecl->parameters()) {
-    if (!first)
-      swiftInitSig += ":_";
-    swiftInitSig += ")";
-    first = false;
-  }
-  clang::SwiftNameAttr *swiftNameAttr =
-      clang::SwiftNameAttr::Create(clangCtx, swiftInitSig);
-  synthesizedCxxMethodDecl->addAttr(swiftNameAttr);
-
-  llvm::SmallVector<clang::Expr *, 8> ctorArgs;
-  for (auto *param : synthesizedParams) {
-    ctorArgs.push_back(clang::DeclRefExpr::Create(
-        clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
-        param,
-        /*RefersToEnclosingVariableOrCapture=*/false, clang::SourceLocation(),
-        param->getType(), clang::VK_LValue));
-  }
-
-  llvm::SmallVector<clang::Expr *, 8> convertedCtorArgs;
-  if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy, ctorArgs,
-                                        cxxRecordDeclLoc, convertedCtorArgs))
-    return nullptr;
-
-  clang::ExprResult synthesizedConstructExprResult =
-      clangSema.BuildCXXConstructExpr(
-          cxxRecordDeclLoc, cxxRecordTy, selectedCtorDecl,
-          /*Elidable=*/false, convertedCtorArgs,
-          /*HadMultipleCandidates=*/false,
-          /*IsListInitialization=*/false,
-          /*IsStdInitListInitialization=*/false,
-          /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
-          clang::SourceRange(cxxRecordDeclLoc, cxxRecordDeclLoc));
-  assert(!synthesizedConstructExprResult.isInvalid() &&
-         "Unable to synthesize constructor expression for c++ foreign "
-         "reference type");
-  clang::Expr *synthesizedConstructExpr = synthesizedConstructExprResult.get();
-
-  clang::ExprResult synthesizedNewExprResult = clangSema.BuildCXXNew(
-      clang::SourceRange(), /*UseGlobal=*/false, clang::SourceLocation(), {},
-      clang::SourceLocation(), clang::SourceRange(), cxxRecordTy,
-      clangCtx.getTrivialTypeSourceInfo(cxxRecordTy), std::nullopt,
-      clang::SourceRange(cxxRecordDeclLoc, cxxRecordDeclLoc),
-      synthesizedConstructExpr);
-  assert(
-      !synthesizedNewExprResult.isInvalid() &&
-      "Unable to synthesize `new` expression for c++ foreign reference type");
-  clang::CXXNewExpr *synthesizedNewExpr =
-      cast<clang::CXXNewExpr>(synthesizedNewExprResult.get());
-
-  clang::ReturnStmt *synthesizedRetStmt = clang::ReturnStmt::Create(
-      clangCtx, cxxRecordDeclLoc, synthesizedNewExpr, nullptr);
-  assert(synthesizedRetStmt && "Unable to synthesize return statement for "
-                               "static factory of c++ foreign reference type");
-  clang::CompoundStmt *synthesizedFuncBody = clang::CompoundStmt::Create(
-      clangCtx, {synthesizedRetStmt}, clang::FPOptionsOverride(),
-      cxxRecordDeclLoc, cxxRecordDeclLoc);
-  assert(synthesizedRetStmt && "Unable to synthesize function body for static "
-                               "factory of c++ foreign reference type");
-
-  synthesizedCxxMethodDecl->setBody(synthesizedFuncBody);
-  synthesizedCxxMethodDecl->addAttr(
-      clang::NoDebugAttr::CreateImplicit(clangCtx));
-
-  synthesizedCxxMethodDecl->setImplicit();
-  synthesizedCxxMethodDecl->setImplicitlyInline();
-
-  return synthesizedCxxMethodDecl;
+  return synthesizedFactories;
 }
