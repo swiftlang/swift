@@ -1886,7 +1886,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
       // to be folded, if needed.
       if (auto *floatLit = dyn_cast<FloatLiteralInst>(inst)) {
         APFloat fpVal = floatLit->getValue();
-        if (EnableDiagnostics && fpVal.isInfinity()) {
+        if (EnableDiagnostics && fpVal.isInfinity() &&
+            floatLit->getLoc().getAsASTNode<FloatLiteralExpr>()) {
           SmallString<10> litStr;
           tryExtractLiteralText(floatLit, litStr);
           diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
