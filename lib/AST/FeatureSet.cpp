@@ -403,6 +403,7 @@ UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(CXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
