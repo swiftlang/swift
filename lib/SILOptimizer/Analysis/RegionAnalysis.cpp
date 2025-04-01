@@ -874,11 +874,13 @@ RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
 
   // If we have an object base...
   if (base->getType().isObject()) {
-    // ... we purposely recurse into the cached version of our computation
-    // rather than recurse into getUnderlyingTrackedObjectValueHelper. This is
-    // safe since we know that value was previously an address so if our base is
-    // an object, it cannot be the same object.
-    return UnderlyingTrackedValueInfo(getUnderlyingTrackedValue(base).value);
+    // Recurse.
+    //
+    // NOTE: We purposely recurse into getUnderlyingTrackedValueHelper instead
+    // of getUnderlyingTrackedValue since we could cause an invalidation to
+    // occur in the underlying DenseMap that backs getUnderlyingTrackedValue()
+    // if we insert another entry into the DenseMap.
+    return UnderlyingTrackedValueInfo(getUnderlyingTrackedValueHelper(base));
   }
 
   // Otherwise, we return the actorIsolation that our visitor found.
