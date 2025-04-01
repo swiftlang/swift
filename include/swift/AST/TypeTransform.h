@@ -20,6 +20,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/LifetimeDependence.h"
 
 namespace swift {
 
@@ -333,11 +334,37 @@ case TypeKind::Id:
         transErrorResult = result;
       }
 
-      if (!changed) return t;
+      if (!changed) {
+        return t;
+      }
+      
+      // Lifetime dependencies get eliminated if their target type was
+      // substituted with an escapable type.
+      auto extInfo = fnTy->getExtInfo();
+      if (!extInfo.getLifetimeDependencies().empty()) {
+        SmallVector<LifetimeDependenceInfo, 2> substDependenceInfos;
+        bool didRemoveLifetimeDependencies
+          = filterEscapableLifetimeDependencies(GenericSignature(),
+                                              extInfo.getLifetimeDependencies(),
+                                              substDependenceInfos,
+                                              [&](unsigned targetIndex) {
+            if (targetIndex >= transInterfaceParams.size()) {
+              // Target is a return type.
+              return transInterfaceResults[targetIndex - transInterfaceParams.size()]
+                .getInterfaceType();
+            } else {
+              // Target is a parameter.
+              return transInterfaceParams[targetIndex].getInterfaceType();
+            }
+          });
+        if (didRemoveLifetimeDependencies) {
+          extInfo = extInfo.withLifetimeDependencies(substDependenceInfos);
+        }
+      }
 
       return SILFunctionType::get(
           fnTy->getInvocationGenericSignature(),
-          fnTy->getExtInfo(),
+          extInfo,
           fnTy->getCoroutineKind(),
           fnTy->getCalleeConvention(),
           transInterfaceParams,
@@ -809,7 +836,7 @@ case TypeKind::Id:
       }
 
       // Transform result type.
-      auto resultTy = doIt(function->getResult(), pos);
+      Type resultTy = doIt(function->getResult(), pos);
       if (!resultTy)
         return Type();
 
@@ -876,8 +903,45 @@ case TypeKind::Id:
         return GenericFunctionType::get(
             genericSig, substParams, resultTy, extInfo);
       }
+      
+      if (isUnchanged) {
+        return t;
+      }
 
-      if (isUnchanged) return t;
+      // Substitution may have replaced parameter or return types that had
+      // lifetime dependencies with Escapable types, which render those
+      // dependencies inactive.
+      if (extInfo && !extInfo->getLifetimeDependencies().empty()) {
+        SmallVector<LifetimeDependenceInfo, 2> substDependenceInfos;
+        bool didRemoveLifetimeDependencies
+          = filterEscapableLifetimeDependencies(GenericSignature(),
+                                                extInfo->getLifetimeDependencies(),
+                                                substDependenceInfos,
+                                                [&](unsigned targetIndex) {
+            // Traverse potentially-curried function types.
+            ArrayRef<AnyFunctionType::Param> params = substParams;
+            auto result = resultTy;
+            while (targetIndex >= params.size()) {
+              if (auto curriedTy = result->getAs<AnyFunctionType>()) {
+                targetIndex -= params.size();
+                params = curriedTy->getParams();
+                result = curriedTy->getResult();
+                continue;
+              } else {
+                // The last lifetime dependency targets the result at the end
+                // of the curried chain.
+                ASSERT(targetIndex == params.size()
+                       && "invalid lifetime dependence target");
+                return result;
+              }
+            }
+            return params[targetIndex].getParameterType();
+          });
+
+        if (didRemoveLifetimeDependencies) {
+          extInfo = extInfo->withLifetimeDependencies(substDependenceInfos);
+        }
+      }
 
       return FunctionType::get(substParams, resultTy, extInfo);
     }
