@@ -30,9 +30,6 @@
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
-// REQUIRES: rdar121923818
-// REQUIRES: swift_feature_Embedded
-
 @_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
