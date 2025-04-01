@@ -2331,6 +2331,9 @@ namespace {
     resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr,
                                       TypeResolutionOptions options);
     NeverNullType
+    resolveConstValueTypeRepr(ConstValueTypeRepr *repr,
+                              TypeResolutionOptions options);
+    NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
     NeverNullType resolveIntegerTypeRepr(IntegerTypeRepr *repr,
@@ -2756,6 +2759,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::CompileTimeLiteral:
       return resolveCompileTimeLiteralTypeRepr(cast<CompileTimeLiteralTypeRepr>(repr),
                                                options);
+  case TypeReprKind::ConstValue:
+      return resolveConstValueTypeRepr(cast<ConstValueTypeRepr>(repr), options);
   case TypeReprKind::UnqualifiedIdent:
   case TypeReprKind::QualifiedIdent: {
       return resolveDeclRefTypeRepr(cast<DeclRefTypeRepr>(repr), options);
@@ -3831,6 +3836,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     bool isolated = false;
     bool compileTimeLiteral = false;
     bool isSending = false;
+    bool isConstVal = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -3849,6 +3855,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeLiteral:
           compileTimeLiteral = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::ConstValue:
+          isConstVal = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3958,7 +3968,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeLiteral, isSending, addressable);
+        isolated, noDerivative, compileTimeLiteral, isSending, addressable,
+        isConstVal);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -5268,6 +5279,12 @@ TypeResolver::resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr
   // TODO: more diagnostics
   return resolveType(repr->getBase(), options);
 }
+NeverNullType
+TypeResolver::resolveConstValueTypeRepr(ConstValueTypeRepr *repr,
+                                        TypeResolutionOptions options) {
+  // TODO: more diagnostics
+  return resolveType(repr->getBase(), options);
+}
 
 NeverNullType
 TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
@@ -6369,6 +6386,7 @@ private:
     case TypeReprKind::Sending:
     case TypeReprKind::Placeholder:
     case TypeReprKind::CompileTimeLiteral:
+    case TypeReprKind::ConstValue:
     case TypeReprKind::Vararg:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:

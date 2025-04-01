@@ -731,7 +731,7 @@ extension Task where Failure == Never {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -900,7 +900,7 @@ self._task = task
   #if $BuiltinCreateAsyncTaskName
   if let name {
     task =
-      name.utf8CString.withUnsafeBufferPointer { nameBytes in
+      unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
         Builtin.createTask(
           flags: flags,
           initialSerialExecutor: builtinSerialExecutor,
@@ -1041,7 +1041,7 @@ extension Task where Failure == Never {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -1183,7 +1183,7 @@ extension Task where Failure == Error {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,

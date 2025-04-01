@@ -93,7 +93,7 @@ extension _Deque: Sequence {
   }
 
   __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
-    ContiguousArray(unsafeUninitializedCapacity: _storage.count) { target, count in
+    unsafe ContiguousArray(unsafeUninitializedCapacity: _storage.count) { target, count in
       unsafe _storage.read { source in
         let segments = unsafe source.segments()
         let c = unsafe segments.first.count

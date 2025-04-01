@@ -54,7 +54,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @inline(__always)
   @lifetime(immortal)
   internal init() {
-    _pointer = nil
+    unsafe _pointer = nil
     _count = 0
   }
 
@@ -79,7 +79,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
     _unchecked pointer: UnsafeRawPointer?,
     byteCount: Int
   ) {
-    _pointer = unsafe pointer
+    unsafe _pointer = pointer
     _count = byteCount
   }
 }
@@ -316,7 +316,7 @@ extension RawSpan {
   public init<Element: BitwiseCopyable>(
     _elements span: Span<Element>
   ) {
-    let pointer = span._pointer
+    let pointer = unsafe span._pointer
     let rawSpan = unsafe RawSpan(
       _unchecked: pointer,
       byteCount: span.count == 1 ? MemoryLayout<Element>.size
@@ -491,7 +491,7 @@ extension RawSpan {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let _pointer, byteCount > 0 else {
+    guard let _pointer = unsafe _pointer, byteCount > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     return try unsafe body(.init(start: _pointer, count: byteCount))
@@ -666,7 +666,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
-    guard let spanStart = other._pointer, _count > 0 else {
+    guard let spanStart = unsafe other._pointer, _count > 0 else {
       return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
     let start = unsafe _start()

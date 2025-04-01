@@ -278,7 +278,7 @@ extension String {
     @_effects(readonly) @_semantics("string.getUTF8CString")
     get {
       if _fastPath(_guts.isFastUTF8) {
-        var result = unsafe _guts.withFastCChar { ContiguousArray($0) }
+        var result = unsafe _guts.withFastCChar { unsafe ContiguousArray($0) }
         result.append(0)
         return result
       }

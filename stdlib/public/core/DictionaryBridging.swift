@@ -71,9 +71,9 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Key.self))
     _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = base
-    self.bridgedKeys = nil
-    self.nextBucket = unsafe base.hashTable.startBucket
-    self.endBucket = unsafe base.hashTable.endBucket
+    unsafe self.bridgedKeys = nil
+    unsafe self.nextBucket = base.hashTable.startBucket
+    unsafe self.endBucket = base.hashTable.endBucket
     super.init()
   }
 
@@ -82,18 +82,18 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self))
     _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = deferred.native
-    self.bridgedKeys = unsafe deferred.bridgeKeys()
-    self.nextBucket = unsafe base.hashTable.startBucket
-    self.endBucket = unsafe base.hashTable.endBucket
+    unsafe self.bridgedKeys = deferred.bridgeKeys()
+    unsafe self.nextBucket = base.hashTable.startBucket
+    unsafe self.endBucket = base.hashTable.endBucket
     super.init()
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
     unsafe _internalInvariant(base.hashTable.isOccupied(bucket))
-    if let bridgedKeys = self.bridgedKeys {
+    if let bridgedKeys = unsafe self.bridgedKeys {
       return unsafe bridgedKeys[bucket]
     }
-    return _bridgeAnythingToObjectiveC(base.uncheckedKey(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(base.uncheckedKey(at: bucket))
   }
 
   @objc
@@ -101,9 +101,9 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     if unsafe nextBucket == endBucket {
       return nil
     }
-    let bucket = nextBucket
-    nextBucket = unsafe base.hashTable.occupiedBucket(after: nextBucket)
-    return self.bridgedKey(at: bucket)
+    let bucket = unsafe nextBucket
+    unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
+    return unsafe self.bridgedKey(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -128,7 +128,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     // enumeration, terminate it, and continue via NSEnumerator.
     let unmanagedObjects = unsafe _UnmanagedAnyObjectArray(objects)
     unsafe unmanagedObjects[0] = self.bridgedKey(at: nextBucket)
-    nextBucket = unsafe base.hashTable.occupiedBucket(after: nextBucket)
+    unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     unsafe state.pointee = theState
     return 1
   }
@@ -230,7 +230,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       owner: native._storage,
       hashTable: native.hashTable)
     for unsafe bucket in unsafe native.hashTable {
-      let object = _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
+      let object = unsafe _bridgeAnythingToObjectiveC(
+        native.uncheckedKey(at: bucket))
       unsafe bridged.initialize(at: bucket, to: object)
     }
 
@@ -249,7 +250,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       owner: native._storage,
       hashTable: native.hashTable)
     for unsafe bucket in unsafe native.hashTable {
-      let value = native.uncheckedValue(at: bucket)
+      let value = unsafe native.uncheckedValue(at: bucket)
       let cocoaValue = _bridgeAnythingToObjectiveC(value)
       unsafe bridged.initialize(at: bucket, to: cocoaValue)
     }
@@ -274,7 +275,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     if let bridgedKeys = unsafe bridgedKeys {
       return unsafe bridgedKeys[bucket]
     }
-    return _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
   }
 
   @inline(__always)
@@ -285,7 +286,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     if let bridgedValues = unsafe bridgedValues {
       return unsafe bridgedValues[bucket]
     }
-    return _bridgeAnythingToObjectiveC(native.uncheckedValue(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(native.uncheckedValue(at: bucket))
   }
 
   @objc(objectForKey:)
@@ -383,7 +384,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     count: Int
   ) -> Int {
     defer { _fixLifetime(self) }
-    let hashTable = native.hashTable
+    let hashTable = unsafe native.hashTable
 
     var theState = unsafe state.pointee
     if unsafe theState.state == 0 {
@@ -809,7 +810,7 @@ extension Dictionary {
     }
 
     if let nativeStorage = unsafe s as? _DictionaryStorage<Key, Value> {
-      return Dictionary(_native: _NativeDictionary(nativeStorage))
+      return Dictionary(_native: unsafe _NativeDictionary(nativeStorage))
     }
 
     if unsafe s === __RawDictionaryStorage.empty {

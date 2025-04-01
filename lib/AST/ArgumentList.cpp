@@ -45,7 +45,7 @@ bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }
 
-bool Argument::isConst() const {
+bool Argument::isCompileTimeLiteral() const {
   return ArgExpr->isSemanticallyConstExpr();
 }
 

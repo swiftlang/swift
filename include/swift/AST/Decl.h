@@ -5915,7 +5915,7 @@ public:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
   bool isCompileTimeLiteral() const;
-  bool isConstVal() const;
+  bool isConstValue() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
@@ -6847,6 +6847,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeLiteral = 1 << 1,
+
+    /// Whether or not this parameter is '@const'.
+    IsConstValue = 1 << 2,
   };
 
   llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
@@ -7202,6 +7205,19 @@ public:
     auto flags = ArgumentNameAndFlags.getInt();
     flags = value ? flags | ArgumentNameFlags::IsCompileTimeLiteral
                   : flags - ArgumentNameFlags::IsCompileTimeLiteral;
+    ArgumentNameAndFlags.setInt(flags);
+  }
+
+  /// Whether or not this parameter is marked with '@const'.
+  bool isConstVal() const {
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::IsConstValue);
+  }
+
+  void setConstValue(bool value = true) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::IsConstValue
+                  : flags - ArgumentNameFlags::IsConstValue;
     ArgumentNameAndFlags.setInt(flags);
   }
 

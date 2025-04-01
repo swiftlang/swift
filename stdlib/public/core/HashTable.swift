@@ -186,6 +186,7 @@ extension _HashTable.Bucket: Comparable {
 }
 
 extension _HashTable {
+  @unsafe
   @usableFromInline
   @frozen
   internal struct Index {
@@ -231,6 +232,7 @@ extension _HashTable.Index: Comparable {
 }
 
 extension _HashTable: @unsafe Sequence {
+  @unsafe
   @usableFromInline
   @frozen
   internal struct Iterator: @unsafe IteratorProtocol {
@@ -280,6 +282,7 @@ extension _HashTable: @unsafe Sequence {
 extension _HashTable.Iterator: Sendable {}
 
 extension _HashTable {
+  @safe
   @inlinable
   @inline(__always)
   internal func isValid(_ bucket: Bucket) -> Bool {
@@ -289,7 +292,7 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func _isOccupied(_ bucket: Bucket) -> Bool {
-    unsafe _internalInvariant(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     return unsafe words[bucket.word].uncheckedContains(bucket.bit)
   }
 
@@ -322,7 +325,7 @@ extension _HashTable {
 
   @inlinable
   internal func occupiedBucket(after bucket: Bucket) -> Bucket {
-    unsafe _internalInvariant(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     let word = unsafe bucket.word
     if let bit = unsafe words[word].intersecting(elementsAbove: bucket.bit).minimum {
       return unsafe Bucket(word: word, bit: bit)
@@ -364,7 +367,7 @@ extension _HashTable {
 extension _HashTable {
   @inlinable
   internal func previousHole(before bucket: Bucket) -> Bucket {
-    unsafe _internalInvariant(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
     var word = unsafe bucket.word
@@ -392,7 +395,7 @@ extension _HashTable {
 
   @inlinable
   internal func nextHole(atOrAfter bucket: Bucket) -> Bucket {
-    unsafe _internalInvariant(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
     var word = unsafe bucket.word

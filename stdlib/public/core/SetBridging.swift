@@ -70,9 +70,9 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
     _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = base
-    self.bridgedElements = nil
-    self.nextBucket = unsafe base.hashTable.startBucket
-    self.endBucket = unsafe base.hashTable.endBucket
+    unsafe self.bridgedElements = nil
+    unsafe self.nextBucket = base.hashTable.startBucket
+    unsafe self.endBucket = base.hashTable.endBucket
     super.init()
   }
 
@@ -81,18 +81,18 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _internalInvariant(!_isBridgedVerbatimToObjectiveC(Element.self))
     _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = deferred.native
-    self.bridgedElements = unsafe deferred.bridgeElements()
-    self.nextBucket = unsafe base.hashTable.startBucket
-    self.endBucket = unsafe base.hashTable.endBucket
+    unsafe self.bridgedElements = deferred.bridgeElements()
+    unsafe self.nextBucket = base.hashTable.startBucket
+    unsafe self.endBucket = base.hashTable.endBucket
     super.init()
   }
 
   private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
     unsafe _internalInvariant(base.hashTable.isOccupied(bucket))
-    if let bridgedElements = self.bridgedElements {
+    if let bridgedElements = unsafe self.bridgedElements {
       return unsafe bridgedElements[bucket]
     }
-    return _bridgeAnythingToObjectiveC(base.uncheckedElement(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(base.uncheckedElement(at: bucket))
   }
 
   //
@@ -106,9 +106,9 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     if unsafe nextBucket == endBucket {
       return nil
     }
-    let bucket = nextBucket
-    nextBucket = unsafe base.hashTable.occupiedBucket(after: nextBucket)
-    return self.bridgedElement(at: bucket)
+    let bucket = unsafe nextBucket
+    unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
+    return unsafe self.bridgedElement(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -133,7 +133,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     // enumeration, terminate it, and continue via NSEnumerator.
     let unmanagedObjects = unsafe _UnmanagedAnyObjectArray(objects)
     unsafe unmanagedObjects[0] = self.bridgedElement(at: nextBucket)
-    nextBucket = unsafe base.hashTable.occupiedBucket(after: nextBucket)
+    unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     unsafe state.pointee = theState
     return 1
   }
@@ -198,7 +198,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       owner: native._storage,
       hashTable: native.hashTable)
     for unsafe bucket in unsafe native.hashTable {
-      let object = _bridgeAnythingToObjectiveC(
+      let object = unsafe _bridgeAnythingToObjectiveC(
         native.uncheckedElement(at: bucket))
       unsafe bridged.initialize(at: bucket, to: object)
     }
@@ -248,7 +248,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     count: Int
   ) -> Int {
     defer { _fixLifetime(self) }
-    let hashTable = native.hashTable
+    let hashTable = unsafe native.hashTable
 
     var theState = unsafe state.pointee
     if unsafe theState.state == 0 {
@@ -628,7 +628,7 @@ extension Set {
     }
 
     if let nativeStorage = unsafe s as? _SetStorage<Element> {
-      return Set(_native: _NativeSet(nativeStorage))
+      return unsafe Set(_native: _NativeSet(nativeStorage))
     }
 
     if unsafe s === __RawSetStorage.empty {

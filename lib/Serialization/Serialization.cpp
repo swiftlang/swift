@@ -4737,6 +4737,7 @@ public:
         param->isAutoClosure(),
         param->isIsolated(),
         param->isCompileTimeLiteral(),
+        param->isConstVal(),
         param->isSending(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
@@ -5437,6 +5438,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     options -= SILParameterInfo::ImplicitLeading;
     result |= SILParameterInfoFlags::ImplicitLeading;
   }
+  
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    result |= SILParameterInfoFlags::Const;
+  }
 
   // If we still have options left, this code is out of sync... return none.
   if (bool(options))
@@ -5828,8 +5834,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeLiteral(), paramFlags.isSending(),
-          paramFlags.isAddressable());
+          paramFlags.isCompileTimeLiteral(), paramFlags.isConstValue(),
+          paramFlags.isSending(), paramFlags.isAddressable());
     }
   }
 
