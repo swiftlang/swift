@@ -3456,6 +3456,12 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (!ctx.supportsVersionedAvailability())
     return false;
 
+  // Don't enforce explicit availability requirements in .swiftinterface files.
+  // These diagnostics are only designed to be emitted when building from
+  // source.
+  if (decl->getDeclContext()->isInSwiftinterface())
+    return false;
+
   // Skip non-public decls.
   if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
     AccessScope scope =
