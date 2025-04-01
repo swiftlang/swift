@@ -4246,10 +4246,6 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   checkInvalidAttrName("_functionBuilder", "resultBuilder",
                        DeclAttrKind::ResultBuilder, diag::attr_renamed_warning);
 
-  // Historical name for @Sendable.
-  checkInvalidAttrName("concurrent", "Sendable", DeclAttrKind::Sendable,
-                       diag::attr_renamed_warning);
-
   // Historical name for 'nonisolated'.
   if (!DK && Tok.getText() == "actorIndependent") {
     diagnose(
@@ -4602,23 +4598,6 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   
   // Determine which attribute it is, and diagnose it if unknown.
   auto optAttr = TypeAttribute::getAttrKindFromString(Tok.getText());
-
-  auto checkInvalidAttrName =
-      [&](StringRef invalidName, StringRef correctName, TypeAttrKind kind,
-          std::optional<Diag<StringRef, StringRef>> diag = std::nullopt) {
-        if (!optAttr && Tok.getText() == invalidName) {
-          optAttr = kind;
-
-          if (diag) {
-            diagnose(Tok, *diag, invalidName, correctName)
-                .fixItReplace(Tok.getLoc(), correctName);
-          }
-        }
-      };
-
-  // Historical name for @Sendable.
-  checkInvalidAttrName("concurrent", "Sendable", TypeAttrKind::Sendable,
-                       diag::attr_renamed_warning);
 
   if (!optAttr) {
     auto declAttrID = DeclAttribute::getAttrKindFromString(Tok.getText());
