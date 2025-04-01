@@ -35,7 +35,6 @@
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 
 import _Concurrency

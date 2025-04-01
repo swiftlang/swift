@@ -6,7 +6,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: OS=macosx
 
 func f(_: Span<Int>) { } // Span is @available(SwiftStdlib 6.1, *)
 func g(_: Int128) { } // Int128 is @available(SwiftStdlib 6.0, *)
