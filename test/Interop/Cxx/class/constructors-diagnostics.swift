@@ -23,5 +23,5 @@ let _ = SwiftInitSynthesisForCXXRefTypes.DefaulltAndNonDefaultCtors()
 // TODO: change the error message when we start supporting parameterised ctors
 let _ = SwiftInitSynthesisForCXXRefTypes.DefaulltAndNonDefaultCtors(2)  // expected-error {{argument passed to call that takes no arguments}}
 
-let _ = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor' cannot be constructed because it has no accessible initializers}}
-let _ = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor(3)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor' cannot be constructed because it has no accessible initializers}}
+// TODO: fix the error message in this case
+let _ = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor()  // expected-error {{missing argument for parameter #1 in call}}
