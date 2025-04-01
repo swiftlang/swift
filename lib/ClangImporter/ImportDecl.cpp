@@ -2558,12 +2558,13 @@ namespace {
                              });
                 });
             if (!hasUserProvidedStaticFactory) {
-              if (auto generatedCxxMethodDecl =
-                      synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                          cxxRecordDecl)) {
+              auto generatedCxxMethodDecls =
+                  synthesizer.synthesizeStaticFactoryForCXXForeignRef(
+                      cxxRecordDecl);
+              for (auto *methodDecl : generatedCxxMethodDecls) {
                 if (Decl *importedInitDecl =
                         Impl.SwiftContext.getClangModuleLoader()
-                            ->importDeclDirectly(generatedCxxMethodDecl))
+                            ->importDeclDirectly(methodDecl))
                   result->addMember(importedInitDecl);
               }
             }
