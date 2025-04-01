@@ -3656,9 +3656,18 @@ public:
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
+
+        // Type checking did not set a range for this query (it may be invalid).
+        // Treat the condition as if it were always true.
+        if (!availabilityRange.has_value()) {
+          alwaysAvailableCount++;
+          continue;
+        }
+
         // If there is no lower endpoint it means that the condition has no
         // OS version specification that matches the target platform.
-        if (!availabilityRange.hasLowerEndpoint()) {
+        // FIXME: [availability] Handle empty ranges (never available).
+        if (!availabilityRange->hasLowerEndpoint()) {
           // An inactive #unavailable condition trivially evaluates to false.
           if (condition->isUnavailability()) {
             neverAvailableCount++;
@@ -3671,7 +3680,7 @@ public:
         }
 
         conditions.push_back(
-            {availabilityRange, condition->isUnavailability()});
+            {*availabilityRange, condition->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this
