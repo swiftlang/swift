@@ -89,6 +89,14 @@ _swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
   return imp(obj, @selector(cStringUsingEncoding:), encoding);
 }
 
+const __swift_uint8_t *
+_swift_stdlib_NSStringUTF8StringTrampoline(id _Nonnull obj) {
+  typedef __swift_uint8_t * _Nullable (*utf8StrImplPtr)(id, SEL);
+  utf8StrImplPtr imp = (utf8StrImplPtr)class_getMethodImplementation([obj superclass],
+                                                                     @selector(UTF8String));
+  return imp(obj, @selector(UTF8String));
+}
+
 __swift_uint8_t
 _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
                                          _swift_shims_UInt8 *buffer,
