@@ -4612,5 +4612,13 @@ ReferencedAssociatedTypesRequest::evaluate(Evaluator &eval,
     reqTy->getCanonicalType().walk(walker);
   }
 
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(req)) {
+    if (auto getter = asd->getEffectfulGetAccessor()) {
+      if (Type thrownErrorType = getter->getThrownInterfaceType()) {
+        thrownErrorType->getCanonicalType().walk(walker);
+      }
+    }
+  }
+
   return assocTypes;
 }
