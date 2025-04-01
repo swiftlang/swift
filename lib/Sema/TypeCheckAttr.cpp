@@ -208,7 +208,8 @@ public:
     }
 
     if (!decl->isAsync()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_execution_only_on_async, decl);
+      diagnoseAndRemoveAttr(attr, diag::execution_behavior_only_on_async, attr,
+                            decl);
       return;
     }
 
@@ -224,8 +225,8 @@ public:
       // isolated parameters affect isolation of the function itself
       if (isa<IsolatedTypeRepr>(repr)) {
         diagnoseAndRemoveAttr(
-            attr, diag::attr_execution_incompatible_isolated_parameter, decl,
-            P);
+            attr, diag::execution_behavior_incompatible_isolated_parameter,
+            attr, decl, P);
         return;
       }
 
@@ -233,8 +234,9 @@ public:
         if (attrType->has(TypeAttrKind::Isolated)) {
           diagnoseAndRemoveAttr(
               attr,
-              diag::attr_execution_incompatible_dynamically_isolated_parameter,
-              decl, P);
+              diag::
+                  execution_behavior_incompatible_dynamically_isolated_parameter,
+              attr, decl, P);
           return;
         }
       }
@@ -8154,7 +8156,7 @@ public:
         closure->getAsyncLoc().isInvalid()) {
       ctx.Diags
           .diagnose(attr->getLocation(),
-                    diag::attr_execution_only_on_async_closure)
+                    diag::execution_behavior_only_on_async_closure, attr)
           .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
     }
@@ -8163,8 +8165,8 @@ public:
       ctx.Diags
           .diagnose(
               attr->getLocation(),
-              diag::attr_execution_type_attr_incompatible_with_global_isolation,
-              actorType)
+              diag::execution_behavior_attr_incompatible_with_global_isolation,
+              attr, actorType)
           .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
     }
@@ -8174,7 +8176,8 @@ public:
         ctx.Diags
             .diagnose(
                 attr->getLocation(),
-                diag::attr_execution_type_attr_incompatible_with_isolated_param)
+                diag::execution_behavior_attr_incompatible_with_isolated_param,
+                attr)
             .fixItRemove(attr->getRangeWithAt());
         attr->setInvalid();
       }

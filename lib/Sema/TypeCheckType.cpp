@@ -4198,7 +4198,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
     if (!repr->isAsync()) {
       diagnoseInvalid(repr, executionAttr->getAtLoc(),
-                      diag::attr_execution_type_attr_only_on_async);
+                      diag::execution_behavior_type_attr_only_on_async,
+                      executionAttr->getAttrName());
     }
 
     switch (isolation.getKind()) {
@@ -4208,20 +4209,22 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     case FunctionTypeIsolation::Kind::GlobalActor:
       diagnoseInvalid(
           repr, executionAttr->getAtLoc(),
-          diag::attr_execution_type_attr_incompatible_with_global_isolation,
-          isolation.getGlobalActorType());
+          diag::execution_behavior_type_attr_incompatible_with_global_isolation,
+          executionAttr->getAttrName(), isolation.getGlobalActorType());
       break;
 
     case FunctionTypeIsolation::Kind::Parameter:
       diagnoseInvalid(
           repr, executionAttr->getAtLoc(),
-          diag::attr_execution_type_attr_incompatible_with_isolated_param);
+          diag::execution_behavior_type_attr_incompatible_with_isolated_param,
+          executionAttr->getAttrName());
       break;
 
     case FunctionTypeIsolation::Kind::Erased:
       diagnoseInvalid(
           repr, executionAttr->getAtLoc(),
-          diag::attr_execution_type_attr_incompatible_with_isolated_any);
+          diag::execution_behavior_type_attr_incompatible_with_isolated_any,
+          executionAttr->getAttrName());
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
