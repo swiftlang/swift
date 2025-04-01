@@ -39,9 +39,32 @@ do {
   }
 
   protocol P {
-    // FIXME: Not diagnosed
+    init(sync: ())
+    @execution(concurrent) init(executionAsync: ()) async
+    @MainActor init(mainActorAsync: ()) async
+    // expected-warning@+1:5 {{feature 'AsyncCallerExecution' will cause nonisolated async initializer 'init' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{5-5=@execution(concurrent) }}{{none}}
+    init(async: ()) async
+
+    func syncF()
+    @execution(concurrent) func executionAsyncF() async
+    @MainActor func mainActorAsyncF() async
+    // expected-warning@+1:10 {{feature 'AsyncCallerExecution' will cause nonisolated async instance method 'asyncF' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{5-5=@execution(concurrent) }}{{none}}
     func asyncF() async
   }
+}
+protocol Functions {}
+extension Functions {
+  init(sync: ()) {}
+  @execution(concurrent) init(executionAsync: ()) async {}
+  @MainActor init(mainActorAsync: ()) async {}
+  // expected-warning@+1:3 {{feature 'AsyncCallerExecution' will cause nonisolated async initializer 'init' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{3-3=@execution(concurrent) }}{{none}}
+  init(async: ()) async {}
+
+  func syncF() {}
+  @execution(concurrent) func executionAsyncF() async {}
+  @MainActor func mainActorAsyncF() async {}
+  // expected-warning@+1:8 {{feature 'AsyncCallerExecution' will cause nonisolated async instance method 'asyncF' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{3-3=@execution(concurrent) }}{{none}}
+  func asyncF() async {}
 }
 
 // MARK: Storage
@@ -81,10 +104,31 @@ do {
 
     // expected-warning@+1:23 {{feature 'AsyncCallerExecution' will cause nonisolated async getter for property 'asyncS' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{5-5=@execution(concurrent) }}{{none}}
     var asyncS: Int { get async }
-    // FIXME: Not diagnosed
+    // expected-warning@+1:39 {{feature 'AsyncCallerExecution' will cause nonisolated async getter for subscript 'subscript' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{5-5=@execution(concurrent) }}{{none}}
     subscript(asyncS _: Int) -> Int { get async }
   }
 }
+protocol Storage {}
+extension Storage {
+  var syncS: Int { get {} set {} }
+  subscript(syncS _: Int) -> Int { get {} }
+
+  @execution(concurrent) var executionAsyncS: Int { get async {} }
+  @execution(concurrent) subscript(executionAsyncS _: Int) -> Int { get async {} }
+
+  @MainActor var mainActorAsyncS: Int { get async {} }
+  @MainActor subscript(mainActorAsyncS _: Int) -> Int { get async {} }
+
+  // expected-warning@+2:5 {{feature 'AsyncCallerExecution' will cause nonisolated async getter for property 'asyncS' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{-1:3-3=@execution(concurrent) }}{{none}}
+  var asyncS: Int {
+    get async {}
+  }
+  // expected-warning@+2:5 {{feature 'AsyncCallerExecution' will cause nonisolated async getter for subscript 'subscript' to run on the caller's actor; use @execution(concurrent) to preserve behavior}}{{-1:3-3=@execution(concurrent) }}{{none}}
+  subscript(asyncS _: Int) -> Int {
+    get async throws {}
+  }
+}
+
 
 // MARK: Parameters
 do {
