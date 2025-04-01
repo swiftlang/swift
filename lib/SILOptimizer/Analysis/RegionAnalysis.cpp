@@ -93,21 +93,23 @@ regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
 
 namespace {
 
-struct UseDefChainVisitor
-    : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
-  bool isMerge = false;
-
-  /// The actor isolation that we found while walking from use->def. Always set
-  /// to the first one encountered.
-  std::optional<ActorIsolation> actorIsolation;
+/// A visitor that walks from uses -> def attempting to determine an object or
+/// address base for the passed in address.
+///
+/// It also is used to determine if we are assigning into a part of an aggregate
+/// or are assigning over an entire value.
+struct AddressBaseComputingVisitor
+    : public AccessUseDefChainVisitor<AddressBaseComputingVisitor, SILValue> {
+  bool isProjectedFromAggregate = false;
 
   SILValue visitAll(SILValue sourceAddr) {
     SILValue result = visit(sourceAddr);
     if (!result)
       return sourceAddr;
 
-    while (SILValue nextAddr = visit(result))
+    while (SILValue nextAddr = visit(result)) {
       result = nextAddr;
+    }
 
     return result;
   }
@@ -154,7 +156,7 @@ struct UseDefChainVisitor
     }
 
     // If we do not have an identity cast, mark this as a merge.
-    isMerge |= castType != AccessStorageCast::Identity;
+    isProjectedFromAggregate |= castType != AccessStorageCast::Identity;
 
     return sourceAddr->get();
   }
@@ -179,7 +181,7 @@ struct UseDefChainVisitor
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
         // Index is always a merge.
-        isMerge = true;
+        isProjectedFromAggregate = true;
         break;
       case ProjectionKind::Enum: {
         auto op = cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand();
@@ -200,7 +202,7 @@ struct UseDefChainVisitor
                                                  op->getFunction()))
           return SILValue();
 
-        isMerge |= op->getType().getNumTupleElements() > 1;
+        isProjectedFromAggregate |= op->getType().getNumTupleElements() > 1;
         break;
       }
       case ProjectionKind::Struct:
@@ -216,7 +218,7 @@ struct UseDefChainVisitor
           return SILValue();
 
         // These are merges if we have multiple fields.
-        isMerge |= op->getType().getNumNominalFields() > 1;
+        isProjectedFromAggregate |= op->getType().getNumNominalFields() > 1;
         break;
       }
     }
@@ -395,9 +397,9 @@ private:
 
 static bool isProjectedFromAggregate(SILValue value) {
   assert(value->getType().isAddress());
-  UseDefChainVisitor visitor;
+  AddressBaseComputingVisitor visitor;
   visitor.visitAll(value);
-  return visitor.isMerge;
+  return visitor.isProjectedFromAggregate;
 }
 
 namespace {
@@ -667,23 +669,6 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
   // Ok, at this point we have a non-Sendable value. First process addresses.
   if (value->getType().isAddress()) {
-    // If we were able to find this was actor isolated from finding our
-    // underlying object, use that. It is never wrong.
-    if (info.actorIsolation) {
-      SILIsolationInfo isolation;
-      if (info.value->getType().isAnyActor()) {
-        isolation = SILIsolationInfo::getActorInstanceIsolated(
-            value, info.value, info.actorIsolation->getActor());
-      } else if (info.actorIsolation->isGlobalActor()) {
-        isolation = SILIsolationInfo::getGlobalActorIsolated(
-            value, info.actorIsolation->getGlobalActor());
-      }
-
-      if (isolation) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
-      }
-    }
-
     auto storage = AccessStorageWithBase::compute(value);
     if (storage.storage) {
       // Check if we have a uniquely identified address that was not captured
@@ -704,19 +689,6 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   // loaded from.
   if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
     auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
-
-    // See if we can use get underlying tracked value to find if it is actor
-    // isolated.
-    //
-    // TODO: Instead of using AccessStorageBase, just use our own visitor
-    // everywhere. Just haven't done it due to possible perturbations.
-    auto parentAddrInfo = getUnderlyingTrackedValue(svi);
-    if (parentAddrInfo.actorIsolation) {
-      iter.first->getSecond().setIsolationRegionInfo(
-          SILIsolationInfo::getActorInstanceIsolated(
-              svi, parentAddrInfo.value,
-              parentAddrInfo.actorIsolation->getActor()));
-    }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
     if (storage.storage) {
@@ -886,24 +858,31 @@ RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
       return UnderlyingTrackedValueInfo(underlyingValue);
     }
 
-    // If we got an address, lets see if we can do even better by looking at the
-    // address.
+    // If we have a load or a load_borrow, lets see if we can do even better by
+    // looking at the address.
     value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
   }
   assert(value->getType().isAddress());
 
-  UseDefChainVisitor visitor;
+  // At this point, we either have a value that we loaded from a
+  // load/load_borrow or just an address. We need to attempt to find either an
+  // object base for that address or an underlying actorIsolation for an address
+  // base.
+  AddressBaseComputingVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
+
+  // If we have an object base...
   if (base->getType().isObject()) {
-    // NOTE: We purposely recurse into the cached version of our computation
+    // ... we purposely recurse into the cached version of our computation
     // rather than recurse into getUnderlyingTrackedObjectValueHelper. This is
     // safe since we know that value was previously an address so if our base is
     // an object, it cannot be the same object.
-    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
+    return UnderlyingTrackedValueInfo(getUnderlyingTrackedValue(base).value);
   }
 
-  return {base, visitor.actorIsolation};
+  // Otherwise, we return the actorIsolation that our visitor found.
+  return UnderlyingTrackedValueInfo(base);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2599,9 +2578,9 @@ public:
 
     // Then check if we are assigning into an aggregate projection. In such a
     // case, we want to ensure that we keep tracking the elements already in the
-    // region of sending. This is more conservative than we need to be
-    // (since we could forget anything reachable from the aggregate
-    // field)... but being more conservative is ok.
+    // region as sending. This is more conservative than we need to be (since we
+    // could forget anything reachable from the aggregate field)... but being
+    // more conservative is ok.
     if (isProjectedFromAggregate(destOperand->get()))
       return;
 

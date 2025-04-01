@@ -303,26 +303,18 @@ private:
   struct UnderlyingTrackedValueInfo {
     SILValue value;
 
-    /// Only used for addresses.
-    std::optional<ActorIsolation> actorIsolation;
-
     explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
 
-    UnderlyingTrackedValueInfo() : value(), actorIsolation() {}
+    UnderlyingTrackedValueInfo() : value() {}
 
     UnderlyingTrackedValueInfo(const UnderlyingTrackedValueInfo &newVal)
-        : value(newVal.value), actorIsolation(newVal.actorIsolation) {}
+        : value(newVal.value) {}
 
     UnderlyingTrackedValueInfo &
     operator=(const UnderlyingTrackedValueInfo &newVal) {
       value = newVal.value;
-      actorIsolation = newVal.actorIsolation;
       return *this;
     }
-
-    UnderlyingTrackedValueInfo(SILValue value,
-                               std::optional<ActorIsolation> actorIsolation)
-        : value(value), actorIsolation(actorIsolation) {}
 
     operator bool() const { return value; }
   };
