@@ -20,6 +20,8 @@
   import Glibc
 #elseif os(Windows)
   import CRT
+#elseif os(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif

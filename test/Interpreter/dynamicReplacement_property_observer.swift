@@ -19,6 +19,8 @@
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #elseif os(Windows)
   import CRT
   import WinSDK
