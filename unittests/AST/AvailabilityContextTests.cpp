@@ -40,7 +40,7 @@ public:
   } domains;
 };
 
-TEST_F(AvailabilityContextTest, PlatformIntroduction) {
+TEST_F(AvailabilityContextTest, PlatformRange) {
   auto &ctx = defaultTestContext.Ctx;
 
   auto macOS10_9 = AvailabilityContext::forDeploymentTarget(ctx);

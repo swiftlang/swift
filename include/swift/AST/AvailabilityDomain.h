@@ -217,6 +217,10 @@ public:
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
 
+  /// Returns true if this domain is a platform domain and is considered active
+  /// in the current compilation context.
+  bool isActivePlatform(const ASTContext &ctx) const;
+
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
   /// this version is specified with the `-target` option. For the Swift

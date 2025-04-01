@@ -100,6 +100,13 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+  if (!isPlatform())
+    return false;
+
+  return isActive(ctx);
+}
+
 static std::optional<llvm::VersionTuple>
 getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
   switch (domain.getKind()) {
