@@ -8758,6 +8758,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 
 std::optional<ExecutionKind>
 AbstractFunctionDecl::getExecutionBehavior() const {
+  if (getAttrs().hasAttribute<ConcurrentAttr>())
+    return ExecutionKind::Concurrent;
+
   auto *attr = getAttrs().getAttribute<ExecutionAttr>();
   if (!attr)
     return {};
