@@ -80,14 +80,8 @@ If set, skips building the msi's and installer
 If set, debug information will be generated for the builds.
 
 .PARAMETER EnableCaching
-If true, use `sccache` to cache the build rules.
-
-.PARAMETER Cache
-The path to a directory where the `sccache` stores the cache. By default, it will point to `$BinaryCache\sccache`.
-
-.PARAMETER EnableRemoteCaching
-If true, use `sccache` to cache the build rules remotely. If set, ensure that you configure the appropriate
-remote caching backend location and credentials environment variables for sccache.
+If true, use `sccache` to cache the build rules. Configuration of sccache must be done through
+the environment variables defined by the sccache project.
 
 .PARAMETER Clean
 If true, clean non-compiler builds while building.
@@ -171,14 +165,9 @@ param
   [string] $Variant = "Asserts",
   [switch] $Clean,
   [switch] $DebugInfo,
-  [parameter(ParameterSetName = "LocalCaching")]
   [switch] $EnableCaching,
-  [parameter(ParameterSetName = "RemoteCaching")]
-  [switch] $EnableRemoteCaching,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
-  [parameter(ParameterSetName = "LocalCaching")]
-  [string] $Cache = "",
   [switch] $Summary,
   [switch] $ToBatch
 )
@@ -1211,11 +1200,6 @@ function Build-CMakeProject {
       Invoke-VsDevShell $Platform
     }
 
-    if ($EnableCaching) {
-      $env:SCCACHE_DIRECT = "true"
-      $env:SCCACHE_DIR = "$(if ($Cache) { $Cache } else { "$BinaryCache\sccache" })"
-    }
-
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
 
@@ -1298,14 +1282,14 @@ function Build-CMakeProject {
 
     if ($UseMSVCCompilers.Contains("C")) {
       Add-KeyValueIfNew $Defines CMAKE_C_COMPILER cl
-      if ($EnableCaching -or $EnableRemoteCaching) {
+      if ($EnableCaching) {
         Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER sccache
       }
       Add-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UseMSVCCompilers.Contains("CXX")) {
       Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER cl
-      if ($EnableCaching -or $EnableRemoteCaching) {
+      if ($EnableCaching) {
         Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
       }
       Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
@@ -3163,7 +3147,7 @@ if ($Clean) {
 }
 
 if (-not $SkipBuild) {
-  if ($EnableCaching -or $EnableRemoteCaching) -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
+  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
     throw "Minimum required sccache version is 0.7.4"
   }
 
