@@ -112,8 +112,7 @@ PackType *PackConformance::getTypeWitness(
     // conformance.
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
       auto assocTypePattern =
-        conformances[i].getTypeWitness(packExpansion->getPatternType(),
-                                       assocType, options);
+        conformances[i].getTypeWitness(assocType, options);
 
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
@@ -121,8 +120,7 @@ PackType *PackConformance::getTypeWitness(
     // If the pack element is a scalar type, replace the scalar type with
     // the associated type witness from the pattern conformance.
     } else {
-      auto assocTypeScalar =
-        conformances[i].getTypeWitness(packElement, assocType, options);
+      auto assocTypeScalar = conformances[i].getTypeWitness(assocType, options);
       packElements.push_back(assocTypeScalar);
     }
   }

@@ -346,7 +346,7 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
   auto *assocDecl = memberType->getAssocType();
   auto *proto = assocDecl->getProtocol();
   auto conformance = lookupConformance(substBaseType, proto);
-  return conformance.getTypeWitness(substBaseType, assocDecl);
+  return conformance.getTypeWitness(assocDecl);
 }
 
 Type RequirementMachine::getReducedTypeParameter(

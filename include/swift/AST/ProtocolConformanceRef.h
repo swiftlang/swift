@@ -205,7 +205,7 @@ public:
 
   /// Look up the type witness for an associated type declaration in this
   /// conformance.
-  Type getTypeWitness(Type origType, AssociatedTypeDecl *assocType,
+  Type getTypeWitness(AssociatedTypeDecl *assocType,
                       SubstOptions options = std::nullopt) const;
 
   /// Given a dependent type (expressed in terms of this conformance's

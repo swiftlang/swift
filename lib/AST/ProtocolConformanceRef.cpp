@@ -160,7 +160,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   if (!assocType)
     return ErrorType::get(proto->getASTContext());
 
-  return getTypeWitness(type, assocType);
+  return getTypeWitness(assocType);
 }
 
 ConcreteDeclRef
@@ -190,43 +190,32 @@ ProtocolConformanceRef::getConditionalRequirements() const {
     return {};
 }
 
-Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
-                                            AssociatedTypeDecl *assocType,
+Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
                                             SubstOptions options) const {
+  if (isInvalid())
+    return ErrorType::get(assocType->getASTContext());
+
   if (isPack()) {
     auto *pack = getPack();
-    ASSERT(conformingType->isEqual(pack->getType()));
-    return pack->getTypeWitness(assocType);
+    return pack->getTypeWitness(assocType, options);
   }
 
-  auto failed = [&]() {
-    return DependentMemberType::get(ErrorType::get(conformingType),
-                                    assocType);
-  };
-
-  if (isInvalid())
-    return failed();
-
-  auto proto = getProtocol();
-  ASSERT(assocType->getProtocol() == proto);
-
   if (isConcrete()) {
-    auto witnessType = getConcrete()->getTypeWitness(assocType, options);
-    if (!witnessType || witnessType->is<ErrorType>())
-      return failed();
+    auto *concrete = getConcrete();
+    ASSERT(concrete->getProtocol() == assocType->getProtocol());
+
+    auto witnessType = concrete->getTypeWitness(assocType, options);
+    if (!witnessType)
+      return ErrorType::get(assocType->getASTContext());
     return witnessType;
   }
 
-  ASSERT(isAbstract());
+  auto *abstract = getAbstract();
+  auto conformingType = abstract->getType();
+  ASSERT(abstract->getProtocol() == assocType->getProtocol());
 
-  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>())
     return archetypeType->getNestedType(assocType);
-  }
-
-  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
-                     conformingType->isTypeVariableOrMember() ||
-                     conformingType->is<UnresolvedType>() ||
-                     conformingType->is<PlaceholderType>());
 
   return DependentMemberType::get(conformingType, assocType);
 }
