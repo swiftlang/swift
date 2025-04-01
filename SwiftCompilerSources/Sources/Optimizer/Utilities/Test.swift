@@ -162,6 +162,7 @@ public func registerOptimizerTests() {
     forwardingUseDefTest,
     gatherCallSitesTest,
     interiorLivenessTest,
+    lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,
     linearLivenessTest,
