@@ -966,26 +966,6 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
 SourceRange Decl::getSourceRangeIncludingAttrs() const {
   auto Range = getSourceRange();
 
-  // Attributes on AccessorDecl may syntactically belong to PatternBindingDecl.
-  // e.g. 'override'.
-  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
-    // If this is implicit getter, accessor range should not include attributes.
-    if (AD->isImplicitGetter())
-      return Range;
-
-    // Otherwise, include attributes directly attached to the accessor.
-    SourceLoc VarLoc = AD->getStorage()->getStartLoc();
-    for (auto *Attr : getParsedAttrs()) {
-      if (!Attr->getRange().isValid())
-        continue;
-
-      SourceLoc AttrStartLoc = Attr->getRangeWithAt().Start;
-      if (getASTContext().SourceMgr.isBeforeInBuffer(VarLoc, AttrStartLoc))
-        Range.widen(AttrStartLoc);
-    }
-    return Range;
-  }
-
   // Attributes on VarDecl syntactically belong to PatternBindingDecl.
   if (isa<VarDecl>(this) && !isa<ParamDecl>(this))
     return Range;
