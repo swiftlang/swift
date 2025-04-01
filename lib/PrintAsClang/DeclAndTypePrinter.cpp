@@ -3007,6 +3007,14 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
       return false;
   }
 
+  // In C output mode print only @cdecls and skip them in other modes.
+  bool isCDeclForC = false;
+  auto *FD = dyn_cast<AbstractFunctionDecl>(VD);
+  if (FD)
+    isCDeclForC = FD->getCDeclKind() == ForeignLanguage::C;
+  if (isCDeclForC != (outputLang == OutputLanguageMode::C))
+    return false;
+
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     return false;
 
