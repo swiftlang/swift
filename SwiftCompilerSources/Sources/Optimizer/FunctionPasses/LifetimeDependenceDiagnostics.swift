@@ -292,7 +292,7 @@ private struct LifetimeVariable {
       return .abortWalk
     }
     defer { useDefVisitor.deinitialize() }
-    _ = useDefVisitor.walkUp(valueOrAddress: value)
+    _ = useDefVisitor.walkUp(newLifetime: value)
     return introducer
   }
 
