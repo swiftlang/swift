@@ -277,7 +277,7 @@ private extension AllocStackInst {
         // The instruction which defines the existential archetype must dominate the alloc_stack, because
         // after the transformation the alloc_stack will use the existential archetype.
         for openArchetypeOp in initExistential.typeDependentOperands {
-          if !openArchetypeOp.value.definingInstruction!.dominatesInSameBlock(self) {
+          if !openArchetypeOp.value.triviallyDominates(self) {
             return nil
           }
         }
