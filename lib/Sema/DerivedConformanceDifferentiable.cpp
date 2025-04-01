@@ -50,10 +50,9 @@ static bool canInvokeMoveByOnProperty(
     return true;
   // When the property is a `let`, the only case that would be supported is when
   // it has a `move(by:)` protocol requirement witness that is non-mutating.
-  auto interfaceType = vd->getInterfaceType();
   auto &C = vd->getASTContext();
   auto witness = diffableConformance.getWitnessByName(
-      interfaceType, DeclName(C, C.Id_move, {C.Id_by}));
+      DeclName(C, C.Id_move, {C.Id_by}));
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());

@@ -164,7 +164,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Identifier name) const {
 }
 
 ConcreteDeclRef
-ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
+ProtocolConformanceRef::getWitnessByName(DeclName name) const {
   // Find the named requirement.
   auto *proto = getProtocol();
   auto *requirement = proto->getSingleRequirement(name);
@@ -174,7 +174,7 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
   if (!isConcrete()) {
-    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, type, *this);
+    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, getType(), *this);
     return ConcreteDeclRef(requirement, subs);
   }
 

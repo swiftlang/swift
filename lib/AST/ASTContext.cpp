@@ -1678,7 +1678,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   }
 
   auto *ctx = const_cast<ASTContext *>(this);
-  witness = builtinConformance.getWitnessByName(type, initName(*ctx));
+  witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
     assert(false && "Missing required witness");
     witness = ConcreteDeclRef();

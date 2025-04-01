@@ -2970,7 +2970,7 @@ namespace {
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
 
         ConcreteDeclRef witness =
-            conformance.getWitnessByName(type->getRValueType(), constrName);
+            conformance.getWitnessByName(constrName);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         return witness;
@@ -3108,8 +3108,7 @@ namespace {
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
 
-      ConcreteDeclRef witness = conformance.getWitnessByName(
-          conformingType->getRValueType(), constrName);
+      ConcreteDeclRef witness = conformance.getWitnessByName(constrName);
 
       auto selectedOverload = solution.getOverloadChoiceIfAvailable(
           cs.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
@@ -3822,7 +3821,7 @@ namespace {
         DeclName name(ctx, DeclBaseName::createConstructor(),
                       {ctx.Id_arrayLiteral});
         ConcreteDeclRef witness =
-            conformance.getWitnessByName(arrayTy->getRValueType(), name);
+            conformance.getWitnessByName(name);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         expr->setInitializer(witness);
@@ -3868,7 +3867,7 @@ namespace {
       DeclName name(ctx, DeclBaseName::createConstructor(),
                     {ctx.Id_dictionaryLiteral});
       ConcreteDeclRef witness =
-          conformance.getWitnessByName(dictionaryTy->getRValueType(), name);
+          conformance.getWitnessByName(name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -8081,7 +8080,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
       auto witness = builtinConformance.getWitnessByName(
-          type->getRValueType(), builtinLiteralFuncName);
+          builtinLiteralFuncName);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
 
@@ -8120,7 +8119,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
 
   // Find the witness that we'll use to initialize the literal value.
   auto witness =
-      conformance.getWitnessByName(type->getRValueType(), literalFuncName);
+      conformance.getWitnessByName(literalFuncName);
   if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
     return nullptr;
 

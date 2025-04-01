@@ -242,7 +242,7 @@ public:
   /// \param type The conforming type.
   ///
   /// \param name The name of the requirement.
-  ConcreteDeclRef getWitnessByName(Type type, DeclName name) const;
+  ConcreteDeclRef getWitnessByName(DeclName name) const;
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;
