@@ -3887,3 +3887,24 @@ void RegionAnalysis::initialize(SILPassManager *pm) {
 SILAnalysis *swift::createRegionAnalysis(SILModule *) {
   return new RegionAnalysis();
 }
+
+//===----------------------------------------------------------------------===//
+//                                MARK: Tests
+//===----------------------------------------------------------------------===//
+
+namespace swift::test {
+
+// Arguments:
+// - SILValue: value to look up isolation for.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest
+    UnderlyingTrackedValue("sil_regionanalysis_underlying_tracked_value",
+                            [](auto &function, auto &arguments, auto &test) {
+                              RegionAnalysisValueMap valueMap(&function);
+                              auto value = arguments.takeValue();
+                              auto trackableValue = valueMap.getTrackableValue(value);
+                              trackableValue.print(llvm::outs());
+                            });
+
+} // namespace swift::test
