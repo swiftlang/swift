@@ -527,9 +527,7 @@ public:
   }
 
   hash_code visitKeyPathInst(KeyPathInst *X) {
-    OperandValueArrayRef Operands(X->getAllOperands());
-    return llvm::hash_combine(X->getKind(), X->getType(), X->getPattern(),
-                              llvm::hash_combine_range(Operands.begin(), Operands.end()));
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getPattern());
   }
 };
 } // end anonymous namespace
@@ -1246,7 +1244,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::TuplePackElementAddrInst:
   case SILInstructionKind::TypeValueInst:
-  case SILInstructionKind::KeyPathInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \
@@ -1272,6 +1269,10 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // issue.
   case SILInstructionKind::OpenExistentialRefInst:
     return !Inst->getFunction()->hasOwnership();
+
+  case SILInstructionKind::KeyPathInst:
+    // If our keypath doesn't reference operands, then we can CSE.
+    return Inst->getNumOperands() == 0;
   default:
     return false;
   }

@@ -59,14 +59,6 @@ extension C: Hashable {
 
 struct Dumb {
   let x: Int
-
-  subscript(_: Int) -> Int {
-    123
-  }
-
-  subscript(_: C) -> Int {
-    123
-  }
 }
 
 @_silgen_name("takeDumbKp")
@@ -82,39 +74,4 @@ func takeDumbKp(_: KeyPath<Dumb, Int>)
 public func dumb1() {
   takeDumbKp(\Dumb.x)
   takeDumbKp(\Dumb.x)
-}
-
-// CHECK-LABEL: sil @$s11cse_keypath5dumb2yyF : $@convention(thin) () -> () {
-// CHECK:         [[KP:%.*]] = keypath $KeyPath<Dumb, Int>
-// CHECK:         [[FN_REF:%.*]] = function_ref @takeDumbKp
-// CHECK-NEXT:    [[APPLY_0:%.*]] = apply [[FN_REF]]([[KP]])
-// CHECK-NEXT:    [[APPLY_1:%.*]] = apply [[FN_REF]]([[KP]])
-// CHECK-NEXT:    strong_release [[KP]]
-// CHECK-LABEL: } // end sil function '$s11cse_keypath5dumb2yyF'
-public func dumb2() {
-  takeDumbKp(\Dumb.[0])
-  takeDumbKp(\Dumb.[0])
-}
-
-// CHECK-LABEL: sil @$s11cse_keypath5dumb3yyF : $@convention(thin) () -> () {
-// CHECK:         [[KP_0:%.*]] = keypath $KeyPath<Dumb, Int>
-// CHECK:         [[FN_REF:%.*]] = function_ref @takeDumbKp
-// CHECK-NEXT:    [[APPLY_0:%.*]] = apply [[FN_REF]]([[KP_0]])
-// CHECK-NEXT:    strong_release [[KP_0]]
-// CHECK:         [[KP_1:%.*]] = keypath $KeyPath<Dumb, Int>
-// CHECK-NEXT:    [[APPLY_1:%.*]] = apply [[FN_REF]]([[KP_1]])
-// CHECK-NEXT:    strong_release [[KP_1]]
-// CHECK-LABEL: } // end sil function '$s11cse_keypath5dumb3yyF'
-public func dumb3() {
-  takeDumbKp(\Dumb.[0])
-  takeDumbKp(\Dumb.[1])
-}
-
-// CHECK-LABEL: sil @$s11cse_keypath5dumb4yyF : $@convention(thin) () -> () {
-// CHECK:         keypath $KeyPath<Dumb, Int>
-// CHECK:         keypath $KeyPath<Dumb, Int>
-// CHECK-LABEL: } // end sil function '$s11cse_keypath5dumb4yyF'
-public func dumb4() {
-  takeDumbKp(\Dumb.[C()])
-  takeDumbKp(\Dumb.[C()])
 }
