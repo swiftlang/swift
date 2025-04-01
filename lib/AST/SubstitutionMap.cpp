@@ -369,23 +369,10 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
 
   auto genericSig = getGenericSignature();
   for (const auto &req : genericSig.getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance) continue;
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
 
-    auto conformance = oldConformances[0];
-
-    // Fast path for concrete case -- we don't need to compute substType
-    // at all.
-    if (conformance.isConcrete() &&
-        !IFS.shouldSubstituteOpaqueArchetypes()) {
-      newConformances.push_back(
-        ProtocolConformanceRef(conformance.getConcrete()->subst(IFS)));
-    } else {
-      auto origType = req.getFirstType();
-      auto substType = origType.subst(*this);
-
-      newConformances.push_back(conformance.subst(substType, IFS));
-    }
-    
+    newConformances.push_back(oldConformances[0].subst(IFS));
     oldConformances = oldConformances.slice(1);
   }
 

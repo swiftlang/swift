@@ -4320,9 +4320,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto hashable = index.Hashable;
       if (genericEnv) {
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
-        hashable = hashable.subst(index.FormalType,
-          [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInModule());
+        hashable = hashable.subst(
+          genericEnv->getForwardingSubstitutionMap());
       }
 
       // Set up a substitution of Self => IndexType.

@@ -766,7 +766,7 @@ std::pair<Type, ProtocolConformanceRef>
 GenericEnvironment::mapConformanceRefIntoContext(
                                      Type conformingInterfaceType,
                                      ProtocolConformanceRef conformance) const {
-  auto contextConformance = conformance.subst(conformingInterfaceType,
+  auto contextConformance = conformance.subst(
     QueryInterfaceTypeSubstitutions(this),
     LookUpConformanceInModule());
   

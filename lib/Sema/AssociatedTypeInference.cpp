@@ -2906,8 +2906,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
     typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
     conformanceInContext =
-      conformanceInContext.subst(conformance->getType(),
-                                 genericEnv->getForwardingSubstitutionMap());
+      conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
 
   auto substitutions =

@@ -282,7 +282,7 @@ public:
       selfType = next;
     }
 
-    auto substConformance = conformance.subst(selfType, IFS);
+    auto substConformance = conformance.subst(IFS);
 
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.

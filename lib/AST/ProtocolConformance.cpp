@@ -896,14 +896,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol);
 
-  auto subMap = getSubstitutionMap();
-
-  Type origType =
-    (conformance.isConcrete()
-       ? conformance.getConcrete()->getType()
-       : GenericConformance->getAssociatedType(assocType));
-
-  return conformance.subst(origType, subMap);
+  return conformance.subst(getSubstitutionMap());
 }
 
 ConcreteDeclRef

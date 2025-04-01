@@ -1094,7 +1094,7 @@ static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
     llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
-  return ref.subst(origType, replacer, replacer,
+  return ref.subst(replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes |
                    SubstFlags::PreservePackExpansionLevel);
 }
@@ -1104,7 +1104,7 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return ref.subst(origType, replacer, replacer,
+  return ref.subst(replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -1159,8 +1159,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto partialSubstRef =
       subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
                               protocol);
-  auto substRef =
-      partialSubstRef.subst(partialSubstTy, outerSubs);
+  auto substRef = partialSubstRef.subst(outerSubs);
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {

@@ -199,15 +199,12 @@ PackConformance::subst(InFlightSubstitution &IFS) const {
         // Just substitute the conformance.  We don't directly represent
         // pack expansion conformances here; it's sort of implicit in the
         // corresponding pack element type.
-        substConformances.push_back(
-            origConformances[i].subst(origExpansion->getPatternType(), IFS));
+        substConformances.push_back(origConformances[i].subst(IFS));
       });
     } else {
       // Substitute a scalar element of the original pack.
       substElementTypes.push_back(origElementType.subst(IFS));
-
-      substConformances.push_back(
-          origConformances[i].subst(origElementType, IFS));
+      substConformances.push_back(origConformances[i].subst(IFS));
     }
   }
 

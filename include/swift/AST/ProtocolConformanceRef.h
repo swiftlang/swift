@@ -185,11 +185,11 @@ public:
   ProtocolDecl *getProtocol() const;
   
   /// Apply a substitution to the conforming type.
-  ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,
+  ProtocolConformanceRef subst(SubstitutionMap subMap,
                                SubstOptions options = std::nullopt) const;
 
   /// Apply a substitution to the conforming type.
-  ProtocolConformanceRef subst(Type origType, TypeSubstitutionFn subs,
+  ProtocolConformanceRef subst(TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
                                SubstOptions options = std::nullopt) const;
 
@@ -197,8 +197,7 @@ public:
   ///
   /// This function should generally not be used outside of the substitution
   /// subsystem.
-  ProtocolConformanceRef subst(Type origType,
-                               InFlightSubstitution &IFS) const;
+  ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
 
   /// Map contextual types to interface types in the conformance.
   ProtocolConformanceRef mapConformanceOutOfContext() const;

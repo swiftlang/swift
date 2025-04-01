@@ -5237,8 +5237,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
     typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
     conformanceInContext =
-      conformanceInContext.subst(conformance->getType(),
-                                 genericEnv->getForwardingSubstitutionMap());
+      conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, typeInContext, conformanceInContext);

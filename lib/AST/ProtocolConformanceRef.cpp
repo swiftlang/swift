@@ -67,24 +67,22 @@ ProtocolDecl *ProtocolConformanceRef::getProtocol() const {
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType,
-                              SubstitutionMap subMap,
+ProtocolConformanceRef::subst(SubstitutionMap subMap,
                               SubstOptions options) const {
   InFlightSubstitutionViaSubMap IFS(subMap, options);
-  return subst(origType, IFS);
+  return subst(IFS);
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType,
-                              TypeSubstitutionFn subs,
+ProtocolConformanceRef::subst(TypeSubstitutionFn subs,
                               LookupConformanceFn conformances,
                               SubstOptions options) const {
   InFlightSubstitution IFS(subs, conformances, options);
-  return subst(origType, IFS);
+  return subst(IFS);
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
+ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
   if (isInvalid())
     return *this;
 
@@ -93,36 +91,28 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   if (isPack())
     return getPack()->subst(IFS);
 
-  ASSERT(isAbstract());
-  auto *proto = getProtocol();
+  auto *abstract = getAbstract();
+  auto origType = abstract->getType();
+  auto *proto = abstract->getProtocol();
 
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
-  if (origType->getAs<OpaqueTypeArchetypeType>()) {
-    if (!IFS.shouldSubstituteOpaqueArchetypes()) {
-      return forAbstract(origType.subst(IFS), proto);
-    }
+  if (origType->is<OpaqueTypeArchetypeType>() &&
+      !IFS.shouldSubstituteOpaqueArchetypes()) {
+    return forAbstract(origType.subst(IFS), proto);
   }
 
-  // FIXME: Handle local archetypes as above!
-
-  // Otherwise, compute the substituted type.
-  auto substType = origType.subst(IFS);
-
-  // If the type is an existential, it must be self-conforming.
-  // FIXME: This feels like it's in the wrong place.
-  if (substType->isExistentialType()) {
-    auto optConformance =
-        lookupConformance(substType, proto, /*allowMissing=*/true);
-    if (optConformance)
-      return optConformance;
-
-    return ProtocolConformanceRef::forInvalid();
+  // If the type is a local archetype, the conformance will remain abstract,
+  // unless we're specifically substituting local types.
+  if (origType->is<LocalArchetypeType>() &&
+      !IFS.shouldSubstituteLocalArchetypes()) {
+    return forAbstract(origType.subst(IFS), proto);
   }
 
   // Local conformance lookup into the substitution map.
   // FIXME: Pack element level?
-  return IFS.lookupConformance(origType->getCanonicalType(), substType, proto,
+  return IFS.lookupConformance(origType->getCanonicalType(),
+                               origType.subst(IFS), proto,
                                /*level=*/0);
 }
 
