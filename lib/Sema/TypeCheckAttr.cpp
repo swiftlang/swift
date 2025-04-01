@@ -2375,6 +2375,11 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
       diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
                attr->Name);
   }
+
+  if (!attr->Underscored &&
+      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_feature_required);
+  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
