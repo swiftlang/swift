@@ -1,6 +1,17 @@
 #ifndef TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
 #define TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
 
+#ifndef __SIZE_T_DEFINED_CUSTOM__
+#define __SIZE_T_DEFINED_CUSTOM__
+
+#if defined(_WIN32) || defined(_WIN64)
+typedef unsigned long long size_t;
+#else
+typedef unsigned long size_t;
+#endif
+
+#endif // __SIZE_T_DEFINED_CUSTOM__
+
 struct ExplicitDefaultConstructor {
   ExplicitDefaultConstructor() : x(42) {}
   int x;
@@ -122,6 +133,7 @@ struct MoveConstructorWithOneParameterWithDefaultArg {
       : value(other.value + 1) {}
 };
 
+namespace UserFactoriesForCXXRefTypeInit {
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retain")))
 __attribute__((swift_attr("release:release"))) ImportWithCtor {
@@ -129,51 +141,261 @@ __attribute__((swift_attr("release:release"))) ImportWithCtor {
   int param1 = 0;
   int param2 = 0;
 
-  __attribute__((swift_name("init()")))
-  __attribute__((swift_attr("returns_retained")))
-  static ImportWithCtor * _Nonnull create() {
+  __attribute__((swift_name("init()"))) __attribute__((swift_attr(
+      "returns_retained"))) static ImportWithCtor *_Nonnull create() {
     return new ImportWithCtor{1};
   }
 
-  __attribute__((swift_name("init(_:)")))
-  __attribute__((swift_attr("returns_retained")))
-  static ImportWithCtor * _Nonnull create(int x) {
+  __attribute__((swift_name("init(_:)"))) __attribute__((swift_attr(
+      "returns_retained"))) static ImportWithCtor *_Nonnull create(int x) {
     return new ImportWithCtor{1, x};
   }
 
   __attribute__((swift_name("init(_:_:)")))
-  __attribute__((swift_attr("returns_retained")))
-  static ImportWithCtor * _Nonnull create(int x, int y) {
+  __attribute__((swift_attr("returns_retained"))) static ImportWithCtor
+      *_Nonnull create(int x, int y) {
     return new ImportWithCtor{1, x, y};
   }
 
   __attribute__((swift_name("init(_:_:_:)")))
-  __attribute__((swift_attr("returns_unretained")))
-  static ImportWithCtor * _Nonnull create(int x, int y, int z) {
+  __attribute__((swift_attr("returns_unretained"))) static ImportWithCtor
+      *_Nonnull create(int x, int y, int z) {
     return new ImportWithCtor{0, x, y};
   }
 };
 
-inline void retain(ImportWithCtor * _Nonnull x) {
+class Value {
+public:
+  __attribute__((swift_name("init(x:)"))) static Value forFoo(int x) {
+    Value ret;
+    ret.x = x;
+    return ret;
+  }
+  int getX() const { return x; }
+
+private:
+  int x;
+};
+} // namespace UserFactoriesForCXXRefTypeInit
+
+inline void retain(UserFactoriesForCXXRefTypeInit::ImportWithCtor *_Nonnull x) {
   x->value++;
 }
 
-inline void release(ImportWithCtor * _Nonnull x) {
+inline void
+release(UserFactoriesForCXXRefTypeInit::ImportWithCtor *_Nonnull x) {
   if (!--x->value)
     delete x;
 }
 
-class Value {
+namespace SwiftInitSynthesisForCXXRefTypes {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain1")))
+__attribute__((swift_attr("release:Release1"))) CompilerGeneratedDefaultCtor {
 public:
-  __attribute__((swift_name("init(x:)")))
-  static Value forFoo(int x) {
-      Value ret;
-      ret.x = x;
-      return ret; 
-  }
-  int getX() const { return x; }
-private:
-  int x;
+  int val = 1;
 };
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain3"))) __attribute__((
+    swift_attr("release:Release3"))) ExplicitCompilerGeneratedDefaultCtor {
+public:
+  int val = 1;
+  ExplicitCompilerGeneratedDefaultCtor() = default;
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) ImmortalReference {
+public:
+  int val = 1;
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain2")))
+__attribute__((swift_attr("release:Release2"))) UserProvidedDefaultCtor {
+public:
+  int val = 1;
+  UserProvidedDefaultCtor() { val = 2; }
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain15")))
+__attribute__((swift_attr("release:Release15"))) UserProvidedStaticFactory {
+public:
+  int val = 1;
+
+  UserProvidedStaticFactory() = default;
+
+  __attribute__((swift_name("init()"))) __attribute__((
+      swift_attr("returns_retained"))) static UserProvidedStaticFactory
+      *_Nonnull create() {
+    UserProvidedStaticFactory *_Nonnull returnPtr =
+        new UserProvidedStaticFactory();
+    returnPtr->val = 2;
+    return returnPtr;
+  }
+
+  __attribute__((swift_name("init(_:)"))) __attribute__((
+      swift_attr("returns_retained"))) static UserProvidedStaticFactory
+      *_Nonnull create(int x) {
+    UserProvidedStaticFactory *returnPtr = new UserProvidedStaticFactory();
+    returnPtr->val = x;
+    return returnPtr;
+  }
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain4")))
+__attribute__((swift_attr("release:Release4"))) PlacementOperatorNew {
+public:
+  int val = 1;
+  void *operator new(size_t, void *ptr) { return ptr; }
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain5")))
+__attribute__((swift_attr("release:Release5"))) PrivateOperatorNew { // expected-error {{'operator new' is a private member of 'SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew}}
+public:
+  int val = 1;
+
+private:
+  void *operator new(size_t); // expected-note {{declared private here}}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain6")))
+__attribute__((swift_attr("release:Release6"))) ProtectedOperatorNew { // expected-error {{'operator new' is a protected member of 'SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew'}}
+public:
+  int val = 1;
+
+protected:
+  void *operator new(size_t); // expected-note {{declared protected here}}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain7")))
+__attribute__((swift_attr("release:Release7"))) DeletedOperatorNew {
+public:
+  int val = 1;
+  void *operator new(size_t) = delete;
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain8")))
+__attribute__((swift_attr("release:Release8"))) PrivateCtor {
+private:
+  int val = 1;
+  PrivateCtor() {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain9")))
+__attribute__((swift_attr("release:Release9"))) ProtectedCtor {
+protected:
+  int val = 1;
+  ProtectedCtor() {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain10")))
+__attribute__((swift_attr("release:Release10"))) DeletedCtor {
+public:
+  int val = 90;
+  DeletedCtor() = delete;
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain11")))
+__attribute__((swift_attr("release:Release11"))) CtorWithDefaultArg {
+public:
+  int val = 1;
+  CtorWithDefaultArg(int x = 2) : val(x) {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain12"))) __attribute__((
+    swift_attr("release:Release12"))) CtorWithDefaultAndNonDefaultArg {
+public:
+  int val;
+  CtorWithDefaultAndNonDefaultArg(int x, int y = 42) : val(x + y) {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain13")))
+__attribute__((swift_attr("release:Release13"))) DefaulltAndNonDefaultCtors {
+public:
+  int val = 1;
+  DefaulltAndNonDefaultCtors() = default;
+  DefaulltAndNonDefaultCtors(int x) : val(x) {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain14")))
+__attribute__((swift_attr("release:Release14"))) ParameterizedCtor {
+public:
+  int val = 1;
+  ParameterizedCtor(int x) : val(x) {}
+};
+} // namespace SwiftInitSynthesisForCXXRefTypes
+
+void Retain1(SwiftInitSynthesisForCXXRefTypes::CompilerGeneratedDefaultCtor
+                  *_Nonnull v) {};
+void Release1(SwiftInitSynthesisForCXXRefTypes::CompilerGeneratedDefaultCtor
+                  *_Nonnull v) {};
+void Retain2(
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedDefaultCtor *_Nonnull v) {};
+void Release2(
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedDefaultCtor *_Nonnull v) {};
+void Retain3(
+    SwiftInitSynthesisForCXXRefTypes::ExplicitCompilerGeneratedDefaultCtor
+        *_Nonnull v) {};
+void Release3(
+    SwiftInitSynthesisForCXXRefTypes::ExplicitCompilerGeneratedDefaultCtor
+        *_Nonnull v) {};
+void Retain4(
+    SwiftInitSynthesisForCXXRefTypes::PlacementOperatorNew *_Nonnull v) {};
+void Release4(
+    SwiftInitSynthesisForCXXRefTypes::PlacementOperatorNew *_Nonnull v) {};
+void Retain5(SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew *_Nonnull v) {
+};
+void Release5(
+    SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew *_Nonnull v) {};
+void Retain6(
+    SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew *_Nonnull v) {};
+void Release6(
+    SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew *_Nonnull v) {};
+void Retain7(SwiftInitSynthesisForCXXRefTypes::DeletedOperatorNew *_Nonnull v) {
+};
+void Release7(
+    SwiftInitSynthesisForCXXRefTypes::DeletedOperatorNew *_Nonnull v) {};
+void Retain8(SwiftInitSynthesisForCXXRefTypes::PrivateCtor *_Nonnull v) {};
+void Release8(SwiftInitSynthesisForCXXRefTypes::PrivateCtor *_Nonnull v) {};
+void Retain9(SwiftInitSynthesisForCXXRefTypes::ProtectedCtor *_Nonnull v) {};
+void Release9(SwiftInitSynthesisForCXXRefTypes::ProtectedCtor *_Nonnull v) {};
+void Retain10(SwiftInitSynthesisForCXXRefTypes::DeletedCtor *_Nonnull v) {};
+void Release10(SwiftInitSynthesisForCXXRefTypes::DeletedCtor *_Nonnull v) {};
+void Retain11(
+    SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultArg *_Nonnull v) {};
+void Release11(
+    SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultArg *_Nonnull v) {};
+void Retain12(SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultAndNonDefaultArg
+                  *_Nonnull v) {};
+void Release12(SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultAndNonDefaultArg
+                    *_Nonnull v) {};
+void Retain13(
+    SwiftInitSynthesisForCXXRefTypes::DefaulltAndNonDefaultCtors *_Nonnull v) {
+};
+void Release13(
+    SwiftInitSynthesisForCXXRefTypes::DefaulltAndNonDefaultCtors *_Nonnull v) {
+};
+void Retain14(SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor *_Nonnull v) {
+};
+void Release14(
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor *_Nonnull v) {};
+void Retain15(
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
+void Release15(
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
