@@ -307,7 +307,7 @@ public:
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:Retain11")))
-__attribute__((swift_attr("release:Release11"))) CtorWithDefaultArg {
+__attribute__((swift_attr("release:Release11"))) CtorWithDefaultArg { // expected-note {{'init(_:)' declared here}}
 public:
   int val = 1;
   CtorWithDefaultArg(int x = 2) : val(x) {}
@@ -315,7 +315,7 @@ public:
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:Retain12"))) __attribute__((
-    swift_attr("release:Release12"))) CtorWithDefaultAndNonDefaultArg {
+    swift_attr("release:Release12"))) CtorWithDefaultAndNonDefaultArg { // expected-note {{'init(_:_:)' declared here}}
 public:
   int val;
   CtorWithDefaultAndNonDefaultArg(int x, int y = 42) : val(x + y) {}
@@ -336,6 +336,17 @@ __attribute__((swift_attr("release:Release14"))) ParameterizedCtor {
 public:
   int val = 1;
   ParameterizedCtor(int x) : val(x) {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain16")))
+__attribute__((swift_attr("release:Release16"))) ParameterizedCtor2 {
+public:
+  int val1 = 1;
+  int val2 = 1;
+  ParameterizedCtor2() {};
+  ParameterizedCtor2(int x) : val1(x) {}
+  ParameterizedCtor2(int x, int y) : val1(x), val2(y) {}
 };
 } // namespace SwiftInitSynthesisForCXXRefTypes
 
@@ -397,5 +408,9 @@ void Retain15(
     SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
 void Release15(
     SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
+void Retain16(
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {};
+void Release16(
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {};
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
