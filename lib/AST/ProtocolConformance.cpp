@@ -628,7 +628,7 @@ Type ProtocolConformance::getAssociatedType(Type assocType) const {
          "associated type must be a type parameter");
 
   ProtocolConformanceRef ref(const_cast<ProtocolConformance*>(this));
-  return ref.getAssociatedType(getType(), assocType);
+  return ref.getAssociatedType(assocType);
 }
 
 ProtocolConformanceRef

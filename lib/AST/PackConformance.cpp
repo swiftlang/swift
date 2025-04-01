@@ -142,9 +142,7 @@ PackConformance *PackConformance::getAssociatedConformance(
     auto packElement = ConformingType->getElementType(i);
 
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
-      auto assocTypePattern =
-        conformances[i].getAssociatedType(packExpansion->getPatternType(),
-                                          assocType);
+      auto assocTypePattern = conformances[i].getAssociatedType(assocType);
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
 
@@ -152,8 +150,7 @@ PackConformance *PackConformance::getAssociatedConformance(
         conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformancePattern);
     } else {
-      auto assocTypeScalar =
-        conformances[i].getAssociatedType(packElement, assocType);
+      auto assocTypeScalar = conformances[i].getAssociatedType(assocType);
       packElements.push_back(assocTypeScalar);
 
       auto assocConformanceScalar =

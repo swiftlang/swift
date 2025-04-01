@@ -3448,8 +3448,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     auto association = entry.getAssociatedConformancePath();
     auto associatedRequirement = entry.getAssociatedConformanceRequirement();
 
-    CanType associatedType =
-      sourceConformance.getAssociatedType(sourceType, association)
+    CanType associatedType = sourceConformance.getAssociatedType(association)
         ->getCanonicalType();
     sourceKey.Type = associatedType;
 
@@ -3527,7 +3526,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       // type directly.
       auto depMemType = cast<DependentMemberType>(association);
       CanType baseSubstType =
-        sourceConformance.getAssociatedType(sourceType, depMemType.getBase())
+        sourceConformance.getAssociatedType(depMemType.getBase())
           ->getCanonicalType();
       if (auto archetypeType = dyn_cast<ArchetypeType>(baseSubstType)) {
         AssociatedType baseAssocType(depMemType->getAssocType());

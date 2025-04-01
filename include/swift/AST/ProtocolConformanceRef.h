@@ -209,7 +209,7 @@ public:
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
-  Type getAssociatedType(Type origType, Type dependentType) const;
+  Type getAssociatedType(Type dependentType) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol) and conformance, follow it from the conforming type.
