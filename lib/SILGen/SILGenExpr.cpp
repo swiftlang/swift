@@ -4152,7 +4152,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
-          formalTy,
           GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
           equatableProtocol);
 

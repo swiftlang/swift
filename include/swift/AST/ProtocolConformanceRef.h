@@ -215,8 +215,7 @@ public:
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol) and conformance, follow it from the conforming type.
   ProtocolConformanceRef
-  getAssociatedConformance(Type origType, Type dependentType,
-                           ProtocolDecl *requirement) const;
+  getAssociatedConformance(Type dependentType, ProtocolDecl *requirement) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0,

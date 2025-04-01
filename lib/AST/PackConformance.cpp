@@ -151,8 +151,7 @@ PackConformance *PackConformance::getAssociatedConformance(
           assocTypePattern, packExpansion->getCountType()));
 
       auto assocConformancePattern =
-        conformances[i].getAssociatedConformance(packExpansion->getPatternType(),
-                                                 assocType, protocol);
+        conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformancePattern);
     } else {
       auto assocTypeScalar =
@@ -160,7 +159,7 @@ PackConformance *PackConformance::getAssociatedConformance(
       packElements.push_back(assocTypeScalar);
 
       auto assocConformanceScalar =
-        conformances[i].getAssociatedConformance(packElement, assocType, protocol);
+        conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformanceScalar);
     }
   }

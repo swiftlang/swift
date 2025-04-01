@@ -3454,8 +3454,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     sourceKey.Type = associatedType;
 
     auto associatedConformance =
-      sourceConformance.getAssociatedConformance(sourceType, association,
-                                                 associatedRequirement);
+      sourceConformance.getAssociatedConformance(association, associatedRequirement);
     sourceKey.Kind =
       LocalTypeDataKind::forProtocolWitnessTable(associatedConformance);
 

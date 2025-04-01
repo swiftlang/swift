@@ -244,24 +244,25 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
-                                                 Type assocType,
+ProtocolConformanceRef::getAssociatedConformance(Type assocType,
                                                  ProtocolDecl *protocol) const {
+  if (isInvalid())
+    return *this;
+
   // If this is a pack conformance, project the associated conformances from
   // each pack element.
   if (isPack()) {
     auto *pack = getPack();
-    assert(conformingType->isEqual(pack->getType()));
     return ProtocolConformanceRef(
         pack->getAssociatedConformance(assocType, protocol));
   }
 
   // If this is a concrete conformance, project the associated conformance.
   if (isConcrete()) {
-    auto conformance = getConcrete();
-    assert(conformance->getType()->isEqual(conformingType));
-    return conformance->getAssociatedConformance(assocType, protocol);
+    return getConcrete()->getAssociatedConformance(assocType, protocol);
   }
+
+  auto conformingType = getType();
 
   auto computeSubjectType = [&](Type conformingType) -> Type {
     return assocType.transformRec(
