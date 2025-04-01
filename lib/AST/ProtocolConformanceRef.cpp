@@ -93,23 +93,24 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   if (isPack())
     return getPack()->subst(IFS);
 
-  // Handle abstract conformances below:
+  ASSERT(isAbstract());
+  auto *proto = getProtocol();
 
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
-  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!IFS.shouldSubstituteOpaqueArchetypes()
-        && isa<OpaqueTypeArchetypeType>(origArchetype)) {
-      return *this;
+  if (auto origArchetype = origType->getAs<OpaqueTypeArchetypeType>()) {
+    if (!IFS.shouldSubstituteOpaqueArchetypes()) {
+      return forAbstract(origType.subst(IFS), proto);
     }
   }
+
+  // FIXME: Handle local archetypes as above!
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(IFS);
 
-  auto *proto = getProtocol();
-
   // If the type is an existential, it must be self-conforming.
+  // FIXME: This feels like it's in the wrong place.
   if (substType->isExistentialType()) {
     auto optConformance =
         lookupConformance(substType, proto, /*allowMissing=*/true);
@@ -119,7 +120,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
     return ProtocolConformanceRef::forInvalid();
   }
 
-  // Check the conformance map.
+  // Local conformance lookup into the substitution map.
   // FIXME: Pack element level?
   return IFS.lookupConformance(origType->getCanonicalType(), substType, proto,
                                /*level=*/0);
@@ -128,24 +129,20 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
   if (isConcrete()) {
     return getConcrete()->subst(
-        [](SubstitutableType *type) -> Type {
-          if (auto *archetypeType = type->getAs<ArchetypeType>())
-            return archetypeType->getInterfaceType();
-          return type;
-        },
+        MapTypeOutOfContext(),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
-        [](SubstitutableType *type) -> Type {
-          if (auto *archetypeType = type->getAs<ArchetypeType>())
-            return archetypeType->getInterfaceType();
-          return type;
-        },
+        MapTypeOutOfContext(),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
+  } else if (isAbstract()) {
+    auto *abstract = getAbstract();
+    return forAbstract(abstract->getType()->mapTypeOutOfContext(),
+                       abstract->getProtocol());
   }
 
   return *this;
@@ -266,6 +263,15 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
     return conformance->getAssociatedConformance(assocType, protocol);
   }
 
+  auto computeSubjectType = [&](Type conformingType) -> Type {
+    return assocType.transformRec(
+      [&](TypeBase *t) -> std::optional<Type> {
+        if (isa<GenericTypeParamType>(t))
+          return conformingType;
+        return std::nullopt;
+      });
+  };
+
   // An associated conformance of an archetype might be known to be
   // a concrete conformance, if the subject type is fixed to a concrete
   // type in the archetype's generic signature. We don't actually have
@@ -276,15 +282,8 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
   // conformances where they store their subject types, we can also
   // cache the lookups inside the abstract conformance instance too.
   if (auto archetypeType = conformingType->getAs<ArchetypeType>()) {
-    conformingType = archetypeType->getInterfaceType();
     auto *genericEnv = archetypeType->getGenericEnvironment();
-
-    auto subjectType = assocType.transformRec(
-      [&](TypeBase *t) -> std::optional<Type> {
-        if (isa<GenericTypeParamType>(t))
-          return conformingType;
-        return std::nullopt;
-      });
+    auto subjectType = computeSubjectType(archetypeType->getInterfaceType());
 
     return lookupConformance(
         genericEnv->mapTypeIntoContext(subjectType),
@@ -296,12 +295,8 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
   // signature of the substitution (or in the case of type variables,
   // we have no visibility into constraints). See the parallel hack
   // to handle this in SubstitutionMap::lookupConformance().
-  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
-                     conformingType->isTypeVariableOrMember() ||
-                     conformingType->is<UnresolvedType>() ||
-                     conformingType->is<PlaceholderType>());
-
-  return ProtocolConformanceRef::forAbstract(conformingType, protocol);
+  auto subjectType = computeSubjectType(conformingType);
+  return ProtocolConformanceRef::forAbstract(subjectType, protocol);
 }
 
 /// Check of all types used by the conformance are canonical.

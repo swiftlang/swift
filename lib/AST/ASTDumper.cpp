@@ -5527,6 +5527,12 @@ public:
       assert(conformance.isAbstract());
 
       printHead("abstract_conformance", ASTNodeColor, label);
+
+      PrintOptions PO;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::StableReference;
+
+      printTypeField(conformance.getType(), Label::always("type"), PO);
       printReferencedDeclField(conformance.getProtocol(),
                                Label::always("protocol"));
       printFoot();
