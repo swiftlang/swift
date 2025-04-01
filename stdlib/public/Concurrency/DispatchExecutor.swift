@@ -154,8 +154,8 @@ protocol DispatchExecutorProtocol: Executor {
 
 /// An enumeration identifying one of the Dispatch-supported clocks
 enum DispatchClockID: CInt {
-  case suspending = 1
-  case continuous = 2
+  case continuous = 1
+  case suspending = 2
 }
 
 @available(SwiftStdlib 6.2, *)
