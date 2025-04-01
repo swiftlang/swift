@@ -959,3 +959,6 @@ Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
 Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
 Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
 Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
+
+// Indirect tagged string creation
+Added: __swift_stdlib_CreateIndirectTaggedPointerString

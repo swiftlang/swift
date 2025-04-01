@@ -124,7 +124,6 @@ static void lookUpIndirectTaggedStringCreationOnceImpl(void *ctxt) {
   Class cls = objc_lookUpClass("NSIndirectTaggedPointerString");
   if (!cls) return;
   SEL sel = @selector(newIndirectTaggedNSStringWithConstantNullTerminatedASCIIBytes_:length_:);
-  if (!sel) return;
   Method m = class_getClassMethod(cls, sel);
   if (!m) return;
   createIndirectTaggedString = (createIndirectTaggedImplPtr)method_getImplementation(m);
