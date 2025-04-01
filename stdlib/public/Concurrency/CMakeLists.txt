@@ -283,8 +283,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       endif()
 
       if("${mod}" MATCHES "-macos$")
-        set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding -stdlib=libc++)
-        set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
+        set(extra_c_compile_flags -ffreestanding -stdlib=libc++)
+        set(extra_swift_compile_flags -Xcc -ffreestanding)
       endif()
 
     elseif (SWIFT_HOST_VARIANT STREQUAL "wasi")
