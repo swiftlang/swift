@@ -799,16 +799,18 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
   foreach ($Var in (Get-ChildItem env:*).GetEnumerator()) {
     $OldVars.Add($Var.Key, $Var.Value)
   }
-
-  & $Block
-
-  Remove-Item env:*
-  foreach ($Var in $OldVars.GetEnumerator()) {
-    New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
+  try {
+    & $Block
   }
+  finally {
+    Remove-Item env:*
+    foreach ($Var in $OldVars.GetEnumerator()) {
+      New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
+    }
 
-  if ($ToBatch) {
-    Write-Output "endlocal"
+    if ($ToBatch) {
+      Write-Output "endlocal"
+    }
   }
 }
 
