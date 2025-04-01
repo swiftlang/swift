@@ -512,8 +512,7 @@ checkEffects(AbstractStorageDecl *witness, AbstractStorageDecl *req) {
 /// to be used by `matchWitness`.
 static std::optional<RequirementMatch>
 matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
-                          bool &decomposeFunctionType, bool &ignoreReturnType,
-                          Type &reqThrownError, Type &witnessThrownError) {
+                          bool &decomposeFunctionType, bool &ignoreReturnType) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -658,23 +657,6 @@ matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
-
-    // Dig out the thrown error types from the getter so we can compare them
-    // later.
-    auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
-      if (auto getter = asd->getEffectfulGetAccessor()) {
-        if (Type thrownErrorType = getter->getThrownInterfaceType()) {
-          return thrownErrorType;
-        } else if (getter->hasThrows()) {
-          return asd->getASTContext().getAnyExistentialType();
-        }
-      }
-
-      return asd->getASTContext().getNeverType();
-    };
-
-    reqThrownError = getThrownErrorType(reqASD);
-    witnessThrownError = getThrownErrorType(witnessASD);
   } else if (isa<ConstructorDecl>(witness)) {
     decomposeFunctionType = true;
     ignoreReturnType = true;
@@ -713,39 +695,33 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
                                                  const ValueDecl *witness) {
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
-  Type reqThrownError;
-  Type witnessThrownError;
   return matchWitnessStructureImpl(req, const_cast<ValueDecl *>(witness),
-                                   decomposeFunctionType, ignoreReturnType,
-                                   reqThrownError,
-                                   witnessThrownError) == std::nullopt;
+                                   decomposeFunctionType, ignoreReturnType)
+      == std::nullopt;
 }
 
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
+        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
         setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
-  Type reqThrownError;
-  Type witnessThrownError;
 
   if (auto StructuralMismatch = matchWitnessStructureImpl(
-          req, witness, decomposeFunctionType, ignoreReturnType, reqThrownError,
-          witnessThrownError)) {
+          req, witness, decomposeFunctionType, ignoreReturnType)) {
     return *StructuralMismatch;
   }
 
   // Set up the match, determining the requirement and witness types
   // in the process.
-  Type reqType, witnessType;
+  Type reqType, witnessType, reqThrownError, witnessThrownError;
   {
     std::optional<RequirementMatch> result;
-    std::tie(result, reqType, witnessType) = setup();
+    std::tie(result, reqType, witnessType, reqThrownError, witnessThrownError) = setup();
     if (result) {
       return std::move(result.value());
     }
@@ -936,7 +912,8 @@ RequirementMatch swift::matchWitness(
 
     case ThrownErrorSubtyping::Subtype:
       // If there were no type parameters, we're done.
-      if (!reqThrownError->hasTypeParameter())
+      if (!reqThrownError->hasTypeVariable() &&
+          !reqThrownError->hasTypeParameter())
         break;
 
       LLVM_FALLTHROUGH;
@@ -1186,7 +1163,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type> {
+      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1199,10 +1176,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (syntheticEnv)
       selfTy = syntheticEnv->mapTypeIntoContext(selfTy);
 
+
     // Open up the type of the requirement.
+    SmallVector<OpenedType, 4> reqReplacements;
+
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    SmallVector<OpenedType, 4> reqReplacements;
     reqType =
         cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isDynamicResult=*/false,
@@ -1235,14 +1214,17 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
 
     // Open up the witness type.
+    SmallVector<OpenedType, 4> witnessReplacements;
+
     witnessType = witness->getInterfaceType();
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       openWitnessType =
-          cs->getTypeOfMemberReference(
-                selfTy, witness, dc, /*isDynamicResult=*/false,
-                FunctionRefInfo::doubleBaseNameApply(), witnessLocator)
+          cs->getTypeOfMemberReference(selfTy, witness, dc,
+                                       /*isDynamicResult=*/false,
+                                       FunctionRefInfo::doubleBaseNameApply(),
+                                       witnessLocator, &witnessReplacements)
               .adjustedReferenceType;
     } else {
       openWitnessType =
@@ -1253,7 +1235,37 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
     openWitnessType = openWitnessType->getRValueType();
 
-    return std::make_tuple(std::nullopt, reqType, openWitnessType);
+    Type reqThrownError;
+    Type witnessThrownError;
+
+    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
+      auto *reqASD = cast<AbstractStorageDecl>(req);
+
+      // Dig out the thrown error types from the getter so we can compare them
+      // later.
+      auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
+        if (auto getter = asd->getEffectfulGetAccessor()) {
+          if (Type thrownErrorType = getter->getThrownInterfaceType()) {
+            return thrownErrorType;
+          } else if (getter->hasThrows()) {
+            return asd->getASTContext().getErrorExistentialType();
+          }
+        }
+
+        return asd->getASTContext().getNeverType();
+      };
+
+      reqThrownError = getThrownErrorType(reqASD);
+      reqThrownError = cs->openType(reqThrownError, reqReplacements,
+                                    reqLocator);
+
+      witnessThrownError = getThrownErrorType(witnessASD);
+      witnessThrownError = cs->openType(witnessThrownError, witnessReplacements,
+                                        witnessLocator);
+    }
+
+    return std::make_tuple(std::nullopt, reqType, openWitnessType,
+                           reqThrownError, witnessThrownError);
   };
 
   // Match a type in the requirement to a type in the witness.
