@@ -197,6 +197,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atReasync))
       case .rethrows:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atRethrows))
+      case .concurrent:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .concurrent))
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 

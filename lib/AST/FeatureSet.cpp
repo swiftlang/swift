@@ -511,6 +511,9 @@ static bool usesFeatureExecutionAttribute(Decl *decl) {
   if (decl->getAttrs().hasAttribute<ExecutionAttr>())
     return true;
 
+  if (decl->getAttrs().hasAttribute<ConcurrentAttr>())
+    return true;
+
   auto hasExecutionAttr = [](TypeRepr *R) {
     if (!R)
       return false;

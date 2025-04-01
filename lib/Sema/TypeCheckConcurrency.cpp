@@ -4903,6 +4903,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
   auto concurrentExecutionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
+  auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
@@ -4914,11 +4915,14 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       globalActorAttr = std::nullopt;
     if (concurrentExecutionAttr && concurrentExecutionAttr->isImplicit())
       concurrentExecutionAttr = nullptr;
+    if (concurrentAttr && concurrentAttr->isImplicit())
+      concurrentAttr = nullptr;
   }
 
   unsigned numIsolationAttrs =
       (isolatedAttr ? 1 : 0) + (nonisolatedAttr ? 1 : 0) +
-      (globalActorAttr ? 1 : 0) + (concurrentExecutionAttr ? 1 : 0);
+      (globalActorAttr ? 1 : 0) + (concurrentExecutionAttr ? 1 : 0) +
+      (concurrentAttr ? 1 : 0);
   if (numIsolationAttrs == 0) {
     if (isa<DestructorDecl>(decl) && !decl->isImplicit()) {
       return ActorIsolation::forNonisolated(false);
@@ -4942,6 +4946,9 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       return ActorIsolation::forCallerIsolationInheriting();
     }
   }
+
+  if (concurrentAttr)
+    return ActorIsolation::forNonisolated(/*is unsafe*/ false);
 
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.

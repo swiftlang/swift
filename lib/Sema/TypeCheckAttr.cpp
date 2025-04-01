@@ -198,7 +198,7 @@ public:
     TypeChecker::checkDeclABIAttribute(D, attr);
   }
 
-  void visitExecutionAttr(ExecutionAttr *attr) {
+  void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
     auto *const decl = cast<ValueDecl>(D);
 
     auto *const storage = dyn_cast<AbstractStorageDecl>(decl);
@@ -241,6 +241,22 @@ public:
         }
       }
     }
+  }
+
+  void visitExecutionAttr(ExecutionAttr *attr) {
+    checkExecutionBehaviorAttribute(attr);
+
+    if (auto *concurrentAttr = D->getAttrs().getAttribute<ConcurrentAttr>())
+    diagnoseAndRemoveAttr(attr, diag::actor_isolation_multiple_attr_2, D,
+                          attr, concurrentAttr);
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    checkExecutionBehaviorAttribute(attr);
+
+    if (auto *executionAttr = D->getAttrs().getAttribute<ExecutionAttr>())
+      diagnoseAndRemoveAttr(attr, diag::actor_isolation_multiple_attr_2, D,
+                            attr, executionAttr);
   }
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -4317,6 +4333,7 @@ static void checkGlobalActorAttr(
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto executionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
+  auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
   llvm::SmallVector<const DeclAttribute *, 2> attributes;
 
@@ -4331,7 +4348,9 @@ static void checkGlobalActorAttr(
   if (executionAttr) {
     attributes.push_back(executionAttr);
   }
-
+  if (concurrentAttr) {
+    attributes.push_back(concurrentAttr);
+  }
   if (attributes.size() == 1)
     return;
 
@@ -8152,13 +8171,13 @@ public:
     // Nothing else to check.
   }
 
-  void visitExecutionAttr(ExecutionAttr *attr) {
+  void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
     if (!ctx.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
       visitDeclAttribute(attr);
       return;
     }
 
-    // `@execution(...)` implies `async`.
+    // execution behavior attribute implies `async`.
     if (closure->hasExplicitResultType() &&
         closure->getAsyncLoc().isInvalid()) {
       ctx.Diags
@@ -8189,6 +8208,14 @@ public:
         attr->setInvalid();
       }
     }
+  }
+
+  void visitExecutionAttr(ExecutionAttr *attr) {
+    checkExecutionBehaviorAttribute(attr);
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    checkExecutionBehaviorAttribute(attr);
   }
 
   void visitNonisolatedAttr(NonisolatedAttr *attr) {
