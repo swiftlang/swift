@@ -10,6 +10,8 @@ public struct S {}
 protocol P {
 }
 
+public class C2: P {}
+
 public struct T: P {
   let c: C
   let s: S
@@ -36,6 +38,7 @@ public enum X {
 sil [ossa] @take_s : $@convention(thin) (@in S) -> ()
 sil [ossa] @take_t : $@convention(thin) (@in T) -> ()
 sil [ossa] @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
+sil [ossa] @use_c2 : $@convention(thin) (@in_guaranteed C2) -> ()
 
 // CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum1 :
 // CHECK:        [[A:%[0-9]+]] = alloc_stack $S
@@ -346,3 +349,19 @@ bb3:
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @init_existential_with_dynamic_self :
+// CHECK:         [[S:%.*]] = alloc_stack $C2
+// CHECK:         store %0 to [init] [[S]]
+// CHECK:         apply %{{[0-9]+}}([[S]])
+// CHECK:       } // end sil function 'init_existential_with_dynamic_self'
+sil [ossa] @init_existential_with_dynamic_self : $@convention(method) (@owned C2) -> () {
+bb0(%0 : @owned $C2):
+  %1 = alloc_stack $P
+  %2 = init_existential_addr %1, $@dynamic_self C2
+  store %0 to [init] %2
+  %4 = function_ref @use_c2 : $@convention(thin) (@in_guaranteed C2) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed C2) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  return %5
+}
