@@ -483,7 +483,7 @@ static bool usesFeatureValueGenericsNameLookup(Decl *decl) {
   if (!fn)
     return false;
 
-  auto body = fn->getTypecheckedBody();
+  auto body = fn->getMacroExpandedBody();
 
   if (!body)
     return false;
