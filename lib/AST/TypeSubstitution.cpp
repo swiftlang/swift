@@ -443,7 +443,10 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
     IFS.lookupConformance(origBase->getCanonicalType(), substBase,
                           proto, level);
 
-  return conformance.getTypeWitness(substBase, assocType, IFS.getOptions());
+  auto result = conformance.getTypeWitness(substBase, assocType, IFS.getOptions());
+  if (result->is<ErrorType>())
+    return DependentMemberType::get(ErrorType::get(substBase), assocType);
+  return result;
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
