@@ -1119,6 +1119,17 @@ void swift::printModuleContentsAsObjC(
       .write();
 }
 
+void swift::printModuleContentsAsC(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+  llvm::raw_null_ostream prologueOS;
+  llvm::StringSet<> exposedModules;
+  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+               /*requiresExposedAttribute=*/false, exposedModules,
+               OutputLanguageMode::C)
+      .write();
+}
+
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     bool requiresExposedAttribute, llvm::StringSet<> &exposedModules) {
