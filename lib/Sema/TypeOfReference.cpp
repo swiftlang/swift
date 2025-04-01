@@ -2260,7 +2260,7 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 /// the full opened type and the reference's type.
 static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     ConstraintSystem &CS, ConstraintLocator *locator,
-    DeclTypeCheckingSemantics semantics) {
+    DeclTypeCheckingSemantics semantics, DeclContext *useDC) {
   switch (semantics) {
   case DeclTypeCheckingSemantics::Normal:
     llvm_unreachable("Decl does not have special type checking semantics!");
@@ -2307,10 +2307,11 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
         0);
     FunctionType::Param arg(escapeClosure);
+    bool isAsync = CS.isAsynchronousContext(useDC);
     auto bodyClosure = FunctionType::get(arg, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
-                                             .withAsync(true)
+                                             .withAsync(isAsync)
                                              .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
@@ -2321,7 +2322,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
-                                         .withAsync(true)
+                                         .withAsync(isAsync)
                                          .withThrows(true, thrownError)
                                          .build());
     return {refType, refType, refType, refType, Type()};
@@ -2400,7 +2401,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     DeclReferenceType declRefType;
     if (semantics != DeclTypeCheckingSemantics::Normal) {
       declRefType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
-          *this, locator, semantics);
+          *this, locator, semantics, useDC);
     } else if (auto baseTy = choice.getBaseType()) {
       // Retrieve the type of a reference to the specific declaration choice.
       assert(!baseTy->hasTypeParameter());
