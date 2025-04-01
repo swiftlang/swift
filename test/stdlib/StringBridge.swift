@@ -77,27 +77,32 @@ StringBridgeTests.test("Constant NSString New SPI") {
   }
 }
 
-StringBridgeTests.test("Constant NSString New SPI") {
-  if #available(SwiftStdlib 6.2, *) {
+StringBridgeTests.test("Shared String SPI")
+  .require(.stdlib_6_2)
+  .code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
     func test(literal: String, isASCII: Bool) {
-      var base = literal
-      var baseCount = literal.length
-      base.withCString { ptr in
-        let fullBuffer = UnsafeButterPointer(start: ptr, count: baseCount)
-        let fullString = _SwiftCreateImmortalString_ForFoundation(
-          buffer: fullBuffer,
-          isASCII: isASCII
-        )
-        let fullCString = fullString.utf8String
-        expectEqual(baseCount, strlen(fullCString))
-        expectEqual(strcmp(ptr, fullCString), 0)
-        let fullCString2 = fullString.utf8String
-        expectEqual(fullCString, fullCString2) //if we're already terminated, we can return the contents pointer as-is
+      let baseCount = literal.utf8.count
+      literal.withCString { intptr in
+        intptr.withMemoryRebound(to: UInt8.self, capacity: baseCount) { ptr in
+          let fullBuffer = UnsafeBufferPointer(start: ptr, count: baseCount)
+          let fullString = _SwiftCreateImmortalString_ForFoundation(
+            buffer: fullBuffer,
+            isASCII: isASCII
+          )
+          expectNotNil(fullString)
+          let bridgedFullString = (fullString! as NSString)
+          let fullCString = bridgedFullString.utf8String!
+          expectEqual(baseCount, strlen(fullCString))
+          expectEqual(strcmp(ptr, fullCString), 0)
+          let fullCString2 = bridgedFullString.utf8String!
+          expectEqual(fullCString, fullCString2) //if we're already terminated, we can return the contents pointer as-is
+          withExtendedLifetime(fullString) {}
+        }
       }
     }
     test(literal: "abcdefghijklmnopqrstuvwxyz", isASCII: true)
     test(literal: "abcdëfghijklmnopqrstuvwxyz", isASCII: false)
-  }
 }
 
 StringBridgeTests.test("Bridging") {
