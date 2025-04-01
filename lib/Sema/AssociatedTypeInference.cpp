@@ -2903,8 +2903,8 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
 
   ProtocolConformanceRef conformanceInContext(conformance);
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
-    conformanceInContext =
-      conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
+    conformanceInContext = conformanceInContext.subst(
+        genericEnv->getForwardingSubstitutionMap());
   }
 
   auto substitutions =

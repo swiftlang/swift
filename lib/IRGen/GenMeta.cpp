@@ -2877,9 +2877,10 @@ namespace {
             substitutions.lookupConformance(underlyingDependentType, P);
 
         if (underlyingType->hasTypeParameter()) {
-          std::tie(underlyingType, underlyingConformance)
-              = GenericEnvironment::mapConformanceRefIntoContext(
-                    genericEnv, underlyingType, underlyingConformance);
+          underlyingType = genericEnv->mapTypeIntoContext(
+              underlyingType);
+          underlyingConformance = underlyingConformance.subst(
+            genericEnv->getForwardingSubstitutionMap());
         }
 
         return emitWitnessTableRef(IGF, underlyingType->getCanonicalType(),
