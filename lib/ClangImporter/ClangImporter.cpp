@@ -6285,9 +6285,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // to import all non-public members by default; if that is disabled, we only
   // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
   // are the only classes that need non-public members.)
+  auto *cxxRecordDecl =
+      dyn_cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl());
   auto skipIfNonPublic =
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
-      importer::getPrivateFileIDAttrs(inheritingDecl->getClangDecl()).empty();
+      cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
@@ -8758,9 +8760,8 @@ void ClangInheritanceInfo::setUnavailableIfNecessary(
 }
 
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
+importer::getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
-
   constexpr auto prefix = StringRef("private_fileid:");
 
   if (decl->hasAttrs()) {

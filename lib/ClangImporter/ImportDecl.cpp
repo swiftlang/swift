@@ -10056,10 +10056,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // to import all non-public members by default; if that is disabled, we only
   // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
   // are the only classes that need non-public members.)
-  auto skipIfNonPublic =
-      !swiftDecl->getASTContext().LangOpts.hasFeature(
-          Feature::ImportNonPublicCxxMembers) &&
-      importer::getPrivateFileIDAttrs(swiftDecl->getClangDecl()).empty();
+  auto *baseRecord = dyn_cast<clang::CXXRecordDecl>(swiftDecl->getClangDecl());
+  auto skipIfNonPublic = !swiftDecl->getASTContext().LangOpts.hasFeature(
+                             Feature::ImportNonPublicCxxMembers) &&
+                         baseRecord &&
+                         importer::getPrivateFileIDAttrs(baseRecord).empty();
 
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
