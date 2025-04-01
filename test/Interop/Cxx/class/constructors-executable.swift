@@ -118,6 +118,37 @@ CxxConstructorTestSuite.test("SynthesizeAndImportStaticFactoryAsInitializer") {
   expectEqual(x7.val, 2)
   x7.val = 3
   expectEqual(x7.val, 3)
+
+  let x8 = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor2()
+  expectEqual(x8.val1, 1)
+  expectEqual(x8.val2, 1)
+  x8.val1 = 2
+  expectEqual(x8.val1, 2)
+  expectEqual(x8.val2, 1)
+
+  let y8 = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor2(2)
+  expectEqual(y8.val1, 2)
+  expectEqual(y8.val2, 1)
+  y8.val1 = 3
+  expectEqual(y8.val1, 3)
+  expectEqual(y8.val2, 1)
+
+  let z8 = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor2(2, 3)
+  expectEqual(z8.val1, 2)
+  expectEqual(z8.val2, 3)
+  z8.val1 = 4
+  z8.val2 = 5
+  expectEqual(z8.val1, 4)
+  expectEqual(z8.val2, 5)
+
+  let x9 = SwiftInitSynthesisForCXXRefTypes.DefaulltAndNonDefaultCtors()
+  expectEqual(x9.val, 1)
+  x9.val = 2
+  expectEqual(x9.val, 2)
+  let y9 = SwiftInitSynthesisForCXXRefTypes.DefaulltAndNonDefaultCtors(3)
+  expectEqual(y9.val, 3)
+  y9.val = 4
+  expectEqual(y9.val, 4)
 }
 
 runAllTests()

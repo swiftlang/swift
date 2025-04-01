@@ -16,12 +16,6 @@ let _ = SwiftInitSynthesisForCXXRefTypes.PrivateCtor()  // expected-error {{'Swi
 let _ = SwiftInitSynthesisForCXXRefTypes.ProtectedCtor()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.ProtectedCtor' cannot be constructed because it has no accessible initializers}}
 let _ = SwiftInitSynthesisForCXXRefTypes.DeletedCtor()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.DeletedCtor' cannot be constructed because it has no accessible initializers}}
 
-let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg' cannot be constructed because it has no accessible initializers}}
-let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
-
-let _ = SwiftInitSynthesisForCXXRefTypes.DefaulltAndNonDefaultCtors()
-// TODO: change the error message when we start supporting parameterised ctors
-let _ = SwiftInitSynthesisForCXXRefTypes.DefaulltAndNonDefaultCtors(2)  // expected-error {{argument passed to call that takes no arguments}}
-
-// TODO: fix the error message in this case
-let _ = SwiftInitSynthesisForCXXRefTypes.ParameterizedCtor()  // expected-error {{missing argument for parameter #1 in call}}
+// Todo: add support for default args in ctors and fix this error
+let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg()  // expected-error {{missing argument for parameter #1 in call}}
+let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg()  // expected-error {{missing arguments for parameters #1, #2 in call}}
