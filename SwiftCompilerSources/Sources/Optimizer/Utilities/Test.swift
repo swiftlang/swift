@@ -160,7 +160,7 @@ public func registerOptimizerTests() {
     enclosingValuesTest,
     forwardingDefUseTest,
     forwardingUseDefTest,
-    gatherCallSitesTest,
+    gatherCallSiteTest,
     interiorLivenessTest,
     lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,

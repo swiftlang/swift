@@ -33,7 +33,7 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> (Float, Float)):
 sil hidden @$s4test1fyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_sites"
+  specify_test "closure_specialize_gather_call_site"
   // CHECK-LABEL: Specializing closures in function: $s4test1fyS2fFTJrSpSr
   // CHECK: PartialApply call site:   %8 = partial_apply [callee_guaranteed] %7(%6) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float 
   // CHECK: Passed in closures:
@@ -103,7 +103,7 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> (Float, Float)):
 sil hidden @$s4test1kyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_sites"
+  specify_test "closure_specialize_gather_call_site"
   // CHECK-LABEL: Specializing closures in function: $s4test1kyS2fFTJrSpSr
   // CHECK: PartialApply call site:   %8 = partial_apply [callee_guaranteed] %7(%6) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float 
   // CHECK: Passed in closures:
@@ -181,7 +181,7 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> Float, %2 : $@callee_guaran
 sil hidden @$s4test1gyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_sites"
+  specify_test "closure_specialize_gather_call_site"
   // CHECK-LABEL: Specializing closures in function: $s4test1gyS2fFTJrSpSr
   // CHECK: PartialApply call site:   %16 = partial_apply [callee_guaranteed] %15(%6, %10, %14) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float 
   // CHECK: Passed in closures:
@@ -292,7 +292,7 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> X.TangentVector):
 sil hidden @$s5test21g1xSfAA1XV_tFTJrSpSr : $@convention(thin) (X) -> (Float, @owned @callee_guaranteed (Float) -> X.TangentVector) {
 bb0(%0 : $X):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_sites"
+  specify_test "closure_specialize_gather_call_site"
   // CHECK-LABEL: Specializing closures in function: $s5test21g1xSfAA1XV_tFTJrSpSr
   // CHECK: PartialApply call site:   %7 = partial_apply [callee_guaranteed] %6(%5) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> X.TangentVector) -> X.TangentVector 
   // CHECK: Passed in closures:
@@ -368,7 +368,7 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> Float):
 sil hidden @$s5test21h1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_sites"
+  specify_test "closure_specialize_gather_call_site"
   // CHECK-LABEL: Specializing closures in function: $s5test21h1xS2f_tFTJrSpSr
   // CHECK: PartialApply call site:     %14 = partial_apply [callee_guaranteed] %13(%11) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float 
   // CHECK: Passed in closures:
@@ -461,7 +461,7 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> Float):
 sil hidden @$s5test21z1xS2f_tFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 bb0(%0 : $Float):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_sites"
+  specify_test "closure_specialize_gather_call_site"
   // CHECK-LABEL: Specializing closures in function: $s5test21z1xS2f_tFTJrSpSr
   // CHECK: PartialApply call site:   %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float 
   // CHECK: Passed in closures:
