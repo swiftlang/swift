@@ -17,6 +17,7 @@
 // DEP: _exit
 // DEP: _free
 // DEP: _malloc
+// DEP: _memcpy
 // DEP: _memmove
 // DEP: _memset
 // DEP: _memset_s
