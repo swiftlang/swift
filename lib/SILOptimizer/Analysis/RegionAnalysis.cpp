@@ -866,25 +866,21 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
 RegionAnalysisValueMap::UnderlyingTrackedValueInfo
 RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
+  do {
+    auto *di = value->getDefiningInstruction();
+    if (di && isStaticallyLookThroughInst(di) && value->getType().isAddress())
+      break;
 
-  auto *di = value->getDefiningInstruction();
-  if (di && isStaticallyLookThroughInst(di) && value->getType().isAddress()) {
-    UseDefChainVisitor visitor;
-    SILValue base = visitor.visitAll(value);
-    assert(base);
-
-    value = base;
-  }
-
-  // Before a check if the value we are attempting to access is Sendable. In
-  // such a case, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value))
-    return UnderlyingTrackedValueInfo(value);
+    // Before a check if the value we are attempting to access is Sendable. In
+    // such a case, just return early.
+    if (!SILIsolationInfo::isNonSendableType(value))
+      return UnderlyingTrackedValueInfo(value);
+  } while (false);
 
   // Look through a project_box, so that we process it like its operand object.
-  //    if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
-  //      value = pbi->getOperand();
-  //    }
+  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
+    value = pbi->getOperand();
+  }
 
   if (!value->getType().isAddress()) {
     SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
