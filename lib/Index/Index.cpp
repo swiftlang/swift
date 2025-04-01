@@ -888,6 +888,11 @@ private:
     // Dig back to the original captured variable
     if (isa<VarDecl>(D)) {
       Info.originalDecl = firstDecl(D);
+      // When indexing locals is disabled, the reference to the original decl
+      // would be lost without overwriting the local symbol.
+      if (!IdxConsumer.indexLocals()) {
+        D = Info.originalDecl;
+      }
     }
 
     if (Data.isImplicit)
