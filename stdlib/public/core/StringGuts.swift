@@ -420,7 +420,7 @@ extension _StringGuts {
 #if _runtime(_ObjC)
 extension _StringGuts {
 
-  private static var associationKey: UnsafeRawPointer {
+  private static var _associationKey: UnsafeRawPointer {
     struct AssociationKey {}
     // We never dereference this, we only use this address as a unique key
     return unsafe unsafeBitCast(
@@ -429,7 +429,7 @@ extension _StringGuts {
     )
   }
 
-  internal func getAssociatedStorage() -> __StringStorage? {
+  private func _getAssociatedStorage() -> __StringStorage? {
     _internalInvariant(_object.hasObjCBridgeableObject)
     let getter = unsafe unsafeBitCast(
       getGetAssociatedObjectPtr(),
@@ -441,7 +441,7 @@ extension _StringGuts {
 
     if let assocPtr = unsafe getter(
       _object.objCBridgeableObject,
-      Self.associationKey
+      Self._associationKey
     ) {
       let storage: __StringStorage
       storage = unsafe Unmanaged.fromOpaque(assocPtr).takeUnretainedValue()
@@ -450,7 +450,7 @@ extension _StringGuts {
     return nil
   }
 
-  internal func setAssociatedStorage(_ storage: __StringStorage) {
+  private func _setAssociatedStorage(_ storage: __StringStorage) {
     _internalInvariant(_object.hasObjCBridgeableObject)
     let setter = unsafe unsafeBitCast(
       getSetAssociatedObjectPtr(),
@@ -464,24 +464,24 @@ extension _StringGuts {
 
     unsafe setter(
       _object.objCBridgeableObject,
-      Self.associationKey,
+      Self._associationKey,
       storage,
       1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
   }
 
-  internal func getOrAllocateAssociatedStorage() -> __StringStorage {
+  internal func _getOrAllocateAssociatedStorage() -> __StringStorage {
     _internalInvariant(_object.hasObjCBridgeableObject)
     let unwrapped: __StringStorage
     // libobjc already provides the necessary memory barriers for
     // double checked locking to be safe, per comments on
     // https://github.com/swiftlang/swift/pull/75148
-    if let storage = getAssociatedStorage() {
+    if let storage = _getAssociatedStorage() {
       unwrapped = storage
     } else {
       let lock = _object.objCBridgeableObject
       objc_sync_enter(lock)
-      if let storage  = getAssociatedStorage() {
+      if let storage  = _getAssociatedStorage() {
         unwrapped = storage
       } else {
         var contents = String.UnicodeScalarView()
@@ -494,7 +494,7 @@ extension _StringGuts {
         }
         _precondition(contents._guts._object.hasNativeStorage)
         unwrapped = (consume contents)._guts._object.nativeStorage
-        setAssociatedStorage(unwrapped)
+        _setAssociatedStorage(unwrapped)
       }
       defer { _fixLifetime(unwrapped) }
       objc_sync_exit(lock)
