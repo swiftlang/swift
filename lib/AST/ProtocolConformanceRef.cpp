@@ -149,7 +149,7 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
 }
 
 Type
-ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
+ProtocolConformanceRef::getTypeWitnessByName(Identifier name) const {
   assert(!isInvalid());
 
   // Find the named requirement.

@@ -234,7 +234,7 @@ public:
     return llvm::hash_value(conformance.Union.getOpaqueValue());
   }
 
-  Type getTypeWitnessByName(Type type, Identifier name) const;
+  Type getTypeWitnessByName(Identifier name) const;
 
   /// Find a particular named function witness for a type that conforms to
   /// the given protocol.

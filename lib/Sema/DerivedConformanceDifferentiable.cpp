@@ -121,7 +121,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   assert(conf && "Contextual type must conform to `Differentiable`");
   if (!conf)
     return nullptr;
-  auto tanType = conf.getTypeWitnessByName(contextualType, C.Id_TangentVector);
+  auto tanType = conf.getTypeWitnessByName(C.Id_TangentVector);
   return tanType->hasArchetype() ? tanType->mapTypeOutOfContext() : tanType;
 }
 
@@ -150,7 +150,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
     auto conf = checkConformance(fieldType, diffableProto);
     if (!conf)
       return false;
-    auto tangentType = conf.getTypeWitnessByName(fieldType, C.Id_TangentVector);
+    auto tangentType = conf.getTypeWitnessByName(C.Id_TangentVector);
     if (!fieldType->isEqual(tangentType))
       return false;
   }

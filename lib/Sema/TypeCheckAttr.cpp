@@ -1951,7 +1951,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl,
   auto dictConf = checkConformance(argType, dictLitProto);
   if (dictConf.isInvalid())
     return false;
-  auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
+  auto keyType = dictConf.getTypeWitnessByName(ctx.Id_Key);
   return (bool) checkConformance(keyType, stringLitProtocol);
 }
 
@@ -5577,7 +5577,7 @@ static bool conformsToDifferentiable(Type type,
     return false;
   if (!tangentVectorEqualsSelf)
     return true;
-  auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
+  auto tanType = conf.getTypeWitnessByName(ctx.Id_TangentVector);
   return type->isEqual(tanType);
 }
 
