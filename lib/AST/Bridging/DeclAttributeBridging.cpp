@@ -250,7 +250,7 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName) {
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
-                /*Implicit=*/false);
+                /*Implicit=*/false, /*Underscored*/true);
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(

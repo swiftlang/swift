@@ -2056,6 +2056,9 @@ ERROR(cdecl_empty_name,none,
       "@_cdecl symbol name cannot be empty", ())
 ERROR(cdecl_throws,none,
       "raising errors from '@_cdecl' functions is not supported", ())
+ERROR(cdecl_feature_required,none,
+      "@cdecl requires '-enable-experimental-feature CDecl'",
+      ())
 
 // @_used and @_section
 ERROR(section_linkage_markers_disabled,none,
