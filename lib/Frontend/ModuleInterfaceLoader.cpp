@@ -1741,13 +1741,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   }
 
-  // Inhibit warnings from the genericSubInvocation since we are assuming the user
-  // is not in a position to address them. (Unless we're verifying, in which
-  // case they might.)
-  if (requestedAction != FrontendOptions::ActionType::Typecheck) {
-    genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
-    GenericArgs.push_back("-suppress-warnings");
-  }
+  // Inhibit warnings from the genericSubInvocation since we are assuming the
+  // user is not in a position to address them.
+  genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
+  GenericArgs.push_back("-suppress-warnings");
+
   // Inherit the parent invocation's setting on whether to suppress remarks
   if (suppressRemarks) {
     genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
