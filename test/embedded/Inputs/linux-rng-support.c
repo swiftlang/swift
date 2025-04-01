@@ -5,7 +5,15 @@
 
 #ifdef __linux__ 
 
+#ifdef __cplusplus
+extern "C"
+#endif
 ssize_t getrandom(void *buf, size_t len, unsigned int flags);
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void arc4random_buf(void *buf, size_t nbytes);
 
 void arc4random_buf(void *buf, size_t nbytes) {
   while (nbytes > 0) {
