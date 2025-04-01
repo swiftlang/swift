@@ -71,6 +71,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     SmallVector<char, 0> stringFloatRepr;
     getFloatValue().toString(stringFloatRepr);
     os << "float: " << stringFloatRepr << "\n";
+    return;
   }
   case RK_String:
     os << "string: \"" << getStringValue() << "\"\n";
