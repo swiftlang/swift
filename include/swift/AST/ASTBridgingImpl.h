@@ -200,6 +200,10 @@ bool BridgedDeclObj::Value_isObjC() const {
   return getAs<swift::ValueDecl>()->isObjC();
 }
 
+bool BridgedDeclObj::AbstractStorage_isConst() const {
+  return getAs<swift::AbstractStorageDecl>()->isConstValue();
+}
+
 bool BridgedDeclObj::GenericType_isGenericAtAnyLevel() const {
   return getAs<swift::GenericTypeDecl>()->isGenericContext();
 }

@@ -90,7 +90,7 @@ ERROR(require_const_initializer_for_const,none,
       "@const value should be initialized with a compile-time value", ())
 
 ERROR(require_const_arg_for_parameter,none,
-      "expected a compile-time value for a '@const' parameter", ())
+      "expected a compile-time value argument for a '@const' parameter", ())
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,

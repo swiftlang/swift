@@ -4651,6 +4651,12 @@ public:
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
   }
+                        
+  void visitConstValueTypeRepr(ConstValueTypeRepr *T, Label label) {
+    printCommon("@const", label);
+    printRec(T->getBase(), Label::optional("base"));
+    printFoot();
+  }
 
   void visitOptionalTypeRepr(OptionalTypeRepr *T, Label label) {
     printCommon("type_optional", label);
@@ -5862,6 +5868,7 @@ namespace {
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
+      printFlag(paramFlags.isConstValue(), "constValue");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 

@@ -2397,7 +2397,8 @@ class ParameterTypeFlags {
     CompileTimeLiteral = 1 << 8,
     Sending = 1 << 9,
     Addressable = 1 << 10,
-    NumBits = 11
+    ConstValue = 1 << 11,
+    NumBits = 12
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2412,21 +2413,23 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeLiteral, bool isSending, bool isAddressable)
+                     bool compileTimeLiteral, bool isSending, bool isAddressable,
+                     bool isConstValue)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeLiteral ? CompileTimeLiteral : 0) |
               (isSending ? Sending : 0) |
-              (isAddressable ? Addressable : 0)) {}
+              (isAddressable ? Addressable : 0) |
+              (isConstValue ? ConstValue : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeLiteral,
-                    bool isSending, bool isAddressable);
+                    bool isSending, bool isAddressable, bool isConstVal);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2440,6 +2443,7 @@ public:
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool isSending() const { return value.contains(Sending); }
   bool isAddressable() const { return value.contains(Addressable); }
+  bool isConstValue() const { return value.contains(ConstValue); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2458,9 +2462,14 @@ public:
                                           : ParamSpecifier::Default);
   }
 
-  ParameterTypeFlags withCompileTimeLiteral(bool isConst) const {
-    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeLiteral
-                                      : value - ParameterTypeFlags::CompileTimeLiteral);
+  ParameterTypeFlags withCompileTimeLiteral(bool isLiteral) const {
+    return ParameterTypeFlags(isLiteral ? value | ParameterTypeFlags::CompileTimeLiteral
+                                        : value - ParameterTypeFlags::CompileTimeLiteral);
+  }
+  
+  ParameterTypeFlags withConst(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::ConstValue
+                                      : value - ParameterTypeFlags::ConstValue);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2606,9 +2615,10 @@ public:
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
-                              /*compileTimeLiteral*/ false,
+                              /*is compileTimeLiteral*/ false,
                               /*is sending*/ false,
-                              /*is addressable*/ false);
+                              /*is addressable*/ false,
+                              /*is constValue*/false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -3401,6 +3411,9 @@ public:
 
     /// Whether the parameter is 'isCompileTimeLiteral'.
     bool isCompileTimeLiteral() const { return Flags.isCompileTimeLiteral(); }
+    
+    /// Whether the parameter is 'isConstValue'.
+    bool isConstVal() const { return Flags.isConstValue(); }
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
@@ -4418,6 +4431,7 @@ inline bool isPackParameter(ParameterConvention conv) {
 StringRef getStringForParameterConvention(ParameterConvention conv);
 
 /// A parameter type and the rules for passing it.
+/// Must be kept consistent with `ParameterInfo.Flag` in `FunctionConvention.swift`
 class SILParameterInfo {
 public:
   enum Flag : uint8_t {
@@ -4454,6 +4468,9 @@ public:
     /// DISCUSSION: These are enforced by the SIL verifier to always be in
     /// between indirect results and the explicit parameters.
     ImplicitLeading = 0x8,
+    
+    /// Set if the given parameter is @const
+    Const = 0x10
   };
 
   using Options = OptionSet<Flag>;
@@ -8125,7 +8142,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeLiteral, bool isSending, bool isAddressable) {
+    bool compileTimeLiteral, bool isSending, bool isAddressable,
+    bool isConstVal) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -8137,7 +8155,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
   }
   return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
           isolated,   isNoDerivative, compileTimeLiteral, isSending,
-          isAddressable};
+          isAddressable, isConstVal};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

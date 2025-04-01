@@ -2328,6 +2328,10 @@ bool Traversal::visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitConstValueTypeRepr(ConstValueTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
 }

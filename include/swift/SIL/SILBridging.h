@@ -56,6 +56,9 @@ class MultipleValueInstructionResult;
 struct ValueOwnershipKind;
 class SILVTableEntry;
 class SILVTable;
+class ConstExprFunctionState;
+class SymbolicValueBumpAllocator;
+class ConstExprEvaluator;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
 class SILDebugLocation;
@@ -467,6 +470,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoContext(BridgedASTType ty) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getFirstBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getLastBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef getDeclRef() const;
   BRIDGED_INLINE SwiftInt getNumIndirectFormalResults() const;
   BRIDGED_INLINE bool hasIndirectErrorResult() const;
   BRIDGED_INLINE SwiftInt getNumSILArguments() const;
@@ -566,10 +570,12 @@ struct BridgedGlobalVar {
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void setLet(bool value) const;
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
   BRIDGED_INLINE bool isPossiblyUsedExternally() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction getFirstStaticInitInst() const;
   bool canBeInitializedStatically() const;
   bool mustBeInitializedStatically() const;
+  bool isConstValue() const;
 };
 
 struct OptionalBridgedGlobalVar {
@@ -1005,6 +1011,22 @@ struct BridgedVTable {
 
 struct OptionalBridgedVTable {
   swift::SILVTable * _Nullable table;
+};
+
+struct BridgedConstExprFunctionState {
+  swift::ConstExprFunctionState * _Nonnull state;
+  swift::SymbolicValueBumpAllocator * _Nonnull allocator;
+  swift::ConstExprEvaluator * _Nonnull constantEvaluator;
+  unsigned int * _Nonnull numEvaluatedSILInstructions;
+  
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  static BridgedConstExprFunctionState create();
+  
+  BRIDGED_INLINE
+  bool isConstantValue(BridgedValue value);
+  
+  BRIDGED_INLINE
+  void deinitialize();
 };
 
 struct BridgedWitnessTableEntry {
