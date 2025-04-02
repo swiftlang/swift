@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -module-name test %s -O -emit-sil | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: PTRSIZE=64
 
 // CHECK-LABEL: sil @$s4test17dont_fold_inf_cmpySbSfF :
 // CHECK:         builtin "fcmp_olt_FPIEEE32"
