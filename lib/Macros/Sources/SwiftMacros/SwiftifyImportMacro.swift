@@ -677,14 +677,14 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
         if unsafe _resultValue == nil {
           return nil
         } else {
-          return unsafe \(raw: try cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
+          return unsafe \(raw: cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
         }
       }()
       """
     }
     return
       """
-      unsafe \(raw: try cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
+      unsafe \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
       """
   }
 }
