@@ -86,51 +86,9 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 
   return II;
 }
-// Amazon Linux 2023 requires lld as the default linker.
-bool isAmazonLinux2023Host() {
-      std::ifstream file("/etc/os-release");
-      std::string line;
-
-      while (std::getline(file, line)) {
-        if (line.substr(0, 12) == "PRETTY_NAME=") {
-          if (line.substr(12) == "\"Amazon Linux 2023\"") {
-            file.close();
-            return true;
-          }
-        }
-      }
-      return false;
-    }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  if (getTriple().isAndroid() || isAmazonLinux2023Host()
-      || (getTriple().isMusl()
-          && getTriple().getVendor() == llvm::Triple::Swift))
-    return "lld";
-
-  switch (getTriple().getArch()) {
-  case llvm::Triple::arm:
-  case llvm::Triple::aarch64:
-  case llvm::Triple::aarch64_32:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    // BFD linker has issues wrt relocation of the protocol conformance
-    // section on these targets, it also generates COPY relocations for
-    // final executables, as such, unless specified, we default to gold
-    // linker.
-    return "gold";
-  case llvm::Triple::x86:
-  case llvm::Triple::x86_64:
-  case llvm::Triple::ppc64:
-  case llvm::Triple::ppc64le:
-  case llvm::Triple::systemz:
-    // BFD linker has issues wrt relocations against protected symbols.
-    return "gold";
-  default:
-    // Otherwise, use the default BFD linker.
-    return "";
-  }
+  return "";
 }
 
 bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
