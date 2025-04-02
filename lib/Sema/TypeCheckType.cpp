@@ -4195,11 +4195,11 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
+  auto checkExecutionBehaviorAttribute = [&](TypeAttribute *attr) {
     if (!repr->isAsync()) {
-      diagnoseInvalid(repr, executionAttr->getAtLoc(),
+      diagnoseInvalid(repr, attr->getAttrLoc(),
                       diag::execution_behavior_type_attr_only_on_async,
-                      executionAttr->getAttrName());
+                      attr->getAttrName());
     }
 
     switch (isolation.getKind()) {
@@ -4208,29 +4208,33 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
     case FunctionTypeIsolation::Kind::GlobalActor:
       diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
+          repr, attr->getAttrLoc(),
           diag::execution_behavior_type_attr_incompatible_with_global_isolation,
-          executionAttr->getAttrName(), isolation.getGlobalActorType());
+          attr->getAttrName(), isolation.getGlobalActorType());
       break;
 
     case FunctionTypeIsolation::Kind::Parameter:
       diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
+          repr, attr->getAttrLoc(),
           diag::execution_behavior_type_attr_incompatible_with_isolated_param,
-          executionAttr->getAttrName());
+          attr->getAttrName());
       break;
 
     case FunctionTypeIsolation::Kind::Erased:
       diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
+          repr, attr->getAttrLoc(),
           diag::execution_behavior_type_attr_incompatible_with_isolated_any,
-          executionAttr->getAttrName());
+          attr->getAttrName());
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
       llvm_unreachable("cannot happen because multiple @execution attributes "
                        "aren't allowed.");
     }
+  };
+
+  if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
+    checkExecutionBehaviorAttribute(executionAttr);
 
     if (!repr->isInvalid()) {
       switch (executionAttr->getBehavior()) {
@@ -4242,6 +4246,10 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         break;
       }
     }
+  } else if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+    checkExecutionBehaviorAttribute(concurrentAttr);
+    if (!repr->isInvalid())
+      isolation = FunctionTypeIsolation::forNonIsolated();
   } else {
     if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
             .isEnabledForAdoption()) {
