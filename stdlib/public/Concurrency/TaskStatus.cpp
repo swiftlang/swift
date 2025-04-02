@@ -350,15 +350,18 @@ void swift::removeStatusRecordWhere(
       });
 }
 
-// Remove and return a status record of the given type. There must be at most
-// one matching record. Returns nullptr if there are none.
 template <typename TaskStatusRecordT>
-static TaskStatusRecordT *popStatusRecordOfType(AsyncTask *task) {
+SWIFT_CC(swift)
+TaskStatusRecordT* swift::popStatusRecordOfType(AsyncTask *task) {
   TaskStatusRecordT *record = nullptr;
+  bool alreadyRemovedRecord = false;
   removeStatusRecordWhere(task, [&](ActiveTaskStatus s, TaskStatusRecord *r) {
+    if (alreadyRemovedRecord)
+      return false;
+
     if (auto *match = dyn_cast<TaskStatusRecordT>(r)) {
-      assert(!record && "two matching records found");
       record = match;
+      alreadyRemovedRecord = true;
       return true; // Remove this record.
     }
 
@@ -561,6 +564,10 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 
   swift_task_dealloc(record);
 }
+
+// Since the header would have incomplete declarations, we instead instantiate a concrete version of the function here
+template SWIFT_CC(swift)
+CancellationNotificationStatusRecord* swift::popStatusRecordOfType<CancellationNotificationStatusRecord>(AsyncTask *);
 
 void AsyncTask::pushInitialTaskExecutorPreference(
     TaskExecutorRef preferredExecutor, bool owned) {
@@ -879,7 +886,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
   }
 
   newStatus.traceStatusChanged(task, false);
-  if (newStatus.getInnermostRecord() == NULL) {
+  if (newStatus.getInnermostRecord() == nullptr) {
      // No records, nothing to propagate
      return;
   }

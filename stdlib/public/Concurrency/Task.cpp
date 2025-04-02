@@ -1758,18 +1758,27 @@ swift_task_addCancellationHandlerImpl(
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
   bool fireHandlerNow = false;
-
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     if (oldStatus.isCancelled()) {
-      fireHandlerNow = true;
       // We don't fire the cancellation handler here since this function needs
       // to be idempotent
+      fireHandlerNow = true;
+
+      // don't add the record, because that would risk triggering it from
+      // task_cancel, concurrently with the record->run() we're about to do below.
+      return false;
     }
-    return true;
+    return true; // add the record
   });
 
   if (fireHandlerNow) {
     record->run();
+
+    // we have not added the record to the task because it has fired immediately,
+    // and therefore we can clean it up immediately rather than wait until removeCancellationHandler
+    // which would be triggered at the end of the withTaskCancellationHandler block.
+    swift_task_dealloc(record);
+    return nullptr; // indicate to the remove... method, that there was no task added
   }
   return record;
 }
@@ -1777,8 +1786,17 @@ swift_task_addCancellationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  removeStatusRecordFromSelf(record);
-  swift_task_dealloc(record);
+  if (!record) {
+    // seems we never added the record but have run it immediately,
+    // so we make no attempts to remove it.
+    return;
+  }
+
+  if (auto poppedRecord =
+      popStatusRecordOfType<CancellationNotificationStatusRecord>(swift_task_getCurrent())) {
+    assert(record == poppedRecord && "The removed record did not match the expected record!");
+    swift_task_dealloc(record);
+  }
 }
 
 SWIFT_CC(swift)
