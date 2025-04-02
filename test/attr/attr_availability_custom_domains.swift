@@ -49,7 +49,7 @@ func deprecatedInEnabledDomain() { }
 func obsoletedInEnabledDomain() { }
 
 @available(DisabledDomain, unavailable)
-func unavailableInDisabledDomain() { } // expected-note 4 {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInDisabledDomain() { }
 
 @available(RedefinedDomain, deprecated, message: "Use something else")
 func deprecatedInRedefinedDomain() { }
@@ -59,94 +59,3 @@ func availableInDynamicDomain() { }
 
 @available(UnknownDomain) // expected-warning {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
-
-func testQuerySyntax() {
-  if #available(EnabledDomain) {}
-  // expected-error@-1 {{condition required for target platform}}
-  if #available(RedefinedDomain) {}
-  // expected-error@-1 {{condition required for target platform}}
-  if #available(DisabledDomain) {}
-  // expected-error@-1 {{condition required for target platform}}
-  if #available(DynamicDomain) {}
-  // expected-error@-1 {{condition required for target platform}}
-  if #available(UnknownDomain) {} // expected-warning {{unrecognized platform name 'UnknownDomain'}}
-  // expected-error@-1 {{condition required for target platform}}
-
-  if #unavailable(EnabledDomain) {}
-  if #unavailable(RedefinedDomain) {}
-  if #unavailable(DisabledDomain) {}
-  if #unavailable(DynamicDomain) {}
-  if #unavailable(UnknownDomain) {} // expected-warning {{unrecognized platform name 'UnknownDomain'}}
-
-  if #available(EnabledDomain 1.0) {} // expected-error {{unexpected version number for EnabledDomain}}
-  // expected-error@-1 {{condition required for target platform}}
-  if #available(EnabledDomain, DisabledDomain) {} // expected-error {{EnabledDomain availability must be specified alone}}
-  // expected-error@-1 {{condition required for target platform}}
-}
-
-func testDeployment() {
-  alwaysAvailable()
-  availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
-  unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
-  deprecatedInRedefinedDomain() // expected-warning {{'deprecatedInRedefinedDomain()' is deprecated: Use something else}}
-  availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
-  availableInUnknownDomain()
-}
-
-@available(EnabledDomain)
-func testEnabledDomainAvailable() {
-  availableInEnabledDomain() // OK
-  if #available(EnabledDomain) {} // FIXME: [availability] Diagnose as redundant
-  // expected-error@-1 {{condition required for target platform}}
-  if #unavailable(EnabledDomain) {}
-
-  alwaysAvailable()
-  unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
-  deprecatedInRedefinedDomain() // expected-warning {{'deprecatedInRedefinedDomain()' is deprecated: Use something else}}
-  availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
-  availableInUnknownDomain()
-}
-
-
-@available(EnabledDomain, unavailable)
-func testEnabledDomainUnavailable() {
-  availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
-  if #available(EnabledDomain) {} // FIXME: [availability] Maybe diagnose?
-  // expected-error@-1 {{condition required for target platform}}
-  if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose as redundant
-
-  alwaysAvailable()
-  unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
-  deprecatedInRedefinedDomain() // expected-warning {{'deprecatedInRedefinedDomain()' is deprecated: Use something else}}
-  availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
-  availableInUnknownDomain()
-}
-
-@available(DisabledDomain, unavailable)
-func testDisabledDomainUnavailable() {
-  unavailableInDisabledDomain() // OK
-}
-
-@available(*, unavailable)
-func testUniversallyUnavailable() {
-  alwaysAvailable()
-  // FIXME: [availability] Diagnostic consistency: potentially unavailable declaration shouldn't be diagnosed
-  // in contexts that are unavailable to broader domains
-  availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
-  unavailableInDisabledDomain()
-  deprecatedInRedefinedDomain() // expected-warning {{'deprecatedInRedefinedDomain()' is deprecated: Use something else}}
-  availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
-  availableInUnknownDomain()
-}
-
-@available(EnabledDomain)
-struct EnabledDomainAvailable {
-  @available(DynamicDomain)
-  func dynamicDomainAvailableMethod() {
-    availableInEnabledDomain() // OK
-    availableInDynamicDomain() // OK
-
-    alwaysAvailable()
-    unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
-  }
-}

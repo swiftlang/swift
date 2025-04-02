@@ -2696,6 +2696,7 @@ extension FixedWidthInteger {
 extension FixedWidthInteger {
   @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @_semantics("optimize.sil.inline.constant.arguments")
   public // @testable
   static func _convert<Source: BinaryFloatingPoint>(
     from source: Source

@@ -252,7 +252,7 @@ fileprivate class _Lock {
 
   init() {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     unsafe self.underlying.initialize(to: os_unfair_lock())
     #elseif os(Windows)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)

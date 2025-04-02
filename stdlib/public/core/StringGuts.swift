@@ -236,7 +236,7 @@ extension _StringGuts {
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     _internalInvariant(!_object.isFastZeroTerminated)
-    return try String(self).utf8CString.withUnsafeBufferPointer {
+    return try unsafe String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
       return try unsafe body(ptr)
     }

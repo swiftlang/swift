@@ -244,6 +244,16 @@ void removeStatusRecordWhere(
     llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
 
+/// Remove and return a status record of the given type. This function removes a
+/// singlw record, and leaves subsequent records as-is if there are any.
+/// Returns `nullptr` if there are no matching records.
+///
+/// NOTE: When using this function with new record types, make sure to provide
+/// an explicit instantiation in TaskStatus.cpp.
+template <typename TaskStatusRecordT>
+SWIFT_CC(swift)
+TaskStatusRecordT* popStatusRecordOfType(AsyncTask *task);
+
 /// Remove a status record from the current task. This must be called
 /// synchronously with the task.
 SWIFT_CC(swift)

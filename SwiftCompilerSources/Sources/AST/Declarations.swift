@@ -83,7 +83,9 @@ final public class AssociatedTypeDecl: TypeDecl {}
 
 final public class ModuleDecl: TypeDecl {}
 
-public class AbstractStorageDecl: ValueDecl {}
+public class AbstractStorageDecl: ValueDecl {
+  final public var isConst: Bool { bridged.AbstractStorage_isConst() }
+}
 
 public class VarDecl: AbstractStorageDecl {}
 

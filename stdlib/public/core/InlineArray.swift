@@ -147,7 +147,7 @@ extension InlineArray where Element: ~Copyable {
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Self._initializationBuffer(start: rawPtr)
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       for i in 0 ..< count {
         do throws(E) {
@@ -204,7 +204,7 @@ extension InlineArray where Element: ~Copyable {
     var o: Element? = first
 
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Self._initializationBuffer(start: rawPtr)
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       guard Self.count > 0 else {
         return
@@ -247,7 +247,7 @@ extension InlineArray where Element: Copyable {
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
     self = Builtin.emplace {
-      let buffer = Self._initializationBuffer(start: $0)
+      let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }

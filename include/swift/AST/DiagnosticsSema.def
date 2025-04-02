@@ -1272,7 +1272,8 @@ REMARK(explicit_interface_build_skipped,none,
        (StringRef))
 
 WARNING(cannot_find_project_version,none,
-        "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))
+        "cannot find user version number for%select{| Clang}1 module '%0';"
+        " version number ignored", (StringRef, bool))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -7579,6 +7580,13 @@ ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
  WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
         "expression shuffles the elements of this tuple; "
         "this behavior is deprecated", ())
+
+//------------------------------------------------------------------------------
+// MARK: Implicit conversion diagnostics
+//------------------------------------------------------------------------------
+ERROR(cannot_implicitly_convert_in_optional_context,none,
+      "cannot implicitly convert value of type %0 to expected type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: marker protocol diagnostics

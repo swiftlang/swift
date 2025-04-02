@@ -98,7 +98,7 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
 void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
                                   MallocTypeId typeId) {
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
     void *p;
     // This check also forces "default" alignment to use malloc_memalign().
     if (alignMask <= MALLOC_ALIGN_MASK) {

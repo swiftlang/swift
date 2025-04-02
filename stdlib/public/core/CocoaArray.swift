@@ -76,7 +76,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     let cocoaStorageBaseAddress = unsafe self.contiguousStorage(self.indices)
 
     if let cocoaStorageBaseAddress = unsafe cocoaStorageBaseAddress {
-      return _SliceBuffer(
+      return unsafe _SliceBuffer(
         owner: self.buffer,
         subscriptBaseAddress: cocoaStorageBaseAddress,
         indices: bounds,

@@ -482,7 +482,7 @@ class alignas(8) PoundAvailableInfo final :
   
   /// The version range when this query will return true. This value is
   /// filled in by Sema.
-  VersionRange AvailableRange;
+  std::optional<VersionRange> AvailableRange;
 
   /// For zippered builds, this is the version range for the target variant
   /// that must hold for the query to return true. For example, when
@@ -490,7 +490,7 @@ class alignas(8) PoundAvailableInfo final :
   /// x86_64-ios13.0 a query of #available(macOS 10.22, iOS 20.0, *) will
   /// have a variant range of [20.0, +inf).
   /// This is filled in by Sema.
-  VersionRange VariantAvailableRange;
+  std::optional<VersionRange> VariantAvailableRange;
 
   struct {
     unsigned isInvalid : 1;
@@ -538,11 +538,13 @@ public:
   SourceLoc getLoc() const { return PoundLoc; }
   SourceRange getSourceRange() const { return SourceRange(getStartLoc(),
                                                           getEndLoc()); }
-  
-  const VersionRange &getAvailableRange() const { return AvailableRange; }
+
+  std::optional<VersionRange> getAvailableRange() const {
+    return AvailableRange;
+  }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
 
-  const VersionRange &getVariantAvailableRange() const {
+  std::optional<VersionRange> getVariantAvailableRange() const {
     return VariantAvailableRange;
   }
   void setVariantAvailableRange(const VersionRange &Range) {

@@ -38,7 +38,7 @@ extension Set {
     @inline(__always)
     init(dummy: ()) {
 #if _pointerBitWidth(_64) && !$Embedded
-      self.object = unsafe _BridgeStorage(taggedPayload: 0)
+      unsafe self.object = _BridgeStorage(taggedPayload: 0)
 #elseif _pointerBitWidth(_32) || $Embedded
       self.init(native: _NativeSet())
 #else
@@ -49,14 +49,14 @@ extension Set {
     @inlinable
     @inline(__always)
     init(native: __owned _NativeSet<Element>) {
-      self.object = unsafe _BridgeStorage(native: native._storage)
+      unsafe self.object = _BridgeStorage(native: native._storage)
     }
 
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
     init(cocoa: __owned __CocoaSet) {
-      self.object = unsafe _BridgeStorage(objC: cocoa.object)
+      unsafe self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
   }
@@ -80,7 +80,7 @@ extension Set._Variant {
   @usableFromInline @_transparent
   internal var isNative: Bool {
     if guaranteedNative { return true }
-    return object.isUnflaggedNative
+    return unsafe object.isUnflaggedNative
   }
 #endif
 
@@ -98,7 +98,7 @@ extension Set._Variant {
       defer {
         // This is in a defer block because yield might throw, and we need to
         // preserve Set's storage invariants when that happens.
-        object = unsafe .init(native: native._storage)
+        unsafe object = .init(native: native._storage)
       }
       yield &native
     }
@@ -284,10 +284,10 @@ extension Set._Variant {
 #endif
     let (bucket, found) = asNative.find(element)
     if found {
-      return (false, asNative.uncheckedElement(at: bucket))
+      return (false, unsafe asNative.uncheckedElement(at: bucket))
     }
     let isUnique = self.isUniquelyReferenced()
-    asNative.insertNew(element, at: bucket, isUnique: isUnique)
+    unsafe asNative.insertNew(element, at: bucket, isUnique: isUnique)
     return (true, element)
   }
 
@@ -305,8 +305,8 @@ extension Set._Variant {
     }
 #endif
     let isUnique = isUniquelyReferenced()
-    let bucket = asNative.validatedBucket(for: index)
-    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
+    let bucket = unsafe asNative.validatedBucket(for: index)
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
   }
 
   @inlinable
@@ -323,7 +323,7 @@ extension Set._Variant {
     let (bucket, found) = asNative.find(member)
     guard found else { return nil }
     let isUnique = isUniquelyReferenced()
-    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
   }
 
 #if _runtime(_ObjC)
@@ -337,7 +337,7 @@ extension Set._Variant {
     var native = _NativeSet<Element>(cocoa)
     let (bucket, found) = native.find(member)
     _precondition(found, "Bridging did not preserve equality")
-    let old = native.uncheckedRemove(at: bucket, isUnique: true)
+    let old = unsafe native.uncheckedRemove(at: bucket, isUnique: true)
     _precondition(member == old, "Bridging did not preserve equality")
     self = .init(native: native)
     return old

@@ -158,6 +158,8 @@ MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
      "Converts read-only var-globals to let-globals")
 MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
+MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
+     "Diagnose any '@const' entities which could not be simplified to a compile-time value")
 
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")

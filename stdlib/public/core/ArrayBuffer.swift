@@ -659,7 +659,7 @@ extension _ArrayBuffer {
       return try unsafe body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try ContiguousArray(self).withUnsafeBufferPointer(body)
+    return try unsafe ContiguousArray(self).withUnsafeBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the

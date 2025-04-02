@@ -2601,11 +2601,19 @@ public:
                               SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
+  enum class ThunkGenFlag {
+    None,
+    ConvertingToNonIsolatedCaller,
+    ConvertingFromNonIsolatedCaller,
+  };
+  using ThunkGenOptions = OptionSet<ThunkGenFlag>;
+
   /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
+      ThunkGenOptions options = {});
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

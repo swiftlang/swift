@@ -385,7 +385,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MutableAddressor, "mutableAddress accessor");
   ENTRY(ReadAccessor, "_read accessor");
   ENTRY(ModifyAccessor, "_modify accessor");
-  ENTRY(InitAccessor, "init acecssor");
+  ENTRY(InitAccessor, "init accessor");
   ENTRY(EnumElement, "enum case");
   ENTRY(Module, "module");
   ENTRY(Missing, "missing decl");
@@ -966,26 +966,6 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
 SourceRange Decl::getSourceRangeIncludingAttrs() const {
   auto Range = getSourceRange();
 
-  // Attributes on AccessorDecl may syntactically belong to PatternBindingDecl.
-  // e.g. 'override'.
-  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
-    // If this is implicit getter, accessor range should not include attributes.
-    if (AD->isImplicitGetter())
-      return Range;
-
-    // Otherwise, include attributes directly attached to the accessor.
-    SourceLoc VarLoc = AD->getStorage()->getStartLoc();
-    for (auto *Attr : getParsedAttrs()) {
-      if (!Attr->getRange().isValid())
-        continue;
-
-      SourceLoc AttrStartLoc = Attr->getRangeWithAt().Start;
-      if (getASTContext().SourceMgr.isBeforeInBuffer(VarLoc, AttrStartLoc))
-        Range.widen(AttrStartLoc);
-    }
-    return Range;
-  }
-
   // Attributes on VarDecl syntactically belong to PatternBindingDecl.
   if (isa<VarDecl>(this) && !isa<ParamDecl>(this))
     return Range;
@@ -1302,7 +1282,7 @@ bool AbstractStorageDecl::isCompileTimeLiteral() const {
   return getAttrs().hasAttribute<CompileTimeLiteralAttr>();
 }
 
-bool AbstractStorageDecl::isConstVal() const {
+bool AbstractStorageDecl::isConstValue() const {
   return getAttrs().hasAttribute<ConstValAttr>();
 }
 
@@ -8952,6 +8932,8 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
           setIsolated(true);
         else if (isa<CompileTimeLiteralTypeRepr>(STR))
           setCompileTimeLiteral(true);
+        else if (isa<ConstValueTypeRepr>(STR))
+          setConstValue(true);
         else if (isa<SendingTypeRepr>(STR))
           setSending(true);
         unwrappedType = STR->getBase();
@@ -9119,7 +9101,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeLiteral(),
-      isSending(), isAddressable());
+      isSending(), isAddressable(), isConstVal());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

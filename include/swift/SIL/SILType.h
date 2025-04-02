@@ -925,6 +925,15 @@ public:
     return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
   }
 
+  bool isNonIsolatedCallerFunction() const {
+    auto funcTy = getAs<SILFunctionType>();
+    if (!funcTy)
+      return false;
+    auto isolatedParam = funcTy->maybeGetIsolatedParameter();
+    return isolatedParam &&
+           isolatedParam->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
   bool isMarkedAsImmortal() const;
 
   /// True if a value of this type can have its address taken by a

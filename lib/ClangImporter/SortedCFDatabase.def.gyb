@@ -39,7 +39,7 @@ with codecs.open(CFDatabaseFile, encoding='utf-8', errors='strict') as f:
       continue
 
     # Otherwise, check for lines like FOO(BAR)
-    m = re.match('^\w+\((\w+)\)', line)
+    m = re.match(r'^\w+\((\w+)\)', line)
     if m:
       lineForName[m.group(1)] = line
 }%

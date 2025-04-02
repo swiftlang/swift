@@ -115,6 +115,13 @@ private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutab
   return unsafe UnsafeMutablePointer(mutating: str._fastCharacterContents())
 }
 
+private func _stdlib_binary_createIndirectTaggedPointerNSString(
+  ptr: UnsafePointer<UInt8>,
+  count: Int
+) -> UnsafeRawPointer? {
+  return _swift_stdlib_CreateIndirectTaggedPointerString(ptr, count);
+}
+
 @usableFromInline // @testable
 @_effects(readonly)
 internal func _stdlib_binary_CFStringGetCharactersPtr(
@@ -623,8 +630,15 @@ extension String {
         return copy._bridgeToObjectiveCImpl()
     }
     if _guts._object.isImmortal && !_guts._object.largeFastIsConstantCocoa {
-      // TODO: We'd rather emit a valid ObjC object statically than create a
-      // shared string class instance.
+      if _guts.isASCII && _guts._object.isFastZeroTerminated {
+        let ptr = _guts._object.fastUTF8.baseAddress!
+        let count = _guts.count
+        if let indirect = _stdlib_binary_createIndirectTaggedPointerNSString(
+          ptr: ptr, count: count
+        ) {
+          return unsafeBitCast(indirect, to: AnyObject.self)
+        }
+      }
       let gutsCountAndFlags = _guts._object._countAndFlags
       return unsafe __SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,

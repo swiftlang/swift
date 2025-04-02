@@ -691,15 +691,15 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
         cast = optType.wrappedType
       }
       return """
-        { () in
-          let _resultValue = \(call)
-          if unsafe _resultValue == nil {
-            return nil
-          } else {
-            return unsafe \(raw: cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
-          }
-        }()
-        """
+      { () in
+        let _resultValue = \(call)
+        if unsafe _resultValue == nil {
+          return nil
+        } else {
+          return unsafe \(raw: cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
+        }
+      }()
+      """
     }
     return
       """

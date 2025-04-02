@@ -908,6 +908,9 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::CompileTimeLiteral:
     Printer.printKeyword("_const", Opts, " ");
     break;
+  case TypeReprKind::ConstValue:
+    Printer.printKeyword("@const", Opts, " ");
+    break;
   }
   printTypeRepr(Base, Printer, Opts);
 }

@@ -35,7 +35,7 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
     _unchecked pointer: UnsafeMutableRawPointer?,
     byteCount: Int
   ) {
-    _pointer = unsafe pointer
+    unsafe _pointer = pointer
     _count = byteCount
   }
 }
@@ -136,7 +136,7 @@ extension MutableRawSpan {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, _count > 0 else {
+    guard let pointer = unsafe _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     return try unsafe body(.init(start: pointer, count: _count))
@@ -147,7 +147,7 @@ extension MutableRawSpan {
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, _count > 0 else {
+    guard let pointer = unsafe _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     return try unsafe body(.init(start: pointer, count: _count))
@@ -160,7 +160,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow mutableRawSpan)
   public init(_mutableRawSpan mutableRawSpan: borrowing MutableRawSpan) {
-    let (start, count) = (mutableRawSpan._start(), mutableRawSpan._count)
+    let (start, count) = unsafe (mutableRawSpan._start(), mutableRawSpan._count)
     let span = unsafe RawSpan(_unsafeStart: start, byteCount: count)
     self = unsafe _overrideLifetime(span, borrowing: mutableRawSpan)
   }
@@ -393,8 +393,8 @@ extension MutableRawSpan {
     fromContentsOf source: Span<Element>
   ) -> Int {
 //    update(from: source.bytes)
-    source.withUnsafeBytes {
-      update(fromContentsOf: $0)
+    unsafe source.withUnsafeBytes {
+      unsafe update(fromContentsOf: $0)
     }
   }
 
@@ -404,8 +404,8 @@ extension MutableRawSpan {
     fromContentsOf source: borrowing MutableSpan<Element>
   ) -> Int {
 //    update(from: source.span.bytes)
-    source.withUnsafeBytes {
-      update(fromContentsOf: $0)
+    unsafe source.withUnsafeBytes {
+      unsafe update(fromContentsOf: $0)
     }
   }
 
@@ -415,7 +415,7 @@ extension MutableRawSpan {
     fromContentsOf source: RawSpan
   ) -> Int {
     if source.byteCount == 0 { return 0 }
-    source.withUnsafeBytes {
+    unsafe source.withUnsafeBytes {
       unsafe _start().copyMemory(from: $0.baseAddress!, byteCount: $0.count)
     }
     return source.byteCount
