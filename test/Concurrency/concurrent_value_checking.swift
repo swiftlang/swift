@@ -451,13 +451,13 @@ enum E11<T>: @unchecked Sendable {
 
 class C11 { }
 
-class C12: @unchecked C11 { } // expected-typechecker-error{{'unchecked' attribute cannot apply to non-protocol type 'C11'}}
+class C12: @unchecked C11 { } // expected-typechecker-error{{'@unchecked' cannot apply to non-protocol type 'C11'}}
 
 protocol P { }
 
-protocol Q: @unchecked Sendable { } // expected-typechecker-error{{'unchecked' attribute only applies in inheritance clauses}}
+protocol Q: @unchecked Sendable { } // expected-typechecker-error{{'@unchecked' only applies in inheritance clauses}}
 
-typealias TypeAlias1 = @unchecked P // expected-typechecker-error{{'unchecked' attribute only applies in inheritance clauses}}
+typealias TypeAlias1 = @unchecked P // expected-typechecker-error{{'@unchecked' only applies in inheritance clauses}}
 
 #endif
 

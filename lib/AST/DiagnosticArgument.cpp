@@ -91,6 +91,9 @@ DiagnosticArgument::DiagnosticArgument(StmtKind SK)
 DiagnosticArgument::DiagnosticArgument(const DeclAttribute *attr)
     : Kind(DiagnosticArgumentKind::DeclAttribute), DeclAttributeVal(attr) {}
 
+DiagnosticArgument::DiagnosticArgument(const TypeAttribute *attr)
+    : Kind(DiagnosticArgumentKind::TypeAttribute), TypeAttributeVal(attr) {}
+
 DiagnosticArgument::DiagnosticArgument(const AvailabilityDomain domain)
     : Kind(DiagnosticArgumentKind::AvailabilityDomain),
       AvailabilityDomainVal(domain) {}
@@ -205,6 +208,11 @@ StmtKind DiagnosticArgument::getAsDescriptiveStmtKind() const {
 const DeclAttribute *DiagnosticArgument::getAsDeclAttribute() const {
   ASSERT(Kind == DiagnosticArgumentKind::DeclAttribute);
   return DeclAttributeVal;
+}
+
+const TypeAttribute *DiagnosticArgument::getAsTypeAttribute() const {
+  ASSERT(Kind == DiagnosticArgumentKind::TypeAttribute);
+  return TypeAttributeVal;
 }
 
 const AvailabilityDomain DiagnosticArgument::getAsAvailabilityDomain() const {

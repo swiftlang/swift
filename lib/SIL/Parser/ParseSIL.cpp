@@ -4843,7 +4843,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       } else if (attr == "builtin") {
         setFromBuiltin(true);
       } else {
-        P.diagnose(identLoc, diag::unknown_attribute, attr);
+        P.diagnose(identLoc, diag::unknown_attr_name, attr);
       }
 
       if (!P.consumeIf(tok::r_square))
@@ -7045,14 +7045,14 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
         llvm::SmallString<64> name;
         llvm::raw_svector_ostream os(name);
         os << isolationCrossing->getCalleeIsolation();
-        P.diagnose(InstLoc.getSourceLoc(), diag::unknown_attribute, name);
+        P.diagnose(InstLoc.getSourceLoc(), diag::unknown_attr_name, name);
       }
       if (isolationCrossing->getCallerIsolation() !=
           ActorIsolation::Unspecified) {
         llvm::SmallString<64> name;
         llvm::raw_svector_ostream os(name);
         os << isolationCrossing->getCalleeIsolation();
-        P.diagnose(InstLoc.getSourceLoc(), diag::unknown_attribute, name);
+        P.diagnose(InstLoc.getSourceLoc(), diag::unknown_attr_name, name);
       }
       return true;
     }

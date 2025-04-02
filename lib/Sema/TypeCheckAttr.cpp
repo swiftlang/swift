@@ -4409,7 +4409,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       llvm::raw_string_ostream out(typeName);
       typeRepr->print(out);
 
-      Ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+      Ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attr_name,
+                         typeName);
     }
 
     attr->setInvalid();

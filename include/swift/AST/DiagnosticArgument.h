@@ -31,6 +31,7 @@ namespace swift {
 
 class Decl;
 class DeclAttribute;
+class TypeAttribute;
 class TypeRepr;
 
 enum class DescriptivePatternKind : uint8_t;
@@ -85,6 +86,7 @@ enum class DiagnosticArgumentKind {
   DescriptiveDeclKind,
   DescriptiveStmtKind,
   DeclAttribute,
+  TypeAttribute,
   AvailabilityDomain,
   AvailabilityRange,
   VersionTuple,
@@ -120,6 +122,7 @@ class DiagnosticArgument {
     DescriptiveDeclKind DescriptiveDeclKindVal;
     StmtKind DescriptiveStmtKindVal;
     const DeclAttribute *DeclAttributeVal;
+    const TypeAttribute *TypeAttributeVal;
     AvailabilityDomain AvailabilityDomainVal;
     AvailabilityRange AvailabilityRangeVal;
     llvm::VersionTuple VersionVal;
@@ -153,6 +156,7 @@ public:
   DiagnosticArgument(DescriptiveDeclKind DDK);
   DiagnosticArgument(StmtKind SK);
   DiagnosticArgument(const DeclAttribute *attr);
+  DiagnosticArgument(const TypeAttribute *attr);
   DiagnosticArgument(const AvailabilityDomain domain);
   DiagnosticArgument(const AvailabilityRange &range);
   DiagnosticArgument(llvm::VersionTuple version);
@@ -192,6 +196,7 @@ public:
   DescriptiveDeclKind getAsDescriptiveDeclKind() const;
   StmtKind getAsDescriptiveStmtKind() const;
   const DeclAttribute *getAsDeclAttribute() const;
+  const TypeAttribute *getAsTypeAttribute() const;
   const AvailabilityDomain getAsAvailabilityDomain() const;
   const AvailabilityRange getAsAvailabilityRange() const;
   llvm::VersionTuple getAsVersionTuple() const;
