@@ -1192,12 +1192,14 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList,
-                           llvm::VersionTuple &foundVersion) const;
+                           bool isSourceCanImport,
+                           llvm::VersionTuple &foundVersion,
+                           llvm::VersionTuple &foundUnderlyingClangVersion) const;
 
   /// Add successful canImport modules.
-  void addSucceededCanImportModule(StringRef moduleName, bool underlyingVersion,
-                                   const llvm::VersionTuple &versionInfo);
+  void addSucceededCanImportModule(StringRef moduleName,
+                                   const llvm::VersionTuple &versionInfo,
+                                   const llvm::VersionTuple &underlyingVersionInfo);
 
 public:
   namelookup::ImportCache &getImportCache() const;

@@ -1272,7 +1272,8 @@ REMARK(explicit_interface_build_skipped,none,
        (StringRef))
 
 WARNING(cannot_find_project_version,none,
-        "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))
+        "cannot find user version number for%select{| Clang}1 module '%0';"
+        " version number ignored", (StringRef, bool))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
