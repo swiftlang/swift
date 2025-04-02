@@ -1908,27 +1908,16 @@ static Type getWithoutProtocolTypeAliases(Type type) {
 ///
 /// Also see simplifyCurrentTypeWitnesses().
 static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
-                                      ValueDecl *witness) {
-  if (witness->isRecursiveValidation()) {
-    LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
-    return Type();
-  }
-
-  if (witness->isInvalid()) {
-    LLVM_DEBUG(llvm::dbgs() << "Invalid witness\n";);
-    return Type();
-  }
-
+                                      ValueDecl *witness, Type type) {
   if (!witness->getDeclContext()->isTypeContext()) {
     // FIXME: Could we infer from 'Self' to make these work?
-    return witness->getInterfaceType();
+    return type;
   }
 
   // Retrieve the set of substitutions to be applied to the witness.
   Type model =
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
-  Type type = witness->getInterfaceType()->getReferenceStorageReferent();
 
   type = getWithoutProtocolTypeAliases(type);
 
@@ -2082,14 +2071,20 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
         !witnessHasImplementsAttrForRequiredName(typeDecl, assocType))
       continue;
 
-    // Determine the witness type.
-    Type witnessType = getWitnessTypeForMatching(conformance, typeDecl);
-    if (!witnessType) continue;
-
-    if (auto witnessMetaType = witnessType->getAs<AnyMetatypeType>())
-      witnessType = witnessMetaType->getInstanceType();
-    else
+    if (typeDecl->isInvalid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
       continue;
+    }
+
+    if (typeDecl->isRecursiveValidation()) {
+      LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
+      continue;
+    }
+
+    // Determine the witness type.
+    Type witnessType = getWitnessTypeForMatching(conformance, typeDecl,
+                                          typeDecl->getDeclaredInterfaceType());
+    if (!witnessType) continue;
 
     if (result.empty()) {
       // If we found at least one default candidate, we must allow for the
@@ -2177,21 +2172,60 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
   InferredAssociatedTypesByWitness inferred;
   inferred.Witness = witness;
 
-  // Compute the requirement and witness types we'll use for matching.
-  Type fullWitnessType = getWitnessTypeForMatching(conformance, witness);
-  if (!fullWitnessType) {
+  auto reqType = removeSelfParam(req, req->getInterfaceType());
+  Type witnessType;
+
+  if (witness->isRecursiveValidation()) {
+    LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
     return inferred;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Witness type for matching is "
-                          << fullWitnessType << "\n";);
+  if (witness->isInvalid()) {
+    LLVM_DEBUG(llvm::dbgs() << "Invalid witness\n";);
+    return inferred;
+  }
 
   auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type> {
-    fullWitnessType = removeSelfParam(witness, fullWitnessType);
+      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
+    // Compute the requirement and witness types we'll use for matching.
+    witnessType = witness->getInterfaceType()->getReferenceStorageReferent();
+    witnessType = getWitnessTypeForMatching(conformance, witness, witnessType);
+
+    LLVM_DEBUG(llvm::dbgs() << "Witness type for matching is "
+                            << witnessType << "\n";);
+
+    witnessType = removeSelfParam(witness, witnessType);
+
+    Type reqThrownError;
+    Type witnessThrownError;
+
+    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
+      auto *reqASD = cast<AbstractStorageDecl>(req);
+
+      // Dig out the thrown error types from the getter so we can compare them
+      // later.
+      auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
+        if (auto getter = asd->getEffectfulGetAccessor()) {
+          if (Type thrownErrorType = getter->getThrownInterfaceType()) {
+            return thrownErrorType;
+          } else if (getter->hasThrows()) {
+            return asd->getASTContext().getErrorExistentialType();
+          }
+        }
+
+        return asd->getASTContext().getNeverType();
+      };
+
+      reqThrownError = getThrownErrorType(reqASD);
+
+      witnessThrownError = getThrownErrorType(witnessASD);
+      witnessThrownError = getWitnessTypeForMatching(conformance, witness,
+                                                     witnessThrownError);
+    }
+
     return std::make_tuple(std::nullopt,
-                           removeSelfParam(req, req->getInterfaceType()),
-                           fullWitnessType);
+                           reqType, witnessType,
+                           reqThrownError, witnessThrownError);
   };
 
   /// Visits a requirement type to match it to a potential witness for
@@ -2327,7 +2361,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
                         Type witnessType) -> std::optional<RequirementMatch> {
     if (!matchVisitor.match(reqType, witnessType)) {
       return RequirementMatch(witness, MatchKind::TypeConflict,
-                              fullWitnessType);
+                              witnessType);
     }
 
     return std::nullopt;
@@ -2340,7 +2374,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
     return RequirementMatch(witness,
                             anyRenaming ? MatchKind::RenamedMatch
                                         : MatchKind::ExactMatch,
-                            fullWitnessType);
+                            witnessType);
 
   };
 
@@ -4585,6 +4619,14 @@ ReferencedAssociatedTypesRequest::evaluate(Evaluator &eval,
     funcTy->getResult()->getCanonicalType().walk(walker);
   } else {
     reqTy->getCanonicalType().walk(walker);
+  }
+
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(req)) {
+    if (auto getter = asd->getEffectfulGetAccessor()) {
+      if (Type thrownErrorType = getter->getThrownInterfaceType()) {
+        thrownErrorType->getCanonicalType().walk(walker);
+      }
+    }
   }
 
   return assocTypes;
