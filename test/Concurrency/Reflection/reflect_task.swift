@@ -46,11 +46,28 @@ func add(_ a: UInt, _ b: UInt) async -> UInt {
   }
 }
 
+func sleepForever() async -> Int {
+  if #available(SwiftStdlib 5.7, *) {
+    try? await Task.sleep(for: .seconds(1_000_000_000))
+    return 42
+  } else {
+    fatalError("This test shouldn't be running against old stdlibs.")
+  }
+}
+
 @main struct Main {
   static func main() async {
     let n = await add(100, 100)
     reflect(any: n)
 
+    async let alet1 = sleepForever()
+    async let alet2 = sleepForever()
+    reflect(asyncTask: _getCurrentTaskShim())
+    // CHECK: Async task {{0x[0-9a-fA-F]*}}
+    // CHECK: children = {
+    // CHECK:   Async task {{0x[0-9a-fA-F]*}}
+    // CHECK:   Async task {{0x[0-9a-fA-F]*}}
+    // CHECK: }
     doneReflecting()
   }
 }

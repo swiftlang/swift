@@ -64,7 +64,7 @@ template <typename Runtime> struct ConformanceCacheEntry {
 
 template <typename Runtime>
 struct HeapObject {
-  typename Runtime::StoredPointer Metadata;
+  typename Runtime::StoredSignedPointer Metadata;
   typename Runtime::StoredSize RefCounts;
 };
 
@@ -131,10 +131,7 @@ struct AsyncTask: Job<Runtime> {
   // On 64-bit, there's a Reserved64 after ResumeContext.
   typename Runtime::StoredPointer ResumeContextAndReserved[
     sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
-  union {
-    AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
-    typename Runtime::StoredPointer PrivateStorageRaw[14];
-  };
+  AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
 };
 
 template <typename Runtime>
