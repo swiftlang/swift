@@ -510,6 +510,9 @@ public:
   /// Scanner Prefix Mapper.
   std::vector<std::string> ScannerPrefixMapper;
 
+  /// Verify resolved plugin is not changed.
+  bool ResolvedPluginVerification = false;
+
   /// When set, don't validate module system dependencies.
   ///
   /// If a system header is modified and this is not set, the compiler will

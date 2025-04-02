@@ -2417,6 +2417,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
 
+  Opts.ResolvedPluginVerification |=
+      Args.hasArg(OPT_resolved_plugin_verification);
+
   // rdar://132340493 disable scanner-side validation for non-caching builds
   Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
                                                OPT_no_scanner_module_validation,

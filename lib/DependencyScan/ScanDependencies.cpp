@@ -214,9 +214,23 @@ private:
       depInfo.addMacroDependency(macro.first(), macro.second.LibraryPath,
                                  macro.second.ExecutablePath);
 
+    bool needPathRemapping = instance.getInvocation()
+                                 .getSearchPathOptions()
+                                 .ResolvedPluginVerification &&
+                             cache.getScanService().hasPathMapping();
+    auto mapPath = [&](StringRef path) {
+      if (!needPathRemapping)
+        return path.str();
+
+      return cache.getScanService().remapPath(path);
+    };
+    if (needPathRemapping)
+      commandline.push_back("-resolved-plugin-verification");
+
     for (auto &macro : depInfo.getMacroDependencies()) {
-      std::string arg = macro.second.LibraryPath + "#" +
-                        macro.second.ExecutablePath + "#" + macro.first;
+      std::string arg = mapPath(macro.second.LibraryPath) + "#" +
+                        mapPath(macro.second.ExecutablePath) + "#" +
+                        macro.first;
       commandline.push_back("-load-resolved-plugin");
       commandline.push_back(arg);
     }
