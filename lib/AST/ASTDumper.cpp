@@ -640,6 +640,21 @@ static StringRef getDumpString(ExplicitSafety safety) {
     return "unsafe";
   }
 }
+static StringRef getDumpString(ConformanceEntryKind kind) {
+  switch (kind) {
+  case ConformanceEntryKind::Inherited:
+    return "inherited";
+  case ConformanceEntryKind::Explicit:
+    return "explicit";
+  case ConformanceEntryKind::PreMacroExpansion:
+    return "pre_macro_expansion";
+  case ConformanceEntryKind::Synthesized:
+    return "synthesized";
+  case ConformanceEntryKind::Implied:
+    return "implied";
+  }
+  llvm_unreachable("unhandled ConformanceEntryKind");
+}
 static StringRef getDumpString(StringRef s) {
   return s;
 }
@@ -1262,6 +1277,40 @@ namespace {
     /// Print a conformance reference as a child node.
     void printRec(const ProtocolConformance *conformance,
                   VisitedConformances &visited, Label label);
+
+    // Print a field that describes the actor isolation associated with an AST
+    // node.
+    void printIsolation(const ActorIsolation &isolation) {
+      switch (isolation) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::NonisolatedUnsafe:
+        break;
+
+      case ActorIsolation::Nonisolated:
+        printFlag(true, "nonisolated", CapturesColor);
+        break;
+
+      case ActorIsolation::Erased:
+        printFlag(true, "dynamically_isolated", CapturesColor);
+        break;
+
+      case ActorIsolation::CallerIsolationInheriting:
+        printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+        break;
+
+      case ActorIsolation::ActorInstance:
+        printReferencedDeclWithContextField(isolation.getActorInstance(),
+                                            Label::always("actor_isolated"),
+                                            CapturesColor);
+        break;
+
+      case ActorIsolation::GlobalActor:
+        printTypeField(isolation.getGlobalActor(),
+                       Label::always("global_actor_isolated"), PrintOptions(),
+                       CapturesColor);
+        break;
+      }
+    }
 
     /// Print a requirement node.
     void visitRequirement(const Requirement &requirement, Label label) {
@@ -4021,36 +4070,7 @@ public:
 
     printField(E->getRawDiscriminator(), Label::always("discriminator"),
                DiscriminatorColor);
-
-    switch (auto isolation = E->getActorIsolation()) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::NonisolatedUnsafe:
-      break;
-
-    case ActorIsolation::Nonisolated:
-      printFlag(true, "nonisolated", CapturesColor);
-      break;
-
-    case ActorIsolation::Erased:
-      printFlag(true, "dynamically_isolated", CapturesColor);
-      break;
-
-    case ActorIsolation::CallerIsolationInheriting:
-      printFlag(true, "isolated_to_caller_isolation", CapturesColor);
-      break;
-
-    case ActorIsolation::ActorInstance:
-      printReferencedDeclWithContextField(isolation.getActorInstance(),
-                                          Label::always("actor_isolated"),
-                                          CapturesColor);
-      break;
-
-    case ActorIsolation::GlobalActor:
-      printTypeField(isolation.getGlobalActor(),
-                     Label::always("global_actor_isolated"), PrintOptions(),
-                     CapturesColor);
-      break;
-    }
+    printIsolation(E->getActorIsolation());
 
     if (auto captureInfo = E->getCachedCaptureInfo()) {
       printCaptureInfoField(captureInfo, Label::optional("captures"));
@@ -5616,6 +5636,11 @@ public:
       printTypeField(conformance->getType(), Label::always("type"));
       printReferencedDeclField(conformance->getProtocol(),
                                Label::always("protocol"));
+      if (isTypeChecked()) {
+        printField(conformance->getSourceKind(), Label::always("source_kind"));
+        printFlag(conformance->isRetroactive(), "retroactive");
+        printIsolation(conformance->getIsolation());
+      }
       if (!Writer.isParsable())
         printFlag(!shouldPrintDetails, "<details printed above>");
     };
@@ -5625,6 +5650,16 @@ public:
         auto normal = cast<NormalProtocolConformance>(conformance);
 
         printCommon("normal_conformance");
+        printFlag(normal->isPreconcurrency(), "preconcurrency");
+        if (normal->isPreconcurrency() && normal->isComplete()) {
+          printFlag(normal->isPreconcurrencyEffectful(),
+                    "effectful_preconcurrency");
+        }
+        printFlag(normal->isRetroactive(), "retroactive");
+        printFlag(normal->isUnchecked(), "unchecked");
+        if (normal->getExplicitSafety() != ExplicitSafety::Unspecified)
+          printField(normal->getExplicitSafety(), Label::always("safety"));
+
         if (!shouldPrintDetails)
           break;
 
