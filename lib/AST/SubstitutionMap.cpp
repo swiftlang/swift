@@ -381,6 +381,13 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
 }
 
 SubstitutionMap
+SubstitutionMap::getProtocolSubstitutions(ProtocolConformanceRef conformance) {
+  return getProtocolSubstitutions(conformance.getProtocol(),
+                                  conformance.getType(),
+                                  conformance);
+}
+
+SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {

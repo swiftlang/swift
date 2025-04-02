@@ -2901,17 +2901,14 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   // Check any same-type requirements in the protocol's requirement signature.
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
 
-  auto typeInContext = adoptee;
   ProtocolConformanceRef conformanceInContext(conformance);
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
-    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
     conformanceInContext =
       conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
 
   auto substitutions =
-    SubstitutionMap::getProtocolSubstitutions(
-      proto, typeInContext, conformanceInContext);
+    SubstitutionMap::getProtocolSubstitutions(conformanceInContext);
 
   SmallVector<Requirement, 4> sanitizedRequirements;
   auto requirements = proto->getRequirementSignature().getRequirements();
@@ -4543,8 +4540,6 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
                                        CanType origTy, ProtocolDecl *reqProto,
                                        unsigned index) const {
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      conformance->getProtocol(),
-      conformance->getType(),
       ProtocolConformanceRef(conformance));
   auto substTy = origTy.subst(subMap);
 

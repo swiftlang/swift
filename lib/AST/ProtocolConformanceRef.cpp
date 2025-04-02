@@ -164,7 +164,7 @@ ProtocolConformanceRef::getWitnessByName(DeclName name) const {
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
   if (!isConcrete()) {
-    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, getType(), *this);
+    auto subs = SubstitutionMap::getProtocolSubstitutions(*this);
     return ConcreteDeclRef(requirement, subs);
   }
 
@@ -214,9 +214,7 @@ Type ProtocolConformanceRef::getAssociatedType(Type assocType) const {
   if (isInvalid())
     return ErrorType::get(assocType->getASTContext());
 
-  auto substMap =
-    SubstitutionMap::getProtocolSubstitutions(getProtocol(), getType(), *this);
-  return assocType.subst(substMap);
+  return assocType.subst(SubstitutionMap::getProtocolSubstitutions(*this));
 }
 
 ProtocolConformanceRef

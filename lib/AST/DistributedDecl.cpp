@@ -364,11 +364,10 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto actorConformance =
       lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
-  if (!actorConformance || actorConformance.isInvalid())
+  if (actorConformance.isInvalid())
     return Type();
 
-  auto subs = SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
+  auto subs = SubstitutionMap::getProtocolSubstitutions(actorConformance);
 
   memberTy = memberTy.subst(subs);
 

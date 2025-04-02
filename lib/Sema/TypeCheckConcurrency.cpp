@@ -5127,7 +5127,6 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         // Substitute into the global actor type.
         auto conformance = std::get<0>(isolated);
         auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
-            conformance->getProtocol(), dc->getSelfInterfaceType(),
             ProtocolConformanceRef(conformance));
         Type globalActor = isolation.getGlobalActor().subst(requirementSubs);
         if (!globalActorTypes.insert(globalActor->getCanonicalType()).second)
