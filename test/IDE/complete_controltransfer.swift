@@ -1,11 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_1 | %FileCheck %s -check-prefix=LABEL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_2 | %FileCheck %s -check-prefix=LABEL_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_3 | %FileCheck %s -check-prefix=LABEL_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_4 | %FileCheck %s -check-prefix=LABEL_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_5 | %FileCheck %s -check-prefix=LABEL_5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_6 | %FileCheck %s -check-prefix=LABEL_6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_7 | %FileCheck %s -check-prefix=LABEL_7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOPLEVEL_1 | %FileCheck %s -check-prefix=TOPLEVEL_1
+// RUN: %batch-code-completion
 
 func test(subject: Int) {
   OUTER_IF_1:
