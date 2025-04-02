@@ -3093,6 +3093,7 @@ function Build-Installer([Hashtable] $Platform) {
     # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
     # https://github.com/microsoft/mimalloc/issues/997
     WORKAROUND_MIMALLOC_ISSUE_997 = if ($IsCrossCompiling) { "true" } else { "false" };
+    INCLUDE_ASSERTS_TOOLCHAIN = "true";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
