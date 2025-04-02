@@ -4521,7 +4521,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
     if (!Options.SuppressSendingArgsAndResults) {
-      if (auto typeRepr = decl->getElementTypeRepr()) {
+      if (decl->getElementTypeRepr()) {
         if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
           Printer << "sending ";
       }
