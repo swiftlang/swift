@@ -45,6 +45,7 @@ add_swift_host_library(swiftAST STATIC
   DeclContext.cpp
   DeclContextDumper.cpp
   DeclNameLoc.cpp
+  DiagnosticArgument.cpp
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp

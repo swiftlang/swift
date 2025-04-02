@@ -28,6 +28,7 @@
 namespace swift {
 class ASTScope;
 class AvailabilityScope;
+class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
 class Token;
