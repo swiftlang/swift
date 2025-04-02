@@ -56,6 +56,15 @@ func test(subject: Int) {
 // LABEL_7: Begin completions, 1 items
 // LABEL_7-DAG: Pattern/Local:                      OUTER_FOR_1;
   }
+
+  // This is illegal, but make sure we don't duplicate in completion.
+  DUPLICATE_LABEL: do {
+    DUPLICATE_LABEL: do {
+      break #^LABEL_8^#
+      // LABEL_8:     Begin completions, 1 items
+      // LABEL_8-DAG: Pattern/Local:                      DUPLICATE_LABEL;
+    }
+  }
 }
 
 TOP_IF_1: if true {}

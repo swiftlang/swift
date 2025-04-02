@@ -3500,54 +3500,23 @@ void CompletionLookup::lookupExternalModuleDecls(
 }
 
 void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
-  class LabelFinder : public ASTWalker {
-    SourceManager &SM;
-    SourceLoc TargetLoc;
-    bool IsContinue;
+  auto *SF = CurrDeclContext->getParentSourceFile();
+  llvm::SmallPtrSet<Identifier, 4> labels;
+  for (auto *LS : ASTScope::lookupLabeledStmts(SF, Loc)) {
+    if (isContinue && !LS->isPossibleContinueTarget())
+      continue;
 
-  public:
-    SmallVector<Identifier, 2> Result;
+    auto labelInfo = LS->getLabelInfo();
+    if (!labelInfo)
+      continue;
 
-    /// Walk only the arguments of a macro.
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
+    auto label = labelInfo.Name;
+    if (!labels.insert(label).second)
+      continue;
 
-    LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
-        : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return Action::SkipNode(S);
-
-      if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
-        if (LS->getLabelInfo()) {
-          if (!IsContinue || LS->isPossibleContinueTarget()) {
-            auto label = LS->getLabelInfo().Name;
-            if (!llvm::is_contained(Result, label))
-              Result.push_back(label);
-          }
-        }
-      }
-
-      return Action::Continue(S);
-    }
-
-    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
-      return Action::Stop();
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return Action::SkipNode(E);
-      return Action::Continue(E);
-    }
-  } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
-  const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);
-  for (auto name : Finder.Result) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Pattern, SemanticContextKind::Local);
-    Builder.addTextChunk(name.str());
+    Builder.addTextChunk(label.str());
   }
 }
 
