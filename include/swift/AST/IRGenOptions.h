@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
@@ -655,11 +656,7 @@ public:
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {
-#ifndef NDEBUG
-    DisableRoundTripDebugTypes = false;
-#else
-    DisableRoundTripDebugTypes = true;
-#endif
+    DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 
   /// Appends to \p os an arbitrary string representing all options which
