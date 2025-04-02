@@ -631,6 +631,7 @@ function(_compile_swift_files
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
+  list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
