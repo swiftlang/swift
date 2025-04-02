@@ -541,6 +541,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable
+  @_semantics("optimize.sil.inline.constant.arguments")
   public var exponent: Int {
     if !isFinite { return .max }
     if isZero { return .min }
@@ -884,6 +885,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable
+  @_semantics("optimize.sil.inline.constant.arguments")
   public var significandWidth: Int {
     let trailingZeroBits = significandBitPattern.trailingZeroBitCount
     if isNormal {
