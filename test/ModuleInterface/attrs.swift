@@ -87,9 +87,9 @@ public struct MutatingTest {
 @abi(func abiSpiFunc())
 @_spi(spiGroup) public func abiSpiFunc() {}
 
-@execution(concurrent)
+@concurrent
 public func testExecutionConcurrent() async {}
-// CHECK: @execution(concurrent) public func testExecutionConcurrent() async
+// CHECK: @concurrent public func testExecutionConcurrent() async
 
 @execution(caller)
 public func testExecutionCaller() async {}

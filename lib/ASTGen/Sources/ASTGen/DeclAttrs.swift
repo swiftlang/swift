@@ -371,7 +371,6 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
-        case "concurrent": return .concurrent
         case "caller": return .caller
         default: return nil
         }

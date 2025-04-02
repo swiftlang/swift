@@ -16,11 +16,11 @@ public struct Test {
   }
 
   // CHECK:  #if compiler(>=5.3) && $ExecutionAttribute
-  // CHECK-NEXT:  @execution(concurrent) public func test() async
+  // CHECK-NEXT:  @concurrent public func test() async
   // CHECK-NEXT:  #else
   // CHECK-NEXT:  public func test() async
   // CHECK-NEXT:  #endif
-  @execution(concurrent)
+  @concurrent
   public func test() async {
   }
 

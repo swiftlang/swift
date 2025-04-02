@@ -94,8 +94,6 @@ BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
     BridgedSourceLoc cBehaviorLoc) {
   auto behaviorKind = [=] {
     switch (behavior) {
-    case BridgedExecutionTypeAttrExecutionKind_Concurrent:
-      return ExecutionKind::Concurrent;
     case BridgedExecutionTypeAttrExecutionKind_Caller:
       return ExecutionKind::Caller;
     }

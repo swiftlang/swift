@@ -40,7 +40,7 @@ func executionCallerIsolation() async {
 }
 
 // Expected to always crash
-@execution(concurrent)
+@concurrent
 func executionConcurrentIsolation() async {
   checkIfOnMainQueue()
 }

@@ -1232,19 +1232,19 @@ nonisolated func isolation5() {}
 @abi(func isolation7(_: some Actor))
 func isolation7(_: isolated some Actor) {}
 
-@abi(@execution(concurrent) func isolation8() async)
-@execution(concurrent) func isolation8() async {}
+@abi(@concurrent func isolation8() async)
+@concurrent func isolation8() async {}
 
 @abi(func isolation9() async)
-@execution(concurrent) func isolation9() async {}
+@concurrent func isolation9() async {}
 
-@abi(@execution(concurrent) func isolation10() async)
+@abi(@concurrent func isolation10() async)
 func isolation10() async {}
 
 @abi(nonisolated func isolation11() async)
-@execution(concurrent) func isolation11() async {}
+@concurrent func isolation11() async {}
 
-@abi(@execution(concurrent) func isolation12() async)
+@abi(@concurrent func isolation12() async)
 nonisolated func isolation12() async {}
 
 @abi(@execution(caller) func isolation13() async)
@@ -1263,9 +1263,9 @@ func isolation15() async {}
 nonisolated func isolation17() async {}
 
 @abi(@execution(caller) func isolation18() async)
-@execution(concurrent) func isolation18() async {}
+@concurrent func isolation18() async {}
 
-@abi(@execution(concurrent) func isolation19() async)
+@abi(@concurrent func isolation19() async)
 @execution(caller) func isolation19() async {}
 
 // NSCopying - see attr/attr_abi_objc.swift

@@ -911,7 +911,6 @@ SWIFT_NAME("BridgedAvailableAttr.setIsGroupTerminator(self:)")
 void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionKind {
-  BridgedExecutionKindConcurrent,
   BridgedExecutionKindCaller,
 };
 
@@ -2591,7 +2590,6 @@ BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
     BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionTypeAttrExecutionKind {
-  BridgedExecutionTypeAttrExecutionKind_Concurrent,
   BridgedExecutionTypeAttrExecutionKind_Caller
 };
 

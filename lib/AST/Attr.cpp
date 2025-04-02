@@ -313,9 +313,6 @@ void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
   printer.printAttrName("@execution");
   printer << "(";
   switch (getBehavior()) {
-  case ExecutionKind::Concurrent:
-    printer << "concurrent";
-    break;
   case ExecutionKind::Caller:
     printer << "caller";
     break;
@@ -1725,9 +1722,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Execution: {
     auto *attr = cast<ExecutionAttr>(this);
     switch (attr->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      Printer << "@execution(concurrent)";
-      break;
     case ExecutionKind::Caller:
       Printer << "@execution(caller)";
       break;
@@ -1958,8 +1952,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "lifetime";
   case DeclAttrKind::Execution: {
     switch (cast<ExecutionAttr>(this)->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      return "execution(concurrent)";
     case ExecutionKind::Caller:
       return "execution(caller)";
     }

@@ -131,8 +131,7 @@ enum : unsigned { NumExternKindBits =
   countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
 
 enum class ExecutionKind : uint8_t {
-  Concurrent = 0,
-  Caller,
+  Caller = 0,
   Last_ExecutionKind = Caller
 };
 
