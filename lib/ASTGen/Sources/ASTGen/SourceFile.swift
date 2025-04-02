@@ -219,7 +219,8 @@ public func emitParserDiagnostics(
     let configuredRegions = sourceFile.pointee.configuredRegions(astContext: ctx)
     for diag in diags {
       // If the diagnostic is in an unparsed #if region, don't emit it.
-      if configuredRegions.isActive(diag.node) == .unparsed {
+      if let diagNode = diag.node,
+          configuredRegions.isActive(diagNode) == .unparsed {
         continue
       }
 

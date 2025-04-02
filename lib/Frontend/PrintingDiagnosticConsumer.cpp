@@ -47,21 +47,31 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   case DiagnosticOptions::FormattingStyle::Swift: {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // Use the swift-syntax formatter.
-    auto bufferStack = DiagnosticBridge::getSourceBufferStack(SM, Info.Loc);
-    if (!bufferStack.empty()) {
-      if (Info.Kind != DiagnosticKind::Note)
-        DiagBridge.flush(Stream, /*includeTrailingBreak=*/true,
-                         /*forceColors=*/ForceColors);
-
-      DiagBridge.enqueueDiagnostic(SM, Info, bufferStack.front());
-      break;
+    if (Info.Kind != DiagnosticKind::Note) {
+      DiagBridge.flush(Stream, /*includeTrailingBreak=*/true,
+                       /*forceColors=*/ForceColors);
     }
-#endif
 
+    auto bufferStack = DiagnosticBridge::getSourceBufferStack(SM, Info.Loc);
+    std::optional<unsigned> innermostBufferID;
+    if (!bufferStack.empty()) {
+      innermostBufferID = bufferStack.front();
+    }
+
+    DiagBridge.enqueueDiagnostic(SM, Info, innermostBufferID);
+
+    // If there was no source-location information, immediately flush the
+    // enqueued diagnostic. It won't ever be grouped with anything.
+    if (bufferStack.empty()) {
+      DiagBridge.flush(Stream, /*includeTrailingBreak=*/true,
+                       /*forceColors=*/ForceColors);
+    }
+
+    break;
+#else
     // Fall through when we don't have the new diagnostics renderer available.
-    // This also happens if the location of the diagnostic is invalid, because
-    // the new rendered cannot cope with that.
     LLVM_FALLTHROUGH;
+#endif
   }
 
   case DiagnosticOptions::FormattingStyle::LLVM:

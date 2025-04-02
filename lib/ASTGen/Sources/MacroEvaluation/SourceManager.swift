@@ -99,9 +99,13 @@ extension SourceManager {
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
   func bridgedSourceLoc<Node: SyntaxProtocol>(
-    for node: Node,
+    for node: Node?,
     at position: AbsolutePosition? = nil
   ) -> BridgedSourceLoc {
+    guard let node else {
+      return nil
+    }
+
     // Find the source file and this node's position within it.
     let (rootNode, rootPosition) = rootSyntax(of: node)
 
@@ -124,8 +128,8 @@ extension SourceManager {
   private func diagnoseSingle<Node: SyntaxProtocol>(
     message: String,
     severity: DiagnosticSeverity,
-    node: Node,
-    position: AbsolutePosition,
+    node: Node?,
+    position: AbsolutePosition?,
     highlights: [Syntax] = [],
     fixItChanges: [FixIt.Change] = []
   ) {

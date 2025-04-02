@@ -25,7 +25,7 @@ fileprivate func emitDiagnosticParts(
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
   message: String,
   severity: DiagnosticSeverity,
-  position: AbsolutePosition,
+  position: AbsolutePosition?,
   offset: Int,
   highlights: [Syntax] = [],
   edits: [SourceEdit] = []
@@ -33,7 +33,11 @@ fileprivate func emitDiagnosticParts(
   // Map severity
   let bridgedSeverity = severity.bridged
 
-  func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
+  func bridgedSourceLoc(at position: AbsolutePosition?) -> BridgedSourceLoc {
+    guard let position else {
+      return nil
+    }
+
     return BridgedSourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
   }
 
@@ -266,95 +270,125 @@ public func addQueuedDiagnostic(
     to: PerFrontendDiagnosticState.self
   )
 
-  guard let rawPosition = cLoc.getOpaquePointerValue() else {
-    return
-  }
+  let rawPosition = cLoc.getOpaquePointerValue()
+  var sourceFile: ExportedSourceFile? = nil
+  if let rawPosition {
+    sourceFile = queuedDiagnostics.pointee.sourceFiles.first { sf in
+      guard let baseAddress = sf.buffer.baseAddress else {
+        return false
+      }
 
-  // Find the source file that contains this location.
-  let sourceFile = queuedDiagnostics.pointee.sourceFiles.first { sf in
-    guard let baseAddress = sf.buffer.baseAddress else {
-      return false
+      return rawPosition >= baseAddress && rawPosition <= baseAddress + sf.buffer.count
     }
-
-    return rawPosition >= baseAddress && rawPosition <= baseAddress + sf.buffer.count
-  }
-  guard let sourceFile = sourceFile else {
-    // FIXME: Hard to report an error here...
-    return
   }
 
-  let sourceFileBaseAddress = UnsafeRawPointer(sourceFile.buffer.baseAddress!)
-  let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
-  let offset = rawPosition - sourceFileBaseAddress
-  let position = AbsolutePosition(utf8Offset: offset)
-
-  // Find the token at that offset.
-  let node: Syntax
-  if let token = sourceFile.syntax.token(at: position) {
-    node = Syntax(token)
-  } else if position == sourceFile.syntax.endPosition {
-    // FIXME: EOF token is not included in '.token(at: position)'
-    // We might want to include it, but want to avoid special handling.
-    // Also 'sourceFile.syntax' is not guaranteed to be 'SourceFileSyntax'.
-    if let token = sourceFile.syntax.lastToken(viewMode: .all) {
-      node = Syntax(token)
-    } else {
-      node = sourceFile.syntax
-    }
-  } else {
-    // position out of range.
-    return
-  }
-
-  // Map the highlights.
+  let node: Syntax?
+  let position: AbsolutePosition?
   var highlights: [Syntax] = []
-  let highlightRanges = UnsafeBufferPointer<BridgedCharSourceRange>(
-    start: highlightRangesPtr,
-    count: numHighlightRanges
-  )
-  for index in 0..<numHighlightRanges {
-    let range = highlightRanges[index]
+  let fixIts: [FixIt]
+  if let sourceFile, let rawPosition {
+    let sourceFileBaseAddress = UnsafeRawPointer(sourceFile.buffer.baseAddress!)
+    let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
+    let offset = rawPosition - sourceFileBaseAddress
+    let myPosition = AbsolutePosition(utf8Offset: offset)
+    position = myPosition
 
-    // Make sure both the start and the end land within this source file.
-    guard let start = range.start.getOpaquePointerValue(),
-      let end = range.start.advanced(by: range.byteLength).getOpaquePointerValue()
-    else {
-      continue
+    // Find the token at that offset.
+    if let token = sourceFile.syntax.token(at: myPosition) {
+      node = Syntax(token)
+    } else if myPosition == sourceFile.syntax.endPosition {
+      // FIXME: EOF token is not included in '.token(at: position)'
+      // We might want to include it, but want to avoid special handling.
+      // Also 'sourceFile.syntax' is not guaranteed to be 'SourceFileSyntax'.
+      if let token = sourceFile.syntax.lastToken(viewMode: .all) {
+        node = Syntax(token)
+      } else {
+        node = sourceFile.syntax
+      }
+    } else {
+      node = nil
     }
 
-    guard start >= sourceFileBaseAddress && start < sourceFileEndAddress,
-      end >= sourceFileBaseAddress && end <= sourceFileEndAddress
-    else {
-      continue
-    }
+    // Map the highlights.
+    let highlightRanges = UnsafeBufferPointer<BridgedCharSourceRange>(
+      start: highlightRangesPtr,
+      count: numHighlightRanges
+    )
+    for index in 0..<numHighlightRanges {
+      let range = highlightRanges[index]
 
-    // Find start tokens in the source file.
-    let startPos = AbsolutePosition(utf8Offset: start - sourceFileBaseAddress)
-    guard let startToken = sourceFile.syntax.token(at: startPos) else {
-      continue
-    }
-
-    // Walk up from the start token until we find a syntax node that matches
-    // the highlight range.
-    let endPos = AbsolutePosition(utf8Offset: end - sourceFileBaseAddress)
-    var highlightSyntax = Syntax(startToken)
-    while true {
-      // If this syntax matches our starting/ending positions, add the
-      // highlight and we're done.
-      if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos
-        && highlightSyntax.endPositionBeforeTrailingTrivia == endPos
-      {
-        highlights.append(highlightSyntax)
-        break
+      // Make sure both the start and the end land within this source file.
+      guard let start = range.start.getOpaquePointerValue(),
+        let end = range.start.advanced(by: range.byteLength).getOpaquePointerValue()
+      else {
+        continue
       }
 
-      // Go up to the parent.
-      guard let parent = highlightSyntax.parent else {
-        break
+      guard start >= sourceFileBaseAddress && start < sourceFileEndAddress,
+        end >= sourceFileBaseAddress && end <= sourceFileEndAddress
+      else {
+        continue
       }
 
-      highlightSyntax = parent
+      // Find start tokens in the source file.
+      let startPos = AbsolutePosition(utf8Offset: start - sourceFileBaseAddress)
+      guard let startToken = sourceFile.syntax.token(at: startPos) else {
+        continue
+      }
+
+      // Walk up from the start token until we find a syntax node that matches
+      // the highlight range.
+      let endPos = AbsolutePosition(utf8Offset: end - sourceFileBaseAddress)
+      var highlightSyntax = Syntax(startToken)
+      while true {
+        // If this syntax matches our starting/ending positions, add the
+        // highlight and we're done.
+        if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos
+          && highlightSyntax.endPositionBeforeTrailingTrivia == endPos
+        {
+          highlights.append(highlightSyntax)
+          break
+        }
+
+        // Go up to the parent.
+        guard let parent = highlightSyntax.parent else {
+          break
+        }
+
+        highlightSyntax = parent
+      }
     }
+
+    // Map the Fix-Its
+    let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
+      fixIts.compactMap { fixIt in
+        guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
+              let endPos = sourceFile.position(
+                of: fixIt.replacementRange.start.advanced(
+                  by: fixIt.replacementRange.byteLength)) else {
+          return nil
+        }
+
+        return FixIt.Change.replaceText(
+          range: startPos..<endPos,
+          with: String(bridged: fixIt.replacementText),
+          in: sourceFile.syntax
+        )
+      }
+    }
+
+    fixIts = fixItChanges.isEmpty
+        ? []
+        : [
+            FixIt(
+              message: BridgedFixItMessage(),
+              changes: fixItChanges
+            )
+          ]
+  } else {
+    node = nil
+    position = nil
+    fixIts = []
   }
 
   let documentationPath = String(bridged: documentationPath)
@@ -382,33 +416,6 @@ public func addQueuedDiagnostic(
   if let category {
     diagnosticState.pointee.referencedCategories.insert(category)
   }
-
-  // Map the Fix-Its
-  let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
-    fixIts.compactMap { fixIt in
-      guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
-            let endPos = sourceFile.position(
-              of: fixIt.replacementRange.start.advanced(
-                by: fixIt.replacementRange.byteLength)) else {
-        return nil
-      }
-
-      return FixIt.Change.replaceText(
-        range: startPos..<endPos,
-        with: String(bridged: fixIt.replacementText),
-        in: sourceFile.syntax
-      )
-    }
-  }
-
-  let fixIts: [FixIt] = fixItChanges.isEmpty
-      ? []
-      : [
-          FixIt(
-            message: BridgedFixItMessage(),
-            changes: fixItChanges
-          )
-        ]
 
   let diagnostic = Diagnostic(
     node: node,

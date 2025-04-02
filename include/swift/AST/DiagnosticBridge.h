@@ -22,6 +22,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
 /// Declare the bridge between swift-syntax and swift-frontend for diagnostics
@@ -44,7 +45,7 @@ class DiagnosticBridge {
 public:
   /// Enqueue diagnostics.
   void enqueueDiagnostic(SourceManager &SM, const DiagnosticInfo &Info,
-                         unsigned innermostBufferID);
+                         std::optional<unsigned> innermostBufferID);
 
   /// Flush all enqueued diagnostics.
   void flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
