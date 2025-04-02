@@ -1741,6 +1741,9 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through borrows.
         for (auto value : nextUse->getUser()->getResults()) {
           for (auto *use : value->getUses()) {
+            if (use->get()->getType().isTrivial(*use->getFunction())) {
+              continue;
+            }
             useWorklist.push_back(use);
           }
         }
