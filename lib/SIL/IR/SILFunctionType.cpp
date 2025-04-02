@@ -28,6 +28,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
@@ -56,6 +57,39 @@ SILType SILFunctionType::substInterfaceType(SILModule &M,
   if (auto subs = getInvocationSubstitutions())
     interfaceType = interfaceType.subst(M, subs, context);
   return interfaceType;
+}
+
+SILFunctionType::ExtInfo
+SILFunctionType::getSubstLifetimeDependencies(GenericSignature genericSig,
+                                              ExtInfo origExtInfo,
+                                              ArrayRef<SILParameterInfo> params,
+                                              ArrayRef<SILYieldInfo> yields,
+                                              ArrayRef<SILResultInfo> results) {
+  if (origExtInfo.getLifetimeDependencies().empty()) {
+    return origExtInfo;
+  }
+  SmallVector<LifetimeDependenceInfo, 2> substLifetimeDependencies;
+  bool didRemoveLifetimeDependencies
+    = filterEscapableLifetimeDependencies(genericSig,
+                                          origExtInfo.getLifetimeDependencies(),
+                                          substLifetimeDependencies,
+                                          [&](unsigned targetIndex) {
+      if (targetIndex >= params.size()) {
+        // Dependency targets a yield or return value.
+        auto targetYieldIndex = targetIndex - params.size();
+        if (targetYieldIndex >= yields.size()) {
+          return results[targetYieldIndex - yields.size()].getInterfaceType();
+        }
+        return yields[targetYieldIndex].getInterfaceType();
+      } else {
+        // Dependency targets a parameter.
+        return params[targetIndex].getInterfaceType();
+      }
+    });
+  if (didRemoveLifetimeDependencies) {
+    return origExtInfo.withLifetimeDependencies(substLifetimeDependencies);
+  }
+  return origExtInfo;
 }
 
 CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
@@ -97,8 +131,12 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
 
   auto signature = isPolymorphic() ? getInvocationGenericSignature()
                                    : CanGenericSignature();
+  
+  auto extInfo = getSubstLifetimeDependencies(signature, getExtInfo(),
+                                              params, yields, results);
+  
   return SILFunctionType::get(signature,
-                              getExtInfo(),
+                              extInfo,
                               getCoroutineKind(),
                               getCalleeConvention(),
                               params, yields, results, errorResult,
@@ -2396,6 +2434,7 @@ static CanSILFunctionType getSILFunctionType(
 
   std::optional<TypeConverter::GenericContextRAII> contextRAII;
   if (genericSig) contextRAII.emplace(TC, genericSig);
+  auto loweredSig = TC.getCurGenericSignature();
 
   bool unimplementable = false;
 
@@ -2520,6 +2559,7 @@ static CanSILFunctionType getSILFunctionType(
     // We'll lower the abstraction pattern type against itself, and then apply
     // those substitutions to form the substituted lowered function type.
     origType = origSubstPat;
+    loweredSig = origType.getGenericSignatureOrNull();
     substFnInterfaceType = cast<AnyFunctionType>(origType.getType());
     if (substYieldType.isValid()) {
       coroutineOrigYieldType = substYieldType;
@@ -2706,6 +2746,12 @@ static CanSILFunctionType getSILFunctionType(
       continue;
     }
     
+    // If the lowered type is escapable, then any lifetime dependencies
+    // targeting it have no effect.
+    if (inputs[i].getInterfaceType()->isEscapable(loweredSig)) {
+      continue;
+    }
+    
     auto formalParamDeps = getLifetimeDependenceFor(
                                        extInfoBuilder.getLifetimeDependencies(),
                                        parameterMap[i]);
@@ -2719,8 +2765,24 @@ static CanSILFunctionType getSILFunctionType(
   if (auto formalReturnDeps = getLifetimeDependenceFor(
                                       extInfoBuilder.getLifetimeDependencies(),
                                       substFnInterfaceType.getParams().size())){
-    loweredLifetimes.emplace_back(lowerLifetimeDependence(*formalReturnDeps,
+    // If the lowered type is escapable, then any lifetime dependencies
+    // targeting it have no effect.
+    bool resultIsEscapable;
+    if (!yields.empty()) {
+      resultIsEscapable
+        = yields[0].getInterfaceType()->isEscapable(loweredSig);
+    } else if (!results.empty()) {
+      resultIsEscapable
+        = results[0].getInterfaceType()->isEscapable(loweredSig);
+    } else {
+      // The result is `()` or some other unit type, which is always escapable.
+      resultIsEscapable = true;
+    }
+    
+    if (!resultIsEscapable) {
+      loweredLifetimes.emplace_back(lowerLifetimeDependence(*formalReturnDeps,
                                                           parameterMap.size()));
+    }
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;

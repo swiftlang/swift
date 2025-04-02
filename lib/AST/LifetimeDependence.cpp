@@ -48,6 +48,32 @@ getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
   return std::nullopt;
 }
 
+bool
+filterEscapableLifetimeDependencies(GenericSignature sig,
+        ArrayRef<LifetimeDependenceInfo> inputs,
+        SmallVectorImpl<LifetimeDependenceInfo> &outputs,
+        llvm::function_ref<Type (unsigned targetIndex)> getSubstTargetType) {
+  bool didRemoveLifetimeDependencies = false;
+
+  for (auto &depInfo : inputs) {
+    auto targetIndex = depInfo.getTargetIndex();
+    Type substTy = getSubstTargetType(targetIndex);
+    
+    // Drop the dependency if the target type is Escapable.
+    if (sig || !substTy->hasTypeParameter()) {
+      if (substTy->isEscapable(sig)) {
+        didRemoveLifetimeDependencies = true;
+        continue;
+      }
+    }
+    
+    // Otherwise, keep the dependency.
+    outputs.push_back(depInfo);
+  }
+
+  return didRemoveLifetimeDependencies;
+}
+
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
   auto addressable = getAddressableIndices();

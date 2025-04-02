@@ -3545,7 +3545,8 @@ public:
 
   // origFormalType is a function type.
   void emitPreparedArgs(PreparedArguments &&args,
-                        AbstractionPattern origFormalType) {
+                        AbstractionPattern origFormalType,
+                        ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
     assert(args.isValid());
     auto params = args.getParams();
     auto argSources = std::move(args).getSources();
@@ -3564,9 +3565,30 @@ public:
       // If the next pattern is not a pack expansion, just emit it as a
       // single argument.
       if (!origFormalParamType.isPackExpansion()) {
+        bool addressable = origFormalType.isFunctionParamAddressable(i);
+      
+        // If the parameter isn't marked explicitly addressable, then the
+        // parameter might otherwise be of a type that is addressable for
+        // dependencies, in which case it becomes addressable when a return has
+        // a scoped dependency on it.
+        if (!addressable) {
+          for (auto &dep : lifetimeDependencies) {
+            auto scoped = dep.getScopeIndices();
+            if (!scoped) {
+              continue;
+            }
+            
+            if (scoped->contains(i)) {
+              addressable = SGF.getTypeLowering(origFormalParamType,
+                                                origFormalParamType.getType())
+                .getRecursiveProperties().isAddressableForDependencies();
+            }
+          }
+        }
+    
         emitSingleArg(std::move(argSources[nextArgSourceIndex]),
                     origFormalParamType,
-                    origFormalType.isFunctionParamAddressable(SGF.SGM.Types, i),
+                    addressable,
                     params[nextArgSourceIndex]);
         ++nextArgSourceIndex;
         // Otherwise we need to emit a pack argument.
@@ -3873,8 +3895,9 @@ private:
 
     // Try to find an expression we can emit as a borrowed l-value.
     auto lvExpr = std::move(arg).findStorageReferenceExprForBorrowExpr(SGF);
-    if (!lvExpr)
+    if (!lvExpr) {
       return false;
+    }
 
     emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
                  origParamType, paramsSlice);
@@ -4924,7 +4947,9 @@ public:
 
   /// Evaluate arguments and begin any inout formal accesses.
   void emit(SILGenFunction &SGF, AbstractionPattern origFormalType,
-            CanSILFunctionType substFnType, ParamLowering &lowering,
+            CanSILFunctionType substFnType,
+            ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
+            ParamLowering &lowering,
             SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
             const ForeignInfo &foreign) && {
@@ -4935,7 +4960,8 @@ public:
       options |= ArgEmitter::IsForCoroutine;
     ArgEmitter emitter(SGF, Loc, lowering.Rep, options, params, args,
                        delayedArgs, foreign);
-    emitter.emitPreparedArgs(std::move(Args), origFormalType);
+    emitter.emitPreparedArgs(std::move(Args), origFormalType,
+                             lifetimeDependencies);
   }
 
   /// Take the arguments for special processing, in place of the above.
@@ -5069,6 +5095,7 @@ private:
   /// ApplyOptions.
   ApplyOptions emitArgumentsForNormalApply(
       AbstractionPattern origFormalType, CanSILFunctionType substFnType,
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
       const ForeignInfo &foreign, SmallVectorImpl<ManagedValue> &uncurriedArgs,
       std::optional<SILLocation> &uncurriedLoc);
 
@@ -5141,6 +5168,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
   // Evaluate the arguments.
   ApplyOptions options = emitArgumentsForNormalApply(
       origFormalType, calleeTypeInfo.substFnType,
+      origFormalType.getLifetimeDependencies(),
       calleeTypeInfo.foreign, uncurriedArgs,
       uncurriedLoc);
 
@@ -5259,6 +5287,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
 
   auto formalType = callee.getSubstFormalType();
   auto origFormalType = callee.getOrigFormalType();
+  auto lifetimeDependencies = origFormalType.getLifetimeDependencies();
 
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
@@ -5304,6 +5333,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
   // emitApply if any of the arguments could have thrown.
   ApplyOptions options = emitArgumentsForNormalApply(
       origFormalType, calleeTypeInfo.substFnType,
+      lifetimeDependencies,
       calleeTypeInfo.foreign, uncurriedArgs,
       uncurriedLoc);
 
@@ -5435,7 +5465,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   SmallVector<ManagedValue, 4> uncurriedArgs;
   std::optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
-  emitArgumentsForNormalApply(origFormalType, substFnType, ForeignInfo{},
+  emitArgumentsForNormalApply(origFormalType, substFnType, {}, ForeignInfo{},
                               uncurriedArgs, uncurriedLoc);
 
   // If we have a late emitter, now that we have emitted our arguments, call the
@@ -5504,6 +5534,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
 
 ApplyOptions CallEmission::emitArgumentsForNormalApply(
     AbstractionPattern origFormalType, CanSILFunctionType substFnType,
+    ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
     const ForeignInfo &foreign, SmallVectorImpl<ManagedValue> &uncurriedArgs,
     std::optional<SILLocation> &uncurriedLoc) {
   ApplyOptions options;
@@ -5552,7 +5583,9 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       
       // Claim the foreign "self" with the self param.
       auto siteForeign = ForeignInfo{foreign.self, {}, {}};
-      std::move(*selfArg).emit(SGF, origFormalType, substFnType, paramLowering,
+      std::move(*selfArg).emit(SGF, origFormalType, substFnType,
+                               lifetimeDependencies,
+                               paramLowering,
                                args.back(), delayedArgs,
                                siteForeign);
 
@@ -5565,7 +5598,8 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     // params.
     auto siteForeignError = ForeignInfo{{}, foreign.error, foreign.async};
     // Claim the method formal params.
-    std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
+    std::move(*callSite).emit(SGF, origFormalType, substFnType,
+                              lifetimeDependencies, paramLowering,
                               args.back(), delayedArgs, siteForeignError);
   }
 
@@ -7228,7 +7262,8 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
                      ClaimedParamsRef(substParamTys), argValues, delayedArgs,
                      ForeignInfo{});
 
-  emitter.emitPreparedArgs(std::move(args), origFnType);
+  emitter.emitPreparedArgs(std::move(args), origFnType,
+                           origFnType.getLifetimeDependencies());
 
   // TODO: do something to preserve LValues in the delayed arguments?
   if (!delayedArgs.empty())
@@ -8003,7 +8038,7 @@ SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
   auto prepared = prepareIndices(loc, substFnType,
                                  // Strategy doesn't matter
                                  AccessStrategy::getStorage(), argList);
-  emitter.emitPreparedArgs(std::move(prepared), origFnType);
+  emitter.emitPreparedArgs(std::move(prepared), origFnType, {});
 
   if (!delayedArgs.empty())
     emitDelayedArguments(*this, delayedArgs, argValues);
