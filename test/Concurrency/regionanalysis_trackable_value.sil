@@ -133,8 +133,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK:     Rep Value:   %6 = struct_element_addr %4 : $*Struct, #Struct.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
 // CHECK: end running test 1 of 1 on allocbox_access_struct_field_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_struct_field_sendable_let : $@convention(thin) () -> () {
 bb0:
@@ -156,8 +160,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK:     Rep Value:   %6 = struct_element_addr %4 : $*Struct, #Struct.sVar
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
 // CHECK: end running test 1 of 1 on allocbox_access_struct_field_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_struct_field_sendable_var : $@convention(thin) () -> () {
 bb0:
@@ -228,8 +236,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
 // CHECK: end running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_struct_field_let_grandfield_sendable_let : $@convention(thin) () -> () {
 bb0:
@@ -252,8 +264,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
-// CHECK:     Rep Value:   {{%.*}} = struct_element_addr %6 : $*Struct2, #Struct2.sVar
+// CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sVar
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
 // CHECK: end running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_struct_field_let_grandfield_sendable_var : $@convention(thin) () -> () {
 bb0:
@@ -325,8 +341,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
 // CHECK: end running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_struct_field_var_grandfield_sendable_let : $@convention(thin) () -> () {
 bb0:
@@ -349,8 +369,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
-// CHECK:     Rep Value:   {{%.*}} = struct_element_addr %6 : $*Struct2, #Struct2.sVar
+// CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sVar
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
 // CHECK: end running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_struct_field_var_grandfield_sendable_var : $@convention(thin) () -> () {
 bb0:
@@ -373,8 +397,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_sendable_struct_field_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK:     Rep Value:   %6 = struct_element_addr %4 : $*SendableStruct, #SendableStruct.nsLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var SendableStruct }
 // CHECK: end running test 1 of 1 on allocbox_access_sendable_struct_field_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_sendable_struct_field_let : $@convention(thin) () -> () {
 bb0:
@@ -396,8 +424,12 @@ bb0:
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on allocbox_access_sendable_struct_field_let_2: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
 // CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK:     Rep Value:   %4 = struct_element_addr %2 : $*SendableStruct, #SendableStruct.nsLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $SendableStruct
 // CHECK: end running test 1 of 1 on allocbox_access_sendable_struct_field_let_2: sil_regionanalysis_underlying_tracked_value with: @trace[0]
 sil [ossa] @allocbox_access_sendable_struct_field_let_2 : $@convention(thin) () -> () {
 bb0:

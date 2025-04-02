@@ -1752,7 +1752,7 @@ private:
   getIsolatedValuePartialApplyIndex(PartialApplyInst *pai,
                                     SILValue isolatedValue) {
     for (auto &paiOp : ApplySite(pai).getArgumentOperands()) {
-      if (valueMap.getTrackableValue(paiOp.get()).getRepresentative() ==
+      if (valueMap.getTrackableValue(paiOp.get()).value.getRepresentative() ==
           isolatedValue) {
         return ApplySite(pai).getASTAppliedArgIndex(paiOp);
       }
@@ -1836,13 +1836,13 @@ bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
     // If our value's rep is task isolated or is the dynamic isolated
     // value... then we are done. This is a 'correct' error value to emit.
     auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
-    if (trackableValue.isSendable())
+    if (trackableValue.value.isSendable())
       continue;
 
-    auto rep = trackableValue.getRepresentative().maybeGetValue();
+    auto rep = trackableValue.value.getRepresentative().maybeGetValue();
     nonSendableOps.push_back(&sendingPAIOp);
 
-    if (trackableValue.getIsolationRegionInfo().isTaskIsolated() ||
+    if (trackableValue.value.getIsolationRegionInfo().isTaskIsolated() ||
         rep == maybeIsolatedValue) {
       if (auto capturedValue = findClosureUse(&sendingPAIOp)) {
         diagnosticEmitter.emitSendingClosureParamDirectlyIsolated(
@@ -2703,6 +2703,7 @@ struct DiagnosticEvaluator final
     const auto &partitionOp = *error.op;
 
     auto &operandState = operandToStateMap.get(error.sendingOp);
+
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and sendingOp was not set with closure
     // capture.
@@ -2791,13 +2792,13 @@ struct DiagnosticEvaluator final
   }
 
   std::optional<Element> getElement(SILValue value) const {
-    return info->getValueMap().getTrackableValue(value).getID();
+    return info->getValueMap().getTrackableValue(value).value.getID();
   }
 
   SILValue getRepresentative(SILValue value) const {
     return info->getValueMap()
         .getTrackableValue(value)
-        .getRepresentative()
+        .value.getRepresentative()
         .maybeGetValue();
   }
 
