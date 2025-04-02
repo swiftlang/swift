@@ -713,6 +713,18 @@ function Copy-Directory {
   }
 }
 
+function Move-File {
+  [CmdletBinding(SupportsShouldProcess)]
+  param (
+      [string] $Src,
+      [string] $Dst
+  )
+
+  if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
+    Move-Item $Src $Dst
+  }
+}
+
 function Move-Directory($Src, $Dst) {
   $Destination = Join-Path -Path $Dst -ChildPath (Split-Path -Path $Src -Leaf)
   if (Test-Path -Path $Destination -Type Container) {
@@ -3253,8 +3265,8 @@ if (-not $SkipBuild) {
       Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
       Invoke-BuildStep Build-Foundation $Platform -Static
 
-      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
-      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-File "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-File "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
     }
     Install-Platform $AndroidSDKPlatforms Android
     Invoke-BuildStep Write-PlatformInfoPlist $Platform
