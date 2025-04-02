@@ -599,6 +599,9 @@ namespace swift {
     void setDecl(const class Decl *decl) { Decl = decl; }
     void setBehaviorLimit(DiagnosticBehavior limit){ BehaviorLimit = limit; }
 
+    /// Returns the wrapped diagnostic, if any.
+    std::optional<const DiagnosticInfo *> getWrappedDiagnostic() const;
+
     /// Returns true if this object represents a particular diagnostic.
     ///
     /// \code
