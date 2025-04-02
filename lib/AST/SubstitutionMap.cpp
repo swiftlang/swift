@@ -176,11 +176,11 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
   for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance) continue;
 
-    CanType depTy = req.getFirstType()->getCanonicalType();
+    Type depTy = req.getFirstType();
     auto replacement = depTy.subst(IFS);
     auto *proto = req.getProtocolDecl();
-    auto conformance = IFS.lookupConformance(depTy, replacement, proto,
-                                             /*level=*/0);
+    auto conformance = IFS.lookupConformance(
+        depTy->getCanonicalType(), replacement, proto, /*level=*/0);
     conformances.push_back(conformance);
   }
 
