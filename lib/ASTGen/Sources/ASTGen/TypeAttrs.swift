@@ -42,6 +42,7 @@ extension ASTGenVisitor {
       // Simple type attributes.
       case .autoclosure,
         .addressable,
+        .concurrent,
         .escaping,
         .noEscape,
         .noDerivative,
