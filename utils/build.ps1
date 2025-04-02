@@ -846,11 +846,7 @@ function Get-Dependencies {
 
   function DownloadAndVerify {
     [CmdletBinding(SupportsShouldProcess)]
-    param(
-      [string] $URL,
-      [string] $Destination,
-      [string] $Hash
-    )
+    param([string] $URL, [string] $Destination, [string] $Hash)
 
     if ($PSCmdlet.ShouldProcess("$URL -> $Destination")) {
       if (Test-Path $Destination) {
@@ -1879,11 +1875,7 @@ function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $Te
 # Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
 function Build-mimalloc() {
   [CmdletBinding(SupportsShouldProcess)]
-  param
-  (
-    [Parameter(Mandatory)]
-    [hashtable]$Platform
-  )
+  param([hashtable] $Platform)
 
   if ($PSCmdlet.ShouldProcess($Platform.Triple)) {
     # TODO: migrate to the CMake build
@@ -2451,9 +2443,7 @@ function Build-FoundationMacros([Hashtable] $Platform) {
     if (-not (Test-Path $SwiftSyntaxDir)) {
       throw "The swift-syntax from the compiler build for $($Platform.OS) $($Platform.Architecture.ShortName) isn't available"
     }
-    $Defines = @{
-      SwiftSyntax_DIR = $SwiftSyntaxDir;
-    }
+    $Defines = @{ SwiftSyntax_DIR = $SwiftSyntaxDir; }
   }
 
   Build-CMakeProject `
@@ -2551,11 +2541,7 @@ function Write-PlatformInfoPlist([Hashtable] $Platform) {
 # to the final platform root, following the installer layout.
 function Install-Platform {
   [CmdletBinding(SupportsShouldProcess)]
-  param
-  (
-    [Hashtable[]] $Platforms,
-    [OS] $OS
-  )
+  param([Hashtable[]] $Platforms, [OS] $OS)
 
   if ($PSCmdlet.ShouldProcess("$OS ($Platforms)")) {
     # Copy SDK header files
