@@ -1755,6 +1755,45 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
+Type CompletionLookup::getTypeAliasType(const TypeAliasDecl *TAD,
+                                        DynamicLookupInfo dynamicLookupInfo) {
+  // Substitute the base type for a nested typealias if needed.
+  auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
+  auto *typeAliasTy = dyn_cast<TypeAliasType>(ty.getPointer());
+  if (!typeAliasTy)
+    return ty;
+
+  // If the underlying type has an error, prefer to print the full typealias,
+  // otherwise get the underlying type. We only want the direct underlying type,
+  // not the full desugared type, since that more faithfully reflects what's
+  // written in source.
+  Type underlyingTy = typeAliasTy->getSinglyDesugaredType();
+  if (underlyingTy->hasError())
+    return ty;
+
+  // The underlying type might be unbound for e.g:
+  //
+  // struct S<T> {}
+  // typealias X = S
+  //
+  // Introduce type parameters such that we print the underlying type as
+  // 'S<T>'. We only expect unbound generics at the top-level of a type-alias,
+  // they are rejected by type resolution in any other position.
+  //
+  // FIXME: This is a hack – using the declared interface type isn't correct
+  // since the generic parameters ought to be introduced at a higher depth,
+  // i.e we should be treating it as `typealias X<T> = S<T>`. Ideally this would
+  // be fixed by desugaring the unbound typealias during type resolution. For
+  // now this is fine though since we only use the resulting type for printing
+  // the type annotation; the type relation logic currently skips type
+  // parameters.
+  if (auto *UGT = underlyingTy->getAs<UnboundGenericType>())
+    underlyingTy = UGT->getDecl()->getDeclaredInterfaceType();
+
+  ASSERT(!underlyingTy->hasUnboundGenericType());
+  return underlyingTy;
+}
+
 void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                                        DeclVisibilityKind Reason,
                                        DynamicLookupInfo dynamicLookupInfo) {
@@ -1764,18 +1803,7 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
   addValueBaseName(Builder, TAD->getBaseName());
-
-  // Substitute the base type for a nested typealias if needed.
-  auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
-
-  // If the underlying type has an error, prefer to print the full typealias,
-  // otherwise get the underlying type.
-  if (auto *TA = dyn_cast<TypeAliasType>(ty.getPointer())) {
-    auto underlyingTy = TA->getSinglyDesugaredType();
-    if (!underlyingTy->hasError())
-      ty = underlyingTy;
-  }
-  addTypeAnnotation(Builder, ty);
+  addTypeAnnotation(Builder, getTypeAliasType(TAD, dynamicLookupInfo));
 }
 
 void CompletionLookup::addGenericTypeParamRef(
