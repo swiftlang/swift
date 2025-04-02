@@ -77,7 +77,6 @@ public:
         return substOpaqueTypesWithUnderlyingTypes(
                ProtocolConformanceRef::forAbstract(conformingReplacementType,
                                                    conformedProtocol),
-               conformingReplacementType->getCanonicalType(),
                typeExpansionContext);
       },
       SubstFlags::SubstituteOpaqueArchetypes |
@@ -292,7 +291,7 @@ public:
       });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
-            substConformance, substType, typeExpansionContext);
+            substConformance, typeExpansionContext);
       }
     }
 

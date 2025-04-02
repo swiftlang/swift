@@ -5026,7 +5026,7 @@ class SILFunctionConventions;
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
 ProtocolConformanceRef
-substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref,
                                     TypeExpansionContext context);
 namespace Lowering {
   class TypeConverter;

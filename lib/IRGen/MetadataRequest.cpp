@@ -560,7 +560,7 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
     auto context = getMaximalTypeExpansionContext();
     return std::make_pair(
        swift::substOpaqueTypesWithUnderlyingTypes(type, context),
-       swift::substOpaqueTypesWithUnderlyingTypes(conformance, type, context));
+       swift::substOpaqueTypesWithUnderlyingTypes(conformance, context));
   }
 
   return std::make_pair(type, conformance);

@@ -1089,7 +1089,7 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
 }
 
 static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
-    ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
+    ProtocolConformanceRef ref, const DeclContext *inContext,
     ResilienceExpansion contextExpansion, bool isWholeModuleContext,
     llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
@@ -1100,7 +1100,7 @@ static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
 }
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
-    ProtocolConformanceRef ref, Type origType, TypeExpansionContext context) {
+    ProtocolConformanceRef ref, TypeExpansionContext context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
@@ -1174,7 +1174,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
-          substRef, substTy, inContext, contextExpansion, isContextWholeModule,
+          substRef, inContext, contextExpansion, isContextWholeModule,
           *alreadySeen);
       alreadySeen->erase(seenKey);
       return res;
@@ -1184,7 +1184,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       llvm::DenseSet<SeenDecl> seenDecls;
       seenDecls.insert(seenKey);
       return ::substOpaqueTypesWithUnderlyingTypesRec(
-          substRef, substTy, inContext, contextExpansion, isContextWholeModule,
+          substRef, inContext, contextExpansion, isContextWholeModule,
           seenDecls);
     }
   }

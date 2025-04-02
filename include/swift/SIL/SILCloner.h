@@ -576,7 +576,7 @@ protected:
           !context.shouldLookThroughOpaqueTypeArchetypes())
         return C;
 
-      return substOpaqueTypesWithUnderlyingTypes(C, Ty, context);
+      return substOpaqueTypesWithUnderlyingTypes(C, context);
     }
 
     return C;
