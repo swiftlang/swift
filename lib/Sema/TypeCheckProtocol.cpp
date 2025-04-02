@@ -3704,7 +3704,8 @@ static Type getTupleConformanceTypeWitness(DeclContext *dc,
 
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
+                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS,
+                     bool withExplicitObjCAttr) {
   if (isa<ConstructorDecl>(Requirement)) {
     if (auto CD = Adopter->getSelfClassDecl()) {
       if (!CD->isSemanticallyFinal() && isa<ExtensionDecl>(Adopter)) {
@@ -3731,15 +3732,35 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
 
+  PrintOptions Options = PrintOptions::printForDiagnostics(
+      AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
+  Options.PrintDocumentationComments = false;
+  Options.PrintAccess = false;
+  Options.SkipAttributes = true;
+  Options.FunctionDefinitions = true;
+  Options.PrintAccessorBodiesInProtocols = true;
+  Options.PrintExplicitAccessorParameters = false;
+  Options.FullyQualifiedTypesIfAmbiguous = true;
+
+  if (withExplicitObjCAttr) {
+    if (auto runtimeName = Requirement->getObjCRuntimeName()) {
+      llvm::SmallString<32> scratch;
+      Printer.printAttrName("@objc");
+      Printer << "(" << runtimeName->getString(scratch) << ")";
+      Printer.printNewline();
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
+    }
+  }
+
   AccessLevel Access =
     std::min(
       /* Access of the context */
       Adopter->getSelfNominalTypeDecl()->getFormalAccess(),
       /* Access of the protocol */
-      Requirement->getDeclContext()->getSelfProtocolDecl()->
-        getFormalAccess());
-  if (Access == AccessLevel::Public)
-    Printer << "public ";
+      Requirement->getDeclContext()->getSelfNominalTypeDecl()
+                      ->getFormalAccess());
+  if (Access > AccessLevel::Internal)
+    Printer.printKeyword(getAccessLevelSpelling(Access), Options, " ");
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
     Printer << "typealias " << MissingTypeWitness->getName() << " = ";
@@ -3762,15 +3783,6 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
         }
       }
     }
-
-    PrintOptions Options = PrintOptions::printForDiagnostics(
-        AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
-    Options.PrintDocumentationComments = false;
-    Options.PrintAccess = false;
-    Options.SkipAttributes = true;
-    Options.FunctionDefinitions = true;
-    Options.PrintAccessorBodiesInProtocols = true;
-    Options.FullyQualifiedTypesIfAmbiguous = true;
 
     bool AdopterIsClass = Adopter->getSelfClassDecl() != nullptr;
     // Skip 'mutating' only inside classes: mutating methods usually

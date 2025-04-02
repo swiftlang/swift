@@ -4229,7 +4229,8 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
         Printer << getAccessorLabel(decl->getAccessorKind());
 
         auto params = decl->getParameters();
-        if (params->size() != 0 && !params->get(0)->isImplicit()) {
+        if (params->size() != 0 && !params->get(0)->isImplicit()
+              && Options.PrintExplicitAccessorParameters) {
           auto Name = params->get(0)->getName();
           if (!Name.empty()) {
             Printer << "(";

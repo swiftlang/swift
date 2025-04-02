@@ -108,6 +108,8 @@ import objc_implementation_private
     get { return 1 }
   }
 
+  @objc let readonlyPropertyFromHeader7: CInt
+
   @objc fileprivate var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
 

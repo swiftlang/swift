@@ -172,6 +172,10 @@ struct PrintOptions {
   /// Whether to print the bodies of accessors in protocol context.
   bool PrintAccessorBodiesInProtocols = false;
 
+  /// Whether to print the parameter list of accessors like \c set . (Even when
+  /// \c true , parameters marked implicit still won't be printed.)
+  bool PrintExplicitAccessorParameters = true;
+
   /// Whether to print type definitions.
   bool TypeDefinitions = false;
 

@@ -1980,10 +1980,16 @@ ERROR(objc_implementation_wrong_swift_name,none,
       "you mean %1?",
       (ObjCSelector, const ValueDecl *))
 
-ERROR(objc_implementation_missing_impl,none,
-      "extension for %select{main class interface|category %0}0 should "
-      "provide implementation for %kind1",
-      (Identifier, ValueDecl *))
+ERROR(objc_implementation_missing_impls,none,
+      "extension for %select{main class interface|category %0}0 does not "
+      "provide all required implementations",
+      (Identifier))
+NOTE(objc_implementation_missing_impls_fixit,none,
+     "add stub%s0 for missing '@implementation' requirement%s0",
+     (unsigned))
+NOTE(objc_implementation_missing_impl,none,
+     "missing %kind0",
+     (ValueDecl *))
 
 ERROR(objc_implementation_class_or_instance_mismatch,none,
       "%kind0 does not match %kindonly1 declared in header",

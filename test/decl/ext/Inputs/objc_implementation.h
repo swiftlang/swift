@@ -53,6 +53,7 @@
 @property (readonly) int readonlyPropertyFromHeader4;
 @property (readonly) int readonlyPropertyFromHeader5;
 @property (readonly) int readonlyPropertyFromHeader6;
+@property (readonly) int readonlyPropertyFromHeader7;
 
 + (void)classMethod1:(int)param;
 + (void)classMethod2:(int)param;
