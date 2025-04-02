@@ -1473,10 +1473,14 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
-    } elseif ($UsePinnedCompilers.Contains("Swift")) {
-      $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
+    if (-not $WhatIfPreference) {
+      # Don't keep growing $env:Path in WhatIf since we don't clean it up.
+      if ($UseBuiltCompilers.Contains("Swift")) {
+        Write-Host -ForegroundColor Blue "PATH = $env:Path"
+        $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
+      } elseif ($UsePinnedCompilers.Contains("Swift")) {
+        $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
+      }
     }
 
     if ($PSCmdlet.ShouldProcess($Src)) {
@@ -1594,15 +1598,15 @@ function Build-SPMProject {
 }
 
 function Build-WiXProject() {
-  [CmdletBinding(PositionalBinding = $false)]
+  [CmdletBinding(PositionalBinding = $false, SupportsShouldProcess)]
   param
   (
-    [Parameter(Position = 0, Mandatory = $true)]
-    [string]$FileName,
-    [Parameter(Mandatory = $true)]
-    [hashtable]$Platform,
-    [switch]$Bundle,
-    [hashtable]$Properties = @{}
+    [Parameter(Position = 0, Mandatory)]
+    [string] $FileName,
+    [Parameter(Mandatory)]
+    [hashtable] $Platform,
+    [switch] $Bundle,
+    [hashtable] $Properties = @{}
   )
 
   $ProductVersionArg = $ProductVersion
@@ -1633,7 +1637,9 @@ function Build-WiXProject() {
   $MSBuildArgs += "-binaryLogger:$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
   $MSBuildArgs += "-detailedSummary:False"
 
-  Invoke-Program $msbuild @MSBuildArgs
+  if ($PSCmdlet.ShouldProcess("msbuild.exe $MSBuildArgs")) {
+    Invoke-Program $msbuild @MSBuildArgs
+  }
 }
 
 # TODO(compnerd): replace this with Get-{Build,Host,Target}ProjectBinaryCache
@@ -3136,10 +3142,15 @@ function Build-Installer([Hashtable] $Platform) {
 
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $Platform
-    # Avoid hard-coding the VC tools version number
-    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-    if ($VCRedistDir) {
-      $Properties["VCRedistDir"] = "$VCRedistDir\"
+    if ($WhatIfPreference) {
+      # Get-ChildItem doesn't support -WhatIf and fails if it can't find the path, so just print that we would find it.
+      Write-Host "What if: Performing operation `"Find `$VCRedistDir`" on target `"$($HostPlatform.Architecture.ShortName)`"."
+    } else {
+      # Avoid hard-coding the VC tools version number
+      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+      if ($VCRedistDir) {
+        $Properties["VCRedistDir"] = "$VCRedistDir\"
+      }
     }
   }
 
