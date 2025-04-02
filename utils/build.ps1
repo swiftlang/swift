@@ -688,11 +688,7 @@ function Get-ModuleTriple([Hashtable] $Platform) {
 
 function Copy-File {
   [CmdletBinding(SupportsShouldProcess)]
-  param
-  (
-    [string] $Src,
-    [string] $Dst
-  )
+  param([string] $Src, [string] $Dst)
 
   if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
     # Create the directory tree first so Copy-Item succeeds
@@ -705,11 +701,7 @@ function Copy-File {
 
 function Copy-Directory {
   [CmdletBinding(SupportsShouldProcess)]
-  param
-  (
-    [string] $Src,
-    [string] $Dst
-  )
+  param([string] $Src, [string] $Dst)
 
   if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
     New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
@@ -719,10 +711,7 @@ function Copy-Directory {
 
 function Move-File {
   [CmdletBinding(SupportsShouldProcess)]
-  param (
-      [string] $Src,
-      [string] $Dst
-  )
+  param([string] $Src, [string] $Dst)
 
   if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
     Move-Item $Src $Dst
