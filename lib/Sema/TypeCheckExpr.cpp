@@ -198,25 +198,28 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
 
   // If the left-hand-side is a 'try', 'await', or 'unsafe', hoist it up
   // turning "(try x) + y" into try (x + y).
-  if (auto *tryEval = dyn_cast<AnyTryExpr>(LHS)) {
-    auto sub = makeBinOp(Ctx, Op, tryEval->getSubExpr(), RHS,
-                         opPrecedence, isEndOfSequence);
-    tryEval->setSubExpr(sub);
-    return tryEval;
-  }
-  
-  if (auto *await = dyn_cast<AwaitExpr>(LHS)) {
-    auto sub = makeBinOp(Ctx, Op, await->getSubExpr(), RHS,
-                         opPrecedence, isEndOfSequence);
-    await->setSubExpr(sub);
-    return await;
-  }
+  if (LHS->isAlwaysLeftFolded()) {
+    if (auto *tryEval = dyn_cast<AnyTryExpr>(LHS)) {
+      auto sub = makeBinOp(Ctx, Op, tryEval->getSubExpr(), RHS, opPrecedence,
+                           isEndOfSequence);
+      tryEval->setSubExpr(sub);
+      return tryEval;
+    }
 
-  if (auto *unsafe = dyn_cast<UnsafeExpr>(LHS)) {
-    auto sub = makeBinOp(Ctx, Op, unsafe->getSubExpr(), RHS,
-                         opPrecedence, isEndOfSequence);
-    unsafe->setSubExpr(sub);
-    return unsafe;
+    if (auto *await = dyn_cast<AwaitExpr>(LHS)) {
+      auto sub = makeBinOp(Ctx, Op, await->getSubExpr(), RHS, opPrecedence,
+                           isEndOfSequence);
+      await->setSubExpr(sub);
+      return await;
+    }
+
+    if (auto *unsafe = dyn_cast<UnsafeExpr>(LHS)) {
+      auto sub = makeBinOp(Ctx, Op, unsafe->getSubExpr(), RHS, opPrecedence,
+                           isEndOfSequence);
+      unsafe->setSubExpr(sub);
+      return unsafe;
+    }
+    llvm_unreachable("Unhandled left-folded case!");
   }
 
   // If the right operand is a try, await, or unsafe, it's an error unless
@@ -235,7 +238,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS) || isa<UnsafeExpr>(RHS)) {
+  if (RHS->isAlwaysLeftFolded()) {
     // If you change this, also change TRY_KIND_SELECT in diagnostics.
     enum class TryKindForDiagnostics : unsigned {
       Try,
