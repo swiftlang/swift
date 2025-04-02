@@ -1722,8 +1722,15 @@ public:
 
     if constexpr (std::is_base_of_v<NominalTypeDecl, DeclTy>) {
       // Estimate brace locations.
-      auto begin = ClangN.getAsDecl()->getBeginLoc();
-      auto end = ClangN.getAsDecl()->getEndLoc();
+      clang::SourceLocation begin;
+      clang::SourceLocation end;
+      if (auto *td = dyn_cast_or_null<clang::TagDecl>(ClangN.getAsDecl())) {
+        begin = td->getBraceRange().getBegin();
+        end = td->getBraceRange().getEnd();
+      } else {
+        begin = ClangN.getAsDecl()->getBeginLoc();
+        end = ClangN.getAsDecl()->getEndLoc();
+      }
       SourceRange range;
       if (begin.isValid() && end.isValid() && D->getNameLoc().isValid())
         range = SourceRange(importSourceLoc(begin), importSourceLoc(end));
@@ -1732,6 +1739,11 @@ public:
       }
       assert(range.isValid() == D->getNameLoc().isValid());
       D->setBraces(range);
+#ifndef NDEBUG
+      auto declRange = D->getSourceRange();
+      CharSourceRange checkValidRange(SwiftContext.SourceMgr, declRange.Start,
+                                      declRange.End);
+#endif
     }
 
     // SwiftAttrs on ParamDecls are interpreted by applyParamAttributes().
