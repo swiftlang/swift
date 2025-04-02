@@ -182,6 +182,10 @@ if ($env:VSCMD_ARG_HOST_ARCH -or $env:VSCMD_ARG_TGT_ARCH) {
   throw "At least one of VSCMD_ARG_HOST_ARCH and VSCMD_ARG_TGT_ARCH is set, which is incompatible with this script. Likely need to run outside of a Developer shell."
 }
 
+if ($ToBatch) {
+  Write-Warning "-ToBatch is deprecated; use -WhatIf instead."
+}
+
 # Prevent elsewhere-installed swift modules from confusing our builds.
 $env:SDKROOT = ""
 
