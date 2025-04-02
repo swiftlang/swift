@@ -435,6 +435,9 @@ public:
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
 
+  Type getTypeAliasType(const TypeAliasDecl *TAD,
+                        DynamicLookupInfo dynamicLookupInfo);
+
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo);
 
