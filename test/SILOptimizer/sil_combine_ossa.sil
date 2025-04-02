@@ -5486,3 +5486,15 @@ bb0(%0 : @owned $Cr):
   return %8
 }
 
+// CHECK-LABEL: sil [ossa] @init_existential_with_debug_value :
+// CHECK:         return %0
+// CHECK:       } // end sil function 'init_existential_with_debug_value'
+sil [ossa] @init_existential_with_debug_value : $@convention(thin) (@owned Cr) -> @owned Cr {
+bb0(%1 : @owned $Cr):
+  %5 = init_existential_ref %1 : $Cr : $Cr, $any Pr
+  debug_value %5, let, name "interactor", argno 2
+  %48 = open_existential_ref %5 to $@opened("F9D78C78-0FCD-11F0-9F91-0EA13E3AABB1", any Pr) Self
+  %49 = unchecked_ref_cast %48 to $Cr
+  return %49
+}
+
