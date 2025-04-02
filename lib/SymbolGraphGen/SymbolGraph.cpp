@@ -88,6 +88,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   ExcludeAttrs.erase("TypeAttrKind::NoEscape");
   ExcludeAttrs.erase("TypeAttrKind::Escaping");
   ExcludeAttrs.erase("TypeAttrKind::Inout");
+  ExcludeAttrs.erase("TypeAttrKind::Sendable");
 
   // Don't allow the following decl attributes:
   // These can be large and are already included elsewhere in
