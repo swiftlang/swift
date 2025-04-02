@@ -620,8 +620,6 @@ static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
 }
 static StringRef getDumpString(ExecutionKind kind) {
   switch (kind) {
-  case ExecutionKind::Concurrent:
-    return "concurrent";
   case ExecutionKind::Caller:
     return "caller";
   }

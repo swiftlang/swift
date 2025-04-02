@@ -889,8 +889,6 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
 
 static ExecutionKind unbridged(BridgedExecutionKind kind) {
   switch (kind) {
-  case BridgedExecutionKindConcurrent:
-    return ExecutionKind::Concurrent;
   case BridgedExecutionKindCaller:
     return ExecutionKind::Caller;
   }

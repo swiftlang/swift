@@ -3,28 +3,28 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_ExecutionAttribute
 
-typealias F = @execution(concurrent) () async -> Void
+typealias F = @concurrent () async -> Void
 
-typealias E = @execution(concurrent) () -> Void
-// expected-error@-1 {{cannot use '@execution' on non-async function type}}
+typealias E = @concurrent () -> Void
+// expected-error@-1 {{cannot use '@concurrent' on non-async function type}}
 
 func test1(_: @execution(caller) (Int...) async -> Void) {}
-func test2(_: @execution(concurrent) (Int...) async -> Void) {}
+func test2(_: @concurrent (Int...) async -> Void) {}
 
-func test_err1_concurrent(_: @execution(concurrent) @MainActor () async -> Void) {}
-// expected-error@-1 {{cannot use '@execution' because function type is isolated to a global actor 'MainActor'}}
+func test_err1_concurrent(_: @concurrent @MainActor () async -> Void) {}
+// expected-error@-1 {{cannot use '@concurrent' because function type is isolated to a global actor 'MainActor'}}
 
 func test_err1_caller(_: @execution(caller) @MainActor () async -> Void) {}
 // expected-error@-1 {{cannot use '@execution' because function type is isolated to a global actor 'MainActor'}}
 
-func test_err2_concurrent(_: @execution(concurrent) @isolated(any) () async -> Void) {}
-// expected-error@-1 {{cannot use '@execution' together with @isolated(any)}}
+func test_err2_concurrent(_: @concurrent @isolated(any) () async -> Void) {}
+// expected-error@-1 {{cannot use '@concurrent' together with @isolated(any)}}
 
 func test_err2_caller(_: @execution(caller) @isolated(any) () async -> Void) {}
 // expected-error@-1 {{cannot use '@execution' together with @isolated(any)}}
 
-func test_err3_concurrent(_: @execution(concurrent) (isolated (any Actor)?) async -> Void) {}
-// expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
+func test_err3_concurrent(_: @concurrent (isolated (any Actor)?) async -> Void) {}
+// expected-error@-1 {{cannot use '@concurrent' together with an isolated parameter}}
 
 func test_err3_caller(_: @execution(caller) (isolated (any Actor)?) async -> Void) {}
 // expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
@@ -46,7 +46,7 @@ func test_err7(_: @execution(hello () async -> Void) {}
 // expected-note@-2 {{to match this opening '('}}
 // expected-error@-3 {{expected ')' after execution behavior}}
 
-func test_err8(_: @execution(concurrent) Int) {} // expected-error {{attribute does not apply to type}}
+func test_err8(_: @concurrent Int) {} // expected-error {{attribute does not apply to type}}
 
 do {
   let _ = [@execution(caller) () async -> Void]()

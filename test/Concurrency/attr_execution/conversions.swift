@@ -8,7 +8,7 @@ actor MyActor {
   static let shared = MyActor()
 }
 
-@execution(concurrent)
+@concurrent
 func concurrentTest() async {
 }
 
@@ -20,7 +20,7 @@ func callerTest() async {
 func actorIsolated() async {}
 
 let _: @execution(caller) () async -> Void = concurrentTest // Ok
-let _: @execution(concurrent) () async -> Void = callerTest // Ok
+let _: @concurrent () async -> Void = callerTest // Ok
 
 let _: @MainActor () async -> Void = concurrentTest // Ok
 let _: @MainActor () async -> Void = callerTest // Ok
@@ -30,10 +30,10 @@ let _: @isolated(any) () async -> Void = callerTest
 // expected-error@-1 {{cannot convert value of type '@execution(caller) () async -> ()' to specified type '@isolated(any) () async -> Void'}}
 
 let _: @execution(caller) () async -> Void = actorIsolated // Ok
-let _: @execution(concurrent) () async -> Void = actorIsolated // Ok
+let _: @concurrent () async -> Void = actorIsolated // Ok
 
 func testIsolationErasure(fn: @escaping @isolated(any) () async -> Void) {
-  let _: @execution(concurrent) () async -> Void = fn // Ok
+  let _: @concurrent () async -> Void = fn // Ok
   let _: @execution(caller) () async -> Void = fn // Ok
 }
 
@@ -47,7 +47,7 @@ func testUpcast(arr: [@execution(caller) () async -> Void]) {
 func testParameterIsolation(fn: @escaping (isolated (any Actor)?) async -> Void, caller: @escaping @execution(caller) (String) async -> Void) {
   let _: @execution(caller) () async -> Void = fn
   // expected-error@-1 {{cannot convert value of type '(isolated (any Actor)?) async -> Void' to specified type '@execution(caller) () async -> Void'}}
-  let _: @execution(concurrent) () async -> Void = fn
+  let _: @concurrent () async -> Void = fn
   // expected-error@-1 {{cannot convert value of type '(isolated (any Actor)?) async -> Void' to specified type '() async -> Void'}}
 
   let _: (isolated (any Actor)?) async -> Void = callerTest // Ok
@@ -97,7 +97,7 @@ do {
 }
 
 do {
-  let _: () -> Void = { @execution(concurrent) in
+  let _: () -> Void = { @concurrent in
     // expected-error@-1 {{invalid conversion from 'async' function of type '() async -> Void' to synchronous function type '() -> Void'}}
   }
 
@@ -117,9 +117,9 @@ func testNonSendableDiagnostics(
   erased1: @escaping @Sendable @isolated(any) (NonSendable) async -> Void,
   erased2: @escaping @Sendable @isolated(any) () async -> NonSendable,
   nonIsolated1: @escaping @Sendable (NonSendable) -> Void,
-  nonIsolated2: @escaping @Sendable @execution(concurrent) (NonSendable) async -> Void,
+  nonIsolated2: @escaping @Sendable @concurrent (NonSendable) async -> Void,
   nonIsolated3: @escaping @Sendable () -> NonSendable,
-  nonIsolated4: @escaping @Sendable @execution(concurrent) () async -> NonSendable,
+  nonIsolated4: @escaping @Sendable @concurrent () async -> NonSendable,
   caller1: @escaping @Sendable @execution(caller) (NonSendable) async -> Void,
   caller2: @escaping @Sendable @execution(caller) () async -> NonSendable
 ) {
@@ -141,15 +141,15 @@ func testNonSendableDiagnostics(
   let _: @execution(caller) () async -> NonSendable = nonIsolated4 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-error@-1 {{cannot convert '@Sendable () async -> NonSendable' to '@execution(caller) () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
-  let _: @execution(concurrent) (NonSendable) async -> Void = erased1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  let _: @concurrent (NonSendable) async -> Void = erased1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-warning@-1 {{cannot convert '@isolated(any) @Sendable (NonSendable) async -> Void' to '(NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
-  let _: @execution(concurrent) () async -> NonSendable = erased2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  let _: @concurrent () async -> NonSendable = erased2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-warning@-1 {{cannot convert '@isolated(any) @Sendable () async -> NonSendable' to '() async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
 
-  let _: @execution(concurrent) (NonSendable) async -> Void = caller1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  let _: @concurrent (NonSendable) async -> Void = caller1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-warning@-1 {{cannot convert '@execution(caller) @Sendable (NonSendable) async -> Void' to '(NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
-  let _: @execution(concurrent) () async -> NonSendable = caller2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  let _: @concurrent () async -> NonSendable = caller2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-warning@-1 {{cannot convert '@execution(caller) @Sendable () async -> NonSendable' to '() async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
   let _: @MainActor (NonSendable) async -> Void = nonIsolated1 // Ok

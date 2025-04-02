@@ -4940,8 +4940,6 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   // we get the semantics of the source module.
   if (concurrentExecutionAttr) {
     switch (concurrentExecutionAttr->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      return ActorIsolation::forNonisolated(false /*is unsafe*/);
     case ExecutionKind::Caller:
       return ActorIsolation::forCallerIsolationInheriting();
     }

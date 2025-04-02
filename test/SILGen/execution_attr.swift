@@ -17,7 +17,7 @@ func executionCaller() async {}
 // CHECK-LABEL: // executionConcurrent()
 // CHECK: // Isolation: nonisolated
 // CHECK: sil hidden [ossa] @$s14execution_attr0A10ConcurrentyyYaF : $@convention(thin) @async () -> () {
-@execution(concurrent)
+@concurrent
 func executionConcurrent() async {}
 
 // DISABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
@@ -29,7 +29,7 @@ func executionCallerParameter(_ x: @execution(caller) () async -> ()) async {
 
 // DISABLED-LABEL: sil hidden [ossa] @$s14execution_attr0A19ConcurrentParameteryyyyYaXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
 // ENABLED-LABEL: sil hidden [ossa] @$s14execution_attr0A19ConcurrentParameteryyyyYaXEYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
-func executionConcurrentParameter(_ x: @execution(concurrent) () async -> ()) async {
+func executionConcurrentParameter(_ x: @concurrent () async -> ()) async {
   await x()
 }
 

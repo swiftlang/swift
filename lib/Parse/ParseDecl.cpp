@@ -3950,8 +3950,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Execution: {
     auto behavior = parseSingleAttrOption<ExecutionKind>(
         *this, Loc, AttrRange, AttrName, DK,
-        {{Context.Id_concurrent, ExecutionKind::Concurrent},
-         {Context.Id_caller, ExecutionKind::Caller}});
+         {{Context.Id_caller, ExecutionKind::Caller}});
     if (!behavior)
       return makeParserSuccess();
 
@@ -4766,10 +4765,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
     bool invalid = false;
     std::optional<ExecutionKind> behavior;
-    if (isIdentifier(Tok, "concurrent")) {
-      behaviorLoc = consumeToken(tok::identifier);
-      behavior = ExecutionKind::Concurrent;
-    } else if (isIdentifier(Tok, "caller")) {
+    if (isIdentifier(Tok, "caller")) {
       behaviorLoc = consumeToken(tok::identifier);
       behavior = ExecutionKind::Caller;
     } else {

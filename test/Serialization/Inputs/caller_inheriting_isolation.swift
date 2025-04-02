@@ -6,7 +6,7 @@ public func unspecifiedAsync<T>(_ t: T) async {
 public func unspecifiedAsyncCaller<T>(_ t: T) async {
 }
 
-@execution(concurrent)
+@concurrent
 public func unspecifiedAsyncConcurrent<T>(_ t: T) async {
 }
 
@@ -17,7 +17,7 @@ nonisolated public func nonisolatedAsync<T>(_ t: T) async {
 nonisolated public func nonisolatedAsyncCaller<T>(_ t: T) async {
 }
 
-@execution(concurrent)
+@concurrent
 nonisolated public func nonisolatedAsyncConcurrent<T>(_ t: T) async {
 }
 
@@ -30,7 +30,7 @@ public struct S {
   public func unspecifiedAsyncCaller<T>(_ t: T) async {
   }
 
-  @execution(concurrent)
+  @concurrent
   public func unspecifiedAsyncConcurrent<T>(_ t: T) async {
   }
 
@@ -41,7 +41,7 @@ public struct S {
   nonisolated public func nonisolatedAsyncCaller<T>(_ t: T) async {
   }
 
-  @execution(concurrent)
+  @concurrent
   nonisolated public func nonisolatedAsyncConcurrent<T>(_ t: T) async {
   }
 }

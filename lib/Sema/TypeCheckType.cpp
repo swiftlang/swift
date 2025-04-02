@@ -4244,9 +4244,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
     if (!repr->isInvalid()) {
       switch (executionAttr->getBehavior()) {
-      case ExecutionKind::Concurrent:
-        isolation = FunctionTypeIsolation::forNonIsolated();
-        break;
       case ExecutionKind::Caller:
         isolation = FunctionTypeIsolation::forNonIsolatedCaller();
         break;

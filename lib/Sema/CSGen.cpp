@@ -2589,9 +2589,11 @@ namespace {
           switch (execution->getBehavior()) {
           case ExecutionKind::Caller:
             return FunctionTypeIsolation::forNonIsolatedCaller();
-          case ExecutionKind::Concurrent:
-            return FunctionTypeIsolation::forNonIsolated();
           }
+        }
+
+        if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+          return FunctionTypeIsolation::forNonIsolated();
         }
 
         return FunctionTypeIsolation::forNonIsolated();

@@ -195,19 +195,19 @@ struct StorageRestrctionTest {
 @_unavailableFromAsync struct UnavailFromAsyncStruct { } // expected-error {{'@_unavailableFromAsync' attribute cannot be applied to this declaration}}
 @_unavailableFromAsync(message: "foo bar") func UnavailFromAsyncFn() {}
 
-@execution(concurrent) func testGlobal() async { // Ok
+@concurrent func testGlobal() async { // Ok
 }
 
 do {
   @execution(caller) func testLocal() async {} // Ok
 
   struct Test {
-    @execution(concurrent) func testMember() async {} // Ok
+    @concurrent func testMember() async {} // Ok
   }
 }
 
 typealias testConvention = @convention(c) (Int) -> Int
-typealias testExecution = @execution(concurrent) () async -> Void
+typealias testExecution = @concurrent () async -> Void
 typealias testIsolated = @isolated(any) () -> Void
 
 protocol OpProto {}
