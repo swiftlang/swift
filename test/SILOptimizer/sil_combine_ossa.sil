@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -update-borrowed-from -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -update-borrowed-from -sil-combine -wmo | %FileCheck %s
 // RUN: %target-sil-opt -sil-print-types -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -update-borrowed-from -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
 //
 // FIXME: check copy-propagation output instead once it is the default mode
@@ -5445,5 +5445,56 @@ bb0(%0 : @owned $C):
   destroy_value %0: $C
   %6 = tuple ()
   return %6 : $()
+}
+
+private protocol Pr: AnyObject {
+}
+
+private class Cr: Pr {
+}
+
+sil @use_pr : $@convention(thin) <τ_0_0 where τ_0_0 : Pr> (@in τ_0_0) -> ()
+
+// CHECK-LABEL: sil [ossa] @existential_consumed_too_early1 :
+// CHECK:         apply {{.*}}<@opened
+// CHECK:       } // end sil function 'existential_consumed_too_early1'
+sil [ossa] @existential_consumed_too_early1 : $@convention(thin) (@owned Pr) -> () {
+bb0(%0 : @owned $Pr):
+  %2 = open_existential_ref %0 to $@opened("5554ACAA-0F2B-11F0-86AA-0EA13E3AABB1", any Pr) Self
+  %3 = alloc_stack $@opened("5554ACAA-0F2B-11F0-86AA-0EA13E3AABB1", any Pr) Self
+  store %2 to [init] %3
+  %5 = function_ref @use_pr : $@convention(thin) <τ_0_0 where τ_0_0 : Pr> (@in τ_0_0) -> ()
+  %6 = apply %5<@opened("5554ACAA-0F2B-11F0-86AA-0EA13E3AABB1", any Pr) Self>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : Pr> (@in τ_0_0) -> ()
+  dealloc_stack %3
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @existential_consumed_too_early2 :
+// CHECK:         apply {{.*}}<@opened
+// CHECK:       } // end sil function 'existential_consumed_too_early2'
+sil [ossa] @existential_consumed_too_early2 : $@convention(thin) (@owned Cr) -> () {
+bb0(%0 : @owned $Cr):
+  %1 = init_existential_ref %0 : $Cr : $Cr, $any Pr
+  %2 = open_existential_ref %1 to $@opened("5554ACAA-0F2B-11F0-86AA-0EA13E3AABB1", any Pr) Self
+  %3 = alloc_stack $@opened("5554ACAA-0F2B-11F0-86AA-0EA13E3AABB1", any Pr) Self
+  store %2 to [init] %3
+  %5 = function_ref @use_pr : $@convention(thin) <τ_0_0 where τ_0_0 : Pr> (@in τ_0_0) -> ()
+  %6 = apply %5<@opened("5554ACAA-0F2B-11F0-86AA-0EA13E3AABB1", any Pr) Self>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : Pr> (@in τ_0_0) -> ()
+  dealloc_stack %3
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @init_existential_with_debug_value :
+// CHECK:         return %0
+// CHECK:       } // end sil function 'init_existential_with_debug_value'
+sil [ossa] @init_existential_with_debug_value : $@convention(thin) (@owned Cr) -> @owned Cr {
+bb0(%1 : @owned $Cr):
+  %5 = init_existential_ref %1 : $Cr : $Cr, $any Pr
+  debug_value %5, let, name "interactor", argno 2
+  %48 = open_existential_ref %5 to $@opened("F9D78C78-0FCD-11F0-9F91-0EA13E3AABB1", any Pr) Self
+  %49 = unchecked_ref_cast %48 to $Cr
+  return %49
 }
 
