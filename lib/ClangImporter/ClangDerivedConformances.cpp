@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -33,8 +34,7 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   TinyPtrVector<ValueDecl *> result;
 
   if (id.isOperator()) {
-    auto underlyingId =
-        ctx.getIdentifier(getPrivateOperatorName(std::string(id)));
+    auto underlyingId = getOperatorName(ctx, id);
     TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
         ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
     for (auto it : underlyingFuncs) {
