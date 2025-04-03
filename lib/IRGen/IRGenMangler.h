@@ -435,10 +435,10 @@ public:
   }
 
   std::string
-  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedType association) {
+  mangleAssociatedTypeAccessFunctionDiscriminator(AssociatedTypeDecl *assocDecl) {
     beginMangling();
-    appendAnyGenericType(association.getSourceProtocol());
-    appendIdentifier(association.getAssociation()->getNameStr());
+    appendAnyGenericType(assocDecl->getProtocol());
+    appendIdentifier(assocDecl->getNameStr());
     return finalize();
   }
 

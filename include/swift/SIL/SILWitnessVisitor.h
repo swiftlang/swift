@@ -100,7 +100,7 @@ public:
       // If this is a new associated type (which does not override an
       // existing associated type), add it.
       if (associatedType->getOverriddenDecls().empty())
-        asDerived().addAssociatedType(AssociatedType(associatedType));
+        asDerived().addAssociatedType(associatedType);
     }
 
     if (asDerived().shouldVisitRequirementSignatureOnly())

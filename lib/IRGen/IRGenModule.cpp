@@ -187,9 +187,8 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
   auto &schema = IGM.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions;
   if (!schema.isEnabled()) return;
 
-  auto decl = dyn_cast_or_null<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
-  assert(decl && "decl not found");
-  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, AssociatedType(decl));
+  auto decl = cast<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, decl);
   assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
 }
 
