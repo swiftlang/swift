@@ -876,6 +876,11 @@ SIMPLE_DECL_ATTR(constInitialized, ConstInitialized,
   168)
 DECL_ATTR_FEATURE_REQUIREMENT(ConstInitialized, CompileTimeValues)
 
+SIMPLE_DECL_ATTR(extensible, Extensible,
+  OnEnum,
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  169)
+
 SIMPLE_DECL_ATTR(concurrent, Concurrent,
   OnFunc | OnConstructor | OnSubscript | OnVar,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,

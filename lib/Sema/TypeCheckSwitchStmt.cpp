@@ -1159,10 +1159,7 @@ namespace {
           auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
               enumModule->isSystemModule() ||
-              enumModule->supportsExtensibleEnums();
-          // Since the module enabled `ExtensibleEnums` feature they
-          // opted-in all of their clients into exhaustivity errors.
-          shouldDowngradeToWarning = !enumModule->supportsExtensibleEnums();
+              theEnum->getAttrs().hasAttribute<ExtensibleAttr>();
         }
         DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                     subjectType, shouldIncludeFutureVersionComment)

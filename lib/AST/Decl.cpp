@@ -7027,14 +7027,11 @@ bool EnumDecl::treatAsExhaustiveForDiags(const DeclContext *useDC) const {
     if (enumModule->inSamePackage(useDC->getParentModule()))
       return true;
 
-    // If the module where enum is declared supports extensible enumerations
-    // and this enum is not explicitly marked as "@frozen", cross-module
-    // access cannot be exhaustive and requires `@unknown default:`.
-    if (enumModule->supportsExtensibleEnums() &&
-        !getAttrs().hasAttribute<FrozenAttr>()) {
-      if (useDC != enumModule->getDeclContext())
-        return false;
-    }
+    // When the enum is marked as `@extensible` cross-module access
+    // cannot be exhaustive and requires `@unknown default:`.
+    if (getAttrs().hasAttribute<ExtensibleAttr>() &&
+        enumModule != useDC->getParentModule())
+      return false;
   }
 
   return isFormallyExhaustive(useDC);
