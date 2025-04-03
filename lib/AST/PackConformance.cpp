@@ -142,20 +142,20 @@ PackConformance *PackConformance::getAssociatedConformance(
     auto packElement = ConformingType->getElementType(i);
 
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
-      auto assocTypePattern = conformances[i].getAssociatedType(assocType);
-      packElements.push_back(PackExpansionType::get(
-          assocTypePattern, packExpansion->getCountType()));
-
       auto assocConformancePattern =
         conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformancePattern);
-    } else {
-      auto assocTypeScalar = conformances[i].getAssociatedType(assocType);
-      packElements.push_back(assocTypeScalar);
 
+      auto assocTypePattern = assocConformancePattern.getType();
+      packElements.push_back(PackExpansionType::get(
+          assocTypePattern, packExpansion->getCountType()));
+    } else {
       auto assocConformanceScalar =
         conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformanceScalar);
+
+      auto assocTypeScalar = assocConformanceScalar.getType();
+      packElements.push_back(assocTypeScalar);
     }
   }
 
