@@ -370,12 +370,6 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   assert(loop->contains(newHeader) && !loop->contains(exit)
          && "Could not find loop header and exit block");
 
-  // It does not make sense to rotate the loop if the new header is loop
-  // exiting as well.
-  if (loop->isLoopExiting(newHeader)) {
-    return false;
-  }
-
   // Incomplete liveranges in the dead-end exit block can cause a missing adjacent
   // phi-argument for a re-borrow if there is a borrow-scope is in the loop.
   // But even when we have complete lifetimes, it's probably not worth rotating
