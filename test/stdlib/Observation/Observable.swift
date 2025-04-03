@@ -290,6 +290,15 @@ final class CowTest {
 @Observable
 final class DeinitTriggeredObserver {
   var property: Int = 3
+  let deinitTrigger: () -> Void
+
+  init(_ deinitTrigger: @escaping () -> Void) {
+    self.deinitTrigger = deinitTrigger
+  }
+
+  deinit {
+    deinitTrigger()
+  }
 }
 
 
@@ -519,13 +528,17 @@ struct Validator {
 
     suite.test("weak container observation") {
       let changed = CapturedState(state: false)
-      var test: DeinitTriggeredObserver? = DeinitTriggeredObserver()
-      withObservationTracking {
+      let deinitialized = CapturedState(state: false)
+      var test = DeinitTriggeredObserver {
+        deinitialized.state = true
+      }
+      withObservationTracking { [weak test] in
         _blackHole(test?.property)
       } onChange: {
         changed.state = true
       }
-      test = nil
+      test = DeinitTriggeredObserver()
+      expectEqual(deinitialized.state, true)
       expectEqual(changed.state, true)
     }
 
