@@ -3521,7 +3521,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    if (!hasMembers && !isExported(extension))
+    if (!hasMembers && !hasConformancesToPublicProtocols(extension))
       return;
   } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
     // Check the first var instead.
