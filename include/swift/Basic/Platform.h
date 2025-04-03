@@ -71,6 +71,10 @@ namespace swift {
   /// (eg. in /usr/lib/swift).
   bool tripleRequiresRPathForSwiftLibrariesInOS(const llvm::Triple &triple);
 
+  /// Returns true if the given triple represents a version of OpenBSD
+  /// that enforces BTCFI by default.
+  bool tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple);
+
   /// Returns the platform name for a given target triple.
   ///
   /// For example, the iOS simulator has the name "iphonesimulator", while real
