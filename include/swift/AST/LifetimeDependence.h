@@ -354,6 +354,18 @@ public:
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
                          unsigned index);
+
+/// Helper to remove lifetime dependencies whose target references an
+/// Escapable type.
+///
+/// Returns true if the set of output lifetime dependencies is different from
+/// the set of input lifetime dependencies, false if there was no change.
+bool
+filterEscapableLifetimeDependencies(GenericSignature sig,
+        ArrayRef<LifetimeDependenceInfo> inputs,
+        SmallVectorImpl<LifetimeDependenceInfo> &outputs,
+        llvm::function_ref<Type (unsigned targetIndex)> getSubstTargetType);
+
 } // namespace swift
 
 #endif

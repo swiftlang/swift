@@ -253,6 +253,11 @@ public:
     auto genericSig = IFS.shouldSubstituteOpaqueArchetypes()
                         ? origType->getInvocationGenericSignature()
                         : nullptr;
+                        
+    extInfo = SILFunctionType::getSubstLifetimeDependencies(genericSig, extInfo,
+                                                            substParams,
+                                                            substYields,
+                                                            substResults);
 
     return SILFunctionType::get(genericSig, extInfo,
                                 origType->getCoroutineKind(),
