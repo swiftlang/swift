@@ -1640,7 +1640,7 @@ namespace {
       if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
         if (gp->isValue()) {
           auto refType = adjustedOpenedType;
-          auto ref = TypeValueExpr::createForDecl(memberLoc, gp);
+          auto ref = TypeValueExpr::createForDecl(memberLoc, gp, dc);
           cs.setType(ref, refType);
 
           auto gpTy = gp->getDeclaredInterfaceType();

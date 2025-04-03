@@ -1449,29 +1449,22 @@ public:
 };
 
 class TypeValueExpr : public Expr {
-  GenericTypeParamDecl *paramDecl;
   TypeRepr *repr;
-  DeclNameLoc loc;
   Type paramType;
 
-  /// Create a \c TypeValueExpr from a given generic value param decl.
-  TypeValueExpr(TypeRepr *repr, DeclNameLoc loc, GenericTypeParamDecl *paramDecl) :
-      Expr(ExprKind::TypeValue, /*implicit*/ false), paramDecl(paramDecl),
-      repr(repr), loc(loc), paramType(nullptr) {}
+  /// Create a \c TypeValueExpr from a given type representation.
+  TypeValueExpr(TypeRepr *repr) :
+      Expr(ExprKind::TypeValue, /*implicit*/ false), repr(repr),
+      paramType(nullptr) {}
 
 public:
-  /// Create a \c TypeValueExpr for a given \c GenericTypeParamDecl.
+  /// Create a \c TypeValueExpr for a given \c TypeDecl.
   ///
   /// The given location must be valid.
-  static TypeValueExpr *createForDecl(DeclNameLoc Loc, GenericTypeParamDecl *D);
+  static TypeValueExpr *createForDecl(DeclNameLoc loc, TypeDecl *d,
+                                      DeclContext *dc);
 
-  /// Create a \c TypeValueExpr for a member of the given parent \c TypeRepr.
-  static TypeValueExpr *createForMemberDecl(TypeRepr *repr, DeclNameLoc loc,
-                                            GenericTypeParamDecl *d);
-
-  GenericTypeParamDecl *getParamDecl() const {
-    return paramDecl;
-  }
+  GenericTypeParamDecl *getParamDecl() const;
 
   TypeRepr *getRepr() const {
     return repr;
@@ -1489,15 +1482,7 @@ public:
     this->paramType = paramType;
   }
 
-  /// Retrieves the underlying value type of the parameter type referenced by
-  /// this expression.
-  Type getValueType() const {
-    return paramDecl->getValueType();
-  }
-
-  SourceRange getSourceRange() const {
-    return loc.getSourceRange();
-  }
+  SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TypeValue;

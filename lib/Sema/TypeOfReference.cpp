@@ -1557,16 +1557,11 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
-    // However, if overload resolution finds a value generic decl from name
-    // lookup, replace the returned member type to be the underlying value type
-    // of the generic.
-    //
-    // This can occur in code that does something like: 'type(of: x).a' where
-    // 'a' is the static value generic member.
-    if (auto gp = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-      if (gp->isValue()) {
-        memberTy = gp->getValueType();
-      }
+    // If this is a value generic, undo the wrapping. 'substMemberTypeWithBase'
+    // returns the underlying value type of the value generic (e.g. 'Int').
+    if (isa<GenericTypeParamDecl>(value) &&
+        cast<GenericTypeParamDecl>(value)->isValue()) {
+      memberTy = memberTy->castTo<MetatypeType>()->getInstanceType();
     }
 
     auto openedType = FunctionType::get({baseObjParam}, memberTy);

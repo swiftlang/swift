@@ -1723,25 +1723,15 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
+      auto declRefRepr = cast<DeclRefTypeRepr>(E->getRepr());
+      auto resolvedTy = resolveTypeReferenceInExpression(declRefRepr,
+                                                         TypeResolverContext::InExpression,
+                                                         CS.getConstraintLocator(E));
 
-      // If we have a type representation for this type value, then we're in a
-      // context where we're statically accessing the generic parameter by name
-      // from a qualified name. E.g. 'A<123>.b'. This context may or may not
-      // have a generic environment from which we can map our parameter to.
-      if (auto repr = E->getRepr()) {
-        auto resolvedTy =
-            resolveTypeReferenceInExpression(repr,
-                                             TypeResolverContext::InExpression,
-                                             CS.getConstraintLocator(E));
+      if (!resolvedTy || resolvedTy->hasError())
+        return Type();
 
-        auto paramType = ty.subst(resolvedTy->getContextSubstitutionMap());
-        E->setParamType(paramType);
-        return E->getParamDecl()->getValueType();
-      }
-
-      auto paramType = CS.DC->mapTypeIntoContext(ty);
-      E->setParamType(paramType);
+      E->setParamType(resolvedTy);
       return E->getParamDecl()->getValueType();
     }
 
