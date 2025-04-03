@@ -8483,7 +8483,8 @@ ERROR(attr_abi_failable_mismatch,none,
 //===----------------------------------------------------------------------===//
 // MARK: Isolated conformances
 //===----------------------------------------------------------------------===//
-ERROR(isolated_conformance_experimental_feature,none,
+GROUPED_ERROR(isolated_conformance_experimental_feature,IsolatedConformances,
+      none,
       "isolated conformances require experimental feature "
       " 'IsolatedConformances'", ())
 NOTE(note_isolate_conformance_to_global_actor,none,
@@ -8492,15 +8493,16 @@ NOTE(note_isolate_conformance_to_global_actor,none,
 NOTE(note_depends_on_isolated_conformance,none,
      "conformance depends on %0 conformance of %1 to %kind2",
      (ActorIsolation, Type, const ValueDecl *))
-ERROR(isolated_conformance_with_sendable,none,
+GROUPED_ERROR(isolated_conformance_with_sendable,IsolatedConformances,none,
       "%4 conformance of %0 to %1 cannot satisfy conformance "
-      "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "
+      "requirement for a %select{'Sendable'|'SendableMetatype'}2 type "
       "parameter %3", (Type, DeclName, bool, Type, ActorIsolation))
-ERROR(isolated_conformance_with_sendable_simple,none,
+GROUPED_ERROR(isolated_conformance_with_sendable_simple,IsolatedConformances,
+      none,
       "%2 conformance of %0 to %1 cannot satisfy "
-      "conformance requirement for a `Sendable` type parameter ",
+      "conformance requirement for a 'Sendable' type parameter ",
       (Type, DeclName, ActorIsolation))
-ERROR(isolated_conformance_wrong_domain,none,
+GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
       "%0 conformance of %1 to %2 cannot be used in %3 context",
       (ActorIsolation, Type, DeclName, ActorIsolation))
 
