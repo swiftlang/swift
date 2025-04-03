@@ -171,6 +171,19 @@ extension CollectionOfOne {
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      let pointer = unsafe UnsafeMutablePointer<Element>(
+        Builtin.addressOfBorrow(self)
+      )
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: 1)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
+  }
 }
 
 @_unavailableInEmbedded

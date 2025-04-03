@@ -72,6 +72,19 @@ suite.test("CollectionOfOne.span stride test")
   expectEqual(bytes.byteCount, MemoryLayout.size(ofValue: c))
 }
 
+suite.test("CollectionOfOne.mutableSpan property (simple)")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var c = CollectionOfOne(Int.random(in: 0..<100000))
+  expectEqual(c.count, 1)
+  var span = c.mutableSpan
+  expectEqual(span.count, 1)
+  span[0] = Int.random(in: .min..<0)
+  let r = span[0]
+  expectEqual(c[0], r)
+}
+
 suite.test("InlineArray.span property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
