@@ -19,4 +19,9 @@ struct StoreAllTheThings {
   let ln: ListNode // expected-note{{property 'ln' involves unsafe type 'ListNode'}}
 
   let sc: SomeColor
-};
+}
+
+func readFromUnion(npu: NoPointersUnion) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = npu.x // expected-note{{reference to unsafe property 'x'}}
+}
