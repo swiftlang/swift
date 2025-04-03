@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -314,6 +314,49 @@ extension String.UTF8View {
       return _guts.count
     }
     return _foreignCount()
+  }
+}
+
+extension String.UTF8View {
+
+  /// A span over the UTF8 code units that make up this string.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property transcodes the code units the first time
+  /// it is called. The transcoded buffer is cached, and subsequent calls
+  /// to `span` can reuse the buffer.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this String.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings,
+  ///  amortized O(1) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+#if _runtime(_ObjC)
+      // handle non-UTF8 Objective-C bridging cases here
+      if !_guts.isFastUTF8 && _guts._object.hasObjCBridgeableObject {
+        let storage = _guts._getOrAllocateAssociatedStorage()
+        let (start, count) = unsafe (storage.start, storage.count)
+        let span = unsafe Span(_unsafeStart: start, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let count = _guts.count
+      if _guts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
+        let span = unsafe Span(_unsafeStart: address, count: count)
+        fatalError("Span over the small string form is not supported yet.")
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      _precondition(_guts.isFastUTF8)
+      let buffer = unsafe _guts._object.fastUTF8
+      _internalInvariant(count == buffer.count)
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 

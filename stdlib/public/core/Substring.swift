@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -746,6 +746,61 @@ extension Substring.UTF8View: BidirectionalCollection {
     // FIXME(strings): tests.
     let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF8View(_slice.base, _bounds: r)
+  }
+}
+
+extension Substring.UTF8View {
+
+  /// A span over the UTF8 code units that make up this substring.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property needs to transcode the code units every time
+  /// it is called.
+  /// For example, if `string` has the bridged UTF16 representation,
+  ///     for word in string.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///  is accidentally quadratic because of this issue. A workaround is to
+  ///  explicitly convert the string into its native UTF8 representation:
+  ///      var nativeString = consume string
+  ///      nativeString.makeContiguousUTF8()
+  ///      for word in nativeString.split(separator: " ") {
+  ///          useSpan(word.span)
+  ///      }
+  ///  This second option has linear time complexity, as expected.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this Substring.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+#if _runtime(_ObjC)
+      // handle non-UTF8 Objective-C bridging cases here
+      if !_wholeGuts.isFastUTF8 && _wholeGuts._object.hasObjCBridgeableObject {
+        let base: String.UTF8View = self._base
+        let first = base._foreignDistance(from: base.startIndex, to: startIndex)
+        let count = base._foreignDistance(from: startIndex, to: endIndex)
+        let span = unsafe base.span._extracting(first..<(first &+ count))
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let first = _slice._startIndex._encodedOffset
+      let end = _slice._endIndex._encodedOffset
+      if _wholeGuts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let offset = first &+ (2 &* MemoryLayout<String.Index>.stride)
+        let start = unsafe UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
+        let span = unsafe Span(_unsafeStart: start, count: end &- first)
+        fatalError("Span over the small string form is not supported yet.")
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      _internalInvariant(_wholeGuts.isFastUTF8)
+      var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
+      span = span._extracting(first..<end)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 
