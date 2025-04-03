@@ -3727,6 +3727,13 @@ namespace {
       return nullptr;
     }
 
+    static bool isClangNamespace(const DeclContext *dc) {
+      if (const auto *ed = dc->getSelfEnumDecl())
+        return isa<clang::NamespaceDecl>(ed->getClangDecl());
+
+      return false;
+    }
+
     Decl *importFunctionDecl(
         const clang::FunctionDecl *decl, ImportedName importedName,
         std::optional<ImportedName> correctSwiftName,
@@ -3862,7 +3869,8 @@ namespace {
 
       bool importFuncWithoutSignature =
           isa<clang::CXXMethodDecl>(decl) && Impl.importSymbolicCXXDecls;
-      if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
+      if (!dc->isModuleScopeContext() && !isClangNamespace(dc) &&
+          !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName().isConstructor()) {
           assert(!accessorInfo);
