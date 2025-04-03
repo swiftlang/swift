@@ -80,10 +80,8 @@ If set, skips building the msi's and installer
 If set, debug information will be generated for the builds.
 
 .PARAMETER EnableCaching
-If true, use `sccache` to cache the build rules.
-
-.PARAMETER Cache
-The path to a directory where the `sccache` stores the cache. By default, it will point to `$BinaryCache\sccache`.
+If true, use `sccache` to cache the build rules. Configuration of sccache must be done through
+the environment variables defined by the sccache project.
 
 .PARAMETER Clean
 If true, clean non-compiler builds while building.
@@ -170,7 +168,6 @@ param
   [switch] $EnableCaching,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
-  [string] $Cache = "",
   [switch] $Summary,
   [switch] $ToBatch
 )
@@ -1201,11 +1198,6 @@ function Build-CMakeProject {
   Invoke-IsolatingEnvVars {
     if ($Platform.OS -eq [OS]::Windows) {
       Invoke-VsDevShell $Platform
-    }
-
-    if ($EnableCaching) {
-      $env:SCCACHE_DIRECT = "true"
-      $env:SCCACHE_DIR = "$(if ($Cache) { $Cache } else { "$BinaryCache\sccache" })"
     }
 
     # Add additional defines (unless already present)
