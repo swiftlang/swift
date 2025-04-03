@@ -69,6 +69,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
@@ -3040,6 +3041,8 @@ namespace {
       return result;
     }
 
+    using ProtocolSet = llvm::SmallSet<ProtocolDecl *, 4>;
+
     void
     addExplicitProtocolConformances(NominalTypeDecl *decl,
                                     const clang::CXXRecordDecl *clangDecl) {
@@ -3054,18 +3057,18 @@ namespace {
       if (!clangDecl->hasAttrs())
         return;
 
-      DeclAttribute *baseAttrsSentry = *decl->getAttrs().begin();
+      ProtocolSet alreadyAdded;
       llvm::for_each(clangDecl->getAttrs(), [&](auto *attr) {
         if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
           if (swiftAttr->getAttribute().starts_with("conforms_to:"))
-            addExplicitProtocolConformance(decl, swiftAttr, baseAttrsSentry);
+            addExplicitProtocolConformance(decl, swiftAttr, alreadyAdded);
         }
       });
     }
 
     void addExplicitProtocolConformance(NominalTypeDecl *decl,
                                         clang::SwiftAttrAttr *conformsToAttr,
-                                        DeclAttribute *baseAttrsSentry) {
+                                        ProtocolSet &alreadyAdded) {
       auto conformsToValue = conformsToAttr->getAttribute()
                                  .drop_front(StringRef("conforms_to:").size())
                                  .str();
@@ -3106,17 +3109,11 @@ namespace {
 
       auto result = results.front();
       if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
-        for (auto attr :
-             decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
-          if (attr == baseAttrsSentry)
-            break;
-
-          auto existingProtocol = attr->getProtocol();
-          if (existingProtocol == protocol) {
-            HeaderLoc attrLoc(conformsToAttr->getLocation());
-            Impl.diagnose(attrLoc, diag::redundant_conformance_protocol,
-                          decl->getDeclaredInterfaceType(), conformsToValue);
-          }
+        auto [_, inserted] = alreadyAdded.insert(protocol);
+        if (!inserted) {
+          HeaderLoc attrLoc(conformsToAttr->getLocation());
+          Impl.diagnose(attrLoc, diag::redundant_conformance_protocol,
+                        decl->getDeclaredInterfaceType(), conformsToValue);
         }
 
         decl->getAttrs().add(
