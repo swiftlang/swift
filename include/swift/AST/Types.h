@@ -5022,6 +5022,8 @@ enum class SILCoroutineKind : uint8_t {
 
 class SILFunctionConventions;
 
+Type substOpaqueTypesWithUnderlyingTypes(Type type,
+                                         TypeExpansionContext context);
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
