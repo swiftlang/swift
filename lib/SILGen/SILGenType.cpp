@@ -692,11 +692,11 @@ public:
     auto assocConformance =
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
-    auto substType =
-      Conformance->getAssociatedType(req.getAssociation())->getCanonicalType();
-
     SGM.useConformance(assocConformance);
 
+    auto substType = (assocConformance
+                      ? assocConformance.getType()
+                      : ErrorType::get(SGM.getASTContext()))->getCanonicalType();
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), substType, assocConformance});
   }
