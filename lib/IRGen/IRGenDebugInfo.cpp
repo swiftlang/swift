@@ -2578,7 +2578,7 @@ private:
     // Scope outermost fileprivate decls in an inline private discriminator
     // namespace.
     if (auto *Decl = DbgTy.getDecl())
-      if (Decl->isOutermostPrivateOrFilePrivateScope())
+      if (!ClangDecl && Decl->isOutermostPrivateOrFilePrivateScope())
         Scope = getFilePrivateScope(Scope, Decl);
 
     return Scope;
