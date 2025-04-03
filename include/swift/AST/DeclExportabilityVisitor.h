@@ -190,6 +190,10 @@ bool isExported(const ValueDecl *VD);
 /// A specialization of `isExported` for `ExtensionDecl`.
 bool isExported(const ExtensionDecl *ED);
 
+/// Returns true if the extension declares any protocol conformances that
+/// require the extension to be exported.
+bool hasConformancesToPublicProtocols(const ExtensionDecl *ED);
+
 } // end namespace swift
 
 #endif
