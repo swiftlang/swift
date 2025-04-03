@@ -1468,12 +1468,10 @@ public:
 
     void defineAssociatedTypeWitnessTableAccessFunction(
                                         AssociatedConformance requirement,
-                                        CanType associatedType,
                                         ProtocolConformanceRef conformance);
 
     llvm::Constant *getAssociatedConformanceWitness(
                                     AssociatedConformance requirement,
-                                    CanType associatedType,
                                     ProtocolConformanceRef conformance);
 
     const FulfillmentMap &getFulfillmentMap() {
@@ -1765,10 +1763,6 @@ public:
         return;
       }
 
-      auto associate =
-        ConformanceInContext.getAssociatedType(
-          requirement.getAssociation())->getCanonicalType();
-
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(
           requirement.getAssociation(),
@@ -1802,8 +1796,7 @@ public:
       }
 
       llvm::Constant *witnessEntry =
-        getAssociatedConformanceWitness(requirement, associate,
-                                        associatedConformance);
+        getAssociatedConformanceWitness(requirement, associatedConformance);
 
       if (isRelative) {
         Table.addRelativeAddress(witnessEntry);
@@ -1869,10 +1862,8 @@ static void buildAssociatedTypeValueName(CanType depAssociatedType,
 
 llvm::Constant *WitnessTableBuilderBase::getAssociatedConformanceWitness(
                                 AssociatedConformance requirement,
-                                CanType associatedType,
                                 ProtocolConformanceRef conformance) {
-  defineAssociatedTypeWitnessTableAccessFunction(requirement, associatedType,
-                                                 conformance);
+  defineAssociatedTypeWitnessTableAccessFunction(requirement, conformance);
   assert(isa<NormalProtocolConformance>(Conformance) && "has associated type");
   auto conf = cast<NormalProtocolConformance>(&Conformance);
   return IGM.getMangledAssociatedConformance(conf, requirement);
@@ -1880,8 +1871,8 @@ llvm::Constant *WitnessTableBuilderBase::getAssociatedConformanceWitness(
 
 void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
                                 AssociatedConformance requirement,
-                                CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
+  auto associatedType = associatedConformance.getType()->getCanonicalType();
   bool hasArchetype = associatedType->hasArchetype();
   bool isOpaqueArchetype = isa<OpaqueTypeArchetypeType>(associatedType);
 
@@ -1926,8 +1917,6 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
   const ConformanceInfo *conformanceI = nullptr;
 
   if (associatedConformance.isConcrete()) {
-    assert(associatedType->isEqual(associatedConformance.getConcrete()->getType()));
-
     conformanceI = &IGM.getConformanceInfo(associatedProtocol,
                                            associatedConformance.getConcrete());
 
@@ -2023,10 +2012,6 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
     if (entry.getKind() == SILWitnessTable::AssociatedConformance) {
       const auto &witness = entry.getAssociatedConformanceWitness();
 
-      auto associate =
-        ConformanceInContext.getAssociatedType(
-          witness.Requirement)->getCanonicalType();
-
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(witness.Requirement,
                                                       witness.Witness.getProtocol());
@@ -2036,8 +2021,7 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
                                         witness.Witness.getProtocol());
 
       llvm::Constant *witnessEntry =
-        getAssociatedConformanceWitness(requirement, associate,
-                                        associatedConformance);
+        getAssociatedConformanceWitness(requirement, associatedConformance);
       resilientWitnesses.push_back(witnessEntry);
       continue;
     }
@@ -2052,8 +2036,7 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
       ProtocolConformanceRef inheritedConformance =
         ConformanceInContext.getAssociatedConformance(selfType, baseProto);
       llvm::Constant *witnessEntry =
-        getAssociatedConformanceWitness(requirement, ConcreteType,
-                                        inheritedConformance);
+        getAssociatedConformanceWitness(requirement, inheritedConformance);
       resilientWitnesses.push_back(witnessEntry);
       continue;
     }
@@ -3448,12 +3431,12 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     auto association = entry.getAssociatedConformancePath();
     auto associatedRequirement = entry.getAssociatedConformanceRequirement();
 
-    CanType associatedType = sourceConformance.getAssociatedType(association)
-        ->getCanonicalType();
-    sourceKey.Type = associatedType;
 
     auto associatedConformance =
       sourceConformance.getAssociatedConformance(association, associatedRequirement);
+    auto associatedType = associatedConformance.getType()->getCanonicalType();
+
+    sourceKey.Type = associatedType;
     sourceKey.Kind =
       LocalTypeDataKind::forProtocolWitnessTable(associatedConformance);
 
@@ -3526,8 +3509,9 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       // type directly.
       auto depMemType = cast<DependentMemberType>(association);
       CanType baseSubstType =
-        sourceConformance.getAssociatedType(depMemType.getBase())
-          ->getCanonicalType();
+        depMemType.getBase().subst(
+          SubstitutionMap::getProtocolSubstitutions(sourceConformance))
+            ->getCanonicalType();
       if (auto archetypeType = dyn_cast<ArchetypeType>(baseSubstType)) {
         AssociatedType baseAssocType(depMemType->getAssocType());
 
