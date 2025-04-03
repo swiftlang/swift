@@ -188,6 +188,25 @@ bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
          });
 }
 
+void importer::recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+  if (!isIUO)
+    return;
+
+#if !defined(NDEBUG)
+  Type ty;
+  if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+    ty = FD->getResultInterfaceType();
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    ty = CD->getResultInterfaceType();
+  } else {
+    ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
+  }
+  assert(ty->getOptionalObjectType());
+#endif
+
+  decl->setImplicitlyUnwrappedOptional(true);
+}
+
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               StringRef left, StringRef right) {
@@ -3395,8 +3414,8 @@ namespace {
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
@@ -4078,8 +4097,8 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       if (dc->getSelfClassDecl())
         // FIXME: only if the class itself is not marked final
@@ -4454,8 +4473,8 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -4886,8 +4905,8 @@ namespace {
           /*IsStatic*/decl->isClassMethod(), VarDecl::Introducer::Var,
                         Impl.importSourceLoc(decl->getLocation()), ident, dc);
       propDecl->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(propDecl,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          propDecl, importedType.isImplicitlyUnwrapped());
 
       ////
       // Build the getter
@@ -5167,7 +5186,7 @@ namespace {
       if (forceClassMethod)
         result->setImplicit();
 
-      Impl.recordImplicitUnwrapForDecl(result, isIUO);
+      importer::recordImplicitUnwrapForDecl(result, isIUO);
 
       // Mark this method @objc.
       addObjCAttribute(result, selector);
@@ -6043,8 +6062,8 @@ namespace {
           /*IsStatic*/decl->isClassProperty(), VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
       result->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       // Recover from a missing getter in no-asserts builds. We're still not
       // sure under what circumstances this occurs, but we shouldn't crash.
@@ -6860,8 +6879,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                                 std::move(initKind));
   result->setImportAsStaticMember();
 
-  Impl.recordImplicitUnwrapForDecl(result,
-                                   importedType.isImplicitlyUnwrapped());
+  importer::recordImplicitUnwrapForDecl(result,
+                                        importedType.isImplicitlyUnwrapped());
   result->setOverriddenDecls({ });
   result->setIsObjC(false);
   result->setIsDynamic(false);
@@ -7051,8 +7070,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   property->setIsObjC(false);
   property->setIsDynamic(false);
 
-  Impl.recordImplicitUnwrapForDecl(property,
-                                   importedType.isImplicitlyUnwrapped());
+  importer::recordImplicitUnwrapForDecl(property,
+                                        importedType.isImplicitlyUnwrapped());
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -7386,8 +7405,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   addObjCAttribute(result, selector);
   recordMemberInContext(dc, result);
 
-  Impl.recordImplicitUnwrapForDecl(result,
-                                   importedType.isImplicitlyUnwrapped());
+  importer::recordImplicitUnwrapForDecl(result,
+                                        importedType.isImplicitlyUnwrapped());
 
   if (implicit)
     result->setImplicit();
@@ -7850,7 +7869,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   subscript->setIsSetterMutating(false);
   importer::makeComputed(subscript, getterThunk, setterThunk);
 
-  Impl.recordImplicitUnwrapForDecl(subscript, isIUO);
+  importer::recordImplicitUnwrapForDecl(subscript, isIUO);
 
   addObjCAttribute(subscript, std::nullopt);
 

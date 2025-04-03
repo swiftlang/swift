@@ -877,25 +877,6 @@ public:
   ModuleDecl *loadModule(SourceLoc importLoc,
                          ImportPath::Module path);
 
-  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
-    if (!isIUO)
-      return;
-
-#if !defined(NDEBUG)
-    Type ty;
-    if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-      ty = FD->getResultInterfaceType();
-    } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      ty = CD->getResultInterfaceType();
-    } else {
-      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
-    }
-    assert(ty->getOptionalObjectType());
-#endif
-
-    decl->setImplicitlyUnwrappedOptional(true);
-  }
-
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -1908,6 +1889,9 @@ bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
 bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+/// Set \a decl as an implicitly unwrapped optional if \a isUIO.
+void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO);
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
