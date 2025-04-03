@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 // A MutableRawSpan represents a span of memory which
 // contains initialized `Element` instances.
 @safe
@@ -338,6 +342,10 @@ extension MutableRawSpan {
   }
 }
 
+// FIXME: The functions in this extension crash the SIL optimizer when built inside
+// the stub. But these declarations don't generate a public symbol anyway.
+#if !SPAN_COMPATIBILITY_STUB
+
 //MARK: copyMemory
 @available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
@@ -429,6 +437,7 @@ extension MutableRawSpan {
     update(fromContentsOf: source.bytes)
   }
 }
+#endif
 
 // MARK: sub-spans
 @available(SwiftStdlib 6.2, *)
