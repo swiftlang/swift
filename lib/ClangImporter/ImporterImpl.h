@@ -2059,14 +2059,19 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   return std::nullopt;
 }
 
-inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
-#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
-  if (OperatorToken == Spelling) {                                             \
-    return "__operator" #Name;                                                 \
-  };
-#include "clang/Basic/OperatorKinds.def"
-  return "None";
-}
+/// Construct the imported Swift name for an imported Clang operator kind,
+/// e.g., \c "__operatorPlus" for Clang::OO_Plus.
+///
+/// Returns an empty identifier (internally, a nullptr) when \a op does not
+/// represent an actual operator, i.e., OO_None or NUM_OVERLOADED_OPERATORS.
+Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
+
+/// Construct the imported Swift name corresponding to an operator identifier,
+/// e.g., \c "__operatorPlus" for \c "+".
+///
+/// Returns an empty identifier (internally, a nullptr) when \a op does not
+/// correspond to an overloaded C++ operator.
+Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
