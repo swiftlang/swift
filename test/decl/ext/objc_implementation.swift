@@ -372,6 +372,10 @@ protocol EmptySwiftProto {}
 }
 
 @objc(Effects) @implementation extension ObjCClass {
+  // expected-error@-1 {{extension for category 'Effects' does not provide all required implementations}}
+  // expected-note@-2 {{missing instance method 'doSomethingMissingAndAsynchronous()' or 'doSomethingMissingAndAsynchronous(completionHandler:)'}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{53-53=\n    @objc(doSomethingMissingAndAsynchronousWithCompletionHandler:)\n    open func doSomethingMissingAndAsynchronous() async throws -> Any {\n        <#code#>\n    \}\n}}
+
   @available(SwiftStdlib 5.1, *)
   public func doSomethingAsynchronous() async throws -> Any {
     return self
