@@ -1218,9 +1218,6 @@ public:
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
       bool isUnchecked = false);
 
-  void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
-                    AccessorDecl *setter);
-
   /// Retrieve the standard library module.
   ModuleDecl *getStdlibModule();
 
@@ -1897,6 +1894,12 @@ public:
 
 namespace importer {
 
+/// Make \a storage a computed property with the given \a getter and \a setter.
+///
+/// \a getter must be non-null.
+void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                  AccessorDecl *setter);
+
 /// Returns true if the given C/C++ record should be imported as a reference
 /// type into Swift.
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
@@ -2082,7 +2085,6 @@ bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
-
 } // end namespace importer
 } // end namespace swift
 

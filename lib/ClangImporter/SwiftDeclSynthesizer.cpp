@@ -441,7 +441,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
   var->getAttrs().add(nonisolatedAttr);
 
   // Set the function up as the getter.
-  ImporterImpl.makeComputed(var, func, nullptr);
+  importer::makeComputed(var, func, nullptr);
 
   return var;
 }
@@ -756,7 +756,7 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   // Create the getter for the computed value variable.
   auto computedVarGetter =
       makeStructRawValueGetter(structDecl, computedVar, storedVar);
-  ImporterImpl.makeComputed(computedVar, computedVarGetter, nullptr);
+  importer::makeComputed(computedVar, computedVarGetter, nullptr);
 
   // Create a pattern binding to describe the variable.
   Pattern *computedBindingPattern = createTypedNamedPattern(computedVar);
@@ -957,7 +957,7 @@ SwiftDeclSynthesizer::makeUnionFieldAccessors(
                                  importedFieldDecl);
   setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
   return {getterDecl, setterDecl};
 }
 
@@ -1022,7 +1022,7 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   auto setterDecl = makeFieldSetterDecl(ImporterImpl, importedStructDecl,
                                         importedFieldDecl, cSetterDecl);
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   // Synthesize the getter body
   {
@@ -1191,7 +1191,7 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
       makeFieldSetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
   setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   auto containingField = indirectField->chain().front();
   VarDecl *anonymousFieldDecl = nullptr;
@@ -1365,7 +1365,7 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
 
   getterDecl->copyFormalAccessFrom(enumDecl);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
-  ImporterImpl.makeComputed(rawValueDecl, getterDecl, nullptr);
+  importer::makeComputed(rawValueDecl, getterDecl, nullptr);
 }
 
 // MARK: Struct RawValue getters
@@ -1755,7 +1755,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(subscript, getterDecl, setterDecl);
+  importer::makeComputed(subscript, getterDecl, setterDecl);
 
   // Implicitly unwrap Optional types for T *operator[].
   ImporterImpl.recordImplicitUnwrapForDecl(
@@ -1860,7 +1860,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
+  importer::makeComputed(result, getterDecl, setterDecl);
   return result;
 }
 
@@ -2411,7 +2411,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
+  importer::makeComputed(result, getterDecl, setterDecl);
 
   return result;
 }

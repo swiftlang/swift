@@ -136,10 +136,9 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
   return decl;
 }
 
-void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
-                                                 AccessorDecl *getter,
-                                                 AccessorDecl *setter) {
-  assert(getter);
+void importer::makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                            AccessorDecl *setter) {
+  assert(getter && "computed property must have non-null getter");
   // The synthesized computed property can either use a `get` or an
   // `unsafeAddress` accessor.
   auto isAddress = getter->getAccessorKind() == AccessorKind::Address;
@@ -656,7 +655,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setIsTransparent(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
-  importer.makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
+  importer::makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
 
   getterDecl->setImplicit();
   getterDecl->setAccess(AccessLevel::Public);
@@ -4916,7 +4915,7 @@ namespace {
 
       // FIXME: Fake locations for '{' and '}'?
       propDecl->setIsSetterMutating(false);
-      Impl.makeComputed(propDecl, getter, /*setter=*/nullptr);
+      importer::makeComputed(propDecl, getter, /*setter=*/nullptr);
       addObjCAttribute(propDecl, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(propDecl, inferredObjCPropertyAttrs);
 
@@ -6071,7 +6070,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->setIsSetterMutating(false);
-      Impl.makeComputed(result, getter, setter);
+      importer::makeComputed(result, getter, setter);
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
@@ -7097,7 +7096,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (swiftSetter) property->setIsSetterMutating(swiftSetter->isMutating());
 
   // Make this a computed property.
-  Impl.makeComputed(property, swiftGetter, swiftSetter);
+  importer::makeComputed(property, swiftGetter, swiftSetter);
 
   // Make the property the alternate declaration for the getter.
   Impl.addAlternateDecl(swiftGetter, property);
@@ -7849,7 +7848,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     Impl.importAttributes(setterObjCMethod, setterThunk);
 
   subscript->setIsSetterMutating(false);
-  Impl.makeComputed(subscript, getterThunk, setterThunk);
+  importer::makeComputed(subscript, getterThunk, setterThunk);
 
   Impl.recordImplicitUnwrapForDecl(subscript, isIUO);
 
