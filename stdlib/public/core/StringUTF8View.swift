@@ -345,11 +345,11 @@ extension String.UTF8View {
 #endif
       let count = _guts.count
       if _guts.isSmall {
-        let a = Builtin.addressOfBorrow(self)
-        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
-        let span = unsafe Span(_unsafeStart: address, count: count)
         fatalError("Span over the small string form is not supported yet.")
-        return unsafe _overrideLifetime(span, borrowing: self)
+//        let a = Builtin.addressOfBorrow(self)
+//        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
+//        let span = unsafe Span(_unsafeStart: address, count: count)
+//        return unsafe _overrideLifetime(span, borrowing: self)
       }
       _precondition(_guts.isFastUTF8)
       let buffer = unsafe _guts._object.fastUTF8
