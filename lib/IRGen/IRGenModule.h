@@ -1118,6 +1118,7 @@ public:
   clang::CodeGen::CodeGenModule &getClangCGM() const;
   
   CanType getRuntimeReifiedType(CanType type);
+  Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
   SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
   std::pair<CanType, ProtocolConformanceRef>

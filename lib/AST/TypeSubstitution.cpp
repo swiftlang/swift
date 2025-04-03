@@ -1071,8 +1071,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   return substTy;
 }
 
-CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
-                                                   TypeExpansionContext context) {
+Type swift::substOpaqueTypesWithUnderlyingTypes(Type ty,
+                                                TypeExpansionContext context) {
   if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
       !ty->hasOpaqueArchetype())
     return ty;
@@ -1082,7 +1082,14 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
       context.isWholeModuleContext());
   SubstOptions flags = (SubstFlags::SubstituteOpaqueArchetypes |
                         SubstFlags::PreservePackExpansionLevel);
-  return ty.subst(replacer, replacer, flags)->getCanonicalType();
+  return ty.subst(replacer, replacer, flags);
+}
+
+CanType
+swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
+                                           TypeExpansionContext context) {
+  return substOpaqueTypesWithUnderlyingTypes(static_cast<Type>(ty), context)
+      ->getCanonicalType();
 }
 
 static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
