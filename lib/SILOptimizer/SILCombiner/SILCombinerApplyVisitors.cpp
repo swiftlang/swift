@@ -423,6 +423,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       break;
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method:
       // We cannot predict the offset of fields in resilient types, because it's
       // unknown if a resilient field is a computed or stored property.
       if (component.getExternalDecl())
@@ -802,7 +803,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
     ArchetypeType *archetypeTy;
-    if (SwiftArgType->isOpenedExistential() &&
+    if (isa<ExistentialArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {
       PD = archetypeTy->getConformsTo()[0];
@@ -979,7 +980,7 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
 /// for the argument at \p SkipArgIdx, contain an opened archetype rooted
 /// on \p RootOA.
 static bool applyInvolvesOpenedArchetypeWithRoot(FullApplySite Apply,
-                                                 OpenedArchetypeType *RootOA,
+                                                 ExistentialArchetypeType *RootOA,
                                                  unsigned SkipArgIdx) {
   auto *env = RootOA->getGenericEnvironment();
 
@@ -1116,7 +1117,7 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
                                  const OpenedArchetypeInfo &OAI,
                                  const ConcreteExistentialInfo &CEI,
                                  unsigned ArgIdx) {
-  if (!CEI.ConcreteValue || CEI.ConcreteType->isOpenedExistential() ||
+  if (!CEI.ConcreteValue || isa<ExistentialArchetypeType>(CEI.ConcreteType) ||
       !CEI.ConcreteValue->getType().isAddress())
     return SILValue();
 
@@ -1378,7 +1379,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
 
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
-  if (!WMI->getLookupType()->isOpenedExistential())
+  if (!isa<ExistentialArchetypeType>(WMI->getLookupType()))
     return nullptr;
 
   // Try to derive the concrete type and the related conformance of self and
@@ -1515,7 +1516,7 @@ static bool canBeRemovedIfResultIsNotUsed(SILFunction *f) {
   return false;
 }
 
-SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1661,7 +1662,7 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
   return true;
 }
 
-SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
+SILInstruction *SILCombiner::legacyVisitTryApplyInst(TryApplyInst *AI) {
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))

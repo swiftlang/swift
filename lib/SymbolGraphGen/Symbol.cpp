@@ -37,19 +37,21 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 Symbol::Symbol(SymbolGraph *Graph, const ExtensionDecl *ED,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Symbol::Symbol(Graph, nullptr, ED, SynthesizedBaseTypeDecl, BaseType) {}
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Symbol::Symbol(Graph, VD, nullptr, SynthesizedBaseTypeDecl, BaseType) {}
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD, const ExtensionDecl *ED,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Graph(Graph), D(VD), BaseType(BaseType),
       SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {
-  if (!BaseType && SynthesizedBaseTypeDecl)
-    BaseType = SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+  if (!BaseType && SynthesizedBaseTypeDecl) {
+    if (const auto *NTD = dyn_cast<NominalTypeDecl>(SynthesizedBaseTypeDecl))
+      BaseType = NTD->getDeclaredInterfaceType();
+  }
   if (D == nullptr) {
     D = ED;
   }
@@ -850,7 +852,7 @@ void Symbol::printPath(llvm::raw_ostream &OS) const {
 
 void Symbol::getUSR(SmallVectorImpl<char> &USR) const {
   llvm::raw_svector_ostream OS(USR);
-  ide::printDeclUSR(D, OS);
+  ide::printDeclUSR(D, OS, /*distinguishSynthesizedDecls*/ true);
   if (SynthesizedBaseTypeDecl) {
     OS << "::SYNTHESIZED::";
     ide::printDeclUSR(SynthesizedBaseTypeDecl, OS);

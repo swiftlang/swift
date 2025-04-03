@@ -52,7 +52,7 @@ func testPostfix6() {
 func testPostfix7() {
   1 + 2 * 3.0#^POSTFIX_7^#
 }
-// POSTFIX_7: Decl[PostfixOperatorFunction]/CurrModule/TypeRelation[Convertible]:  ***[#Double#]
+// POSTFIX_7: Decl[PostfixOperatorFunction]/CurrModule:  ***[#Double#]
 
 func testPostfix8(x: S) {
   x#^POSTFIX_8^#
@@ -212,8 +212,8 @@ func testInfix15<T: P where T.T == S2>() {
 // INFIX_15-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(:)
 // INFIX_15-DAG: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
 // INFIX_15-DAG: Keyword/CurrNominal:                .Type[#T.Type#]; name=Type
-// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#(any Any.Type)?#}[#Bool#];
-// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#(any Any.Type)?#}[#Bool#];
+// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
+// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
 
 func testInfix16<T: P where T.T == S2>() {
   T.foo#^INFIX_16^#

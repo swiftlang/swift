@@ -41,6 +41,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/CommandLine.h"
+#include <memory>
 #include <optional>
 #include <system_error>
 
@@ -343,7 +344,7 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
   llvm_unreachable("bad status");
 }
 
-llvm::ErrorOr<llvm::StringSet<>>
+llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
     StringRef SDKName, StringRef packageName, llvm::vfs::FileSystem *fileSystem,
@@ -352,7 +353,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   if (!moduleBuf)
     return moduleBuf.getError();
 
-  llvm::StringSet<> importedModuleNames;
+  std::vector<ScannerImportStatementInfo> importedModuleNames;
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
@@ -375,7 +376,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    importedModuleNames.insert(moduleName);
+    importedModuleNames.push_back({moduleName.str(), dependency.isExported()});
   }
 
   return importedModuleNames;
@@ -481,6 +482,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
     ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
     bool isTestableImport) {
   llvm::StringSet<> importedModuleNames;
+  llvm::StringSet<> importedExportedModuleNames;
   std::string importedHeader = "";
   for (const auto &dependency : loadedModuleFile.getDependencies()) {
     if (dependency.isHeader()) {
@@ -515,9 +517,12 @@ SerializedModuleLoaderBase::getImportsOfModule(
       moduleName = "std";
 
     importedModuleNames.insert(moduleName);
+    if (dependency.isExported())
+      importedExportedModuleNames.insert(moduleName);
   }
 
   return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames,
+                                                         importedExportedModuleNames,
                                                          importedHeader};
 }
 
@@ -602,17 +607,23 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
   auto importedModuleSet = binaryModuleImports->moduleImports;
   std::vector<ScannerImportStatementInfo> moduleImports;
   moduleImports.reserve(importedModuleSet.size());
-  llvm::transform(
-      importedModuleSet.keys(), std::back_inserter(moduleImports),
-      [](llvm::StringRef N) { return ScannerImportStatementInfo(N.str()); });
+  llvm::transform(importedModuleSet.keys(), std::back_inserter(moduleImports),
+                  [&binaryModuleImports](llvm::StringRef N) {
+                    return ScannerImportStatementInfo(
+                        N.str(),
+                        binaryModuleImports->exportedModules.contains(N));
+                  });
 
   auto importedHeader = binaryModuleImports->headerImport;
   auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
+  auto &importedExportedOptionalModuleSet =
+      binaryModuleOptionalImports->exportedModules;
   std::vector<ScannerImportStatementInfo> optionalModuleImports;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
       optionalModuleImports.push_back(
-          ScannerImportStatementInfo(optionalImportedModule.str()));
+          {optionalImportedModule.str(),
+           importedExportedOptionalModuleSet.contains(optionalImportedModule)});
 
   std::vector<LinkLibrary> linkLibraries;
   {
@@ -620,8 +631,9 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
     llvm::copy(loadedModuleFile->getLinkLibraries(),
                std::back_inserter(linkLibraries));
     if (loadedModuleFile->isFramework())
-      linkLibraries.push_back(LinkLibrary(loadedModuleFile->getName(),
-                                          LibraryKind::Framework));
+      linkLibraries.emplace_back(
+          loadedModuleFile->getName(), LibraryKind::Framework,
+                      loadedModuleFile->isStaticLibrary());
   }
 
   // Attempt to resolve the module's defining .swiftinterface path
@@ -1088,6 +1100,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
+    if (loadedModuleFile->supportsExtensibleEnums())
+      M.setSupportsExtensibleEnums();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     M.setSwiftInterfaceCompilerVersion(
         loadedModuleFile->getSwiftInterfaceCompilerVersion());
@@ -1244,7 +1258,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleBufferID);
     break;
   case serialization::Status::NotInOSSA:
-    if (Ctx.SerializationOpts.ExplicitModuleBuild) {
+    if (Ctx.SerializationOpts.ExplicitModuleBuild ||
+        Ctx.SILOpts.EnableOSSAModules) {
       Ctx.Diags.diagnose(diagLoc,
                          diag::serialization_non_ossa_module_incompatible,
                          ModuleName);
@@ -1556,6 +1571,21 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   return result;
 }
 
+std::string swift::extractEmbeddedBridgingHeaderContent(
+    std::unique_ptr<llvm::MemoryBuffer> file, ASTContext &Context) {
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      "", "", std::move(file), nullptr, nullptr, false,
+      Context.SILOpts.EnableOSSAModules, Context.LangOpts.SDKName,
+      Context.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFile);
+
+  if (loadInfo.status != serialization::Status::Valid)
+    return {};
+
+  return loadedModuleFile->getEmbeddedHeader();
+}
+
 bool SerializedModuleLoaderBase::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
     bool isTestableDependencyLookup) {
@@ -1758,10 +1788,11 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     Ctx.removeLoadedModule(moduleID.Item);
     return nullptr;
   }
-  // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
-  // from .swift_ast sections are never produced from textual interfaces. By
-  // disabling resilience the debugger can directly access private members.
-  if (BypassResilience)
+  // The MemoryBuffer loader is used by LLDB during debugging. Modules
+  // imported from .swift_ast sections are not typically produced from
+  // textual interfaces. By disabling resilience, the debugger can
+  // directly access private members.
+  if (BypassResilience && !M->isBuiltFromInterface())
     M->setBypassResilience();
 
   return M;

@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
+  AsyncCallerExecutionMigration.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
@@ -13,7 +14,6 @@ add_swift_host_library(swiftSema STATIC
   CSStep.cpp
   CSTrail.cpp
   CSFix.cpp
-  CSOptimizer.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
   CodeSynthesisDistributedActor.cpp
@@ -50,6 +50,7 @@ add_swift_host_library(swiftSema STATIC
   TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
+  TypeCheckAttrABI.cpp
   TypeCheckAvailability.cpp
   TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp

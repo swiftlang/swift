@@ -19,59 +19,85 @@
 
 #include "swift/AST/AvailabilityContext.h"
 #include "llvm/ADT/FoldingSet.h"
-#include <optional>
+#include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
-/// Summarizes availability the constraints contained by an AvailabilityContext.
-class AvailabilityContext::Info {
+class DeclAvailabilityConstraints;
+
+/// A wrapper for storing an `AvailabilityDomain` and its associated information
+/// in `AvailabilityContext::Storage`.
+class AvailabilityContext::DomainInfo final {
+  AvailabilityDomain domain;
+  AvailabilityRange range;
+
 public:
-  /// The introduction version.
-  AvailabilityRange Range;
+  DomainInfo(AvailabilityDomain domain, const AvailabilityRange &range)
+      : domain(domain), range(range) {};
 
-  /// The broadest unavailable domain.
-  std::optional<AvailabilityDomain> UnavailableDomain;
+  static DomainInfo unavailable(AvailabilityDomain domain) {
+    return DomainInfo(domain, AvailabilityRange::neverAvailable());
+  }
 
-  /// Whether or not the context is considered deprecated on the current
-  /// platform.
-  unsigned IsDeprecated : 1;
+  AvailabilityDomain getDomain() const { return domain; }
+  AvailabilityRange getRange() const { return range; }
+  bool isUnavailable() const { return range.isKnownUnreachable(); }
 
-  /// Sets each field to the value of the corresponding field in `other` if the
-  /// other is more restrictive. Returns true if any field changed as a result
-  /// of adding this constraint.
-  bool constrainWith(const Info &other);
-
-  /// Updates each field to reflect the availability of `decl`, if that
-  /// availability is more restrictive. Returns true if any field was updated.
-  bool constrainWith(const Decl *decl);
-
-  bool constrainUnavailability(std::optional<AvailabilityDomain> domain);
-
-  /// Returns true if `other` is as available or is more available.
-  bool isContainedIn(const Info &other) const;
+  bool constrainRange(const AvailabilityRange &range);
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    Range.getRawVersionRange().Profile(ID);
-    if (UnavailableDomain) {
-      UnavailableDomain->Profile(ID);
-    } else {
-      ID.AddPointer(nullptr);
-    }
-    ID.AddBoolean(IsDeprecated);
+    ID.AddPointer(domain.getOpaqueValue());
+    range.getRawVersionRange().Profile(ID);
   }
 };
 
 /// As an implementation detail, the values that make up an `Availability`
 /// context are uniqued and stored as folding set nodes.
-class AvailabilityContext::Storage final : public llvm::FoldingSetNode {
-  Storage(const Info &info) : info(info){};
+class AvailabilityContext::Storage final
+    : public llvm::FoldingSetNode,
+      public llvm::TrailingObjects<Storage, DomainInfo> {
+  friend TrailingObjects;
+
+  Storage(const AvailabilityRange &platformRange, bool isDeprecated,
+          unsigned domainInfoCount)
+      : platformRange(platformRange), isDeprecated(isDeprecated),
+        domainInfoCount(domainInfoCount) {};
 
 public:
-  Info info;
+  /// The introduction version for the current platform.
+  const AvailabilityRange platformRange;
 
-  static const Storage *get(const Info &info, ASTContext &ctx);
+  /// Whether or not the context is considered deprecated on the current
+  /// platform.
+  const unsigned isDeprecated : 1;
 
-  void Profile(llvm::FoldingSetNodeID &ID) const { info.Profile(ID); }
+  /// The number of `DomainInfo` objects in trailing storage.
+  const unsigned domainInfoCount;
+
+  /// Retrieves the unique storage instance from the `ASTContext` for the given
+  /// parameters.
+  static const Storage *get(const AvailabilityRange &platformRange,
+                            bool isDeprecated,
+                            llvm::ArrayRef<DomainInfo> domainInfos,
+                            const ASTContext &ctx);
+
+  llvm::ArrayRef<DomainInfo> getDomainInfos() const {
+    return llvm::ArrayRef(getTrailingObjects<DomainInfo>(), domainInfoCount);
+  }
+
+  llvm::SmallVector<DomainInfo, 4> copyDomainInfos() const {
+    return llvm::SmallVector<DomainInfo, 4>{getDomainInfos()};
+  }
+
+  /// Uniquing for `ASTContext`.
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      const AvailabilityRange &platformRange, bool isDeprecated,
+                      llvm::ArrayRef<DomainInfo> domainInfos);
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, platformRange, static_cast<bool>(isDeprecated),
+            getDomainInfos());
+  }
 };
 
 } // end namespace swift

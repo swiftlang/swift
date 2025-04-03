@@ -39,6 +39,12 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     return true
   }
 
+  // We cannot de-virtualize C++ destructor calls of C++ move-only types because we cannot get
+  // its destructor (`nominal.valueTypeDestructor` is nil).
+  if nominal.hasClangNode {
+    return false
+  }
+
   if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
     guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
@@ -116,7 +122,7 @@ extension DestroyValueInst : DevirtualizableDestroy {
     let builder = Builder(before: self, context)
     let subs = context.getContextSubstitutionMap(for: type)
     let deinitRef = builder.createFunctionRef(deinitializer)
-    if deinitializer.argumentConventions[deinitializer.selfArgumentIndex].isIndirect {
+    if deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let allocStack = builder.createAllocStack(type)
       builder.createStore(source: destroyedValue, destination: allocStack, ownership: .initialize)
       builder.createApply(function: deinitRef, subs, arguments: [allocStack])
@@ -188,7 +194,7 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     let builder = Builder(before: self, context)
     let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
     let deinitRef = builder.createFunctionRef(deinitializer)
-    if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex].isIndirect {
+    if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
       builder.createApply(function: deinitRef, subs, arguments: [value])
     } else {

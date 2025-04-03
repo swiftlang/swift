@@ -1,7 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// The feature flag should be enabled.
+#if !hasFeature(StrictMemorySafety)
+#error("Strict memory safety is not enabled!")
+#endif
+
 
 @unsafe
 func unsafeFunction() { }
@@ -17,10 +20,7 @@ func g() {
   unsafe unsafeFunction()
 }
 
-// expected-warning@+3{{global function 'h' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
-func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType'}}
+func h(_: UnsafeType) {
 // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   unsafeFunction() // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
 
@@ -31,16 +31,10 @@ func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType
   unsafe g()
 }
 
-// expected-warning@+3 {{global function 'rethrowing' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
+func rethrowing(body: (UnsafeType) throws -> Void) rethrows { }
 
 class HasStatics {
-  // expected-warning@+3{{static method 'f' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{3-3=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{3-3=@safe }}
-  static internal func f(_: UnsafeType) { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
+  static internal func f(_: UnsafeType) { }
 
   
 }
@@ -87,8 +81,9 @@ func returnsExistentialP() -> any P {
   // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
-struct UnsafeAsSequence: @unsafe Sequence, IteratorProtocol {
-  mutating func next() -> Int? { nil }
+// FIXME: Should work even if the IteratorProtocol conformance is safe
+struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
+  @unsafe mutating func next() -> Int? { nil }
 }
 
 func testUnsafeAsSequenceForEach() {
@@ -96,8 +91,35 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
-  for _ in unsafe uas { } // okay
+  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
+
+  for unsafe _ in unsafe uas { } // okay
+}
+
+func testForInUnsafeAmbiguity(_ integers: [Int]) {
+  for unsafe in integers {
+    _ = unsafe
+  }
+  for unsafe: Int in integers {
+    _ = unsafe
+  }
+}
+
+struct UnsafeIterator: @unsafe IteratorProtocol {
+  @unsafe mutating func next() -> Int? { nil }
+}
+
+struct SequenceWithUnsafeIterator: Sequence {
+  func makeIterator() -> UnsafeIterator { UnsafeIterator() }
+}
+
+func testUnsafeIteratorForEach() {
+  let swui = SequenceWithUnsafeIterator()
+
+  for _ in swui { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  for unsafe _ in swui { } // okay, it's only the iterator that's unsafe
 }
 
 class MyRange {
@@ -140,7 +162,7 @@ func testKeyPath() {
 func takesAutoclosure<T>(_ body: @autoclosure () -> T) { }
 
 func testAutoclosure() {
-  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{20-20=unsafe }}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
   takesAutoclosure(unsafeFunction()) // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
 
   unsafe takesAutoclosure(unsafeFunction())
@@ -153,6 +175,49 @@ func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
 }
 
+enum Color {
+case red
+}
+
+func acceptBools(_: Bool, _: Bool) { }
+
+func acceptBoolsUnsafeLabel(unsafe _: Bool, _: Bool) { }
+
+func unsafe(_: Int) { }
+
+func unsafeFun() {
+  var unsafe = true
+  unsafe = false
+  unsafe.toggle()
+  _ = [unsafe]
+  _ = { unsafe }
+  acceptBools(unsafe, unsafe)
+  acceptBoolsUnsafeLabel(unsafe: unsafe, unsafe)
+
+  let color: Color
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}{{11-18=}}
+  color = unsafe .red
+  _ = color
+
+  if unsafe { }
+}
+
+func moreUnsafeFunc(unsafe: [Int]) {
+  let _: [Int] = unsafe []
+  // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+
+  _ = unsafe[1]
+
+  _ = "\(unsafe)"
+}
+
+func yetMoreUnsafeFunc(unsafe: () -> Void) {
+  unsafe()
+
+  _ = unsafe ()
+  // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+}
+
 // @safe suppresses unsafe-type-related diagnostics on an entity
 struct MyArray<Element> {
   @safe func withUnsafeBufferPointer<R, E>(
@@ -163,7 +228,8 @@ struct MyArray<Element> {
 }
 
 extension UnsafeBufferPointer {
-  @safe var safeCount: Int { unsafe count }
+  @unsafe var unsafeCount: Int { 17 }
+  @safe var safeCount: Int { unsafe unsafeCount }
 }
 
 func testMyArray(ints: MyArray<Int>) {
@@ -171,8 +237,37 @@ func testMyArray(ints: MyArray<Int>) {
     let bufferCopy = unsafe buffer
     _ = unsafe bufferCopy
 
-    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-    print(buffer.safeCount) // expected-note{{reference to parameter 'buffer' involves unsafe type 'UnsafeBufferPointer<Int>'}}
-    unsafe print(buffer.baseAddress!)
+    print(buffer.safeCount)
+    unsafe print(buffer.unsafeCount)
   }
 }
+
+func testUnsafeLHS() {
+  @unsafe var value: Int = 0
+  unsafe value = switch unsafe value {
+  case 0: 1
+  default: 0
+  }
+}
+
+@safe
+struct UnsafeWrapTest {
+  var pointer: UnsafeMutablePointer<Int>?
+
+  func test() {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to property 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>'}}
+      _ = unsafe pointer
+    }
+  }
+
+  func otherTest(pointer: UnsafeMutablePointer<Int>?) {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>}}
+      _ = unsafe pointer
+    }
+  }
+}
+
+@safe @unsafe
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}

@@ -163,14 +163,6 @@ BridgedFunction BridgedTestArguments::takeFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                SILType
-//===----------------------------------------------------------------------===//
-
-static_assert((int)BridgedType::MetatypeRepresentation::Thin == (int)swift::MetatypeRepresentation::Thin);
-static_assert((int)BridgedType::MetatypeRepresentation::Thick == (int)swift::MetatypeRepresentation::Thick);
-static_assert((int)BridgedType::MetatypeRepresentation::ObjC == (int)swift::MetatypeRepresentation::ObjC);
-
-//===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
@@ -335,6 +327,13 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
 bool BridgedGlobalVar::mustBeInitializedStatically() const {
   SILGlobalVariable *global = getGlobal();
   return global->mustBeInitializedStatically();
+}
+
+bool BridgedGlobalVar::isConstValue() const {
+  SILGlobalVariable *global = getGlobal();
+  if (const auto &decl = global->getDecl())
+    return decl->isConstValue();
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

@@ -1,7 +1,9 @@
 add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   ASTGen.swift
   ASTGen+CompilerBuildConfiguration.swift
+  Availability.swift
   Bridge.swift
+  BuiltinPound.swift
   CompilerBuildConfiguration.swift
   DeclAttrs.swift
   Decls.swift

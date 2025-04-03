@@ -35,7 +35,7 @@ extension ASTGenVisitor {
     case .borrowExpr(let node):
       return self.generate(borrowExpr: node).asExpr
     case .closureExpr(let node):
-      return self.generate(closureExpr: node).asExpr
+      return self.generate(closureExpr: node)
     case .consumeExpr(let node):
       return self.generate(consumeExpr: node).asExpr
     case .copyExpr(let node):
@@ -71,11 +71,11 @@ extension ASTGenVisitor {
     case .keyPathExpr(let node):
       return self.generate(keyPathExpr: node)
     case .macroExpansionExpr(let node):
-      return self.generate(macroExpansionExpr: node).asExpr
+      return self.generate(macroExpansionExpr: node)
     case .memberAccessExpr(let node):
       return self.generate(memberAccessExpr: node)
-    case .missingExpr:
-      fatalError("unimplemented")
+    case .missingExpr(let node):
+      return self.generate(missingExpr: node)
     case .nilLiteralExpr(let node):
       return self.generate(nilLiteralExpr: node).asExpr
     case .optionalChainingExpr(let node):
@@ -91,7 +91,7 @@ extension ASTGenVisitor {
     case .postfixOperatorExpr(let node):
       return self.generate(postfixOperatorExpr: node).asExpr
     case .prefixOperatorExpr(let node):
-      return self.generate(prefixOperatorExpr: node).asExpr
+      return self.generate(prefixOperatorExpr: node)
     case .regexLiteralExpr(let node):
       return self.generate(regexLiteralExpr: node).asExpr
     case .sequenceExpr(let node):
@@ -219,7 +219,7 @@ extension ASTGenVisitor {
   }
 
   func generate(binaryOperatorExpr node: BinaryOperatorExprSyntax) -> BridgedUnresolvedDeclRefExpr {
-    return createOperatorRefExpr(token: node.operator, kind: .binaryOperator)
+    return createUnresolvedDeclRefExpr(token: node.operator, kind: .binaryOperator)
   }
 
   func generate(closureSignature node: ClosureSignatureSyntax) -> GeneratedClosureSignature {
@@ -233,7 +233,7 @@ extension ASTGenVisitor {
     if let node = node.capture {
       result.bracketRange = self.generateSourceRange(node)
       let captures = node.items.lazy.map { node in
-        self.generate(closureCapture: node)
+        self.generate(closureCapture: node, capturedSelfDecl: &result.capturedSelfDecl)
       }
       result.captureList = captures.bridgedArray(in: self)
     }
@@ -244,12 +244,7 @@ extension ASTGenVisitor {
     case .simpleInput(let node):
       result.params = self.generate(closureShorthandParameterList: node)
     case nil:
-      result.params = .createParsed(
-        self.ctx,
-        leftParenLoc: nil,
-        parameters: BridgedArrayRef(),
-        rightParenLoc: nil
-      )
+      result.params = nil
     }
 
     if let effects = node.effectSpecifiers {
@@ -268,8 +263,56 @@ extension ASTGenVisitor {
     return result
   }
 
-  func generate(closureCapture node: ClosureCaptureSyntax) {
-    fatalError("unimplemented")
+  func generate(closureCapture node: ClosureCaptureSyntax, capturedSelfDecl: inout BridgedVarDecl?) -> BridgedCaptureListEntry {
+    let ownership: BridgedReferenceOwnership
+    switch node.specifier?.specifier.rawText {
+    case nil:
+      ownership = .strong
+    case "weak":
+      ownership = .weak
+    case "unowned":
+      switch node.specifier?.detail?.rawText {
+      case nil, "safe":
+        ownership = .unowned
+      case "unsafe":
+        ownership = .unmanaged
+      default:
+        // TODO: Diagnose.
+        fatalError("invalid ownership")
+      }
+    default:
+      // TODO: Diagnose.
+      fatalError("invalid ownership")
+    }
+    let nameAndLoc = self.generateIdentifierAndSourceLoc(node.name)
+    let equalLoc: BridgedSourceLoc
+    let initExpr: BridgedExpr
+    if let initializer = node.initializer {
+      equalLoc = self.generateSourceLoc(initializer.equal)
+      initExpr = self.generate(expr: initializer.value)
+    } else {
+      // Otherwise, create an 'UnresolvedDeclRefExpr' with the name
+      equalLoc = nil
+      initExpr = self.createUnresolvedDeclRefExpr(token: node.name, kind: .ordinary).asExpr
+    }
+
+    let entry = BridgedCaptureListEntry.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      ownership: ownership,
+      ownershipRange: self.generateSourceRange(node.specifier),
+      name: nameAndLoc.identifier,
+      nameLoc: nameAndLoc.sourceLoc,
+      equalLoc: equalLoc,
+      initializer: initExpr
+    )
+
+    // If we captured something under the name "self", remember that.
+    if nameAndLoc.identifier == ctx.id_self {
+      capturedSelfDecl = entry.varDecl
+    }
+
+    return entry
   }
 
   struct GeneratedClosureSignature {
@@ -286,7 +329,7 @@ extension ASTGenVisitor {
     var inLoc: BridgedSourceLoc = nil
   }
 
-  func generate(closureExpr node: ClosureExprSyntax) -> BridgedClosureExpr {
+  func generate(closureExpr node: ClosureExprSyntax) -> BridgedExpr {
     let signature: GeneratedClosureSignature
     if let node = node.signature {
       signature = self.generate(closureSignature: node)
@@ -299,7 +342,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       attributes: signature.attributes,
       bracketRange: signature.bracketRange,
-      capturedSelfDecl: BridgedNullableVarDecl(raw: signature.capturedSelfDecl?.raw),
+      capturedSelfDecl: signature.capturedSelfDecl.asNullable,
       parameterList: signature.params.asNullable,
       asyncLoc: signature.asyncLoc,
       throwsLoc: signature.throwsLoc,
@@ -309,35 +352,58 @@ extension ASTGenVisitor {
       inLoc: signature.inLoc
     )
 
+    if signature.params == nil {
+      let loc = self.generateSourceLoc(node.leftBrace)
+      var params: [BridgedParamDecl] = []
+      if let anonymousParamMaxIndex = findMaxAnonymousClosureParamUsage(closureExpr: node) {
+        for idx in 0...anonymousParamMaxIndex {
+          let param = BridgedParamDecl.createParsed(
+            self.ctx,
+            declContext: expr.asDeclContext,
+            specifierLoc: nil,
+            argName: nil,
+            argNameLoc: nil,
+            paramName: ctx.getDollarIdentifier(idx),
+            paramNameLoc: loc,
+            defaultValue: nil,
+            defaultValueInitContext: nil
+          )
+          param.setSpecifier(.default)
+          param.setImplicit()
+          params.append(param)
+        }
+      }
+
+      let paramList = BridgedParameterList.createParsed(
+        self.ctx,
+        leftParenLoc: loc,
+        parameters: params.lazy.bridgedArray(in: self),
+        rightParenLoc: loc
+      )
+      expr.setParameterList(paramList)
+      expr.setHasAnonymousClosureVars()
+    }
+
     let body = self.withDeclContext(expr.asDeclContext) {
       BridgedBraceStmt.createParsed(
         self.ctx,
         lBraceLoc: self.generateSourceLoc(node.leftBrace),
-        elements: self.generate(codeBlockItemList: node.statements),
+        elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
         rBraceLoc: self.generateSourceLoc(node.rightBrace)
       )
-    }
-
-    if signature.params == nil {
-      // TODO: Handle doller identifiers inside the closure.
-      let loc = self.generateSourceLoc(node.leftBrace)
-      let params = BridgedParameterList.createParsed(
-        self.ctx,
-        leftParenLoc: loc,
-        parameters: .init(),
-        rightParenLoc: loc
-      )
-      expr.setParameterList(params)
-      expr.setHasAnonymousClosureVars()
     }
 
     expr.setBody(body)
 
     if signature.captureList.count > 0 {
-      // TODO: CaptureListExpr.
+      return BridgedCaptureListExpr.createParsed(
+        self.ctx,
+        captureList: signature.captureList,
+        closure: expr
+      ).asExpr
     }
 
-    return expr
+    return expr.asExpr
   }
 
   func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
@@ -395,7 +461,7 @@ extension ASTGenVisitor {
       let bridgedTrailingClosureArg = BridgedCallArgument(
         labelLoc: nil,
         label: nil,
-        argExpr: self.generate(closureExpr: trailingClosure).asExpr
+        argExpr: self.generate(closureExpr: trailingClosure)
       )
       let normalArgsAndClosure = ConcatCollection(normalArgs, CollectionOfOne(bridgedTrailingClosureArg))
       guard let additionalTrailingClosures else {
@@ -407,7 +473,7 @@ extension ASTGenVisitor {
         return BridgedCallArgument(
           labelLoc: self.generateSourceLoc(argNode.label),
           label: self.generateIdentifier(argNode.label),
-          argExpr: self.generate(closureExpr: argNode.closure).asExpr
+          argExpr: self.generate(closureExpr: argNode.closure)
         )
       }
       let allArgs = ConcatCollection(normalArgsAndClosure, additions)
@@ -539,13 +605,54 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateDollarIdentifierExpr(token: TokenSyntax) -> BridgedExpr {
+    let loc = self.generateSourceLoc(token)
+
+    guard self.declContext.isClosureExpr else {
+      // TODO: Diagnose dollar identifier not in ClosureExpr
+      fatalError("dollar identifier not in ClosureExpr")
+    }
+
+    guard let idx = parseDollarIdentifierIndex(text: token.rawText) else {
+      // TODO: Diagnose.
+      fatalError("(compiler bug) malformed dollar identifier token")
+    }
+
+    let closure = self.declContext.castToClosureExpr()
+    let params = closure.getParameterList()
+
+    if !closure.hasAnonymousClosureVars {
+      // TODO: Diagnose and fix it to the named parameter.
+      // Fall through, bind to the parameter even though the name doesn't match.
+    }
+
+    guard idx < params.size else {
+      // TODO: Diagnose out of range (but should be unreachable)
+      fatalError("(compiler bug) out-of-bound dollar identifier number")
+    }
+
+    let param = params.get(idx)
+
+    return BridgedDeclRefExpr.create(
+      self.ctx,
+      decl: param.asDecl,
+      loc: .createParsed(loc),
+      isImplicit: false
+    ).asExpr
+  }
+
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedExpr {
     if node.baseName.isEditorPlaceholder {
+      if node.argumentNames != nil {
+        // TODO: Diagnose.
+      }
       return generateEditorPlaceholderExpr(token: node.baseName).asExpr
     }
     if node.baseName.rawTokenKind == .dollarIdentifier {
-      // TODO: Handle dollar identifier in closure decl context.
-      // It's done in C++ Parser because it needs to handle inactive #if regions.
+      if node.argumentNames != nil {
+        // TODO: Diagnose.
+      }
+      return generateDollarIdentifierExpr(token: node.baseName)
     }
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return BridgedUnresolvedDeclRefExpr.createParsed(
@@ -628,6 +735,29 @@ extension ASTGenVisitor {
           trailingClosure: nil,
           additionalTrailingClosures: nil
         )
+      ).asExpr
+      
+    case .method(let method):
+      let dotLoc = self.generateSourceLoc(node.period)
+      let declNameRef = self.generateDeclNameRef(declReferenceExpr: method.declName)
+      let unresolvedDotExpr = BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: baseExpr,
+          dotLoc: dotLoc,
+          name: declNameRef.name,
+          nameLoc: declNameRef.loc
+      ).asExpr
+
+      let args = self.generateArgumentList(
+          leftParen: method.leftParen,
+          labeledExprList: method.arguments,
+          rightParen: method.rightParen,
+          trailingClosure: nil,
+          additionalTrailingClosures: nil)
+      return BridgedCallExpr.createParsed(
+          self.ctx,
+          fn: unresolvedDotExpr,
+          args: args
       ).asExpr
     }
   }
@@ -737,9 +867,30 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionExpr {
+  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedExpr {
+    switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+    case .generated(let astNode):
+      guard let astNode else {
+        return BridgedErrorExpr.create(
+          self.ctx,
+          loc: self.generateSourceRange(node)
+        ).asExpr
+      }
+      switch astNode.kind {
+      case .expr:
+        return astNode.castToExpr()
+      case .stmt, .decl:
+        // TODO: Diagnose
+        fatalError("builtin pound directive in expression position")
+        // return BridgedErrorExpr.create(...)
+      }
+    case .ignored:
+      // Fallback to MacroExpansionExpr.
+      break
+    }
+
     let info = self.generate(freestandingMacroExpansion: node)
-    return .createParsed(
+    return BridgedMacroExpansionExpr.createParsed(
       self.declContext,
       poundLoc: info.poundLoc,
       macroNameRef: info.macroNameRef,
@@ -748,7 +899,7 @@ extension ASTGenVisitor {
       genericArgs: info.genericArgs,
       rightAngleLoc: info.rightAngleLoc,
       args: info.arguments
-    )
+    ).asExpr
   }
 
   func generate(memberAccessExpr node: MemberAccessExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedExpr {
@@ -798,6 +949,14 @@ extension ASTGenVisitor {
         nameLoc: nameAndLoc.loc
       ).asExpr
     }
+  }
+
+  func generate(missingExpr node: MissingExprSyntax) -> BridgedExpr {
+    let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
+    return BridgedErrorExpr.create(
+      self.ctx,
+      loc: BridgedSourceRange(start: loc, end: loc)
+    ).asExpr
   }
 
   func generate(genericSpecializationExpr node: GenericSpecializationExprSyntax) -> BridgedUnresolvedSpecializeExpr {
@@ -904,7 +1063,7 @@ extension ASTGenVisitor {
     let operand = self.generate(expr: node.expression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
     return .createParsed(
       self.ctx,
-      operator: self.createOperatorRefExpr(
+      operator: self.createUnresolvedDeclRefExpr(
         token: node.operator,
         kind: .postfixOperator
       ).asExpr,
@@ -912,15 +1071,27 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(prefixOperatorExpr node: PrefixOperatorExprSyntax) -> BridgedPrefixUnaryExpr {
-    return .createParsed(
+  func generate(prefixOperatorExpr node: PrefixOperatorExprSyntax) -> BridgedExpr {
+    if node.operator.rawText == "-" {
+      if let subNode = node.expression.as(IntegerLiteralExprSyntax.self) {
+        let literal = self.generate(integerLiteralExpr: subNode)
+        literal.setNegative(loc: self.generateSourceLoc(node.operator))
+        return literal.asExpr
+      }
+      if let subNode = node.expression.as(FloatLiteralExprSyntax.self) {
+        let literal = self.generate(floatLiteralExpr: subNode)
+        literal.setNegative(loc: self.generateSourceLoc(node.operator))
+        return literal.asExpr
+      }
+    }
+    return BridgedPrefixUnaryExpr.createParsed(
       self.ctx,
-      operator: self.createOperatorRefExpr(
+      operator: self.createUnresolvedDeclRefExpr(
         token: node.operator,
         kind: .prefixOperator
       ).asExpr,
       operand: self.generate(expr: node.expression)
-    )
+    ).asExpr
   }
 
   func generate(regexLiteralExpr node: RegexLiteralExprSyntax) -> BridgedRegexLiteralExpr {
@@ -955,6 +1126,18 @@ extension ASTGenVisitor {
     var elements: [BridgedExpr] = []
     elements.reserveCapacity(node.elements.count)
 
+    // If the left-most sequence expr is a 'try', hoist it up to turn
+    // '(try x) + y' into 'try (x + y)'. This is necessary to do in the
+    // ASTGen because 'try' nodes are represented in the ASTScope tree
+    // to look up catch nodes. The scope tree must be syntactic because
+    // it's constructed before sequence folding happens during preCheckExpr.
+    // Otherwise, catch node lookup would find the incorrect catch node for
+    // 'try x + y' at the source location for 'y'.
+    //
+    // 'try' has restrictions for where it can appear within a sequence
+    // expr. This is still diagnosed in TypeChecker::foldSequence.
+    let firstTryExprSyntax = node.elements.first?.as(TryExprSyntax.self)
+
     var iter = node.elements.makeIterator()
     while let node = iter.next() {
       switch node.as(ExprSyntaxEnum.self) {
@@ -981,15 +1164,24 @@ extension ASTGenVisitor {
       case .unresolvedTernaryExpr(let node):
         elements.append(self.generate(unresolvedTernaryExpr: node).asExpr)
       default:
-        // Operand.
-        elements.append(self.generate(expr: node))
+        if let firstTryExprSyntax, node.id == firstTryExprSyntax.id {
+          elements.append(self.generate(expr: firstTryExprSyntax.expression))
+        } else {
+          elements.append(self.generate(expr: node))
+        }
       }
     }
 
-    return BridgedSequenceExpr.createParsed(
+    let seqExpr = BridgedSequenceExpr.createParsed(
       self.ctx,
       exprs: elements.lazy.bridgedArray(in: self)
     ).asExpr
+
+    if let firstTryExprSyntax {
+      return self.generate(tryExpr: firstTryExprSyntax, overridingSubExpr: seqExpr)
+    } else {
+      return seqExpr
+    }
   }
 
   func generate(subscriptCallExpr node: SubscriptCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedSubscriptExpr {
@@ -1021,9 +1213,9 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {
+  func generate(tryExpr node: TryExprSyntax, overridingSubExpr: BridgedExpr? = nil) -> BridgedExpr {
     let tryLoc = self.generateSourceLoc(node.tryKeyword)
-    let subExpr = self.generate(expr: node.expression)
+    let subExpr = overridingSubExpr ?? self.generate(expr: node.expression)
 
     switch node.questionOrExclamationMark {
     case nil:
@@ -1154,7 +1346,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  fileprivate func createOperatorRefExpr(
+  fileprivate func createUnresolvedDeclRefExpr(
     token node: TokenSyntax,
     kind: BridgedDeclRefKind
   ) -> BridgedUnresolvedDeclRefExpr {
@@ -1168,3 +1360,128 @@ extension ASTGenVisitor {
     );
   }
 }
+
+private func parseDollarIdentifierIndex(text: SyntaxText) -> Int? {
+  precondition(text.first == UInt8(ascii: "$"))
+  var result = 0
+  for c in text.dropFirst() {
+    switch c {
+    case UInt8(ascii: "0")...UInt8(ascii: "9"):
+      let digit = Int(c &- UInt8(ascii: "0"))
+      result = result * 10 + digit
+    default:
+      return nil
+    }
+  }
+  return result
+}
+
+func findMaxAnonymousClosureParamUsage(closureExpr node: ClosureExprSyntax) -> Int? {
+  let visitor = ClosureAnonymousParameterFinder()
+  visitor.walk(node.statements)
+  return visitor.maxIndex
+
+  class ClosureAnonymousParameterFinder: SyntaxVisitor {
+    var maxIndex: Int? = nil
+
+    init() {
+      super.init(viewMode: .sourceAccurate)
+    }
+
+    override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+      if
+        node.baseName.rawTokenKind == .dollarIdentifier,
+        let idx = parseDollarIdentifierIndex(text: node.baseName.rawText)
+      {
+        self.maxIndex = max(self.maxIndex ?? 0, idx)
+      }
+      return .skipChildren
+    }
+
+    // Nodes that change the decl context.
+
+    override func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: SubscriptDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: DeinitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: MacroDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: EnumCaseDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+
+    // Nodes that never contain expressions, but can have many descendant nodes.
+
+    override func visit(_ node: ArrayTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: AttributedTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: CompositionTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: DictionaryTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: FunctionTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: MemberTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: TupleTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: PrecedenceGroupDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: PoundSourceLocationSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+  }
+
+}
+

@@ -26,12 +26,23 @@ void swift_ASTGen_addQueuedSourceFile(
     void *_Nonnull sourceFile, const uint8_t *_Nonnull displayNamePtr,
     intptr_t displayNameLength, ssize_t parentID, ssize_t positionInParent);
 void swift_ASTGen_addQueuedDiagnostic(
-    void *_Nonnull queued, const char *_Nonnull text, ptrdiff_t textLength,
-    BridgedDiagnosticSeverity severity, const void *_Nullable sourceLoc,
-    const void *_Nullable *_Nullable highlightRanges,
-    ptrdiff_t numHighlightRanges);
+    void *_Nonnull queued, void *_Nonnull state,
+    BridgedStringRef text,
+    BridgedDiagnosticSeverity severity,
+    BridgedSourceLoc sourceLoc,
+    BridgedStringRef categoryName,
+    BridgedStringRef documentationPath,
+    const BridgedCharSourceRange *_Nullable highlightRanges,
+    ptrdiff_t numHighlightRanges,
+    BridgedArrayRef /*BridgedFixIt*/ fixIts);
 void swift_ASTGen_renderQueuedDiagnostics(
     void *_Nonnull queued, ssize_t contextSize, ssize_t colorize,
+    BridgedStringRef *_Nonnull renderedString);
+
+void *_Nonnull swift_ASTGen_createPerFrontendDiagnosticState();
+void swift_ASTGen_destroyPerFrontendDiagnosticState(void * _Nonnull state);
+void swift_ASTGen_renderCategoryFootnotes(
+    void * _Nonnull state, ssize_t colorize,
     BridgedStringRef *_Nonnull renderedString);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
@@ -57,8 +68,8 @@ int swift_ASTGen_emitParserDiagnostics(
 // Build AST nodes for the top-level entities in the syntax.
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
-    BridgedDeclContext declContext, BridgedASTContext astContext,
-    void *_Nonnull outputContext,
+    BridgedDeclContext declContext, BridgedNullableDecl attachedDecl,
+    BridgedASTContext astContext, void *_Nonnull outputContext,
     void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
 
 BridgedFingerprint
@@ -110,6 +121,14 @@ swift_ASTGen_virtualFiles(void *_Nonnull sourceFile,
                           BridgedVirtualFile *_Nullable *_Nonnull virtualFiles);
 void swift_ASTGen_freeBridgedVirtualFiles(
     BridgedVirtualFile *_Nullable virtualFiles, size_t numFiles);
+
+bool swift_ASTGen_parseAvailabilityMacroDefinition(
+    BridgedASTContext ctx, BridgedDeclContext dc, BridgedDiagnosticEngine diags,
+    BridgedStringRef buffer,
+    BridgedAvailabilityMacroDefinition *_Nonnull outPtr);
+
+void swift_ASTGen_freeAvailabilityMacroDefinition(
+    BridgedAvailabilityMacroDefinition *_Nonnull definition);
 
 #ifdef __cplusplus
 }

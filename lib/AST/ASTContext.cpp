@@ -15,9 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "AbstractConformance.h"
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -270,6 +272,9 @@ struct ASTContext::Implementation {
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
 
+  /// The global cache of side tables for random things.
+  GlobalCache globalCache;
+
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
@@ -343,6 +348,12 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
+  /// The declaration of Optional<T>.TangentVector.init
+  ConstructorDecl *OptionalTanInitDecl = nullptr;
+
+  /// The declaration of Optional<T>.TangentVector.value
+  VarDecl *OptionalTanValueDecl = nullptr;
+  
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
@@ -426,9 +437,6 @@ struct ASTContext::Implementation {
 
   /// Singleton used to cache the import graph.
   swift::namelookup::ImportCache TheImportCache;
-
-  /// Cache of availability macros parsed from the command line.
-  AvailabilityMacroMap TheAvailabilityMacroCache;
 
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
@@ -540,6 +548,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
+    llvm::DenseMap<std::pair<Type, Type>, InlineArrayType *> InlineArrayTypes;
     llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
@@ -572,12 +581,6 @@ struct ASTContext::Implementation {
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
 
-    /// The set of normal protocol conformances.
-    llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
-
-    // The set of self protocol conformances.
-    llvm::DenseMap<ProtocolDecl*, SelfProtocolConformance*> SelfConformances;
-
     /// The set of specialized protocol conformances.
     llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
 
@@ -594,8 +597,8 @@ struct ASTContext::Implementation {
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
-    /// The set of unique AvailabilityContexts (uniqued by their storage).
-    llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
+    /// The set of abstract conformances (uniqued by their storage).
+    llvm::FoldingSet<AbstractConformance> AbstractConformances;
 
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
@@ -610,11 +613,6 @@ struct ASTContext::Implementation {
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning (default: 4189)
 #endif
-
-      // Call the normal conformance destructors last since they could be
-      // referenced by the other conformance types.
-      for (auto &conformance : NormalConformances)
-        conformance.~NormalProtocolConformance();
     }
 
     size_t getTotalMemory() const;
@@ -642,6 +640,14 @@ struct ASTContext::Implementation {
       AutoDiffDerivativeFunctionIdentifiers;
 
   llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
+  llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
+  llvm::DenseMap<ProtocolDecl*, SelfProtocolConformance*> SelfConformances;
+
+  /// The set of unique AvailabilityContexts (uniqued by their storage).
+  llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
+
+  /// The set of unique custom availability domains.
+  llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -717,6 +723,9 @@ ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
       IntrinsicScratchContext(new llvm::LLVMContext()) {}
 ASTContext::Implementation::~Implementation() {
+  for (auto &conformance : NormalConformances)
+    conformance.~NormalProtocolConformance();
+
   for (auto &cleanup : Cleanups)
     cleanup();
 }
@@ -748,6 +757,10 @@ inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto offset = llvm::alignAddr((void *)sizeof(*this),
                                 llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
+}
+
+ASTContext::GlobalCache &ASTContext::getGlobalCache() const {
+  return getImpl().globalCache;
 }
 
 void ASTContext::operator delete(void *Data) throw() {
@@ -802,6 +815,8 @@ ASTContext::ASTContext(
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
+      TheUnconstrainedAnyType(
+          ProtocolCompositionType::theUnconstrainedAnyType(*this)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -886,6 +901,10 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
   SIZE_AND_BYTES(BuiltinIntegerTypes);
   SIZE_AND_BYTES(OpenedElementEnvironments);
+  SIZE(NormalConformances);
+  SIZE(SelfConformances);
+  SIZE(AvailabilityContexts);
+  SIZE(CustomAvailabilityDomains);
   SIZE_AND_BYTES(ForeignRepresentableCache);
   SIZE(SearchPathsSet);
 
@@ -966,6 +985,12 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   auto pair = std::make_pair(Str, Identifier::Aligner());
   auto I = getImpl().IdentifierTable.insert(pair).first;
   return Identifier(I->getKeyData());
+}
+
+Identifier ASTContext::getDollarIdentifier(size_t Idx) const {
+  SmallVector<char, 4> StrBuf;
+  StringRef varName = ("$" + Twine(Idx)).toStringRef(StrBuf);
+  return getIdentifier(varName);
 }
 
 void ASTContext::lookupInModule(
@@ -1303,6 +1328,10 @@ CanType ASTContext::getAnyExistentialType() const {
   return ExistentialType::get(TheAnyType)->getCanonicalType();
 }
 
+CanType ASTContext::getUnconstrainedAnyExistentialType() const {
+  return ExistentialType::get(TheUnconstrainedAnyType)->getCanonicalType();
+}
+
 CanType ASTContext::getAnyObjectConstraint() const {
   if (getImpl().AnyObjectType) {
     return getImpl().AnyObjectType;
@@ -1429,6 +1458,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::SerialExecutor:
+  case KnownProtocolKind::ExecutorFactory:
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:
@@ -2130,14 +2160,18 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   for (auto k: aliasMap.keys()) {
     auto v = aliasMap.lookup(k);
     if (!v.empty()) {
-      auto key = getIdentifier(k);
-      auto val = getIdentifier(v);
-      // key is a module alias, val is its corresponding real name
-      ModuleAliasMap[key] = std::make_pair(val, true);
-      // add an entry with an alias as key for an easier lookup later
-      ModuleAliasMap[val] = std::make_pair(key, false);
+      addModuleAlias(k, v);
     }
   }
+}
+
+void ASTContext::addModuleAlias(StringRef moduleAlias, StringRef realName) {
+  auto key = getIdentifier(moduleAlias);
+  auto val = getIdentifier(realName);
+  // key is a module alias, val is its corresponding real name
+  ModuleAliasMap[key] = std::make_pair(val, true);
+  // add an entry with an alias as key for an easier lookup later
+  ModuleAliasMap[val] = std::make_pair(key, false);
 }
 
 Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption option) const {
@@ -2245,6 +2279,52 @@ void ASTContext::loadObjCMethods(
   }
 }
 
+ConstructorDecl *ASTContext::getOptionalTanInitDecl(CanType optionalTanType) {
+  if (!getImpl().OptionalTanInitDecl) {
+    auto *optionalTanDecl = optionalTanType.getNominalOrBoundGenericNominal();
+    // Look up the `Optional<T>.TangentVector.init` declaration.
+    auto initLookup =
+      optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
+    ConstructorDecl *constructorDecl = nullptr;
+    for (auto *candidate : initLookup) {
+      auto candidateModule = candidate->getModuleContext();
+      if (candidateModule->getName() == Id_Differentiation ||
+          candidateModule->isStdlibModule()) {
+        assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+        constructorDecl = cast<ConstructorDecl>(candidate);
+#ifdef NDEBUG
+        break;
+#endif
+      }
+    }
+    assert(constructorDecl && "No `Optional.TangentVector.init`");
+
+    getImpl().OptionalTanInitDecl = constructorDecl;
+  }
+
+  return getImpl().OptionalTanInitDecl;
+}
+
+VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
+  if (!getImpl().OptionalTanValueDecl) {
+    // TODO: Maybe it would be better to have getters / setters here that we
+    // can call and hide this implementation detail?
+    StructDecl *optStructDecl = optionalTanType.getStructOrBoundGenericStruct();
+    assert(optStructDecl && "Unexpected type of Optional.TangentVector");
+
+    ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
+    assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
+    VarDecl *wrappedValueVar = properties[0];
+
+    assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
+           getOptionalDecl() && "Unexpected type of Optional.TangentVector");
+
+    getImpl().OptionalTanValueDecl = wrappedValueVar;
+  }
+
+  return getImpl().OptionalTanValueDecl;
+}
+
 void ASTContext::loadDerivativeFunctionConfigurations(
     AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
     llvm::SetVector<AutoDiffConfig> &results) {
@@ -2297,8 +2377,10 @@ swift::namelookup::ImportCache &ASTContext::getImportCache() const {
   return getImpl().TheImportCache;
 }
 
-AvailabilityMacroMap &ASTContext::getAvailabilityMacroCache() const {
-  return getImpl().TheAvailabilityMacroCache;
+const AvailabilityMacroMap &ASTContext::getAvailabilityMacroMap() const {
+  auto *ctx = const_cast<ASTContext *>(this);
+  return *evaluateOrFatal(ctx->evaluator,
+                          AvailabilityMacroArgumentsRequest{ctx});
 }
 
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {
@@ -2855,15 +2937,14 @@ ASTContext::getNormalConformance(Type conformingType,
 
   // Did we already record the normal conformance?
   void *insertPos;
-  auto &normalConformances =
-    getImpl().getArena(AllocationArena::Permanent).NormalConformances;
+  auto &normalConformances = getImpl().NormalConformances;
   if (auto result = normalConformances.FindNodeOrInsertPos(id, insertPos))
     return result;
 
   // Build a new normal protocol conformance.
-  auto result = new (*this, AllocationArena::Permanent)
-      NormalProtocolConformance(conformingType, protocol, loc, dc, state,
-                                options, preconcurrencyLoc);
+  auto result = new (*this) NormalProtocolConformance(
+      conformingType, protocol, loc, dc, state,
+      options, preconcurrencyLoc);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -2872,12 +2953,11 @@ ASTContext::getNormalConformance(Type conformingType,
 /// Produce a self-conformance for the given protocol.
 SelfProtocolConformance *
 ASTContext::getSelfConformance(ProtocolDecl *protocol) {
-  auto &selfConformances =
-    getImpl().getArena(AllocationArena::Permanent).SelfConformances;
+  auto &selfConformances = getImpl().SelfConformances;
   auto &entry = selfConformances[protocol];
   if (!entry) {
-    entry = new (*this, AllocationArena::Permanent)
-      SelfProtocolConformance(protocol->getDeclaredExistentialType());
+    entry = new (*this) SelfProtocolConformance(
+      protocol->getDeclaredExistentialType());
   }
   return entry;
 }
@@ -3217,6 +3297,9 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().GenericSignatures ?
     // getImpl().CompoundNames ?
     // getImpl().IntegerTypes ?
+    // getImpl().NormalConformances ?
+    // getImpl().SelfConformances ?
+    // getImpl().AvailabilityContexts
     getImpl().Permanent.getTotalMemory();
 
     Size += getSolverMemory();
@@ -3258,7 +3341,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // FunctionTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
-    // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
     // BuiltinConformances ?
@@ -3303,14 +3385,12 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(OpaqueArchetypeEnvironments);
     SIZE_AND_BYTES(OpenedExistentialEnvironments);
     SIZE(FunctionTypes);
-    SIZE(NormalConformances);
-    SIZE(SelfConformances);
     SIZE(SpecializedConformances);
     SIZE(InheritedConformances);
     SIZE_AND_BYTES(BuiltinConformances);
     SIZE(PackConformances);
     SIZE(SubstitutionMaps);
-    SIZE(AvailabilityContexts);
+    SIZE(AbstractConformances);
 
 #undef SIZE
 #undef SIZE_AND_BYTES
@@ -5036,7 +5116,7 @@ void SILFunctionType::Profile(
   invocationSubs.profile(id);
   id.AddBoolean((bool)conformance);
   if (conformance)
-    id.AddPointer(conformance.getRequirement());
+    id.AddPointer(conformance.getProtocol());
 }
 
 SILFunctionType::SILFunctionType(
@@ -5359,6 +5439,21 @@ ArraySliceType *ArraySliceType::get(Type base) {
   return entry = new (C, arena) ArraySliceType(C, base, properties);
 }
 
+InlineArrayType *InlineArrayType::get(Type count, Type elt) {
+  auto properties =
+      count->getRecursiveProperties() | elt->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  const ASTContext &C = count->getASTContext();
+
+  auto *&entry = C.getImpl().getArena(arena).InlineArrayTypes[{count, elt}];
+  if (entry)
+    return entry;
+
+  entry = new (C, arena) InlineArrayType(C, count, elt, properties);
+  return entry;
+}
+
 VariadicSequenceType *VariadicSequenceType::get(Type base) {
   auto properties = base->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -5544,7 +5639,7 @@ Type OpaqueTypeArchetypeType::get(
   return env->getOrCreateArchetypeFromInterfaceType(interfaceType);
 }
 
-CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
+CanTypeWrapper<ExistentialArchetypeType> ExistentialArchetypeType::getNew(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout) {
@@ -5552,21 +5647,21 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
       RecursiveTypeProperties::HasOpenedExistential, conformsTo, superclass,
       environment->getOuterSubstitutions());
   auto arena = getArena(properties);
-  auto size = OpenedArchetypeType::totalSizeToAlloc<
+  auto size = ExistentialArchetypeType::totalSizeToAlloc<
       ProtocolDecl *, Type, LayoutConstraint>(
       conformsTo.size(),
       superclass ? 1 : 0,
       layout ? 1 : 0);
 
   ASTContext &ctx = interfaceType->getASTContext();
-  void *mem = ctx.Allocate(size, alignof(OpenedArchetypeType), arena);
+  void *mem = ctx.Allocate(size, alignof(ExistentialArchetypeType), arena);
 
-  return CanOpenedArchetypeType(::new (mem) OpenedArchetypeType(
+  return CanExistentialArchetypeType(::new (mem) ExistentialArchetypeType(
       environment, interfaceType, conformsTo, superclass, layout,
       properties));
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential) {
+CanExistentialArchetypeType ExistentialArchetypeType::get(CanType existential) {
   auto &ctx = existential->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(existential);
 
@@ -5574,17 +5669,17 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential) {
       existentialSig.OpenedSig, existentialSig.Shape,
       existentialSig.Generalization, UUID::fromTime());
 
-  return cast<OpenedArchetypeType>(
+  return cast<ExistentialArchetypeType>(
     genericEnv->mapTypeIntoContext(existentialSig.SelfType)
       ->getCanonicalType());
 }
 
-Type OpenedArchetypeType::getAny(Type existential) {
+Type ExistentialArchetypeType::getAny(Type existential) {
   assert(existential->isAnyExistentialType());
 
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
     auto instanceTy = metatypeTy->getExistentialInstanceType();
-    auto openedInstanceTy = OpenedArchetypeType::getAny(instanceTy);
+    auto openedInstanceTy = ExistentialArchetypeType::getAny(instanceTy);
     if (metatypeTy->hasRepresentation()) {
       return MetatypeType::get(openedInstanceTy,
                                metatypeTy->getRepresentation());
@@ -5592,7 +5687,7 @@ Type OpenedArchetypeType::getAny(Type existential) {
     return MetatypeType::get(openedInstanceTy);
   }
 
-  return OpenedArchetypeType::get(existential->getCanonicalType());
+  return ExistentialArchetypeType::get(existential->getCanonicalType());
 }
 
 void SubstitutionMap::Storage::Profile(
@@ -5656,21 +5751,96 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
   return result;
 }
 
-const AvailabilityContext::Storage *
-AvailabilityContext::Storage::get(const Info &info, ASTContext &ctx) {
-  llvm::FoldingSetNodeID id;
-  info.Profile(id);
+ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
+    Type conformingType, ProtocolDecl *proto) {
+  ASTContext &ctx = proto->getASTContext();
 
-  auto &foldingSet =
-      ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
+  auto kind = conformingType->getDesugaredType()->getKind();
+  switch (kind) {
+  case TypeKind::GenericTypeParam:
+  case TypeKind::TypeVariable:
+  case TypeKind::DependentMember:
+  case TypeKind::Unresolved:
+  case TypeKind::Placeholder:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::ExistentialArchetype:
+  case TypeKind::ElementArchetype:
+    break;
+
+  default:
+    llvm::errs() << "Abstract conformance with bad subject type:\n";
+    conformingType->dump(llvm::errs());
+    abort();
+  }
+
+  // Figure out which arena this should go in.
+  auto properties = conformingType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  // Form the folding set key.
+  llvm::FoldingSetNodeID id;
+  AbstractConformance::Profile(id, conformingType, proto);
+
+  // Did we already record this abstract conformance?
+  void *insertPos;
+  auto &abstractConformances =
+      ctx.getImpl().getArena(arena).AbstractConformances;
+  if (auto result = abstractConformances.FindNodeOrInsertPos(id, insertPos))
+    return ProtocolConformanceRef(result);
+
+  // Allocate and record this abstract conformance.
+  auto mem = ctx.Allocate(sizeof(AbstractConformance),
+                          alignof(AbstractConformance), arena);
+  auto result = new (mem) AbstractConformance(conformingType, proto);
+  abstractConformances.InsertNode(result, insertPos);
+  return ProtocolConformanceRef(result);
+}
+
+const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
+    const AvailabilityRange &platformRange, bool isDeprecated,
+    llvm::ArrayRef<DomainInfo> domainInfos, const ASTContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  AvailabilityContext::Storage::Profile(id, platformRange, isDeprecated,
+                                        domainInfos);
+
+  auto &foldingSet = ctx.getImpl().AvailabilityContexts;
   void *insertPos;
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
     return existing;
 
-  void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
-                           alignof(AvailabilityContext::Storage));
-  auto *newNode = ::new (mem) AvailabilityContext::Storage(info);
+  size_t storageToAlloc = AvailabilityContext::Storage::totalSizeToAlloc<
+      AvailabilityContext::DomainInfo>(domainInfos.size());
+  void *mem =
+      ctx.Allocate(storageToAlloc, alignof(AvailabilityContext::Storage));
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(
+      platformRange, isDeprecated, domainInfos.size());
+  std::uninitialized_copy(
+      domainInfos.begin(), domainInfos.end(),
+      newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+}
+
+const CustomAvailabilityDomain *
+CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
+                              const ASTContext &ctx) {
+  auto identifier = ctx.getIdentifier(name);
+  llvm::FoldingSetNodeID id;
+  CustomAvailabilityDomain::Profile(id, identifier, mod, kind);
+
+  auto &foldingSet = ctx.getImpl().CustomAvailabilityDomains;
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
+                           alignof(CustomAvailabilityDomain));
+  auto *newNode = ::new (mem) CustomAvailabilityDomain(identifier, mod, kind);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -7001,6 +7171,11 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-StringRef ASTContext::getTargetPlatformStringForDiagnostics() const {
-  return prettyPlatformString(targetPlatform(LangOpts));
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  auto platform = swift::targetPlatform(LangOpts);
+  if (platform != PlatformKind::none)
+    return AvailabilityDomain::forPlatform(platform);
+
+  // Fall back to the universal domain for triples without a platform.
+  return AvailabilityDomain::forUniversal();
 }

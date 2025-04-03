@@ -55,27 +55,6 @@ type, use `alloc_box`.
 
 `T` must not be a pack type. To allocate a pack, use `alloc_pack`.
 
-### alloc_vector
-
-```
-sil-instruction ::= 'alloc_vector' sil-type, sil-operand
-
-%1 = alloc_vector $T, %0 : $Builtin.Word
-// %1 has type $*T
-```
-
-Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a vector of values of type `T`. The result of the instruction
-is the address of the allocated memory. The number of vector elements is
-specified by the operand, which must be a builtin integer value.
-
-`alloc_vector` either allocates memory on the stack or - if contained in
-a global variable static initializer list - in the data section.
-
-`alloc_vector` is a stack allocation instruction, unless it's contained
-in a global initializer list. See the section above on stack discipline.
-The corresponding stack deallocation instruction is `dealloc_stack`.
-
 ### alloc_pack
 
 ```
@@ -1985,35 +1964,118 @@ destroy the value, such as `release_value`, `strong_release`,
 ### mark_dependence
 
 ```
-sil-instruction :: 'mark_dependence' '[nonescaping]'? sil-operand 'on' sil-operand
+sil-instruction :: 'mark_dependence' mark-dep-option? sil-operand 'on' sil-operand
+mark-dep-option ::= '[nonescaping]'
+mark-dep-option ::= '[unresolved]'
 
 %2 = mark_dependence %value : $*T on %base : $Builtin.NativeObject
 ```
 
 `%base` must not be identical to `%value`.
 
-Indicates that the validity of `%value` depends on the value of `%base`.
+The value of the result depends on the value of `%base`.
 Operations that would destroy `%base` must not be moved before any
-instructions which depend on the result of this instruction, exactly as
+instructions that depend on the result of this instruction, exactly as
 if the address had been directly derived from that operand (e.g. using
 `ref_element_addr`).
 
-The result is the forwarded value of `%value`. `%value` may be an
-address, but it could be an address in a non-obvious form, such as a
-Builtin.RawPointer or a struct containing the same.
+The result is the forwarded value of `%value`. If `%value` is an
+address, then result is also an address, and the semantics are the
+same as the non-address form: the dependency is on any value derived
+from the resulting address. The value could also be a
+Builtin.RawPointer or a struct containing the same, in which case,
+pointed-to values have a dependency if they are derived from this
+instruction's result. Note that in-memory values are only dependent on
+base if they are derived from this instruction's result. In this
+example, the load of `%dependent_value` depends on `%base`, but the
+load of `%independent_value` does not:
 
-`%base` may have either object or address type. In the latter case, the
-dependency is on the current value stored in the address.
+```
+%dependent_address = mark_dependence %original_address on %base
+%dependent_value = load [copy] %dependent_address
+%independent_value = load %original_address
+destroy_value %base
+```
 
-The optional `nonescaping` attribute indicates that no value derived from
-`%value` escapes the lifetime of `%base`. As with escaping `mark_dependence`,
-all values transitively forwarded from `%value` must be destroyed within the
-lifetime of `base`. Unlike escaping`mark_dependence`, this must be statically
-verifiable. Additionally, unlike escaping`mark_dependence`, derived values
-include copies of`%value`and values transitively forwarded from those copies.
-If`%base`must not be identical to`%value`. Unlike escaping`mark_dependence`,
-no value derived from`%value`may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use). 
+`%base` may have either object or address type. If it is an address,
+then the dependency is on the current value stored at the address.
+
+The optional `nonescaping` attribute indicates that the lifetime
+guarantee is statically verifiable via a def-use walk starting at this
+instruction's result. No value derived from a nonescaping
+`mark_dependence` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use). The `unresolved`
+attribute indicates that this verification is required but has not yet
+been diagnosed.
+
+`mark_dependence` may only have a non-`Escapable` result if it also
+has a `nonescaping` or `unresolved` attribute. A non-`Escapable`
+`mark_dependence` extends the lifetime of `%base` through copies of
+`%value` and values transitively forwarded from those copies. If
+`%value` is an address, then that includes loads from the
+address. None of those values may be used by a bitwise escape
+(conversion to UnsafePointer) or pointer escape (unknown use). In this
+example, the apply depends on `%base` because `%value` has a
+non-`Escapable` type:
+
+```
+%dependent_address = mark_dependence [nonescaping] %value : %*NonescapableType on %base
+%dependent_value = load %dependent_address
+%copied_value = copy_value %dependent_value
+apply %f(%dependent_value)
+destroy_value %base
+```
+
+### mark_dependence_addr
+
+```
+sil-instruction :: 'mark_dependence_addr' mark-dep-option? sil-operand 'on' sil-operand
+mark-dep-option ::= '[nonescaping]'
+mark-dep-option ::= '[unresolved]'
+
+mark_dependence_addr [nonescaping] %address : $*T on %base : $Builtin.NativeObject
+```
+
+The in-memory value at `%address` depends on the value of `%base`.
+Operations that would destroy `%base` must not be moved before any
+instructions that depend on that value, exactly as if the location at
+`%address` aliases `%base` on all paths reachable from this instruction.
+
+In this example, the load of `%dependent_value` depends on `%base`:
+
+```
+mark_dependence_addr %address on %base
+%dependent_value = load [copy] %address
+destroy_value %base
+```
+
+`%base` may have either object or address type. If it is an address,
+then the dependency is on the current value stored at the address.
+
+The optional `nonescaping` attribute indicates that the lifetime
+guarantee is statically verifiable via a data flow over all paths
+reachable from this instruction considering all addresses that may
+alias with `%address`. No aliasing address may be used by a bitwise
+escape (conversion to UnsafePointer) or pointer escape (unknown
+use). The `unresolved` attribute indicates that this verification is
+required but has not yet been diagnosed.
+
+`mark_dependence_addr` may only have a non-`Escapable` `%address` if
+it also has a `nonescaping` or `unresolved` attribute. A
+non-`Escapable` `mark_dependence_addr` extends the lifetime of `%base`
+through values loaded from the memory location at `%address` and
+through any transitively forwarded or copied values. None of those
+values may be used by a bitwise escape (conversion to UnsafePointer)
+or pointer escape (unknown use). In this example, the apply depends on
+`%base` because `%address` has a non-`Escapable` type:
+
+```
+mark_dependence_addr [nonescaping] %address : %*NonescapableType on %base
+%dependent_value = load %address
+%copied_value = copy_value %dependent_value
+apply %f(%dependent_value)
+destroy_value %base
+```
 
 ### is_unique
 
@@ -2084,18 +2146,19 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
-### is_escaping_closure
+### destroy_not_escaped_closure
 
 ```
-sil-instruction ::= 'is_escaping_closure' sil-operand
+sil-instruction ::= 'destroy_not_escaped_closure' sil-operand
 
-%1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+%1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
 // %0 must be an escaping swift closure.
 // %1 will be of type Builtin.Int1
 ```
 
-Checks whether the context reference is not nil and bigger than one and
-returns true if it is.
+Checks if the closure context escaped and then destroys the context.
+The escape-check is done by checking if its reference count is exactly 1.
+Returns true if it is.
 
 ### copy_block
 
@@ -4788,7 +4851,9 @@ on whether the cast succeeds or not.
 ### unconditional_checked_cast
 
 ```
-sil-instruction ::= 'unconditional_checked_cast' sil-operand 'to' sil-type
+sil-instruction ::= 'unconditional_checked_cast' 
+                    sil-prohibit-isolated-conformances?
+                    sil-operand 'to' sil-type
 
 %1 = unconditional_checked_cast %0 : $A to $B
 %1 = unconditional_checked_cast %0 : $*A to $*B
@@ -4804,8 +4869,9 @@ ownership are unsupported.
 
 ```
 sil-instruction ::= 'unconditional_checked_cast_addr'
-                     sil-type 'in' sil-operand 'to'
-                     sil-type 'in' sil-operand
+                    sil-prohibit-isolated-conformances?
+                    sil-type 'in' sil-operand 'to'
+                    sil-type 'in' sil-operand
 
 unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
 // $A and $B must be both addresses
@@ -5168,10 +5234,12 @@ instruction branches to `bb2`.
 
 ```
 sil-terminator ::= 'checked_cast_br' sil-checked-cast-exact?
+                    sil-prohibit-isolated-conformances?
                     sil-type 'in'
                     sil-operand 'to' sil-type ','
                     sil-identifier ',' sil-identifier
 sil-checked-cast-exact ::= '[' 'exact' ']'
+sil-prohibit-isolated-conformances ::= '[' 'prohibit_isolated_conformances' ']'
 
 checked_cast_br A in %0 : $A to $B, bb1, bb2
 checked_cast_br *A in %0 : $*A to $*B, bb1, bb2
@@ -5190,10 +5258,14 @@ An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it. The source and target types must
 be class types.
 
+A cast can specify that the runtime should prohibit all uses of isolated
+conformances when attempting to satisfy protocol requirements of existentials.
+
 ### checked_cast_addr_br
 
 ```
 sil-terminator ::= 'checked_cast_addr_br'
+                    sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
                     sil-stype 'in' sil-operand ','

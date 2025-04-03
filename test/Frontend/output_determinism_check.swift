@@ -8,8 +8,7 @@
 /// object files should match when forcing object generation.
 // RUN: %target-swift-frontend -module-name test -emit-dependencies -c -o %t/test.o -primary-file %s -enable-deterministic-check -always-compile-output-files 2>&1 | %FileCheck %s --check-prefix=OBJECT_OUTPUT --check-prefix=DEPS_OUTPUT
 
-/// FIXME: Fine-grain dependencies graph is not deterministics.
-/// FAIL:  %target-swift-frontend -module-name test -emit-reference-dependencies-path %t/test.swiftdeps -c -o %t/test.o -primary-file %s -enable-deterministic-check -always-compile-output-files
+/// RUN:  %target-swift-frontend -module-name test -emit-reference-dependencies-path %t/test.swiftdeps -c -o %t/test.o -primary-file %s -enable-deterministic-check -always-compile-output-files
 
 /// Explicit module build. Check building swiftmodule from interface file.
 // RUN: %target-swift-frontend -scan-dependencies -module-name test -o %t/test.json %s -enable-deterministic-check 2>&1 | %FileCheck %s --check-prefix=DEPSCAN_OUTPUT
@@ -38,4 +37,31 @@
 // PCM_OUTPUT: remark: produced matching output file '{{.*}}{{/|\\}}test.pcm'
 
 public var x = 1
-public func test() {}
+public func test() {
+  precondition(x == 1, "dummy check")
+}
+
+class A {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
+class B {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
+class C {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}
+class D {
+  var a = 0
+  var b = 0
+  var c = 0
+  var d = 0
+}

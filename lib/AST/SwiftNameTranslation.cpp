@@ -37,6 +37,10 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
          isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD) ||
          isa<TypeAliasDecl>(VD));
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getNameForObjC(abiRole.getCounterpart(), customNamesOnly);
+
   if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName()) {
       assert(name->getNumSelectorPieces() == 1);
@@ -63,6 +67,10 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   // Should have already been diagnosed as diag::objc_enum_generic.
   assert(!ED->isGenericContext() && "Trying to bridge generic enum error to Obj-C");
 
+  auto abiRole = ABIRoleInfo(ED);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getErrorDomainStringForObjC(abiRole.getCounterpart());
+
   SmallVector<const NominalTypeDecl *, 4> outerTypes;
   for (const NominalTypeDecl * D = ED;
        D != nullptr;
@@ -86,6 +94,11 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
 bool swift::objc_translation::
 printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
                              Identifier PreferredName) {
+  auto abiRole = ABIRoleInfo(EL);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return printSwiftEnumElemNameInObjC(abiRole.getCounterpart(), OS,
+                                        PreferredName);
+
   StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
   if (!ElemName.empty()) {
     OS << ElemName;
@@ -104,6 +117,10 @@ printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
 
 std::pair<Identifier, ObjCSelector> swift::objc_translation::
 getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getObjCNameForSwiftDecl(abiRole.getCounterpart(), PreferredName);
+
   ASTContext &Ctx = VD->getASTContext();
   Identifier BaseName;
   if (PreferredName) {
@@ -157,6 +174,10 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
 StringRef
 swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
                                       CustomNamesOnly_t customNamesOnly) {
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getNameForCxx(abiRole.getCounterpart(), customNamesOnly);
+
   ASTContext& ctx = VD->getASTContext();
 
   for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
@@ -214,6 +235,10 @@ swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD,
     std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getDeclRepresentation(abiRole.getCounterpart(), isZeroSized);
+
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
@@ -249,11 +274,6 @@ swift::cxx_translation::getDeclRepresentation(
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
     }
-    // Nested classes are not yet supported.
-    if (isa<ClassDecl>(VD) && !typeDecl->hasClangNode() &&
-        isa_and_nonnull<NominalTypeDecl>(
-            typeDecl->getDeclContext()->getAsDecl()))
-      return {Unsupported, UnrepresentableNested};
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
@@ -392,8 +412,6 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_protocol_to_cxx_unsupported, vd);
   case UnrepresentableMoveOnly:
     return Diagnostic(diag::expose_move_only_to_cxx, vd);
-  case UnrepresentableNested:
-    return Diagnostic(diag::expose_nested_type_to_cxx, vd);
   case UnrepresentableMacro:
     return Diagnostic(diag::expose_macro_to_cxx, vd);
   case UnrepresentableZeroSizedValueType:

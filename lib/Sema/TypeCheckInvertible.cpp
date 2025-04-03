@@ -38,6 +38,7 @@ static void addConformanceFixIt(const NominalTypeDecl *nominal,
     text.append(": ");
     if (inverse) text.append("~");
     text.append(getProtocolName(proto));
+    text.append(" ");
     diag.fixItInsert(fixItLoc, text);
   } else {
     auto fixItLoc = nominal->getInherited().getEndLoc();
@@ -115,7 +116,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
   assert(!conformance.isInvalid());
 
   const auto kp = getKnownProtocolKind(ip);
-  assert(conformance.getRequirement()->isSpecificProtocol(kp));
+  assert(conformance.getProtocol()->isSpecificProtocol(kp));
 
   auto *nominalDecl = dc->getSelfNominalTypeDecl();
   assert(isa<StructDecl>(nominalDecl) ||

@@ -206,6 +206,17 @@ OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (CancellationNotificationStatusRecord *record), (record))
 
+OVERRIDE_TASK(task_addPriorityEscalationHandler,
+              EscalationNotificationStatusRecord *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (EscalationNotificationStatusRecord::FunctionType handler,
+               void *context),
+              (handler, context))
+
+OVERRIDE_TASK(task_removePriorityEscalationHandler, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (EscalationNotificationStatusRecord *record), (record))
+
 OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (size_t priority,
@@ -426,6 +437,11 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
 OVERRIDE_TASK(task_startOnMainActor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (AsyncTask *task), (task))
+
+// In ACTOR since we need ExecutorTracking info
+OVERRIDE_ACTOR(task_startSynchronously, void,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (AsyncTask *task), (task))
 
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR

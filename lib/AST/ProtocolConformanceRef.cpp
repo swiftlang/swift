@@ -1,4 +1,4 @@
-//===--- ProtocolConformance.cpp - AST Protocol Conformance Reference -----===//
+//===--- ProtocolConformanceRef.cpp - AST Protocol Conformance Reference --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "AbstractConformance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -32,12 +33,6 @@
 
 using namespace swift;
 
-ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
-    Type subjectType, ProtocolDecl *proto) {
-  // Temporary implementation:
-  return ProtocolConformanceRef(proto);
-}
-
 bool ProtocolConformanceRef::isInvalid() const {
   if (!Union)
     return true;
@@ -48,15 +43,26 @@ bool ProtocolConformanceRef::isInvalid() const {
   return false;
 }
 
-ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
-  assert(!isInvalid());
+Type ProtocolConformanceRef::getType() const {
+  if (isInvalid())
+    return Type();
 
+  if (isConcrete())
+    return getConcrete()->getType();
+
+  if (isPack())
+    return Type(getPack()->getType());
+
+  return getAbstract()->getType();
+}
+
+ProtocolDecl *ProtocolConformanceRef::getProtocol() const {
   if (isConcrete()) {
     return getConcrete()->getProtocol();
   } else if (isPack()) {
     return getPack()->getProtocol();
   } else {
-    return getAbstract();
+    return getAbstract()->getProtocol();
   }
 }
 
@@ -87,23 +93,24 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   if (isPack())
     return getPack()->subst(IFS);
 
-  // Handle abstract conformances below:
+  ASSERT(isAbstract());
+  auto *proto = getProtocol();
 
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
-  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
-    if (!IFS.shouldSubstituteOpaqueArchetypes()
-        && isa<OpaqueTypeArchetypeType>(origArchetype)) {
-      return *this;
+  if (origType->getAs<OpaqueTypeArchetypeType>()) {
+    if (!IFS.shouldSubstituteOpaqueArchetypes()) {
+      return forAbstract(origType.subst(IFS), proto);
     }
   }
+
+  // FIXME: Handle local archetypes as above!
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(IFS);
 
-  auto *proto = getRequirement();
-
   // If the type is an existential, it must be self-conforming.
+  // FIXME: This feels like it's in the wrong place.
   if (substType->isExistentialType()) {
     auto optConformance =
         lookupConformance(substType, proto, /*allowMissing=*/true);
@@ -113,7 +120,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
     return ProtocolConformanceRef::forInvalid();
   }
 
-  // Check the conformance map.
+  // Local conformance lookup into the substitution map.
   // FIXME: Pack element level?
   return IFS.lookupConformance(origType->getCanonicalType(), substType, proto,
                                /*level=*/0);
@@ -122,24 +129,20 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
   if (isConcrete()) {
     return getConcrete()->subst(
-        [](SubstitutableType *type) -> Type {
-          if (auto *archetypeType = type->getAs<ArchetypeType>())
-            return archetypeType->getInterfaceType();
-          return type;
-        },
+        MapTypeOutOfContext(),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
-        [](SubstitutableType *type) -> Type {
-          if (auto *archetypeType = type->getAs<ArchetypeType>())
-            return archetypeType->getInterfaceType();
-          return type;
-        },
+        MapTypeOutOfContext(),
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
+  } else if (isAbstract()) {
+    auto *abstract = getAbstract();
+    return forAbstract(abstract->getType()->mapTypeOutOfContext(),
+                       abstract->getProtocol());
   }
 
   return *this;
@@ -150,7 +153,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   assert(!isInvalid());
 
   // Find the named requirement.
-  ProtocolDecl *proto = getRequirement();
+  ProtocolDecl *proto = getProtocol();
   auto *assocType = proto->getAssociatedType(name);
 
   // FIXME: Shouldn't this be a hard error?
@@ -163,7 +166,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
 ConcreteDeclRef
 ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   // Find the named requirement.
-  auto *proto = getRequirement();
+  auto *proto = getProtocol();
   auto *requirement = proto->getSingleRequirement(name);
   if (requirement == nullptr)
     return ConcreteDeclRef();
@@ -204,7 +207,7 @@ Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
   if (isInvalid())
     return failed();
 
-  auto proto = getRequirement();
+  auto proto = getProtocol();
   ASSERT(assocType->getProtocol() == proto);
 
   if (isConcrete()) {
@@ -233,7 +236,7 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
   if (isInvalid())
     return ErrorType::get(assocType->getASTContext());
 
-  auto proto = getRequirement();
+  auto proto = getProtocol();
 
   auto substMap =
     SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
@@ -260,6 +263,15 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
     return conformance->getAssociatedConformance(assocType, protocol);
   }
 
+  auto computeSubjectType = [&](Type conformingType) -> Type {
+    return assocType.transformRec(
+      [&](TypeBase *t) -> std::optional<Type> {
+        if (isa<GenericTypeParamType>(t))
+          return conformingType;
+        return std::nullopt;
+      });
+  };
+
   // An associated conformance of an archetype might be known to be
   // a concrete conformance, if the subject type is fixed to a concrete
   // type in the archetype's generic signature. We don't actually have
@@ -270,15 +282,8 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
   // conformances where they store their subject types, we can also
   // cache the lookups inside the abstract conformance instance too.
   if (auto archetypeType = conformingType->getAs<ArchetypeType>()) {
-    conformingType = archetypeType->getInterfaceType();
     auto *genericEnv = archetypeType->getGenericEnvironment();
-
-    auto subjectType = assocType.transformRec(
-      [&](TypeBase *t) -> std::optional<Type> {
-        if (isa<GenericTypeParamType>(t))
-          return conformingType;
-        return std::nullopt;
-      });
+    auto subjectType = computeSubjectType(archetypeType->getInterfaceType());
 
     return lookupConformance(
         genericEnv->mapTypeIntoContext(subjectType),
@@ -290,30 +295,35 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
   // signature of the substitution (or in the case of type variables,
   // we have no visibility into constraints). See the parallel hack
   // to handle this in SubstitutionMap::lookupConformance().
-  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
-                     conformingType->isTypeVariableOrMember() ||
-                     conformingType->is<UnresolvedType>() ||
-                     conformingType->is<PlaceholderType>());
-
-  return ProtocolConformanceRef(protocol);
+  auto subjectType = computeSubjectType(conformingType);
+  return ProtocolConformanceRef::forAbstract(subjectType, protocol);
 }
 
 /// Check of all types used by the conformance are canonical.
 bool ProtocolConformanceRef::isCanonical() const {
-  if (isAbstract() || isInvalid())
+  if (isInvalid())
     return true;
+
   if (isPack())
     return getPack()->isCanonical();
-  return getConcrete()->isCanonical();
 
+  if (isAbstract())
+    return getType()->isCanonical();
+
+  return getConcrete()->isCanonical();
 }
 
 ProtocolConformanceRef
 ProtocolConformanceRef::getCanonicalConformanceRef() const {
-  if (isAbstract() || isInvalid())
+  if (isInvalid())
     return *this;
+
   if (isPack())
     return ProtocolConformanceRef(getPack()->getCanonicalConformance());
+
+  if (isAbstract())
+    return forAbstract(getType()->getCanonicalType(), getProtocol());
+
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }
 
@@ -386,9 +396,45 @@ bool ProtocolConformanceRef::forEachMissingConformance(
   return false;
 }
 
+bool ProtocolConformanceRef::forEachIsolatedConformance(
+    llvm::function_ref<bool(ProtocolConformanceRef)> body
+) const {
+  if (isInvalid() || isAbstract())
+    return false;
+
+  if (isPack()) {
+    auto pack = getPack()->getPatternConformances();
+    for (auto conformance : pack) {
+      if (conformance.forEachIsolatedConformance(body))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Is this an isolated conformance?
+  auto concrete = getConcrete();
+  if (auto normal =
+          dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
+    if (normal->isIsolated()) {
+      if (body(*this))
+        return true;
+    }
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concrete->getSubstitutionMap();
+  for (auto conformance : subMap.getConformances()) {
+    if (conformance.forEachIsolatedConformance(body))
+      return true;
+  }
+
+  return false;
+}
+
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
-    simple_display(out, conformanceRef.getAbstract());
+    simple_display(out, conformanceRef.getProtocol());
   } else if (conformanceRef.isConcrete()) {
     simple_display(out, conformanceRef.getConcrete());
   } else if (conformanceRef.isPack()) {
@@ -398,7 +444,7 @@ void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef confor
 
 SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
-    return extractNearestSourceLoc(conformanceRef.getAbstract());
+    return extractNearestSourceLoc(conformanceRef.getProtocol());
   } else if (conformanceRef.isConcrete()) {
     return extractNearestSourceLoc(conformanceRef.getConcrete());
   }

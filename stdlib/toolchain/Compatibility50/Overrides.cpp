@@ -87,6 +87,7 @@ using mach_header_platform = mach_header_64;
 using mach_header_platform = mach_header;
 #endif
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor))
 static void installGetClassHook_untrusted() {
   extern char __dso_handle[];
@@ -112,9 +113,10 @@ static void installGetClassHook_untrusted() {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (objc_setHook_getClass) {
+  if (&objc_setHook_getClass) {
     objc_setHook_getClass(getObjCClassByMangledName_untrusted,
                           &OldGetClassHook);
   }
 #pragma clang diagnostic pop
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END

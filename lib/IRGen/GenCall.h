@@ -43,6 +43,7 @@ namespace clang {
 }
 
 namespace swift {
+enum class CoroAllocatorKind : uint8_t;
 namespace irgen {
   class Address;
   class Alignment;
@@ -139,13 +140,15 @@ namespace irgen {
   ///               be returned for it.
   ///
   /// \return {function, size}
-  std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
-      IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
-      FunctionPointer functionPointer, llvm::Value *thickContext,
-      std::pair<bool, bool> values = {true, true});
-  llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
-                                     SILFunctionTypeRepresentation convention,
-                                     bool isAsync);
+  std::pair<llvm::Value *, llvm::Value *>
+  getAsyncFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
+                          std::pair<bool, bool> values = {true, true});
+  std::pair<llvm::Value *, llvm::Value *>
+  getCoroFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
+                         std::pair<bool, bool> values = {true, true});
+  llvm::CallingConv::ID
+  expandCallingConv(IRGenModule &IGM, SILFunctionTypeRepresentation convention,
+                    bool isAsync, bool isCalleeAllocatedCoro);
 
   Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
                                       CanSILFunctionType fnType,
@@ -212,16 +215,26 @@ namespace irgen {
 
   Address emitAllocYieldOnceCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF, Address buffer);
-  void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
-                                           llvm::Value *allocation);
   void
   emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
+
+  llvm::Value *
+  emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
+                                   std::optional<CoroAllocatorKind> kind);
+  StackAddress emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                                 llvm::Value *size);
+  void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                           StackAddress allocation);
   void
-  emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+  emitYieldOnce2CoroutineEntry(IRGenFunction &IGF, LinkEntity coroFunction,
                                CanSILFunctionType coroutineType,
                                NativeCCEntryPointArgumentEmission &emission);
+  void emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                                    CanSILFunctionType fnType,
+                                    llvm::Value *buffer, llvm::Value *allocator,
+                                    llvm::GlobalVariable *cfp);
 
   Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);
@@ -241,6 +254,9 @@ namespace irgen {
                               const AsyncContextLayout &layout,
                               LinkEntity asyncFunction,
                               unsigned asyncContextIndex);
+
+  StackAddress emitAllocCoroStaticFrame(IRGenFunction &IGF, llvm::Value *size);
+  void emitDeallocCoroStaticFrame(IRGenFunction &IGF, StackAddress frame);
 
   /// Yield the given values from the current continuation.
   ///

@@ -1341,3 +1341,48 @@ bb0(%0 : @guaranteed $COpt, %1 : $Int32):
 }
 
 
+// CHECK-LABEL: sil @copy_addr_copy_init :
+// CHECK:         copy_addr
+// CHECK-NEXT:    load
+// CHECK-LABEL: } // end sil function 'copy_addr_copy_init'
+sil @copy_addr_copy_init : $@convention(thin) (@in_guaranteed B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr %0 to [init] %1
+  %3 = load %1
+  return %3
+}
+
+// CHECK-LABEL: sil @copy_addr_copy_assign :
+// CHECK:         copy_addr
+// CHECK-NEXT:    load
+// CHECK-LABEL: } // end sil function 'copy_addr_copy_assign'
+sil @copy_addr_copy_assign : $@convention(thin) (@in_guaranteed B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr %0 to %1
+  %3 = load %1
+  return %3
+}
+
+// CHECK-LABEL: sil @copy_addr_take_init :
+// CHECK:         [[LD:%.*]] = load %0
+// CHECK-NEXT:    store [[LD]] to %1
+// CHECK:         return [[LD]]
+// CHECK-LABEL: } // end sil function 'copy_addr_take_init'
+sil @copy_addr_take_init : $@convention(thin) (@in B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr [take] %0 to [init] %1
+  %3 = load %1
+  return %3
+}
+
+// CHECK-LABEL: sil @copy_addr_take_assign :
+// CHECK:         copy_addr
+// CHECK-NEXT:    load
+// CHECK-LABEL: } // end sil function 'copy_addr_take_assign'
+sil @copy_addr_take_assign : $@convention(thin) (@in B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr [take] %0 to %1
+  %3 = load %1
+  return %3
+}
+

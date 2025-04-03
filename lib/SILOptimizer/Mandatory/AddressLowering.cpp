@@ -2924,7 +2924,8 @@ public:
     }
 
     termBuilder.createCheckedCastAddrBranch(
-        castLoc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        castLoc, ccb->getIsolatedConformances(),
+        CastConsumptionKind::TakeOnSuccess, srcAddr,
         ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
         successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
 
@@ -3020,7 +3021,8 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   }
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      uncondCheckedCast->getLoc(), uncondCheckedCast->getIsolatedConformances(),
+      srcAddr, srcAddr->getType().getASTType(),
       destAddr, destAddr->getType().getASTType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());

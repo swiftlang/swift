@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -dump-parse -import-objc-header %S/Inputs/objc_decls.h -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -dump-parse -import-objc-header %S/Inputs/objc_decls.h > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s %dump-parse -import-objc-header %S/Inputs/objc_decls.h -enable-experimental-feature ParserASTGen \
+// RUN:   | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s %dump-parse -import-objc-header %S/Inputs/objc_decls.h \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 // RUN: %target-typecheck-verify-swift %clang-importer-sdk -import-objc-header %S/Inputs/objc_decls.h -enable-experimental-feature ParserASTGen 
@@ -19,14 +17,25 @@
   @objc(barWithX:Y:) func foo(x: Int, y: Int) {}
 }
 
-@objc @implementation extension ObjCClass {}
+@objc @implementation extension ObjCClass {
+    var theValue: String? {
+        get { "" }
+        set {}
+    }
+    @objc(methodWithX:Y:)
+    func methodWith(x: Int, y: Int) {}
+}
 @objc @implementation(Category1) extension ObjCClass {} // expected-error {{Objective-C category should be specified on '@objc', not '@implementation'}}
 @objc(Category2) @implementation extension ObjCClass {}
 
-// FIXME: @_objcImplementation inserts implicit @objc attribute in C++ parser.
-//@_objcImplementation extension ObjCClass2 {} // xpected-error {{cannot find type 'ObjCClass2' in scope}}
-//@_objcImplementation(Category) extension ObjCClass2 {} // xpected-error {{cannot find type 'ObjCClass2' in scope}}
+@_objcImplementation extension ObjCClass2 {} // expected-warning {{'@_objcImplementation' is deprecated; use '@implementation' instead}}
 
 @_objcRuntimeName(RenamedClass) class ThisWillBeRenamed {}
 
 @_swift_native_objc_runtime_base(NSMagicBase) class TestNativeObjCRuntimeBase {}
+
+func testPoundObjC() {
+  let _: String = #keyPath(ObjCClass.theValue)
+  let _: Selector = #selector(getter:ObjCClass.theValue)
+  let _: Selector = #selector(ObjCClass.methodWith(x:y:))
+}

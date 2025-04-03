@@ -15,6 +15,7 @@
 
 #include "SILParserState.h"
 
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/Parser.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
@@ -393,7 +394,8 @@ public:
       if (*existing.Value == value) {
         P.diagnose(loc, diag::duplicate_attribute, /*modifier*/ 1);
       } else {
-        P.diagnose(loc, diag::mutually_exclusive_attrs, name, existing.Name,
+        P.diagnose(loc, diag::mutually_exclusive_attr_names, name,
+                   existing.Name,
                    /*modifier*/ 1);
       }
       P.diagnose(existing.Loc, diag::previous_attribute, /*modifier*/ 1);

@@ -8,47 +8,65 @@ cmake_minimum_required(VERSION 3.21)
 # Where the standard library lives today
 set(StdlibSources "${CMAKE_CURRENT_LIST_DIR}/../stdlib")
 
-message(STATUS "Source dir: ${StdlibSources}")
+# Copy a list of files
+function(copy_files from_prefix to_prefix)
+  cmake_parse_arguments(ARG "" "ROOT" "FILES" ${ARGN})
+  if(NOT ARG_ROOT)
+    set(ARG_ROOT ${StdlibSources})
+  endif()
+
+  set(full_to_prefix "${CMAKE_CURRENT_LIST_DIR}/${to_prefix}")
+
+  foreach(file ${ARG_FILES})
+    # Get and create the directory
+    get_filename_component(dirname ${file} DIRECTORY)
+    file(MAKE_DIRECTORY "${full_to_prefix}/${dirname}")
+    file(COPY_FILE
+      "${ARG_ROOT}/${from_prefix}/${file}"              # From
+      "${full_to_prefix}/${file}"                       # To
+      RESULT _output
+      ONLY_IF_DIFFERENT)
+    if(_output)
+      message(SEND_ERROR
+        "Copy ${ARG_ROOT}/${from_prefix}/${file} -> ${full_to_prefix}/${file} Failed: ${_output}")
+    endif()
+  endforeach()
+endfunction()
 
 # Copy the files under the "name" directory in the standard library into the new
 # location under Runtimes
 function(copy_library_sources name from_prefix to_prefix)
-  message(STATUS "${name}[${StdlibSources}/${from_prefix}/${name}] -> ${to_prefix}/${name} ")
+  cmake_parse_arguments(ARG "" "ROOT" "" ${ARGN})
+
+  if(NOT ARG_ROOT)
+    set(ARG_ROOT ${StdlibSources})
+  endif()
+
+  message(STATUS "${name}[${ARG_ROOT}/${from_prefix}/${name}] -> ${to_prefix}/${name} ")
 
   set(full_to_prefix "${CMAKE_CURRENT_LIST_DIR}/${to_prefix}")
 
   file(GLOB_RECURSE filenames
     FOLLOW_SYMLINKS
     LIST_DIRECTORIES FALSE
-    RELATIVE "${StdlibSources}/${from_prefix}"
-    "${StdlibSources}/${from_prefix}/${name}/*.swift"
-    "${StdlibSources}/${from_prefix}/${name}/*.h"
-    "${StdlibSources}/${from_prefix}/${name}/*.cpp"
-    "${StdlibSources}/${from_prefix}/${name}/*.c"
-    "${StdlibSources}/${from_prefix}/${name}/*.mm"
-    "${StdlibSources}/${from_prefix}/${name}/*.m"
-    "${StdlibSources}/${from_prefix}/${name}/*.def"
-    "${StdlibSources}/${from_prefix}/${name}/*.gyb"
-    "${StdlibSources}/${from_prefix}/${name}/*.apinotes"
-    "${StdlibSources}/${from_prefix}/${name}/*.yaml"
-    "${StdlibSources}/${from_prefix}/${name}/*.inc"
-    "${StdlibSources}/${from_prefix}/${name}/*.modulemap"
-    "${StdlibSources}/${from_prefix}/${name}/*.json")
+    RELATIVE "${ARG_ROOT}/${from_prefix}"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.swift"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.h"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.cpp"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.c"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.mm"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.m"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.def"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.gyb"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.apinotes"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.yaml"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.inc"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.modulemap"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.json")
 
-  foreach(file ${filenames})
-    # Get and create the directory
-    get_filename_component(dirname ${file} DIRECTORY)
-    file(MAKE_DIRECTORY "${full_to_prefix}/${dirname}")
-    file(COPY_FILE
-      "${StdlibSources}/${from_prefix}/${file}"         # From
-      "${full_to_prefix}/${file}"                       # To
-      RESULT _output
-      ONLY_IF_DIFFERENT)
-    if(_output)
-      message(SEND_ERROR
-        "Copy ${from_prefix}/${file} -> ${full_to_prefix}/${file} Failed: ${_output}")
-    endif()
-  endforeach()
+  copy_files("${from_prefix}" "${to_prefix}"
+    ROOT "${ARG_ROOT}"
+    FILES ${filenames})
 endfunction()
 
 # Directories in the existing standard library that make up the Core project
@@ -59,18 +77,6 @@ copy_library_sources(include "" "Core")
 # Copy magic linker symbols
 copy_library_sources("linker-support" "" "Core")
 
-# Copy Plist
-message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
-file(COPY_FILE
-  "${StdlibSources}/Info.plist.in"                             # From
-  "${CMAKE_CURRENT_LIST_DIR}/Core/Info.plist.in"               # To
-  RESULT _output
-  ONLY_IF_DIFFERENT)
-if(_output)
-  message(SEND_ERROR
-    "Copy ${StdlibSources}/Info.plist.in] -> Core/Info.plist.in Failed: ${_output}")
-endif()
-
 set(CoreLibs
   LLVMSupport
   SwiftShims
@@ -78,19 +84,65 @@ set(CoreLibs
   CompatibilityOverride
   stubs
   CommandLineSupport
-  core)
-
-  # Add these as we get them building
-  # core
-  # Concurrency
-  # SwiftOnoneSUpport
-  # CommandLineSupport
-  # Demangling
-  # runtime)
+  core
+  SwiftOnoneSupport
+  Concurrency
+  Concurrency/InternalShims)
 
 foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
+copy_files("" "Core" FILES "Info.plist.in")
+
+# Platform Overlays
+
+# Copy magic linker symbols
+copy_library_sources("linker-support" "" "Overlay")
+
+message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
+copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
+
+# Windows Overlay
+message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
+copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
+
+message(STATUS "Windows Modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang")
+copy_files(public/Platform Overlay/Windows/clang
+  FILES
+    ucrt.modulemap
+    winsdk.modulemap
+    vcruntime.modulemap
+    vcruntime.apinotes)
+
+message(STATUS "CRT[${StdlibSources}/public/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/CRT")
+copy_files(public/Platform Overlay/Windows/CRT
+  FILES
+    ucrt.swift
+    Platform.swift
+    POSIXError.swift
+    TiocConstants.swift
+    tgmath.swift.gyb)
+
 # TODO: Add source directories for the platform overlays, supplemental
 # libraries, and test support libraries.
+
+# Supplemental Libraries
+
+# Copy StringProcessing, RegexParser, RegexBuilder
+if(NOT DEFINED StringProcessing_ROOT_DIR)
+  find_path(StringProcessing_ROOT_DIR
+    "swift-experimental-string-processing/Package.swift"
+    HINTS "${CMAKE_CURRENT_LIST_DIR}/../../")
+endif()
+message(STATUS "String Processing Root: ${StringProcessing_ROOT_DIR}")
+
+copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+copy_library_sources(_StringProcessing "Sources" "Supplemental/StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
+  ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")

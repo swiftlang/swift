@@ -103,11 +103,57 @@ struct ExpectedFixIt {
   std::string Text;
 };
 
+struct DiagLoc {
+  std::optional<unsigned> bufferID;
+  unsigned line;
+  unsigned column;
+  SourceLoc sourceLoc;
+
+  DiagLoc(SourceManager &diagSM, SourceManager &verifierSM,
+          SourceLoc initialSourceLoc, bool wantEnd = false)
+      : bufferID(std::nullopt), line(0), column(0), sourceLoc(initialSourceLoc)
+  {
+    if (sourceLoc.isInvalid())
+      return;
+
+    // Walk out of generated code for macros in default arguments so that we
+    // register diagnostics emitted in them at the call site instead.
+    while (true) {
+      bufferID = diagSM.findBufferContainingLoc(sourceLoc);
+      ASSERT(bufferID.has_value());
+
+      auto generatedInfo = diagSM.getGeneratedSourceInfo(*bufferID);
+      if (!generatedInfo || generatedInfo->originalSourceRange.isInvalid()
+            || generatedInfo->kind != GeneratedSourceInfo::DefaultArgument)
+        break;
+
+      if (wantEnd)
+        sourceLoc = generatedInfo->originalSourceRange.getEnd();
+      else
+        sourceLoc = generatedInfo->originalSourceRange.getStart();
+
+      ASSERT(sourceLoc.isValid());
+    }
+
+    // If this diagnostic came from a different SourceManager (as can happen
+    // while compiling a module interface), translate its SourceLoc to match the
+    // verifier's SourceManager.
+    if (&diagSM != &verifierSM) {
+      sourceLoc = verifierSM.getLocForForeignLoc(sourceLoc, diagSM);
+      bufferID = verifierSM.findBufferContainingLoc(sourceLoc);
+    }
+
+    // At this point, `bufferID` is filled in and `sourceLoc` is a location in
+    // that buffer.
+    if (sourceLoc.isValid())
+      std::tie(line, column) = verifierSM.getLineAndColumnInBuffer(sourceLoc);
+  }
+};
+
 } // end namespace swift
 
 const LineColumnRange &
-CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
-                                      unsigned BufferID) const {
+CapturedFixItInfo::getLineColumnRange(SourceManager &SM) const {
   if (LineColRange.StartLine != 0) {
     // Already computed.
     return LineColRange;
@@ -115,21 +161,13 @@ CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
 
   auto SrcRange = FixIt.getRange();
 
-  std::tie(LineColRange.StartLine, LineColRange.StartCol) =
-      SM.getPresumedLineAndColumnForLoc(SrcRange.getStart(), BufferID);
+  DiagLoc startLoc(*diagSM, SM, SrcRange.getStart());
+  LineColRange.StartLine = startLoc.line;
+  LineColRange.StartCol = startLoc.column;
 
-  // We don't have to compute much if the end location is on the same line.
-  if (SrcRange.getByteLength() == 0) {
-    LineColRange.EndLine = LineColRange.StartLine;
-    LineColRange.EndCol = LineColRange.StartCol;
-  } else if (SM.extractText(SrcRange, BufferID).find_first_of("\n\r") ==
-             StringRef::npos) {
-    LineColRange.EndLine = LineColRange.StartLine;
-    LineColRange.EndCol = LineColRange.StartCol + SrcRange.getByteLength();
-  } else {
-    std::tie(LineColRange.EndLine, LineColRange.EndCol) =
-        SM.getPresumedLineAndColumnForLoc(SrcRange.getEnd(), BufferID);
-  }
+  DiagLoc endLoc(*diagSM, SM, SrcRange.getEnd(), /*wantEnd=*/true);
+  LineColRange.EndLine = endLoc.line;
+  LineColRange.EndCol = endLoc.column;
 
   return LineColRange;
 }
@@ -137,7 +175,7 @@ CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
 namespace {
 
 static constexpr StringLiteral fixitExpectationNoneString("none");
-static constexpr StringLiteral educationalNotesSpecifier("educational-notes=");
+static constexpr StringLiteral categoryDocFileSpecifier("documentation-file=");
 
 struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
@@ -171,16 +209,16 @@ struct ExpectedDiagnosticInfo {
   // Loc of {{none}}
   const char *noneMarkerStartLoc = nullptr;
 
-  /// Represents a specifier of the form '{{educational-notes=note1,note2}}'.
-  struct ExpectedEducationalNotes {
+  /// Represents a specifier of the form '{{documentation-file=note1}}'.
+  struct ExpectedDocumentationFile {
     const char *StartLoc, *EndLoc; // The loc of the {{ and }}'s.
-    llvm::SmallVector<StringRef, 1> Names; // Names of expected notes.
+    StringRef Name; // Name of expected documentation file.
 
-    ExpectedEducationalNotes(const char *StartLoc, const char *EndLoc,
-                             llvm::SmallVector<StringRef, 1> Names)
-        : StartLoc(StartLoc), EndLoc(EndLoc), Names(Names) {}
+    ExpectedDocumentationFile(const char *StartLoc, const char *EndLoc,
+                              StringRef Name)
+        : StartLoc(StartLoc), EndLoc(EndLoc), Name(Name) {}
   };
-  std::optional<ExpectedEducationalNotes> EducationalNotes;
+  std::optional<ExpectedDocumentationFile> DocumentationFile;
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
                          const char *ClassificationStart,
@@ -205,15 +243,12 @@ static std::string getDiagKindString(DiagnosticKind Kind) {
   llvm_unreachable("Unhandled DiagKind in switch.");
 }
 
-/// Render the verifier syntax for a given set of educational notes.
+/// Render the verifier syntax for a given documentation file.
 static std::string
-renderEducationalNotes(llvm::SmallVectorImpl<std::string> &EducationalNotes) {
+renderDocumentationFile(const std::string &documentationFile) {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  OS << "{{" << educationalNotesSpecifier;
-  interleave(EducationalNotes, [&](const auto &Note) { OS << Note; },
-             [&] { OS << ','; });
-  OS << "}}";
+  OS << "{{" << categoryDocFileSpecifier << documentationFile << "}}";
   return OS.str();
 }
 
@@ -223,13 +258,13 @@ renderEducationalNotes(llvm::SmallVectorImpl<std::string> &EducationalNotes) {
 /// Otherwise return \c CapturedDiagnostics.end() with \c false.
 static std::tuple<std::vector<CapturedDiagnosticInfo>::iterator, bool>
 findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
-               const ExpectedDiagnosticInfo &Expected, StringRef BufferName) {
+               const ExpectedDiagnosticInfo &Expected, unsigned BufferID) {
   auto fallbackI = CapturedDiagnostics.end();
 
   for (auto I = CapturedDiagnostics.begin(), E = CapturedDiagnostics.end();
        I != E; ++I) {
     // Verify the file and line of the diagnostic.
-    if (I->Line != Expected.LineNo || I->FileName != BufferName)
+    if (I->Line != Expected.LineNo || I->SourceBufferID != BufferID)
       continue;
 
     // If a specific column was expected, verify it.
@@ -363,7 +398,7 @@ bool DiagnosticVerifier::checkForFixIt(
       if (ActualFixIt.getText() != Expected.Text)
         continue;
 
-      auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+      auto &ActualRange = ActualFixIt.getLineColumnRange(SM);
 
       if (Expected.Range.StartCol != ActualRange.StartCol ||
           Expected.Range.EndCol != ActualRange.EndCol ||
@@ -394,7 +429,7 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
   interleave(
       ActualFixIts,
       [&](const CapturedFixItInfo &ActualFixIt) {
-        auto &ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+        auto &ActualRange = ActualFixIt.getLineColumnRange(SM);
         OS << "{{";
 
         if (ActualRange.StartLine != DiagnosticLineNo)
@@ -566,7 +601,6 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
-  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
   // file order.
@@ -709,7 +743,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
-      Expected.LineNo = SM.getPresumedLineAndColumnForLoc(
+      Expected.LineNo = SM.getLineAndColumnInBuffer(
                               BufferStartLoc.getAdvancedLoc(MatchStart.data() -
                                                             InputFile.data()),
                               BufferID)
@@ -773,30 +807,23 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         startNewAlternatives = true;
       }
 
-      // If this check starts with 'educational-notes=', check for one or more
-      // educational notes instead of a fix-it.
-      if (CheckStr.starts_with(educationalNotesSpecifier)) {
-        if (Expected.EducationalNotes.has_value()) {
+      // If this check starts with 'documentation-file=', check for a
+      // documentation file name instead of a fix-it.
+      if (CheckStr.starts_with(categoryDocFileSpecifier)) {
+        if (Expected.DocumentationFile.has_value()) {
           addError(CheckStr.data(),
                    "each verified diagnostic may only have one "
-                   "{{educational-notes=<#notes#>}} declaration");
+                   "{{documentation-file=<#notes#>}} declaration");
           continue;
         }
-        StringRef NotesStr = CheckStr.substr(
-            educationalNotesSpecifier.size()); // Trim 'educational-notes='.
-        llvm::SmallVector<StringRef, 1> names;
-        // Note names are comma-separated.
-        std::pair<StringRef, StringRef> split;
-        do {
-          split = NotesStr.split(',');
-          names.push_back(split.first);
-          NotesStr = split.second;
-        } while (!NotesStr.empty());
-        Expected.EducationalNotes.emplace(OpenLoc, CloseLoc, names);
+
+        // Trim 'documentation-file='.
+        StringRef name = CheckStr.substr(categoryDocFileSpecifier.size());
+        Expected.DocumentationFile = { OpenLoc, CloseLoc, name };
         continue;
       }
 
-      // This wasn't an educational notes specifier, so it must be a fix-it.
+      // This wasn't a documentation file specifier, so it must be a fix-it.
       // Special case for specifying no fixits should appear.
       if (CheckStr == fixitExpectationNoneString) {
         if (Expected.noneMarkerStartLoc) {
@@ -888,7 +915,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     // Check to see if we had this expected diagnostic.
     auto FoundDiagnosticInfo =
-        findDiagnostic(CapturedDiagnostics, expected, BufferName);
+        findDiagnostic(CapturedDiagnostics, expected, BufferID);
     auto FoundDiagnosticIter = std::get<0>(FoundDiagnosticInfo);
     if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
       // Diagnostic didn't exist.  If this is a 'mayAppear' diagnostic, then
@@ -1029,29 +1056,27 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
                       replEndLoc, actualFixits);
     }
 
-    if (auto expectedNotes = expected.EducationalNotes) {
-      // Verify educational notes
-      for (auto &foundName : FoundDiagnostic.EducationalNotes) {
-        llvm::erase_if(expectedNotes->Names,
-                       [&](StringRef item) { return item == foundName; });
-      }
+    if (auto expectedDocFile = expected.DocumentationFile) {
+      // Verify diagnostic file.
+      if (FoundDiagnostic.CategoryDocFile == expectedDocFile->Name)
+        expectedDocFile = std::nullopt;
 
-      if (!expectedNotes->Names.empty()) {
-        if (FoundDiagnostic.EducationalNotes.empty()) {
-          addError(expectedNotes->StartLoc,
-                   "expected educational note(s) not seen");
+      if (expectedDocFile) {
+        if (FoundDiagnostic.CategoryDocFile.empty()) {
+          addError(expectedDocFile->StartLoc,
+                   "expected documentation file not seen");
         } else {
-          // If we had an incorrect expected note, render it and produce a fixit
-          // of our own.
+          // If we had an incorrect expected document file, render it and
+          // produce a fixit of our own.
           auto actual =
-              renderEducationalNotes(FoundDiagnostic.EducationalNotes);
-          auto replStartLoc = SMLoc::getFromPointer(expectedNotes->StartLoc);
-          auto replEndLoc = SMLoc::getFromPointer(expectedNotes->EndLoc);
+              renderDocumentationFile(FoundDiagnostic.CategoryDocFile);
+          auto replStartLoc = SMLoc::getFromPointer(expectedDocFile->StartLoc);
+          auto replEndLoc = SMLoc::getFromPointer(expectedDocFile->EndLoc);
 
           llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
-          addError(expectedNotes->StartLoc,
-                   "expected educational note(s) not seen; actual educational "
-                   "note(s): " + actual, fix);
+          addError(expectedDocFile->StartLoc,
+                   "expected documentation file not seen; actual documentation "
+                   "file: " + actual, fix);
         }
       }
     }
@@ -1078,8 +1103,8 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     auto I = CapturedDiagnostics.begin();
     for (auto E = CapturedDiagnostics.end(); I != E; ++I) {
       // Verify the file and line of the diagnostic.
-      if (I->Line != expectedDiagIter->LineNo || I->FileName != BufferName ||
-          I->Classification != expectedDiagIter->Classification)
+      if (I->Line != expectedDiagIter->LineNo || I->SourceBufferID != BufferID
+            || I->Classification != expectedDiagIter->Classification)
         continue;
       
       // Otherwise, we found it, break out.
@@ -1167,7 +1192,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   bool HadUnexpectedDiag = false;
   auto CapturedDiagIter = CapturedDiagnostics.begin();
   while (CapturedDiagIter != CapturedDiagnostics.end()) {
-    if (CapturedDiagIter->FileName != BufferName) {
+    if (CapturedDiagIter->SourceBufferID != BufferID) {
       ++CapturedDiagIter;
       continue;
     }
@@ -1241,12 +1266,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                           const DiagnosticInfo &Info) {
   SmallVector<CapturedFixItInfo, 2> fixIts;
   for (const auto &fixIt : Info.FixIts) {
-    fixIts.emplace_back(fixIt);
-  }
-
-  llvm::SmallVector<std::string, 1> eduNotes;
-  for (auto &notePath : Info.EducationalNotePaths) {
-    eduNotes.push_back(llvm::sys::path::stem(notePath).str());
+    fixIts.emplace_back(SM, fixIt);
   }
 
   llvm::SmallString<128> message;
@@ -1256,40 +1276,40 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                            Info.FormatArgs);
   }
 
-  if (Info.Loc.isValid()) {
-    const auto lineAndColumn = SM.getPresumedLineAndColumnForLoc(Info.Loc);
-    const auto fileName = SM.getDisplayNameForLoc(Info.Loc);
-    CapturedDiagnostics.emplace_back(message, fileName, Info.Kind, Info.Loc,
-                                     lineAndColumn.first, lineAndColumn.second,
-                                     fixIts, eduNotes);
-  } else {
-    CapturedDiagnostics.emplace_back(message, StringRef(), Info.Kind, Info.Loc,
-                                     0, 0, fixIts, eduNotes);
-  }
-
-  // If this diagnostic came from a different SourceManager (as can happen
-  // while compiling a module interface), translate its SourceLocs to match the
-  // verifier's SourceManager.
-  if (&SM != &(this->SM)) {
-    auto &capturedDiag = CapturedDiagnostics.back();
-    auto &correctSM = this->SM;
-
-    capturedDiag.Loc = correctSM.getLocForForeignLoc(capturedDiag.Loc, SM);
-    for (auto &fixIt : capturedDiag.FixIts) {
-      auto newStart =
-          correctSM.getLocForForeignLoc(fixIt.getSourceRange().getStart(), SM);
-      auto &mutableRange = fixIt.getSourceRange();
-      mutableRange =
-          CharSourceRange(newStart, fixIt.getSourceRange().getByteLength());
-    }
-  }
+  DiagLoc loc(SM, this->SM, Info.Loc);
+  CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
+                                   loc.sourceLoc, loc.line, loc.column, fixIts,
+                                   llvm::sys::path::stem(
+                                      Info.CategoryDocumentationURL).str());
 }
 
 /// Once all diagnostics have been captured, perform verification.
 bool DiagnosticVerifier::finishProcessing() {
   DiagnosticVerifier::Result Result = {false, false};
 
-  ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, AdditionalBufferIDs };
+  SmallVector<unsigned, 4> additionalBufferIDs;
+  for (auto path : AdditionalFilePaths) {
+    auto bufferID = SM.getIDForBufferIdentifier(path);
+    if (!bufferID) {
+      // Still need to scan this file for expectations.
+      auto result = SM.getFileSystem()->getBufferForFile(path);
+      if (!result) {
+        auto message = SM.GetMessage(
+           SourceLoc(), llvm::SourceMgr::DiagKind::DK_Error,
+           llvm::Twine("unable to open file in '-verify-additional-file ") +
+           path + "': " + result.getError().message(), {}, {});
+        printDiagnostic(message);
+        Result.HadError |= true;
+        continue;
+      }
+      bufferID = SM.addNewSourceBuffer(std::move(result.get()));
+    }
+    if (bufferID) {
+      additionalBufferIDs.push_back(*bufferID);
+    }
+  }
+
+  ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, additionalBufferIDs };
   for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
     for (auto &BufferID : BufferIDList) {
       DiagnosticVerifier::Result FileResult = verifyFile(BufferID);

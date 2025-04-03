@@ -18,6 +18,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
@@ -1360,6 +1361,34 @@ CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
          "Capture lists only support single-var patterns");
 }
 
+CaptureListEntry CaptureListEntry::createParsed(
+    ASTContext &Ctx, ReferenceOwnership ownershipKind,
+    SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
+    SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
+
+  auto introducer =
+      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
+                                                 : VarDecl::Introducer::Var);
+  auto *VD =
+      new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
+
+  if (ownershipKind != ReferenceOwnership::Strong)
+    VD->getAttrs().add(
+        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+
+  auto *pattern = NamedPattern::createImplicit(Ctx, VD);
+
+  auto *PBD = PatternBindingDecl::create(Ctx, /*StaticLoc=*/SourceLoc(),
+                                         StaticSpellingKind::None, nameLoc,
+                                         pattern, equalLoc, initializer, DC);
+  CaptureListEntry CLE(PBD);
+
+  if (CLE.isSimpleSelfCapture())
+    VD->setIsSelfParamCapture();
+
+  return CLE;
+}
+
 VarDecl *CaptureListEntry::getVar() const {
   return PBD->getSingleVar();
 }
@@ -1725,6 +1754,13 @@ Expr *CallExpr::getDirectCallee() const {
       continue;
     }
 
+    // Explicit specializations are currently invalid for function calls, but
+    // look through them for better recovery.
+    if (auto *spec = dyn_cast<UnresolvedSpecializeExpr>(fn)) {
+      fn = spec->getSubExpr();
+      continue;
+    }
+
     return fn;
   }
 }
@@ -1934,6 +1970,12 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   evaluateOrDefault(
       ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
 
+#if NDEBUG
+  static constexpr bool useFallbackDiscriminator = true;
+#else
+  static constexpr bool useFallbackDiscriminator = false;
+#endif
+
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
@@ -1943,7 +1985,8 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
-       getParent()->isModuleScopeContext())) {
+       getParent()->isModuleScopeContext() ||
+       useFallbackDiscriminator)) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
@@ -1972,6 +2015,29 @@ BraceStmt * AbstractClosureExpr::getBody() const {
   if (const ClosureExpr *cls = dyn_cast<ClosureExpr>(this))
     return cls->getBody();
   llvm_unreachable("Unknown closure expression");
+}
+
+BraceStmt *ClosureExpr::getExpandedBody() {
+  auto &ctx = getASTContext();
+
+  // Expand a body macro, if there is one.
+  BraceStmt *macroExpandedBody = nullptr;
+  if (auto bufferID = evaluateOrDefault(
+          ctx.evaluator,
+          ExpandBodyMacroRequest{this},
+          std::nullopt)) {
+    CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+    auto bufferStart = bufferRange.getStart();
+    auto module = getParentModule();
+    auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
+
+    if (macroSourceFile->getTopLevelItems().size() == 1) {
+      auto stmt = macroSourceFile->getTopLevelItems()[0].dyn_cast<Stmt *>();
+      macroExpandedBody = dyn_cast<BraceStmt>(stmt);
+    }
+  }
+
+  return macroExpandedBody;
 }
 
 bool AbstractClosureExpr::bodyHasExplicitReturnStmt() const {
@@ -2131,6 +2197,17 @@ void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
+}
+
+MacroDecl *
+ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
+  auto &ctx = getASTContext();
+  auto declRef = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveMacroRequest{customAttr, this},
+      ConcreteDeclRef());
+
+  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -2364,20 +2441,18 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
-                                            DeclContext *DC) {
-  ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid());
-  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
-  Repr->setValue(Decl, DC);
-  return new (C) TypeValueExpr(Repr);
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, 
+                                            GenericTypeParamDecl *paramDecl) {
+  auto &ctx = paramDecl->getASTContext();
+  ASSERT(loc.isValid());
+  return new (ctx) TypeValueExpr(loc, paramDecl);
 }
 
-OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
+ExistentialArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
-  return type->castTo<OpenedArchetypeType>();
+  return type->castTo<ExistentialArchetypeType>();
 }
 
 KeyPathExpr::KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot,
@@ -2459,7 +2534,7 @@ KeyPathExpr::setComponents(ASTContext &C,
 
 std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   for (auto idx : indices(getComponents())) {
-    if (auto *args = getComponents()[idx].getSubscriptArgs()) {
+    if (auto *args = getComponents()[idx].getArgs()) {
       if (args->findArgumentExpr(arg))
         return idx;
     }
@@ -2514,13 +2589,14 @@ KeyPathExpr::Component::Component(
     DeclNameOrRef decl, ArgumentList *argList,
     ArrayRef<ProtocolConformanceRef> indexHashables, Kind kind, Type type,
     SourceLoc loc)
-    : Decl(decl), SubscriptArgList(argList), KindValue(kind),
-      ComponentType(type), Loc(loc) {
-  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript);
+    : Decl(decl), ArgList(argList), KindValue(kind), ComponentType(type),
+      Loc(loc) {
+  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript ||
+         kind == Kind::UnresolvedApply || kind == Kind::Apply);
   assert(argList);
   assert(argList->size() == indexHashables.size() || indexHashables.empty());
-  SubscriptHashableConformancesData = indexHashables.empty()
-    ? nullptr : indexHashables.data();
+  HashableConformancesData =
+      indexHashables.empty() ? nullptr : indexHashables.data();
 }
 
 SingleValueStmtExpr *SingleValueStmtExpr::create(ASTContext &ctx, Stmt *S,

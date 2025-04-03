@@ -60,6 +60,7 @@ struct NE : ~Escapable {
   }
 }
 
+@lifetime(copy container)
 func bv_get_consume(container: consuming NE) -> BV {
   return container.getBV() // expected-error {{lifetime-dependent value escapes its scope}}
     // expected-note @-1{{it depends on this scoped access to variable 'container'}}
@@ -70,23 +71,15 @@ struct Wrapper : ~Escapable {
   let bv: BV
 }
 
-@lifetime(bv2)
+@lifetime(copy bv2)
 func bv_incorrect_annotation1(_ bv1: borrowing BV, _ bv2: borrowing BV) -> BV { // expected-error {{lifetime-dependent variable 'bv1' escapes its scope}}
   return copy bv1                                                                              // expected-note @-1{{it depends on the lifetime of argument 'bv1'}}
 }                                                                                              // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
 
-@lifetime(w2)
+@lifetime(copy w2)
 func bv_incorrect_annotation2(_ w1: borrowing Wrapper, _ w2: borrowing Wrapper) -> BV { // expected-error {{lifetime-dependent variable 'w1' escapes its scope}}
   return w1.bv                                                                                        // expected-note @-1{{it depends on the lifetime of argument 'w1'}}
 }                                                                                                     // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
-
-let ptr = UnsafeRawPointer(bitPattern: 1)!
-let nc = NC(ptr, 0)
-
-func bv_global(dummy: BV) -> BV {
-  nc.getBV()  // expected-error {{lifetime-dependent value escapes its scope}}
-  // expected-note @-4{{it depends on the lifetime of variable 'nc'}}
-} // expected-note {{this use causes the lifetime-dependent value to escape}}
 
 func testEmpty(nc: consuming NC) {
   var e: Empty // expected-error {{lifetime-dependent variable 'e' escapes its scope}}

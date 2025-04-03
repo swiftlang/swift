@@ -32,8 +32,16 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
+  func enableAddressDependencies() -> Bool {
+    _bridged.enableAddressDependencies()
+  }
+
   var enableEmbeddedSwift: Bool {
     _bridged.hasFeature(.Embedded)
+  }
+
+  var enableMergeableTraps: Bool {
+    _bridged.enableMergeableTraps()
   }
 
   func hasFeature(_ feature: BridgedFeature) -> Bool {

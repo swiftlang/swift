@@ -39,6 +39,8 @@
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -149,32 +151,6 @@ static constexpr const char *const fixItStrings[] = {
 #include "swift/AST/DiagnosticsAll.def"
     "<not a fix-it>",
 };
-
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  static constexpr const char *const DIAG##_educationalNotes[] = {__VA_ARGS__, \
-                                                                  nullptr};
-#include "swift/AST/EducationalNotes.def"
-
-// NOTE: sadly, while GCC and Clang support array designators in C++, they are
-// not part of the standard at the moment, so Visual C++ doesn't support them.
-// This construct allows us to provide a constexpr array initialized to empty
-// values except in the cases that EducationalNotes.def are provided, similar to
-// what the C array would have looked like.
-template<int N>
-struct EducationalNotes {
-  constexpr EducationalNotes() : value() {
-    for (auto i = 0; i < N; ++i) value[i] = {};
-#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  value[static_cast<std::underlying_type_t<DiagID>>(DiagID::DIAG)] =           \
-      DIAG##_educationalNotes;
-#include "swift/AST/EducationalNotes.def"
-  }
-  const char *const *value[N];
-};
-
-static constexpr EducationalNotes<NumDiagIDs> _EducationalNotes =
-    EducationalNotes<NumDiagIDs>();
-static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
   // Initialize our ignored diagnostics to defaults
@@ -396,6 +372,42 @@ InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::fixItInsertAttribute(SourceLoc L,
+                                         const DeclAttribute *Attr) {
+  return fixItInsert(L, "%0 ", {Attr});
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
+                                      const ClosureExpr *E) {
+  ASSERT(!E->isImplicit());
+
+  SourceLoc insertionLoc;
+
+  if (auto *paramList = E->getParameters()) {
+    // HACK: Don't set insertion loc to param list start loc if it's equal to
+    // closure start loc (meaning it's implicit).
+    // FIXME: Don't set the start loc of an implicit param list, or put an
+    // isImplicit bit on ParameterList.
+    if (paramList->getStartLoc() != E->getStartLoc()) {
+      insertionLoc = paramList->getStartLoc();
+    }
+  }
+
+  if (insertionLoc.isInvalid()) {
+    insertionLoc = E->getInLoc();
+  }
+
+  if (insertionLoc.isValid()) {
+    return fixItInsert(insertionLoc, "%0 ", {Attr});
+  } else {
+    insertionLoc = E->getBody()->getLBraceLoc();
+    ASSERT(insertionLoc.isValid());
+    return fixItInsertAfter(insertionLoc, " %0 in ", {Attr});
+  }
+}
+
 InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
                                                       SourceRange R2) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
@@ -440,7 +452,8 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     limitBehavior(limit);
   }
 
-  if (majorVersion == 6) {
+  // Record all of the diagnostics that are going to be emitted.
+  if (majorVersion == 6 && limit != DiagnosticBehavior::Ignore) {
     if (auto stats = Engine->statsReporter) {
       ++stats->getFrontendCounters().NumSwift6Errors;
     }
@@ -457,8 +470,7 @@ InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
 
 InFlightDiagnostic &
 InFlightDiagnostic::warnInSwiftInterface(const DeclContext *context) {
-  auto sourceFile = context->getParentSourceFile();
-  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface) {
+  if (context->isInSwiftinterface()) {
     return limitBehavior(DiagnosticBehavior::Warning);
   }
 
@@ -752,6 +764,11 @@ void swift::printClangDeclName(const clang::NamedDecl *ND,
   ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
+void swift::printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os) {
+  clang::QualType::print(Ty, clang::Qualifiers(), os,
+                         clang::PrintingPolicy{clang::LangOptions()}, "");
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -1040,17 +1057,38 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Stmt::getDescriptiveKindName(Arg.getAsDescriptiveStmtKind());
     break;
 
-  case DiagnosticArgumentKind::DeclAttribute:
+  case DiagnosticArgumentKind::DeclAttribute: {
+    auto *const attr = Arg.getAsDeclAttribute();
+    const auto printAttrName = [&] {
+      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
+        custom->getTypeRepr()->print(Out);
+      } else {
+        Out << attr->getAttrName();
+      }
+    };
+
     assert(Modifier.empty() &&
            "Improper modifier for DeclAttribute argument");
-    if (Arg.getAsDeclAttribute()->isDeclModifier())
-      Out << FormatOpts.OpeningQuotationMark
-          << Arg.getAsDeclAttribute()->getAttrName()
-          << FormatOpts.ClosingQuotationMark;
-    else
-      Out << '@' << Arg.getAsDeclAttribute()->getAttrName();
+    if (Arg.getAsDeclAttribute()->isDeclModifier()) {
+      Out << FormatOpts.OpeningQuotationMark;
+      printAttrName();
+      Out << FormatOpts.ClosingQuotationMark;
+    } else {
+      Out << '@';
+      printAttrName();
+    }
     break;
-
+  }
+  case DiagnosticArgumentKind::AvailabilityDomain:
+    assert(Modifier.empty() &&
+           "Improper modifier for AvailabilityDomain argument");
+    Out << Arg.getAsAvailabilityDomain().getNameForDiagnostics();
+    break;
+  case DiagnosticArgumentKind::AvailabilityRange:
+    assert(Modifier.empty() &&
+           "Improper modifier for AvailabilityRange argument");
+    Out << Arg.getAsAvailabilityRange().getRawMinimumVersion().getAsString();
+    break;
   case DiagnosticArgumentKind::VersionTuple:
     assert(Modifier.empty() &&
            "Improper modifier for VersionTuple argument");
@@ -1087,6 +1125,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
     Out << FormatOpts.OpeningQuotationMark;
     printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
+
+  case DiagnosticArgumentKind::ClangType:
+    assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangTypeName(Arg.getAsClangType(), Out);
     Out << FormatOpts.ClosingQuotationMark;
     break;
   }
@@ -1330,13 +1375,16 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     }
   }
 
+  auto groupID = diagnostic.getGroupID();
   StringRef Category;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
-  else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     Category = "no-usage";
+  else if (groupID != DiagGroupID::no_group)
+    Category = getDiagGroupInfoByID(groupID).name;
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
+    Category = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1361,16 +1409,11 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     }
   }
 
-  llvm::StringRef format;
-  if (includeDiagnosticName)
-    format =
-        diagnosticStringWithNameFor(diagnostic.getID(), diagnostic.getGroupID(),
-                                    getPrintDiagnosticNamesMode());
-  else
-    format = diagnosticStringFor(diagnostic.getID());
+  auto formatString =
+      getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        format, diagnostic.getArgs(), Category,
+                        formatString, diagnostic.getArgs(), Category,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
@@ -1515,15 +1558,18 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
 
-    SmallVector<std::string, 1> educationalNotePaths;
-    auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
-    while (associatedNotes && *associatedNotes) {
-      SmallString<128> notePath(getDiagnosticDocumentationPath());
-      llvm::sys::path::append(notePath, *associatedNotes);
-      educationalNotePaths.push_back(notePath.str().str());
-      ++associatedNotes;
+    // Capture information about the diagnostic group and its documentation
+    // URL.
+    auto groupID = diagnostic.getGroupID();
+    if (groupID != DiagGroupID::no_group) {
+      const auto &diagGroup = getDiagGroupInfoByID(groupID);
+      
+      std::string docURL(getDiagnosticDocumentationPath());
+      if (!docURL.empty() && docURL.back() != '/')
+        docURL += "/";
+      docURL += diagGroup.documentationFile;
+      info->CategoryDocumentationURL = std::move(docURL);
     }
-    info->EducationalNotePaths = educationalNotePaths;
 
     for (auto &consumer : Consumers) {
       consumer->handleDiagnostic(SourceMgr, *info);
@@ -1541,7 +1587,7 @@ DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {
   return storedDiagnosticInfos[(unsigned)id].kind;
 }
 
-llvm::StringRef DiagnosticEngine::diagnosticStringFor(DiagID id) {
+llvm::StringRef DiagnosticEngine::getFormatStringForDiagnostic(DiagID id) {
   llvm::StringRef message = diagnosticStrings[(unsigned)id];
   if (auto localizationProducer = localization.get()) {
     message = localizationProducer->getMessageOr(id, message);
@@ -1549,10 +1595,16 @@ llvm::StringRef DiagnosticEngine::diagnosticStringFor(DiagID id) {
   return message;
 }
 
-llvm::StringRef DiagnosticEngine::diagnosticStringWithNameFor(
-    DiagID id, DiagGroupID groupID,
-    PrintDiagnosticNamesMode printDiagnosticNamesMode) {
-  auto message = diagnosticStringFor(id);
+llvm::StringRef
+DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
+                                               bool includeDiagnosticName) {
+  auto diagID = diagnostic.getID();
+  auto message = getFormatStringForDiagnostic(diagID);
+
+  if (!includeDiagnosticName) {
+    return message;
+  }
+
   auto formatMessageWithName = [&](StringRef message, StringRef name) {
     const int additionalCharsLength = 3; // ' ', '[', ']'
     std::string messageWithName;
@@ -1566,17 +1618,23 @@ llvm::StringRef DiagnosticEngine::diagnosticStringWithNameFor(
   };
   switch (printDiagnosticNamesMode) {
   case PrintDiagnosticNamesMode::None:
-    break;
-  case PrintDiagnosticNamesMode::Identifier:
-    message = formatMessageWithName(message, diagnosticIDStringFor(id));
-    break;
   case PrintDiagnosticNamesMode::Group:
-    if (groupID != DiagGroupID::no_group) {
-      message =
-          formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);
+    break;
+  case PrintDiagnosticNamesMode::Identifier: {
+    // If this diagnostic is a wrapper for another diagnostic, use the ID of
+    // the wrapped diagnostic.
+    for (const auto &arg : diagnostic.getArgs()) {
+      if (arg.getKind() == DiagnosticArgumentKind::Diagnostic) {
+        diagID = arg.getAsDiagnostic()->ID;
+        break;
+      }
     }
+
+    message = formatMessageWithName(message, diagnosticIDStringFor(diagID));
     break;
   }
+  }
+
   return message;
 }
 

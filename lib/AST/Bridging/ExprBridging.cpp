@@ -121,6 +121,31 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                           /*implicit*/ false);
 }
 
+BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedReferenceOwnership cOwnershipKind,
+    BridgedSourceRange cOwnershipRange, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cEqualLoc,
+    BridgedExpr cInitializer) {
+  return CaptureListEntry::createParsed(
+      cContext.unbridged(), unbridged(cOwnershipKind),
+      cOwnershipRange.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
+      cEqualLoc.unbridged(), cInitializer.unbridged(),
+      cDeclContext.unbridged());
+}
+
+BridgedCaptureListExpr
+BridgedCaptureListExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedArrayRef cCaptureList,
+                                    BridgedClosureExpr cClosure) {
+  SmallVector<CaptureListEntry, 4> captureList;
+  for (auto e : cCaptureList.unbridged<BridgedCaptureListEntry>())
+    captureList.push_back(e.unbridged());
+
+  return CaptureListExpr::create(cContext.unbridged(), captureList,
+                                 cClosure.unbridged());
+}
+
 BridgedClosureExpr BridgedClosureExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedDeclAttributes cAttributes, BridgedSourceRange cBracketRange,
@@ -146,9 +171,18 @@ BridgedClosureExpr BridgedClosureExpr_createParsed(
                   declContext);
 }
 
+BridgedParameterList
+BridgedClosureExpr_getParameterList(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged()->getParameters();
+}
+
 void BridgedClosureExpr_setParameterList(BridgedClosureExpr cClosure,
                                          BridgedParameterList cParams) {
   cClosure.unbridged()->setParameterList(cParams.unbridged());
+}
+
+bool BridgedClosureExpr_hasAnonymousClosureVars(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged()->hasAnonymousClosureVars();
 }
 
 void BridgedClosureExpr_setHasAnonymousClosureVars(
@@ -322,6 +356,26 @@ BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
       cParsedPath.unbridged(), hasLeadingDot);
 }
 
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsedPoundKeyPath(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cNames,
+    BridgedArrayRef cNameLocs, BridgedSourceLoc cRParenLoc) {
+
+  SmallVector<KeyPathExpr::Component> components;
+  auto cNameArr = cNames.unbridged<BridgedDeclNameRef>();
+  auto cNameLocArr = cNameLocs.unbridged<BridgedDeclNameLoc>();
+  for (size_t i = 0, e = cNameArr.size(); i != e; ++i) {
+    auto name = cNameArr[i].unbridged();
+    auto loc = cNameLocArr[i].unbridged().getBaseNameLoc();
+    components.push_back(KeyPathExpr::Component::forUnresolvedMember(
+        name, FunctionRefInfo::unappliedBaseName(), loc));
+  }
+
+  return KeyPathExpr::createParsedPoundKeyPath(
+      cContext.unbridged(), cPoundLoc.unbridged(), cLParenLoc.unbridged(),
+      components, cRParenLoc.unbridged());
+}
+
 BridgedSuperRefExpr
 BridgedSuperRefExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cSuperLoc) {
@@ -372,10 +426,97 @@ BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
                           : getFreestandingMacroRoles());
 }
 
+BridgedMagicIdentifierLiteralKind
+BridgedMagicIdentifierLiteralKind_fromString(BridgedStringRef cStr) {
+  StringRef str = cStr.unbridged();
+
+  // Note: STRING includes '#' e.g. '#fileID'.
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  if (str == StringRef(STRING).drop_front())                                   \
+    return BridgedMagicIdentifierLiteralKind##NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
+  return BridgedMagicIdentifierLiteralKindNone;
+}
+
+static std::optional<MagicIdentifierLiteralExpr::Kind>
+unbridge(BridgedMagicIdentifierLiteralKind cKind) {
+  switch (cKind) {
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  case BridgedMagicIdentifierLiteralKind##NAME:                                \
+    return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
+  case BridgedMagicIdentifierLiteralKindNone:
+    return std::nullopt;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedMagicIdentifierLiteralExpr
+BridgedMagicIdentifierLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedMagicIdentifierLiteralKind cKind,
+    BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged())
+      MagicIdentifierLiteralExpr(*unbridge(cKind), cLoc.unbridged());
+}
+
 BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc) {
   return new (cContext.unbridged()) NilLiteralExpr(cNilKeywordLoc.unbridged());
+}
+
+BridgedObjCSelectorExpr BridgedObjCSelectorExpr_createParsed(
+    BridgedASTContext cContext, BridgedObjCSelectorKind cKind,
+    BridgedSourceLoc cKeywordLoc, BridgedSourceLoc cLParenLoc,
+    BridgedSourceLoc cModifierLoc, BridgedExpr cSubExpr,
+    BridgedSourceLoc cRParenLoc) {
+  ObjCSelectorExpr::ObjCSelectorKind kind;
+  switch (cKind) {
+  case BridgedObjCSelectorKindMethod:
+    kind = ObjCSelectorExpr::Method;
+    break;
+  case BridgedObjCSelectorKindGetter:
+    kind = ObjCSelectorExpr::Getter;
+    break;
+  case BridgedObjCSelectorKindSetter:
+    kind = ObjCSelectorExpr::Setter;
+    break;
+  }
+  return new (cContext.unbridged()) ObjCSelectorExpr(
+      kind, cKeywordLoc.unbridged(), cLParenLoc.unbridged(),
+      cModifierLoc.unbridged(), cSubExpr.unbridged(), cRParenLoc.unbridged());
+}
+
+SWIFT_NAME("BridgedObjectLiteralKind.init(from:)")
+BridgedObjectLiteralKind
+BridgedObjectLiteralKind_fromString(BridgedStringRef cStr) {
+  return llvm::StringSwitch<BridgedObjectLiteralKind>(cStr.unbridged())
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  .Case(#Name, BridgedObjectLiteralKind_##Name)
+#include "swift/AST/TokenKinds.def"
+      .Default(BridgedObjectLiteralKind_none);
+}
+
+static std::optional<ObjectLiteralExpr::LiteralKind>
+unbridge(BridgedObjectLiteralKind kind) {
+  switch (kind) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  case BridgedObjectLiteralKind_##Name:                                        \
+    return ObjectLiteralExpr::LiteralKind::Name;
+#include "swift/AST/TokenKinds.def"
+  case BridgedObjectLiteralKind_none:
+    return std::nullopt;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+SWIFT_NAME("BridgedObjectLiteralExpr.createParsed(_:poundLoc:kind:args:)")
+BridgedObjectLiteralExpr BridgedObjectLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedObjectLiteralKind cKind, BridgedArgumentList cArgs) {
+  return ObjectLiteralExpr::create(cContext.unbridged(), cPoundLoc.unbridged(),
+                                   *unbridge(cKind), cArgs.unbridged(),
+                                   /*implicit=*/false);
 }
 
 BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(

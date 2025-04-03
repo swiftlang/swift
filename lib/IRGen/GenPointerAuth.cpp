@@ -193,6 +193,8 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     if (fnType->isAsync()) {
       return options.AsyncSwiftFunctionPointers;
+    } else if (fnType->isCalleeAllocatedCoroutine()) {
+      return options.CoroSwiftFunctionPointers;
     }
 
     return options.SwiftFunctionPointers;
@@ -766,4 +768,8 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
 
   addSignedPointer(pointer, schema.getKey(), schema.isAddressDiscriminated(),
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
+}
+
+llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
+  return getDiscriminatorForString(IGM, CurFn->getName());
 }

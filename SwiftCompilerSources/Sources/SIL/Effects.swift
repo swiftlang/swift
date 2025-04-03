@@ -690,10 +690,10 @@ extension StringParser {
   private mutating func parseArgumentIndexFromSource(for function: Function,
                                              params: Dictionary<String, Int>) throws -> Int {
     if consume("self") {
-      if !function.hasSelfArgument {
+      guard let selfArgIdx = function.selfArgumentIndex else {
         try throwError("function does not have a self argument")
       }
-      return function.selfArgumentIndex
+      return selfArgIdx
     }
     if let name = consumeIdentifier() {
       guard let idx = params[name] else {

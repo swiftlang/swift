@@ -617,9 +617,6 @@ ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
 ///          returns a pointer to the declaration.
 const AbstractFunctionDecl *isActorInitOrDeInitContext(const DeclContext *dc);
 
-/// Determine whether this declaration is always accessed asynchronously.
-bool isAsyncDecl(ConcreteDeclRef declRef);
-
 /// Determine whether this declaration can throw errors.
 bool isThrowsDecl(ConcreteDeclRef declRef);
 
@@ -698,6 +695,37 @@ void introduceUnsafeInheritExecutorReplacements(
 /// we route them to the @_unsafeInheritExecutor versions implicitly.
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
+
+/// Check for correct use of isolated conformances in the given reference.
+///
+/// This checks that any isolated conformances that occur in the given
+/// declaration reference match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the set given set of
+/// protocol conformances.
+///
+/// This checks that any isolated conformances that occur in the given
+/// declaration reference match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
+    const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the given substitution
+/// map.
+///
+/// This checks that any isolated conformances that occur in the given
+/// substitution map match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the given type.
+///
+/// This checks that any isolated conformances that occur in the given
+/// type match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    Type type, SourceLoc loc, const DeclContext *dc);
 
 } // end namespace swift
 

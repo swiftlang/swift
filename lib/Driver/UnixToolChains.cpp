@@ -266,11 +266,13 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   getResourceDirPath(SharedResourceDirPath, context.Args,
                      /*Shared=*/!(staticExecutable || staticStdlib));
 
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  if (!context.Args.hasArg(options::OPT_nostartfiles)) {
+    SmallString<128> swiftrtPath = SharedResourceDirPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);

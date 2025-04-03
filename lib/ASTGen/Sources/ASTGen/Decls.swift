@@ -13,7 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 // MARK: - TypeDecl
 
@@ -50,8 +50,8 @@ extension ASTGenVisitor {
       return self.generate(macroDecl: node)?.asDecl
     case .macroExpansionDecl(let node):
       return self.generate(macroExpansionDecl: node).asDecl
-    case .missingDecl:
-      fatalError("unimplemented")
+    case .missingDecl(let node):
+      return self.generate(missingDecl: node)?.asDecl
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
     case .poundSourceLocation:
@@ -68,13 +68,8 @@ extension ASTGenVisitor {
     case .typeAliasDecl(let node):
       return self.generate(typeAliasDecl: node)?.asDecl
     case .variableDecl(let node):
-      return self.generate(variableDecl: node).asDecl
+      return self.generate(variableDecl: node)
     }
-  }
-
-  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
-    // TODO: Set semicolon loc.
-    generate(decl: node.decl)
   }
 
   func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc)? {
@@ -378,7 +373,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  private func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
+  func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -398,6 +393,12 @@ extension ASTGenVisitor {
       return .modify
     case .`init`:
       return .`init`
+    case .read:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .read2
+    case .modify:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .modify2
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
@@ -483,7 +484,7 @@ extension ASTGenVisitor {
         let brace = BridgedBraceStmt.createParsed(
           self.ctx,
           lBraceLoc: leftBrace,
-          elements: self.generate(codeBlockItemList: codeBlock),
+          elements: self.generate(codeBlockItemList: codeBlock).lazy.bridgedArray(in: self),
           rBraceLoc: rightBrace
         )
         accessor.setParsedBody(brace)
@@ -496,8 +497,9 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult) -> BridgedPatternBindingEntry {
+  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry {
     let pattern = generate(pattern: binding.pattern)
+
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
     var initExpr: BridgedExpr?
@@ -506,10 +508,10 @@ extension ASTGenVisitor {
       // Create a PatternBindingInitializer if we're not in a local context (this
       // ensures that property initializers are correctly treated as being in a
       // local context).
-      if !self.declContext.isLocalContext {
+      if !self.declContext.isLocalContext, topLevelDecl == nil {
         initContext = .create(declContext: self.declContext)
       }
-      initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
+      initExpr = withDeclContext(topLevelDecl?.asDeclContext ?? initContext?.asDeclContext ?? self.declContext) {
         generate(expr: initializer.value)
       }
     }
@@ -531,14 +533,14 @@ extension ASTGenVisitor {
     )
   }
 
-  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult) -> BridgedArrayRef {
+  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedArrayRef {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
     // Generate the bindings in reverse, keeping track of the TypeRepr to
     // propagate to earlier patterns if needed.
     for binding in node.bindings.reversed() {
-      var entry = self.generate(patternBinding: binding, attrs: attrs)
+      var entry = self.generate(patternBinding: binding, attrs: attrs, topLevelDecl: topLevelDecl)
 
       // We can potentially propagate a type annotation back if we don't have an initializer, and are a bare NamedPattern.
       let canPropagateType = binding.initializer == nil && binding.pattern.is(IdentifierPatternSyntax.self)
@@ -571,19 +573,50 @@ extension ASTGenVisitor {
     return entries.reversed().bridgedArray(in: self)
   }
 
-  func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
+  func generate(variableDecl node: VariableDeclSyntax) -> BridgedDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
-    let isLet = node.bindingSpecifier.keywordKind == .let
+    let introducer: BridgedVarDeclIntroducer
+    switch node.bindingSpecifier.rawText {
+    case "let":
+      introducer = .let
+    case "var":
+      introducer = .var
+    case "inout":
+      introducer = .inOut
+    default:
+      // TODO: Diagnostics
+      fatalError("invalid pattern binding introducer")
+    }
+    let topLevelDecl: BridgedTopLevelCodeDecl?
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode {
+      topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
+    } else {
+      topLevelDecl = nil
+    }
 
-    return .createParsed(
+    let decl = BridgedPatternBindingDecl.createParsed(
       self.ctx,
-      declContext: self.declContext,
-      bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      entries: self.generateBindingEntries(for: node, attrs: attrs),
+      declContext: topLevelDecl?.asDeclContext ?? self.declContext,
       attributes: attrs.attributes,
-      isStatic: attrs.staticLoc.isValid,
-      isLet: isLet
+      staticLoc: attrs.staticLoc,
+      staticSpelling: attrs.staticSpelling,
+      introducerLoc: self.generateSourceLoc(node.bindingSpecifier),
+      introducer: introducer,
+      entries: self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl)
     )
+    if let topLevelDecl {
+      let range = self.generateImplicitBraceRange(node)
+      let body = BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: range.start,
+        element: .decl(decl.asDecl),
+        rBraceLoc: range.end
+      )
+      topLevelDecl.setBody(body: body);
+      return topLevelDecl.asDecl
+    } else {
+      return decl.asDecl
+    }
   }
 
   func generate(subscriptDecl node: SubscriptDeclSyntax) -> BridgedSubscriptDecl {
@@ -598,7 +631,8 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.parameterClause, for: .subscript),
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
-      returnType: self.generate(type: node.returnClause.type)
+      returnType: self.generate(type: node.returnClause.type),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     subscriptDecl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -608,16 +642,70 @@ extension ASTGenVisitor {
     }
     return subscriptDecl
   }
+
+  func generate(accessorBlockFile node: AccessorBlockFileSyntax, for storage: BridgedAbstractStorageDecl) -> [BridgedAccessorDecl] {
+    var accessors: [BridgedAccessorDecl] = []
+    for elem in node.accessors {
+      if let accessor = self.generate(accessorDecl: elem, for: storage) {
+        accessors.append(accessor)
+      }
+    }
+    // NOTE: Do not set brace locations even if exist. AST doesn't expect that.
+    let record = BridgedAccessorRecord(
+      lBraceLoc: nil,
+      accessors: accessors.lazy.bridgedArray(in: self),
+      rBraceLoc: nil
+    )
+    // FIXME: The caller should setAccessors() after ASTGen just return parsed accessors.
+    storage.setAccessors(record)
+    return accessors
+  }
 }
 
 // MARK: - AbstractFunctionDecl
 
 extension ASTGenVisitor {
+  struct GeneratedFunctionSignature {
+    var parameterList: BridgedParameterList
+    var asyncLoc: BridgedSourceLoc
+    var isReasync: Bool
+    var throwsLoc: BridgedSourceLoc
+    var isRethrows: Bool
+    var thrownType: BridgedTypeRepr?
+    var returnType: BridgedTypeRepr?
+  }
+  
+  func generate(
+    functionSignature node: FunctionSignatureSyntax,
+    for context: ParameterContext
+  ) -> GeneratedFunctionSignature {
+    let parameterList = self.generate(functionParameterClause: node.parameterClause, for: context)
+    let asyncLoc = self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier)
+    let isReasync = node.effectSpecifiers?.asyncSpecifier?.rawText == "reasync"
+    let throwsLoc = self.generateSourceLoc(node.effectSpecifiers?.throwsClause?.throwsSpecifier)
+    let isRethrows = node.effectSpecifiers?.throwsClause?.throwsSpecifier.rawText == "rethrows"
+    let thrownType = (node.effectSpecifiers?.thrownError).map(self.generate(type:))
+    let returnType = (node.returnClause?.type).map(self.generate(type:))
+    return GeneratedFunctionSignature(
+      parameterList: parameterList,
+      asyncLoc: asyncLoc,
+      isReasync: isReasync,
+      throwsLoc: throwsLoc,
+      isRethrows: isRethrows,
+      thrownType: thrownType,
+      returnType: returnType
+    )
+  } 
+  
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: true)
+    var attrs = self.generateDeclAttributes(node, allowStatic: true)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
+    let signature = self.generate(
+      functionSignature: node.signature,
+      for: name.isOperator ? .operator : .function
+    )
 
     let decl = BridgedFuncDecl.createParsed(
       self.ctx,
@@ -628,13 +716,19 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, for: name.isOperator ? .operator : .function),
-      asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
-      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
-      returnType: self.generate(type: node.signature.returnClause?.type),
+      parameterList: signature.parameterList,
+      asyncSpecifierLoc: signature.asyncLoc,
+      throwsSpecifierLoc: signature.throwsLoc,
+      thrownType: signature.thrownType.asNullable,
+      returnType: signature.returnType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    if signature.isReasync {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+    }
+    if signature.isRethrows {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+    }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
@@ -647,7 +741,11 @@ extension ASTGenVisitor {
   }
 
   func generate(initializerDecl node: InitializerDeclSyntax) -> BridgedConstructorDecl {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    var attrs = self.generateDeclAttributes(node, allowStatic: false)
+    let signature = self.generate(
+      functionSignature: node.signature,
+      for: .initializer
+    )
 
     let decl = BridgedConstructorDecl.createParsed(
       self.ctx,
@@ -656,13 +754,24 @@ extension ASTGenVisitor {
       failabilityMarkLoc: self.generateSourceLoc(node.optionalMark),
       isIUO: node.optionalMark?.rawTokenKind == .exclamationMark,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, for: .initializer),
-      asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
-      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
+      parameterList: signature.parameterList,
+      asyncSpecifierLoc: signature.asyncLoc,
+      throwsSpecifierLoc: signature.throwsLoc,
+      thrownType: signature.thrownType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    if signature.isReasync {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+    }
+    if signature.isRethrows {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+    }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+    
+    guard signature.returnType == nil else {
+      // TODO: Diagnose.
+      fatalError("unexpected return type in initializer decl")
+    }
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -691,6 +800,14 @@ extension ASTGenVisitor {
 
     return decl
   }
+
+  func generate(missingDecl node: MissingDeclSyntax) -> BridgedMissingDecl? {
+    // Generate the attributes for diagnostics, but discard the result.
+    // There's no use of the attributes in AST at this point.
+    // FIXME:  We probably should place 'swift::MissingDecl' with the attributes attached in AST for better IDE experience in custom attributes.
+    _ = self.generateDeclAttributes(node, allowStatic: true)
+    return nil
+  }
 }
 
 extension ASTGenVisitor {
@@ -709,9 +826,11 @@ extension ASTGenVisitor {
       paramList: self.generate(functionParameterClause: node.signature.parameterClause, for: .macro),
       arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
       resultType: self.generate(type: node.signature.returnClause?.type),
-      definition: self.generate(expr: node.definition?.value)
+      definition: self.generate(expr: node.definition?.value),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+
     return decl;
   }
 }
@@ -720,9 +839,16 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   func generate(macroExpansionDecl node: MacroExpansionDeclSyntax) -> BridgedMacroExpansionDecl {
+    switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+    case .generated(_):
+      fatalError("(compiler bug) builtin pound keywords should be handled elsewhere")
+    case .ignored:
+      // Fallback to MacroExpansionDecl.
+      break
+    }
+
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let info = self.generate(freestandingMacroExpansion: node)
-
     let decl = BridgedMacroExpansionDecl.createParsed(
       self.declContext,
       poundLoc: info.poundLoc,
@@ -737,6 +863,21 @@ extension ASTGenVisitor {
 
     return decl
   }
+
+  func generateMacroExpansionDecl(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionDecl {
+    let info = self.generate(freestandingMacroExpansion: node)
+    return .createParsed(
+      self.declContext,
+      poundLoc: info.poundLoc,
+      macroNameRef: info.macroNameRef,
+      macroNameLoc: info.macroNameLoc,
+      leftAngleLoc: info.leftAngleLoc,
+      genericArgs: info.genericArgs,
+      rightAngleLoc: info.rightAngleLoc,
+      args: info.arguments
+    )
+  }
+
 }
 
 // MARK: - OperatorDecl
@@ -943,6 +1084,29 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
+  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
+    if let node = node.decl.as(MacroExpansionDeclSyntax.self) {
+      switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+      case .generated(let generated?):
+        switch generated.kind {
+        case .decl:
+          // Actually unreachable as no builtin pound emits a declaration.
+          return generated.castToDecl()
+        case .stmt, .expr:
+          // TODO: Diagnose
+          fatalError("builtin pound keyword in declaration member block")
+          //return nil
+        }
+      case .generated(nil):
+        return nil
+      case .ignored:
+        // Fallback to normal macro expansion.
+        break
+      }
+    }
+    return self.generate(decl: node.decl)
+  }
+
   @inline(__always)
   func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> [BridgedDecl] {
     var allMembers: [BridgedDecl] = []
@@ -952,12 +1116,20 @@ extension ASTGenVisitor {
       }
 
       return .underlying(element)
-    } body: { member in
-      guard let member = self.generate(decl: member.decl) else {
+    } body: { node in
+      guard let member = self.generate(memberBlockItem: node) else {
         return
       }
       // TODO: Set semicolon loc.
       allMembers.append(member)
+
+      // Hoist 'VarDecl' and 'EnumElementDecl' to the block.
+      withBridgedSwiftClosure { ptr in
+        let d = ptr!.load(as: BridgedDecl.self)
+        allMembers.append(d)
+      } call: { handle in
+        member.forEachDeclToHoist(handle)
+      }
     }
 
     return allMembers

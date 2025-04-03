@@ -33,6 +33,7 @@ internal protocol _DictionaryBuffer {
 extension Dictionary {
   @usableFromInline
   @frozen
+  @safe
   internal struct _Variant {
     @usableFromInline
     internal var object: _BridgeStorage<__RawDictionaryStorage>
@@ -40,14 +41,14 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(native: __owned _NativeDictionary<Key, Value>) {
-      self.object = _BridgeStorage(native: native._storage)
+      unsafe self.object = _BridgeStorage(native: native._storage)
     }
 
     @inlinable
     @inline(__always)
     init(dummy: Void) {
 #if _pointerBitWidth(_64) && !$Embedded
-      self.object = _BridgeStorage(taggedPayload: 0)
+      unsafe self.object = _BridgeStorage(taggedPayload: 0)
 #elseif _pointerBitWidth(_32) || $Embedded
       self.init(native: _NativeDictionary())
 #else
@@ -59,7 +60,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(cocoa: __owned __CocoaDictionary) {
-      self.object = _BridgeStorage(objC: cocoa.object)
+      unsafe self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
   }
@@ -75,29 +76,29 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    return object.isUniquelyReferencedUnflaggedNative()
+    return unsafe object.isUniquelyReferencedUnflaggedNative()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
     if guaranteedNative { return true }
-    return object.isUnflaggedNative
+    return unsafe object.isUnflaggedNative
   }
 #endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeDictionary<Key, Value> {
     get {
-      return _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
+      return unsafe _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
-      var native = _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
+      var native = unsafe _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
-      defer { object = .init(native: native._storage) }
+      defer { unsafe object = .init(native: native._storage) }
       yield &native
     }
   }
@@ -105,7 +106,7 @@ extension Dictionary._Variant {
 #if _runtime(_ObjC)
   @inlinable
   internal var asCocoa: __CocoaDictionary {
-    return __CocoaDictionary(object.objCInstance)
+    return unsafe __CocoaDictionary(object.objCInstance)
   }
 #endif
 
@@ -323,7 +324,7 @@ extension Dictionary._Variant {
         cocoa, capacity: cocoa.count + 1)
       let result = native.mutatingFind(key, isUnique: true)
       self = .init(native: native)
-      return result
+      return unsafe result
     }
 #endif
     let isUnique = isUniquelyReferenced()
@@ -389,8 +390,8 @@ extension Dictionary._Variant {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
     let native = ensureUniqueNative()
-    let bucket = native.validatedBucket(for: index)
-    return asNative.uncheckedRemove(at: bucket, isUnique: true)
+    let bucket = unsafe native.validatedBucket(for: index)
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: true)
   }
 
   @inlinable
@@ -403,7 +404,7 @@ extension Dictionary._Variant {
       var native = _NativeDictionary<Key, Value>(cocoa)
       let (bucket, found) = native.find(key)
       _precondition(found, "Bridging did not preserve equality")
-      let old = native.uncheckedRemove(at: bucket, isUnique: true).value
+      let old = unsafe native.uncheckedRemove(at: bucket, isUnique: true).value
       self = .init(native: native)
       return old
     }
@@ -411,7 +412,7 @@ extension Dictionary._Variant {
     let (bucket, found) = asNative.find(key)
     guard found else { return nil }
     let isUnique = isUniquelyReferenced()
-    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
   }
 
   @inlinable

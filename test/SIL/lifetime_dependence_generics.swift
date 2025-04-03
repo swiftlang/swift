@@ -34,7 +34,7 @@ public func test(pview: borrowing PView) -> View {
   return pview.getDefault()
 }
 
-// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics1PPAAE10getDefault1EQzyF : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> @lifetime(borrow 0)  @out Self.E {
+// CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics1PPAAE10getDefault1EQzyF : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> @lifetime(borrow address_for_deps 0)  @out Self.E {
 
 // CHECK-LABEL: sil hidden @$s28lifetime_dependence_generics5PViewV4getEAA4ViewVyF : $@convention(method) (PView) -> @lifetime(immortal) @owned View {
 

@@ -437,16 +437,6 @@ public:
         isFromVarDecl, wasMoved));
   }
 
-  AllocVectorInst *
-  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
-    if (isInsertingIntoGlobal()) {
-      return insert(AllocVectorInst::createInInitializer(
-          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
-    }
-    return insert(AllocVectorInst::create(
-        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
-  }
-
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
@@ -573,7 +563,7 @@ public:
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
-          SILFunctionTypeIsolation::Unknown,
+          SILFunctionTypeIsolation::forUnknown(),
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
@@ -1075,7 +1065,7 @@ public:
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false);
+      bool trace = false, bool overrideLoc = true);
   DebugValueInst *createDebugValueAddr(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
@@ -1247,13 +1237,6 @@ public:
   ThunkInst *createIdentityThunk(SILLocation Loc, SILValue Op,
                                  SubstitutionMap substitutionMap = {}) {
     return createThunk(Loc, Op, ThunkInst::Kind::Identity, substitutionMap);
-  }
-
-  ThunkInst *
-  createHopToMainActorIfNeededThunk(SILLocation Loc, SILValue Op,
-                                    SubstitutionMap substitutionMap = {}) {
-    return createThunk(Loc, Op, ThunkInst::Kind::HopToMainActorIfNeeded,
-                       substitutionMap);
   }
 
   ConvertEscapeToNoEscapeInst *
@@ -1569,28 +1552,34 @@ public:
   }
 
   UnconditionalCheckedCastInst *
-  createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
+  createUnconditionalCheckedCast(SILLocation Loc,
+                                 CastingIsolatedConformances isolatedConformances,
+                                 SILValue op,
                                  SILType destLoweredTy,
                                  CanType destFormalTy) {
-    return createUnconditionalCheckedCast(Loc, op, destLoweredTy, destFormalTy,
+    return createUnconditionalCheckedCast(Loc, isolatedConformances, op,
+                                          destLoweredTy, destFormalTy,
                                           op->getOwnershipKind());
   }
 
   UnconditionalCheckedCastInst *
-  createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
+  createUnconditionalCheckedCast(SILLocation Loc,
+                                 CastingIsolatedConformances isolatedConformances,
+                                 SILValue op,
                                  SILType destLoweredTy, CanType destFormalTy,
                                  ValueOwnershipKind forwardingOwnershipKind) {
     return insert(UnconditionalCheckedCastInst::create(
-        getSILDebugLocation(Loc), op, destLoweredTy, destFormalTy,
-        getFunction(), forwardingOwnershipKind));
+        getSILDebugLocation(Loc), isolatedConformances, op, destLoweredTy,
+        destFormalTy, getFunction(), forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastAddrInst *
   createUnconditionalCheckedCastAddr(SILLocation Loc,
+                                     CastingIsolatedConformances isolatedConformances,
                                      SILValue src, CanType sourceFormalType,
                                      SILValue dest, CanType targetFormalType) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), src, sourceFormalType,
+        getSILDebugLocation(Loc), isolatedConformances, src, sourceFormalType,
         dest, targetFormalType, getFunction()));
   }
 
@@ -2355,6 +2344,14 @@ public:
                     forwardingOwnershipKind, dependenceKind));
   }
 
+  MarkDependenceAddrInst *
+  createMarkDependenceAddr(SILLocation Loc, SILValue address, SILValue base,
+                           MarkDependenceKind dependenceKind) {
+    return insert(new (getModule()) MarkDependenceAddrInst(
+                    getSILDebugLocation(Loc), address, base,
+                    dependenceKind));
+  }
+
   IsUniqueInst *createIsUnique(SILLocation Loc, SILValue operand) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
@@ -2371,11 +2368,11 @@ public:
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
-  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+  DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsEscapingClosureInst(
+    return insert(new (getModule()) DestroyNotEscapedClosureInst(
         getSILDebugLocation(Loc), operand, Int1Ty, VerificationType));
   }
 
@@ -2438,6 +2435,16 @@ public:
                               getSILDebugLocation(loc),
                               valueType, paramType));
   }
+
+  /// Create a zero-initialized value of the given (loadable) type.
+  ///
+  /// This is currently only expected to be used in narrow situations
+  /// involving bridging and only makes a best effort attempt.
+  SILValue createZeroInitValue(SILLocation loc, SILType loweredTy);
+
+  /// Zero-initialize an object in memory of the given type (which may
+  /// or may not be loadable).
+  BuiltinInst *createZeroInitAddr(SILLocation loc, SILValue addr);
 
   //===--------------------------------------------------------------------===//
   // Unchecked cast helpers
@@ -2741,16 +2748,20 @@ public:
   }
 
   CheckedCastBranchInst *
-  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op, 
-                          CanType srcFormalTy, SILType destLoweredTy, 
+  createCheckedCastBranch(SILLocation Loc, bool isExact,
+                          CastingIsolatedConformances isolatedConformances,
+                          SILValue op,
+                          CanType srcFormalTy, SILType destLoweredTy,
                           CanType destFormalTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastBranchInst *
-  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op, 
-                          CanType srcFormalTy, SILType destLoweredTy, 
+  createCheckedCastBranch(SILLocation Loc, bool isExact,
+                          CastingIsolatedConformances isolatedConformances,
+                          SILValue op,
+                          CanType srcFormalTy, SILType destLoweredTy,
                           CanType destFormalTy, SILBasicBlock *successBB, 
                           SILBasicBlock *failureBB,
                           ValueOwnershipKind forwardingOwnershipKind,
@@ -2758,7 +2769,9 @@ public:
                           ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastAddrBranchInst *
-  createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
+  createCheckedCastAddrBranch(SILLocation Loc,
+                              CastingIsolatedConformances isolatedConformances,
+                              CastConsumptionKind consumption,
                               SILValue src, CanType sourceFormalType,
                               SILValue dest, CanType targetFormalType,
                               SILBasicBlock *successBB,
@@ -2766,9 +2779,9 @@ public:
                               ProfileCounter Target1Count = ProfileCounter(),
                               ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(CheckedCastAddrBranchInst::create(
-        getSILDebugLocation(Loc), consumption, src, sourceFormalType, dest,
-        targetFormalType, successBB, failureBB, Target1Count, Target2Count,
-        getFunction()));
+        getSILDebugLocation(Loc), isolatedConformances, consumption, src,
+        sourceFormalType, dest, targetFormalType, successBB, failureBB,
+        Target1Count, Target2Count, getFunction()));
   }
 
   //===--------------------------------------------------------------------===//
@@ -3125,12 +3138,16 @@ private:
     C.notifyInserted(TheInst);
 
 #ifndef NDEBUG
-    // If we are inserting into a specific function (rather than a block for a
-    // global_addr), verify that our instruction/the associated location are in
-    // sync. We don't care if an instruction is used in global_addr.
-    if (F)
-      TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership(&C.silConv);
+    // A vector instruction can only be in a global initializer. Therefore there
+    // is no point in verifying debug info or ownership.
+    if (!isa<VectorInst>(TheInst)) {
+      // If we are inserting into a specific function (rather than a block for a
+      // global_addr), verify that our instruction/the associated location are in
+      // sync. We don't care if an instruction is used in global_addr.
+      if (F)
+        TheInst->verifyDebugInfo();
+      TheInst->verifyOperandOwnership(&C.silConv);
+    }
 #endif
   }
 

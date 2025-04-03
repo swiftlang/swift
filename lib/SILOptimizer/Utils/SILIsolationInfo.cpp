@@ -14,7 +14,6 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -212,6 +211,8 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
   AddressWalker walker(state);
 
   // If we fail to walk, emit an unknown patten error.
+  //
+  // FIXME: check AddressUseKind::NonEscaping != walk().
   if (AddressUseKind::Unknown == std::move(walker).walk(asi)) {
     return SILIsolationInfo();
   }
@@ -487,8 +488,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
                                                         nomDecl)
           .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
 
-    if (auto isolation = swift::getActorIsolation(nomDecl)) {
-      assert(isolation.isGlobalActor());
+    if (auto isolation = swift::getActorIsolation(nomDecl);
+        isolation && isolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
                  rei, isolation.getGlobalActor())
           .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
@@ -803,6 +804,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         }
       }
     }
+  }
+
+  /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
+  /// into another isolation domain.
+  if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
+    return SILIsolationInfo::getTaskIsolated(mi);
   }
 
   // Check if we have an ApplyInst with nonisolated.

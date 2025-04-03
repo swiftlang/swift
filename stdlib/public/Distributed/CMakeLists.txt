@@ -52,6 +52,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
+    -strict-memory-safety
 
   LINK_FLAGS
     "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"

@@ -50,13 +50,13 @@ swift build --triple %ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% ^
 In order to build on Windows with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
 
 ~~~
-cmake -B out -G Ninja -S . -D ArgumentParser_DIR=... -D CMAKE_Swift_FLAGS="-Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror"
+cmake -B out -G Ninja -S . -D CMAKE_Swift_FLAGS="-Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror"
 ~~~
 
 In order to build on Linux with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
 
 ~~~
-cmake -B out -G Ninja -S . -D ArgumentParser_DIR=... -D CMAKE_Swift_FLAGS="-Xcc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror"
+cmake -B out -G Ninja -S . -D CMAKE_Swift_FLAGS="-Xcc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror"
 ~~~
 
 In order to build for Android with CMake on Windows, some additiona parameters must be passed to the build tool to locate the necessary Swift modules.
@@ -75,12 +75,14 @@ cmake -B build -S . -G Ninja ^
     -D CMAKE_SYSTEM_VERSION=%ANDROID_API_LEVEL% ^
     -D CMAKE_Swift_COMPILER_TARGET=%ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% ^
     -D CMAKE_Swift_FLAGS="-sdk %SDKROOT_ANDROID% -L%ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\%ANDROID_CLANG_VERSION%\lib\linux\%ANDROID_ARCH% -Xclang-linker -resource-dir -Xclang-linker %ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\%ANDROID_CLANG_VERSION% -Xcc -I%SDKROOT_ANDROID%\usr\include -I%SDKROOT_ANDROID%\usr\include\swift\SwiftRemoteMirror" ^
-    -D ArgumentParser_DIR=...
 cmake --build build
 ~~~
 
-Building with CMake requires a local copy of [swift-argument-parser](https://github.com/apple/swift-argument-parser) built with CMake.
-The `ArumentParser_DIR=` definition must refer to the `cmake/modules` sub-directory of the swift-argument-parser build output directory.
+Building with CMake can use a local copy of [swift-argument-parser](https://github.com/apple/swift-argument-parser) built with CMake.
+The `ArgumentParser_DIR=` definition must refer to the `cmake/modules` sub-directory of the swift-argument-parser build output directory.
+~~~cmd
+cmake -b out -G Ninja -S . -D ArgumentParser_DIR=S:\swift-argument-parser\build\cmake\modules
+~~~
 
 ### Using
 

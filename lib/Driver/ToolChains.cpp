@@ -204,8 +204,16 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
-  if (const Arg *arg = inputArgs.getLastArg(
-        options::OPT_experimental_serialize_debug_info)) {
+  if (Triple.isOSOpenBSD() && Triple.getArch() == llvm::Triple::aarch64) {
+    arguments.push_back("-Xcc");
+    arguments.push_back("-Xclang=-mbranch-target-enforce");
+    arguments.push_back("-Xcc");
+    arguments.push_back("-Xclang=-msign-return-address=non-leaf");
+    arguments.push_back("-Xcc");
+    arguments.push_back("-Xclang=-msign-return-address-key=a_key");
+  }
+
+  if (inputArgs.getLastArg(options::OPT_experimental_serialize_debug_info)) {
     arguments.push_back(
         inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
   }
@@ -274,6 +282,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                    options::OPT_disable_experimental_feature,
                                    options::OPT_enable_upcoming_feature,
                                    options::OPT_disable_upcoming_feature});
+  inputArgs.AddLastArg(arguments, options::OPT_strict_memory_safety);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -366,6 +375,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   if (!globalRemapping.empty()) {
     arguments.push_back("-debug-prefix-map");
     arguments.push_back(inputArgs.MakeArgString(globalRemapping));
+  }
+
+  if (inputArgs.hasArg(options::OPT_executor_factory)) {
+    inputArgs.AddLastArg(arguments, options::OPT_executor_factory);
   }
 
   // Pass through the values passed to -Xfrontend.

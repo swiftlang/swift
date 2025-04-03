@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,6 +49,20 @@ GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
                 "'%0' is not an experimental feature, "
                 "use -%select{disable|enable}1-upcoming-feature instead",
                 (StringRef, bool))
+
+GROUPED_WARNING(invalid_feature_mode, StrictLanguageFeatures, none,
+                "'%0' is not a recognized mode for feature '%1'"
+                "%select{|; did you mean '%2'?}3",
+                (StringRef, StringRef, StringRef, bool))
+
+GROUPED_WARNING(cannot_disable_feature_with_mode, StrictLanguageFeatures, none,
+                "'%0' argument '%1' cannot specify a mode",
+                (StringRef, StringRef))
+
+GROUPED_WARNING(feature_does_not_support_adoption_mode, StrictLanguageFeatures,
+                none,
+                "feature '%0' does not support adoption mode",
+                (StringRef))
 
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
@@ -188,8 +202,6 @@ WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
 REMARK(warn_implicit_string_processing_import_failed,none,
        "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
-REMARK(warn_implicit_backtracing_import_failed,none,
-       "unable to perform implicit import of \"_Backtracing\" module: no such module found", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
@@ -356,16 +368,8 @@ ERROR(placeholder_dependency_module_map_corrupted,none,
       "Swift placeholder dependency module map from %0 is malformed",
       (StringRef))
 
-ERROR(batch_scan_input_file_missing,none,
-      "cannot open batch dependencies scan input file from %0",
-      (StringRef))
-
 ERROR(const_extract_protocol_list_input_file_missing,none,
       "cannot open constant extraction protocol list input file from %0",
-      (StringRef))
-
-ERROR(batch_scan_input_file_corrupted,none,
-      "batch dependencies scan input file from %0 is malformed",
       (StringRef))
 
 ERROR(const_extract_protocol_list_input_file_corrupted,none,
@@ -450,6 +454,7 @@ NOTE(sdk_version_pbm_version,none,
 NOTE(compiled_module_ignored_reason,none,
      "compiled module '%0' was ignored because %select{%error"
      "|it belongs to a framework in the SDK"
+     "|it's a library module in the SDK"
      "|loading from module interfaces is preferred"
      "|it's a compiler host module"
      "|the module name is blocklisted,"
@@ -568,7 +573,7 @@ ERROR(dont_enable_interop_and_compat,none,
       "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
 
 NOTE(valid_cxx_interop_modes,none,
-      "valid arguments to '-cxx-interoperability-mode=' are %0", (StringRef))
+      "valid arguments to '%0' are %1", (StringRef, StringRef))
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
      "selected compatibility mode, so updating the Swift compiler will not "
@@ -599,7 +604,7 @@ ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
 
-GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
+GROUPED_WARNING(command_line_conflicts_with_strict_safety,StrictMemorySafety,none,
       "'%0' is not memory-safe and should not be combined with "
       "strict memory safety checking", (StringRef))
 

@@ -747,7 +747,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType);
+    auto openedType = ExistentialArchetypeType::get(nativeType);
 
     FormalEvaluationScope scope(SGF);
 
@@ -1985,8 +1985,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           auto param = completionTy->getParameters()[i];
           auto paramTy = param.getSILStorageInterfaceType();
           if (paramTy.isTrivial(F)) {
-            // If it's trivial, the value passed doesn't matter.
-            completionHandlerArgs.push_back(SILUndef::get(&F, paramTy));
+            // If it's trivial, pass a zero value of whatever the type is.
+            auto zero = B.createZeroInitValue(loc, paramTy);
+            completionHandlerArgs.push_back(zero);
           } else {
             // If it's not trivial, it must be a nullable class type. Pass
             // nil.

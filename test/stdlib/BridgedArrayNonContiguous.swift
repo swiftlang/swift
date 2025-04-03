@@ -10,12 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift -enable-experimental-feature LifetimeDependence -enable-experimental-feature Span
+// RUN: %target-run-stdlib-swift -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_Span
 
 import StdlibUnittest
 
@@ -24,19 +23,48 @@ import Foundation
 var suite = TestSuite("EagerLazyBridgingTests")
 defer { runAllTests() }
 
-var x: NSObject? = nil
-
 suite.test("Bridged NSArray without direct memory sharing") {
 
-  var arr = Array(repeating: NSObject(), count: 100) as [AnyObject]
-  let nsArray:NSArray = NSArray(objects: &arr, count: 100)
-  for _ in 0 ..< 5 {
-    let tmp = nsArray as! [NSObject]
-    x = tmp.withContiguousStorageIfAvailable {
-      $0[0]
-    }
-    expectNotNil(x)
-  }
+  var arr = (0..<100).map({ _ in NSObject() as AnyObject})
+  let identifiers = arr.map(ObjectIdentifier.init)
 
-  x = nil
+  let nsArray = arr.withUnsafeBufferPointer {
+    NSArray(objects: $0.baseAddress, count: $0.count)
+  }
+  arr = []
+
+  for i in 0..<nsArray.count {
+    let bridged = nsArray as! [NSObject]
+    let x: NSObject? = bridged.withContiguousStorageIfAvailable { $0[i] }
+
+    expectNotNil(x)
+    if let x {
+      expectEqual(identifiers[i], ObjectIdentifier(x))
+    }
+  }
+}
+
+suite.test("Bridged NSArray as Span")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
+  reason: "Requires Swift 6.2's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+  
+  var arr = (0..<100).map({ _ in NSObject() as AnyObject})
+  let identifiers = arr.map(ObjectIdentifier.init)
+
+  let nsArray = arr.withUnsafeBufferPointer {
+    NSArray(objects: $0.baseAddress, count: $0.count)
+  }
+  arr = []
+
+  for i in 0..<nsArray.count {
+    let bridged = nsArray as! [NSObject]
+    let span = bridged.span
+
+    let x: NSObject = span[i]
+    expectEqual(identifiers[i], ObjectIdentifier(x))
+  }  
 }

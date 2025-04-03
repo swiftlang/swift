@@ -165,6 +165,9 @@ FRONTEND_STATISTIC(AST, ModuleVisibilityCacheMiss)
 FRONTEND_STATISTIC(AST, ModuleShadowCacheHit)
 FRONTEND_STATISTIC(AST, ModuleShadowCacheMiss)
 
+/// Number of types deserialized.
+FRONTEND_STATISTIC(AST, NumDepScanFilesystemLookups)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 

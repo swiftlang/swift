@@ -890,6 +890,10 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     for (auto &Inst : *BB) {
       if (hasOwnershipOperandsOrResults(&Inst)) {
         checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        // Collect fullApplies to be checked in analyzeBeginAccess
+        if (auto fullApply = FullApplySite::isa(&Inst)) {
+          fullApplies.push_back(fullApply);
+        }
         continue;
       }
       switch (Inst.getKind()) {
@@ -905,7 +909,17 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         LoadsAndStores.push_back(&Inst);
         break;
       case SILInstructionKind::StoreInst: {
-        Stores.push_back(cast<StoreInst>(&Inst));
+        auto *store = cast<StoreInst>(&Inst);
+        switch (store->getOwnershipQualifier()) {
+          case StoreOwnershipQualifier::Assign:
+          case StoreOwnershipQualifier::Init:
+            // Currently not supported.
+            continue;
+          case StoreOwnershipQualifier::Unqualified:
+          case StoreOwnershipQualifier::Trivial:
+            break;
+        }
+        Stores.push_back(store);
         LoadsAndStores.push_back(&Inst);
         checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
         break;

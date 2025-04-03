@@ -638,17 +638,24 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              PoisonRefs_t poisonRefs,
                                              UsesMoveableValueDebugInfo_t moved,
-                                             bool trace) {
+                                             bool trace, bool overrideLoc) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
 
   llvm::SmallString<4> Name;
 
-  // Debug location overrides cannot apply to debug value instructions.
-  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
-  return insert(DebugValueInst::create(
-      getSILDebugLocation(Loc, true), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, moved, trace));
+  SILDebugLocation DebugLoc;
+  if (overrideLoc) {
+    // Debug location overrides cannot apply to debug value instructions.
+    DebugLocOverrideRAII LocOverride{*this, std::nullopt};
+    DebugLoc = getSILDebugLocation(Loc, true);
+  } else {
+    DebugLoc = getSILDebugLocation(Loc, true);
+  }
+
+  return insert(DebugValueInst::create(DebugLoc, src, getModule(),
+                                       *substituteAnonymousArgs(Name, Var, Loc),
+                                       poisonRefs, moved, trace));
 }
 
 DebugValueInst *SILBuilder::createDebugValueAddr(
@@ -772,19 +779,24 @@ SwitchEnumInst *SILBuilder::createSwitchEnum(
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILLocation Loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ProfileCounter target1Count,
     ProfileCounter target2Count) {
   auto forwardingOwnership =
       deriveForwardingOwnership(op, destLoweredTy, getFunction());
   return createCheckedCastBranch(
-      Loc, isExact, op, srcFormalTy, destLoweredTy, destFormalTy, successBB,
+      Loc, isExact, isolatedConformances, op, srcFormalTy, destLoweredTy,
+      destFormalTy, successBB,
       failureBB, forwardingOwnership, target1Count, target2Count);
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
-    SILLocation Loc, bool isExact, SILValue op, CanType srcFormalTy,
+    SILLocation Loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ValueOwnershipKind forwardingOwnershipKind,
     ProfileCounter target1Count, ProfileCounter target2Count) {
@@ -793,9 +805,29 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
          "failureBB's argument doesn't match incoming argument type");
 
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op, srcFormalTy, destLoweredTy,
-      destFormalTy, successBB, failureBB, getFunction(), target1Count,
-      target2Count, forwardingOwnershipKind));
+      getSILDebugLocation(Loc), isExact, isolatedConformances, op, srcFormalTy,
+      destLoweredTy, destFormalTy, successBB, failureBB, getFunction(),
+      target1Count, target2Count, forwardingOwnershipKind));
+}
+
+BuiltinInst *SILBuilder::createZeroInitAddr(SILLocation loc, SILValue addr) {
+  assert(addr->getType().isAddress());
+  auto &C = getASTContext();
+  auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+  return createBuiltin(loc, zeroInit->getBaseIdentifier(),
+                       SILType::getEmptyTupleType(C),
+                       SubstitutionMap(),
+                       addr);
+}
+
+SILValue SILBuilder::createZeroInitValue(SILLocation loc, SILType loweredTy) {
+  assert(loweredTy.isObject());
+  auto &C = getASTContext();
+  auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
+  return createBuiltin(loc, zeroInit->getBaseIdentifier(),
+                       loweredTy,
+                       SubstitutionMap(),
+                       {});
 }
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,

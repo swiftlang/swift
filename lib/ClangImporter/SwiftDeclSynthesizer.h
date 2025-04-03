@@ -84,10 +84,11 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             const clang::APValue &value,
                             ConstantConvertKind convertKind, bool isStatic,
-                            ClangNode ClangN);
+                            ClangNode ClangN, AccessLevel access);
 
   /// Create a new named constant with the given value.
   ///
@@ -97,9 +98,11 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             StringRef value, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN);
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
 
   /// Create a new named constant using the given expression.
   ///
@@ -109,9 +112,11 @@ public:
   /// \param valueExpr An expression to use as the value of the constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             Expr *valueExpr, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN);
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
   ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
@@ -328,6 +333,12 @@ public:
   CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
                                 const swift::Type &swiftParamTy,
                                 SourceLoc paramLoc);
+
+  /// Synthesize a static factory method for a C++ foreign reference type,
+  /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
+  /// allocation function is not found.
+  clang::CXXMethodDecl *synthesizeStaticFactoryForCXXForeignRef(
+      const clang::CXXRecordDecl *cxxRecordDecl);
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);

@@ -39,7 +39,8 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  /// The pointer is FileUnit insted of SynthesizedFileUnit to break
+  /// circularity.
   llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
@@ -125,6 +126,14 @@ public:
                             const ModuleDecl *importedModule,
                             llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
+  /// Find all availability domains defined in this module with the given
+  /// identifier.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual void lookupAvailabilityDomains(
+      Identifier identifier,
+      SmallVectorImpl<AvailabilityDomain> &results) const {};
+
   virtual std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const {
     return std::nullopt;
@@ -194,8 +203,6 @@ public:
   /// identifier.
   virtual Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
-
-  virtual bool shouldCollectDisplayDecls() const { return true; }
 
   /// Finds all top-level decls in this file.
   ///

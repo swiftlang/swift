@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -517,15 +518,13 @@ private:
         if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
           return Action::Stop();
       }
-      auto *PL = getParameterList(cast<ValueDecl>(D));
+      auto *PL = cast<ValueDecl>(D)->getParameterList();
       if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
         return Action::Stop();
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
         return Action::Stop();
-    } else if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      // TODO: add paren locations to PoundDiagnosticDecl
     }
 
     return Action::Continue();
@@ -580,7 +579,7 @@ private:
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       if (!handleBraceStmt(WS->getBody(), WS->getWhileLoc()))
         return Action::Stop();
-    } else if (auto *PAS = dyn_cast<PoundAssertStmt>(S)) {
+    } else if (isa<PoundAssertStmt>(S)) {
       // TODO: add paren locations to PoundAssertStmt
     }
 
@@ -1905,17 +1904,6 @@ private:
         return Ctx;
       }
 
-      return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
-    }
-
-    if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      SourceLoc ContextLoc = PDD->getStartLoc();
-      // FIXME: add paren source locations to the AST Node.
-      if (auto *SLE = PDD->getMessage()) {
-        SourceRange MessageRange = SLE->getSourceRange();
-        if (MessageRange.isValid() && overlapsTarget(MessageRange))
-          return IndentContext {ContextLoc, true};
-      }
       return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
     }
 

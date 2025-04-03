@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,11 +39,6 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let lifetimeDependenceDiagnosticsPass = FunctionPass(
   name: "lifetime-dependence-diagnostics")
 { (function: Function, context: FunctionPassContext) in
-#if os(Windows)
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-#endif
   log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
   log("\(function.convention)")
@@ -101,10 +96,11 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
 
-  // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
-  // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
-  // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July 2025).
   if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+    // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
+    // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
+    // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July
+    // 2025).
     if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
       return true
     }
@@ -122,7 +118,7 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
-  let result = walker.walkDown(root: dependence.dependentValue)
+  let result = walker.walkDown(dependence: dependence)
   // The walk may abort without a diagnostic error.
   assert(!error || result == .abortWalk)
   return result == .continueWalk
@@ -197,6 +193,10 @@ private struct DiagnoseDependence {
   func checkFunctionResult(operand: Operand) -> WalkResult {
 
     if function.hasUnsafeNonEscapableResult {
+      return .continueWalk
+    }
+    // If the dependence scope is global, then it has immortal lifetime.
+    if case .global = dependence.scope {
       return .continueWalk
     }
     // Check that the parameter dependence for this result is the same
@@ -287,7 +287,7 @@ private struct LifetimeVariable {
 
   private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    var useDefVisitor = VariableIntroducerUseDefWalker(context) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value) {
       introducer = $0
       return .abortWalk
     }
@@ -349,7 +349,7 @@ private struct LifetimeVariable {
 }
 
 /// Walk up an address into which a dependent value has been stored. If any address in the use-def chain is a
-/// mark_dependence, follow the depenedence base rather than the forwarded value. If any of the dependence bases in
+/// mark_dependence, follow the dependence base rather than the forwarded value. If any of the dependence bases in
 /// within the current scope is with (either local checkInoutResult), then storing a value into that address is
 /// nonescaping.
 ///

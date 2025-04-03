@@ -770,6 +770,21 @@ Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
+Added: _$sSBsE5radixSivpZMV
+Added: _$sSFsE8ulpOfOnexvpZMV
+Added: _$sSUsE8isSignedSbvpZMV
+Added: _$sSUss17FixedWidthIntegerRzrlE3maxxvpZMV
+Added: _$sSUss17FixedWidthIntegerRzrlE3minxvpZMV
+Added: _$sSZsE8isSignedSbvpZMV
+Added: _$sSZss17FixedWidthIntegerRzrlE3maxxvpZMV
+Added: _$sSZss17FixedWidthIntegerRzrlE3minxvpZMV
+Added: _$ss11SIMDStoragePsE11scalarCountSivpZMV
+Added: _$ss17FixedWidthIntegerPsE13_highBitIndexxvpZMV
+Added: _$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvpZMV
+Added: _$ss4SIMDPsSF6ScalarRpzrlE3onexvpZMV
+Added: _$ss4SIMDPsSF6ScalarRpzrlE4zeroxvpZMV
+Added: _$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE3onexvpZMV
+Added: _$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE4zeroxvpZMV
 
 // SE-0445 Improving printed descriptions of String.Index
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
@@ -779,10 +794,10 @@ Added: _$sSS5IndexVs28CustomDebugStringConvertiblesWP
 // SE-0447 Span and RawSpan
 Added: _$ss4SpanVMa
 Added: _$ss4SpanVMn
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvpMV
+Added: _$ss4SpanVsRi_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zrlE6_countSivpMV
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvg
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvpMV
 Added: _$ss4SpanVsRi_zrlE5countSivpMV
 Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
 Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
@@ -799,9 +814,39 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
+// SE-0467 MutableSpan and MutableRawSpan
+Added: _$ss11MutableSpanVMa
+Added: _$ss11MutableSpanVMn
+Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
+Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
+Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
+Added: _$ss14MutableRawSpanV6_countSivg
+Added: _$ss14MutableRawSpanV8_pointerSvSgvg
+Added: _$ss14MutableRawSpanVMa
+Added: _$ss14MutableRawSpanVMn
+Added: _$ss14MutableRawSpanVN
+
+// SE-0456 Span-providing properties
+Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSW5bytess7RawSpanVvpMV
+Added: _$sSa4spans4SpanVyxGvpMV
+Added: _$sSrsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSw5bytess7RawSpanVvpMV
+Added: _$ss10ArraySliceV4spans4SpanVyxGvpMV
+Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
+Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
+Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+
+// SE-0467 mutableSpan properties
+Added: _$sSa11mutableSpans07MutableB0VyxGvr
+Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
+Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
+Added: _$ss13_SwiftifyExprO4selfyA2BmFWC
 Added: _$ss13_SwiftifyExprOMa
 Added: _$ss13_SwiftifyExprOMn
 Added: _$ss13_SwiftifyExprON
@@ -809,7 +854,7 @@ Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
-Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABSi_s01_A4ExprOs01_D4TypeOtcABmFWC
+Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
@@ -831,17 +876,89 @@ Added: _$ss15_DependenceTypeOSQsWP
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
 
-// Slab metadata accessor
-Added: _$ss4SlabVMa
+// InlineArray metadata accessor
+Added: _$ss11InlineArrayVMa
 
-// Slab nominal type descriptor
-Added: _$ss4SlabVMn
+// InlineArray nominal type descriptor
+Added: _$ss11InlineArrayVMn
 
-// Slab.count property descriptor
-Added: _$ss4SlabVsRi__rlE5countSivpZMV
+// InlineArray.count property descriptor
+Added: _$ss11InlineArrayVsRi__rlE5countSivpZMV
 
-// Slab._storage _read accessor
-Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr
+// InlineArray._storage _read accessor
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvr
 
 // Shared string creation for Foundation
 Added: _$ss40_SwiftCreateImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
+
+// Compact value witnesses
+Added: _swift_cvw_allocateGenericClassMetadataWithLayoutString
+Added: _swift_cvw_allocateGenericValueMetadataWithLayoutString
+Added: _swift_cvw_assignWithCopy
+Added: _swift_cvw_assignWithTake
+Added: _swift_cvw_destroy
+Added: _swift_cvw_enumFn_getEnumTag
+Added: _swift_cvw_enumSimple_destructiveInjectEnumTag
+Added: _swift_cvw_enumSimple_getEnumTag
+Added: _swift_cvw_initEnumMetadataMultiPayloadWithLayoutString
+Added: _swift_cvw_initEnumMetadataSingleCaseWithLayoutString
+Added: _swift_cvw_initEnumMetadataSinglePayloadWithLayoutString
+Added: _swift_cvw_initStructMetadataWithLayoutString
+Added: _swift_cvw_initWithCopy
+Added: _swift_cvw_initWithTake
+Added: _swift_cvw_initializeBufferWithCopyOfBuffer
+Added: _swift_cvw_instantiateLayoutString
+Added: _swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTag
+Added: _swift_cvw_multiPayloadEnumGeneric_getEnumTag
+Added: _swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTag
+Added: _swift_cvw_singlePayloadEnumGeneric_getEnumTag
+Added: _swift_cvw_singletonEnum_destructiveInjectEnumTag
+Added: _swift_cvw_singletonEnum_getEnumTag
+Added: _swift_cvw_assignWithCopyMultiPayloadEnumFN
+Added: _swift_cvw_assignWithTakeMultiPayloadEnumFN
+Added: _swift_cvw_destroyMultiPayloadEnumFN
+Added: _swift_cvw_initWithCopyMultiPayloadEnumFN
+Added: _swift_cvw_initWithTakeMultiPayloadEnumFN
+Added: _swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN
+
+// SE-0457 Expose attosecond representation of Duration
+Added: _$ss8DurationV11attosecondss6Int128VvpMV
+
+
+// add callee-allocated coro entrypoints
+Added: _$ss48swift_deletedCalleeAllocatedCoroutineMethodErrorytvg
+Added: _swift_deletedCalleeAllocatedCoroutineMethodError
+
+// Isolated conformances
+Added: _swift_ConformanceExecutionContextSize
+Added: _swift_conformsToProtocolWithExecutionContext
+Added: _swift_isInConformanceExecutionContext
+
+// Swift Settings
+Added: _$ss12SwiftSettingVABycfC
+Added: _$ss12SwiftSettingVMa
+Added: _$ss12SwiftSettingVMn
+Added: _$ss12SwiftSettingVN
+
+// EnumeratedSequence Collection conformances
+Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
+Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE10startIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMa
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMn
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5countSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
+Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
+
+// Indirect tagged string creation
+Added: __swift_stdlib_CreateIndirectTaggedPointerString

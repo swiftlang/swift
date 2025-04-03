@@ -56,22 +56,26 @@ protocol AddressUseVisitor {
     -> WalkResult
 
   /// A loaded address use propagates the value at the address.
-  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value)
     -> WalkResult
 
   /// A loaded address use propagates the value at the address to the
   /// destination address operand.
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand)
     -> WalkResult
 
   /// Yielding an address may modify the value at the yield, but not past the yield. The yielded value may escape, but
   /// only if its type is escapable.
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult
 
-  /// A non-address owned `value` whose ownership depends on the in-memory
-  /// value at `address`, such as `mark_dependence %value on %address`.
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
-    -> WalkResult
+  /// A forwarded `value` whose ownership depends on the in-memory value at the address `operand`.
+  /// `%value` may be an address type, but only uses of this address value are dependent.
+  /// e.g. `%value = mark_dependence %_ on %operand`
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult
+
+  /// A dependent `address` whose lifetime depends on the in-memory value at `address`.
+  /// e.g. `mark_dependence_addr %address on %operand`
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult
 
   /// A pointer escape may propagate the address beyond the current instruction.
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult
@@ -91,34 +95,11 @@ extension AddressUseVisitor {
     case is EndAccessInst, is EndApplyInst, is AbortApplyInst, is EndBorrowInst:
       return scopeEndingAddressUse(of: operand)
 
-    case let markDep as MarkDependenceInst:
-      if markDep.valueOperand == operand {
-        return projectedAddressUse(of: operand, into: markDep)
-      }
-      assert(markDep.baseOperand == operand)
-      // If another address depends on the current address,
-      // handle it like a projection.
-      if markDep.type.isAddress {
-        return projectedAddressUse(of: operand, into: markDep)
-      }
-      switch markDep.dependenceKind {
-      case .Unresolved:
-        if LifetimeDependence(markDep, context) == nil {
-          break
-        }
-        fallthrough
-      case .NonEscaping:
-        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
-        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
-        return dependentAddressUse(of: operand, into: markDep)
-      case .Escaping:
-        break
-      }
-      // A potentially escaping value depends on this address.
-      return escapingAddressUse(of: operand)
+    case is MarkDependenceInstruction:
+      return classifyMarkDependence(operand: operand)
 
     case let pai as PartialApplyInst where !pai.mayEscape:
-      return dependentAddressUse(of: operand, into: pai)
+      return dependentAddressUse(of: operand, dependentValue: pai)
 
     case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
@@ -156,14 +137,14 @@ extension AddressUseVisitor {
     case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
          is PackElementGetInst:
       let svi = operand.instruction as! SingleValueInstruction
-      return loadedAddressUse(of: operand, into: svi)
+      return loadedAddressUse(of: operand, intoValue: svi)
 
     case is YieldInst:
       return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction
            where sdai.sourceOperand == operand:
-      return loadedAddressUse(of: operand, into: sdai.destinationOperand)
+      return loadedAddressUse(of: operand, intoAddress: sdai.destinationOperand)
 
     case let sdai as SourceDestAddrInstruction
            where sdai.destinationOperand == operand:
@@ -198,28 +179,103 @@ extension AddressUseVisitor {
       return unknownAddressUse(of: operand)
     }
   }
+
+  private mutating func classifyMarkDependence(operand: Operand) -> WalkResult {
+    switch operand.instruction {
+    case let markDep as MarkDependenceInst:
+      if markDep.valueOperand == operand {
+        return projectedAddressUse(of: operand, into: markDep)
+      }
+      assert(markDep.baseOperand == operand)
+      // If another address depends on the current address,
+      // handle it like a projection.
+      if markDep.type.isAddress {
+        return projectedAddressUse(of: operand, into: markDep)
+      }
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        // Note: This is unreachable from InteriorUseVisitor because the base address of a `mark_dependence
+        // [nonescaping]` must be a `begin_access`, and interior liveness does not check uses of the accessed address.
+        return dependentAddressUse(of: operand, dependentValue: markDep)
+      case .Escaping:
+        break
+      }
+      // A potentially escaping value depends on this address.
+      return escapingAddressUse(of: operand)
+      
+    case let markDep as MarkDependenceAddrInst:
+      if markDep.addressOperand == operand {
+        return leafAddressUse(of: operand)
+      }
+      switch markDep.dependenceKind {
+      case .Unresolved:
+        if LifetimeDependence(markDep, context) == nil {
+          break
+        }
+        fallthrough
+      case .NonEscaping:
+        return dependentAddressUse(of: operand, dependentAddress: markDep.address)
+      case .Escaping:
+        break
+      }
+      // A potentially escaping value depends on this address.
+      return escapingAddressUse(of: operand)
+
+    default:
+      fatalError("Unexpected MarkDependenceInstruction")
+    }
+  }
 }
 
 extension AccessBase {
-  /// If this access base has a single initializer, return it, along
-  /// with the initialized address. This does not guarantee that all
-  /// uses of that address are dominated by the store or even that the
-  /// store is a direct use of `address`.
-  func findSingleInitializer(_ context: some Context) -> (initialAddress: Value, initializingStore: Instruction)? {
+  enum Initializer {
+    // An @in or @inout argument that is never modified inside the function. Handling an unmodified @inout like an @in
+    // allows clients to ignore access scopes for the purpose of reaching definitions and lifetimes.
+    case argument(FunctionArgument)
+    // A yielded @in argument.
+    case yield(MultipleValueInstructionResult)
+    // A local variable or @out argument that is assigned once.
+    // 'initialAddress' is the first point at which address may be used. Typically the allocation.
+    case store(initializingStore: Instruction, initialAddress: Value)
+
+    var initialAddress: Value {
+      let address: Value
+      switch self {
+      case let .argument(arg):
+        address = arg
+      case let .yield(result):
+        address = result
+      case let .store(_, initialAddress):
+        address = initialAddress
+      }
+      assert(address.type.isAddress)
+      return address
+    }
+  }
+
+  /// If this access base has a single initializer, return it, along with the initialized address. This does not
+  /// guarantee that all uses of that address are dominated by the store or even that the store is a direct use of
+  /// `address`.
+  func findSingleInitializer(_ context: some Context) -> Initializer? {
     let baseAddr: Value
     switch self {
     case let .stack(allocStack):
       baseAddr = allocStack
     case let .argument(arg):
-      guard arg.convention.isIndirectOut else {
-        return nil
+      if arg.convention.isIndirectIn {
+        return .argument(arg)
       }
       baseAddr = arg
     case let .storeBorrow(sbi):
       guard case let .stack(allocStack) = sbi.destinationOperand.value.accessBase else {
         return nil
       }
-      return (initialAddress: allocStack, initializingStore: sbi)
+      return .store(initializingStore: sbi, initialAddress: allocStack)
     default:
       return nil
     }
@@ -254,33 +310,43 @@ extension AccessBase {
 // distinguishes between `mayWriteToMemory` for dependence vs. actual
 // modification of memory.
 struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
+  let baseAddress: Value
   let context: any Context
 
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   var isProjected = false
-  var initializingStore: Instruction?
+  var initializer: AccessBase.Initializer?
 
   static func findSingleInitializer(ofAddress baseAddr: Value, context: some Context)
-    -> (initialAddress: Value, initializingStore: Instruction)? {
+    -> AccessBase.Initializer? {
 
-    var walker = AddressInitializationWalker(context: context)
+    var walker = AddressInitializationWalker(baseAddress: baseAddr, context)
     if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath()) == .abortWalk {
       return nil
     }
-    guard let initializingStore = walker.initializingStore else {
-      return nil
+    return walker.initializer
+  }
+
+  private init(baseAddress: Value, _ context: some Context) {
+    self.baseAddress = baseAddress
+    self.context = context
+    if let arg = baseAddress as? FunctionArgument {
+      assert(!arg.convention.isIndirectIn, "@in arguments cannot be initialized")
+      if arg.convention.isInout {
+        initializer = .argument(arg)
+      }
+      // @out arguments are initialized normally via stores.
     }
-    return (initialAddress: baseAddr, initializingStore: initializingStore)
   }
 
   private mutating func setInitializer(instruction: Instruction) -> WalkResult {
     // An initializer must be unique and store the full value.
-    if initializingStore != nil || isProjected {
-      initializingStore = nil
+    if initializer != nil || isProjected {
+      initializer = nil
       return .abortWalk
     }
-    initializingStore = instruction
+    initializer = .store(initializingStore: instruction, initialAddress: baseAddress)
     return .continueWalk
   }
 }
@@ -335,12 +401,12 @@ extension AddressInitializationWalker {
     return convention.isIndirectIn ? .continueWalk : .abortWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value)
     -> WalkResult {
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand)
     -> WalkResult {
     return .continueWalk
   }
@@ -351,8 +417,11 @@ extension AddressInitializationWalker {
     return .continueWalk
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
-    -> WalkResult {
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
+    return .continueWalk
+  }
+
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
     return .continueWalk
   }
 
@@ -520,8 +589,8 @@ extension AddressOwnershipLiveRange {
   ///
   /// For address values, use AccessBase.computeOwnershipRange.
   ///
-  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as lifetime completion
-  /// runs immediately after SILGen.
+  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as complete OSSA lifetimes
+  /// are verified.
   private static func computeValueLiveRange(of value: Value, _ context: FunctionPassContext)
     -> AddressOwnershipLiveRange? {
     switch value.ownership {

@@ -152,7 +152,13 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
       "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
       FALSE)
 
-if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
+set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
+    "List of extra target triples to build the embedded Swift standard library for")
+
+if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
@@ -165,68 +171,76 @@ endif()
 set(EMBEDDED_STDLIB_TARGET_TRIPLES)
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
-  if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+  if(SWIFT_WASI_SYSROOT_PATH)
+    # Don't attempt to build any other Embedded Swift stdlib triples
+    # when building for WASI.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      # arch    module_name               target triple
-      "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
-      "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
-      "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
-      "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
-      "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
+      "wasm32    wasm32-unknown-wasip1  wasm32-unknown-wasip1"
     )
-  endif()
-  if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
-      "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
-      "arm64    arm64-apple-ios           arm64-apple-ios18"
-      "arm64e   arm64e-apple-ios          arm64e-apple-ios18"
-    )
-  endif()
+  else()
+    if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        # arch    module_name               target triple
+        "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
+        "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
+        "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+        "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
+        "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
+      )
+    endif()
+    if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+        "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
+        "arm64    arm64-apple-ios           arm64-apple-ios18"
+        "arm64e   arm64e-apple-ios          arm64e-apple-ios18"
+      )
+    endif()
 
-  # the following are all ELF targets
-  if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "armv4t   armv4t-none-none-eabi     armv4t-none-none-eabi"
-      "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
-      "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
-      "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
-      "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
-    )
-  endif()
-  if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
-    )
-  endif()
-  if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
-      "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
-    )
-  endif()
-  if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "i686    i686-unknown-none-elf       i686-unknown-none-elf"
-      "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
-    )
-  endif()
+    # the following are all ELF targets
+    if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "armv4t   armv4t-none-none-eabi     armv4t-none-none-eabi"
+        "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
+        "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
+        "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
+        "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+      )
+    endif()
+    if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+      )
+    endif()
+    if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
+        "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
+      )
+    endif()
+    if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "i686    i686-unknown-none-elf       i686-unknown-none-elf"
+        "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      )
+    endif()
 
-  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
-      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
-    )
-  endif()
+    if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+        "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+      )
+    endif()
 
-  if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
-    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "avr  avr-none-none-elf    avr-none-none-elf"
-    )
-  endif()  
+    if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "avr  avr-none-none-elf    avr-none-none-elf"
+      )
+    endif()
+  endif()
 endif()
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
@@ -249,6 +263,24 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     )
   endif()
 endif()
+
+foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
+  if(triple STREQUAL "")
+    continue()
+  endif()
+
+  string(REGEX REPLACE "-" ";" list "${triple}")
+  list(GET list 0 arch)
+  list(GET list 1 vendor)
+  list(GET list 2 os)
+  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" " " mod "${triple}")
+
+  list(FILTER EMBEDDED_STDLIB_TARGET_TRIPLES EXCLUDE REGEX " ${mod} ")
+
+  list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+    "${arch} ${mod} ${triple}"
+  )
+endforeach()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(triples)
@@ -301,8 +333,8 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
     add_subdirectory(Observation)
   endif()
 
-  if(SWIFT_ENABLE_BACKTRACING)
-    add_subdirectory(Backtracing)
+  if(SWIFT_ENABLE_RUNTIME_MODULE)
+    add_subdirectory(RuntimeModule)
   endif()
 
   if(SWIFT_ENABLE_SYNCHRONIZATION)

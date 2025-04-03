@@ -1,6 +1,7 @@
 public enum _SwiftifyExpr {
     case param(_ index: Int)
     case `return`
+    case `self`
 }
 
 public enum _DependenceType {
@@ -41,7 +42,7 @@ public enum _SwiftifyInfo {
     case nonescaping(pointer: _SwiftifyExpr)
     /// Can express lifetime dependencies between inputs and outputs of a function.
     /// 'dependsOn' is the input on which the output 'pointer' depends.
-    case lifetimeDependence(dependsOn: Int, pointer: _SwiftifyExpr, type: _DependenceType)
+    case lifetimeDependence(dependsOn: _SwiftifyExpr, pointer: _SwiftifyExpr, type: _DependenceType)
 }
 
 /// Generates a safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] or std::span arguments.
@@ -57,6 +58,8 @@ public enum _SwiftifyInfo {
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
+#if hasFeature(Macros)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
+#endif

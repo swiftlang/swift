@@ -68,17 +68,10 @@ def _apply_default_arguments(args):
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
-    elif args.cmake_generator == 'Xcode':
-        # Building with Xcode is deprecated.
-        args.skip_build = True
-        args.build_early_swift_driver = False
-        args.build_early_swiftsyntax = False
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = (
-            'MinSizeRel' if args.cmake_generator == 'Xcode' else 'Debug'
-        )
+        args.build_variant = 'Debug'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -644,6 +637,12 @@ def create_argument_parser():
                 '`bootstrapping-with-hostlibs`, `crosscompile`, and '
                 '`crosscompile-with-hostlibs`')
 
+    option('--use-linker', store('use_linker'),
+           choices=['gold', 'lld'],
+           default=None,
+           metavar='USE_LINKER',
+           help='Choose the default linker to use when compiling LLVM/Swift')
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 
@@ -703,6 +702,9 @@ def create_argument_parser():
 
     option('--swift-freestanding-is-darwin', toggle_true,
            help='True if the freestanding platform is a Darwin one.')
+
+    option('--enable-new-runtime-build', toggle_true,
+           help='True to enable the new runtime build.')
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
@@ -788,9 +790,6 @@ def create_argument_parser():
            help='set to validate that RawSyntax layout nodes contain children of ' +
                 'the expected types and that RawSyntax tokens have the expected ' +
                 'token kinds')
-    option('--swiftsyntax-lint',
-           toggle_true('swiftsyntax_lint'),
-           help='verify that swift-syntax Source code is formatted correctly')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-swiftformat'], toggle_true('install_swiftformat'),
@@ -853,7 +852,7 @@ def create_argument_parser():
            help='install playground support')
 
     option('--build-ninja', toggle_true,
-           help='build the Ninja tool')
+           help='build the Ninja tool [deprecated: Ninja is built when necessary]')
 
     option(['--build-lld'], toggle_true('build_lld'), default=True,
            help='build lld as part of llvm')
@@ -1041,9 +1040,11 @@ def create_argument_parser():
     option(['-m', '--make'], store('cmake_generator'),
            const='Unix Makefiles',
            help="use CMake's Makefile generator (%(default)s by default)")
+
+    # Xcode generation is no longer supported, leave the option so we can
+    # inform the user.
     option(['-x', '--xcode'], store('cmake_generator'),
-           const='Xcode',
-           help="use CMake's Xcode generator (%(default)s by default)")
+           const='Xcode', help=argparse.SUPPRESS)
 
     # -------------------------------------------------------------------------
     in_group('Run tests')
@@ -1272,10 +1273,6 @@ def create_argument_parser():
     option('--skip-test-ios-simulator',
            toggle_false('test_ios_simulator'),
            help='skip testing iOS simulator targets')
-    option('--skip-test-watchos-32bit-simulator',
-           toggle_false('test_watchos_32bit_simulator'),
-           default=False,
-           help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
            help='skip testing iOS device targets on the host machine (the '
@@ -1493,6 +1490,10 @@ def create_argument_parser():
            default=True,
            help='Enable Volatile module.')
 
+    option('--enable-runtime-module', toggle_true,
+           default=True,
+           help='Enable Runtime module.')
+
     option('--enable-experimental-parser-validation', toggle_true,
            default=True,
            help='Enable experimental Swift Parser validation by default.')
@@ -1669,10 +1670,6 @@ To run OS X and iOS tests that don't require a device:
 To use 'make' instead of 'ninja', use '-m':
 
   [~/src/s]$ ./swift/utils/build-script -m -R
-
-To create Xcode projects that can build Swift, use '-x':
-
-  [~/src/s]$ ./swift/utils/build-script -x -R
 
 Preset mode in build-script
 ---------------------------

@@ -130,7 +130,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         SugaredGenericSig(Info.SugaredGenericSig),
         FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}),
+                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
         ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
@@ -1468,6 +1468,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),
@@ -1497,7 +1498,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
-    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
+    SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {
@@ -1934,8 +1935,6 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<EnumCaseDecl>(Member)) {
       // All containing variables should have been handled.
-    } else if (isa<PoundDiagnosticDecl>(Member)) {
-      // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
     } else if (isa<MissingMemberDecl>(Member)) {
@@ -2438,7 +2437,7 @@ class ConstExtractor: public ASTWalker {
     }
     assert(ReferencedDecl);
     if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
-      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeLiteralAttr>()) {
         return false;
       }
       if (auto *PD = VAR->getParentPatternBinding()) {

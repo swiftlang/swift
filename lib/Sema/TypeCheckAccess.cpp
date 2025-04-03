@@ -17,11 +17,12 @@
 #include "TypeCheckAccess.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
-#include "TypeChecker.h"
 #include "TypeCheckUnsafe.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Import.h"
@@ -601,7 +602,6 @@ public:
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
 
-  UNREACHABLE(PoundDiagnostic, "does not have access control")
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(Missing, "does not have access control")
@@ -1332,7 +1332,7 @@ public:
       if (macroDecl) {
         diagnoseDeclAvailability(
             macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
-            ExportContext::forDeclSignature(const_cast<Decl *>(D), nullptr),
+            ExportContext::forDeclSignature(const_cast<Decl *>(D)),
             std::nullopt);
       }
     }
@@ -1393,7 +1393,6 @@ public:
 #define UNINTERESTING(KIND) \
   void visit##KIND##Decl(KIND##Decl *D) {}
 
-  UNINTERESTING(PoundDiagnostic) // Does not have access control.
   UNINTERESTING(EnumCase) // Handled at the EnumElement level.
   UNINTERESTING(Var) // Handled at the PatternBinding level.
   UNINTERESTING(Destructor) // Always correct.
@@ -2184,7 +2183,6 @@ public:
 
   UNINTERESTING(PrefixOperator) // Does not reference other decls.
   UNINTERESTING(PostfixOperator) // Does not reference other decls.
-  UNINTERESTING(PoundDiagnostic) // Not applicable.
   UNINTERESTING(EnumCase) // Handled at the EnumElement level.
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
@@ -2678,35 +2676,9 @@ void swift::checkAccessControl(Decl *D) {
   if (isa<AccessorDecl>(D))
     return;
 
-  // If we need to gather all unsafe uses from the declaration signature,
-  // do so now.
-  llvm::SmallVector<UnsafeUse, 2> unsafeUsesVec;
-  llvm::SmallVectorImpl<UnsafeUse> *unsafeUses = nullptr;
-  if (D->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !D->isImplicit() &&
-      D->getExplicitSafety() == ExplicitSafety::Unspecified) {
-    unsafeUses = &unsafeUsesVec;
-  }
-
-  auto where = ExportContext::forDeclSignature(D, unsafeUses);
+  auto where = ExportContext::forDeclSignature(D);
   if (where.isImplicit())
     return;
 
   DeclAvailabilityChecker(where).visit(D);
-
-  // If there were any unsafe uses, this declaration needs "@unsafe".
-  if (!unsafeUsesVec.empty()) {
-    D->diagnose(diag::decl_signature_involves_unsafe, D);
-
-    ASTContext &ctx = D->getASTContext();
-    auto insertLoc = D->getAttributeInsertionLoc(/*forModifier=*/false);
-
-    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_unsafe)
-      .fixItInsert(insertLoc, "@unsafe ");
-    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_safe)
-      .fixItInsert(insertLoc, "@safe ");
-
-    std::for_each(unsafeUsesVec.begin(), unsafeUsesVec.end(),
-                  diagnoseUnsafeUse);
-  }
 }

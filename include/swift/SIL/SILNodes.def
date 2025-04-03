@@ -313,8 +313,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
     SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(AllocVectorInst, alloc_vector,
-                              AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
@@ -443,6 +441,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
+  // MarkDependenceAddrInst has read effects for the base operand. See
+  // getMemoryBehavior()
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
@@ -529,8 +529,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
                             SingleValueInstruction, None, DoesNotRelease)
 
-  SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(DestroyNotEscapedClosureInst, destroy_not_escaped_closure,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
 
   // Accessing memory
   SINGLE_VALUE_INST(LoadInst, load,
@@ -903,7 +903,12 @@ NON_VALUE_INST(IgnoredUseInst, ignored_use,
 NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
                SILInstruction, MayReadWrite, DoesNotRelease)
 
-NODE_RANGE(NonValueInstruction, UnreachableInst, IncrementProfilerCounterInst)
+// MarkDependenceAddrInst has read effects for the base operand. See
+// getMemoryBehavior().
+NON_VALUE_INST(MarkDependenceAddrInst, mark_dependence_addr,
+               SILInstruction, None, DoesNotRelease)
+
+NODE_RANGE(NonValueInstruction, UnreachableInst, MarkDependenceAddrInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,

@@ -28,14 +28,19 @@ install(FILES
   _SwiftDistributed.h
   _SynchronizationShims.h
   module.modulemap
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/shims")
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/shims"
+  COMPONENT SwiftCore_development)
 
 add_library(swiftShims INTERFACE)
 target_include_directories(swiftShims INTERFACE
-  $<$<COMPILE_LANGUAGE:C,CXX>:${CMAKE_CURRENT_SOURCE_DIR}/../../>
-  $<$<COMPILE_LANGUAGE:Swift>:${CMAKE_CURRENT_SOURCE_DIR}>)
+  $<$<COMPILE_LANGUAGE:C,CXX>:$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}>>
+  $<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/swift/shims>>)
 target_compile_definitions(swiftShims INTERFACE
   $<$<AND:$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>,$<COMPILE_LANGUAGE:C,CXX>>:SWIFT_STATIC_STDLIB>)
 target_compile_options(swiftShims INTERFACE
   "$<$<AND:$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DSWIFT_STATIC_STDLIB>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=\"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/swift/shims/module.modulemap>\">")
+
+install(TARGETS swiftShims
+  EXPORT SwiftCoreTargets
+  COMPONENT SwiftCore_development)

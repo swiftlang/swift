@@ -114,6 +114,10 @@ private:
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
 
+      /// Whether to bind the variables encountered within the pattern to
+      /// fresh type variables via one-way constraints.
+      bool bindPatternVarsOneWay;
+
       union {
         struct {
           /// The pattern binding declaration for an initialization, if any.
@@ -161,7 +165,6 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      GenericEnvironment *packElementEnv;
       ForEachStmtInfo info;
     } forEachPreamble;
 
@@ -240,25 +243,23 @@ public:
     uninitializedVar.type = patternTy;
   }
 
-  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         GenericEnvironment *packElementEnv)
+  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc)
       : kind(Kind::forEachPreamble) {
     forEachPreamble.stmt = stmt;
     forEachPreamble.dc = dc;
-    forEachPreamble.packElementEnv = packElementEnv;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
   static SyntacticElementTarget
   forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
-                    Pattern *pattern);
+                    Pattern *pattern, bool bindPatternVarsOneWay);
 
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
   static SyntacticElementTarget
   forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
-                    unsigned patternBindingIndex);
+                    unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form an expression target for a ReturnStmt.
   static SyntacticElementTarget
@@ -267,8 +268,9 @@ public:
   /// Form a target for the preamble of a for-in loop, excluding its where
   /// clause and body.
   static SyntacticElementTarget
-  forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                     GenericEnvironment *packElementEnv = nullptr);
+  forForEachPreamble(ForEachStmt *stmt, DeclContext *dc) {
+    return {stmt, dc};
+  }
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -493,6 +495,14 @@ public:
     return false;
   }
 
+  /// Whether to bind the types of any variables within the pattern via
+  /// one-way constraints.
+  bool shouldBindPatternVarsOneWay() const {
+    if (kind == Kind::expression)
+      return expression.bindPatternVarsOneWay;
+    return false;
+  }
+
   /// Whether or not an opaque value placeholder should be injected into the
   /// first \c wrappedValue argument of an apply expression so the initializer
   /// expression can be turned into a property wrapper generator function.
@@ -536,11 +546,6 @@ public:
   unsigned getInitializationPatternBindingIndex() const {
     assert(isForInitialization());
     return expression.initialization.patternBindingIndex;
-  }
-
-  GenericEnvironment *getPackElementEnv() const {
-    assert(isForEachPreamble());
-    return forEachPreamble.packElementEnv;
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {

@@ -397,6 +397,9 @@ struct PrintOptions {
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
 
+  /// Suppress the @execution attribute
+  bool SuppressExecutionAttribute = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
@@ -586,6 +589,10 @@ struct PrintOptions {
 
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
+
+  /// Whether to always desugar inline array types from
+  /// `[<count> x <element>]` to `InlineArray<count, element>`
+  bool AlwaysDesugarInlineArrayTypes = false;
 
   /// Whether to always desugar dictionary types
   /// from `[key_type:value_type]` to `Dictionary<key_type,value_type>`

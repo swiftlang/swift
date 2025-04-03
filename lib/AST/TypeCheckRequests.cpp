@@ -356,7 +356,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   decl->setIsDynamic(value);
 
   // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>())
+  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
+        ABIRoleInfo(decl).providesAPI())
     decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
 }
 
@@ -1369,6 +1370,43 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// ConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<ActorIsolation>
+ConformanceIsolationRequest::getCachedResult() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return ActorIsolation::forNonisolated(false);
+
+  // Was actor isolation non-isolated?
+  if (rootNormal->isComputedNonisolated())
+    return ActorIsolation::forNonisolated(false);
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      cast<NormalProtocolConformance>(conformance->getRootConformance());
+
+  // Common case: conformance is nonisolated.
+  if (result.isNonisolated()) {
+    rootNormal->setComputedNonnisolated();
+    return;
+  }
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1404,13 +1442,14 @@ void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // DefaultArgumentInitContextRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<Initializer *>
+std::optional<DefaultArgumentInitializer *>
 DefaultArgumentInitContextRequest::getCachedResult() const {
   auto *param = std::get<0>(getStorage());
   return param->getCachedDefaultArgumentInitContext();
 }
 
-void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+void DefaultArgumentInitContextRequest::cacheResult(
+    DefaultArgumentInitializer *init) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultArgumentInitContext(init);
 }
@@ -1654,16 +1693,16 @@ void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckSourceFileRequest computation.
+// TypeCheckPrimaryFileRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+evaluator::DependencySource TypeCheckPrimaryFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   return std::get<0>(getStorage());
 }
 
 std::optional<evaluator::SideEffect>
-TypeCheckSourceFileRequest::getCachedResult() const {
+TypeCheckPrimaryFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
     return std::make_tuple<>();
@@ -1671,7 +1710,7 @@ TypeCheckSourceFileRequest::getCachedResult() const {
   return std::nullopt;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
+void TypeCheckPrimaryFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.
@@ -2643,19 +2682,17 @@ void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed,
+                 "body");
 }
 
 void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity_through,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed_through,
+                 "body");
 }
 
 //----------------------------------------------------------------------------//
@@ -2724,7 +2761,7 @@ SemanticAvailableAttrRequest::getCachedResult() const {
   if (!attr->hasComputedSemanticAttr())
     return std::nullopt;
 
-  if (!attr->hasCachedDomain()) {
+  if (!attr->getDomainOrIdentifier().isDomain()) {
     return std::optional<SemanticAvailableAttr>{};
   }
 
@@ -2735,4 +2772,6 @@ void SemanticAvailableAttrRequest::cacheResult(
     std::optional<SemanticAvailableAttr> value) const {
   AvailableAttr *attr = const_cast<AvailableAttr *>(std::get<0>(getStorage()));
   attr->setComputedSemanticAttr();
+  if (!value)
+    attr->setInvalid();
 }

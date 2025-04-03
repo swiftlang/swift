@@ -85,6 +85,15 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
   return nullptr;
 }
 
+SILGlobalVariable *SerializedSILLoader::lookupSILGlobalVariable(StringRef Name) {
+  for (auto &Des : LoadedSILSections) {
+    if (auto *G = Des->lookupSILGlobalVariable(Name)) {
+      return G;
+    }
+  }
+  return nullptr;
+}
+
 bool SerializedSILLoader::hasSILFunction(StringRef Name,
                                          std::optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
@@ -132,6 +141,14 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   for (auto &Des : LoadedSILSections)
     if (auto wT = Des->lookupDefaultWitnessTable(WT))
       return wT;
+  return nullptr;
+}
+
+SILDefaultOverrideTable *
+SerializedSILLoader::lookupDefaultOverrideTable(SILDefaultOverrideTable *OT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto oT = Des->lookupDefaultOverrideTable(OT))
+      return oT;
   return nullptr;
 }
 
@@ -241,6 +258,12 @@ void SerializedSILLoader::getAllWitnessTables() {
 void SerializedSILLoader::getAllDefaultWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllDefaultWitnessTables();
+}
+
+/// Deserialize all DefaultOverrideTables in all SILModules.
+void SerializedSILLoader::getAllDefaultOverrideTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultOverrideTables();
 }
 
 /// Deserialize all Properties in all SILModules.

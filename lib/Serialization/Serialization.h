@@ -238,6 +238,10 @@ class Serializer : public SerializerBase {
                        index_block::PROTOCOL_CONFORMANCE_OFFSETS>
   ConformancesToSerialize;
 
+  ASTBlockRecordKeeper<AbstractConformance *, ProtocolConformanceID,
+                       index_block::ABSTRACT_CONFORMANCE_OFFSETS>
+  AbstractConformancesToSerialize;
+
   ASTBlockRecordKeeper<PackConformance *, ProtocolConformanceID,
                        index_block::PACK_CONFORMANCE_OFFSETS>
   PackConformancesToSerialize;
@@ -381,6 +385,9 @@ private:
   void writeASTBlockEntity(ProtocolConformance *conformance);
 
   void writeLocalNormalProtocolConformance(NormalProtocolConformance *);
+
+  /// Writes an abstract conformance.
+  void writeASTBlockEntity(AbstractConformance *conformance);
 
   /// Writes a pack conformance.
   void writeASTBlockEntity(PackConformance *conformance);

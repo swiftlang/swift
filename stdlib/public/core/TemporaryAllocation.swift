@@ -84,7 +84,7 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
   // without worrying about running out of space, and the compiler would emit
   // such allocations on the stack anyway when they represent structures or
   // stack-promoted objects.
-  if byteCount <= 1024 {
+  if _fastPath(byteCount <= 1024) {
     return true
   }
 
@@ -220,7 +220,7 @@ internal func _fallBackToHeapAllocation<R: ~Copyable>(
     alignment: alignment
   )
   defer {
-    buffer.deallocate()
+    unsafe buffer.deallocate()
   }
   return try body(buffer._rawValue)
 }
@@ -269,11 +269,11 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable>(
     capacity: byteCount,
     alignment: alignment
   ) { pointer in
-    let buffer = UnsafeMutableRawBufferPointer(
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
       start: .init(pointer),
       count: byteCount
     )
-    return try body(buffer)
+    return try unsafe body(buffer)
   }
 }
 
@@ -293,11 +293,11 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable>(
     capacity: byteCount,
     alignment: alignment
   ) { pointer in
-    let buffer = UnsafeMutableRawBufferPointer(
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
       start: .init(pointer),
       count: byteCount
     )
-    return try body(buffer)
+    return try unsafe body(buffer)
   }
 }
 
@@ -346,11 +346,11 @@ public func withUnsafeTemporaryAllocation<
     alignment: MemoryLayout<T>.alignment
   ) { pointer in
     Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
-    let buffer = UnsafeMutableBufferPointer<T>(
+    let buffer = unsafe UnsafeMutableBufferPointer<T>(
       start: .init(pointer),
       count: capacity
     )
-    return try body(buffer)
+    return try unsafe body(buffer)
   }
 }
 
@@ -373,10 +373,10 @@ public func _withUnprotectedUnsafeTemporaryAllocation<
     alignment: MemoryLayout<T>.alignment
   ) { pointer in
     Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
-    let buffer = UnsafeMutableBufferPointer<T>(
+    let buffer = unsafe UnsafeMutableBufferPointer<T>(
       start: .init(pointer),
       count: capacity
     )
-    return try body(buffer)
+    return try unsafe body(buffer)
   }
 }

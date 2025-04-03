@@ -23,9 +23,6 @@
 
 #include "ExecutorImpl.h"
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu-offsetof-extensions"
-
 // JobFlags
 static_assert(sizeof(swift::JobFlags) == sizeof(SwiftJobFlags));
 
@@ -53,16 +50,6 @@ static_assert((SwiftJobPriority)swift::JobPriority::Unspecified
 
 // Job (has additional fields not exposed via SwiftJob)
 static_assert(sizeof(swift::Job) >= sizeof(SwiftJob));
-static_assert(offsetof(swift::Job, metadata) == offsetof(SwiftJob, metadata));
-#if !SWIFT_CONCURRENCY_EMBEDDED
-static_assert(offsetof(swift::Job, refCounts) == offsetof(SwiftJob, refCounts));
-#else
-static_assert(offsetof(swift::Job, embeddedRefcount) == offsetof(SwiftJob, refCounts));
-#endif
-static_assert(offsetof(swift::Job, SchedulerPrivate) == offsetof(SwiftJob, schedulerPrivate));
-static_assert(offsetof(swift::Job, SchedulerPrivate[0]) == offsetof(SwiftJob, schedulerPrivate[0]));
-static_assert(offsetof(swift::Job, SchedulerPrivate[1]) == offsetof(SwiftJob, schedulerPrivate[1]));
-static_assert(offsetof(swift::Job, Flags) == offsetof(SwiftJob, flags));
 
 // SerialExecutorRef
 static_assert(sizeof(swift::SerialExecutorRef) == sizeof(SwiftExecutorRef));
@@ -70,7 +57,5 @@ static_assert(sizeof(swift::SerialExecutorRef) == sizeof(SwiftExecutorRef));
 // swift_clock_id
 static_assert((SwiftClockId)swift::swift_clock_id_continuous
               == SwiftContinuousClock);
-static_assert((SwiftClockId)swift::swift_clock_id_suspending
-              == SwiftSuspendingClock);
-
-#pragma clang diagnostic pop
+static_assert((SwiftClockId)swift::swift_clock_id_suspending ==
+              SwiftSuspendingClock);

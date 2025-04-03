@@ -833,16 +833,6 @@ DisableImplicitStringProcessingImport("disable-implicit-string-processing-module
                                       llvm::cl::desc("Disable implicit import of _StringProcessing module"),
                                       llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-EnableImplicitBacktracingImport("enable-implicit-backtracing-module-import",
-                                 llvm::cl::desc("Enable implicit import of _Backtracing module"),
-                                 llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-DisableImplicitBacktracingImport("disable-implicit-backtracing-module-import",
-                                 llvm::cl::desc("Disable implicit import of _Backtracing module"),
-                                 llvm::cl::init(false));
-
 static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
     "enable-experimental-named-opaque-types",
     llvm::cl::desc("Enable experimental support for named opaque result types"),
@@ -4470,13 +4460,6 @@ int main(int argc, char *argv[]) {
   if (options::DisableImplicitStringProcessingImport) {
     InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
-  if (options::DisableImplicitBacktracingImport) {
-    InitInvok.getLangOptions().DisableImplicitBacktracingModuleImport = true;
-  } else if (options::EnableImplicitBacktracingImport) {
-    InitInvok.getLangOptions().DisableImplicitBacktracingModuleImport = false;
-  } else {
-    InitInvok.getLangOptions().DisableImplicitBacktracingModuleImport = true;
-  }
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
@@ -4541,6 +4524,9 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getClangImporterOptions().BridgingHeader =
     options::ImportObjCHeader;
+  if (!options::ImportObjCHeader.empty())
+    InitInvok.getFrontendOptions().ModuleHasBridgingHeader = true;
+
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableDeserializationSafety =

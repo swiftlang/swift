@@ -92,7 +92,7 @@
                     "fix_lifetime" "mark_dependence"
                     "end_lifetime"
                     "is_unique"
-                    "is_escaping_closure"
+                    "destroy_not_escaped_closure"
                     "copy_block"
                     "copy_block_without_escaping"
                     "is_unique")

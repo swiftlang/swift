@@ -57,6 +57,7 @@ split_embedded_sources(
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
+  EMBEDDED SwiftSettings.swift
   EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguouslyStored.swift
@@ -75,6 +76,7 @@ split_embedded_sources(
   EMBEDDED DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
+  EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
   EMBEDDED ExistentialCollection.swift
@@ -92,6 +94,7 @@ split_embedded_sources(
   EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
+  EMBEDDED InlineArray.swift
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
@@ -151,10 +154,11 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
-  EMBEDDED Slab.swift
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/MutableRawSpan.swift
+  EMBEDDED Span/MutableSpan.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
   EMBEDDED StaticString.swift
@@ -322,6 +326,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCo
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
+list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
@@ -335,13 +340,26 @@ endif()
 list(APPEND swift_stdlib_compile_flags "-plugin-path" "${swift_lib_dir}/swift/host/plugins")
 
 set(swift_core_incorporate_object_libraries)
-list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
+list(APPEND swift_core_incorporate_object_libraries swiftRuntimeCore)
 list(APPEND swift_core_incorporate_object_libraries swiftLLVMSupport)
 list(APPEND swift_core_incorporate_object_libraries swiftDemangling)
 list(APPEND swift_core_incorporate_object_libraries swiftStdlibStubs)
 list(APPEND swift_core_incorporate_object_libraries swiftThreading)
 if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
+endif()
+
+# Backward deployment of Span on Apple platforms is implemented via the
+# libswiftCompatibilitySpan.dylib shim.
+#
+# This flag ensures we emit the correct $ld$previous$ symbols in the standard
+# library. When building a binary for an older deployment target, we
+# pretend certain symbols are actually in libswiftCompatibilitySpan.dylib.
+#
+# Further discussion of libswiftCompatibilitySpan.dylib appears below.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-previous-module-installname-map-file" "-Xfrontend" "${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json")
 endif()
 
 set(swiftCore_common_options
@@ -421,6 +439,44 @@ add_swift_target_library(swiftCore
                     zippered
                  )
 
+# When a binary built with an older deployment target is run with a new
+# standard library, the symbols that were previously in the backward
+# compatibility shim are now in the standard library. To ensure the
+# dynamic linker continues to find these symbols, the compatibility
+# shim must be replaced by a symlink to the standard library.
+#
+# Since we're building the "new" standard library here, we create this
+# symlink in the same directory, from libswiftCompatibilitySpan.dylib to
+# libswiftCore.dylib.
+#
+# The sources for the real libswiftCompatibilitySpan.dylib are found in
+# stdlib/toolchain/CompatibilitySpan. When running a binary with an old
+# standard library, this dynamic library must be present at run time.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  foreach(sdk ${SWIFT_SDKS})
+    set(lib_dir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(lib_path "${SWIFTLIB_DIR}/${lib_dir}")
+    set(compat_lib_name "${lib_path}/libswiftCompatibilitySpan.dylib")
+
+    # This doesn't depend on libswiftCore.dylib because we don't actually need
+    # for it to exist to create the symlink, nor is there any need to recreate
+    # the symlink if the dylib changes.
+    add_custom_command_target(unused_var
+                              CUSTOM_TARGET_NAME "swiftCompatibilitySpan-symlink-${lib_dir}"
+                              OUTPUT "${compat_lib_name}"
+                              COMMAND ${CMAKE_COMMAND} "-E" "create_symlink" "${lib_path}/libswiftCore.dylib" "${compat_lib_name}")
+    foreach(ARCH ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      add_dependencies("swiftCore-${lib_dir}-${ARCH}" "swiftCompatibilitySpan-symlink-${lib_dir}")
+    endforeach()
+
+    swift_install_symlink_component(stdlib
+      LINK_NAME libswiftCompatibilitySpan.dylib
+      TARGET libswiftCore.dylib
+      DESTINATION "lib/swift/${lib_dir}")
+  endforeach()
+endif()
+
 # Embedded standard library - embedded libraries are built as .swiftmodule only,
 # i.e. there is no .o or .a file produced (no binary code is actually produced)
 # and only users of a library are going to actually compile any needed code.
@@ -460,7 +516,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
+        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded
         -Xfrontend -enable-ossa-modules
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"

@@ -256,11 +256,22 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   if (auto *pack = type->getAs<PackType>()) {
     auto info = GenericParameterReferenceInfo();
 
-    for (auto arg : pack->getElementTypes()) {
-      info |= findGenericParameterReferencesRec(
-          genericSig, origParam, openedParam, arg,
-          TypePosition::Invariant, /*canBeCovariantResult=*/false);
-    }
+    // FIXME: Source compatibility remedy to allow existential opening in
+    // the following case:
+    // ```
+    // protocol P {}
+    // struct S<each T> {}
+    // func foo<T: P>(_: T, _: S<T>? = nil) {}
+    // let p: any P
+    // foo(p)
+    // ```
+    //
+    // for (auto arg : pack->getElementTypes()) {
+    //   info |= findGenericParameterReferencesRec(
+    //       genericSig, origParam, openedParam, arg,
+    //       TypePosition::Invariant, /*canBeCovariantResult=*/false);
+    // }
+    (void)pack;
 
     return info;
   }
@@ -902,10 +913,10 @@ Type swift::typeEraseOpenedArchetypesFromEnvironment(
         return t->hasOpenedExistential();
       },
       /*predicateFn=*/[](Type t) {
-        return t->is<OpenedArchetypeType>();
+        return t->is<ExistentialArchetypeType>();
       },
       /*eraseFn=*/[&](Type t, TypePosition currPos) {
-        auto *openedTy = t->castTo<OpenedArchetypeType>();
+        auto *openedTy = t->castTo<ExistentialArchetypeType>();
         if (openedTy->getGenericEnvironment() == env)
           return openedTy->getExistentialType();
 

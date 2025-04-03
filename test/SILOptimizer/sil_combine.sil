@@ -1,7 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_ValueGenerics
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -196,6 +195,7 @@ sil @dead_use_of_alloc_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_stack $((), (), ())
   %2 = tuple_element_addr %1 : $*((), (), ()), 0
+  fix_lifetime %2
   dealloc_stack %1 : $*((), (), ())
   %3 = tuple ()
   return %3 : $()
@@ -3447,10 +3447,10 @@ class ClientSocket : Socket {
 }
 
 // CHECK-LABEL: static_existential
-// CHECK:bb0:
-// CHECK:  [[META:%.*]] = metatype $@thick ClientSocket.Type
-// CHECK:  [[WM:%.*]] = witness_method $ClientSocket
-// CHECK:  try_apply [[WM]]<ClientSocket>([[META]])
+// CHECK:       bb0:
+// CHECK-DAG:    [[META:%.*]] = metatype $@thick ClientSocket.Type
+// CHECK-DAG:    [[WM:%.*]] = witness_method $ClientSocket
+// CHECK:        try_apply [[WM]]<ClientSocket>([[META]])
 sil @static_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
 bb0:
   %0 = metatype $@thick ClientSocket.Type
@@ -3516,9 +3516,9 @@ sil @any_to_object : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @own
 
 // CHECK-LABEL: sil @dont_crash_when_propagating_existentials
 // CHECK:   [[EM:%[0-9]+]] = init_existential_metatype %0
-// CHECK:   [[S:%[0-9]+]] = alloc_stack $Any
+// CHECK:   [[S:%[0-9]+]] = alloc_stack $C
 // CHECK:   [[M:%[0-9]+]] = open_existential_metatype [[EM]]
-// CHECK:   [[E:%[0-9]+]] = init_existential_addr [[S]]
+// CHECK:   [[E:%[0-9]+]] = unchecked_addr_cast [[S]]
 // CHECK:   store [[M]] to [[E]]
 // CHECK:   apply {{%[0-9]+}}<(@opened("5F99B72C-EC40-11EA-9534-8C8590A6A134", AnyObject) Self).Type>([[E]])
 // CHECK: } // end sil function 'dont_crash_when_propagating_existentials'
@@ -3790,8 +3790,6 @@ bb0(%0 : $B):
 // CHECK-LABEL: sil @mark_dependence_trivial_address_base :
 // CHECK: bb0(
 // CHECK-NEXT: strong_retain
-// CHECK-NEXT: alloc_stack $Int
-// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'mark_dependence_trivial_address_base'
 sil @mark_dependence_trivial_address_base : $@convention(thin) (@guaranteed B) -> @owned B {

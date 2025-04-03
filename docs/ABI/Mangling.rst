@@ -238,6 +238,8 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function
+  global ::= global 'Twc'                // coro function pointer of a function
+  global ::= global 'Twd'                // default override of a function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
@@ -258,6 +260,8 @@ types where the metadata itself has unknown layout.)
   global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
+  global ::= entity generic-signature? type type* 'Tkmu' // key path unapplied method
+  global ::= entity generic-signature? type type* 'TkMA' // key path applied method
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
   global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function
@@ -756,6 +760,9 @@ Types
     function-isolation ::= type 'YA'         // @isolated(any) on function type
     sending-result ::= 'YT'                  // -> sending T
   #endif
+  #if SWIFT_RUNTIME_VERSION >= 6.2
+    function-isolation :== 'YC'              // @execution(caller) on function type
+  #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
@@ -948,6 +955,7 @@ productions:
   type ::= base-type "XSq"                       // sugared Optional type
   type ::= base-type "XSa"                       // sugared Array type
   type ::= key-type value-type "XSD"             // sugared Dictionary type
+  type ::= count-type element-type "XSA"         // sugared InlineArray type
 
 Generics
 ~~~~~~~~

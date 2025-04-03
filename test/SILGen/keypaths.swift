@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -parse-stdlib -module-name keypaths %s | %FileCheck %s
-
+// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithMethodMembers -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 import Swift
 
@@ -639,6 +639,88 @@ struct TestKeyPathWithSomeType : DefineSomeType {
   }
 }
 
+class J: Hashable {
+  static func == (lhs: J, rhs: J) -> Bool { return lhs === rhs }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+}
+
+struct K {
+  var year = 2024
+  static let millenium: Int = 3
+  init() {}
+  init(val value: Int = 2024) { year = value }
+  
+  var add: (Int, Int) -> Int { return { $0 + $1 } }
+  func add(this: Int) -> Int { this + this}
+  func add(that: Int) -> Int { that + that }
+  static func subtract(_ val: Int) -> Int { return millenium - val }
+  nonisolated func nonisolatedNextYear() -> Int { year + 1 }
+  func doubleValue(_ value: inout Int) { value *= 2 }
+  func foo(hashableParam j: J) {}
+  subscript(index: Int) -> Int { return year + index}
+}
+
+protocol Describable {
+  func describe() -> String
+}
+
+struct L: Describable {
+  var name: String
+  func describe() -> String { return "\(name)" }
+}
+
+// CHECK-LABEL: // test_method_and_initializer_keypaths()
+// CHECK-LABEL: sil hidden [ossa] @{{.*}} : $@convention(thin) () -> () {
+func test_method_and_initializer_keypaths() {
+  // CHECK: %0 = keypath $WritableKeyPath<K.Type, () -> K>
+  // CHECK-SAME: root $K.Type; gettable_property $() -> K, id @$s8keypaths1KVACycfC : $@convention(method) (@thin K.Type) -> K, getter @$s8keypaths1KVACycfcACmTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <K>)
+  let _ = \K.Type.init
+  // CHECK: keypath $WritableKeyPath<K.Type, K>, (root $K.Type; gettable_property $K, id @$s8keypaths1KVACycfC : $@convention(method) (@thin K.Type) -> K, getter @$s8keypaths1KVACycfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out K)
+  let _ = \K.Type.init()
+  // CHECK: keypath $WritableKeyPath<K.Type, (Int) -> K>
+  // CHECK-SAME: root $K.Type; gettable_property $(Int) -> K, id @$s8keypaths1KV3valACSi_tcfC : $@convention(method) (Int, @thin K.Type) -> K, getter @$s8keypaths1KV3valACSi_tcfcACmTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, K>)
+  let _ = \K.Type.init(val:)
+  // CHECK: keypath $WritableKeyPath<K.Type, K>, (root $K.Type; gettable_property $K, id @$s8keypaths1KV3valACSi_tcfC : $@convention(method) (Int, @thin K.Type) -> K, getter @$s8keypaths1KV3valACSi_tcfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type, @in_guaranteed Int) -> @out K, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int)
+  let _ = \K.Type.init(val: 2025)
+  // CHECK: keypath $WritableKeyPath<K.Type, Int>, (root $K.Type; gettable_property $K, id @$s8keypaths1KV3valACSi_tcfC : $@convention(method) (Int, @thin K.Type) -> K, getter @$s8keypaths1KV3valACSi_tcfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type, @in_guaranteed Int) -> @out K, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; stored_property #K.year : $Int)
+  let _ = \K.Type.init(val: 2025).year
+  // CHECK: keypath $KeyPath<K.Type, Int>, (root $K.Type; gettable_property $K, id @$s8keypaths1KVACycfC : $@convention(method) (@thin K.Type) -> K, getter @$s8keypaths1KVACycfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out K; gettable_property $Int, id @$s8keypaths1KVyS2icig : $@convention(method) (Int, K) -> Int, getter @$s8keypaths1KVyS2icipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed K, @in_guaranteed Int) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int)
+  let _ = \K.Type.init()[0]
+  // CHECK: keypath $KeyPath<K, (Int, Int) -> Int>, (root $K; gettable_property $(Int, Int) -> Int, id @$s8keypaths1KV3addyS2i_Sitcvg : $@convention(method) (K) -> @owned @callee_guaranteed (Int, Int) -> Int, getter @$s8keypaths1KV3addyS2i_SitcvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_2 for <Int, Int, Int>)
+  let _ = \K.add
+  // CHECK: keypath $WritableKeyPath<K, (Int) -> Int>
+  // CHECK-SAME: root $K; gettable_property $(Int) -> Int, id @$s8keypaths1KV3add4thisS2i_tF : $@convention(method) (Int, K) -> Int, getter @$s8keypaths1KV3add4thisS2i_tFACTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>)
+  let _ = \K.add(this:)
+  // CHECK: keypath $WritableKeyPath<K, Int>, (root $K; gettable_property $Int, id @$s8keypaths1KV3add4thatS2i_tF : $@convention(method) (Int, K) -> Int, getter @$s8keypaths1KV3add4thatS2i_tFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed K, @in_guaranteed Int) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int)
+  let _ = \K.add(that: 1)
+  // CHECK: keypath $WritableKeyPath<K.Type, (Int) -> Int>
+  // CHECK-SAME: root $K.Type; gettable_property $(Int) -> Int, id @$s8keypaths1KV8subtractyS2iFZ : $@convention(method) (Int, @thin K.Type) -> Int, getter @$s8keypaths1KV8subtractyS2iFZACmTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>)
+  let _ = \K.Type.subtract
+  // CHECK: keypath $WritableKeyPath<K.Type, Int>, (root $K.Type; gettable_property $Int, id @$s8keypaths1KV8subtractyS2iFZ : $@convention(method) (Int, @thin K.Type) -> Int, getter @$s8keypaths1KV8subtractyS2iFZACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type, @in_guaranteed Int) -> @out Int, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int)
+  let _ = \K.Type.subtract(1)
+  // CHECK: keypath $WritableKeyPath<K, () -> Int>
+  // CHECK-SAME: root $K; gettable_property $() -> Int, id @$s8keypaths1KV19nonisolatedNextYearSiyF : $@convention(method) (K) -> Int, getter @$s8keypaths1KV19nonisolatedNextYearSiyFACTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>)
+  let _ = \K.nonisolatedNextYear
+  // CHECK: keypath $WritableKeyPath<K, Int>, (root $K; gettable_property $Int, id @$s8keypaths1KV19nonisolatedNextYearSiyF : $@convention(method) (K) -> Int, getter @$s8keypaths1KV19nonisolatedNextYearSiyFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out Int)
+  let _ = \K.nonisolatedNextYear()
+  // CHECK: keypath $WritableKeyPath<K.Type, Int>, (root $K.Type; gettable_property $K, id @$s8keypaths1KV3valACSi_tcfC : $@convention(method) (Int, @thin K.Type) -> K, getter @$s8keypaths1KV3valACSi_tcfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type, @in_guaranteed Int) -> @out K, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; gettable_property $Int, id @$s8keypaths1KV19nonisolatedNextYearSiyF : $@convention(method) (K) -> Int, getter @$s8keypaths1KV19nonisolatedNextYearSiyFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out Int)
+  let _ = \K.Type.init(val:2025).nonisolatedNextYear()
+  // CHECK: keypath $KeyPath<K.Type, String>, (root $K.Type; gettable_property $K, id @$s8keypaths1KV3valACSi_tcfC : $@convention(method) (Int, @thin K.Type) -> K, getter @$s8keypaths1KV3valACSi_tcfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type, @in_guaranteed Int) -> @out K, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; gettable_property $Int, id @$s8keypaths1KV19nonisolatedNextYearSiyF : $@convention(method) (K) -> Int, getter @$s8keypaths1KV19nonisolatedNextYearSiyFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out Int; gettable_property $String, id @$sSzsE11descriptionSSvg : $@convention(method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> @owned String, getter @$sSzsE11descriptionSSvpSiTK : $@convention(keypath_accessor_getter) (@in_guaranteed Int) -> @out String, external #BinaryInteger.description<Int>)
+  let _ = \K.Type.init(val:2025).nonisolatedNextYear().description
+  // CHECK: keypath $WritableKeyPath<K.Type, Int>, (root $K.Type; gettable_property $K, id @$s8keypaths1KV3valACSi_tcfC : $@convention(method) (Int, @thin K.Type) -> K, getter @$s8keypaths1KV3valACSi_tcfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type, @in_guaranteed Int) -> @out K, indices [%$0 : $Int : $Int], indices_equals @$sSiTH : $@convention(keypath_accessor_equals) (@in_guaranteed Int, @in_guaranteed Int) -> Bool, indices_hash @$sSiTh : $@convention(keypath_accessor_hash) (@in_guaranteed Int) -> Int; gettable_property $Int, id @$s8keypaths1KV19nonisolatedNextYearSiyF : $@convention(method) (K) -> Int, getter @$s8keypaths1KV19nonisolatedNextYearSiyFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed K) -> @out Int; gettable_property $Int, id @$sSi6signumSiyF : $@convention(method) (Int) -> Int, getter @$sSi6signumSiyFSiTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed Int) -> @out Int)
+  let _ = \K.Type.init(val:2025).nonisolatedNextYear().signum()
+  // CHECK: keypath $WritableKeyPath<K, ()>, (root $K; gettable_property $(), id @$s8keypaths1KV3foo13hashableParamyAA1JC_tF : $@convention(method) (@guaranteed J, K) -> (), getter @$s8keypaths1KV3foo13hashableParamyAA1JC_tFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed K, @in_guaranteed J) -> @out (), indices [%$0 : $J : $J], indices_equals @$s8keypaths1JCTH : $@convention(keypath_accessor_equals) (@in_guaranteed J, @in_guaranteed J) -> Bool, indices_hash @$s8keypaths1JCTh : $@convention(keypath_accessor_hash) (@in_guaranteed J) -> Int)
+  let hashableInstance = J()
+  let _ = \K.foo(hashableParam: hashableInstance)
+  // CHECK: keypath $WritableKeyPath<L, () -> String>
+  // CHECK-SAME: root $L; gettable_property $() -> String, id @$s8keypaths1LV8describeSSyF : $@convention(method) (@guaranteed L) -> @owned String, getter @$s8keypaths1LV8describeSSyFACTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed L) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <String>)
+  let _ = \L.describe
+  // CHECK: keypath $WritableKeyPath<L, String>, (root $L; gettable_property $String, id @$s8keypaths1LV8describeSSyF : $@convention(method) (@guaranteed L) -> @owned String, getter @$s8keypaths1LV8describeSSyFACTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed L) -> @out String)
+  let _ = \L.describe()
+}
+
 struct N {
   static let kelvin = 293
 }
@@ -670,6 +752,8 @@ func test_metatype_keypaths() {
   let _: KeyPath<M.Type, N.Type> = \M.Type.[76]
   // CHECK: keypath $KeyPath<M, Optional<Int>>, (root $M; gettable_property $Optional<N.Type>, id #M.degrees!getter : (M) -> () -> N.Type?, getter @$s8keypaths1MC7degreesAA1NVmSgvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed M) -> @out Optional<@thick N.Type>; optional_chain : $N.Type; gettable_property $Int, id @$s8keypaths1NV6kelvinSivgZ : $@convention(method) (@thin N.Type) -> Int, getter @$s8keypaths1NV6kelvinSivpZACmTK : $@convention(keypath_accessor_getter) (@in_guaranteed @thick N.Type) -> @out Int; optional_wrap : $Optional<Int>)
   let _: KeyPath<M, Int?> = \.degrees?.kelvin
+  // CHECK: keypath $KeyPath<Int.Type, Int>, (root $Int.Type; gettable_property $Int, id @$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvgZ : $@convention(method) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral> (@thick τ_0_0.Type) -> @out τ_0_0, getter @$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvpZSimTK : $@convention(keypath_accessor_getter) (@in_guaranteed @thick Int.Type) -> @out Int, external #AdditiveArithmetic.zero<Int>)
+  let _: KeyPath<Int.Type, Int> = \Int.Type.zero
 }
 
 

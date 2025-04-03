@@ -97,6 +97,7 @@ PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
 PROTOCOL(TaskExecutor)
 PROTOCOL(GlobalActor)
+PROTOCOL(ExecutorFactory)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
@@ -107,6 +108,7 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
 PROTOCOL(Sendable)
+PROTOCOL(SendableMetatype)
 PROTOCOL(UnsafeSendable)
 
 PROTOCOL_(ObjectiveCBridgeable)

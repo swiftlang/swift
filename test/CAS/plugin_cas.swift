@@ -8,7 +8,7 @@
 // RUN:   -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift \
 // RUN:   -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h \
 // RUN:   -swift-version 4 -enable-cross-import-overlays -cache-compile-job \
-// RUN:   -cas-path %t/cas \
+// RUN:   -cas-path %t/cas -scanner-output-dir %t -auto-bridging-header-chaining \
 // RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
 // RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
 // RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
@@ -27,13 +27,11 @@
 // RUN:   -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders \
 // RUN:   -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h \
 // RUN:   -swift-version 4 -enable-cross-import-overlays -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job \
-// RUN:   -cas-path %t/cas \
+// RUN:   -cas-path %t/cas -scanner-output-dir %t -auto-bridging-header-chaining \
 // RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
 // RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
 // RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
-// Check the contents of the JSON output
-// RUN: %validate-json %t/deps_clang_target.json &>/dev/null
-// RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
+
 
 import C
 import E
@@ -58,17 +56,13 @@ import SubE
 // CHECK-DAG:     "swift": "_cross_import_E"
 // CHECK: ],
 
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
 // CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
 // CHECK-SAME: Bridging.h
 
 // CHECK-NEXT: "sourceFiles":
+// CHECK-NEXT: ChainedBridgingHeader.h
 // CHECK-NEXT: Bridging.h
 // CHECK-NEXT: BridgingOther.h
 
@@ -109,7 +103,6 @@ import SubE
 // CHECK-MAKE-DEPS-SAME: A.swiftinterface
 // CHECK-MAKE-DEPS-SAME: G.swiftinterface
 // CHECK-MAKE-DEPS-SAME: B.h
-// CHECK-MAKE-DEPS-SAME: F.h
 // CHECK-MAKE-DEPS-SAME: Bridging.h
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap
@@ -159,13 +152,6 @@ import SubE
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",
-// CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_NO_CLANG_TARGET-NEXT:   "-target",
-// CHECK_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_CLANG_TARGET-NEXT:   "-fapinotes-swift-version={{.*}}"
-// CHECK_CLANG_TARGET-NEXT:   ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"

@@ -171,6 +171,7 @@ protected:
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
+    llvm::StringSet<> exportedModules;
     std::string headerImport;
   };
 
@@ -185,7 +186,7 @@ protected:
 
   /// If the module has a package name matching the one
   /// specified, return a set of package-only imports for this module.
-  static llvm::ErrorOr<llvm::StringSet<>>
+  static llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
   getMatchingPackageOnlyImportsOfModule(Twine modulePath,
                                         bool isFramework,
                                         bool isRequiredOSSAModules,
@@ -263,7 +264,7 @@ public:
   virtual void verifyAllModules() override;
 
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
@@ -436,7 +437,7 @@ public:
   getFilenameForPrivateDecl(const Decl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
-  
+
   virtual OpaqueTypeDecl *
   lookupOpaqueResultType(StringRef MangledName) override;
 
@@ -583,6 +584,11 @@ bool extractCompilerFlagsFromInterface(
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
+
+/// Extract embedded bridging header from binary module.
+std::string
+extractEmbeddedBridgingHeaderContent(std::unique_ptr<llvm::MemoryBuffer> file,
+                                     ASTContext &Context);
 } // end namespace swift
 
 #endif

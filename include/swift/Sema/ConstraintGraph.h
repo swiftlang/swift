@@ -148,7 +148,7 @@ private:
 
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
-  void retractFromInference(Type fixedType);
+  void retractFromInference();
 
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
@@ -175,11 +175,6 @@ private:
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
-
-  void updateFixedType(
-      Type fixedType,
-      llvm::function_ref<void (ConstraintGraphNode &,
-                               Constraint *)> notification) const;
   /// }
 
   /// The constraint graph this node belongs to.
@@ -294,31 +289,24 @@ public:
 
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
-  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
+  void retractFromInference(TypeVariableType *typeVar);
 
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
   void introduceToInference(TypeVariableType *typeVar, Type fixedType);
 
-  /// Describes which constraints \c gatherConstraints should gather.
-  enum class GatheringKind {
-    /// Gather constraints associated with all of the variables within the
-    /// same equivalence class as the given type variable, as well as its
-    /// immediate fixed bindings.
-    EquivalenceClass,
-    /// Gather all constraints that mention this type variable or type variables
-    /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
-    /// through transitive fixed bindings. This can be used to find all the
-    /// constraints that may be affected when binding a type variable.
-    AllMentions,
-  };
-
-  /// Gather the set of constraints that involve the given type variable,
-  /// i.e., those constraints that will be affected when the type variable
-  /// gets merged or bound to a fixed type.
+  /// Gather constraints associated with all of the variables within the
+  /// same equivalence class as the given type variable, as well as its
+  /// immediate fixed bindings.
   llvm::TinyPtrVector<Constraint *>
-  gatherConstraints(TypeVariableType *typeVar,
-                    GatheringKind kind,
+  gatherAllConstraints(TypeVariableType *typeVar);
+
+  /// Gather all constraints that mention this type variable or type variables
+  /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
+  /// through transitive fixed bindings. This can be used to find all the
+  /// constraints that may be affected when binding a type variable.
+  llvm::TinyPtrVector<Constraint *>
+  gatherNearbyConstraints(TypeVariableType *typeVar,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
 
@@ -436,11 +424,6 @@ private:
   /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void unrelateTypeVariables(TypeVariableType *typeVar,
                              TypeVariableType *otherTypeVar);
-
-  /// Infer bindings from the given constraint.
-  ///
-  /// Note that this it only meant to be called by SolverTrail::Change::undo().
-  void inferBindings(TypeVariableType *typeVar, Constraint *constraint);
 
   /// Retract bindings from the given constraint.
   ///

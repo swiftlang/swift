@@ -21,7 +21,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -48,6 +47,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -61,6 +61,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -693,13 +694,17 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
-  if (!accessPath.empty()) {
-    for (auto &member : ClassMembers) {
-      // Non-simple names are also stored under their simple name, so make
-      // sure to only report them once.
-      if (!member.first.isSimpleName())
-        continue;
+  std::vector<std::pair<DeclName, TinyPtrVector<ValueDecl *>>> OrderedMembers;
+  for (auto &member : ClassMembers) {
+    if (!member.first.isSimpleName())
+      continue;
+    OrderedMembers.emplace_back(member.first, member.second);
+  }
+  llvm::sort(OrderedMembers,
+             [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });
 
+  if (!accessPath.empty()) {
+    for (auto &member : OrderedMembers) {
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().Item)
@@ -711,12 +716,7 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
     return;
   }
 
-  for (auto &member : ClassMembers) {
-    // Non-simple names are also stored under their simple name, so make sure to
-    // only report them once.
-    if (!member.first.isSimpleName())
-      continue;
-
+  for (auto &member : OrderedMembers) {
     for (ValueDecl *vd : member.second)
       if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
         consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
@@ -911,20 +911,6 @@ ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
   return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
 }
 
-SourceFile *IDEInspectionFileRequest::evaluate(Evaluator &evaluator,
-                                               ModuleDecl *mod) const {
-  const auto &SM = mod->getASTContext().SourceMgr;
-  assert(mod->isMainModule() && "Can only do completion in the main module");
-  assert(SM.hasIDEInspectionTargetBuffer() && "Not in IDE inspection mode?");
-
-  for (auto *file : mod->getFiles()) {
-    auto *SF = dyn_cast<SourceFile>(file);
-    if (SF && SF->getBufferID() == SM.getIDEInspectionTargetBufferID())
-      return SF;
-  }
-  llvm_unreachable("Couldn't find the completion file?");
-}
-
 #define FORWARD(name, args)                                                    \
   for (const FileUnit *file : getFiles()) {                                    \
     file->name args;                                                           \
@@ -955,6 +941,22 @@ ModuleDecl *ModuleDecl::getTopLevelModule(bool overlay) {
   }
   // Swift modules don't currently support submodules.
   return this;
+}
+
+bool ModuleDecl::isSubmoduleOf(const ModuleDecl *M) const {
+  // Swift modules don't currently support submodules.
+  if (!isNonSwiftModule())
+    return false;
+
+  auto *ClangParent = M->findUnderlyingClangModule();
+  if (!ClangParent)
+    return false;
+
+  auto *ClangModule = findUnderlyingClangModule();
+  if (!ClangModule)
+    return false;
+
+  return ClangModule->isSubModuleOf(ClangParent);
 }
 
 static bool isParsedModule(const ModuleDecl *mod) {
@@ -1071,6 +1073,18 @@ void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
+void ModuleDecl::lookupAvailabilityDomains(
+    Identifier identifier,
+    llvm::SmallVectorImpl<AvailabilityDomain> &results) const {
+  auto iter = AvailabilityDomains.find(identifier);
+  if (iter != AvailabilityDomains.end()) {
+    results.push_back(AvailabilityDomain::forCustom(iter->getSecond()));
+    return;
+  }
+
+  FORWARD(lookupAvailabilityDomains, (identifier, results));
 }
 
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
@@ -1237,14 +1251,6 @@ void SourceFile::lookupObjCMethods(
   auto known = ObjCMethods.find(selector);
   if (known == ObjCMethods.end()) return;
   results.append(known->second.begin(), known->second.end());
-}
-
-bool ModuleDecl::shouldCollectDisplayDecls() const {
-  for (const FileUnit *file : getFiles()) {
-    if (!file->shouldCollectDisplayDecls())
-      return false;
-  }
-  return true;
 }
 
 void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
@@ -1471,9 +1477,6 @@ void ModuleDecl::ImportCollector::collect(
     const ImportedModule &importedModule) {
   auto *module = importedModule.importedModule;
 
-  if (!module->shouldCollectDisplayDecls())
-    return;
-
   if (importFilter && !importFilter(module))
     return;
 
@@ -1494,11 +1497,17 @@ static void
 collectExportedImports(const ModuleDecl *topLevelModule,
                        ModuleDecl::ImportCollector &importCollector) {
   SmallVector<const ModuleDecl *> stack;
+  SmallPtrSet<const ModuleDecl *, 4> visited;
+  visited.insert(topLevelModule);
   stack.push_back(topLevelModule);
   while (!stack.empty()) {
     const ModuleDecl *module = stack.pop_back_val();
-    if (module->isNonSwiftModule())
+    if (module->isNonSwiftModule() && module != topLevelModule &&
+        !module->isSubmoduleOf(topLevelModule)) {
+      // Recurse into submodules of the top-level module so that we can
+      // re-export them if necessary.
       continue;
+    }
 
     for (const FileUnit *file : module->getFiles()) {
       if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
@@ -1518,10 +1527,12 @@ collectExportedImports(const ModuleDecl *topLevelModule,
                                  ModuleDecl::ImportFilterKind::Exported);
         for (const auto &im : exportedImports) {
           // Skip collecting the underlying clang module as we already have the relevant import.
-          if (module->isClangOverlayOf(im.importedModule))
-            continue;
-          importCollector.collect(im);
-          stack.push_back(im.importedModule);
+          if (!module->isClangOverlayOf(im.importedModule))
+            importCollector.collect(im);
+          if (!visited.contains(im.importedModule)) {
+            visited.insert(im.importedModule);
+            stack.push_back(im.importedModule);
+          }
         }
       }
     }
@@ -1978,7 +1989,7 @@ StringRef ModuleDecl::getModuleFilename() const {
       continue;
     }
     // Skip synthesized files.
-    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+    if (isa<SynthesizedFileUnit>(F))
       continue;
     return StringRef();
   }
@@ -2004,6 +2015,10 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
 
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
+}
+
+bool ModuleDecl::isConcurrencyModule() const {
+  return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
 
 bool ModuleDecl::hasStandardSubstitutions() const {
@@ -3047,33 +3062,6 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   return true;
 }
 
-bool ModuleDecl::
-canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
-  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
-
-  // If the context defined in the same module - or is the same module, it's
-  // fine.
-  if (moduleOfCtxt == this)
-    return true;
-
-  // See if context is imported in a "regular" way, i.e. not with
-  // @_implementationOnly, `package import` or @_spiOnly.
-  ModuleDecl::ImportFilter filter = {
-    ModuleDecl::ImportFilterKind::ImplementationOnly,
-    ModuleDecl::ImportFilterKind::PackageOnly,
-    ModuleDecl::ImportFilterKind::SPIOnly
-  };
-  SmallVector<ImportedModule, 4> results;
-  getImportedModules(results, filter);
-
-  auto &imports = getASTContext().getImportCache();
-  for (auto &desc : results) {
-    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
-      return false;
-  }
-  return true;
-}
-
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
@@ -3160,7 +3148,7 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  const Decl *D = abstractSyntaxDeclForAvailableAttribute(this);
+  const Decl *D = getAbstractSyntaxDeclForAttributes();
 
   if (!isa<ValueDecl>(D) &&
       !isa<ExtensionDecl>(D))
@@ -3177,6 +3165,11 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   assert (isa<ValueDecl>(decl) ||
           isa<ExtensionDecl>(decl));
 
+  // ABI decls share the SPI groups of their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSPIGroups();
+
   // First, look for local attributes.
   llvm::SetVector<Identifier> spiGroups;
   for (auto attr : decl->getAttrs().getAttributes<SPIAccessControlAttr>())
@@ -3190,6 +3183,14 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
       auto originalSPIs = originalDecl->getSPIGroups();
       spiGroups.insert(originalSPIs.begin(), originalSPIs.end());
     }
+
+  // Accessors get the SPI groups from the PBD.
+  if (auto AD = dyn_cast<AccessorDecl>(decl))
+    if (auto VD = dyn_cast<VarDecl>(AD->getStorage()))
+      if (auto *PBD = VD->getParentPatternBinding()) {
+        auto moreGroups = PBD->getSPIGroups();
+        spiGroups.insert(moreGroups.begin(), moreGroups.end());
+      }
 
   // If there is no local SPI information, look at the context.
   if (spiGroups.empty()) {
@@ -3338,7 +3339,19 @@ getInfoForUsedFileNames(const ModuleDecl *module) {
 
 static void computeFileID(const ModuleDecl *module, StringRef name,
                           SmallVectorImpl<char> &result) {
-  result.assign(module->getNameStr().begin(), module->getNameStr().end());
+  // The module might alias itself (e.g., to use a raw identifier as the name
+  // that it references itself with in its own source code), so we need to look
+  // that up.
+  Identifier moduleName = module->getASTContext().getRealModuleName(
+      module->getName(),
+      ASTContext::ModuleAliasLookupOption::aliasFromRealName);
+  if (moduleName.mustAlwaysBeEscaped()) {
+    result.push_back('`');
+    result.append(moduleName.str().begin(), moduleName.str().end());
+    result.push_back('`');
+  } else {
+    result.assign(moduleName.str().begin(), moduleName.str().end());
+  }
   result.push_back('/');
   result.append(name.begin(), name.end());
 }
@@ -3733,6 +3746,10 @@ void SourceFile::setAvailabilityScope(AvailabilityScope *scope) {
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
   for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
+    if (vd->getDeclContext()->getInnermostSkippedFunctionContext()) {
+      // Ignore things in skipped functions.
+      continue;
+    }
     if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
       auto inserted = ValidatedOpaqueReturnTypes.insert(
                 {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
@@ -3787,6 +3804,29 @@ ArrayRef<TypeDecl *> SourceFile::getLocalTypeDecls() const {
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            LocalTypeDeclsRequest{mutableThis}, {});
+}
+
+std::optional<SourceFile::FileIDStr>
+SourceFile::FileIDStr::parse(StringRef fileID) {
+  auto names = fileID.split('/');
+  auto moduleName = names.first;
+  auto fileName = names.second;
+
+  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift") ||
+      fileName.contains('/'))
+    return {};
+
+  return {SourceFile::FileIDStr{/*.moduleName=*/moduleName,
+                                /*.fileName=*/fileName}};
+}
+
+bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
+  // Never match with SourceFiles that do not correpond to a file on disk
+  if (file->getFilename().empty())
+    return false;
+
+  return moduleName == file->getParentModule()->getNameStr() &&
+         fileName == llvm::sys::path::filename(file->getFilename());
 }
 
 namespace {
@@ -4140,4 +4180,283 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   }
 
   return version::Version();
+}
+
+//===----------------------------------------------------------------------===//
+//                            MARK: SwiftSettings
+//===----------------------------------------------------------------------===//
+
+static llvm::cl::opt<bool> AllowForDuplicateSwiftSettings(
+    "swift-settings-allow-duplicates",
+    llvm::cl::desc("Option that allows for duplicate SwiftSettings. Just for "
+                   "compiler testing"),
+    llvm::cl::Hidden);
+
+namespace {
+
+enum class SwiftSettingKind {
+  Unknown = 0,
+  DefaultIsolation,
+
+  LastKind = DefaultIsolation,
+};
+
+struct SwiftSettingsWalker : ASTWalker {
+  SourceFile &sf;
+  ASTContext &ctx;
+  SourceFileLangOptions result;
+
+  SmallVector<Expr *, 1> swiftSettingIndexToOriginalExprMap;
+
+  SwiftSettingsWalker(SourceFile &sf, ASTContext &ctx)
+      : sf(sf), ctx(ctx), result() {
+    // NOTE: We do not store a value for Unknown.
+    for (unsigned i : range(unsigned(SwiftSettingKind::LastKind))) {
+      (void)i;
+      swiftSettingIndexToOriginalExprMap.push_back(nullptr);
+    }
+  }
+
+  Expr *&getOriginalSwiftSetting(SwiftSettingKind kind) {
+    assert(kind != SwiftSettingKind::Unknown);
+    return swiftSettingIndexToOriginalExprMap[unsigned(kind) - 1];
+  }
+
+  /// Given a specific CallExpr, pattern matches the CallExpr's first argument
+  /// to validate it is MainActor.self. Returns CanType() if the CallExpr has
+  /// multiple parameters or if its first parameter is not a MainActor.self.
+  ///
+  /// This is used when pattern matching against
+  /// .defaultIsolation(MainActor.self).
+  CanType patternMatchDefaultIsolationMainActor(CallExpr *callExpr);
+
+  /// Validates that macroExpr is a well formed "SwiftSettings" macro. Returns
+  /// true if we can process it and false otherwise.
+  bool isSwiftSettingsMacroExpr(MacroExpansionExpr *macroExpr);
+
+  /// Given a specific \p arg to a SwiftSettings macro, attempt to lookup the
+  /// static method on SwiftSetting. Returns nullptr on failure.
+  std::optional<std::pair<CallExpr *, FuncDecl *>>
+  getSwiftSettingArgDecl(Argument arg);
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    // First see if we have a "SwiftSettings" macro expansion expr. If we do not
+    // there is no further work to do... just continue.
+    auto *macroExpr = dyn_cast<MacroExpansionExpr>(expr);
+    if (!macroExpr || !isSwiftSettingsMacroExpr(macroExpr))
+      return Action::SkipChildren(expr);
+
+    // Ok, we found our SwiftSettingsMacro. Lets start pattern matching.
+    bool emittedDiagnostic = false;
+    for (auto arg : *macroExpr->getArgs()) {
+      // If we did not find any macro, we emit an unknown macro error. We use
+      // SWIFT_DEFER so we can use early exits below and ensure we always
+      // perform the check.
+      bool foundValidArg = false;
+      SWIFT_DEFER {
+        if (!foundValidArg) {
+          emittedDiagnostic = true;
+          ctx.Diags.diagnose(arg.getStartLoc(),
+                             diag::swift_settings_invalid_setting);
+        }
+      };
+
+      auto calleeFuncDecl = getSwiftSettingArgDecl(arg);
+      if (!calleeFuncDecl)
+        continue;
+      CallExpr *callExpr;
+      FuncDecl *funcDecl;
+      std::tie(callExpr, funcDecl) = *calleeFuncDecl;
+
+      auto kind =
+          llvm::StringSwitch<SwiftSettingKind>(
+              funcDecl->getBaseIdentifier().get())
+              .Case("defaultIsolation", SwiftSettingKind::DefaultIsolation)
+              .Default(SwiftSettingKind::Unknown);
+      switch (kind) {
+      case SwiftSettingKind::Unknown:
+        // Emit error.
+        continue;
+
+      case SwiftSettingKind::DefaultIsolation:
+        auto *&expr =
+            getOriginalSwiftSetting(SwiftSettingKind::DefaultIsolation);
+
+        // If we already have an expr, emit an error and continue.
+        if (!AllowForDuplicateSwiftSettings && expr) {
+          ctx.Diags.diagnose(arg.getStartLoc(),
+                             diag::swift_settings_duplicate_setting);
+          ctx.Diags.diagnose(
+              expr->getLoc(),
+              diag::swift_settings_duplicate_setting_original_loc);
+          foundValidArg = true;
+          continue;
+        }
+
+        // Otherwise, set things up appropriately.
+        if (auto actor = patternMatchDefaultIsolationMainActor(callExpr)) {
+          expr = callExpr;
+          result.defaultIsolation = actor;
+          foundValidArg = true;
+          continue;
+        }
+
+        if (isa<NilLiteralExpr>(callExpr->getArgs()->getExpr(0))) {
+          expr = callExpr;
+          result.defaultIsolation = {Type()};
+          foundValidArg = true;
+          continue;
+        }
+
+        continue;
+      }
+    }
+
+    return Action::SkipChildren(expr);
+  }
+};
+
+} // namespace
+
+bool SwiftSettingsWalker::isSwiftSettingsMacroExpr(
+    MacroExpansionExpr *macroExpr) {
+  // First make sure we actually have a macro with the name SwiftSettings.
+  if (!macroExpr->getMacroName().getBaseName().getIdentifier().is(
+          "SwiftSettings"))
+    return false;
+
+  // Ok, we found a SwiftSettings macro. Perform an unqualified lookup to find
+  // the decl.
+  SmallVector<MacroDecl *, 1> macroDecls;
+  namelookup::forEachPotentialResolvedMacro(
+      sf.getModuleScopeContext(), macroExpr->getMacroName(),
+      MacroRole::Declaration,
+      [&](MacroDecl *decl, const MacroRoleAttr *) -> void {
+        macroDecls.push_back(decl);
+      });
+
+  // If we have multiple macroDecls, we must have some other macro called
+  // SwiftSettings. Let that take precedence and do not emit anything. The
+  // user can always specify Swift.SwiftSettings if needed?
+  if (macroDecls.size() != 1)
+    return false;
+
+  // Ok, we only found one macroDecl. Make sure that it is from the stdlib. If
+  // not, something weird is happening... we can just skip the children.
+  auto *macroDecl = macroDecls.pop_back_val();
+  if (!macroDecl->isStdlibDecl())
+    return false;
+
+  // Validate the form of our macroDef. We use assert instead of ASSERT since we
+  // go through the request evaluator when we call getDefinition().
+#ifndef NDEBUG
+  auto macroDef = macroDecl->getDefinition();
+  assert(macroDef.kind == MacroDefinition::Kind::Builtin &&
+         macroDef.getBuiltinKind() == BuiltinMacroKind::SwiftSettingsMacro &&
+         "SwiftSettings macro from the stdlib that is not the actual builtin "
+         "macro?!");
+#endif
+
+  // We found a good SwiftSettings macro!
+  return true;
+}
+
+std::optional<std::pair<CallExpr *, FuncDecl *>>
+SwiftSettingsWalker::getSwiftSettingArgDecl(Argument arg) {
+  auto *callExpr = dyn_cast<CallExpr>(arg.getExpr());
+  if (!callExpr)
+    return {};
+
+  auto *directCallee =
+      dyn_cast<UnresolvedMemberExpr>(callExpr->getDirectCallee());
+  if (!directCallee)
+    return {};
+
+  // Now lookup our swiftSettingDecl.
+  NominalTypeDecl *swiftSettingsDecl = nullptr;
+  {
+    SmallVector<ValueDecl *, 1> decls;
+    ctx.lookupInSwiftModule("SwiftSetting", decls);
+
+    // We should always have only one decl and it should be a nominal type
+    // decl.
+    if (decls.size() != 1)
+      return {};
+    swiftSettingsDecl = dyn_cast<NominalTypeDecl>(decls.pop_back_val());
+    if (!swiftSettingsDecl)
+      return {};
+  }
+  assert(swiftSettingsDecl);
+
+  // We have our callee, perform qualified name lookup for it on
+  // SwiftSetting.
+  DirectLookupDescriptor lookupDesc{
+      swiftSettingsDecl, directCallee->getName().getFullName(),
+      NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions};
+  auto lookup =
+      evaluateOrDefault(ctx.evaluator, DirectLookupRequest{lookupDesc, {}}, {});
+  if (lookup.empty())
+    return {};
+
+  auto *f = dyn_cast<FuncDecl>(lookup.front());
+  if (!f)
+    return {};
+
+  return {{callExpr, f}};
+}
+
+CanType
+SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
+  // Grab the dot self expr.
+  auto *selfExpr = dyn_cast<DotSelfExpr>(callExpr->getArgs()->getExpr(0));
+  if (!selfExpr)
+    return CanType();
+
+  // Then validate we have something that is MainActor.
+  auto *declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(selfExpr->getSubExpr());
+  if (!declRefExpr ||
+      !declRefExpr->getName().getBaseName().getIdentifier().is("MainActor"))
+    return CanType();
+
+  // Then use unqualified lookup descriptor to find our MainActor.
+  UnqualifiedLookupDescriptor lookupDesc{
+      declRefExpr->getName(), sf.getModuleScopeContext(), SourceLoc(),
+      UnqualifiedLookupFlags::ExcludeMacroExpansions};
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{lookupDesc}, {});
+  if (lookup.allResults().empty())
+    return CanType();
+
+  // Then grab our nominal type decl and make sure it is from the concurrency
+  // module.
+  auto *nomDecl =
+      dyn_cast<NominalTypeDecl>(lookup.allResults().front().getValueDecl());
+  if (!nomDecl)
+    return CanType();
+  auto *nomDeclDC = nomDecl->getDeclContext();
+  auto *nomDeclModule = nomDecl->getParentModule();
+  if (!nomDeclDC->isModuleScopeContext() || !nomDeclModule->isConcurrencyModule())
+    return CanType();
+
+  return nomDecl->getDeclaredType()->getCanonicalType();
+}
+
+SourceFileLangOptions
+SourceFileLangOptionsRequest::evaluate(Evaluator &evaluator,
+                                       SourceFile *f) const {
+  SwiftSettingsWalker walker(*f, f->getASTContext());
+
+  if (!f->getASTContext().LangOpts.hasFeature(Feature::SwiftSettings))
+    return walker.result;
+
+  for (auto *decl : f->getTopLevelDecls())
+    decl->walk(walker);
+
+  return walker.result;
+}
+
+SourceFileLangOptions SourceFile::getLanguageOptions() const {
+  auto &eval = getASTContext().evaluator;
+  auto *self = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(eval, SourceFileLangOptionsRequest{self}, {});
 }

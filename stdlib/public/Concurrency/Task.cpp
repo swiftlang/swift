@@ -35,6 +35,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/STLCompatibility.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -208,6 +209,8 @@ TaskExecutorRef _task_taskExecutor_getTaskExecutorRef(
 
 TaskExecutorRef
 InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTaskExecutor() const {
+  if (!Identity) return TaskExecutorRef::undefined();
+
   TaskExecutorRef executorRef = _task_taskExecutor_getTaskExecutorRef(
       Identity,
       /*selfType=*/swift_getObjectType(Identity),
@@ -375,9 +378,8 @@ static SerialExecutorRef executorForEnqueuedJob(Job *job) {
     return SerialExecutorRef::generic();
   }
 
-  if (auto identity = reinterpret_cast<HeapObject *>(jobQueue)) {
-    return SerialExecutorRef::forOrdinary(
-        identity, _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+  if (jobQueue == (void *)dispatch_get_main_queue()) {
+    return swift_task_getMainExecutor();
   }
 
   return SerialExecutorRef::generic();
@@ -721,6 +723,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Collect the options we know about.
   SerialExecutorRef serialExecutor = SerialExecutorRef::generic();
   TaskExecutorRef taskExecutor = TaskExecutorRef::undefined();
+  const char* taskName = nullptr;
   bool taskExecutorIsOwned = false;
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
@@ -736,8 +739,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     case TaskOptionRecordKind::InitialTaskExecutorUnowned:
       taskExecutor = cast<InitialTaskExecutorRefPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
-      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       taskExecutorIsOwned = false;
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
     case TaskOptionRecordKind::InitialTaskExecutorOwned:
@@ -749,6 +752,12 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       taskExecutorIsOwned = true;
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       #endif
+      break;
+
+    case TaskOptionRecordKind::InitialTaskName:
+      taskName = cast<InitialTaskNameTaskOptionRecord>(option)
+                         ->getTaskName();
+      jobFlags.task_setHasInitialTaskName(true);
       break;
 
     case TaskOptionRecordKind::TaskGroup:
@@ -847,7 +856,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
      // basePriority should already be the right value
 
   } else if (taskIsUnstructured(taskCreateFlags, jobFlags)) {
-     SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p", currentTask);
+     SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p%s", currentTask,
+                          taskCreateFlags.isSynchronousStartTask() ? " [start synchronously]" : "");
 
     if (isUnspecified(basePriority)) {
       // Case 1: No priority specified
@@ -1049,8 +1059,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Initialize the parent context pointer to null.
   initialContext->Parent = nullptr;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   // Initialize the resumption funclet pointer (async return address) to
   // the final funclet for completing the task.
 
@@ -1064,21 +1072,20 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // The final funclet shouldn't release the task or the task function.
   } else if (asyncLet) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTask);
+        std::bit_cast<TaskContinuationFunction *>(&completeTask);
 
   // If we have a non-null closure context and the task function is not
   // consumed by calling it, use a final funclet that releases both the
   // task and the closure context.
   } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskWithClosure);
+        std::bit_cast<TaskContinuationFunction *>(&completeTaskWithClosure);
 
   // Otherwise, just release the task.
   } else {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskAndRelease);
+        std::bit_cast<TaskContinuationFunction *>(&completeTaskAndRelease);
   }
-#pragma clang diagnostic pop
 
   // Initialize the task-local allocator and our other private runtime
   // state for the task.
@@ -1123,13 +1130,14 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     task->_private().Local.initializeLinkParent(task, parent);
   }
 
-  // FIXME: add discarding flag
-  // FIXME: add task executor
   concurrency::trace::task_create(
       task, parent, group, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),
       task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
-      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask(),
+      taskCreateFlags.isDiscardingTask(),
+      task->Flags.task_hasInitialTaskExecutorPreference(),
+      taskName);
 
   // Attach to the group, if needed.
   if (group) {
@@ -1155,17 +1163,24 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
-  // Task executor preference
-  // If the task does not have a specific executor set already via create
-  // options, and there is a task executor preference set in the parent, we
-  // inherit it by deep-copying the preference record. if
-  // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
-  if (jobFlags.task_hasInitialTaskExecutorPreference()) {
-    // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
-    // because the group takes a fast-path when attaching the child record.
-    assert(jobFlags.task_hasInitialTaskExecutorPreference());
-    task->pushInitialTaskExecutorPreference(
-        taskExecutor, /*owned=*/taskExecutorIsOwned);
+  // ==== Initial Task records
+  {
+    // Task executor preference
+    // If the task does not have a specific executor set already via create
+    // options, and there is a task executor preference set in the parent, we
+    // inherit it by deep-copying the preference record. if
+    // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+    if (jobFlags.task_hasInitialTaskExecutorPreference()) {
+      // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
+      // because the group takes a fast-path when attaching the child record.
+      task->pushInitialTaskExecutorPreference(taskExecutor,
+                                              /*owned=*/taskExecutorIsOwned);
+    }
+
+    // Task name
+    if (jobFlags.task_hasInitialTaskName()) {
+      task->pushInitialTaskName(taskName);
+    }
   }
 
   // If we're supposed to enqueue the task, do so now.
@@ -1762,6 +1777,30 @@ swift_task_addCancellationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
+  removeStatusRecordFromSelf(record);
+  swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
+static EscalationNotificationStatusRecord*
+swift_task_addPriorityEscalationHandlerImpl(
+    EscalationNotificationStatusRecord::FunctionType handler,
+    void *context) {
+  void *allocation =
+      swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
+  auto *record = ::new (allocation)
+      EscalationNotificationStatusRecord(handler, context);
+
+  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
+    return true;
+  });
+
+  return record;
+}
+
+SWIFT_CC(swift)
+static void swift_task_removePriorityEscalationHandlerImpl(
+    EscalationNotificationStatusRecord *record) {
   removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
 }

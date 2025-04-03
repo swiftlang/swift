@@ -424,7 +424,8 @@ public:
     auto *pbTupleVal = buildPullbackValueTupleValue(ccbi);
     // Create a new `checked_cast_branch` instruction.
     getBuilder().createCheckedCastBranch(
-        ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
+        ccbi->getLoc(), ccbi->isExact(), ccbi->getIsolatedConformances(),
+        getOpValue(ccbi->getOperand()),
         getOpASTType(ccbi->getSourceFormalType()),
         getOpType(ccbi->getTargetLoweredType()),
         getOpASTType(ccbi->getTargetFormalType()),
@@ -439,7 +440,9 @@ public:
     auto *pbTupleVal = buildPullbackValueTupleValue(ccabi);
     // Create a new `checked_cast_addr_branch` instruction.
     getBuilder().createCheckedCastAddrBranch(
-        ccabi->getLoc(), ccabi->getConsumptionKind(),
+        ccabi->getLoc(),
+        ccabi->getIsolatedConformances(),
+        ccabi->getConsumptionKind(),
         getOpValue(ccabi->getSrc()), getOpASTType(ccabi->getSourceFormalType()),
         getOpValue(ccabi->getDest()),
         getOpASTType(ccabi->getTargetFormalType()),

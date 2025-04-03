@@ -463,7 +463,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (StringRef))
+      "unexpected attribute %0 in operator declaration", (DeclAttribute))
 WARNING(operator_decl_remove_designated_types,none,
         "designated types are no longer used by the compiler; please remove "
         "the designated type list from this operator declaration", ())
@@ -763,6 +763,14 @@ ERROR(sil_witness_assoc_conf_not_found,none,
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
+// SIL default override table
+ERROR(sil_default_override_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_default_override_class_not_found,none,
+      "sil class not found %0", (Identifier))
+ERROR(sil_default_override_decl_not_class,none,
+      "sil decl found for %0 is not a class", (Identifier))
+
 // SIL differentiability witnesses
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
@@ -877,6 +885,10 @@ NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
      "the elements", ())
 NOTE(subscript_array_element_fix_it_remove_space, none,
      "remove the space between the elements to silence this warning", ())
+
+// Inline Array
+ERROR(expected_rsquare_inline_array,none,
+      "expected ']' in inline array type", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
@@ -1473,7 +1485,11 @@ ERROR(multiple_access_level_modifiers,none,
 NOTE(previous_access_level_modifier,none,
      "previous modifier specified here", ())
 ERROR(mutually_exclusive_attrs,none,
-      "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
+      "%0 contradicts previous %select{attribute|modifier}2 %1",
+      (DeclAttribute, DeclAttribute, bool))
+ERROR(mutually_exclusive_attr_names,none,
+      "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
+      (StringRef, StringRef, bool))
 
 ERROR(invalid_infix_on_func,none,
       "'infix' modifier is not required or allowed on func declarations", ())
@@ -1548,6 +1564,8 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
+      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
 // availability
@@ -1578,20 +1596,6 @@ ERROR(attr_availability_expected_equal,none,
 
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
-
-WARNING(attr_availability_platform_agnostic_expected_option,none,
-      "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
-      "for platform '%1'", (StringRef, StringRef))
-WARNING(attr_availability_platform_agnostic_expected_deprecated_version,none,
-      "expected version number with 'deprecated' in '%0' attribute for "
-      "platform '%1'", (StringRef, StringRef))
-WARNING(attr_availability_platform_agnostic_infeasible_option,none,
-      "'%0' cannot be used in '%1' attribute for platform '%2'",
-      (StringRef, StringRef, StringRef))
-
-WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
-      "unexpected version number in '%0' attribute for non-specific platform "
-      "'*'", (StringRef))
 
 WARNING(attr_availability_wildcard_ignored,none,
         "* as platform name has no effect in '%0' attribute", (StringRef))
@@ -1692,6 +1696,14 @@ ERROR(attr_isolated_expected_rparen,none,
       "expected ')' after isolation kind", ())
 ERROR(attr_isolated_expected_kind,none,
       "expected 'any' as the isolation kind", ())
+
+ERROR(attr_execution_expected_lparen,none,
+      "expected '(' after '@execution'",
+      ())
+ERROR(attr_execution_expected_rparen,none,
+      "expected ')' after execution behavior", ())
+ERROR(attr_execution_expected_kind,none,
+      "expected 'concurrent' or 'caller' as the execution behavior", ())
 
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
@@ -1978,13 +1990,6 @@ ERROR(avail_query_expected_version_number,PointsToFirstBadToken,
 ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
       "expected ')' in availability query", ())
 
-WARNING(avail_query_unrecognized_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
-WARNING(avail_query_suggest_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0;"
-        " did you mean '%1'?",
-        (Identifier, StringRef))
-
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
 
@@ -1997,24 +2002,6 @@ NOTE(avail_query_meant_introduced,PointsToFirstBadToken,
 
 ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())
-
-ERROR(availability_query_wildcard_required, none,
-      "must handle potential future platforms with '*'", ())
-
-ERROR(unavailability_query_wildcard_not_required, none,
-      "platform wildcard '*' is always implicit in #unavailable", ())
-
-ERROR(availability_must_occur_alone, none,
-      "'%0' version-availability must be specified alone", (StringRef))
-
-ERROR(pound_available_swift_not_allowed, none,
-      "Swift language version checks not allowed in %0(...)", (StringRef))
-
-ERROR(pound_available_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in %0(...)", (StringRef))
-
-ERROR(availability_query_repeated_platform, none,
-      "version for '%0' already specified", (StringRef))
 
 ERROR(availability_cannot_be_mixed,none,
       "#available and #unavailable cannot be in the same statement", ())

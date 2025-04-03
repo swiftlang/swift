@@ -377,11 +377,6 @@ static bool isLoadFromStack(SILInstruction *i, AllocStackInst *asi) {
   if (!isa<LoadInst>(i) && !isa<LoadBorrowInst>(i))
     return false;
 
-  if (auto *lbi = dyn_cast<LoadBorrowInst>(i)) {
-    if (BorrowedValue(lbi).hasReborrow())
-      return false;
-  }
-
   // Skip struct and tuple address projections.
   ValueBase *op = i->getOperand(0);
   while (op != asi) {
@@ -1199,7 +1194,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
     }
 
     // Debug values will automatically be salvaged, we can ignore them.
-    if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
+    if (DebugValueInst::hasAddrVal(inst)) {
       continue;
     }
 
@@ -1455,7 +1450,7 @@ void StackAllocationPromoter::fixBranchesAndUses(
     SILBasicBlock *userBlock = user->getParent();
 
     // Debug values will automatically be salvaged, we can ignore them.
-    if (auto *dvi = DebugValueInst::hasAddrVal(user)) {
+    if (DebugValueInst::hasAddrVal(user)) {
       continue;
     }
 
@@ -2040,7 +2035,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     }
 
     // Debug values will automatically be salvaged, we can ignore them.
-    if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
+    if (DebugValueInst::hasAddrVal(inst)) {
       continue;
     }
 

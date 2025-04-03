@@ -65,8 +65,8 @@ await printFromMyActor(value: a)
 // CHECK: [[PRINTFROMMYACTOR_FUNC:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars16printFromMyActor5valueySi_tF
 // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
 // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
-// CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
 // CHECK: end_borrow [[ACTORREF]]
+// CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
 // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 
 if a < 10 {
@@ -119,7 +119,7 @@ if a < 10 {
     // CHECK: [[PRINTFROMMYACTOR_FUNC:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars16printFromMyActor5valueySi_tF
     // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
     // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
-    // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
     // CHECK: end_borrow [[ACTORREF]]
+    // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
     // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 }

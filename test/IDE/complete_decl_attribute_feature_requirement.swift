@@ -8,7 +8,7 @@
 // RUN: %batch-code-completion -filecheck-additional-suffix _DISABLED
 // RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED \
 // RUN:        -enable-experimental-feature ABIAttribute \
-// RUN:        -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN:        -enable-experimental-feature ExecutionAttribute
 
 // NOTE: Please do not include the ", N items" after "Begin completions". The
 // item count creates needless merge conflicts given that an "End completions"
@@ -54,7 +54,7 @@
 @#^ON_GLOBALVAR^# var globalVar
 // ON_GLOBALVAR:              Begin completions
 // ON_GLOBALVAR_ENABLED-DAG:  Keyword/None:              abi[#Var Attribute#]; name=abi
-// ON_GLOBALVAR_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
+// ON_GLOBALVAR_ENABLED-DAG:  Keyword/None:              execution[#Var Attribute#]; name=execution
 // ON_GLOBALVAR_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // ON_GLOBALVAR_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_GLOBALVAR:              End completions
@@ -63,7 +63,7 @@ struct _S {
   @#^ON_INIT^# init()
 // ON_INIT:              Begin completions
 // ON_INIT_ENABLED-DAG:  Keyword/None:              abi[#Constructor Attribute#]; name=abi
-// ON_INIT_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
+// ON_INIT_ENABLED-DAG:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_INIT_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // ON_INIT_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_INIT:              End completions
@@ -71,10 +71,18 @@ struct _S {
   @#^ON_PROPERTY^# var foo
 // ON_PROPERTY:              Begin completions
 // ON_PROPERTY_ENABLED-DAG:  Keyword/None:              abi[#Var Attribute#]; name=abi
-// ON_PROPERTY_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
+// ON_PROPERTY_ENABLED-DAG:  Keyword/None:              execution[#Var Attribute#]; name=execution
 // ON_PROPERTY_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // ON_PROPERTY_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_PROPERTY:              End completions
+
+  @#^ON_SUBSCR^# subscript
+// ON_SUBSCR:              Begin completions
+// ON_SUBSCR_ENABLED-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
+// ON_SUBSCR_ENABLED-DAG:  Keyword/None:              execution[#Declaration Attribute#]; name=execution
+// ON_SUBSCR_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
+// ON_SUBSCR_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
+// ON_SUBSCR:              End completions
 
   @#^ON_METHOD^# private
   func foo()

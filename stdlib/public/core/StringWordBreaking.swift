@@ -39,7 +39,7 @@ extension _StringGuts {
       return _foreignNextWordIndex(startingAt: i)
     }
 
-    return withFastUTF8 { utf8 in
+    return unsafe withFastUTF8 { utf8 in
       nextWordBoundary(startingAt: i) {
         _internalInvariant($0 >= 0)
 
@@ -47,7 +47,7 @@ extension _StringGuts {
           return nil
         }
 
-        let (scalar, len) = _decodeScalar(utf8, startingAt: $0)
+        let (scalar, len) = unsafe _decodeScalar(utf8, startingAt: $0)
         return (scalar, $0 &+ len)
       }
     }
@@ -80,7 +80,7 @@ extension _StringGuts {
       return _foreignPreviousWordIndex(endingAt: i)
     }
 
-    return withFastUTF8 { utf8 in
+    return unsafe withFastUTF8 { utf8 in
       previousWordBoundary(endingAt: i) {
         _internalInvariant($0 <= count)
 
@@ -88,7 +88,7 @@ extension _StringGuts {
           return nil
         }
 
-        let (scalar, len) = _decodeScalar(utf8, endingAt: $0)
+        let (scalar, len) = unsafe _decodeScalar(utf8, endingAt: $0)
         return (scalar, $0 &- len)
       }
     }

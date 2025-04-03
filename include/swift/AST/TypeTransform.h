@@ -154,7 +154,7 @@ case TypeKind::Id:
         return *result;
 
       auto subMap = opaque->getSubstitutions();
-      auto newSubMap = asDerived().transformSubMap(subMap);
+      auto newSubMap = asDerived().transformSubstitutionMap(subMap);
       if (newSubMap == subMap)
         return t;
       if (!newSubMap)
@@ -165,7 +165,7 @@ case TypeKind::Id:
                                           newSubMap);
     }
 
-    case TypeKind::OpenedArchetype: {
+    case TypeKind::ExistentialArchetype: {
       auto *local = cast<LocalArchetypeType>(base);
       if (auto result = asDerived().transformLocalArchetypeType(local, pos))
         return *result;
@@ -177,7 +177,7 @@ case TypeKind::Id:
       auto subMap = env->getOuterSubstitutions();
       auto uuid = env->getOpenedExistentialUUID();
 
-      auto newSubMap = asDerived().transformSubMap(subMap);
+      auto newSubMap = asDerived().transformSubstitutionMap(subMap);
       if (newSubMap == subMap)
         return t;
       if (!newSubMap)
@@ -259,7 +259,7 @@ case TypeKind::Id:
       }
 
       auto oldSubMap = boxTy->getSubstitutions();
-      auto newSubMap = asDerived().transformSubMap(oldSubMap);
+      auto newSubMap = asDerived().transformSubstitutionMap(oldSubMap);
       if (oldSubMap && !newSubMap)
         return Type();
       changed |= (oldSubMap != newSubMap);
@@ -281,7 +281,7 @@ case TypeKind::Id:
         return fnTy;
 
       auto updateSubs = [&](SubstitutionMap &subs) -> bool {
-        auto newSubs = asDerived().transformSubMap(subs);
+        auto newSubs = asDerived().transformSubstitutionMap(subs);
         if (subs && !newSubs)
           return false;
         if (subs == newSubs)
@@ -894,6 +894,25 @@ case TypeKind::Id:
       return ArraySliceType::get(baseTy);
     }
 
+    case TypeKind::InlineArray: {
+      auto ty = cast<InlineArrayType>(base);
+      auto countTy = doIt(ty->getCountType(), TypePosition::Invariant);
+      if (!countTy)
+        return Type();
+
+      // Currently the element type is invariant for InlineArray.
+      // FIXME: Should we allow covariance?
+      auto eltTy = doIt(ty->getElementType(), TypePosition::Invariant);
+      if (!eltTy)
+        return Type();
+
+      if (countTy.getPointer() == ty->getCountType().getPointer() &&
+          eltTy.getPointer() == ty->getElementType().getPointer())
+        return t;
+
+      return InlineArrayType::get(countTy, eltTy);
+    }
+
     case TypeKind::Optional: {
       auto optional = cast<OptionalType>(base);
       auto baseTy = doIt(optional->getBaseType(), pos);
@@ -1033,7 +1052,7 @@ case TypeKind::Id:
 
   // If original was non-empty and transformed is empty, we're
   // signaling failure, that is, a Type() return from doIt().
-  SubstitutionMap transformSubMap(SubstitutionMap subs) {
+  SubstitutionMap transformSubstitutionMap(SubstitutionMap subs) {
     if (subs.empty())
       return subs;
 

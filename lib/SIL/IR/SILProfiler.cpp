@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILProfiler.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -117,7 +118,7 @@ static bool shouldProfile(SILDeclRef Constant) {
 
   if (auto *D = DC->getInnermostDeclarationDeclContext()) {
     // Do not profile AST nodes in unavailable contexts.
-    if (D->isSemanticallyUnavailable()) {
+    if (AvailabilityContext::forDeclSignature(D).isUnavailable()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: unavailable context\n");
       return false;
     }
@@ -188,7 +189,7 @@ void ProfileCounterRef::dumpSimple(raw_ostream &OS) const {
     if (auto *D = Node.dyn_cast<Decl *>()) {
       OS << Decl::getKindName(D->getKind());
     } else if (auto *E = Node.dyn_cast<Expr *>()) {
-      OS << Decl::getKindName(D->getKind());
+      OS << Expr::getKindName(E->getKind());
     } else if (auto *S = Node.dyn_cast<Stmt *>()) {
       OS << Stmt::getKindName(S->getKind());
     }
@@ -238,7 +239,7 @@ shouldWalkIntoExpr(Expr *E, ASTWalker::ParentTy Parent, SILDeclRef Constant) {
 
   // Profiling for closures should be handled separately. Do not visit
   // closure expressions twice.
-  if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+  if (isa<AbstractClosureExpr>(E)) {
     // A non-null parent means we have a closure child, which we will visit
     // separately. Even if the parent is null, don't walk into a closure if the
     // SILDeclRef is not for a closure, as it could be for a property

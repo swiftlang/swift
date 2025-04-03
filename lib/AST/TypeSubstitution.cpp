@@ -61,29 +61,11 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs,
                                       SubstOptions options) {
-  return substGenericArgs(
-    [=](Type t) { return t.subst(subs, options); });
-}
-
-FunctionType *GenericFunctionType::substGenericArgs(
-    llvm::function_ref<Type(Type)> substFn) const {
-  llvm::SmallVector<AnyFunctionType::Param, 4> params;
-  params.reserve(getNumParams());
-
-  llvm::transform(getParams(), std::back_inserter(params),
-                  [&](const AnyFunctionType::Param &param) {
-                    return param.withType(substFn(param.getPlainType()));
-                  });
-
-  auto resultTy = substFn(getResult());
-
-  Type thrownError = getThrownError();
-  if (thrownError)
-    thrownError = substFn(thrownError);
-
-  // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy,
-                           getExtInfo().withThrows(isThrowing(), thrownError));
+  // FIXME: Before dropping the signature, we should assert that
+  // subs.getGenericSignature() is equal to this function type's
+  // generic signature.
+  Type fnType = FunctionType::get(getParams(), getResult(), getExtInfo());
+  return fnType.subst(subs, options)->castTo<FunctionType>();
 }
 
 CanFunctionType
@@ -105,7 +87,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
   // Lookup conformances for archetypes that conform concretely
   // via a superclass.
-  if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
+  if (conformingReplacementType->is<ArchetypeType>()) {
     return lookupConformance(
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
@@ -154,87 +136,19 @@ operator()(CanType dependentType, Type conformingReplacementType,
         PackConformance::get(conformingPack, conformedProtocol, conformances));
   }
 
-  assert((conformingReplacementType->is<ErrorType>() ||
-          conformingReplacementType->is<SubstitutableType>() ||
-          conformingReplacementType->is<DependentMemberType>() ||
-          conformingReplacementType->hasTypeVariable()) &&
-         "replacement requires looking up a concrete conformance");
+  if (conformingReplacementType->is<ErrorType>())
+    return ProtocolConformanceRef::forInvalid();
+
   // A class-constrained archetype might conform to the protocol
   // concretely.
   if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    if (auto superclassType = archetypeType->getSuperclass()) {
+    if (archetypeType->getSuperclass()) {
       return lookupConformance(archetypeType, conformedProtocol);
     }
   }
+
   return ProtocolConformanceRef::forAbstract(
     conformingReplacementType, conformedProtocol);
-}
-
-static Type substGenericFunctionType(GenericFunctionType *genericFnType,
-                                     InFlightSubstitution &IFS) {
-  // Substitute into the function type (without generic signature).
-  auto *bareFnType = FunctionType::get(genericFnType->getParams(),
-                                       genericFnType->getResult(),
-                                       genericFnType->getExtInfo());
-  Type result = Type(bareFnType).subst(IFS);
-  if (!result || result->is<ErrorType>()) return result;
-
-  auto *fnType = result->castTo<FunctionType>();
-  // Substitute generic parameters.
-  bool anySemanticChanges = false;
-  SmallVector<GenericTypeParamType *, 2> genericParams;
-  for (auto param : genericFnType->getGenericParams()) {
-    Type paramTy = Type(param).subst(IFS);
-    if (!paramTy)
-      return Type();
-
-    if (auto newParam = paramTy->getAs<GenericTypeParamType>()) {
-      if (!newParam->isEqual(param))
-        anySemanticChanges = true;
-
-      genericParams.push_back(newParam);
-    } else {
-      anySemanticChanges = true;
-    }
-  }
-
-  // If no generic parameters remain, this is a non-generic function type.
-  if (genericParams.empty())
-    return result;
-
-  // Transform requirements.
-  SmallVector<Requirement, 2> requirements;
-  for (const auto &req : genericFnType->getRequirements()) {
-    // Substitute into the requirement.
-    auto substReqt = req.subst(IFS);
-
-    // Did anything change?
-    if (!anySemanticChanges &&
-        (!req.getFirstType()->isEqual(substReqt.getFirstType()) ||
-         (req.getKind() != RequirementKind::Layout &&
-          !req.getSecondType()->isEqual(substReqt.getSecondType())))) {
-      anySemanticChanges = true;
-    }
-
-    requirements.push_back(substReqt);
-  }
-
-  GenericSignature genericSig;
-  if (anySemanticChanges) {
-    // If there were semantic changes, we need to build a new generic
-    // signature.
-    ASTContext &ctx = genericFnType->getASTContext();
-    genericSig = buildGenericSignature(ctx, GenericSignature(),
-                                       genericParams, requirements,
-                                       /*allowInverses=*/false);
-  } else {
-    // Use the mapped generic signature.
-    genericSig = GenericSignature::get(genericParams, requirements);
-  }
-
-  // Produce the new generic function type.
-  return GenericFunctionType::get(genericSig, fnType->getParams(),
-                                  fnType->getResult(), fnType->getExtInfo());
 }
 
 InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
@@ -558,11 +472,8 @@ Type Type::subst(TypeSubstitutionFn substitutions,
 }
 
 Type Type::subst(InFlightSubstitution &IFS) const {
-  // Handle substitutions into generic function types.
-  // FIXME: This should be banned.
-  if (auto genericFnType = getPointer()->getAs<GenericFunctionType>()) {
-    return substGenericFunctionType(genericFnType, IFS);
-  }
+  ASSERT(!getPointer()->getAs<GenericFunctionType>() &&
+         "Perhaps you want GenericFunctionType::substGenericArgs() instead");
 
   if (IFS.isInvariant(*this))
     return *this;
@@ -667,7 +578,7 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
     }
 
     // This case indicates we have invalid nesting of types.
-    if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
+    if (baseTy->is<ProtocolType>()) {
       if (!first)
         break;
 
@@ -1197,37 +1108,23 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
-  auto abstractRef = ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
-  
   auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
-  if (!archetype) {
-    if (maybeOpaqueType->isTypeParameter() ||
-        maybeOpaqueType->is<ArchetypeType>())
-      return abstractRef;
-    
-    // SIL type lowering may have already substituted away the opaque type, in
-    // which case we'll end up "substituting" the same type.
-    if (maybeOpaqueType->isEqual(replacementType)) {
-      return lookupConformance(replacementType, protocol);
-    }
-    
-    llvm_unreachable("origType should have been an opaque type or type parameter");
-  }
+  if (!archetype)
+    return lookupConformance(replacementType, protocol);
 
   auto *genericEnv = archetype->getGenericEnvironment();
   auto *decl = genericEnv->getOpaqueTypeDecl();
   auto outerSubs = genericEnv->getOuterSubstitutions();
 
   auto substitutionKind = shouldPerformSubstitution(decl);
-  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
-    return abstractRef;
-  }
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute)
+    return lookupConformance(replacementType, protocol);
 
   auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
-    return abstractRef;
+    return lookupConformance(replacementType, protocol);
 
   // Apply the underlying type substitutions to the interface type of the
   // archetype in question. This will map the inner generic signature of the
@@ -1248,7 +1145,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
               return true;
             return false;
           }))
-    return abstractRef;
+    return lookupConformance(replacementType, protocol);
 
   // Then apply the substitutions from the root opaque archetype, to specialize
   // for its type arguments. We perform this substitution after checking for
@@ -1257,7 +1154,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto substTy = partialSubstTy.subst(outerSubs);
 
   auto partialSubstRef =
-      abstractRef.subst(archetype->getInterfaceType(), *subs);
+      subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
+                              protocol);
   auto substRef =
       partialSubstRef.subst(partialSubstTy, outerSubs);
 
@@ -1270,7 +1168,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       // type back to the caller. This substitution will fail at runtime
       // instead.
       if (!alreadySeen->insert(seenKey).second) {
-        return abstractRef;
+        return lookupConformance(replacementType, protocol);
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(

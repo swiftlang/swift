@@ -428,6 +428,10 @@ enum class PartitionOpKind : uint8_t {
   Assign,
 
   /// Assign one value to a fresh region, takes one arg.
+  ///
+  /// NOTE: This just produces a new value that is tracked by the dataflow. The
+  /// isolation characteristics of the value are actually decided by
+  /// tryToTrackValue and SILIsolationInfo::get().
   AssignFresh,
 
   /// Merge the regions of two values, takes two args, both must be from
@@ -1319,12 +1323,16 @@ public:
           if (auto value = instance.maybeGetValue()) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
               if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                auto staticRegionIsolation =
+                    getIsolationRegionInfo(op.getOpArgs()[1]);
                 Region srcRegion = p.getRegion(op.getOpArgs()[1]);
                 auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+
                 // We can unconditionally getValue here since we can never
                 // assign an actor introducing inst.
                 auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
-                if (!dynamicRegionIsolation.isDisconnected()) {
+                if (!dynamicRegionIsolation.isDisconnected() &&
+                    !staticRegionIsolation.isUnsafeNonIsolated()) {
                   handleError(AssignNeverSendableIntoSendingResultError(
                       op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
                       dynamicRegionIsolation));
@@ -1447,12 +1455,15 @@ public:
           if (auto value = instance.maybeGetValue()) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
               if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                auto staticRegionIsolation =
+                    getIsolationRegionInfo(op.getOpArgs()[1]);
                 Region srcRegion = p.getRegion(op.getOpArgs()[1]);
                 auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
                 // We can unconditionally getValue here since we can never
                 // assign an actor introducing inst.
                 auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
-                if (!dynamicRegionIsolation.isDisconnected()) {
+                if (!dynamicRegionIsolation.isDisconnected() &&
+                    !staticRegionIsolation.isUnsafeNonIsolated()) {
                   handleError(AssignNeverSendableIntoSendingResultError(
                       op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
                       dynamicRegionIsolation));

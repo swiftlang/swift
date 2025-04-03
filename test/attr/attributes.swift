@@ -308,6 +308,9 @@ class ExclusivityAttrClass {
 class HasStorage {
   @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
 }
+extension HasStorage {
+  @_hasStorage var y : Int { 24 } // expected-error {{'@_hasStorage' attribute cannot be applied to declaration in extension}}
+}
 
 @_show_in_interface protocol _underscored {}
 @_show_in_interface class _notapplicable {} // expected-error {{may only be used on 'protocol' declarations}}

@@ -185,6 +185,11 @@ private:
   /// \p selfTy must be a \c Self type of the context.
   static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD);
 
+  /// Retrieve the type to use as the base for a member completion.
+  Type getMemberBaseType() const {
+    return BaseType ? BaseType : ExprType;
+  }
+
 public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;
@@ -335,6 +340,8 @@ public:
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
 
+  void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
+
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T,
@@ -427,6 +434,9 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
+
+  Type getTypeAliasType(const TypeAliasDecl *TAD,
+                        DynamicLookupInfo dynamicLookupInfo);
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo);
@@ -605,7 +615,7 @@ public:
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
 
   void getTypeAttributeKeywordCompletions(CompletionKind completionKind);

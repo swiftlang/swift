@@ -31,6 +31,10 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   func getSendableGenericStructAsync() async -> SendableGenericStruct { fatalError() }
 }
 
+nonisolated final class NonIsolatedFinalKlass {
+  var ns = NonSendableKlass()
+}
+
 class SendableKlass : @unchecked Sendable {}
 
 actor MyActor {
@@ -593,14 +597,14 @@ func testConversionsAndSendable(a: MyActor, f: @Sendable () -> Void, f2: () -> V
 func testSendableClosureCapturesNonSendable(a: MyActor) {
   let klass = NonSendableKlass()
   let _ = { @Sendable in
-    _ = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    _ = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
 }
 
 func testSendableClosureCapturesNonSendable2(a: FinalMainActorIsolatedKlass) {
   let klass = NonSendableKlass()
   let _ = { @Sendable @MainActor in
-    a.klass = klass // expected-complete-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    a.klass = klass // expected-complete-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
 }
 
@@ -1548,7 +1552,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
     let _ = x // expected-tns-warning {{sending 'x' risks causing data races}}
     // expected-tns-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '() -> ()' in a '@Sendable' closure}}
     // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 }
@@ -1736,7 +1740,7 @@ func sendableGlobalActorIsolated() {
   let _ = { @Sendable @MainActor in
     print(x) // expected-tns-warning {{sending 'x' risks causing data races}}
     // expected-tns-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
   print(x) // expected-tns-note {{access can happen concurrently}}
 }
@@ -1931,5 +1935,36 @@ func testIndirectAndDirectSendingResultsWithGlobalActor() async {
   let ns2: NonSendableKlass = await s.getNonSendableKlassIndirect()
   Task.detached {
     _ = ns2
+  }
+}
+
+// We used to not check if bodies were not empty when emitting the error for
+// using result in the throwing task group. Make sure we do not crash.
+func testFunctionIsNotEmpty(input: SendableKlass) async throws {
+  var result: [SendableKlass] = []
+  try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+    taskGroup.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      result.append(input) // expected-tns-note {{closure captures reference to mutable var 'result' which is accessible to code in the current task}}
+    }
+  }
+}
+
+func unsafeNonIsolatedAppliesToAssignToOutParam(ns: NonSendableKlass) -> sending NonSendableKlass {
+  func withUnsafeValue<T>(_ block: (NonSendableKlass) throws -> sending T) rethrows -> sending T {
+    fatalError()
+  }
+
+  return withUnsafeValue {
+    nonisolated(unsafe) let obj = $0
+    return obj
+  }
+}
+
+extension NonIsolatedFinalKlass {
+  // We used to crash while computing the isolation of the ref_element_addr
+  // here. Make sure we do not crash.
+  func testGetIsolationInfoOfField() async {
+    await transferToMain(ns) // expected-tns-warning {{sending 'self.ns' risks causing data races}}
+    // expected-tns-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   }
 }

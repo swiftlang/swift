@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ThenStatements -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ThenStatements > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ThenStatements -enable-experimental-feature ParserASTGen \
+// RUN:    | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ThenStatements \
+// RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
@@ -94,6 +92,7 @@ func testFor(arg1: [Int?]) {
     elem += 1
     print(elem)
   }
+  for (a, b) in [(1,2)] {}
 }
 
 func testRepeat() {
@@ -114,6 +113,17 @@ func testThen() {
     then .zero
   } else {
     then 0
+  }
+}
+
+func intOrString() -> Int? { 1 }
+func intOrString() -> String? { "" }
+func testIf() {
+  if
+    let i: Int = intOrString(),
+    case let str? = intOrString() as String?
+  {
+    _ = (i, str)
   }
 }
 

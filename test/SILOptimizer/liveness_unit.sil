@@ -258,9 +258,9 @@ bb3(%phi : @guaranteed $D):
 // CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
 // CHECK-NEXT: bb0: LiveOut
 // CHECK-NEXT: bb1: LiveWithin
-// CHECK-NEXT: regular user:   %7 = borrowed %4 : $C from (%0 : $C)
-// CHECK-NEXT: regular user:   br bb1(%1 : $C, %2 : $PairC)
-// CHECK-NEXT: last user:   %7 = borrowed %4 : $C from (%0 : $C)
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $C, %{{.*}} : $PairC)
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
 // CHECK-NEXT: end running
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):

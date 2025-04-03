@@ -1108,8 +1108,8 @@ static ValueDecl *getIsOptionalOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getIsSameMetatypeOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_existentialMetatype(_any),
-                                        _existentialMetatype(_any)),
+                            _parameters(_existentialMetatype(_unconstrainedAny),
+                                        _existentialMetatype(_unconstrainedAny)),
                             _int(1));
 }
 
@@ -1137,6 +1137,8 @@ static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+// Obsolete: only there to be able to read old Swift.interface files which still
+// contain the builtin.
 static ValueDecl *getAllocVectorOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -1571,6 +1573,7 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
                                 _existential(_taskExecutor),
                                 /*else*/ _executor))),
                             _nil)),
+          _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation",
                  _sending(_function(_async(_throws(_thick)), _typeparam(0),
                                     _parameters())))),
@@ -1595,6 +1598,7 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
                                 _existential(_taskExecutor),
                                 /*else*/ _executor))),
                             _nil)),
+          _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation", _sending(_function(_async(_throws(_thick)), _void,
                                                  _parameters())))),
       _tuple(_nativeObject, _rawPointer));

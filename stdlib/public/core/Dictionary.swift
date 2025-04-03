@@ -486,10 +486,20 @@ public struct Dictionary<Key: Hashable, Value> {
     // error instead of calling fatalError() directly because we want the
     // message to include the duplicate key, and the closure only has access to
     // the conflicting values.
+    #if !$Embedded
     try! native.merge(
       keysAndValues,
       isUnique: true,
       uniquingKeysWith: { _, _ in throw _MergeError.keyCollision })
+    #else
+    native.merge(
+      keysAndValues,
+      isUnique: true,
+      uniquingKeysWith: { _, _ throws(_MergeError) in
+        throw _MergeError.keyCollision
+      }
+    )
+    #endif
     self.init(_native: native)
   }
 
@@ -828,7 +838,7 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
     for (key, value) in elements {
       let (bucket, found) = native.find(key)
       _precondition(!found, "Dictionary literal contains duplicate keys")
-      native._insert(at: bucket, key: key, value: value)
+      unsafe native._insert(at: bucket, key: key, value: value)
     }
     self.init(_native: native)
   }
@@ -894,15 +904,15 @@ extension Dictionary {
     }
     @inline(__always)
     _modify {
-      let (bucket, found) = _variant.mutatingFind(key)
+      let (bucket, found) = unsafe _variant.mutatingFind(key)
       let native = _variant.asNative
       if !found {
         let value = defaultValue()
-        native._insert(at: bucket, key: key, value: value)
+        unsafe native._insert(at: bucket, key: key, value: value)
       }
-      let address = native._values + bucket.offset
+      let address = unsafe native._values + bucket.offset
       defer { _fixLifetime(self) }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -1366,7 +1376,7 @@ extension Dictionary {
       if
         lhs._variant.isNative,
         rhs._variant.isNative,
-        lhs._variant.asNative._storage === rhs._variant.asNative._storage
+        unsafe (lhs._variant.asNative._storage === rhs._variant.asNative._storage)
       {
         return true
       }
@@ -1378,7 +1388,7 @@ extension Dictionary {
         return true
       }
 #else
-      if lhs._variant.asNative._storage === rhs._variant.asNative._storage {
+      if unsafe (lhs._variant.asNative._storage === rhs._variant.asNative._storage) {
         return true
       }
 #endif
@@ -1448,10 +1458,10 @@ extension Dictionary {
       }
       _modify {
         let native = _variant.ensureUniqueNative()
-        let bucket = native.validatedBucket(for: position)
-        let address = native._values + bucket.offset
+        let bucket = unsafe native.validatedBucket(for: position)
+        let address = unsafe native._values + bucket.offset
         defer { _fixLifetime(self) }
-        yield &address.pointee
+        yield unsafe &address.pointee
       }
     }
 
@@ -1481,9 +1491,9 @@ extension Dictionary {
 #endif
       let isUnique = _variant.isUniquelyReferenced()
       let native = _variant.asNative
-      let a = native.validatedBucket(for: i)
-      let b = native.validatedBucket(for: j)
-      _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
+      let a = unsafe native.validatedBucket(for: i)
+      let b = unsafe native.validatedBucket(for: j)
+      unsafe _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
   }
 }
@@ -1675,7 +1685,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
@@ -1763,6 +1773,7 @@ extension Dictionary {
 
     @frozen
     @usableFromInline
+    @safe
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
@@ -1782,7 +1793,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     internal init(_native index: _HashTable.Index) {
-      self.init(_variant: .native(index))
+      unsafe self.init(_variant: .native(index))
     }
 
 #if _runtime(_ObjC)
@@ -1837,7 +1848,7 @@ extension Dictionary.Index {
   internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
-      return nativeIndex
+      return unsafe nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
       _preconditionFailure(
@@ -1864,8 +1875,8 @@ extension Dictionary.Index {
         _preconditionFailure(
           "Attempting to access Dictionary elements using an invalid index")
       }
-      let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
-      _variant = .native(dummy)
+      let dummy = unsafe _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
+      _variant = unsafe .native(dummy)
       defer { _variant = .cocoa(cocoa) }
       yield &cocoa
     }
@@ -1881,7 +1892,7 @@ extension Dictionary.Index: Equatable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative == rhsNative
+      return unsafe lhsNative == rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1901,7 +1912,7 @@ extension Dictionary.Index: Comparable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative < rhsNative
+      return unsafe lhsNative < rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1923,9 +1934,9 @@ extension Dictionary.Index: Hashable {
       return
     }
     hasher.combine(0 as UInt8)
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #else
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #endif
   }
 }

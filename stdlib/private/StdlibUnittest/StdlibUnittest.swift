@@ -2112,6 +2112,11 @@ public final class TestSuite {
       return self
     }
 
+    public func require(_ stdlibVersion: StdLibVersion) -> _TestBuilder {
+      _data._skip.append(.minimumStdlib(stdlibVersion))
+      return self
+    }
+
     public func stdin(_ stdinText: String, eof: Bool = false) -> _TestBuilder {
       _data._stdinText = stdinText
       _data._stdinEndsWithEOF = eof
@@ -2202,6 +2207,35 @@ func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
 }
 #endif
 #endif
+
+public enum StdLibVersion: String {
+  case stdlib_5_7  = "5.7"
+  case stdlib_5_8  = "5.8"
+  case stdlib_5_9  = "5.9"
+  case stdlib_5_10 = "5.10"
+  case stdlib_6_0  = "6.0"
+  case stdlib_6_1  = "6.1"
+  case stdlib_6_2  = "6.2"
+  
+  var isAvailable: Bool {
+    switch self {
+    case .stdlib_5_7:
+      return if #available(SwiftStdlib 5.7, *)  { true } else { false }
+    case .stdlib_5_8:
+      return if #available(SwiftStdlib 5.8, *)  { true } else { false }
+    case .stdlib_5_9:
+      return if #available(SwiftStdlib 5.9, *)  { true } else { false }
+    case .stdlib_5_10:
+      return if #available(SwiftStdlib 5.10, *) { true } else { false }
+    case .stdlib_6_0:
+      return if #available(SwiftStdlib 6.0, *)  { true } else { false }
+    case .stdlib_6_1:
+      return if #available(SwiftStdlib 6.1, *)  { true } else { false }
+    case .stdlib_6_2:
+      return if #available(SwiftStdlib 6.2, *)  { true } else { false }
+    }
+  }
+}
 
 public enum OSVersion : CustomStringConvertible {
   case osx(major: Int, minor: Int, bugFix: Int)
@@ -2410,9 +2444,13 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case haikuAny(reason: String)
 
+  case wasiAny(reason: String)
+
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
 
+  case minimumStdlib(StdLibVersion)
+  
   public var description: String {
     switch self {
     case .custom(_, let reason):
@@ -2529,10 +2567,16 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .haikuAny(reason: let reason):
       return "haikuAny(*, reason: \(reason))"
 
+    case .wasiAny(reason: let reason):
+      return "wasiAny(*, reason: \(reason))"
+
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
     case .nativeRuntime(let reason):
       return "Native runtime (no ObjC), reason: \(reason))"
+      
+    case .minimumStdlib(let version):
+      return "Requires Swift \(version.rawValue)'s standard library"
     }
   }
 
@@ -2908,6 +2952,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .wasiAny:
+      switch _getRunningOSVersion() {
+      case .wasi:
+        return true
+      default:
+        return false
+      }
+
     case .objCRuntime:
 #if _runtime(_ObjC)
       return true
@@ -2921,6 +2973,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 #else
       return true
 #endif
+      
+    case .minimumStdlib(let version):
+      return !version.isAvailable
     }
   }
 }

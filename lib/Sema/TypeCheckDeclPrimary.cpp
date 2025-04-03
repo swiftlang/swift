@@ -1152,8 +1152,7 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   assert(PD->getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
 
   auto *DC = PD->getInnermostDeclContext();
-  const SourceFile *SF = DC->getParentSourceFile();
-  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+  assert((DC->isInSwiftinterface() || PD->isImplicit()) &&
          "explicit inherited default argument outside of a module interface?");
 
   // The containing decl should be a designated initializer.
@@ -1362,17 +1361,16 @@ Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Initializer *
+DefaultArgumentInitializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
-  auto &ctx = param->getASTContext();
   auto *parentDC = param->getDeclContext();
-  auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
+  auto *paramList = cast<ValueDecl>(parentDC->getAsDecl())->getParameterList();
 
   // In order to compute the initializer context for this parameter, we need to
   // know its index in the parameter list. Therefore iterate over the parameters
   // looking for it and fill in the other parameter's contexts while we're here.
-  Initializer *result = nullptr;
+  DefaultArgumentInitializer *result = nullptr;
   for (auto idx : indices(*paramList)) {
     auto *otherParam = paramList->get(idx);
 
@@ -1387,7 +1385,7 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     // Create a new initializer context. If this is for the parameter that
     // kicked off the request, make a note of it for when we return. Otherwise
     // cache the result ourselves.
-    auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
+    auto *initDC = DefaultArgumentInitializer::create(parentDC, idx);
     if (param == otherParam) {
       result = initDC;
     } else {
@@ -1807,7 +1805,7 @@ static void diagnoseRetroactiveConformances(
   }
 
   // Don't warn for this if we see it in module interfaces.
-  if (ext->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+  if (ext->getDeclContext()->isInSwiftinterface()) {
     return;
   }
 
@@ -2175,6 +2173,10 @@ void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
 
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  // Access notes don't apply to ABI-only attributes.
+  if (!ABIRoleInfo(VD).providesAPI())
+    return {};
+
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
   if (auto note = notes.lookup(VD))
     applyAccessNote(VD, *note.get(), notes);
@@ -2365,10 +2367,12 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // Check for actor isolation of top-level and local declarations.
+      // Check for actor isolation of top-level and local declarations, and
+      // protocol requirements.g
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
-      if (!VD->getDeclContext()->isTypeContext())
+      if (!VD->getDeclContext()->isTypeContext() ||
+          isa<ProtocolDecl>(VD->getDeclContext()))
         (void) getActorIsolation(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
@@ -2388,12 +2392,19 @@ public:
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
 
-      // Expand extension macros.
       if (auto *nominal = dyn_cast<NominalTypeDecl>(VD)) {
+        // Expand extension macros.
         (void)evaluateOrDefault(
             Ctx.evaluator,
             ExpandExtensionMacros{nominal},
             { });
+
+        // If strict memory safety checking is enabled, check the storage
+        // of the nominal type.
+        if (Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+            !isa<ProtocolDecl>(nominal)) {
+          checkUnsafeStorage(nominal);
+        }
       }
     }
   }
@@ -2463,7 +2474,7 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }
@@ -2557,9 +2568,8 @@ public:
           // This allows the compiler to process existing .swiftinterface
           // files that contain this issue.
           if (resultType->isVoid()) {
-            if (auto sourceFile = MD->getParentSourceFile())
-              if (sourceFile->Kind == SourceFileKind::Interface)
-                diag.limitBehavior(DiagnosticBehavior::Warning);
+            if (MD->getDeclContext()->isInSwiftinterface())
+              diag.limitBehavior(DiagnosticBehavior::Warning);
           }
         }
 
@@ -3124,6 +3134,7 @@ public:
 
     // An associated type that was introduced after the protocol
     auto module = AT->getDeclContext()->getParentModule();
+    // FIXME: [availability] Query AvailabilityContext, not platform range.
     if (!defaultType &&
         module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
         AvailabilityInference::availableRange(proto).isSupersetOf(
@@ -3332,8 +3343,7 @@ public:
   void checkRequiredInClassInits(ClassDecl *cd) {
     // Initializers may be omitted from property declarations in module
     // interface files so don't diagnose in them.
-    SourceFile *sourceFile = cd->getDeclContext()->getParentSourceFile();
-    if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+    if (cd->getDeclContext()->isInSwiftinterface())
       return;
 
     ClassDecl *source = nullptr;
@@ -3789,9 +3799,8 @@ public:
       if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
-          Ctx.Diags.diagnose(
-              CDeclAttr->getLocation(), diag::attr_decl_async,
-              CDeclAttr->getAttrName(), FD->getDescriptiveKind());
+          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::attr_decl_async,
+                             CDeclAttr, FD);
         } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
@@ -3988,7 +3997,7 @@ public:
       return;
     }
 
-    // Record a dependency from TypeCheckSourceFileRequest to
+    // Record a dependency from TypeCheckPrimaryFileRequest to
     // ExtendedNominalRequest, since the call to getExtendedNominal()
     // above doesn't record a dependency when reading a cached value.
     ED->computeExtendedNominal();
@@ -4087,16 +4096,6 @@ public:
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
   
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-    if (PDD->hasBeenEmitted()) { return; }
-    PDD->markEmitted();
-    Ctx.Diags
-        .diagnose(PDD->getMessage()->getStartLoc(),
-                  PDD->isError() ? diag::pound_error : diag::pound_warning,
-                  PDD->getMessage()->getValue())
-        .highlight(PDD->getMessage()->getSourceRange());
-  }
-
   void visitConstructorDecl(ConstructorDecl *CD) {
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();

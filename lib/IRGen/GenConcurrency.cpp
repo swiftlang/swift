@@ -747,6 +747,29 @@ struct InitialTaskExecutorOwnedRecordTraits {
   }
 };
 
+struct InitialTaskNameRecordTraits {
+  static StringRef getLabel() {
+    return "task_name";
+  }
+  static llvm::StructType *getRecordType(IRGenModule &IGM) {
+    return IGM.SwiftInitialTaskNameTaskOptionRecordTy;
+  }
+  static TaskOptionRecordFlags getRecordFlags() {
+    return TaskOptionRecordFlags(TaskOptionRecordKind::InitialTaskName);
+  }
+  static CanType getValueType(ASTContext &ctx) {
+      return ctx.TheRawPointerType;
+  }
+
+  // Create 'InitialTaskNameTaskOptionRecord'
+  void initialize(IRGenFunction &IGF, Address recordAddr,
+                  Explosion &taskName) const {
+    auto record =
+      IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
+    IGF.Builder.CreateStore(taskName.claimNext(), record);
+  }
+};
+
 } // end anonymous namespace
 
 static llvm::Value *
@@ -783,12 +806,20 @@ maybeAddInitialTaskExecutorOwnedOptionRecord(IRGenFunction &IGF,
                               taskExecutorExistential);
 }
 
+static llvm::Value *
+maybeAddTaskNameOptionRecord(IRGenFunction &IGF, llvm::Value *prevOptions,
+                             OptionalExplosion &taskName) {
+  return maybeAddOptionRecord(IGF, prevOptions, InitialTaskNameRecordTraits(),
+                              taskName);
+}
+
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
                       OptionalExplosion &serialExecutor,
                       OptionalExplosion &taskGroup,
                       OptionalExplosion &taskExecutorUnowned,
                       OptionalExplosion &taskExecutorExistential,
+                      OptionalExplosion &taskName,
                       Explosion &taskFunction,
                       SubstitutionMap subs) {
   llvm::Value *taskOptions =
@@ -824,6 +855,9 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
     taskOptions = maybeAddInitialTaskExecutorOwnedOptionRecord(
         IGF, taskOptions, taskExecutorExistential);
   }
+
+  // Add an option record for the initial task name, if present.
+  taskOptions = maybeAddTaskNameOptionRecord(IGF, taskOptions, taskName);
 
   // In embedded Swift, create and pass result type info.
   taskOptions = maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, resultType);

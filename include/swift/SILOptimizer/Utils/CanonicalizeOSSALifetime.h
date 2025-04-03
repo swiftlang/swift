@@ -97,7 +97,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
 #include "swift/Basic/SmallPtrSetVector.h"
-#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -238,6 +237,8 @@ private:
   /// copies.
   const MaximizeLifetime_t maximizeLifetime;
 
+  SILFunction *function;
+
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
   // before such an access scope is fine regardless.)
@@ -279,68 +280,25 @@ private:
   /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  class Def {
-    struct Root {
-      SILValue value;
-    };
-    struct Copy {
-      CopyValueInst *cvi;
-    };
-    struct BorrowedFrom {
-      BorrowedFromInst *bfi;
-    };
-    struct Reborrow {
-      SILArgument *argument;
-    };
-    using Payload = TaggedUnion<Root, Copy, BorrowedFrom, Reborrow>;
-    Payload payload;
-    Def(Payload payload) : payload(payload) {}
-
-  public:
-    enum class Kind {
+  struct Def {
+    enum Kind {
       Root,
       Copy,
       BorrowedFrom,
       Reborrow,
     };
-    Kind getKind() const {
-      if (payload.isa<Root>()) {
-        return Kind::Root;
-      }
-      if (payload.isa<Copy>()) {
-        return Kind::Copy;
-      }
-      if (payload.isa<BorrowedFrom>()) {
-        return Kind::BorrowedFrom;
-      }
-      assert(payload.isa<Reborrow>());
-      return Kind::Reborrow;
-    }
-    operator Kind() const { return getKind(); }
-    bool operator==(Def rhs) const {
-      return getKind() == rhs.getKind() && getValue() == rhs.getValue();
-    }
-    static Def root(SILValue value) { return {Root{value}}; }
-    static Def copy(CopyValueInst *cvi) { return {Copy{cvi}}; }
+    const Kind kind;
+    const SILValue value;
+    static Def root(SILValue value) { return {Root, value}; }
+    static Def copy(CopyValueInst *cvi) { return {Copy, cvi}; }
     static Def borrowedFrom(BorrowedFromInst *bfi) {
-      return {BorrowedFrom{bfi}};
+      return {BorrowedFrom, bfi};
     }
-    static Def reborrow(SILArgument *argument) { return {Reborrow{argument}}; }
-    SILValue getValue() const {
-      switch (*this) {
-      case Kind::Root:
-        return payload.get<Root>().value;
-      case Kind::Copy:
-        return payload.get<Copy>().cvi;
-      case Kind::BorrowedFrom:
-        return payload.get<BorrowedFrom>().bfi;
-      case Kind::Reborrow:
-        return payload.get<Reborrow>().argument;
-      }
-      llvm_unreachable("covered switch");
-    }
+    static Def reborrow(SILArgument *argument) { return {Reborrow, argument}; }
+
+  private:
+    Def(Kind kind, SILValue value) : kind(kind), value(value) {}
   };
-  friend llvm::DenseMapInfo<Def>;
 
   /// The defs derived from currentDef whose uses are added to liveness.
   SmallVector<Def, 8> discoveredDefs;
@@ -398,7 +356,7 @@ public:
       DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
       BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis),
+        function(function), accessBlockAnalysis(accessBlockAnalysis),
         deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
@@ -412,9 +370,7 @@ public:
     currentDef = def;
     currentLexicalLifetimeEnds = lexicalLifetimeEnds;
 
-    if (maximizeLifetime || respectsDeinitBarriers()) {
-      liveness->initializeDiscoveredBlocks(&discoveredBlocks);
-    }
+    liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     liveness->initializeDef(getCurrentDef());
   }
 
@@ -543,6 +499,7 @@ private:
                             PrunedLivenessBoundary &boundary);
 
   void extendLivenessToDeadEnds();
+  void extendLexicalLivenessToDeadEnds();
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);

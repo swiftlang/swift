@@ -16,12 +16,8 @@ import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 extension ASTGenVisitor {
-  func generateTypeAttributes(_ node: some WithAttributesSyntax) -> BridgedTypeAttributes? {
-    guard !node.attributes.isEmpty else {
-      return nil
-    }
-
-    let attrs = BridgedTypeAttributes.new()
+  func generateTypeAttributes(_ node: some WithAttributesSyntax) -> [BridgedTypeOrCustomAttr] {
+    var attrs: [BridgedTypeOrCustomAttr] = []
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -31,19 +27,13 @@ extension ASTGenVisitor {
       }
     } body: { attribute in
       if let attr = self.generateTypeAttribute(attribute: attribute) {
-        attrs.add(attr)
+        attrs.append(attr)
       }
     }
-
-    guard !attrs.isEmpty else {
-      attrs.delete()
-      return nil
-    }
-
     return attrs
   }
 
-  func generateTypeAttribute(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+  func generateTypeAttribute(attribute node: AttributeSyntax) -> BridgedTypeOrCustomAttr? {
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
       let attrKind = BridgedTypeAttrKind(from: attrName.bridged)
@@ -63,6 +53,7 @@ extension ASTGenVisitor {
         .preconcurrency,
         .local,
         .noMetadata,
+        .nonisolated,
         .packGuaranteed,
         .packInout,
         .packOut,
@@ -76,20 +67,23 @@ extension ASTGenVisitor {
         .thick,
         .unimplementable:
         return self.generateSimpleTypeAttr(attribute: node, kind: attrKind)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
-      case .opened:
-        fatalError("unimplemented")
-      case .packElement:
-        fatalError("unimplemented")
-      case .differentiable:
-        fatalError("unimplemented")
       case .convention:
-        fatalError("unimplemented")
+        return (self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .differentiable:
+        return (self.generateDifferentiableTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .execution:
+        return (self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .opaqueReturnTypeOf:
-        fatalError("unimplemented")
-
+        return (self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .isolated:
-        return self.generateIsolatedTypeAttr(attribute: node)
+        return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       // SIL type attributes are not supported.
       case .autoreleased,
@@ -112,8 +106,10 @@ extension ASTGenVisitor {
         .inoutAliasable,
         .moveOnly,
         .objCMetatype,
+        .opened,
         .out,
         .owned,
+        .packElement,
         .silIsolated,
         .silUnmanaged,
         .silUnowned,
@@ -121,15 +117,19 @@ extension ASTGenVisitor {
         .silSending,
         .silImplicitLeadingParam,
         .unownedInnerPointer:
+        // TODO: Diagnose or fallback to CustomAttr?
+        fatalError("SIL type attributes are not supported")
         break;
 
-      // Not a type attribute.
       case .none:
+        // Not a builtin type attribute. Fall back to CustomAttr
         break;
       }
     }
 
-    // TODO: Diagnose.
+    if let customAttr = self.generateCustomAttr(attribute: node) {
+      return .customAttr(customAttr)
+    }
     return nil
   }
 
@@ -143,34 +143,201 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
-    guard case .argumentList(let isolatedArgs) = node.arguments,
-          isolatedArgs.count == 1,
-          let labelArg = isolatedArgs.first,
-          labelArg.label == nil,
-          let isolationKindExpr = labelArg.expression.as(DeclReferenceExprSyntax.self),
-          isolationKindExpr.argumentNames == nil
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-  
+  /// E.g.
+  ///   ```
+  ///   @convention(c)
+  ///   @convention(c, cType: "int (*)(int)")
+  ///   ```
+  func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let nameAndLoc: (name: _, loc: _)? =  self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        (ctx.allocateCopy(string: $0.rawText.bridged), self.generateSourceLoc($0))
+      }
+      guard let nameAndLoc else {
+        return nil
+      }
 
-    var isolationKind: BridgedIsolatedTypeAttrIsolationKind
-    switch isolationKindExpr.baseName {
-    case "any": isolationKind = .dynamicIsolation
-    default:
-      // TODO: Diagnose.
-      return nil
+      let cTypeNameLoc: BridgedSourceLoc?
+      let cTypeName: BridgedStringRef?
+      if !args.isEmpty {
+        cTypeNameLoc = self.generateSourceLoc(args.first?.expression)
+        cTypeName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "cType")
+        guard cTypeName != nil else {
+          return nil
+        }
+      } else {
+        cTypeNameLoc = nil
+        cTypeName = nil
+      }
+
+      // `@convention(witness_method: <protocol-name>)` is for SIL only.
+      let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        nameLoc: self.generateSourceLoc(node.attributeName),
+        parensRange: self.generateAttrParensRange(attribute: node),
+        name: nameAndLoc.name,
+        nameLoc: nameAndLoc.loc,
+        witnessMethodProtocol: witnessMethodProtocol,
+        clangType: cTypeName ?? BridgedStringRef(),
+        clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
+      )
+    }
+  }
+
+  func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
+    let differentiability: BridgedDifferentiabilityKind
+    let differentiabilityLoc: BridgedSourceLoc
+    if let args = node.arguments {
+      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
+        fatalError("(compiler bug) invalid arguments for @differentiable attribute")
+      }
+
+      if let kindSpecifier = args.kindSpecifier {
+        differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
+        differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
+
+        guard differentiability != .nonDifferentiable else {
+          // TODO: Diagnose
+          fatalError("invalid kind for @differentiable type attribute")
+        }
+
+        guard kindSpecifier.nextToken(viewMode: .fixedUp) == node.rightParen else {
+          // TODO: Diagnose
+          fatalError("only expeceted 'reverse' in @differentiable type attribute")
+        }
+      } else {
+        // TODO: Diagnose
+        fatalError("expected @differentiable(reverse)")
+      }
+    } else {
+      differentiability = .normal
+      differentiabilityLoc = nil
     }
 
-    return BridgedTypeAttribute.createIsolated(
+    // Only 'reverse' is formally supported today. '_linear' works for testing
+    // purposes. '_forward' is rejected.
+    switch differentiability {
+    case .normal, .nonDifferentiable:
+      // TODO: Diagnose
+      fatalError("Only @differentiable(reverse) is supported")
+    case .forward:
+      // TODO: Diagnose
+      fatalError("Only @differentiable(reverse) is supported")
+    case .reverse, .linear:
+      break
+    }
+
+    return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      lpLoc: self.generateSourceLoc(node.leftParen!),
-      isolationKindLoc: self.generateSourceLoc(isolationKindExpr.baseName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      kind: differentiability,
+      kindLoc: differentiabilityLoc
+    )
+  }
+
+  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
+    let behaviorLoc = self.generateSourceLoc(node.arguments)
+    let behavior: BridgedExecutionTypeAttrExecutionKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "concurrent": return .concurrent
+        case "caller": return .caller
+        default:
+          // TODO: Diagnose.
+          return nil
+        }
+      }
+    )
+    guard let behavior else {
+      return nil
+    }
+      
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      behavior: behavior,
+      behaviorLoc: behaviorLoc
+    )
+  }
+  
+  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedIsolatedTypeAttr? {
+    let isolationKindLoc = self.generateSourceLoc(node.arguments)
+    let isolationKind: BridgedIsolatedTypeAttrIsolationKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "any": return .dynamicIsolation
+        default:
+          // TODO: Diagnose.
+          return nil
+        }
+      }
+    )
+    guard let isolationKind else {
+      return nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
       isolationKind: isolationKind,
-      rpLoc: self.generateSourceLoc(node.rightParen!))
+      isolationKindLoc: isolationKindLoc
+    )
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @_opaqueReturnTypeOf("$sMangledName", 4)
+  ///   ```
+  func generateOpaqueReturnTypeOfTypeAttr(attribute node: AttributeSyntax) -> BridgedOpaqueReturnTypeOfTypeAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let mangledLoc = self.generateSourceLoc(args.first?.expression)
+      let mangledName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+      guard let mangledName else {
+        return nil
+      }
+
+      let indexLoc = self.generateSourceLoc(args.first?.expression)
+      let index: Int? = self.generateConsumingAttrOption(args: &args, label: nil) { expr in
+        guard let intExpr = expr.as(IntegerLiteralExprSyntax.self) else {
+          // TODO: Diagnostics.
+          fatalError("expected integer literal")
+          // return nil
+        }
+        return intExpr.representedLiteralValue
+      }
+      guard let index else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        nameLoc: self.generateSourceLoc(node.attributeName),
+        parensRange: self.generateAttrParensRange(attribute: node),
+        mangled: mangledName,
+        mangledLoc: mangledLoc,
+        index: index,
+        indexLoc: indexLoc
+      )
+    }
+
+  }
+  
+  func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
+    guard let lParen = node.leftParen else {
+      return BridgedSourceRange()
+    }
+    return self.generateSourceRange(start: lParen, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 }

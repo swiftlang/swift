@@ -157,9 +157,12 @@ NODE(Isolated)
 CONTEXT_NODE(IsolatedDeallocator)
 NODE(Sending)
 NODE(IsolatedAnyFunctionType)
+NODE(NonIsolatedCallerFunctionType)
 NODE(SendingResultFunctionType)
 NODE(KeyPathGetterThunkHelper)
 NODE(KeyPathSetterThunkHelper)
+NODE(KeyPathUnappliedMethodThunkHelper)
+NODE(KeyPathAppliedMethodThunkHelper)
 NODE(KeyPathEqualsThunkHelper)
 NODE(KeyPathHashThunkHelper)
 NODE(LazyProtocolWitnessTableAccessor)
@@ -293,7 +296,6 @@ NODE(ReflectionMetadataSuperclassDescriptor)
 NODE(GenericTypeParamDecl)
 NODE(CurryThunk)
 NODE(SILThunkIdentity)
-NODE(SILThunkHopToMainActorIfNeeded)
 NODE(DispatchThunk)
 NODE(MethodDescriptor)
 NODE(ProtocolRequirementsBaseDescriptor)
@@ -328,6 +330,7 @@ NODE(AssociatedTypeGenericParamRef)
 NODE(SugaredOptional)
 NODE(SugaredArray)
 NODE(SugaredDictionary)
+NODE(SugaredInlineArray)
 NODE(SugaredParen) // Removed in Swift 6.TBD
 
 // Added in Swift 5.1
@@ -369,7 +372,7 @@ NODE(AsyncSuspendResumePartialFunction)
 
 // Added in Swift 5.6
 NODE(AccessibleFunctionRecord)
-NODE(CompileTimeConst)
+NODE(CompileTimeLiteral)
 
 // Added in Swift 5.7
 NODE(BackDeploymentThunk)
@@ -407,6 +410,9 @@ NODE(DependentGenericInverseConformanceRequirement)
 NODE(Integer)
 NODE(NegativeInteger)
 NODE(DependentGenericParamValueMarker)
+NODE(CoroFunctionPointer)
+NODE(DefaultOverride)
+NODE(ConstValue)
 
 #undef CONTEXT_NODE
 #undef NODE

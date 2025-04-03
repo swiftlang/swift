@@ -628,7 +628,7 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics2")
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
-  list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
+
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
 
@@ -856,7 +856,12 @@ function(_compile_swift_files
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     set(HOST_EXECUTABLE_SUFFIX .exe)
   endif()
-  if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+  if(NOT SWIFT_ENABLE_SWIFT_IN_SWIFT)
+    # This is only for bootstrapping purposes. The just-built Swift is very
+    # limited and only built for the builder to build the next stages with
+    # hosttools.
+    set(swift_compiler_tool "${Swift_BINARY_DIR}/bin/swiftc")
+  elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     if(SWIFT_PREBUILT_SWIFT)
       set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
     elseif(CMAKE_Swift_COMPILER)
@@ -886,8 +891,10 @@ function(_compile_swift_files
     # cross-compiling the compiler.
     list(APPEND swift_compiler_tool_dep "swift-frontend${target_suffix}")
 
-    # If we aren't cross compiling, also depend on SwiftMacros.
-    list(APPEND swift_compiler_tool_dep SwiftMacros)
+    if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
+      # If we aren't cross compiling, also depend on SwiftMacros.
+      list(APPEND swift_compiler_tool_dep SwiftMacros)
+    endif()
   endif()
 
   # If there are more than one output files, we assume that they are specified
@@ -984,37 +991,6 @@ function(_compile_swift_files
 
     # FIXME: should we use '-resource-dir' here?  Seems like it has no advantage
     # over '-I' in this case.
-  endif()
-
-  if(XCODE)
-    # HACK: work around an issue with CMake Xcode generator and the Swift
-    # driver.
-    #
-    # The Swift driver does not update the mtime of the output files if the
-    # existing output files on disk are identical to the ones that are about
-    # to be written.  This behavior confuses the makefiles used in CMake Xcode
-    # projects: the makefiles will not consider everything up to date after
-    # invoking the compiler.  As a result, the standard library gets rebuilt
-    # multiple times during a single build.
-    #
-    # To work around this issue we touch the output files so that their mtime
-    # always gets updated.
-    set(command_touch_standard_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${standard_outputs})
-    set(command_touch_module_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${module_outputs})
-    set(command_touch_sib_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${sib_outputs})
-    set(command_touch_sibopt_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${sibopt_outputs})
-    set(command_touch_sibgen_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${sibgen_outputs})
-
-    # macCatalyst zippered outputs
-    if(maccatalyst_build_flavor STREQUAL "zippered")
-      set(command_touch_maccatalyst_module_outputs
-        COMMAND "${CMAKE_COMMAND}" -E touch ${maccatalyst_module_outputs})
-    endif()
   endif()
 
   list(REMOVE_DUPLICATES dirs_to_create)

@@ -777,8 +777,9 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 
     // If we have an ignored use whose operand is our no return call, ignore it.
     if (auto *i = dyn_cast<IgnoredUseInst>(currInst)) {
-      if (auto *svi = dyn_cast<SingleValueInstruction>(i->getOperand());
-          svi && getAsCallToNoReturn(svi)) {
+      // This handles try_apply, apply, begin_apply.
+      if (auto *inst = i->getOperand()->getDefiningInstructionOrTerminator();
+          inst && inst == noReturnCall) {
         return false;
       }
     }

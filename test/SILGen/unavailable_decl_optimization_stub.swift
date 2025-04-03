@@ -90,3 +90,9 @@ public func obsoletedInSwift1() {}
 // CHECK:       } // end sil function '$s4Test17obsoletedInSwift5yyF'
 @available(swift, obsoleted: 5)
 public func obsoletedInSwift5() {}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test19introducedInSwift99yyF : $@convention(thin) () -> () {
+// CHECK-NOT:     ss36_diagnoseUnavailableCodeReached
+// CHECK:       } // end sil function '$s4Test19introducedInSwift99yyF'
+@available(swift, introduced: 99)
+public func introducedInSwift99() {}

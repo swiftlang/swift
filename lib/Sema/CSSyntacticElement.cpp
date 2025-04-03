@@ -122,7 +122,7 @@ public:
           // relative to this element's context.
           if (CS.simplifyType(type)->hasTypeVariable()) {
             auto transformedTy = type.transformRec([&](Type type) -> std::optional<Type> {
-              if (auto *typeVar = type->getAs<TypeVariableType>()) {
+              if (type->is<TypeVariableType>()) {
                 return Type(ErrorType::get(CS.getASTContext()));
               }
               return std::nullopt;
@@ -188,8 +188,8 @@ public:
     // that reference pack elements have to bring expansion's shape
     // type in scope to make sure that the shapes match.
     if (auto *packElement = getAsExpr<PackElementExpr>(expr)) {
-      if (auto *outerEnvironment = CS.getPackEnvironment(packElement)) {
-        auto *expansionTy = CS.simplifyType(CS.getType(outerEnvironment))
+      if (auto *outerExpansion = CS.getPackElementExpansion(packElement)) {
+        auto *expansionTy = CS.simplifyType(CS.getType(outerExpansion))
                                 ->castTo<PackExpansionType>();
         expansionTy->getCountType()->getTypeVariables(ReferencedVars);
       }
@@ -199,7 +199,7 @@ public:
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-    if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+    if (isa<ClosureExpr>(expr)) {
       ClosureDCs.pop_back();
     }
     return Action::Continue(expr);
@@ -295,9 +295,7 @@ static bool isViableElement(ASTNode element,
                             ConstraintSystem &cs) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;
-    // - Skip #warning and #error, they are handled during solution
-    //   application.
-    if (isa<VarDecl>(decl) || isa<PoundDiagnosticDecl>(decl))
+    if (isa<VarDecl>(decl))
       return false;
   }
 
@@ -436,7 +434,8 @@ ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
 
 struct SyntacticElementContext
     : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
-                                SingleValueStmtExpr *, ExprPattern *, TapExpr *> {
+                                SingleValueStmtExpr *, ExprPattern *, TapExpr *,
+                                CaptureListExpr *> {
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
@@ -459,6 +458,10 @@ struct SyntacticElementContext
 
   static SyntacticElementContext forFunction(AbstractFunctionDecl *func) {
     return {func};
+  }
+
+  static SyntacticElementContext forCaptureList(CaptureListExpr *CLE) {
+    return {CLE};
   }
 
   static SyntacticElementContext
@@ -484,6 +487,9 @@ struct SyntacticElementContext
       return EP->getDeclContext();
     } else if (auto *tap = this->dyn_cast<TapExpr *>()) {
       return tap->getVar()->getDeclContext();
+    } else if (auto *CLE = this->dyn_cast<CaptureListExpr *>()) {
+      // The capture list is part of the closure's parent context.
+      return CLE->getClosureBody()->getParent();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -552,6 +558,8 @@ class SyntacticElementConstraintGenerator
   SyntacticElementContext context;
   ConstraintLocator *locator;
 
+  std::optional<llvm::SaveAndRestore<DeclContext *>> DCScope;
+
   /// Whether a conjunction was generated.
   bool generatedConjunction = false;
 
@@ -562,7 +570,17 @@ public:
   SyntacticElementConstraintGenerator(ConstraintSystem &cs,
                                       SyntacticElementContext context,
                                       ConstraintLocator *locator)
-      : cs(cs), context(context), locator(locator) {}
+      : cs(cs), context(context), locator(locator) {
+    // Capture list bindings in multi-statement closures get solved as part of
+    // the closure's conjunction, which has the DeclContext set to the closure.
+    // This is wrong for captures though, which are semantically bound outside
+    // of the closure body. So we need to re-adjust their DeclContext here for
+    // constraint generation. The constraint system's DeclContext will be wrong
+    // for solving, but CSGen should ensure that constraints carry the correct
+    // DeclContext.
+    if (context.is<CaptureListExpr *>())
+      DCScope.emplace(cs.DC, context.getAsDeclContext());
+  }
 
   void createConjunction(ArrayRef<ElementInfo> elements,
                          ConstraintLocator *locator, bool isIsolated = false,
@@ -701,7 +719,8 @@ private:
 
   void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
     Type patternType = cs.generateConstraints(
-        pattern, locator, /*patternBinding=*/nullptr, /*patternIndex=*/0);
+        pattern, locator, /*bindPatternVarsOneWay=*/false,
+        /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!patternType) {
       hadError = true;
@@ -789,7 +808,8 @@ private:
     // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SyntacticElementTarget::forInitialization(
-          init, patternType, patternBinding, index);
+          init, patternType, patternBinding, index,
+          /*bindPatternVarsOneWay=*/false);
 
       if (ConstraintSystem::preCheckTarget(target))
         return std::nullopt;
@@ -799,7 +819,8 @@ private:
 
     if (init) {
       return SyntacticElementTarget::forInitialization(
-          init, patternType, patternBinding, index);
+          init, patternType, patternBinding, index,
+          /*bindPatternVarsOneWay=*/false);
     }
 
     return SyntacticElementTarget::forUninitializedVar(patternBinding, index,
@@ -855,10 +876,6 @@ private:
       }
     }
 
-    // Skip #warning/#error; we'll handle them when applying the closure.
-    if (isa<PoundDiagnosticDecl>(decl))
-      return;
-
     // Ignore variable declarations, because they're always handled within
     // their enclosing pattern bindings.
     if (isa<VarDecl>(decl))
@@ -900,7 +917,7 @@ private:
     if (auto *elseStmt = ifStmt->getElseStmt()) {
       auto *elseLoc = cs.getConstraintLocator(
           locator, LocatorPathElt::TernaryBranch(/*then=*/false));
-      elements.push_back(makeElement(ifStmt->getElseStmt(), elseLoc));
+      elements.push_back(makeElement(elseStmt, elseLoc));
     }
 
     createConjunction(elements, locator);
@@ -952,7 +969,7 @@ private:
     auto throwLoc = throwStmt->getThrowLoc();
     Type errorType;
     if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc))
-      errorType = catchNode.getExplicitCaughtType(cs.getASTContext());
+      errorType = cs.getExplicitCaughtErrorType(catchNode);
 
     if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {
@@ -1042,8 +1059,8 @@ private:
         cs.setTargetFor(switchStmt, target);
       }
 
-      for (auto rawCase : switchStmt->getRawCases())
-        elements.push_back(makeElement(rawCase, locator));
+      for (auto &CS : switchStmt->getCases())
+        elements.push_back(makeElement(CS, locator));
     }
 
     createConjunction(elements, locator);
@@ -1613,26 +1630,40 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
   return false;
 }
 
+static std::optional<SyntacticElementContext>
+getSyntacticElementContext(ASTNode element, ConstraintLocatorBuilder locator) {
+  /// Capture list bindings are part of the capture list, which is semantically
+  /// outside the closure it's part of. As such, it needs its own context.
+  if (auto *PBD = getAsDecl<PatternBindingDecl>(element)) {
+    if (auto *VD = PBD->getSingleVar()) {
+      if (auto *CLE = VD->getParentCaptureList())
+        return SyntacticElementContext::forCaptureList(CLE);
+    }
+  }
+
+  auto anchor = locator.getAnchor();
+  if (auto *closure = getAsExpr<ClosureExpr>(anchor))
+    return SyntacticElementContext::forClosure(closure);
+  if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor))
+    return SyntacticElementContext::forFunction(fn);
+  if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor))
+    return SyntacticElementContext::forSingleValueStmtExpr(SVE);
+  if (auto *EP = getAsPattern<ExprPattern>(anchor))
+    return SyntacticElementContext::forExprPattern(EP);
+  if (auto *tap = getAsExpr<TapExpr>(anchor))
+    return SyntacticElementContext::forTapExpr(tap);
+
+  return std::nullopt;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifySyntacticElementConstraint(
     ASTNode element, ContextualTypeInfo contextInfo, bool isDiscarded,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-  auto anchor = locator.getAnchor();
 
-  std::optional<SyntacticElementContext> context;
-  if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-    context = SyntacticElementContext::forClosure(closure);
-  } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
-    context = SyntacticElementContext::forFunction(fn);
-  } else if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor)) {
-    context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
-  } else if (auto *EP = getAsPattern<ExprPattern>(anchor)) {
-    context = SyntacticElementContext::forExprPattern(EP);
-  } else if (auto *tap = getAsExpr<TapExpr>(anchor)) {
-    context = SyntacticElementContext::forTapExpr(tap);
-  } else {
+  auto context = getSyntacticElementContext(element, locator);
+  if (!context)
     return SolutionKind::Error;
-  }
 
   SyntacticElementConstraintGenerator generator(*this, *context,
                                                 getConstraintLocator(locator));
@@ -1932,18 +1963,12 @@ private:
 
     // Visit the raw cases.
     bool limitExhaustivityChecks = false;
-    for (auto rawCase : switchStmt->getRawCases()) {
-      if (auto decl = rawCase.dyn_cast<Decl *>()) {
-        visitDecl(decl);
-        continue;
-      }
-
-      auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
+    for (auto *CS : switchStmt->getCases()) {
       // Body of the `case` statement can contain a `fallthrough`
       // statement that requires both source and destination
       // `case` preambles to be type-checked, so bodies of `case`
       // statements should be visited after preambles.
-      visitCaseStmtPreamble(caseStmt);
+      visitCaseStmtPreamble(CS);
     }
 
     for (auto *caseStmt : switchStmt->getCases()) {
@@ -2464,7 +2489,7 @@ private:
 
       auto constraint = getUnsatisfiedAvailabilityConstraint(
           nominal, context.getAsDeclContext(), loc);
-      if (constraint && constraint->isConditionallySatisfiable()) {
+      if (constraint && constraint->isPotentiallyAvailable()) {
         auto &ctx = getASTContext();
         ctx.Diags.diagnose(loc,
                            diag::result_builder_missing_limited_availability,

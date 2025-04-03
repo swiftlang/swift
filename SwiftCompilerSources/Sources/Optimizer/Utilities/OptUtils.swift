@@ -185,6 +185,24 @@ extension Value {
     }
     return true
   }
+
+  /// Performs a simple dominance check without using the dominator tree.
+  /// Returns true if `instruction` is in the same block as this value, but "after" this value,
+  /// or if this value is a function argument.
+  func triviallyDominates(_ instruction: Instruction) -> Bool {
+    switch self {
+    case is FunctionArgument:
+      return true
+    case let arg as Argument:
+      return arg.parentBlock == instruction.parentBlock
+    case let svi as SingleValueInstruction:
+      return svi.dominatesInSameBlock(instruction)
+    case let mvi as MultipleValueInstructionResult:
+      return mvi.parentInstruction.dominatesInSameBlock(instruction)
+    default:
+      return false
+    }
+  }
 }
 
 extension FullApplySite {
@@ -424,7 +442,6 @@ extension Instruction {
          is FloatLiteralInst,
          is ObjectInst,
          is VectorInst,
-         is AllocVectorInst,
          is UncheckedRefCastInst,
          is UpcastInst,
          is ValueToBridgeObjectInst,
@@ -437,6 +454,54 @@ extension Instruction {
     default:
       return false
     }
+  }
+
+  /// Returns true if `otherInst` is in the same block and dominated by this instruction.
+  /// To be used as simple dominance check if both instructions are most likely located in the same block
+  /// and no DominatorTree is available (like in instruction simplification).
+  func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {
+    if parentBlock != otherInst.parentBlock {
+      return false
+    }
+    // Walk in both directions. This is most efficient if both instructions are located nearby but it's not clear
+    // which one comes first in the block's instruction list.
+    var forwardIter = self
+    var backwardIter = self
+    while let f = forwardIter.next {
+      if f == otherInst {
+        return true
+      }
+      forwardIter = f
+      if let b = backwardIter.previous {
+        if b == otherInst {
+          return false
+        }
+        backwardIter = b
+      }
+    }
+    return false
+  }
+
+  /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
+  /// returns the concrete type if it is known.
+  var concreteTypeOfDependentExistentialArchetype: CanonicalType? {
+    // For simplicity only support a single type dependent operand, which is true in most of the cases anyway.
+    if let openArchetypeOp = typeDependentOperands.singleElement,
+       // Match the sequence
+       //   %1 = metatype $T
+       //   %2 = init_existential_metatype %1, any P.Type
+       //   %3 = open_existential_metatype %2 to $@opened(...)
+       //   this_instruction_which_uses $@opened(...)  // type-defs: %3
+       let oemt = openArchetypeOp.value as? OpenExistentialMetatypeInst,
+       let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
+       let mt = iemt.metatype as? MetatypeInst
+    {
+      return mt.type.canonicalType.instanceTypeOfMetatype
+    }
+    // TODO: also handle open_existential_addr and open_existential_ref.
+    // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
+    // Eventually we want to replace the SILCombine implementation with this one.
+    return nil
   }
 }
 
@@ -513,15 +578,16 @@ extension StoreInst {
 }
 
 extension LoadInst {
-  func trySplit(_ context: FunctionPassContext) {
+  @discardableResult
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     var elements = [Value]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
-        return
+        return false
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
-        return
+        return false
       }
       for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
@@ -530,6 +596,7 @@ extension LoadInst {
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
+      return true
     } else if type.isTuple {
       var elements = [Value]()
       let builder = Builder(before: self, context)
@@ -540,7 +607,9 @@ extension LoadInst {
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
       self.replace(with: newTuple, context)
+      return true
     }
+    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -788,10 +857,13 @@ extension InstructionRange {
 ///   %i = some_const_initializer_insts
 ///   store %i to %a
 /// ```
+/// 
+/// For all other instructions `handleUnknownInstruction` is called and such an instruction
+/// is accepted if `handleUnknownInstruction` returns true.
 func getGlobalInitialization(
   of function: Function,
-  forStaticInitializer: Bool,
-  _ context: some Context
+  _ context: some Context,
+  handleUnknownInstruction: (Instruction) -> Bool
 ) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
   guard let block = function.blocks.singleElement else {
     return nil
@@ -808,34 +880,36 @@ func getGlobalInitialization(
          is DebugStepInst,
          is BeginAccessInst,
          is EndAccessInst:
-      break
+      continue
     case let agi as AllocGlobalInst:
-      if allocInst != nil {
-        return nil
+      if allocInst == nil {
+        allocInst = agi
+        continue
       }
-      allocInst = agi
     case let ga as GlobalAddrInst:
       if let agi = allocInst, agi.global == ga.global {
         globalAddr = ga
       }
+      continue
     case let si as StoreInst:
-      if store != nil {
-        return nil
+      if store == nil,
+         let ga = globalAddr,
+         si.destination == ga
+      {
+        store = si
+        continue
       }
-      guard let ga = globalAddr else {
-        return nil
-      }
-      if si.destination != ga {
-        return nil
-      }
-      store = si
-    case is GlobalValueInst where !forStaticInitializer:
-      break
+    // Note that the initializer must not contain a `global_value` because `global_value` needs to
+    // initialize the class metadata at runtime.
     default:
-      if !inst.isValidInStaticInitializerOfGlobal(context) {
-        return nil
+      if inst.isValidInStaticInitializerOfGlobal(context) {
+        continue
       }
     }
+    if handleUnknownInstruction(inst) {
+      continue
+    }
+    return nil
   }
   if let store = store {
     return (allocInst: allocInst!, storeToGlobal: store)
@@ -843,7 +917,9 @@ func getGlobalInitialization(
   return nil
 }
 
-func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
+                        in function: Function, sourceTypeIsExact: Bool
+) -> Bool? {
   switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
     case .willSucceed: return true
     case .maySucceed:  return nil
@@ -860,6 +936,32 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+}
+
+extension CopyAddrInst {
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
+    let loadOwnership: LoadInst.LoadOwnership
+    let storeOwnership: StoreInst.StoreOwnership
+    if parentFunction.hasOwnership {
+      if source.type.isTrivial(in: parentFunction) {
+        loadOwnership = .trivial
+        storeOwnership = .trivial
+      } else {
+        loadOwnership = isTakeOfSrc ? .take : .copy
+        storeOwnership = isInitializationOfDest ? .initialize : .assign
+      }
+    } else {
+      loadOwnership = .unqualified
+      storeOwnership = .unqualified
+    }
+    
+    let builder = Builder(before: self, context)
+    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    context.erase(instruction: self)
+    return store
   }
 }
 

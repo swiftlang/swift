@@ -154,7 +154,7 @@ public:
 
   enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
 
-  constexpr static const size_t maxBitfieldID =
+  constexpr static const uint64_t maxBitfieldID =
       std::numeric_limits<uint64_t>::max();
 
   /// Gets the ID (= index in the function's block list) of the block.
@@ -556,6 +556,9 @@ public:
 
   /// Pretty-print the SILBasicBlock.
   void dump() const;
+
+  /// Pretty-print the SILBasicBlock with Debug Info.
+  void dump(bool DebugInfo) const;
 
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;

@@ -14,6 +14,7 @@
 #define SWIFT_AST_UNSAFEUSE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
@@ -45,6 +46,8 @@ public:
     NonisolatedUnsafe,
     /// A reference to an unsafe declaration.
     ReferenceToUnsafe,
+    /// A reference to an unsafe storage.
+    ReferenceToUnsafeStorage,
     /// A reference to a typealias that is not itself unsafe, but has
     /// an unsafe underlying type.
     ReferenceToUnsafeThroughTypealias,
@@ -52,6 +55,9 @@ public:
     CallToUnsafe,
     /// A @preconcurrency import.
     PreconcurrencyImport,
+    /// A use of withoutActuallyEscaping that lacks enforcement that the
+    /// value didn't actually escape.
+    TemporarilyEscaping,
   };
 
 private:
@@ -83,6 +89,8 @@ private:
       const void *location;
     } entity;
 
+    MakeTemporarilyEscapableExpr *temporarilyEscaping;
+
     const ImportDecl *importDecl;
   } storage;
 
@@ -113,6 +121,7 @@ private:
            kind == ExclusivityUnchecked ||
            kind == NonisolatedUnsafe ||
            kind == ReferenceToUnsafe ||
+           kind == ReferenceToUnsafeStorage ||
            kind == ReferenceToUnsafeThroughTypealias ||
            kind == CallToUnsafe);
 
@@ -179,11 +188,23 @@ public:
                         decl, type, location);
   }
 
+  static UnsafeUse forReferenceToUnsafeStorage(const Decl *decl,
+                                               Type type,
+                                               SourceLoc location) {
+    return forReference(ReferenceToUnsafeStorage, decl, type, location);
+  }
+
   static UnsafeUse forReferenceToUnsafeThroughTypealias(const Decl *decl,
                                         Type type,
                                         SourceLoc location) {
     return forReference(ReferenceToUnsafeThroughTypealias,
                         decl, type, location);
+  }
+
+  static UnsafeUse forTemporarilyEscaping(MakeTemporarilyEscapableExpr *expr) {
+    UnsafeUse result(TemporarilyEscaping);
+    result.storage.temporarilyEscaping = expr;
+    return result;
   }
 
   static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
@@ -215,10 +236,14 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return SourceLoc(
           llvm::SMLoc::getFromPointer((const char *)storage.entity.location));
+
+    case TemporarilyEscaping:
+      return storage.temporarilyEscaping->getLoc();
 
     case PreconcurrencyImport:
       return storage.importDecl->getLoc();
@@ -230,6 +255,7 @@ public:
     switch (getKind()) {
     case Override:
     case Witness:
+    case TemporarilyEscaping:
     case PreconcurrencyImport:
       // Cannot replace location.
       return;
@@ -246,6 +272,7 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       storage.entity.location = loc.getOpaquePointerValue();
@@ -266,11 +293,13 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.decl;
 
     case UnsafeConformance:
+    case TemporarilyEscaping:
       return nullptr;
 
     case PreconcurrencyImport:
@@ -299,9 +328,11 @@ public:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
+    case ReferenceToUnsafeStorage:
     case CallToUnsafe:
     case UnsafeConformance:
     case PreconcurrencyImport:
+    case TemporarilyEscaping:
       return nullptr;
     }
   }
@@ -324,9 +355,13 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.type;
+
+    case TemporarilyEscaping:
+      return storage.temporarilyEscaping->getOpaqueValue()->getType();
     }
   }
 
@@ -348,8 +383,10 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
+    case TemporarilyEscaping:
     case PreconcurrencyImport:
       return ProtocolConformanceRef::forInvalid();
     }

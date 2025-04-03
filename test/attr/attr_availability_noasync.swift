@@ -18,6 +18,14 @@ func asyncReplacement() async -> Int { }
 @available(*, noasync, renamed: "IOActor.readString()")
 func readStringFromIO() -> String {}
 
+// expected-warning@+1 {{'noasync' cannot be used in '@available' attribute for Swift}}
+@available(swift, noasync)
+func swiftNoAsync() { }
+
+// expected-warning@+1 {{'noasync' cannot be used in '@available' attribute for PackageDescription}}
+@available(_PackageDescription, noasync)
+func packageDescriptionNoAsync() { }
+
 @available(SwiftStdlib 5.5, *)
 actor IOActor {
     func readString() -> String {
@@ -44,6 +52,17 @@ func asyncFunc() async {
 @available(SwiftStdlib 5.5, *)
 @available(*, noasync)
 func unavailableAsyncFunc() async {
+}
+
+do {
+  struct S {
+    @available(*, noasync)
+    subscript(_: Int) -> Int {
+      get async {}
+      // expected-error@+1 {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
+      set {}
+    }
+  }
 }
 
 @available(SwiftStdlib 5.5, *)

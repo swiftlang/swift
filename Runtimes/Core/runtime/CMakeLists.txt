@@ -86,11 +86,10 @@ endif()
 target_compile_definitions(swiftRuntime
   PRIVATE
     -DSWIFT_RUNTIME
-    -DSWIFT_TARGET_LIBRARY_NAME=swiftRuntime
+    -DSWIFT_TARGET_LIBRARY_NAME=swiftRuntimeCore
     $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
     $<$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>:-DSWIFT_ENABLE_BACKTRACING>
     $<$<BOOL:${SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE}>:-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE>
-    $<$<BOOL:${SwiftCore_ENABLE_MALLOC_TYPE}>:-DSWIFT_STDLIB_HAS_MALLOC_TYPE>
     $<$<BOOL:${SwiftCore_BACKTRACER_PATH}>:-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH="${SwiftCore_BACKTRACER_PATH}">
     $<$<BOOL:${SwiftCore_ENABLE_STDLIB_TRACING}>:-DSWIFT_STDLIB_TRACING>
     $<$<BOOL:${SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS}>:-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS>
@@ -103,6 +102,7 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">
     $<$<BOOL:${SwiftCore_ENABLE_FATALERROR_BACKTRACE}>:-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING>
   PUBLIC
+    $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
     $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)
 
 target_include_directories(swiftRuntime PRIVATE
@@ -111,6 +111,7 @@ target_include_directories(swiftRuntime PRIVATE
 
 target_link_libraries(swiftRuntime PRIVATE
   $<$<PLATFORM_ID:Windows>:User32>
+  $<$<PLATFORM_ID:Windows>:ShLwApi>
   swiftShims
   swiftDemangling)
 
@@ -143,6 +144,12 @@ if(SwiftCore_ENABLE_OBJC_INTEROP)
     ObjCRuntimeGetImageNameFromClass.mm)
 endif()
 
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftRuntime
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
+endif()
+
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}x" SwiftCore_OBJECT_FORMAT)
 if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   add_library(swiftrt OBJECT SwiftRT-ELF-WASM.cpp)
@@ -152,21 +159,38 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
-  # Regardless of settings
+  # The driver requires that swiftrt.o is under
+  # `usr/lib/(swift|swift_static)/<platform>/<arch>` regardless of whether the
+  # other files are under the platform and architecture subdirectories:
+  # https://github.com/swiftlang/swift-driver/blob/f66e33575150cc778289b5f573218c7a0c70bab6/Sources/SwiftDriver/Jobs/GenericUnixToolchain%2BLinkerSupport.swift#L186
   install(FILES $<TARGET_OBJECTS:swiftrt>
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    COMPONENT SwiftCore_runtime
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
+
+  install(TARGETS swiftrt
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
+  add_library(swiftrtT OBJECT SwiftRT-COFF.cpp)
+  target_compile_definitions(swiftrtT PRIVATE
+    SWIFT_STATIC_STDLIB)
+  target_link_libraries(swiftrtT PRIVATE swiftShims)
+  install(FILES $<TARGET_OBJECTS:swiftrtT>
+    COMPONENT SwiftCore_runtime
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrtT.obj)
+
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
-  target_compile_definitions(swiftrt PRIVATE
-    $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:SWIFT_STATIC_STDLIB>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrt>
-    # The driver requires that swifrt.obj is under `usr/lib/swift/<platform>/<arch>`
-    # Regardless of settings
+    COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
+
+  install(TARGETS swiftrtT swiftrt
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
   message(SEND_ERROR "Unknown object format '${SwiftCore_OBJECT_FORMAT}'")
 endif()

@@ -223,7 +223,7 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
+      "disable-sil-ownership-verifier",
       llvm::cl::desc(
           "Do not verify SIL ownership invariants during SIL verification"));
 
@@ -310,9 +310,8 @@ struct SILOptOptions {
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
-  llvm::cl::opt<bool>
-  EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
+  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
+      "enable-ossa-modules", llvm::cl::init(true),
       llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                      "this is disabled we do not serialize in OSSA "
                      "form when optimizing."));
@@ -593,6 +592,14 @@ struct SILOptOptions {
       "swift-version",
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
+
+  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
+      "enable-address-dependencies",
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+
+  llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
+      "mergeable-traps",
+      llvm::cl::desc("Enable cond_fail merging."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -794,6 +801,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
@@ -883,7 +891,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
-
+  SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
   }
@@ -908,6 +916,9 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
+
+  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)
@@ -1058,6 +1069,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
+    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

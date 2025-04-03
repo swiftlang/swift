@@ -1384,7 +1384,7 @@ public:
   SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
                                  Operand *sourceAddr) {
     auto projIdx = ProjectionIndex(projectedAddr);
-    if (auto *indexAddr = dyn_cast<IndexAddrInst>(projectedAddr)) {
+    if (isa<IndexAddrInst>(projectedAddr)) {
       addPathOffset(projIdx.isValid() ? projIdx.Index
                                       : AccessPath::UnknownOffset);
     } else if (isa<TailAddrInst>(projectedAddr)) {
@@ -2829,13 +2829,15 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:

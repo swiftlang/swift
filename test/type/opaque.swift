@@ -13,7 +13,7 @@ class C {}
 class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {}; func d() {} }
 
 let property: some P = 1
-let deflessLet: some P // expected-error{{has no initializer}} {{educational-notes=opaque-type-inference}}
+let deflessLet: some P // expected-error{{has no initializer}} {{documentation-file=opaque-type-inference}}
 var deflessVar: some P // expected-error{{has no initializer}}
 
 struct GenericProperty<T: P> {
@@ -173,13 +173,13 @@ func recursion(x: Int) -> some P {
   return recursion(x: x - 1)
 }
 
-func noReturnStmts() -> some P {} // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}} {{educational-notes=opaque-type-inference}}
+func noReturnStmts() -> some P {} // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}} {{documentation-file=opaque-type-inference}}
 
 func returnUninhabited() -> some P { // expected-note {{opaque return type declared here}}
     fatalError() // expected-error{{return type of global function 'returnUninhabited()' requires that 'Never' conform to 'P'}}
 }
 
-func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}} {{educational-notes=opaque-type-inference}}
+func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}} {{documentation-file=opaque-type-inference}}
   if x {
     return y // expected-note{{underlying type 'Int'}}
   } else {
@@ -209,7 +209,7 @@ func jan() -> some P {
   return [marcia(), marcia(), marcia()]
 }
 func marcia() -> some P {
-  return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}} {{educational-notes=opaque-type-inference}}
+  return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}} {{documentation-file=opaque-type-inference}}
 }
 
 protocol R {
@@ -274,7 +274,8 @@ func associatedTypeIdentity() {
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
   sameType(gary(doug()).r_out(), gary(candace()).r_out())
-  // expected-error@-1:39 {{cannot convert value of type 'some R' (result of 'candace()') to expected argument type 'some R' (result of 'doug()')}}
+  // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
+  // expected-error@-2 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}

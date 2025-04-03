@@ -52,7 +52,7 @@ evaluator::DependencySource ASTLoweringRequest::readDependencySource(
   auto &desc = std::get<0>(getStorage());
 
   // We don't track dependencies in whole-module mode.
-  if (auto *mod = desc.context.dyn_cast<ModuleDecl *>()) {
+  if (desc.context.is<ModuleDecl *>()) {
     return nullptr;
   }
 

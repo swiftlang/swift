@@ -22,32 +22,32 @@ func test(value: A) {
     switch value {
     // CHECK: (case_stmt
     // CHECK:   (case_label_item ownership=borrowing
-    // CHECK:     (pattern_expr type="A" ownership=borrowing
+    // CHECK:     (pattern_expr type="A" {{.*}} ownership=borrowing
     case B():
         break
     // CHECK: (case_stmt
     // CHECK:   (case_label_item ownership=borrowing
-    // CHECK:     (pattern_expr type="A" ownership=borrowing
+    // CHECK:     (pattern_expr type="A" {{.*}} ownership=borrowing
     case C():
         break
     // CHECK: (case_stmt
     // CHECK:   (case_label_item ownership=borrowing
-    // CHECK:     (pattern_expr type="A" ownership=consuming
+    // CHECK:     (pattern_expr type="A" {{.*}} ownership=consuming
     case D():
         break
     // CHECK: (case_stmt
     // CHECK:   (case_label_item ownership=borrowing
-    // CHECK:     (pattern_expr type="A" ownership=borrowing
+    // CHECK:     (pattern_expr type="A" {{.*}} ownership=borrowing
     case E():
         break
     // CHECK: (case_stmt
     // CHECK:   (case_label_item ownership=borrowing
-    // CHECK:     (pattern_expr type="A" ownership=borrowing
+    // CHECK:     (pattern_expr type="A" {{.*}} ownership=borrowing
     case F():
         break
     // CHECK: (case_stmt
     // CHECK:   (case_label_item ownership=borrowing
-    // CHECK:     (pattern_expr type="A" ownership=consuming
+    // CHECK:     (pattern_expr type="A" {{.*}} ownership=consuming
     case G():
         break
     // CHECK: (case_stmt

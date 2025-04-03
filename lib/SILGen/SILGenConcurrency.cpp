@@ -74,17 +74,18 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
   // If we have caller isolation inheriting... just grab from our isolated
   // argument.
   if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
-    if (auto *isolatedArg = SGF.F.maybeGetIsolatedArgument()) {
-      ManagedValue isolatedMV;
-      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-      } else {
-        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
-      }
-
-      SGF.ExpectedExecutor.set(SGF.emitLoadActorExecutor(loc, isolatedMV));
-      return;
+    auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
+    assert(isolatedArg &&
+           "Caller Isolation Inheriting without isolated parameter");
+    ManagedValue isolatedMV;
+    if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+    } else {
+      isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
     }
+
+    SGF.ExpectedExecutor.set(SGF.emitLoadActorExecutor(loc, isolatedMV));
+    return;
   }
 
   llvm_unreachable("Unhandled case?!");
@@ -384,7 +385,7 @@ emitDistributedActorIsolation(SILGenFunction &SGF, SILLocation loc,
                               ManagedValue actor, CanType actorType) {
   // First, open the actor type if it's an existential type.
   if (actorType->isExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(actorType)
+    CanType openedType = ExistentialArchetypeType::getAny(actorType)
         ->getCanonicalType();
     SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
@@ -397,7 +398,7 @@ emitDistributedActorIsolation(SILGenFunction &SGF, SILLocation loc,
   // Doing this manually is ill-advised in general, but this is such a
   // simple case that it's okay.
   auto distributedActorConf = getDistributedActorConformance(SGF, actorType);
-  auto sig = distributedActorConf.getRequirement()->getGenericSignature();
+  auto sig = distributedActorConf.getProtocol()->getGenericSignature();
   auto distributedActorSubs = SubstitutionMap::get(sig, {actorType},
                                                    {distributedActorConf});
 
@@ -523,7 +524,7 @@ SILGenFunction::emitFlowSensitiveSelfIsolation(SILLocation loc,
   SGM.useConformance(conformance);
 
   SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getRequirement(), actorType, conformance);
+      conformance.getProtocol(), actorType, conformance);
   auto origActor =
     maybeEmitValueOfLocalVarDecl(isolatedVar, AccessKind::Read).getValue();
   SILType resultTy = SILType::getOpaqueIsolationType(ctx);
@@ -563,6 +564,7 @@ SILGenFunction::emitFunctionTypeIsolation(SILLocation loc,
 
   // Emit nonisolated by simply emitting Optional.none in the result type.
   case FunctionTypeIsolation::Kind::NonIsolated:
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
     return emitNonIsolatedIsolation(loc);
 
   // Emit global actor isolation by loading .shared from the global actor,

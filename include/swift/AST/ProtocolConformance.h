@@ -147,7 +147,7 @@ protected:
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+
+                               1+1+1+1+1+
                                bitmax(NumProtocolConformanceOptions,8)+
                                bitmax(NumProtocolConformanceStateBits,8)+
                                bitmax(NumConformanceEntryKindBits,8),
@@ -157,6 +157,16 @@ protected:
       /// populated any of its elements).
       HasComputedAssociatedConformances : 1,
 
+      /// Whether the preconcurrency attribute is effectful (not redundant) for
+      /// this conformance.
+      IsPreconcurrencyEffectful : 1,
+
+      /// Whether the computed actor isolation is nonisolated.
+      IsComputedNonisolated : 1,
+
+      /// Whether there is an explicit global actor specified for this
+      /// conformance.
+      HasExplicitGlobalActor : 1,
       : NumPadBits,
 
       /// Options.
@@ -235,6 +245,14 @@ public:
   /// If the current conformance is canonical already, it will be returned.
   /// Otherwise a new conformance will be created.
   ProtocolConformance *getCanonicalConformance();
+
+  /// Determine the actor isolation of this conformance.
+  ActorIsolation getIsolation() const;
+
+  /// Determine whether this conformance is isolated to an actor.
+  bool isIsolated() const {
+    return getIsolation().isActorIsolated();
+  }
 
   /// Return true if the conformance has a witness for the given associated
   /// type.
@@ -525,6 +543,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
 {
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
+  friend class ConformanceIsolationRequest;
 
   /// The protocol being conformed to.
   ProtocolDecl *Protocol;
@@ -566,6 +585,20 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   void resolveLazyInfo() const;
 
+  /// Retrieve the explicitly-specified global actor isolation.
+  TypeExpr *getExplicitGlobalActorIsolation() const;
+
+  // Record the explicitly-specified global actor isolation.
+  void setExplicitGlobalActorIsolation(TypeExpr *typeExpr);
+
+  bool isComputedNonisolated() const {
+    return Bits.NormalProtocolConformance.IsComputedNonisolated;
+  }
+
+  void setComputedNonnisolated(bool value = true) {
+    Bits.NormalProtocolConformance.IsComputedNonisolated = value;
+  }
+
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
@@ -584,10 +617,14 @@ public:
            "Cannot have a @preconcurrency location without isPreconcurrency");
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
+    Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = false;
     Bits.NormalProtocolConformance.Options = options.toRaw();
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
+    Bits.NormalProtocolConformance.IsComputedNonisolated = false;
+    Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    setExplicitGlobalActorIsolation(options.getGlobalActorIsolationType());
   }
 
   /// Get the protocol being conformed to.
@@ -629,7 +666,8 @@ public:
   void setInvalid() { Bits.NormalProtocolConformance.IsInvalid = true; }
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options);
+    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options,
+                                      getExplicitGlobalActorIsolation());
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -643,6 +681,20 @@ public:
     // OK to mutate because the flags are not part of the folding set node ID.
     Bits.NormalProtocolConformance.Options =
         (getOptions() | ProtocolConformanceFlags::Unchecked).toRaw();
+  }
+
+  /// Whether the preconcurrency attribute is effectful (not redundant) for
+  /// this conformance.
+  bool isPreconcurrencyEffectful() const {
+    ASSERT(isPreconcurrency() && isComplete());
+    return Bits.NormalProtocolConformance.IsPreconcurrencyEffectful;
+  }
+
+  /// Record that the preconcurrency attribute is effectful (not redundant)
+  /// for this conformance.
+  void setPreconcurrencyEffectful() {
+    ASSERT(isPreconcurrency());
+    Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = true;
   }
 
   /// Whether this is an preconcurrency conformance.
@@ -659,8 +711,6 @@ public:
   ExplicitSafety getExplicitSafety() const {
     if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
       return ExplicitSafety::Unsafe;
-    if (getOptions().contains(ProtocolConformanceFlags::Safe))
-      return ExplicitSafety::Safe;
     return ExplicitSafety::Unspecified;
   }
 

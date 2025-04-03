@@ -54,6 +54,10 @@ ERROR(dump_pcm_error,Fatal,
 WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
+WARNING(invalid_swift_name_for_decl,none,
+  "custom Swift name '%0' ignored because it is not valid for %kindonly1; "
+  "imported as %1 instead",
+  (StringRef, ValueDecl *))
 
 NOTE(note_while_importing, none, "while importing '%0'", (StringRef))
 ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
@@ -170,6 +174,10 @@ NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "does this type have reference "
                                                 "semantics?",
      (StringRef, StringRef))
+NOTE(record_unsupported_default_args, none,
+     "copy constructors and move constructors with more than one parameter are "
+     "unavailable in Swift",
+     ())
 
 NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
                                           "of type '%1' is unavailable",
@@ -207,6 +215,24 @@ NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
      (StringRef))
 NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
                                         "are potentially unsafe; try using Swift collection APIs instead", ())
+
+ERROR(private_fileid_attr_repeated, none,
+     "multiple SWIFT_PRIVATE_FILEID annotations were found on '%0'",
+     (StringRef))
+
+ ERROR(private_fileid_attr_on_incomplete_type, none,
+     "SWIFT_PRIVATE_FILEID cannot be applied to incomplete type, '%0'",
+     (StringRef))
+ NOTE(private_fileid_attr_here, none,
+     "SWIFT_PRIVATE_FILEID annotation found here", ())
+
+ WARNING(private_fileid_attr_format_invalid, none,
+     "SWIFT_PRIVATE_FILEID annotation on '%0' does not have a valid file ID",
+     (StringRef))
+ REMARK(private_fileid_attr_format_specification, none,
+     "file IDs have the following format: 'ModuleName/FileName.swift'", ())
+ NOTE(private_fileid_attr_format_suggestion, none,
+     "did you mean '%0'?", (StringRef))
 
 ERROR(reference_type_must_have_retain_release_attr, none,
       "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
@@ -273,7 +299,9 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
 
-// TODO: make this case an error in next cxx-interop versions rdar://138806722
+// TODO: In the next C++ interop version, convert this warning into an error and
+// stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
+// rdar://138806722
 WARNING(no_returns_retained_returns_unretained, none,
         "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
         "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
@@ -284,6 +312,15 @@ WARNING(returns_retained_returns_unretained_on_overloaded_operator, none,
         "yet for overloaded C++ %0. Overloaded C++ operators always "
         "return "
         "SWIFT_SHARED_REFERENCE types as owned ",
+        (const clang::NamedDecl *))
+
+// TODO: In the next C++ interop version, convert this warning into an error and
+// stop importing C++ types that inherit from SWIFT_SHARED_REFERENCE if the
+// Swift compiler cannot find unique retain/release functions.
+// rdar://145194375
+WARNING(cant_infer_frt_in_cxx_inheritance, none,
+        "unable to infer SWIFT_SHARED_REFERENCE for %0, although one of its "
+        "transitive base types is marked as SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
@@ -331,6 +368,10 @@ NOTE(bridged_pointer_type_not_found,none,
      "UnsafeMutablePointer|UnsafePointer|AutoreleasingUnsafeMutablePointer}0' "
      "for bridging; module 'Swift' may be broken",
      (unsigned))
+
+NOTE(ptr_to_nonescapable,none,
+     "pointer to non-escapable type %0 cannot be imported",
+     (const clang::Type*))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

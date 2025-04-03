@@ -62,9 +62,6 @@ enum {
   /// in a non-default distributed actor.
   NumWords_NonDefaultDistributedActor = 12,
 
-  /// The number of words in a task.
-  NumWords_AsyncTask = 24,
-
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
 
@@ -313,6 +310,11 @@ enum class DynamicCastFlags : size_t {
   /// True if the cast should destroy the source value on failure;
   /// false if the value should be left in place.
   DestroyOnFailure = 0x4,
+
+  /// True if the cast should prohibit the use of any isolated conformances,
+  /// for example because there is a Sendable constraint on the existential
+  /// type we're casting to.
+  ProhibitIsolatedConformances = 0x8,
 };
 inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
   return (size_t(a) & size_t(b)) != 0;
@@ -437,6 +439,23 @@ public:
   bool isInstance() const { return Value & IsInstanceMask; }
 
   bool isAsync() const { return Value & IsAsyncMask; }
+
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getKind()) {
+    case Kind::Method:
+    case Kind::Init:
+    case Kind::Getter:
+    case Kind::Setter:
+    case Kind::ModifyCoroutine:
+    case Kind::ReadCoroutine:
+      return false;
+    case Kind::Read2Coroutine:
+    case Kind::Modify2Coroutine:
+      return true;
+    }
+  }
+
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
 
   uint16_t getExtraDiscriminator() const {
     return (Value >> ExtraDiscriminatorShift);
@@ -649,6 +668,26 @@ public:
 
   bool isAsync() const { return Value & IsAsyncMask; }
 
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getKind()) {
+    case Kind::BaseProtocol:
+    case Kind::Method:
+    case Kind::Init:
+    case Kind::Getter:
+    case Kind::Setter:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
+    case Kind::AssociatedTypeAccessFunction:
+    case Kind::AssociatedConformanceAccessFunction:
+      return false;
+    case Kind::Read2Coroutine:
+    case Kind::Modify2Coroutine:
+      return true;
+    }
+  }
+
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
+
   bool isSignedWithAddress() const {
     return getKind() != Kind::BaseProtocol;
   }
@@ -709,6 +748,15 @@ private:
     HasResilientWitnessesMask = 0x01u << 16,
     HasGenericWitnessTableMask = 0x01u << 17,
     IsConformanceOfProtocolMask = 0x01u << 18,
+    HasGlobalActorIsolation = 0x01u << 19,
+
+    // Used to detect if this is a conformance to SerialExecutor that has
+    // an user defined implementation of 'isIsolatingCurrentContext'. This
+    // requirement is special in the sense that if a non-default impl is present
+    // we will avoid calling the `checkIsolated` method which would lead to a
+    // crash. In other words, this API "soft replaces" 'checkIsolated' so we
+    // must at runtime the presence of a non-default implementation.
+    HasNonDefaultSerialExecutorIsIsolatingCurrentContext = 0x01u << 20,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
@@ -768,6 +816,22 @@ public:
                                  : 0));
   }
   
+  ConformanceFlags withHasGlobalActorIsolation(
+                                           bool hasGlobalActorIsolation) const {
+    return ConformanceFlags((Value & ~HasGlobalActorIsolation)
+                            | (hasGlobalActorIsolation
+                                 ? HasGlobalActorIsolation
+                                 : 0));
+  }
+
+  ConformanceFlags withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
+                                           bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext) const {
+    return ConformanceFlags((Value & ~HasNonDefaultSerialExecutorIsIsolatingCurrentContext)
+                            | (hasNonDefaultSerialExecutorIsIsolatingCurrentContext
+                                 ? HasNonDefaultSerialExecutorIsIsolatingCurrentContext
+                                 : 0));
+  }
+
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -806,7 +870,16 @@ public:
   bool isConformanceOfProtocol() const {
     return Value & IsConformanceOfProtocolMask;
   }
-  
+
+  /// Does this conformance have a global actor to which it is isolated?
+  bool hasGlobalActorIsolation() const {
+    return Value & HasGlobalActorIsolation;
+  }
+
+  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
+    return Value & HasNonDefaultSerialExecutorIsIsolatingCurrentContext;
+  }
+
   /// Retrieve the # of conditional requirements.
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)
@@ -1222,6 +1295,7 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
+    NonIsolatedCaller      = 0x00000004U,
 
     // Values if we have a sending result.
     HasSendingResult  = 0x00000010U,
@@ -1254,6 +1328,12 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withNonIsolatedCaller() const {
+    return TargetExtendedFunctionTypeFlags<int_type>((Data & ~IsolationMask) |
+                                                     NonIsolatedCaller);
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withSendingResult(bool newValue = true) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~HasSendingResult) |
@@ -1271,6 +1351,10 @@ public:
 
   bool isIsolatedAny() const {
     return (Data & IsolationMask) == IsolatedAny;
+  }
+
+  bool isNonIsolatedCaller() const {
+    return (Data & IsolationMask) == NonIsolatedCaller;
   }
 
   bool hasSendingResult() const {
@@ -1678,7 +1762,7 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
-  const uint16_t EscalationNotificationFunction = 0x5be4; // = 23524
+  const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
@@ -1707,6 +1791,10 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
+
+  /// IsCurrentGlobalActor function used between the Swift runtime and
+  /// concurrency runtime.
+  const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1861,14 +1949,19 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
-    /// Set if the type descriptor has a pointer to a list of canonical
-    /// prespecializations.
-    HasCanonicalMetadataPrespecializations = 3,
+    /// Set if the generic type descriptor has a pointer to a list of canonical
+    /// prespecializations, or the non-generic type descriptor has a pointer to
+    /// its singleton metadata.
+    HasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer = 3,
 
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
+    /// WARNING: 5 is the last bit!
+
     // Type-specific flags:
+
+    Class_HasDefaultOverrideTable = 6,
 
     /// Set if the class is an actor.
     ///
@@ -1948,7 +2041,10 @@ public:
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(
+      HasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer,
+      hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer,
+      setHasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasLayoutString,
                                 hasLayoutString,
@@ -1972,6 +2068,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsActor,
                                 class_isActor,
                                 class_setIsActor)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
+                                class_hasDefaultOverrideTable,
+                                class_setHasDefaultOverrideTable)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -2657,13 +2756,13 @@ public:
     Task_EnqueueJob                               = 12,
     Task_AddPendingGroupTaskUnconditionally       = 13,
     Task_IsDiscardingTask                         = 14,
-
     /// The task function is consumed by calling it (@callee_owned).
     /// The context pointer should be treated as opaque and non-copyable;
     /// in particular, it should not be retained or released.
     ///
     /// Supported starting in Swift 6.1.
-    Task_IsTaskFunctionConsumed                       = 15,
+    Task_IsTaskFunctionConsumed                   = 15,
+    Task_IsStartSynchronouslyTask                 = 16,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2696,6 +2795,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskFunctionConsumed,
                                 isTaskFunctionConsumed,
                                 setIsTaskFunctionConsumed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsStartSynchronouslyTask,
+                                isSynchronousStartTask,
+                                setIsSYnchronousStartTask)
 };
 
 /// Flags for schedulable jobs.
@@ -2719,6 +2821,7 @@ public:
     // 27 is currently unused
     Task_IsAsyncLetTask                   = 28,
     Task_HasInitialTaskExecutorPreference = 29,
+    Task_HasInitialTaskName               = 30,
   };
   // clang-format on
 
@@ -2755,6 +2858,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskExecutorPreference,
                                 task_hasInitialTaskExecutorPreference,
                                 task_setHasInitialTaskExecutorPreference)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskName,
+                                task_hasInitialTaskName,
+                                task_setHasInitialTaskName)
 };
 
 /// Kinds of task status record.
@@ -2784,6 +2890,9 @@ enum class TaskStatusRecordKind : uint8_t {
   /// enqueued on.
   TaskExecutorPreference = 5,
 
+  /// A human-readable task name.
+  TaskName = 6,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
@@ -2807,6 +2916,8 @@ enum class TaskOptionRecordKind : uint8_t {
   /// Set the initial task executor preference of the task.
   InitialTaskExecutorUnowned = 5,
   InitialTaskExecutorOwned = 6,
+  // Set a human-readable task name.
+  InitialTaskName = 7,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

@@ -148,6 +148,7 @@ void ASTScope::unqualifiedLookup(
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
   // Perform validation of SwiftLexicalLookup if option
   // Feature::UnqualifiedLookupValidation is enabled and lookup was not
   // performed in a macro.
@@ -171,6 +172,9 @@ void ASTScope::unqualifiedLookup(
   } else {
     ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);
   }
+#else
+    ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);
+#endif
 }
 
 llvm::SmallVector<LabeledStmt *, 4> ASTScope::lookupLabeledStmts(
@@ -290,6 +294,20 @@ NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
 #define SCOPE_NODE(Name) case ScopeKind::Name:
 #include "swift/AST/ASTScopeNodes.def"
       return nullptr;
+  }
+}
+
+bool ASTScopeImpl::isDeclAttribute() const {
+  switch (getKind()) {
+#define DECL_ATTRIBUTE_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return true;
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+#define DECL_ATTRIBUTE_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return false;
   }
 }
 

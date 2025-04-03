@@ -52,7 +52,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
-  case ConstraintLocator::OptionalPayload:
+  case ConstraintLocator::OptionalInjection:
   case ConstraintLocator::Member:
   case ConstraintLocator::MemberRefBase:
   case ConstraintLocator::UnresolvedMember:
@@ -176,8 +176,8 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "apply function";
     break;
 
-  case ConstraintLocator::OptionalPayload:
-    out << "optional payload";
+  case ConstraintLocator::OptionalInjection:
+    out << "optional injection";
     break;
 
   case ConstraintLocator::ApplyArgToParam: {
@@ -604,6 +604,25 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
     auto &component = KPE->getComponents()[index];
     return component.getKind() == ComponentKind::Subscript ||
            component.getKind() == ComponentKind::UnresolvedSubscript;
+  });
+}
+
+bool ConstraintLocator::isKeyPathMemberComponent() const {
+  auto *anchor = getAsExpr(getAnchor());
+  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+  if (!KPE)
+    return false;
+
+  using ComponentKind = KeyPathExpr::Component::Kind;
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
+    if (!keyPathElt)
+      return false;
+
+    auto index = keyPathElt->getIndex();
+    auto &component = KPE->getComponents()[index];
+    return component.getKind() == ComponentKind::Member ||
+           component.getKind() == ComponentKind::UnresolvedMember;
   });
 }
 

@@ -74,6 +74,9 @@ class Swift(product.Product):
         # Add volatile flag.
         self.cmake_options.extend(self._enable_volatile)
 
+        # Add runtime module flag.
+        self.cmake_options.extend(self._enable_runtime_module)
+
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
 
@@ -97,6 +100,9 @@ class Swift(product.Product):
             self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
+
+        self.cmake_options.extend(
+            self._enable_new_runtime_build)
 
     @classmethod
     def product_source_name(cls):
@@ -236,6 +242,11 @@ updated without updating swift.py?")
                  self.args.enable_volatile)]
 
     @property
+    def _enable_runtime_module(self):
+        return [('SWIFT_ENABLE_RUNTIME_MODULE:BOOL',
+                 self.args.enable_runtime_module)]
+
+    @property
     def _enable_stdlib_static_vprintf(self):
         return [('SWIFT_STDLIB_STATIC_PRINT',
                  self.args.build_swift_stdlib_static_print)]
@@ -279,6 +290,11 @@ updated without updating swift.py?")
     def _enable_stdlib_symbol_graphs(self):
         return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
                  self.args.build_stdlib_docs)]
+
+    @property
+    def _enable_new_runtime_build(self):
+        return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
+                 self.args.enable_new_runtime_build)]
 
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args

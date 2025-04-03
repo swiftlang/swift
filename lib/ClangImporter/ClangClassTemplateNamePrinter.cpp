@@ -12,6 +12,7 @@
 
 #include "ClangClassTemplateNamePrinter.h"
 #include "ImporterImpl.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
 #include "clang/AST/TypeVisitor.h"
 
@@ -24,10 +25,14 @@ struct TemplateInstantiationNamePrinter
   NameImporter *nameImporter;
   ImportNameVersion version;
 
+  ClangImporter::Implementation *importerImpl;
+
   TemplateInstantiationNamePrinter(ASTContext &swiftCtx,
                                    NameImporter *nameImporter,
-                                   ImportNameVersion version)
-      : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version) {}
+                                   ImportNameVersion version,
+                                   ClangImporter::Implementation *importerImpl)
+      : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version),
+        importerImpl(importerImpl) {}
 
   std::string VisitType(const clang::Type *type) {
     // Print "_" as a fallback if we couldn't emit a more meaningful type name.
@@ -39,7 +44,7 @@ struct TemplateInstantiationNamePrinter
     case clang::BuiltinType::Void:
       return "Void";
     case clang::BuiltinType::NullPtr:
-      return "nil";
+      return "__cxxNullPtrT";
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
     case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
@@ -100,9 +105,7 @@ struct TemplateInstantiationNamePrinter
     bool isReferenceType = false;
     if (auto tagDecl = type->getPointeeType()->getAsTagDecl()) {
       if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
-        isReferenceType =
-            ClangImporter::Implementation::recordHasReferenceSemantics(
-                rd, swiftCtx);
+        isReferenceType = recordHasReferenceSemantics(rd, importerImpl);
     }
 
     TagTypeDecorator decorator;
@@ -167,8 +170,9 @@ struct TemplateArgumentPrinter
   TemplateInstantiationNamePrinter typePrinter;
 
   TemplateArgumentPrinter(ASTContext &swiftCtx, NameImporter *nameImporter,
-                          ImportNameVersion version)
-      : typePrinter(swiftCtx, nameImporter, version) {}
+                          ImportNameVersion version,
+                          ClangImporter::Implementation *importerImpl)
+      : typePrinter(swiftCtx, nameImporter, version, importerImpl) {}
 
   void VisitTemplateArgument(const clang::TemplateArgument &arg,
                              llvm::raw_svector_ostream &buffer) {
@@ -179,10 +183,18 @@ struct TemplateArgumentPrinter
   void VisitTypeTemplateArgument(const clang::TemplateArgument &arg,
                                  llvm::raw_svector_ostream &buffer) {
     auto ty = arg.getAsType();
+
+    if (ty.isConstQualified())
+      buffer << "__cxxConst<";
+    if (ty.isVolatileQualified())
+      buffer << "__cxxVolatile<";
+
     buffer << typePrinter.Visit(ty.getTypePtr());
-    if (ty.isConstQualified()) {
-      buffer << "_const";
-    }
+
+    if (ty.isVolatileQualified())
+      buffer << ">";
+    if (ty.isConstQualified())
+      buffer << ">";
   }
 
   void VisitIntegralTemplateArgument(const clang::TemplateArgument &arg,
@@ -191,7 +203,12 @@ struct TemplateArgumentPrinter
     if (arg.getIntegralType()->isBuiltinType()) {
       buffer << typePrinter.Visit(arg.getIntegralType().getTypePtr()) << "_";
     }
-    arg.getAsIntegral().print(buffer, true);
+    auto value = arg.getAsIntegral();
+    if (value.isNegative()) {
+      value.negate();
+      buffer << "Neg_";
+    }
+    value.print(buffer, arg.getIntegralType()->isSignedIntegerType());
   }
 
   void VisitPackTemplateArgument(const clang::TemplateArgument &arg,
@@ -219,7 +236,8 @@ struct TemplateArgumentPrinter
 std::string swift::importer::printClassTemplateSpecializationName(
     const clang::ClassTemplateSpecializationDecl *decl, ASTContext &swiftCtx,
     NameImporter *nameImporter, ImportNameVersion version) {
-  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version);
+  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version,
+                                             nameImporter->getImporterImpl());
 
   llvm::SmallString<128> storage;
   llvm::raw_svector_ostream buffer(storage);

@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
 #include "swift/AST/ActorIsolation.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
@@ -38,10 +39,12 @@
 
 namespace clang {
 class NamedDecl;
+class Type;
 }
 
 namespace swift {
   class ConstructorDecl;
+  class ClosureExpr;
   class Decl;
   class DeclAttribute;
   class DiagnosticEngine;
@@ -143,12 +146,15 @@ namespace swift {
     DescriptiveDeclKind,
     DescriptiveStmtKind,
     DeclAttribute,
+    AvailabilityDomain,
+    AvailabilityRange,
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
     IsolationSource,
     Diagnostic,
-    ClangDecl
+    ClangDecl,
+    ClangType,
   };
 
   namespace diag {
@@ -179,12 +185,15 @@ namespace swift {
       DescriptiveDeclKind DescriptiveDeclKindVal;
       StmtKind DescriptiveStmtKindVal;
       const DeclAttribute *DeclAttributeVal;
+      AvailabilityDomain AvailabilityDomainVal;
+      AvailabilityRange AvailabilityRangeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
       IsolationSource IsolationSourceVal;
       DiagnosticInfo *DiagnosticVal;
       const clang::NamedDecl *ClangDecl;
+      const clang::Type *ClangType;
     };
     
   public:
@@ -278,6 +287,14 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::DeclAttribute),
           DeclAttributeVal(attr) {}
 
+    DiagnosticArgument(const AvailabilityDomain domain)
+        : Kind(DiagnosticArgumentKind::AvailabilityDomain),
+          AvailabilityDomainVal(domain) {}
+
+    DiagnosticArgument(const AvailabilityRange &range)
+        : Kind(DiagnosticArgumentKind::AvailabilityRange),
+          AvailabilityRangeVal(range) {}
+
     DiagnosticArgument(llvm::VersionTuple version)
       : Kind(DiagnosticArgumentKind::VersionTuple),
         VersionVal(version) { }
@@ -303,6 +320,9 @@ namespace swift {
 
     DiagnosticArgument(const clang::NamedDecl *ND)
         : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {}
+
+    DiagnosticArgument(const clang::Type *Ty)
+        : Kind(DiagnosticArgumentKind::ClangType), ClangType(Ty) {}
 
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
@@ -400,6 +420,16 @@ namespace swift {
       return DeclAttributeVal;
     }
 
+    const AvailabilityDomain getAsAvailabilityDomain() const {
+      assert(Kind == DiagnosticArgumentKind::AvailabilityDomain);
+      return AvailabilityDomainVal;
+    }
+
+    const AvailabilityRange getAsAvailabilityRange() const {
+      assert(Kind == DiagnosticArgumentKind::AvailabilityRange);
+      return AvailabilityRangeVal;
+    }
+
     llvm::VersionTuple getAsVersionTuple() const {
       assert(Kind == DiagnosticArgumentKind::VersionTuple);
       return VersionVal;
@@ -428,6 +458,11 @@ namespace swift {
     const clang::NamedDecl *getAsClangDecl() const {
       assert(Kind == DiagnosticArgumentKind::ClangDecl);
       return ClangDecl;
+    }
+
+    const clang::Type *getAsClangType() const {
+      assert(Kind == DiagnosticArgumentKind::ClangType);
+      return ClangType;
     }
   };
 
@@ -667,6 +702,10 @@ namespace swift {
     /// Flush the active diagnostic to the diagnostic output engine.
     void flush();
 
+    /// Returns the \c SourceManager associated with \c SourceLoc s for this
+    /// diagnostic.
+    SourceManager &getSourceManager();
+
     /// Prevent the diagnostic from behaving more severely than \p limit. For
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
@@ -866,7 +905,17 @@ namespace swift {
     InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef Str) {
       return fixItInsertAfter(L, "%0", {Str});
     }
-    
+
+    /// Add a fix-it suggesting to insert the given attribute at the given
+    /// location.
+    InFlightDiagnostic &fixItInsertAttribute(SourceLoc L,
+                                             const DeclAttribute *Attr);
+
+    /// Add a fix-it suggesting to add the given attribute to the given
+    /// closure.
+    InFlightDiagnostic &fixItAddAttribute(const DeclAttribute *Attr,
+                                          const ClosureExpr *E);
+
     /// Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R);
@@ -1485,16 +1534,17 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    /// Get a localized format string for a given `DiagID`. If no localization
-    /// available returns the default string for that `DiagID`.
-    llvm::StringRef diagnosticStringFor(DiagID id);
+    /// Get a localized format string for the given `DiagID`. If no localization
+    /// is available, returns the default string.
+    llvm::StringRef getFormatStringForDiagnostic(DiagID id);
 
-    /// Get a localized format string with an optional diagnostic name appended
-    /// to it. The diagnostic name type is defined by
-    /// `PrintDiagnosticNamesMode`.
-    llvm::StringRef diagnosticStringWithNameFor(
-        DiagID id, DiagGroupID groupID,
-        PrintDiagnosticNamesMode printDiagnosticNamesMode);
+    /// Get a localized format string for the given diagnostic. If no
+    /// localization is available, returns the default string.
+    ///
+    /// \param includeDiagnosticName Whether to at all consider embedding the
+    /// name of the diagnostic identifier or group, per the setting.
+    llvm::StringRef getFormatStringForDiagnostic(const Diagnostic &diagnostic,
+                                                 bool includeDiagnosticName);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 
@@ -1514,6 +1564,10 @@ namespace swift {
       return getBestAddImportFixItLoc(Member, nullptr);
     }
   };
+
+  inline SourceManager &InFlightDiagnostic::getSourceManager() {
+    return Engine->SourceMgr;
+  }
 
   /// Remember details about the state of a diagnostic engine and restore them
   /// when the object is destroyed.
@@ -1784,6 +1838,7 @@ namespace swift {
   }
 
   void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
+  void printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os);
 
   /// Temporary on-stack storage and unescaping for encoded diagnostic
   /// messages.

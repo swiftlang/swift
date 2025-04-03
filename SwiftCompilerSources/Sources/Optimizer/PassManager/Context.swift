@@ -44,6 +44,10 @@ extension Context {
     }
   }
 
+  var currentModuleContext: ModuleDecl {
+    _bridged.getCurrentModuleContext().getAs(ModuleDecl.self)
+  }
+
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
@@ -344,14 +348,6 @@ struct FunctionPassContext : MutatingContext {
 
   fileprivate func notifyEffectsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
-  }
-
-  func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if _bridged.optimizeMemoryAccesses(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
   }
 
   func eliminateDeadAllocations(in function: Function) -> Bool {
@@ -797,5 +793,11 @@ extension Function {
   func appendNewBlock(_ context: FunctionPassContext) -> BasicBlock {
     context.notifyBranchesChanged()
     return context._bridged.appendBlock(bridged).block
+  }
+}
+
+extension DeclRef {
+  func calleesAreStaticallyKnowable(_ context: some Context) -> Bool {
+    context._bridged.calleesAreStaticallyKnowable(bridged)
   }
 }

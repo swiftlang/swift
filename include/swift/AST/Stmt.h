@@ -20,7 +20,6 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/ThrownErrorDestination.h"
@@ -36,6 +35,7 @@ namespace swift {
 class AnyPattern;
 class ASTContext;
 class ASTWalker;
+class AvailabilitySpec;
 class Decl;
 class DeclContext;
 class Evaluator;
@@ -44,6 +44,7 @@ class FuncDecl;
 class AbstractFunctionDecl;
 class Pattern;
 class PatternBindingDecl;
+class SemanticAvailabilitySpecs;
 class VarDecl;
 class CaseStmt;
 class DoCatchStmt;
@@ -212,12 +213,12 @@ public:
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
+    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
+    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
   }
 
   ASTNode findAsyncNode();
@@ -330,10 +331,10 @@ public:
   SourceLoc getEndLoc() const;
 
   ArrayRef<Expr*> getYields() const {
-    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
   }
   MutableArrayRef<Expr*> getMutableYields() {
-    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
@@ -481,7 +482,7 @@ class alignas(8) PoundAvailableInfo final :
   
   /// The version range when this query will return true. This value is
   /// filled in by Sema.
-  VersionRange AvailableRange;
+  std::optional<VersionRange> AvailableRange;
 
   /// For zippered builds, this is the version range for the target variant
   /// that must hold for the query to return true. For example, when
@@ -489,34 +490,46 @@ class alignas(8) PoundAvailableInfo final :
   /// x86_64-ios13.0 a query of #available(macOS 10.22, iOS 20.0, *) will
   /// have a variant range of [20.0, +inf).
   /// This is filled in by Sema.
-  VersionRange VariantAvailableRange;
+  std::optional<VersionRange> VariantAvailableRange;
 
-  /// Indicates that the expression is checking if a version range 
-  /// is **not** available.
-  bool _isUnavailability;
+  struct {
+    unsigned isInvalid : 1;
+
+    /// Indicates that the expression is checking if a version range
+    /// is **not** available.
+    unsigned isUnavailability : 1;
+  } Flags;
 
   PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,
                      ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc,
                      bool isUnavailability)
-   : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-     NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
-     VariantAvailableRange(VersionRange::empty()), 
-     _isUnavailability(isUnavailability) {
+      : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+        NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
+        VariantAvailableRange(VersionRange::empty()), Flags() {
+    Flags.isInvalid = false;
+    Flags.isUnavailability = isUnavailability;
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());
   }
-  
+
 public:
   static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
                                     SourceLoc LParenLoc,
                                     ArrayRef<AvailabilitySpec *> queries,
                                     SourceLoc RParenLoc,
                                     bool isUnavailability);
-  
+
+  bool isInvalid() const { return Flags.isInvalid; }
+  void setInvalid() { Flags.isInvalid = true; }
+
   ArrayRef<AvailabilitySpec *> getQueries() const {
     return llvm::ArrayRef(getTrailingObjects<AvailabilitySpec *>(), NumQueries);
   }
-  
+
+  /// Returns an iterator for the statement's type-checked availability specs.
+  SemanticAvailabilitySpecs
+  getSemanticAvailabilitySpecs(const DeclContext *declContext) const;
+
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
@@ -525,18 +538,20 @@ public:
   SourceLoc getLoc() const { return PoundLoc; }
   SourceRange getSourceRange() const { return SourceRange(getStartLoc(),
                                                           getEndLoc()); }
-  
-  const VersionRange &getAvailableRange() const { return AvailableRange; }
+
+  std::optional<VersionRange> getAvailableRange() const {
+    return AvailableRange;
+  }
   void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
 
-  const VersionRange &getVariantAvailableRange() const {
+  std::optional<VersionRange> getVariantAvailableRange() const {
     return VariantAvailableRange;
   }
   void setVariantAvailableRange(const VersionRange &Range) {
     VariantAvailableRange = Range;
   }
 
-  bool isUnavailability() const { return _isUnavailability; }
+  bool isUnavailability() const { return Flags.isUnavailability; }
 };
 
 /// An expression that guards execution based on whether the symbols for the
@@ -990,6 +1005,7 @@ class ForEachStmt : public LabeledStmt {
   SourceLoc ForLoc;
   SourceLoc TryLoc;
   SourceLoc AwaitLoc;
+  SourceLoc UnsafeLoc;
   Pattern *Pat;
   SourceLoc InLoc;
   Expr *Sequence;
@@ -1007,13 +1023,14 @@ class ForEachStmt : public LabeledStmt {
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc,
-              SourceLoc AwaitLoc, Pattern *Pat, SourceLoc InLoc, Expr *Sequence,
+              SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
+              SourceLoc InLoc, Expr *Sequence,
               SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
               std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
-        ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), Pat(nullptr),
-        InLoc(InLoc), Sequence(Sequence), WhereLoc(WhereLoc),
+        ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
+        Pat(nullptr), InLoc(InLoc), Sequence(Sequence), WhereLoc(WhereLoc),
         WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
@@ -1051,6 +1068,7 @@ public:
 
   SourceLoc getAwaitLoc() const { return AwaitLoc; }
   SourceLoc getTryLoc() const { return TryLoc; }
+  SourceLoc getUnsafeLoc() const { return UnsafeLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
@@ -1259,11 +1277,11 @@ public:
   }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
-    return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
   }
 
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
-    return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
   }
 
   unsigned getNumCaseLabelItems() const { return Bits.CaseStmt.NumPatterns; }
@@ -1392,7 +1410,7 @@ public:
 
 /// Switch statement.
 class SwitchStmt final : public LabeledStmt,
-    private llvm::TrailingObjects<SwitchStmt, ASTNode> {
+                         private llvm::TrailingObjects<SwitchStmt, CaseStmt *> {
   friend TrailingObjects;
 
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
@@ -1415,16 +1433,13 @@ class SwitchStmt final : public LabeledStmt,
 public:
   /// Allocate a new SwitchStmt in the given ASTContext.
   static SwitchStmt *create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
-                            Expr *SubjectExpr,
-                            SourceLoc LBraceLoc,
-                            ArrayRef<ASTNode> Cases,
-                            SourceLoc RBraceLoc,
-                            SourceLoc EndLoc,
-                            ASTContext &C);
+                            Expr *SubjectExpr, SourceLoc LBraceLoc,
+                            ArrayRef<CaseStmt *> Cases, SourceLoc RBraceLoc,
+                            SourceLoc EndLoc, ASTContext &C);
 
   static SwitchStmt *createImplicit(LabeledStmtInfo LabelInfo,
-                                    Expr *SubjectExpr, ArrayRef<ASTNode> Cases,
-                                    ASTContext &C) {
+                                    Expr *SubjectExpr,
+                                    ArrayRef<CaseStmt *> Cases, ASTContext &C) {
     return SwitchStmt::create(LabelInfo, /*SwitchLoc=*/SourceLoc(), SubjectExpr,
                               /*LBraceLoc=*/SourceLoc(), Cases,
                               /*RBraceLoc=*/SourceLoc(), /*EndLoc=*/SourceLoc(),
@@ -1447,27 +1462,10 @@ public:
   Expr *getSubjectExpr() const { return SubjectExpr; }
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
 
-  ArrayRef<ASTNode> getRawCases() const {
-    return {getTrailingObjects<ASTNode>(), Bits.SwitchStmt.CaseCount};
-  }
-
-private:
-  struct AsCaseStmtWithSkippingNonCaseStmts {
-    AsCaseStmtWithSkippingNonCaseStmts() {}
-    std::optional<CaseStmt *> operator()(const ASTNode &N) const {
-      if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt*>()))
-        return CS;
-      return std::nullopt;
-    }
-  };
-
-public:
-  using AsCaseStmtRange = OptionalTransformRange<ArrayRef<ASTNode>,
-                            AsCaseStmtWithSkippingNonCaseStmts>;
-  
   /// Get the list of case clauses.
-  AsCaseStmtRange getCases() const {
-    return AsCaseStmtRange(getRawCases(), AsCaseStmtWithSkippingNonCaseStmts());
+  ArrayRef<CaseStmt *> getCases() const {
+    return {getTrailingObjects<CaseStmt *>(),
+            static_cast<size_t>(Bits.SwitchStmt.CaseCount)};
   }
 
   /// Retrieve the complete set of branches for this switch statement.
@@ -1541,10 +1539,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CaseStmt *> getCatches() const {
-    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
   }
   MutableArrayRef<CaseStmt *> getMutableCatches() {
-    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
   }
 
   /// Retrieve the complete set of branches for this do-catch statement.

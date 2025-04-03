@@ -529,13 +529,16 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 }
 #endif
 
-bool swift::_conformsToProtocol(const OpaqueValue *value,
-                                const Metadata *type,
-                                ProtocolDescriptorRef protocol,
-                                const WitnessTable **conformance) {
+bool swift::_conformsToProtocol(
+    const OpaqueValue *value,
+    const Metadata *type,
+    ProtocolDescriptorRef protocol,
+    const WitnessTable **conformance,
+    ConformanceExecutionContext *context) {
   // Look up the witness table for protocols that need them.
   if (protocol.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocolCommon(type, protocol.getSwiftProtocol());
+    auto witness = swift_conformsToProtocolWithExecutionContext(
+        type, protocol.getSwiftProtocol(), context);
     if (!witness)
       return false;
     if (conformance)
@@ -607,12 +610,36 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
   return false;
 }
 
+bool swift::_conformsToProtocolInContext(
+    const OpaqueValue *value,
+    const Metadata *type,
+    ProtocolDescriptorRef protocol,
+    const WitnessTable **conformance,
+    bool prohibitIsolatedConformances) {
+
+  ConformanceExecutionContext context;
+  if (!_conformsToProtocol(value, type, protocol, conformance, &context))
+    return false;
+
+  // If we aren't allowed to use isolated conformances and we ended up with
+  // one, fail.
+  if (prohibitIsolatedConformances &&
+      context.globalActorIsolationType)
+    return false;
+
+  if (!swift_isInConformanceExecutionContext(type, &context))
+    return false;
+
+  return true;
+}
+
 /// Check whether a type conforms to the given protocols, filling in a
 /// list of conformances.
 static bool _conformsToProtocols(const OpaqueValue *value,
                                  const Metadata *type,
                                  const ExistentialTypeMetadata *existentialType,
-                                 const WitnessTable **conformances) {
+                                 const WitnessTable **conformances,
+                                 bool prohibitIsolatedConformances) {
   if (auto *superclass = existentialType->getSuperclassConstraint()) {
     if (!swift_dynamicCastMetatype(type, superclass))
       return false;
@@ -624,7 +651,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!_conformsToProtocol(value, type, protocol, conformances))
+    if (!_conformsToProtocolInContext(
+            value, type, protocol, conformances, prohibitIsolatedConformances))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
@@ -1030,9 +1058,10 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
 }
 
 static const Metadata *
-swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
-                                           const Metadata *targetType,
-                                           const char *file, unsigned line, unsigned column) {
+swift_dynamicCastMetatypeUnconditionalImpl(
+    const Metadata *sourceType,
+    const Metadata *targetType,
+    const char *file, unsigned line, unsigned column) {
   auto origSourceType = sourceType;
 
   // Identical types always succeed
@@ -1118,7 +1147,8 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+    if (_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential,
+                             nullptr, /*prohibitIsolatedConformances=*/false))
       return origSourceType;
     swift_dynamicCastFailure(sourceType, targetType);
   }

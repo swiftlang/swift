@@ -37,6 +37,19 @@ $ swiftc -target <target triple> -enable-experimental-feature Embedded -wmo \
   input1.swift input2.swift ... -c -o output.o
 ```
 
+On macOS, it's common to have Xcode installed, which comes with a toolchain that does not support Embedded Swift yet. Unless you download, install, and activate a swift.org toolchain, you'll see this error:
+
+```bash
+$ swiftc input1.swift -enable-experimental-feature Embedded -wmo
+<unknown>:0: error: unable to load standard library for target 'arm64-apple-macosx15.0'
+```
+
+To resolve it, download and install a nightly toolchain from swift.org. Then, don't forget to activate it in your terminal by setting the `TOOLCHAINS` environment variable, for example with this command (if you installed into the `/Library` path):
+
+```bash
+$ export TOOLCHAINS=$(plutil -extract CFBundleIdentifier raw /Library/Developer/Toolchains/swift-latest.xctoolchain/Info.plist)
+```
+
 ## Examples
 
 ### Building Swift firmware for an embedded target
@@ -126,7 +139,7 @@ _swift_stdlib_isLinkingConsonant
 _swift_stdlib_nfd_decompositions
 ```
 
-To resolve this, link in the libswiftUnicodeDataTables.a that's in Swift toolchain's resource directory (`lib/swift/`) under the target triple that you're using:
+To resolve this, link in the `libswiftUnicodeDataTables.a` that's in Swift toolchain's resource directory (`lib/swift/`) under the target triple that you're using:
 
 ```bash
 $ swiftc <inputs> -target armv6m-none-none-eabi -enable-experimental-feature Embedded -wmo -c -o output.o
@@ -138,17 +151,17 @@ $ ld ... -o binary output.o $(dirname `which swiftc`)/../lib/swift/embedded/armv
 - Comparing String objects for equality
 - Sorting Strings
 - Using String's hash values, and in particular using String as dictionary keys
-- Using String's .count property
-- Using Unicode-aware string processing APIs (.split(), iterating characters, indexing)
-- Using Unicode-aware conversion String APIs (.uppercased(), .lowercased(), etc.)
+- Using String's `.count` property
+- Using Unicode-aware string processing APIs (`.split()`, iterating characters, indexing)
+- Using Unicode-aware conversion String APIs (`.uppercased()`, `.lowercased()`, etc.)
 
 **For contrast, unicode data tables are *not required for* (list not exhaustive):**
 
 - Using StaticString
 - Creating, concatenating, string interpolating, and printing String objects
-- Using .utf8, .utf16, and .unicodeScalars views of strings, including their .count property, using them as dictionary keys
+- Using `.utf8`, `.utf16`, and `.unicodeScalars` views of strings, including their .count property, using them as dictionary keys
 
-Manually linking libUnicodeDataTables.a is required for several reasons, including acknowledging that the data tables are desirable: Since they have a non-negligible size, it's useful to be aware that you are using them.
+Manually linking `libswiftUnicodeDataTables.a` is required for several reasons, including acknowledging that the data tables are desirable: Since they have a non-negligible size, it's useful to be aware that you are using them.
 
 ## Conditionalizing compilation for Embedded Swift
 

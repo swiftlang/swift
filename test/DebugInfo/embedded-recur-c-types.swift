@@ -23,5 +23,5 @@ typedef struct S2 {
 
 public var v: UnsafeMutablePointer<S1_t>? = nil
 
-// CHECK:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}} identifier: "$eSpySo4S1_taGD"
-// CHECK:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}} identifier: "$eSpySo2S2VGD"
+// CHECK-DAG:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}}name: "$eSpySo4S1_taGD"
+// CHECK-DAG:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}}name: "$eSpySo2S2VGD"

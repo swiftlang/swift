@@ -33,6 +33,7 @@
 #include "llvm/Support/VersionTuple.h"
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace swift {
@@ -229,6 +230,26 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Type layout string descriminator.
   PointerAuthSchema TypeLayoutString;
+
+  /// Like SwiftFunctionPointers but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroSwiftFunctionPointers;
+
+  /// Like SwiftClassMethods but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroSwiftClassMethods;
+
+  /// Like ProtocolWitnesses but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroProtocolWitnesses;
+
+  /// Like SwiftClassMethodPointers but for use with CoroFunctionPointer
+  /// values.
+  PointerAuthSchema CoroSwiftClassMethodPointers;
+
+  /// Like SwiftDynamicReplacements but for use with CoroFunctionPointer
+  /// values.
+  PointerAuthSchema CoroSwiftDynamicReplacements;
+
+  /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroPartialApplyCapture;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -258,7 +279,7 @@ public:
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
   /// The public dependent libraries specified on the command line.
-  std::vector<std::string> PublicLinkLibraries;
+  std::vector<std::tuple<std::string, bool>> PublicLinkLibraries;
 
   /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
   /// used to force-load this module.
@@ -270,6 +291,9 @@ public:
   /// Should we spend time verifying that the IR we produce is
   /// well-formed?
   unsigned Verify : 1;
+
+  /// Whether to verify after every optimizer change.
+  unsigned VerifyEach : 1;
 
   OptimizationMode OptMode;
 
@@ -294,6 +318,10 @@ public:
   /// (use DebugPrefixMap and CoveragePrefixMap for those) - currently just
   /// indexing info.
   PathRemapper FilePrefixMap;
+
+  /// Indicates whether or not the frontend should generate callsite information
+  /// in the debug info.
+  bool DebugCallsiteInfo = false;
 
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
@@ -371,6 +399,8 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  unsigned DisableLLVMMergeFunctions : 1;
+
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
@@ -383,6 +413,7 @@ public:
   unsigned LazyInitializeClassMetadata : 1;
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
+  unsigned IndirectCoroFunctionPointer : 1;
 
   /// Use absolute function references instead of relative ones.
   /// Mainly used on WebAssembly, that doesn't support relative references
@@ -397,6 +428,10 @@ public:
   /// Create metadata specializations for generic types at statically known type
   /// arguments.
   unsigned PrespecializeGenericMetadata : 1;
+
+  /// Emit pointers to the corresponding type metadata in non-public non-generic
+  /// type descriptors.
+  unsigned EmitSingletonMetadataPointers : 1;
 
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
@@ -455,10 +490,14 @@ public:
 
   unsigned ConditionalRuntimeRecords : 1;
 
+  unsigned AnnotateCondFailMessage : 1;
+
   unsigned InternalizeAtLink : 1;
 
   /// Internalize symbols (static library) - do not export any public symbols.
   unsigned InternalizeSymbols : 1;
+
+  unsigned MergeableSymbols : 1;
 
   /// Emit a section with references to class_ro_t* in generic class patterns.
   unsigned EmitGenericRODatas : 1;
@@ -485,14 +524,24 @@ public:
 
   unsigned EmitAsyncFramePushPopMetadata : 1;
 
-  // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
-  unsigned EmitYieldOnce2AsYieldOnce : 1;
+  // Whether to emit typed malloc during coroutine frame allocation.
+  unsigned EmitTypeMallocForCoroFrame : 1;
 
   // Whether to force emission of a frame for all async functions
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
 
   unsigned UseProfilingMarkerThunks : 1;
+
+  // Whether swiftcorocc should be used for yield_once_2 routines on x86_64.
+  unsigned UseCoroCCX8664 : 1;
+
+  // Whether swiftcorocc should be used for yield_once_2 routines on arm64
+  // variants.
+  unsigned UseCoroCCArm64 : 1;
+
+  // Whether to emit mergeable or non-mergeable traps.
+  unsigned MergeableTraps : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -556,7 +605,7 @@ public:
 
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), OptMode(OptimizationMode::NotSet),
+        Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false), SanitizerUseStableABI(false),
@@ -571,12 +620,14 @@ public:
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
-        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
+        EnableReflectionNames(true), DisableLLVMMergeFunctions(false),
+        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
+        LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false),
+        IndirectAsyncFunctionPointer(false), IndirectCoroFunctionPointer(false),
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        PrespecializeGenericMetadata(false),
+        EmitSingletonMetadataPointers(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLargeLoadableTypesReg2Mem(true),
         EnableLayoutStringValueWitnesses(false),
@@ -588,13 +639,17 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
+        AnnotateCondFailMessage(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
+        MergeableSymbols(false), EmitGenericRODatas(true),
+        NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
+        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(false),
+        MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),

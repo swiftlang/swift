@@ -222,6 +222,10 @@ public:
     SearchPathOpts.VFSOverlayFiles = Overlays;
   }
 
+  void setSysRoot(StringRef SysRoot) {
+    SearchPathOpts.setSysRoot(SysRoot);
+  }
+
   void setExtraClangArgs(const std::vector<std::string> &Args) {
     ClangImporterOpts.ExtraArgs = Args;
   }
@@ -230,8 +234,8 @@ public:
     return ClangImporterOpts.ExtraArgs;
   }
 
-  void addLinkLibrary(StringRef name, LibraryKind kind) {
-    IRGenOpts.LinkLibraries.push_back({name, kind});
+  void addLinkLibrary(StringRef name, LibraryKind kind, bool isStaticLibrary) {
+    IRGenOpts.LinkLibraries.emplace_back(name, kind, isStaticLibrary);
   }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
@@ -424,10 +428,6 @@ public:
   /// Whether the Swift String Processing support library should be implicitly
   /// imported.
   bool shouldImportSwiftStringProcessing() const;
-
-  /// Whether the Swift Backtracing support library should be implicitly
-  /// imported.
-  bool shouldImportSwiftBacktracing() const;
 
   /// Whether the CXX module should be implicitly imported.
   bool shouldImportCxx() const;
@@ -678,14 +678,6 @@ public:
   /// Whether the Swift String Processing support library can be imported
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
-
-  /// Verify that if an implicit import of the `Backtracing` module if
-  /// expected, it can actually be imported. Emit a warning, otherwise.
-  void verifyImplicitBacktracingImport();
-
-  /// Whether the Swift Backtracing support library can be imported
-  /// i.e. if it can be found.
-  bool canImportSwiftBacktracing() const;
 
   /// Whether the Cxx library can be imported
   bool canImportCxx() const;

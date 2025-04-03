@@ -368,7 +368,7 @@ public:
     unsigned appliedArgIndex = getAppliedArgIndex(oper);
     if (auto *pai = dyn_cast<PartialApplyInst>(Inst)) {
       if (pai->getFunctionType()->getIsolation() ==
-          SILFunctionTypeIsolation::Erased) {
+          SILFunctionTypeIsolation::forErased()) {
         assert(appliedArgIndex != 0 &&
                "isolation(any) does not correspond to an AST argument");
         appliedArgIndex -= 1;

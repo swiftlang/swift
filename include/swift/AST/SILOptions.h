@@ -191,7 +191,7 @@ public:
   /// Do we always serialize SIL in OSSA form?
   ///
   /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = false;
+  bool EnableOSSAModules = true;
 
   /// Allow recompilation of a non-OSSA module to an OSSA module when imported
   /// from another OSSA module.
@@ -330,6 +330,13 @@ public:
   /// Block expanding and register promotion more aggressively throughout the
   /// optimizer.
   bool UseAggressiveReg2MemForCodeSize = true;
+
+  /// Enable enforcement of lifetime dependencies on addressable arguments.
+  /// Temporarily used to bootstrap the AddressableParameters feature.
+  bool EnableAddressDependencies = true;
+
+  // Whether to allow merging traps and cond_fails.
+  bool MergeableTraps = false;
 
   SILOptions() {}
 

@@ -31,6 +31,25 @@
 #define AST_BRIDGING_WRAPPER_NONNULL(Name) AST_BRIDGING_WRAPPER(Name)
 #endif
 
+/// AST_BRIDGING_WRAPPER_CONST(Name)
+///   The default macro to define a const bridging wrapper type.
+#ifndef AST_BRIDGING_WRAPPER_CONST
+#define AST_BRIDGING_WRAPPER_CONST(Name) AST_BRIDGING_WRAPPER(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name)
+///   Specifies that both a nullable and non-null variant of the wrapper should
+///   be created.
+#ifndef AST_BRIDGING_WRAPPER_CONST_NULLABLE
+#define AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name) AST_BRIDGING_WRAPPER_CONST(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST_NONNULL(Name)
+///   Specifies that only a non-null variant of the wrapper should be created.
+#ifndef AST_BRIDGING_WRAPPER_CONST_NONNULL
+#define AST_BRIDGING_WRAPPER_CONST_NONNULL(Name) AST_BRIDGING_WRAPPER_CONST(Name)
+#endif
+
 #ifndef DECL
 #define DECL(Id, Parent) AST_BRIDGING_WRAPPER_NULLABLE(Id##Decl)
 #endif
@@ -66,6 +85,12 @@
 #endif
 #include "swift/AST/DeclAttr.def"
 
+#ifndef TYPE_ATTR
+#define SIMPLE_TYPE_ATTR(...)
+#define TYPE_ATTR(SPELLING, CLASS) AST_BRIDGING_WRAPPER_NONNULL(CLASS##TypeAttr)
+#endif
+#include "swift/AST/TypeAttr.def"
+
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
 AST_BRIDGING_WRAPPER_NULLABLE(Decl)
@@ -83,14 +108,21 @@ AST_BRIDGING_WRAPPER_NULLABLE(GenericParamList)
 AST_BRIDGING_WRAPPER_NULLABLE(TrailingWhereClause)
 AST_BRIDGING_WRAPPER_NULLABLE(ParameterList)
 AST_BRIDGING_WRAPPER_NULLABLE(PatternBindingInitializer)
+AST_BRIDGING_WRAPPER_NULLABLE(DefaultArgumentInitializer)
 AST_BRIDGING_WRAPPER_NULLABLE(CustomAttributeInitializer)
-AST_BRIDGING_WRAPPER_NONNULL(TypeAttributes)
 AST_BRIDGING_WRAPPER_NONNULL(CustomAttribute)
 AST_BRIDGING_WRAPPER_NULLABLE(ArgumentList)
+AST_BRIDGING_WRAPPER_NULLABLE(AvailabilitySpec)
+AST_BRIDGING_WRAPPER_CONST_NONNULL(AvailabilityMacroMap)
+AST_BRIDGING_WRAPPER_NONNULL(PoundAvailableInfo)
+AST_BRIDGING_WRAPPER_NONNULL(LifetimeEntry)
 
 // Non-AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
 
 #undef AST_BRIDGING_WRAPPER_NONNULL
 #undef AST_BRIDGING_WRAPPER_NULLABLE
+#undef AST_BRIDGING_WRAPPER_CONST_NONNULL
+#undef AST_BRIDGING_WRAPPER_CONST_NULLABLE
+#undef AST_BRIDGING_WRAPPER_CONST
 #undef AST_BRIDGING_WRAPPER

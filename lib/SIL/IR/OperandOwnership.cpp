@@ -151,7 +151,6 @@ OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
-OPERAND_OWNERSHIP(TrivialUse, AllocVector)
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
 OPERAND_OWNERSHIP(TrivialUse, MoveOnlyWrapperToCopyableAddr)
 OPERAND_OWNERSHIP(TrivialUse, CopyableToMoveOnlyWrapperAddr)
@@ -222,7 +221,6 @@ OPERAND_OWNERSHIP(InstantaneousUse, FixLifetime)
 OPERAND_OWNERSHIP(InstantaneousUse, WitnessMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, DynamicMethodBranch)
 OPERAND_OWNERSHIP(InstantaneousUse, ValueMetatype)
-OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
@@ -299,6 +297,7 @@ OPERAND_OWNERSHIP(DestroyingConsume, DeallocBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocExistentialBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocRef)
 OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
+OPERAND_OWNERSHIP(DestroyingConsume, DestroyNotEscapedClosure)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
 OPERAND_OWNERSHIP(DestroyingConsume, BeginCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
@@ -430,7 +429,7 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 OperandOwnership
 OperandOwnershipClassifier::visitBorrowedFromInst(BorrowedFromInst *bfi) {
   return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
-                                : OperandOwnership::InstantaneousUse;
+                                : OperandOwnership::Borrow;
 }
 
 // MARK: Instructions whose use ownership depends on the operand in question.
@@ -665,29 +664,42 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
   return OperandOwnership::UnownedInstantaneousUse;
 }
 
+template<SILInstructionKind Opc, typename Derived>
+static OperandOwnership
+visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, Derived> *mdi) {
+}
+
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
-  if (getOperandIndex() == MarkDependenceInst::Value) {
+  if (getOperandIndex() == MarkDependenceInst::Dependent) {
     return getOwnershipKind().getForwardingOperandOwnership(
       /*allowUnowned*/true);
   }
   if (mdi->isNonEscaping()) {
-    if (!mdi->getType().isAddress()) {
-      // This creates a "dependent value", just like on-stack partial_apply,
-      // which we treat like a borrow.
-      return OperandOwnership::Borrow;
+    if (auto *svi = dyn_cast<SingleValueInstruction>(mdi)) {
+      if (!svi->getType().isAddress()) {
+        // This creates a "dependent value", just like on-stack partial_apply,
+        // which we treat like a borrow.
+        return OperandOwnership::Borrow;
+      }
     }
-    return OperandOwnership::InteriorPointer;
+    return OperandOwnership::AnyInteriorPointer;
   }
   if (mdi->hasUnresolvedEscape()) {
     // This creates a dependent value that may extend beyond the parent's
     // lifetime.
     return OperandOwnership::UnownedInstantaneousUse;
   }
-  // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
-  // a borrow of the base (mark_dependence %base -> end_dependence is analogous
-  // to a borrow scope).
+  return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership OperandOwnershipClassifier::
+visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
+  // If we are analyzing "the value", this is a trivial use
+  if (getOperandIndex() == MarkDependenceInst::Dependent) {
+    return OperandOwnership::TrivialUse;
+  }
   return OperandOwnership::PointerEscape;
 }
 

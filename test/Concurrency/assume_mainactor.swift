@@ -1,16 +1,14 @@
-// RUN: %target-swift-frontend -swift-version 6 -emit-silgen -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s | %FileCheck %s
-// RUN: %target-swift-frontend -swift-version 6 -emit-sil -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s -verify
-
-// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
+// RUN: %target-swift-frontend -swift-version 6 -emit-silgen -default-isolation MainActor %s | %FileCheck %s
+// RUN: %target-swift-frontend -swift-version 6 -emit-sil -default-isolation MainActor %s -verify
 
 // READ THIS! This test is meant to FileCheck the specific isolation when
-// UnspecifiedMeansMainActorIsolated is enabled. Please do not put other types
+// `-default-isolation` is set to `MainActor`. Please do not put other types
 // of tests in here.
 
 class Klass {
   // Implicit deinit
   // CHECK: // Klass.deinit
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject {
 
   // Implicit deallocating deinit
@@ -163,7 +161,7 @@ nonisolated func nonisolatedFunctionTest() async {
 
 actor MyActor {
   // CHECK: // variable initialization expression of MyActor.k
-  // CHECK-NEXT: // Isolation: actor_instance
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor7MyActorC1kAA5KlassCvpfi : $@convention(thin) () -> @owned Klass {
 
   // CHECK: // MyActor.k.getter
@@ -175,9 +173,21 @@ actor MyActor {
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor7MyActorC1kAA5KlassCvs : $@convention(method) (@owned Klass, @sil_isolated @guaranteed MyActor) -> () {
   var k = Klass()
 
+  // CHECK: // static MyActor.f()
+  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorC1fyyFZ : $@convention(method) (@thick MyActor.Type) -> ()
+  static func f() {}
+
+  struct Nested {
+    // CHECK: // MyActor.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorC6NestedV1fyyF : $@convention(method) (MyActor.Nested) -> ()
+    func f() {}
+  }
+
   // Implicit deinit
   // CHECK: // MyActor.deinit
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorCfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject {
 
   // Non-async init should be nonisolated

@@ -155,7 +155,7 @@ extension Maybe: Copyable where Wrapped: Copyable {}
 // expected-note@+2{{requirement specified as 'Wrapped' : 'Copyable'}}
 // expected-note@+1{{requirement from conditional conformance of 'Maybe<Wrapped>' to 'Copyable'}}
 struct RequireCopyable<T> {
-  // expected-note@-1 {{consider adding '~Copyable' to generic struct 'RequireCopyable'}}{{27-27=: ~Copyable}}
+  // expected-note@-1 {{consider adding '~Copyable' to generic struct 'RequireCopyable'}}{{27-27=: ~Copyable }}
   deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'RequireCopyable' that conforms to 'Copyable'}}
 }
 
@@ -249,6 +249,7 @@ struct BuggerView<T: ~Copyable>: ~Escapable, Copyable {}
 
 struct MutableBuggerView<T: ~Copyable>: ~Copyable, ~Escapable {}
 
+@lifetime(mutRef: copy mutRef)
 func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
                    _ ref: BuggerView<NC>,
                    _ intMutRef: borrowing MutableBuggerView<Int>,
@@ -475,8 +476,8 @@ func checkExistentials() {
 
 typealias NotCopyable = ~Copyable
 typealias EmptyComposition = ~Copyable & ~Escapable
-func test(_ t: borrowing NotCopyable) {} // expected-error {{use of 'NotCopyable' (aka '~Copyable') as a type must be written 'any NotCopyable'}}
-func test(_ t: borrowing EmptyComposition) {} // expected-error {{use of 'EmptyComposition' (aka '~Copyable & ~Escapable') as a type must be written 'any EmptyComposition' (aka 'any ~Copyable & ~Escapable')}}
+func test(_ t: borrowing NotCopyable) {} // expected-warning {{use of 'NotCopyable' (aka '~Copyable') as a type must be written 'any NotCopyable'}}
+func test(_ t: borrowing EmptyComposition) {} // expected-warning {{use of 'EmptyComposition' (aka '~Copyable & ~Escapable') as a type must be written 'any EmptyComposition' (aka 'any ~Copyable & ~Escapable')}}
 
 typealias Copy = Copyable
 func test(_ z1: Copy, _ z2: Copyable) {}

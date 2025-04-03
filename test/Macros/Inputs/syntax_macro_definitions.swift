@@ -1628,6 +1628,20 @@ public struct FooExtensionMacro: ExtensionMacro {
   }
 }
 
+public struct BadExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    // Note this is purposefully not using `providingExtensionsOf`.
+    let unqualifiedName = declaration.as(StructDeclSyntax.self)!.name.trimmed
+    return [try ExtensionDeclSyntax("extension \(unqualifiedName) {}")]
+  }
+}
+
 public struct ConformanceViaExtensionMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -1805,6 +1819,46 @@ public struct AddAllConformancesMacro: ExtensionMacro {
         """
       return decl.cast(ExtensionDeclSyntax.self)
     }
+  }
+}
+
+public struct ListConformancesMacro { }
+
+extension ListConformancesMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    protocols.map { proto in
+      let decl: DeclSyntax =
+        """
+        extension \(type): \(proto) {}
+        """
+      return decl.cast(ExtensionDeclSyntax.self)
+    }
+  }
+}
+
+extension ListConformancesMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let typeName = declaration.asProtocol(NamedDeclSyntax.self)!.name.text
+
+    let protocolNames: [ExprSyntax] = protocols.map { "\(literal: $0.trimmedDescription)" }
+    let protocolsArray: ExprSyntax =
+      "[ \(raw: protocolNames.map { $0.description }.joined(separator: ", ")) ]"
+    let unknownDecl: DeclSyntax =
+    """
+    @_nonoverride static func conformances() -> [String: [String]] { [ \(literal: typeName): \(protocolsArray) ] }
+    """
+    return [unknownDecl]
   }
 }
 

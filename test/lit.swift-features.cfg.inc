@@ -3,7 +3,7 @@
 /*
  * This source file is part of the Swift.org open source project
  *
- * Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+ * Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
  * Licensed under Apache License v2.0 with Runtime Library Exception
  *
  * See https://swift.org/LICENSE.txt for license information
@@ -30,6 +30,7 @@ def language_feature(feature_name, enabled):
 
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) language_feature(#FeatureName, True)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) language_feature(#FeatureName, #AvailableInProd == "true")
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) language_feature(#FeatureName, True)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  language_feature(#FeatureName, True)
 
 #include <swift/Basic/Features.def>

@@ -92,8 +92,10 @@ enum MyError: Error {
 case fail
 }
 
+protocol P {}
+
 @_unsafeInheritExecutor
-func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
+func unsafeCallerAvoidsNewLoop() async throws {
   // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   _ = await withUnsafeContinuation { (continuation: UnsafeContinuation<Int, Never>) in
@@ -129,13 +131,6 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
   func operation() async throws -> Int { 7 }
   try await TL.$string.withValue("hello", operation: operation)
 
-  // FIXME: Clock.measure does not currently support this hack.
-  // expected-error@+1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}
-  _ = try! await clock.measure {
-    print("so very slow")
-    try await Task.sleep(nanoseconds: 500)
-  }
-
   _ = await withDiscardingTaskGroup(returning: Int.self) { group in
     group.addTask {
       print("hello")
@@ -170,6 +165,32 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
     }
 
     throw MyError.fail
+  }
+}
+
+@_unsafeInheritExecutor
+func unsafeClockCaller(
+  specificClock: ContinuousClock,
+  genericClock: some Clock,
+  existentialClock: any Clock,
+  existentialCompositionClock: any P & Clock,
+) async throws {
+  // expected-warning@-6{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+
+  _ = try! await specificClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = try! await genericClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = try! await existentialClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = try! await existentialCompositionClock.measure {
+    try await Task.sleep(nanoseconds: 500)
   }
 }
 

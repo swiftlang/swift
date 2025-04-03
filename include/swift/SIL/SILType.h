@@ -49,7 +49,7 @@ namespace swift {
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found opened archetype or empty type otherwise.
-CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
+CanExistentialArchetypeType getOpenedArchetypeOf(CanType Ty);
 CanLocalArchetypeType getLocalArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.
@@ -264,23 +264,6 @@ public:
     });
   }
 
-  bool isBuiltinInteger() const {
-    return is<BuiltinIntegerType>();
-  }
-
-  bool isBuiltinFixedWidthInteger(unsigned width) const {
-    BuiltinIntegerType *bi = getAs<BuiltinIntegerType>();
-    return bi && bi->isFixedWidth(width);
-  }
-
-  bool isBuiltinFloat() const {
-    return is<BuiltinFloatType>();
-  }
-
-  bool isBuiltinVector() const {
-    return is<BuiltinVectorType>();
-  }
-
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
   SILType getBuiltinVectorElementType() const {
@@ -450,12 +433,6 @@ public:
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {
     return getASTType()->isClassExistentialType();
-  }
-
-  /// Returns true if the referenced type is an opened existential type
-  /// (which is actually a kind of archetype).
-  bool isOpenedExistential() const {
-    return getASTType()->isOpenedExistential();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
@@ -943,16 +920,25 @@ public:
 
   SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
-  MetatypeRepresentation getRepresentationOfMetatype(SILFunction *function) const;
-
-  bool isOrContainsObjectiveCClass() const;
-
   bool isCalleeConsumedFunction() const {
     auto funcTy = castTo<SILFunctionType>();
     return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
   }
 
+  bool isNonIsolatedCallerFunction() const {
+    auto funcTy = getAs<SILFunctionType>();
+    if (!funcTy)
+      return false;
+    auto isolatedParam = funcTy->maybeGetIsolatedParameter();
+    return isolatedParam &&
+           isolatedParam->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
   bool isMarkedAsImmortal() const;
+
+  /// True if a value of this type can have its address taken by a
+  /// lifetime-dependent value.
+  bool isAddressableForDeps(const SILFunction &function) const;
 
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed

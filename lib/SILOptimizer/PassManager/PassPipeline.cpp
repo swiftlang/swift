@@ -151,13 +151,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // and `differentiable_function` instructions.
   P.addDifferentiation();
 
-  // Only run semantic arc opts if we are optimizing and if mandatory semantic
-  // arc opts is explicitly enabled.
-  //
-  // NOTE: Eventually this pass will be split into a mandatory/more aggressive
-  // pass. This will happen when OSSA is no longer eliminated before the
-  // optimizer pipeline is run implying we can put a pass that requires OSSA
-  // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
 
@@ -213,7 +206,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
-  P.addPredictableMemoryAccessOptimizations();
+  P.addMandatoryRedundantLoadElimination();
 
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
@@ -257,7 +250,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
-  P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
 
   // MandatoryPerformanceOptimizations might create specializations that are not
@@ -270,6 +262,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDeadFunctionAndGlobalElimination();
   }
 
+  P.addDiagnoseUnknownConstValues();
   P.addPerformanceDiagnostics();
 }
 
@@ -404,7 +397,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
   // End of unrolling passes.
-  P.addABCOpt();
+  P.addBoundsCheckOpts();
   // Cleanup.
   P.addDCE();
   P.addCOWArrayOpts();
@@ -475,7 +468,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   if (OpLevel == OptimizationLevelKind::MidLevel) {
     P.addHighLevelLICM();
     P.addArrayCountPropagation();
-    P.addABCOpt();
+    P.addBoundsCheckOpts();
     P.addDCE();
     P.addCOWArrayOpts();
     P.addDCE();
@@ -1011,14 +1004,14 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // importing this module.
   P.addSerializeSILPass();
 
+  if (Options.StopOptimizationAfterSerialization)
+    return P;
+
   if (P.getOptions().EnableOSSAModules && SILPrintFinalOSSAModule) {
     addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
   }
   // Strip any transparent functions that still have ownership.
   P.addOwnershipModelEliminator();
-
-  if (Options.StopOptimizationAfterSerialization)
-    return P;
 
   P.addAutodiffClosureSpecialization();
 
@@ -1081,6 +1074,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
+
+  if (Options.StopOptimizationAfterSerialization)
+    return P;
 
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();

@@ -24,6 +24,8 @@
 #include <cstring>
 #include <algorithm>
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+
 using namespace swift;
 
 // So remote inspection/debugging tools can obtain
@@ -65,7 +67,7 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
+static void swift_cvw_initEnumMetadataSingleCaseWithLayoutStringImpl(
     EnumMetadata *self, EnumLayoutFlags layoutFlags,
     const Metadata *payloadType) {
   assert(self->hasLayoutString());
@@ -106,17 +108,18 @@ void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
   writer.writeBytes(((uint64_t)flags) &
                     ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
-  vwtable->destroy = swift_generic_destroy;
-  vwtable->initializeWithCopy = swift_generic_initWithCopy;
-  vwtable->initializeWithTake = swift_generic_initWithTake;
-  vwtable->assignWithCopy = swift_generic_assignWithCopy;
-  vwtable->assignWithTake = swift_generic_assignWithTake;
-
   installCommonValueWitnesses(layout, vwtable);
 
   self->setLayoutString(layoutStr);
 
   vwtable->publishLayout(layout);
+}
+
+void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
+    EnumMetadata *self, EnumLayoutFlags layoutFlags,
+    const Metadata *payloadType) {
+  swift_cvw_initEnumMetadataSingleCaseWithLayoutString(self, layoutFlags,
+                                                       payloadType);
 }
 
 void
@@ -218,7 +221,7 @@ XIElement findXIElement(const Metadata *type) {
 }
 } // namespace
 
-void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
+static void swift_cvw_initEnumMetadataSinglePayloadWithLayoutStringImpl(
     EnumMetadata *self, EnumLayoutFlags layoutFlags,
     const Metadata *payloadType, unsigned emptyCases) {
   assert(self->hasLayoutString());
@@ -317,11 +320,6 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
                     ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
   self->setLayoutString(layoutStr);
-  vwtable->destroy = swift_generic_destroy;
-  vwtable->initializeWithCopy = swift_generic_initWithCopy;
-  vwtable->initializeWithTake = swift_generic_initWithTake;
-  vwtable->assignWithCopy = swift_generic_assignWithCopy;
-  vwtable->assignWithTake = swift_generic_assignWithTake;
 
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
@@ -350,6 +348,13 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
 #endif
 
   vwtable->publishLayout(layout);
+}
+
+void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
+    EnumMetadata *self, EnumLayoutFlags layoutFlags,
+    const Metadata *payloadType, unsigned emptyCases) {
+  return swift_cvw_initEnumMetadataSinglePayloadWithLayoutString(
+      self, layoutFlags, payloadType, emptyCases);
 }
 
 unsigned
@@ -437,11 +442,9 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
-    EnumMetadata *enumType,
-    EnumLayoutFlags layoutFlags,
-    unsigned numPayloads,
-    const Metadata * const *payloadLayouts) {
+static void swift_cvw_initEnumMetadataMultiPayloadWithLayoutStringImpl(
+    EnumMetadata *enumType, EnumLayoutFlags layoutFlags, unsigned numPayloads,
+    const Metadata *const *payloadLayouts) {
   assert(enumType->hasLayoutString());
 
   // Accumulate the layout requirements of the payloads.
@@ -545,12 +548,6 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
                       ~((uint64_t)LayoutStringFlags::HasRelativePointers));
 
     enumType->setLayoutString(layoutStr);
-
-    vwtable->destroy = swift_generic_destroy;
-    vwtable->initializeWithCopy = swift_generic_initWithCopy;
-    vwtable->initializeWithTake = swift_generic_initWithTake;
-    vwtable->assignWithCopy = swift_generic_assignWithCopy;
-    vwtable->assignWithTake = swift_generic_assignWithTake;
   }
 
   // Set up the layout info in the vwtable.
@@ -576,6 +573,13 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
       swift_storeMultiPayloadEnumTagSinglePayload;
 
   vwtable->publishLayout(layout);
+}
+
+void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
+    EnumMetadata *enumType, EnumLayoutFlags layoutFlags, unsigned numPayloads,
+    const Metadata *const *payloadLayouts) {
+  swift_cvw_initEnumMetadataMultiPayloadWithLayoutString(
+      enumType, layoutFlags, numPayloads, payloadLayouts);
 }
 
 namespace {
@@ -719,3 +723,6 @@ swift::swift_getEnumCaseMultiPayload(const OpaqueValue *value,
     }
   }
 }
+
+#define OVERRIDE_CVW_METADATA_ENUM COMPATIBILITY_OVERRIDE
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

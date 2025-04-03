@@ -55,6 +55,7 @@ class ExecutorBreadcrumb;
 
 struct LValueOptions {
   bool IsNonAccessing = false;
+  bool TryAddressable = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -63,7 +64,6 @@ struct LValueOptions {
 
     // Assume we're going to access the base.
     copy.IsNonAccessing = false;
-
     return copy;
   }
 
@@ -71,6 +71,12 @@ struct LValueOptions {
   /// applying the derived component will not touch the memory.
   LValueOptions forProjectedBaseLValue() const {
     auto copy = *this;
+    return copy;
+  }
+  
+  LValueOptions withAddressable(bool addressable) const {
+    auto copy = *this;
+    copy.TryAddressable = addressable;
     return copy;
   }
 };
@@ -466,24 +472,112 @@ public:
     /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
     
-    /// True if the `value` represents the memory location of a value that is
-    /// stable for the lifetimes of any dependencies on that value.
-    bool addressable;
-
-    static VarLoc get(SILValue value, SILValue box = SILValue(),
-                      bool addressable = false) {
-      VarLoc Result;
-      Result.value = value;
-      Result.box = box;
-      Result.addressable = addressable;
-      return Result;
-    }
+    /// What kind of access enforcement should be used to access the variable,
+    /// or `Unknown` if it's known to be immutable.
+    SILAccessEnforcement access;
+    
+    /// A structure used for bookkeeping the on-demand formation and cleanup
+    /// of an addressable representation for an immutable value binding.
+    struct AddressableBuffer {
+      struct State {
+        // If the value needs to be reabstracted to provide an addressable
+        // representation, this SILValue owns the reabstracted representation.
+        SILValue reabstraction = SILValue();
+        // The stack allocation for the addressable representation.
+        SILValue allocStack = SILValue();
+        // The initiation of the in-memory borrow.
+        SILValue storeBorrow = SILValue();
+        
+        State(SILValue reabstraction,
+              SILValue allocStack,
+              SILValue storeBorrow)
+          : reabstraction(reabstraction), allocStack(allocStack),
+            storeBorrow(storeBorrow)
+        {}
+      };
+      
+      std::unique_ptr<State> state = nullptr;
+      
+      // If the variable cleanup is triggered before the addressable
+      // representation is demanded, but the addressable representation
+      // gets demanded later, we save the insertion points where the
+      // representation would be cleaned up so we can backfill them.
+      llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
+      
+      AddressableBuffer() = default;
+      
+      AddressableBuffer(AddressableBuffer &&other)
+        : state(std::move(other.state))
+      {
+        cleanupPoints.swap(other.cleanupPoints);
+      }
+      
+      AddressableBuffer &operator=(AddressableBuffer &&other) {
+        state = std::move(other.state);
+        cleanupPoints.swap(other.cleanupPoints);
+        return *this;
+      }
+      
+      ~AddressableBuffer();
+    };
+    AddressableBuffer addressableBuffer;
+    
+    VarLoc() = default;
+    
+    VarLoc(SILValue value, SILAccessEnforcement access,
+           SILValue box = SILValue())
+      : value(value), box(box), access(access)
+    {}
   };
   
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+  
+  // Represents an addressable buffer that has been allocated but not yet used.
+  struct PreparedAddressableBuffer {
+    SILInstruction *insertPoint = nullptr;
+    
+    PreparedAddressableBuffer() = default;
+    
+    PreparedAddressableBuffer(SILInstruction *insertPoint)
+      : insertPoint(insertPoint)
+    {}
+    
+    PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
+      : insertPoint(other.insertPoint)
+    {
+      other.insertPoint = nullptr;
+    }
+    
+    PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
+      insertPoint = other.insertPoint;
+      other.insertPoint = nullptr;
+      return *this;
+    }
+    
+    ~PreparedAddressableBuffer() {
+      if (insertPoint) {
+        // Remove the insertion point if it went unused.
+        insertPoint->eraseFromParent();
+      }
+    }
+  };
+  llvm::DenseMap<VarDecl *, PreparedAddressableBuffer> AddressableBuffers;
+  
+  /// Establish the scope for the addressable buffer that might be allocated
+  /// for a local variable binding.
+  ///
+  /// This must be enclosed within the scope of the value binding for the
+  /// variable, and cover the scope in which the variable can be referenced.
+  void enterLocalVariableAddressableBufferScope(VarDecl *decl);
+  
+  /// Get a stable address which is suitable for forming dependent pointers
+  /// if possible.
+  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
+                                             SILLocation loc,
+                                             ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
@@ -789,6 +883,15 @@ public:
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
   void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }
 
+  /// Can the generated code reference \c decl safely?
+  ///
+  /// Checks that the module defining \c decl is as visible to clients as the
+  /// code referencing it, preventing an inlinable function to reference an
+  /// implementation-only dependency and similar. This applies similar checks
+  /// as the exportability checker does to source code for decls referenced by
+  /// generated code.
+  bool referenceAllowed(ValueDecl *decl);
+
   std::optional<SILAccessEnforcement>
   getStaticEnforcement(VarDecl *var = nullptr);
   std::optional<SILAccessEnforcement>
@@ -1066,18 +1169,21 @@ public:
                            bool isSelfConformance, bool isPreconcurrency,
                            std::optional<ActorIsolation> enterIsolation);
 
-  /// Generates subscript arguments for keypath. This function handles lowering
-  /// of all index expressions including default arguments.
+  /// Generates subscript or method arguments for keypath. This function handles
+  /// lowering of all arguments or index expressions including default
+  /// arguments.
   ///
   /// \returns Lowered index arguments.
-  /// \param subscript - The subscript decl who's arguments are being lowered.
-  /// \param subs - Used to get subscript function type and to substitute generic args.
-  /// \param argList - The argument list of the subscript.
-  SmallVector<ManagedValue, 4>
-  emitKeyPathSubscriptOperands(SILLocation loc,
-                               SubscriptDecl *subscript,
-                               SubstitutionMap subs,
-                               ArgumentList *argList);
+  /// \param decl - The subscript or method decl whose arguments are being
+  /// lowered.
+  /// \param subs - Used to get subscript or method function type and to
+  /// substitute generic args.
+  /// \param argList - The argument list of the
+  /// subscript or method.
+  SmallVector<ManagedValue, 4> emitKeyPathOperands(SILLocation loc,
+                                                   ValueDecl *decl,
+                                                   SubstitutionMap subs,
+                                                   ArgumentList *argList);
 
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
@@ -1858,11 +1964,14 @@ public:
                                 const FunctionTypeInfo &typeContext,
                                 SubstitutionMap subs);
 
-  PreparedArguments prepareSubscriptIndices(SILLocation loc,
-                                            SubscriptDecl *subscript,
-                                            SubstitutionMap subs,
-                                            AccessStrategy strategy,
-                                            ArgumentList *argList);
+  /// Get substituted type for a given interface type, optionally apply a
+  /// substitution map if provided.
+  CanFunctionType prepareStorageType(ValueDecl *decl, SubstitutionMap subs);
+
+  /// Evaluate and associate arguments with their expressions.
+  PreparedArguments prepareIndices(SILLocation loc, CanFunctionType substFnType,
+                                   AccessStrategy strategy,
+                                   ArgumentList *argList);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
@@ -1882,6 +1991,18 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
+
+  RValue emitRValueForKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseFormalType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
+
+  RValue emitUnappliedKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
 
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
@@ -2480,11 +2601,19 @@ public:
                               SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
+  enum class ThunkGenFlag {
+    None,
+    ConvertingToNonIsolatedCaller,
+    ConvertingFromNonIsolatedCaller,
+  };
+  using ThunkGenOptions = OptionSet<ThunkGenFlag>;
+
   /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
+      ThunkGenOptions options = {});
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
@@ -2521,6 +2650,25 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  /// Emit conversion from T.TangentVector to Optional<T>.TangentVector.
+  ManagedValue
+  emitTangentVectorToOptionalTangentVector(SILLocation loc,
+                                           ManagedValue input,
+                                           CanType wrappedType, // `T`
+                                           CanType inputType,   // `T.TangentVector`
+                                           CanType outputType,  // `Optional<T>.TangentVector`
+                                           SGFContext ctxt);
+
+  /// Emit conversion from Optional<T>.TangentVector to T.TangentVector.
+  ManagedValue
+  emitOptionalTangentVectorToTangentVector(SILLocation loc,
+                                           ManagedValue input,
+                                           CanType wrappedType, // `T`
+                                           CanType inputType,   // `Optional<T>.TangentVector`
+                                           CanType outputType,  // `T.TangentVector`
+                                           SGFContext ctxt);
+
+  
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//
@@ -2648,10 +2796,6 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
-    // No lowering support needed.
-  }
-
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 
@@ -2914,7 +3058,7 @@ public:
 
   /// Returns the SILDeclRef to use for references to the given accessor.
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
-    return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
+    return SGM.getFuncDeclRef(accessor, F.getResilienceExpansion());
   }
 
   /// Given a lowered pack expansion type, produce a generic environment

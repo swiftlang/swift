@@ -256,6 +256,10 @@ public:
   /// of the key path at some index.
   bool isKeyPathSubscriptComponent() const;
 
+  /// Determine whether this locator points to a member component
+  /// of the key path at some index.
+  bool isKeyPathMemberComponent() const;
+
   /// Determine whether this locator points to the member found
   /// via key path dynamic member lookup.
   bool isForKeyPathDynamicMemberLookup() const;
@@ -1275,7 +1279,7 @@ public:
 
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
-          return elt.getKind() != ConstraintLocator::OptionalPayload &&
+          return elt.getKind() != ConstraintLocator::OptionalInjection &&
                  elt.getKind() != ConstraintLocator::GenericArgument;
         });
 

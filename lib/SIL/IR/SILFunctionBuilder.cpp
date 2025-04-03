@@ -61,7 +61,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (auto *A = Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
+  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
   // Propagate @_specialize.
@@ -377,6 +377,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
       // Add attributes for e.g. computed properties.
+      ASSERT(ABIRoleInfo(storage).providesAPI()
+                && "addFunctionAttributes() on ABI-only accessor?");
+
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
                             
@@ -395,6 +398,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
         F->setInlineStrategy(NoInline);
       }
     }
+    ASSERT(ABIRoleInfo(decl).providesAPI()
+              && "addFunctionAttributes() on ABI-only decl?");
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
   }

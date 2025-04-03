@@ -223,8 +223,7 @@ static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
 
 #define KNOWN_SDK_FUNC_DECL(MODULE, NAME, ID)                                  \
   FuncDecl *SILGenModule::get##NAME(SILLocation loc) {                         \
-    if (ModuleDecl *M = getASTContext().getLoadedModule(                       \
-            getASTContext().Id_##MODULE)) {                                    \
+    if (getASTContext().getLoadedModule(getASTContext().Id_##MODULE)) {        \
       if (auto fn = getASTContext().get##NAME())                               \
         return fn;                                                             \
     }                                                                          \
@@ -459,6 +458,10 @@ FuncDecl *SILGenModule::getDeinitOnExecutor() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_deinitOnExecutor");
 }
 
+FuncDecl *SILGenModule::getCreateExecutors() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_createExecutors");
+}
+
 FuncDecl *SILGenModule::getExit() {
   ASTContext &C = getASTContext();
 
@@ -506,6 +509,40 @@ FuncDecl *SILGenModule::getExit() {
   }
 
   return exitFunction;
+}
+
+Type SILGenModule::getConfiguredExecutorFactory() {
+  auto &ctx = getASTContext();
+
+  ModuleDecl *module;
+
+  // Parse the executor factory name
+  StringRef qualifiedName = *ctx.LangOpts.ExecutorFactory;
+  StringRef typeName;
+
+  auto parts = qualifiedName.split('.');
+
+  if (parts.second.empty()) {
+    // This was an unqualified name; assume it's relative to the main module
+    module = ctx.MainModule;
+    typeName = qualifiedName;
+  } else {
+    Identifier moduleName = ctx.getIdentifier(parts.first);
+    module = ctx.getModuleByIdentifier(moduleName);
+    typeName = parts.second;
+  }
+
+  return ctx.getNamedSwiftType(module, typeName);
+}
+
+Type SILGenModule::getDefaultExecutorFactory() {
+  auto &ctx = getASTContext();
+
+  ModuleDecl *module = ctx.getModuleByIdentifier(ctx.Id_Concurrency);
+  if (!module)
+    return Type();
+
+  return ctx.getNamedSwiftType(module, "DefaultExecutorFactory");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -1440,6 +1477,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit default arguments and property wrapper initializers.
   emitArgumentGenerators(AFD, AFD->getParameters());
 
+  ASSERT(ABIRoleInfo(AFD).providesAPI()
+            && "emitAbstractFuncDecl() on ABI-only decl?");
+
   // If the declaration is exported as a C function, emit its native-to-foreign
   // thunk too, if it wasn't already forced.
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
@@ -1720,7 +1760,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     break;
 
   case DefaultArgumentKind::Inherited:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral:
@@ -2077,10 +2117,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serializedKind*/ 0, decl, component);
-}
-
-void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-  // Nothing to do for #error/#warning; they've already been emitted.
 }
 
 void SILGenModule::emitSourceFile(SourceFile *sf) {

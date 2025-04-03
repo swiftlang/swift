@@ -22,12 +22,12 @@
 #include <windows.h>
 #endif
 
-#include "MetadataCache.h"
 #include "BytecodeLayouts.h"
+#include "MetadataCache.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
@@ -41,6 +41,7 @@
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 #include <cctype>
@@ -56,13 +57,14 @@
 extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
     (Class _Nonnull oldClass, Class _Nonnull newClass));
 #endif
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Hashing.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
-#include "swift/Runtime/Debug.h"
+#include "GenericCacheEntry.h"
 #include "Private.h"
+#include "swift/Runtime/Debug.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Hashing.h"
 
 #if SWIFT_OBJC_INTEROP
 #include "ObjCRuntimeGetImageNameFromClass.h"
@@ -311,146 +313,6 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
   return bounds.ImmediateMembersOffset / sizeof(void*);
 }
 
-static bool
-areAllTransitiveMetadataComplete_cheap(const Metadata *metadata);
-
-static MetadataDependency
-checkTransitiveCompleteness(const Metadata *metadata);
-
-static PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
-  if (metadata->getValueWitnesses()->isIncomplete())
-    return PrivateMetadataState::Abstract;
-
-  // TODO: internal vs. external layout-complete?
-  return PrivateMetadataState::LayoutComplete;
-}
-
-namespace {
-  struct GenericCacheEntry final :
-      VariadicMetadataCacheEntryBase<GenericCacheEntry> {
-    static const char *getName() { return "GenericCache"; }
-
-    // The constructor/allocate operations that take a `const Metadata *`
-    // are used for the insertion of canonical specializations.
-    // The metadata is always complete after construction.
-
-    GenericCacheEntry(MetadataCacheKey key,
-                      MetadataWaitQueue::Worker &worker,
-                      MetadataRequest request,
-                      const Metadata *candidate)
-      : VariadicMetadataCacheEntryBase(key, worker,
-                                       PrivateMetadataState::Complete,
-                                       const_cast<Metadata*>(candidate)) {}
-
-    AllocationResult allocate(const Metadata *candidate) {
-      swift_unreachable("always short-circuited");
-    }
-
-    static bool allowMangledNameVerification(const Metadata *candidate) {
-      // Disallow mangled name verification for specialized candidates
-      // because it will trigger recursive entry into the swift_once
-      // in cacheCanonicalSpecializedMetadata.
-      // TODO: verify mangled names in a second pass in that function.
-      return false;
-    }
-
-    // The constructor/allocate operations that take a descriptor
-    // and arguments are used along the normal allocation path.
-
-    GenericCacheEntry(MetadataCacheKey key,
-                      MetadataWaitQueue::Worker &worker,
-                      MetadataRequest request,
-                      const TypeContextDescriptor *description,
-                      const void * const *arguments)
-      : VariadicMetadataCacheEntryBase(key, worker,
-                                       PrivateMetadataState::Allocating,
-                                       /*candidate*/ nullptr) {}
-
-    AllocationResult allocate(const TypeContextDescriptor *description,
-                              const void * const *arguments) {
-      if (auto *prespecialized =
-              getLibPrespecializedMetadata(description, arguments))
-        return {prespecialized, PrivateMetadataState::Complete};
-
-      // Find a pattern.  Currently we always use the default pattern.
-      auto &generics = description->getFullGenericContextHeader();
-      auto pattern = generics.DefaultInstantiationPattern.get();
-
-      // Call the pattern's instantiation function.
-      auto metadata =
-        pattern->InstantiationFunction(description, arguments, pattern);
-
-      // If there's no completion function, do a quick-and-dirty check to
-      // see if all of the type arguments are already complete.  If they
-      // are, we can broadcast completion immediately and potentially avoid
-      // some extra locking.
-      PrivateMetadataState state;
-      if (pattern->CompletionFunction.isNull()) {
-        if (areAllTransitiveMetadataComplete_cheap(metadata)) {
-          state = PrivateMetadataState::Complete;
-        } else {
-          state = PrivateMetadataState::NonTransitiveComplete;
-        }
-      } else {
-        state = inferStateForMetadata(metadata);
-      }
-
-      return { metadata, state };
-    }
-
-    static bool allowMangledNameVerification(
-                                  const TypeContextDescriptor *description,
-                                             const void * const *arguments) {
-      return true;
-    }
-
-    MetadataStateWithDependency tryInitialize(Metadata *metadata,
-                                      PrivateMetadataState state,
-                               PrivateMetadataCompletionContext *context) {
-      assert(state != PrivateMetadataState::Complete);
-
-      // Finish the completion function.
-      if (state < PrivateMetadataState::NonTransitiveComplete) {
-        // Find a pattern.  Currently we always use the default pattern.
-        auto &generics = metadata->getTypeContextDescriptor()
-                                 ->getFullGenericContextHeader();
-        auto pattern = generics.DefaultInstantiationPattern.get();
-
-        // Complete the metadata's instantiation.
-        auto dependency =
-          pattern->CompletionFunction(metadata, &context->Public, pattern);
-
-        // If this failed with a dependency, infer the current metadata state
-        // and return.
-        if (dependency) {
-          return { inferStateForMetadata(metadata), dependency };
-        }
-      }
-
-      // Check for transitive completeness.
-      if (auto dependency = checkTransitiveCompleteness(metadata)) {
-        return { PrivateMetadataState::NonTransitiveComplete, dependency };
-      }
-
-      // We're done.
-      return { PrivateMetadataState::Complete, MetadataDependency() };
-    }
-  };
-} // end anonymous namespace
-
-namespace swift {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-  struct StaticAssertGenericMetadataCacheEntryValueOffset {
-    static_assert(
-      offsetof(GenericCacheEntry, Value) ==
-      offsetof(swift::GenericMetadataCacheEntry<InProcess::StoredPointer>,
-               Value),
-      "The generic metadata cache entry layout mismatch");
-  };
-#pragma clang diagnostic pop
-}
-
 namespace {
   class GenericMetadataCache :
     public MetadataCache<GenericCacheEntry, GenericMetadataCacheTag> {
@@ -549,7 +411,7 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
             reinterpret_cast<void **>(&dest[i]),
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
-            !descriptors[i].Flags.isAsync(),
+            !descriptors[i].Flags.isData(),
             /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                                  // might be proven unused and null'ed)
       }
@@ -756,14 +618,20 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
-ClassMetadata *
-swift::swift_allocateGenericClassMetadataWithLayoutString(
-    const ClassDescriptor *description,
-    const void *arguments,
+static ClassMetadata *
+swift_cvw_allocateGenericClassMetadataWithLayoutStringImpl(
+    const ClassDescriptor *description, const void *arguments,
     const GenericClassMetadataPattern *pattern) {
   return swift::swift_allocateGenericClassMetadata(description,
                                                    arguments,
                                                    pattern);
+}
+
+ClassMetadata *swift::swift_allocateGenericClassMetadataWithLayoutString(
+    const ClassDescriptor *description, const void *arguments,
+    const GenericClassMetadataPattern *pattern) {
+  return swift_cvw_allocateGenericClassMetadataWithLayoutString(
+      description, arguments, pattern);
 }
 
 static void
@@ -837,16 +705,21 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   return metadata;
 }
 
-ValueMetadata *
-swift::swift_allocateGenericValueMetadataWithLayoutString(
-    const ValueTypeDescriptor *description,
-    const void *arguments,
-    const GenericValueMetadataPattern *pattern,
-    size_t extraDataSize) {
+static ValueMetadata *
+swift_cvw_allocateGenericValueMetadataWithLayoutStringImpl(
+    const ValueTypeDescriptor *description, const void *arguments,
+    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
   return swift::swift_allocateGenericValueMetadata(description,
                                                    arguments,
                                                    pattern,
                                                    extraDataSize);
+}
+
+ValueMetadata *swift::swift_allocateGenericValueMetadataWithLayoutString(
+    const ValueTypeDescriptor *description, const void *arguments,
+    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
+  return swift_cvw_allocateGenericValueMetadataWithLayoutString(
+      description, arguments, pattern, extraDataSize);
 }
 
 // Look into the canonical prespecialized metadata attached to the type
@@ -1765,7 +1638,7 @@ public:
                                     PrivateMetadataCompletionContext *context);
 
   MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = ::checkTransitiveCompleteness(&Data);
+    auto dependency = swift::checkTransitiveCompleteness(&Data);
     return { dependency ? PrivateMetadataState::NonTransitiveComplete
                         : PrivateMetadataState::Complete,
              dependency };
@@ -2104,7 +1977,7 @@ public:
                                     PrivateMetadataCompletionContext *context);
 
   MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = ::checkTransitiveCompleteness(&Data);
+    auto dependency = swift::checkTransitiveCompleteness(&Data);
     return { dependency ? PrivateMetadataState::NonTransitiveComplete
                         : PrivateMetadataState::Complete,
              dependency };
@@ -3081,7 +2954,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initStructMetadataWithLayoutString(
+static void swift_cvw_initStructMetadataWithLayoutStringImpl(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
     const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
     uint32_t *fieldOffsets) {
@@ -3191,11 +3064,6 @@ void swift::swift_initStructMetadataWithLayoutString(
   structType->setLayoutString(layoutStr);
 
   auto *vwtable = getMutableVWTableForInit(structType, layoutFlags);
-  vwtable->destroy = swift_generic_destroy;
-  vwtable->initializeWithCopy = swift_generic_initWithCopy;
-  vwtable->initializeWithTake = swift_generic_initWithTake;
-  vwtable->assignWithCopy = swift_generic_assignWithCopy;
-  vwtable->assignWithTake = swift_generic_assignWithTake;
 
   layout.extraInhabitantCount = extraInhabitantCount;
 
@@ -3203,6 +3071,14 @@ void swift::swift_initStructMetadataWithLayoutString(
   installCommonValueWitnesses(layout, vwtable);
 
   vwtable->publishLayout(layout);
+}
+
+void swift::swift_initStructMetadataWithLayoutString(
+    StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
+    const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
+    uint32_t *fieldOffsets) {
+  swift_cvw_initStructMetadataWithLayoutString(
+      structType, layoutFlags, numFields, fieldTypes, fieldTags, fieldOffsets);
 }
 
 size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
@@ -3302,8 +3178,9 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
              reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
 
       if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
-                                         reader.layoutStr + layoutStringHeaderSize, fieldType);
+        swift_cvw_resolve_resilientAccessors(
+            writer.layoutStr, writer.offset,
+            reader.layoutStr + layoutStringHeaderSize, fieldType);
       }
 
       if (offset) {
@@ -3672,10 +3549,12 @@ static bool installLazyClassNameHook() {
   return false;
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor)) SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static bool
 supportsLazyObjcClassNames() {
   return SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 static void setUpGenericClassObjCName(ClassMetadata *theClass) {
   if (supportsLazyObjcClassNames()) {
@@ -3733,7 +3612,7 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
             reinterpret_cast<void **>(&dest[i]),
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
-            !descriptors[i].Flags.isAsync(),
+            !descriptors[i].Flags.isData(),
             /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                                  // might be proven unused and null'ed)
       }
@@ -3767,10 +3646,49 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #endif
 }
 
+template <typename GetImpl>
+static void installOverrideInVTable(ContextDescriptor const *baseContext,
+                                    MethodDescriptor const *baseMethod,
+                                    GetImpl getImpl, void const *table,
+                                    void **classWords) {
+  // Get the base class and method.
+  auto *baseClass = cast_or_null<ClassDescriptor>(baseContext);
+
+  // If the base method is null, it's an unavailable weak-linked
+  // symbol.
+  if (baseClass == nullptr || baseMethod == nullptr)
+    return;
+
+  // Calculate the base method's vtable offset from the
+  // base method descriptor. The offset will be relative
+  // to the base class's vtable start offset.
+  auto baseClassMethods = baseClass->getMethodDescriptors();
+
+  // If the method descriptor doesn't land within the bounds of the
+  // method table, abort.
+  if (baseMethod < baseClassMethods.begin() ||
+      baseMethod >= baseClassMethods.end()) {
+    fatalError(0,
+               "resilient vtable at %p contains out-of-bounds "
+               "method descriptor %p\n",
+               table, baseMethod);
+  }
+
+  // Install the method override in our vtable.
+  auto baseVTable = baseClass->getVTableDescriptor();
+  auto offset = (baseVTable->getVTableOffset(baseClass) +
+                 (baseMethod - baseClassMethods.data()));
+  swift_ptrauth_init_code_or_data(&classWords[offset], getImpl(),
+                                  baseMethod->Flags.getExtraDiscriminator(),
+                                  !baseMethod->Flags.isData());
+}
+
 /// Using the information in the class context descriptor, fill in in the
-/// immediate vtable entries for the class and install overrides of any
-/// superclass vtable entries.
-static void initClassVTable(ClassMetadata *self) {
+/// immediate vtable entries for the class install overrides of any
+/// superclass vtable entries, and install any default overrides if appropriate.
+static void initClassVTable(ClassMetadata *self,
+                            llvm::SmallVectorImpl<const ClassDescriptor *>
+                                &superclassesWithDefaultOverrides) {
   const auto *description = self->getDescription();
   auto *classWords = reinterpret_cast<void **>(self);
 
@@ -3783,48 +3701,53 @@ static void initClassVTable(ClassMetadata *self) {
       swift_ptrauth_init_code_or_data(
           &classWords[vtableOffset + i], methodDescription.getImpl(),
           methodDescription.Flags.getExtraDiscriminator(),
-          !methodDescription.Flags.isAsync());
+          !methodDescription.Flags.isData());
     }
   }
 
-  if (description->hasOverrideTable()) {
-    auto *overrideTable = description->getOverrideTable();
-    auto overrideDescriptors = description->getMethodOverrideDescriptors();
+  if (!description->hasOverrideTable()) {
+    // The class didn't override anything, so we're done.
+    return;
+  }
 
-    for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
-      auto &descriptor = overrideDescriptors[i];
+  auto hasSuperclassWithDefaultOverride =
+      superclassesWithDefaultOverrides.size() > 0;
+  std::unordered_set<const MethodDescriptor *> seenDescriptors;
 
-      // Get the base class and method.
-      auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
-      auto *baseMethod = descriptor.Method.get();
+  // Install our overrides.
+  auto *overrideTable = description->getOverrideTable();
+  auto overrideDescriptors = description->getMethodOverrideDescriptors();
+  for (auto &descriptor : overrideDescriptors) {
+    if (hasSuperclassWithDefaultOverride)
+      seenDescriptors.insert(descriptor.Method);
 
-      // If the base method is null, it's an unavailable weak-linked
-      // symbol.
-      if (baseClass == nullptr || baseMethod == nullptr)
+    installOverrideInVTable(
+        descriptor.Class.get(), descriptor.Method.get(),
+        [&descriptor]() { return descriptor.getImpl(); }, overrideTable,
+        classWords);
+  }
+
+  if (!hasSuperclassWithDefaultOverride) {
+    // No ancestor had default overrides to consider, so we're done.
+    return;
+  }
+
+  // Install any necessary default overrides.
+  for (auto *description : superclassesWithDefaultOverrides) {
+    assert(description->hasDefaultOverrideTable());
+    auto *header = description->getDefaultOverrideTable();
+    assert(header->NumEntries > 0 && "default override table with 0 entries");
+    auto entries = description->getDefaultOverrideDescriptors();
+    for (auto &entry : entries) {
+      auto *original = entry.Original.get();
+      if (!seenDescriptors.count(original))
         continue;
-
-      // Calculate the base method's vtable offset from the
-      // base method descriptor. The offset will be relative
-      // to the base class's vtable start offset.
-      auto baseClassMethods = baseClass->getMethodDescriptors();
-
-      // If the method descriptor doesn't land within the bounds of the
-      // method table, abort.
-      if (baseMethod < baseClassMethods.begin() ||
-          baseMethod >= baseClassMethods.end()) {
-        fatalError(0, "resilient vtable at %p contains out-of-bounds "
-                   "method descriptor %p\n",
-                   overrideTable, baseMethod);
-      }
-
-      // Install the method override in our vtable.
-      auto baseVTable = baseClass->getVTableDescriptor();
-      auto offset = (baseVTable->getVTableOffset(baseClass) +
-                     (baseMethod - baseClassMethods.data()));
-      swift_ptrauth_init_code_or_data(&classWords[offset],
-                                      descriptor.getImpl(),
-                                      baseMethod->Flags.getExtraDiscriminator(),
-                                      !baseMethod->Flags.isAsync());
+      auto *replacement = entry.Replacement.get();
+      if (seenDescriptors.count(replacement))
+        continue;
+      installOverrideInVTable(
+          description, replacement, [&entry]() { return entry.getImpl(); },
+          header, classWords);
     }
   }
 }
@@ -4131,7 +4054,7 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
 
 SWIFT_CC(swift)
 static std::pair<MetadataDependency, const ClassMetadata *>
-getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
+getSuperclassMetadata(const ClassMetadata *self, bool allowDependency) {
   MetadataRequest request(allowDependency ? MetadataState::NonTransitiveComplete
                                           : /*FIXME*/ MetadataState::Abstract,
                           /*non-blocking*/ allowDependency);
@@ -4172,6 +4095,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   auto superDependencyAndSuper = getSuperclassMetadata(self, allowDependency);
   if (superDependencyAndSuper.first)
     return superDependencyAndSuper.first;
+
   auto super = superDependencyAndSuper.second;
 
   self->Superclass = super;
@@ -4192,6 +4116,28 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
       nullptr);
 #endif
 
+  // To populate the vtable, we must check our ancestors for default overloads.
+  // We may obstructed by dependencies, however, so do it now before doing any
+  // setup.
+  llvm::SmallVector<const ClassDescriptor *, 16>
+      superclassesWithDefaultOverrides;
+  if (self->getDescription()->hasOverrideTable()) {
+    const ClassMetadata *super = superDependencyAndSuper.second;
+    while (super && !super->isPureObjC()) {
+      const auto *description = super->getDescription();
+      if (description->hasDefaultOverrideTable()) {
+        // This superclass has default overrides.  Record it for later
+        // traversal.
+        superclassesWithDefaultOverrides.push_back(description);
+      }
+      auto superDependencyAndSuper =
+          getSuperclassMetadata(super, allowDependency);
+      if (superDependencyAndSuper.first)
+        return superDependencyAndSuper.first;
+      super = superDependencyAndSuper.second;
+    }
+  }
+
   // Copy field offsets, generic arguments and (if necessary) vtable entries
   // from our superclass.
   copySuperclassMetadataToSubclass(self, layoutFlags);
@@ -4199,7 +4145,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
   if (!hasStaticVTable(layoutFlags))
-    initClassVTable(self);
+    initClassVTable(self, superclassesWithDefaultOverrides);
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
@@ -4476,7 +4422,7 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 #if SWIFT_PTRAUTH
   // Re-sign the return value without the address.
   unsigned extra = method->Flags.getExtraDiscriminator();
-  if (method->Flags.isAsync()) {
+  if (method->Flags.isData()) {
     return ptrauth_auth_and_resign(
         *methodPtr, ptrauth_key_process_independent_data,
         ptrauth_blend_discriminator(methodPtr, extra),
@@ -6221,7 +6167,7 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
                                     reqt.Flags.getExtraDiscriminator(),
-                                    !reqt.Flags.isAsync());
+                                    !reqt.Flags.isData());
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
@@ -6263,7 +6209,7 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
   case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(
-        dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isAsync(),
+        dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isData(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                              // might be proven unused and null'ed)
     return;
@@ -7609,9 +7555,9 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
   return false;
 }
 
+namespace swift {
 /// Do a quick check to see if all the transitive type metadata are complete.
-static bool
-areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
+bool areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
   // Look for any transitive metadata that's *incomplete*.
   return !findAnyTransitiveMetadata(type, [](const Metadata *type) {
     struct IsIncompleteCallbacks {
@@ -7654,6 +7600,14 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
   });
 }
 
+PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isIncomplete())
+    return PrivateMetadataState::Abstract;
+
+  // TODO: internal vs. external layout-complete?
+  return PrivateMetadataState::LayoutComplete;
+}
+
 /// Check for transitive completeness.
 ///
 /// The key observation here is that all we really care about is whether
@@ -7663,8 +7617,7 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
 /// scan its transitive metadata and actually try to find something that's
 /// incomplete.  If we don't find anything, then we know all the transitive
 /// dependencies actually hold, and we can keep going.
-static MetadataDependency
-checkTransitiveCompleteness(const Metadata *initialType) {
+MetadataDependency checkTransitiveCompleteness(const Metadata *initialType) {
   llvm::SmallVector<const Metadata *, 8> worklist;
   
   // An efficient hash-set implementation in the spirit of llvm's SmallPtrSet:
@@ -7745,6 +7698,7 @@ checkTransitiveCompleteness(const Metadata *initialType) {
   // Otherwise, we're transitively complete.
   return MetadataDependency();
 }
+} // namespace swift
 
 /// Diagnose a metadata dependency cycle.
 SWIFT_NORETURN static void
@@ -8094,10 +8048,28 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
           Tag);
     }
 
+    // If we allocated a new page, then we need to do a store-release to ensure
+    // the initialization writes are properly ordered when viewed from other
+    // threads that read from the new page. If we did not allocate a new page,
+    // then we need a load-consume to cover the other side of that.
+    std::memory_order successOrder = allocatedNewPage
+                                         ? std::memory_order_release
+                                         : SWIFT_MEMORY_ORDER_CONSUME;
+
     // Swap in the new state.
     if (AllocationPool.compare_exchange_weak(curState, newState,
-                                             std::memory_order_relaxed,
+                                             successOrder,
                                              std::memory_order_relaxed)) {
+      // If the program is using Thread Sanitizer, it can't see our memory
+      // ordering, so inform it manually. TSan will track the consume ordering
+      // in __swift_instantiateConcreteTypeFromMangledName so we register the
+      // correct ordering with threads that get a metadata pointer from a cache
+      // variable too.
+      if (allocatedNewPage)
+        swift::tsan::release(&AllocationPool);
+      else
+        swift::tsan::acquire(&AllocationPool);
+
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
@@ -8242,6 +8214,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
+#define OVERRIDE_CVW_METADATA COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 // Autolink with libc++, for cases where libswiftCore is linked statically.

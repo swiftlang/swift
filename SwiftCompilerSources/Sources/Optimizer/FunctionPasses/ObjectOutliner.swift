@@ -305,7 +305,8 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is DeallocStackRefInst,
        is StrongRetainInst,
        is StrongReleaseInst,
-       is FixLifetimeInst:
+       is FixLifetimeInst,
+       is MarkDependenceAddrInst:
     return true
 
   case let mdi as MarkDependenceInst:

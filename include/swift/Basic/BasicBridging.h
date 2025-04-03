@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -78,6 +78,7 @@
 namespace llvm {
 class raw_ostream;
 class StringRef;
+class VersionTuple;
 } // end namespace llvm
 
 namespace swift {
@@ -99,34 +100,42 @@ typedef uintptr_t SwiftUInt;
 // and Swift could import the underlying pointee type instead. We need to be
 // careful that the interface we expose remains consistent regardless of
 // PURE_BRIDGING_MODE.
-#define BRIDGING_WRAPPER_IMPL(Node, Name, Nullability)                         \
+#define BRIDGING_WRAPPER_IMPL(Node, Name, Qualifier, Nullability)              \
   class Bridged##Name {                                                        \
-    Node * Nullability Ptr;                                                    \
+    Qualifier Node *Nullability Ptr;                                           \
                                                                                \
   public:                                                                      \
     SWIFT_UNAVAILABLE("Use init(raw:) instead")                                \
-    Bridged##Name(Node * Nullability ptr) : Ptr(ptr) {}                        \
+    Bridged##Name(Qualifier Node *Nullability ptr) : Ptr(ptr) {}               \
                                                                                \
     SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
-    Node * Nullability unbridged() const { return Ptr; }                       \
+    Qualifier Node *Nullability unbridged() const { return Ptr; }              \
   };                                                                           \
                                                                                \
   SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
-  inline void * Nullability Bridged##Name##_getRaw(Bridged##Name bridged) {    \
+  inline Qualifier void *Nullability Bridged##Name##_getRaw(                   \
+      Bridged##Name bridged) {                                                 \
     return bridged.unbridged();                                                \
   }                                                                            \
                                                                                \
   SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
-  inline Bridged##Name Bridged##Name##_fromRaw(void * Nullability ptr) {       \
-    return static_cast<Node *>(ptr);                                           \
+  inline Bridged##Name Bridged##Name##_fromRaw(                                \
+      Qualifier void *Nullability ptr) {                                       \
+    return static_cast<Qualifier Node *>(ptr);                                 \
   }
 
 // Bridging wrapper macros for convenience.
-#define BRIDGING_WRAPPER_NONNULL(Node, Name) \
-  BRIDGING_WRAPPER_IMPL(Node, Name, _Nonnull)
+#define BRIDGING_WRAPPER_NONNULL(Node, Name)                                   \
+  BRIDGING_WRAPPER_IMPL(Node, Name, /*unqualified*/, _Nonnull)
 
-#define BRIDGING_WRAPPER_NULLABLE(Node, Name) \
-  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, _Nullable)
+#define BRIDGING_WRAPPER_NULLABLE(Node, Name)                                  \
+  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, /*unqualified*/, _Nullable)
+
+#define BRIDGING_WRAPPER_CONST_NONNULL(Node, Name)                             \
+  BRIDGING_WRAPPER_IMPL(Node, Name, const, _Nonnull)
+
+#define BRIDGING_WRAPPER_CONST_NULLABLE(Node, Name)                            \
+  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, const, _Nullable)
 
 void assertFail(const char * _Nonnull msg, const char * _Nonnull file,
                 SwiftUInt line, const char * _Nonnull function);
@@ -167,6 +176,9 @@ const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr);
 
 SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
 BRIDGED_INLINE SwiftInt BridgedArrayRef_count(BridgedArrayRef arr);
+
+SWIFT_NAME("getter:BridgedArrayRef.isEmpty(self:)")
+BRIDGED_INLINE bool BridgedArrayRef_isEmpty(BridgedArrayRef arr);
 
 //===----------------------------------------------------------------------===//
 // MARK: Data
@@ -445,7 +457,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
   BridgedGeneratedSourceFileKindReplacedFunctionBody,
   BridgedGeneratedSourceFileKindPrettyPrinted,
   BridgedGeneratedSourceFileKindDefaultArgument,
-  BridgedGeneratedSourceFileKindAttribute,
+  BridgedGeneratedSourceFileKindAttributeFromClang,
 
   BridgedGeneratedSourceFileKindNone,
 };
@@ -460,6 +472,56 @@ struct BridgedVirtualFile {
   BridgedStringRef Name;
   ptrdiff_t LineOffset;
   size_t NamePosition;
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: VersionTuple
+//===----------------------------------------------------------------------===//
+
+struct BridgedVersionTuple {
+  unsigned Major : 32;
+
+  unsigned Minor : 31;
+  unsigned HasMinor : 1;
+
+  unsigned Subminor : 31;
+  unsigned HasSubminor : 1;
+
+  unsigned Build : 31;
+  unsigned HasBuild : 1;
+
+  BridgedVersionTuple()
+      : Major(0), Minor(0), HasMinor(false), Subminor(0), HasSubminor(false),
+        Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major)
+      : Major(Major), Minor(0), HasMinor(false), Subminor(0),
+        HasSubminor(false), Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major, unsigned Minor)
+      : Major(Major), Minor(Minor), HasMinor(true), Subminor(0),
+        HasSubminor(false), Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major, unsigned Minor, unsigned Subminor)
+      : Major(Major), Minor(Minor), HasMinor(true), Subminor(Subminor),
+        HasSubminor(true), Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major, unsigned Minor, unsigned Subminor,
+                      unsigned Build)
+      : Major(Major), Minor(Minor), HasMinor(true), Subminor(Subminor),
+        HasSubminor(true), Build(Build), HasBuild(true) {}
+
+  BridgedVersionTuple(llvm::VersionTuple);
+
+  llvm::VersionTuple unbridged() const;
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSwiftClosure
+//===----------------------------------------------------------------------===//
+
+/// Wrapping a pointer to a Swift closure `(UnsafeRawPointer?) -> Void`
+/// See 'withBridgedSwiftClosure(closure:call:)' in ASTGen.
+struct BridgedSwiftClosure {
+  const void *_Nonnull closure;
+
+  BRIDGED_INLINE void operator()(const void *_Nullable);
 };
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

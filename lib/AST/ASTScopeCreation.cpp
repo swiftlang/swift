@@ -309,13 +309,22 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
       break;
     }
     case MacroRole::Body: {
-      // Use the end location of the function decl itself as the parentLoc
-      // for the new function body scope. This is different from the end
-      // location of the original source range, which is after the end of the
-      // function decl.
       auto expansion = SF->getMacroExpansion();
-      parentLoc = expansion.getEndLoc();
-      bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+      if (expansion.is<Decl *>()) {
+        // Use the end location of the function decl itself as the parentLoc
+        // for the new function body scope. This is different from the end
+        // location of the original source range, which is after the end of the
+        // function decl.
+        bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+        parentLoc = expansion.getEndLoc();
+        break;
+      }
+
+      // Otherwise, we have a closure body macro.
+      auto insertionRange = SF->getMacroInsertionRange();
+      parentLoc = insertionRange.End;
+      if (insertionRange.Start != insertionRange.End)
+        parentLoc = parentLoc.getAdvancedLoc(-1);
       break;
     }
     }
@@ -364,7 +373,6 @@ public:
   VISIT_AND_IGNORE(AssociatedTypeDecl)
   VISIT_AND_IGNORE(ModuleDecl)
   VISIT_AND_IGNORE(ParamDecl)
-  VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
 
@@ -602,6 +610,12 @@ ASTScopeImpl *ScopeCreator::addToScopeTreeAndReturnInsertionPoint(
 void ScopeCreator::addChildrenForParsedAccessors(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
   asd->visitParsedAccessors([&](AccessorDecl *ad) {
+    // Ignore accessors added by macro expansions.
+    // TODO: This ought to be the default behavior of `visitParsedAccessors`,
+    // we ought to have a different entrypoint for clients that care about
+    // the semantic set of "explicit" accessors.
+    if (ad->isInMacroExpansionInContext())
+      return;
     assert(asd == ad->getStorage());
     this->addToScopeTree(ad, parent);
   });
@@ -658,11 +672,16 @@ ScopeCreator::addPatternBindingToScopeTree(PatternBindingDecl *patternBinding,
   if (auto *var = patternBinding->getSingleVar())
     addChildrenForKnownAttributes(var, parentScope);
 
+  // Check to see if we have a local binding. Note we need to exclude bindings
+  // in `@abi` attributes here since they may be in a local DeclContext, but
+  // their scope shouldn't extend past the attribute.
   bool isLocalBinding = false;
-  for (auto i : range(patternBinding->getNumPatternEntries())) {
-    if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
-      isLocalBinding = varDecl->getDeclContext()->isLocalContext();
-      break;
+  if (!isa<ABIAttributeScope>(parentScope)) {
+    for (auto i : range(patternBinding->getNumPatternEntries())) {
+      if (auto *varDecl = patternBinding->getAnchoringVarDecl(i)) {
+        isLocalBinding = varDecl->getDeclContext()->isLocalContext();
+        break;
+      }
     }
   }
 
@@ -694,9 +713,8 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   ASTScopeAssert(!child->getParent(), "child should not already have parent");
   child->parentAndWasExpanded.setPointer(this);
 
-#ifndef NDEBUG
-  // checkSourceRangeBeforeAddingChild(child, ctx);
-#endif
+  if (CONDITIONAL_ASSERT_enabled())
+    checkSourceRangeBeforeAddingChild(child, ctx);
 
   // If this is the first time we've added children, notify the ASTContext
   // that there's a SmallVector that needs to be cleaned up.

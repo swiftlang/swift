@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
@@ -58,7 +59,7 @@
 // Unwrap an Expected<> variable following the typical deserialization pattern:
 // - On a value, assign it to Output.
 // - On an error, return it to bubble it up to the caller.
-#define UNWRAP(Input, Output) { \
+#define SET_OR_RETURN_ERROR(Output, Input) { \
   auto ValueOrError = Input; \
   if (!ValueOrError) \
       return ValueOrError.takeError(); \
@@ -178,6 +179,8 @@ const char ModularizationError::ID = '\0';
 void ModularizationError::anchor() {}
 const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
+const char ConformanceXRefError::ID = '\0';
+void ConformanceXRefError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -403,6 +406,16 @@ ModuleFile::diagnoseModularizationError(llvm::Error error,
   return outError;
 }
 
+void
+ConformanceXRefError::diagnose(const ModuleFile *MF,
+                               DiagnosticBehavior limit) const {
+  auto &diags = MF->getContext().Diags;
+  diags.diagnose(MF->getSourceLoc(),
+                 diag::modularization_issue_conformance_xref_error,
+                 name, protoName, expectedModule->getName())
+    .limitBehavior(limit);
+}
+
 llvm::Error ModuleFile::diagnoseFatal(llvm::Error error) const {
 
   auto &ctx = getContext();
@@ -537,7 +550,7 @@ Expected<ParameterList *> ModuleFile::readParameterList() {
   SmallVector<ParamDecl *, 8> params;
   for (DeclID paramID : rawMemberIDs) {
     Decl *param;
-    UNWRAP(getDeclChecked(paramID), param);
+    SET_OR_RETURN_ERROR(param, getDeclChecked(paramID));
     params.push_back(cast<ParamDecl>(param));
   }
 
@@ -583,7 +596,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
     Pattern *subPattern;
-    UNWRAP(readPattern(owningDC), subPattern);
+    SET_OR_RETURN_ERROR(subPattern, readPattern(owningDC));
 
     auto result = ParenPattern::createImplicit(getContext(), subPattern);
 
@@ -616,13 +629,13 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       Identifier label = getIdentifier(labelID);
 
       Pattern *subPattern;
-      UNWRAP(readPattern(owningDC), subPattern);
+      SET_OR_RETURN_ERROR(subPattern, readPattern(owningDC));
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
     auto result = TuplePattern::createImplicit(getContext(), elements);
     Type tupleType;
-    UNWRAP(getTypeChecked(tupleTypeID), tupleType);
+    SET_OR_RETURN_ERROR(tupleType, getTypeChecked(tupleTypeID));
     recordPatternType(result, tupleType);
     restoreOffset.reset();
     return result;
@@ -683,7 +696,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     BindingPatternLayout::readRecord(scratch, rawIntroducer);
 
     Pattern *subPattern;
-    UNWRAP(readPattern(owningDC), subPattern);
+    SET_OR_RETURN_ERROR(subPattern, readPattern(owningDC));
 
     auto introducer = getActualVarDeclIntroducer(
         (serialization::VarDeclIntroducer) rawIntroducer);
@@ -774,6 +787,9 @@ public:
 
   Expected<PackConformance *>
   read(ModuleFile::Serialized<PackConformance *> &entry);
+
+  Expected<AbstractConformance *>
+  read(ModuleFile::Serialized<AbstractConformance *> &entry);
 };
 } // end namespace swift
 
@@ -859,9 +875,11 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
     return subMapOrError.takeError();
   auto subMap = subMapOrError.get();
 
-  auto genericConformance = MF.getConformance(conformanceID);
+  ProtocolConformanceRef genericConformance;
+  SET_OR_RETURN_ERROR(genericConformance,
+                      MF.getConformanceChecked(conformanceID));
 
-  PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
+  PrettyStackTraceDecl traceTo("... to", genericConformance.getProtocol());
   ++NumNormalProtocolConformancesLoaded;
 
   auto *rootConformance = cast<NormalProtocolConformance>(
@@ -891,10 +909,11 @@ ProtocolConformanceDeserializer::readInheritedProtocolConformance(
   PrettyStackTraceType trace(ctx, "reading inherited conformance for",
                              conformingType);
 
-  ProtocolConformanceRef inheritedConformance =
-    MF.getConformance(conformanceID);
+  ProtocolConformanceRef inheritedConformance;
+  SET_OR_RETURN_ERROR(inheritedConformance,
+                      MF.getConformanceChecked(conformanceID));
   PrettyStackTraceDecl traceTo("... to",
-                               inheritedConformance.getRequirement());
+                               inheritedConformance.getProtocol());
 
   assert(inheritedConformance.isConcrete() &&
          "Abstract inherited conformance?");
@@ -942,14 +961,16 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                             moduleID);
 
-  auto maybeNominal = MF.getDeclChecked(nominalID);
-  if (!maybeNominal)
-    return maybeNominal.takeError();
-
-  auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
+  Decl *maybeNominal;
+  SET_OR_RETURN_ERROR(maybeNominal, MF.getDeclChecked(nominalID));
+  auto nominal = cast<NominalTypeDecl>(maybeNominal);
   PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
-  auto proto = cast<ProtocolDecl>(MF.getDecl(protoID));
+
+  Decl *maybeProto;
+  SET_OR_RETURN_ERROR(maybeProto, MF.getDeclChecked(protoID));
+  auto proto = cast<ProtocolDecl>(maybeProto);
   PrettyStackTraceDecl traceTo("... to", proto);
+
   auto module = MF.getModule(moduleID);
 
   // FIXME: If the module hasn't been loaded, we probably don't want to fall
@@ -957,16 +978,39 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   if (!module)
     module = MF.getAssociatedModule();
 
-  SmallVector<ProtocolConformance *, 2> conformances;
-  nominal->lookupConformance(proto, conformances);
   PrettyStackTraceModuleFile traceMsg(
       "If you're seeing a crash here, check that your SDK and dependencies "
       "are at least as new as the versions used to build", MF);
-  // This would normally be an assertion but it's more useful to print the
-  // PrettyStackTrace here even in no-asserts builds.
-  if (conformances.empty())
-    abort();
-  return conformances.front();
+
+  // Because Sendable conformances are currently inferred with
+  // 'ImplicitKnownProtocolConformanceRequest' in swift::lookupConformance,
+  // we may end up in a situation where we are deserializing such inferred
+  // conformance but a lookup on the 'NominalDecl' will not succeed nor
+  // will it run inference logic. For now, special-case 'Sendable' lookups
+  // here.
+  // TODO: Sink Sendable derivation into the conformance lookup table
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    auto conformanceRef = lookupConformance(nominal->getDeclaredInterfaceType(), proto);
+    if (conformanceRef.isConcrete())
+      return conformanceRef.getConcrete();
+  } else {
+    SmallVector<ProtocolConformance *, 2> conformances;
+    nominal->lookupConformance(proto, conformances);
+    if (!conformances.empty())
+      return conformances.front();
+  }
+
+  auto error = llvm::make_error<ConformanceXRefError>(
+                 nominal->getName(), proto->getName(), module);
+
+  if (!MF.enableExtendedDeserializationRecovery()) {
+    error = llvm::handleErrors(std::move(error),
+      [&](const ConformanceXRefError &error) -> llvm::Error {
+        error.diagnose(&MF);
+        return llvm::make_error<ConformanceXRefError>(std::move(error));
+      });
+  }
+  return error;
 }
 
 Expected<ProtocolConformance *>
@@ -979,12 +1023,15 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   DeclContextID contextID;
   unsigned valueCount, typeCount, conformanceCount;
   unsigned rawOptions;
+  TypeID globalActorTypeID;
   ArrayRef<uint64_t> rawIDs;
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              rawOptions, rawIDs);
+                                              rawOptions,
+                                              globalActorTypeID,
+                                              rawIDs);
 
   auto doOrError = MF.getDeclContextChecked(contextID);
   if (!doOrError)
@@ -1003,10 +1050,19 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   PrettyStackTraceDecl traceTo("... to", proto);
 
+  auto globalActorTypeOrError = MF.getTypeChecked(globalActorTypeID);
+  if (!globalActorTypeOrError)
+    return globalActorTypeOrError.takeError();
+  auto globalActorType = globalActorTypeOrError.get();
+
+  TypeExpr *globalActorTypeExpr = nullptr;
+  if (globalActorType)
+    globalActorTypeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
-      ProtocolConformanceOptions(rawOptions));
+      ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
   if (conformance->isConformanceOfProtocol()) {
     auto &C = dc->getASTContext();
@@ -1050,6 +1106,47 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   conformance->setLazyLoader(&MF, offset);
   return conformance;
+}
+
+Expected<AbstractConformance *>
+ProtocolConformanceDeserializer::read(
+    ModuleFile::Serialized<AbstractConformance *> &conformanceEntry) {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 16> scratch;
+
+  llvm::BitstreamEntry entry =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    // We don't know how to serialize types represented by sub-blocks.
+    return MF.diagnoseFatal();
+  }
+
+  StringRef blobData;
+  unsigned kind = MF.fatalIfUnexpected(
+      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+  assert(blobData.empty());
+
+  if (kind != decls_block::ABSTRACT_CONFORMANCE)
+    return MF.diagnoseFatal(llvm::make_error<InvalidRecordKindError>(kind));
+
+  TypeID conformingTypeID;
+  DeclID protocolID;
+  AbstractConformanceLayout::readRecord(scratch, conformingTypeID, protocolID);
+
+  auto conformingTypeOrError = MF.getTypeChecked(conformingTypeID);
+  if (!conformingTypeOrError)
+    return conformingTypeOrError.takeError();
+  auto conformingType = conformingTypeOrError.get();
+
+  auto protocolOrError = MF.getDeclChecked(protocolID);
+  if (!protocolOrError)
+    return protocolOrError.takeError();
+  auto *protocol = cast<ProtocolDecl>(protocolOrError.get());
+
+  return ProtocolConformanceRef::forAbstract(conformingType, protocol)
+      .getAbstract();
 }
 
 Expected<PackConformance*>
@@ -1127,13 +1224,25 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
 
   switch (conformanceID & SerializedProtocolConformanceKind::Mask) {
   case SerializedProtocolConformanceKind::Abstract: {
-    auto protocolID = conformanceID >> SerializedProtocolConformanceKind::Shift;
-    auto maybeProtocol = getDeclChecked(protocolID);
-    if (!maybeProtocol)
-      return maybeProtocol.takeError();
-    auto proto = cast<ProtocolDecl>(maybeProtocol.get());
-    // FIXME: Passing an empty Type() here temporarily.
-    return ProtocolConformanceRef::forAbstract(Type(), proto);
+    auto conformanceIndex = (conformanceID >> SerializedProtocolConformanceKind::Shift) - 1;
+    assert(conformanceIndex < AbstractConformances.size() &&
+           "invalid abstract conformance ID");
+    auto &conformanceOrOffset = AbstractConformances[conformanceIndex];
+    if (!conformanceOrOffset.isComplete()) {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      if (auto error = diagnoseFatalIfNotSuccess(
+              DeclTypeCursor.JumpToBit(conformanceOrOffset)))
+        return std::move(error);
+
+      auto result =
+        ProtocolConformanceDeserializer(*this).read(conformanceOrOffset);
+      if (!result)
+        return result.takeError();
+
+      conformanceOrOffset = result.get();
+    }
+    auto conformance = conformanceOrOffset.get();
+    return ProtocolConformanceRef(conformance);
   }
 
   case SerializedProtocolConformanceKind::Concrete: {
@@ -1183,7 +1292,8 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
   }
 }
 
-GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
+Expected<GenericParamList *>
+ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
@@ -1208,7 +1318,10 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   ArrayRef<uint64_t> paramIDs;
   GenericParamListLayout::readRecord(scratch, paramIDs);
   for (DeclID nextParamID : paramIDs) {
-    auto genericParam = cast<GenericTypeParamDecl>(getDecl(nextParamID));
+    Decl *nextParam;
+    SET_OR_RETURN_ERROR(nextParam, getDeclChecked(nextParamID));
+
+    auto genericParam = cast<GenericTypeParamDecl>(nextParam);
     params.push_back(genericParam);
   }
 
@@ -2057,7 +2170,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                getIdentifier(privateDiscriminator));
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NL_QualifiedDefault,
+                                  SourceLoc(), NL_RemoveOverridden,
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
@@ -2267,8 +2380,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                    getIdentifier(privateDiscriminator));
         } else {
           otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                      SourceLoc(), NL_QualifiedDefault,
-                                      values);
+                                       SourceLoc(), NL_RemoveOverridden,
+                                       values);
         }
 
         std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
@@ -2810,7 +2923,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
                                                        discriminator,
                                                        parentID);
     DeclContext *parent;
-    UNWRAP(getDeclContextChecked(parentID), parent);
+    SET_OR_RETURN_ERROR(parent, getDeclContextChecked(parentID));
 
     auto type = getType(closureTypeID);
 
@@ -2824,7 +2937,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     decls_block::TopLevelCodeDeclContextLayout::readRecord(scratch,
                                                            parentID);
     DeclContext *parent;
-    UNWRAP(getDeclContextChecked(parentID), parent);
+    SET_OR_RETURN_ERROR(parent, getDeclContextChecked(parentID));
 
     declContextOrOffset = new (ctx) SerializedTopLevelCodeDeclContext(parent);
     break;
@@ -2855,9 +2968,9 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
                                                               parentID,
                                                               index);
     DeclContext *parent;
-    UNWRAP(getDeclContextChecked(parentID), parent);
+    SET_OR_RETURN_ERROR(parent, getDeclContextChecked(parentID));
 
-    declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
+    declContextOrOffset = DefaultArgumentInitializer::create(parent, index);
     break;
   }
 
@@ -3302,8 +3415,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 5);
-      ProtocolConformanceOptions options(rawID & 0x1F);
+      static_assert(NumProtocolConformanceOptions == 6);
+      ProtocolConformanceOptions options(rawID & 0x3F, /*global actor*/nullptr);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -3411,9 +3524,10 @@ public:
     }
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3496,7 +3610,7 @@ public:
                                                       rawOverriddenIDs);
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -3572,7 +3686,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3681,12 +3796,13 @@ public:
     }
 
     DeclContext *parent;
-    UNWRAP(MF.getDeclContextChecked(contextID), parent);
+    SET_OR_RETURN_ERROR(parent, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericParams = MF.maybeReadGenericParams(parent);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(parent));
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3703,8 +3819,7 @@ public:
                                                /*ThrowsLoc=*/SourceLoc(),
                                                TypeLoc::withoutLoc(thrownType),
                                                /*BodyParams=*/nullptr,
-                                               genericParams, parent,
-                                               nullptr);
+                                               genericParams, parent);
     declOrOffset = ctor;
 
     ctor->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -3715,7 +3830,7 @@ public:
       return MF.diagnoseFatal();
 
     ParameterList *bodyParams;
-    UNWRAP(MF.readParameterList(), bodyParams);
+    SET_OR_RETURN_ERROR(bodyParams, MF.readParameterList());
     assert(bodyParams && "missing parameters for constructor");
     ctor->setParameters(bodyParams);
 
@@ -3850,7 +3965,7 @@ public:
     }
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -3910,7 +4025,8 @@ public:
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
 
     // Add the @_hasStorage attribute if this var has storage.
-    if (var->hasStorage())
+    // (Unless it's an ABI-only decl--they shouldn't have a HasStorageAttr.)
+    if (var->hasStorage() && ABIDeclCounterpartID == 0)
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     {
@@ -3988,7 +4104,7 @@ public:
     bool isVariadic;
     bool isAutoClosure;
     bool isIsolated;
-    bool isCompileTimeConst;
+    bool isCompileTimeLiteral, isConstValue;
     bool isSending;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -3999,7 +4115,8 @@ public:
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
-                                         isCompileTimeConst,
+                                         isCompileTimeLiteral,
+                                         isConstValue,
                                          isSending,
                                          rawDefaultArg,
                                          defaultExprType,
@@ -4011,7 +4128,7 @@ public:
     PrettySupplementalDeclNameTrace trace(paramName);
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -4027,7 +4144,9 @@ public:
 
     declOrOffset = param;
 
-    auto paramTy = MF.getType(interfaceTypeID);
+    Type paramTy;
+    SET_OR_RETURN_ERROR(paramTy, MF.getTypeChecked(interfaceTypeID));
+
     if (paramTy->hasError() && !MF.allowCompilerErrors()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
@@ -4041,7 +4160,8 @@ public:
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
-    param->setCompileTimeConst(isCompileTimeConst);
+    param->setCompileTimeLiteral(isCompileTimeLiteral);
+    param->setConstValue(isConstValue);
     param->setSending(isSending);
 
     // Decode the default argument kind.
@@ -4049,7 +4169,9 @@ public:
     if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg)) {
       param->setDefaultArgumentKind(*defaultArg);
 
-      if (auto exprType = MF.getType(defaultExprType))
+      Type exprType;
+      SET_OR_RETURN_ERROR(exprType, MF.getTypeChecked(defaultExprType));
+      if (exprType)
         param->setDefaultExprType(exprType);
 
       auto isoKind = *getActualActorIsolationKind(rawDefaultArgIsolation);
@@ -4233,7 +4355,7 @@ public:
     }
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -4241,7 +4363,8 @@ public:
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
     // DeclContext for now.
-    GenericParamList *genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.has_value())
@@ -4309,7 +4432,7 @@ public:
     fn->setImplicitlyUnwrappedOptional(isIUO);
 
     ParameterList *paramList;
-    UNWRAP(MF.readParameterList(), paramList);
+    SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
     fn->setParameters(paramList);
     auto numParams =
         fn->hasImplicitSelfDecl() ? paramList->size() + 1 : paramList->size();
@@ -4465,7 +4588,7 @@ public:
                                               exportUnderlyingType);
     
     DeclContext *declContext;
-    UNWRAP(MF.getDeclContextChecked(contextID), declContext);
+    SET_OR_RETURN_ERROR(declContext, MF.getDeclContextChecked(contextID));
 
     auto interfaceSigOrErr = MF.getGenericSignatureChecked(interfaceSigID);
     if (!interfaceSigOrErr)
@@ -4475,7 +4598,8 @@ public:
     if (declOrOffset.isComplete())
       return cast<OpaqueTypeDecl>(declOrOffset.get());
 
-    auto genericParams = MF.maybeReadGenericParams(declContext);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(declContext));
 
     // Create the decl.
     auto opaqueDecl = OpaqueTypeDecl::get(
@@ -4570,7 +4694,7 @@ public:
       return MF.diagnoseFatal();
 
     DeclContext *dc;
-    UNWRAP(MF.getDeclContextChecked(contextID), dc);
+    SET_OR_RETURN_ERROR(dc, MF.getDeclContextChecked(contextID));
 
     SmallVector<std::pair<Pattern *, DeclContextID>, 4> patterns;
     for (unsigned i = 0; i != numPatterns; ++i) {
@@ -4608,7 +4732,7 @@ public:
       binding->setPattern(i, patterns[i].first);
 
       DeclContext *dcPattern;
-      UNWRAP(MF.getDeclContextChecked(patterns[i].second), dcPattern);
+      SET_OR_RETURN_ERROR(dcPattern, MF.getDeclContextChecked(patterns[i].second));
       if (dcPattern)
         binding->setInitContext(i, cast<PatternBindingInitializer>(dcPattern));
     }
@@ -4644,7 +4768,7 @@ public:
     }
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -4676,7 +4800,8 @@ public:
     ctx.evaluator.cacheOutput(InheritedProtocolsRequest{proto},
                               ctx.AllocateCopy(inherited));
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
     assert(genericParams && "protocol with no generic parameters?");
     ctx.evaluator.cacheOutput(GenericParamListRequest{proto},
                               std::move(genericParams));
@@ -4717,7 +4842,7 @@ public:
     PrettySupplementalDeclNameTrace trace(name);
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     auto result = MF.createDecl<OperatorDecl>(
         DC, SourceLoc(), name, SourceLoc());
@@ -4754,7 +4879,7 @@ public:
       return precedenceGroup.takeError();
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), name, SourceLoc(), SourceLoc(), Identifier(),
@@ -4782,7 +4907,7 @@ public:
                                                    rawRelations);
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     auto associativity = getActualAssociativity(rawAssociativity);
     if (!associativity.has_value())
@@ -4866,12 +4991,13 @@ public:
     }
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4891,7 +5017,11 @@ public:
     if (isImplicit)
       theClass->setImplicit();
     theClass->setIsObjC(isObjC);
-    theClass->setSuperclass(MF.getType(superclassID));
+
+    Type superclass;
+    SET_OR_RETURN_ERROR(superclass, MF.getTypeChecked(superclassID));
+    theClass->setSuperclass(superclass);
+
     ctx.evaluator.cacheOutput(InheritsSuperclassInitializersRequest{theClass},
                               std::move(inheritsSuperclassInitializers));
     ctx.evaluator.cacheOutput(HasMissingDesignatedInitializersRequest{theClass},
@@ -4949,7 +5079,8 @@ public:
       return DCOrError.takeError();
     auto DC = DCOrError.get();
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4975,7 +5106,9 @@ public:
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
 
-    theEnum->setRawType(MF.getType(rawTypeID));
+    Type rawType;
+    SET_OR_RETURN_ERROR(rawType, MF.getTypeChecked(rawTypeID));
+    theEnum->setRawType(rawType);
 
     handleInherited(theEnum, inheritedIDs);
 
@@ -5029,7 +5162,7 @@ public:
     }
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -5045,7 +5178,7 @@ public:
     // Read payload parameter list, if it exists.
     if (hasPayload) {
       ParameterList *paramList;
-      UNWRAP(MF.readParameterList(), paramList);
+      SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
       elem->setParameterList(paramList);
     }
 
@@ -5139,12 +5272,13 @@ public:
     }
 
     DeclContext *parent;
-    UNWRAP(MF.getDeclContextChecked(contextID), parent);
+    SET_OR_RETURN_ERROR(parent, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericParams = MF.maybeReadGenericParams(parent);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(parent));
     if (declOrOffset.isComplete())
       return declOrOffset;
     
@@ -5165,7 +5299,7 @@ public:
     subscript->setGenericSignature(MF.getGenericSignature(genericSigID));
 
     ParameterList *paramList;
-    UNWRAP(MF.readParameterList(), paramList);
+    SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
     subscript->setIndices(paramList);
 
     MF.configureStorage(subscript, opaqueReadOwnership,
@@ -5196,7 +5330,8 @@ public:
       OpaqueTypeDecl *opaqueDecl = nullptr;
       if (opaqueReturnTypeID) {
         Decl *opaqueReturnType;
-        UNWRAP(MF.getDeclChecked(opaqueReturnTypeID), opaqueReturnType);
+        SET_OR_RETURN_ERROR(opaqueReturnType,
+                            MF.getDeclChecked(opaqueReturnTypeID));
 
         opaqueDecl = cast<OpaqueTypeDecl>(opaqueReturnType);
       }
@@ -5224,7 +5359,7 @@ public:
                                              data);
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     auto conformanceIDs = data.slice(0, numConformances);
     data = data.slice(numConformances);
@@ -5250,7 +5385,12 @@ public:
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = MF.maybeReadGenericParams(DC)) {
+    while (true) {
+      GenericParamList *genericParams;
+      SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(DC));
+      if (!genericParams)
+        break;
+
       genericParams->setOuterParameters(outerParams);
 
       // Set up the DeclContexts for the GenericTypeParamDecls in the list.
@@ -5312,7 +5452,7 @@ public:
                                               genericSigID);
 
     DeclContext *DC;
-    UNWRAP(MF.getDeclContextChecked(contextID), DC);
+    SET_OR_RETURN_ERROR(DC, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -5389,12 +5529,13 @@ public:
     }
 
     DeclContext *parent;
-    UNWRAP(MF.getDeclContextChecked(contextID), parent);
+    SET_OR_RETURN_ERROR(parent, MF.getDeclContextChecked(contextID));
 
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericParams = MF.maybeReadGenericParams(parent);
+    GenericParamList *genericParams;
+    SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(parent));
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -5414,7 +5555,7 @@ public:
     macro->resultType.setType(resultInterfaceType);
 
     if (hasParameterList) {
-      UNWRAP(MF.readParameterList(), macro->parameterList);
+      SET_OR_RETURN_ERROR(macro->parameterList, MF.readParameterList());
     }
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
@@ -5436,7 +5577,11 @@ public:
       case 2:
         builtinKind = BuiltinMacroKind::IsolationMacro;
         break;
-          
+
+      case 3:
+        builtinKind = BuiltinMacroKind::SwiftSettingsMacro;
+        break;
+
       default:
         break;
       }
@@ -5643,7 +5788,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   }
 
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
+      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind, message, rename,
                     Introduced, SourceRange(), Deprecated, SourceRange(),
                     Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
@@ -5901,11 +6046,23 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
            Platform);
         llvm::VersionTuple MovedVer;
         DECODE_VER_TUPLE(MovedVer)
-        auto ModuleNameEnd = blobData.find('\0');
-        assert(ModuleNameEnd != StringRef::npos);
-        auto ModuleName = blobData.slice(0, ModuleNameEnd);
+
+        auto ManglingModuleNameEnd = blobData.find('\0');
+        assert(ManglingModuleNameEnd != StringRef::npos);
+        auto ManglingModuleName = blobData.slice(0, ManglingModuleNameEnd);
+
+        blobData = blobData.slice(ManglingModuleNameEnd + 1, blobData.size());
+
+        auto LinkerModuleNameEnd = blobData.find('\0');
+        assert(LinkerModuleNameEnd != StringRef::npos);
+        auto LinkerModuleName = blobData.slice(0, LinkerModuleNameEnd);
+
+        ASSERT(!ManglingModuleName.empty());
+        ASSERT(!LinkerModuleName.empty());
+
         Attr = new (ctx) OriginallyDefinedInAttr(SourceLoc(), SourceRange(),
-                                                 ModuleName,
+                                                 ManglingModuleName,
+                                                 LinkerModuleName,
                                                  (PlatformKind)Platform,
                                                  MovedVer,
                                                  isImplicit);
@@ -6773,6 +6930,11 @@ getActualSILParameterOptions(uint8_t raw) {
     options -= serialization::SILParameterInfoFlags::ImplicitLeading;
     result |= SILParameterInfo::ImplicitLeading;
   }
+  
+  if (options.contains(serialization::SILParameterInfoFlags::Const)) {
+    options -= serialization::SILParameterInfoFlags::Const;
+    result |= SILParameterInfo::Const;
+  }
 
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
@@ -7119,6 +7281,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedCaller)) {
+    isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Erased)) {
@@ -7165,13 +7329,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst;
+        isCompileTimeLiteral, isConstValue;
     bool isNoDerivative, isSending, isAddressable;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, isSending, isAddressable);
+        isCompileTimeLiteral, isConstValue, isSending, isAddressable);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7186,8 +7350,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         ParameterTypeFlags(isVariadic, isAutoClosure,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
-                                           isCompileTimeConst, isSending,
-                                           isAddressable),
+                                           isCompileTimeLiteral, isSending,
+                                           isAddressable, isConstValue),
                         MF.getIdentifier(internalLabelID));
   }
 
@@ -7323,12 +7487,12 @@ Expected<Type> DESERIALIZE_TYPE(PRIMARY_ARCHETYPE_TYPE)(
   return contextType;
 }
 
-Expected<Type> DESERIALIZE_TYPE(OPENED_ARCHETYPE_TYPE)(
+Expected<Type> DESERIALIZE_TYPE(EXISTENTIAL_ARCHETYPE_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   TypeID interfaceID;
   GenericEnvironmentID genericEnvID;
 
-  decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
+  decls_block::ExistentialArchetypeTypeLayout::readRecord(scratch,
                                                      interfaceID,
                                                      genericEnvID);
 
@@ -7696,9 +7860,9 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     clangFunctionType = clangType.get();
   }
 
-  auto isolation = SILFunctionTypeIsolation::Unknown;
+  auto isolation = SILFunctionTypeIsolation::forUnknown();
   if (erasedIsolation)
-    isolation = SILFunctionTypeIsolation::Erased;
+    isolation = SILFunctionTypeIsolation::forErased();
 
   auto extInfo = SILFunctionType::ExtInfoBuilder(
                      *representation, pseudogeneric, noescape, sendable, async,
@@ -7829,7 +7993,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   ProtocolConformanceRef witnessMethodConformance;
   if (*representation == swift::SILFunctionTypeRepresentation::WitnessMethod) {
     auto conformanceID = variableData[nextVariableDataIndex++];
-    witnessMethodConformance = MF.getConformance(conformanceID);
+    SET_OR_RETURN_ERROR(witnessMethodConformance,
+                        MF.getConformanceChecked(conformanceID));
   }
 
   GenericSignature invocationSig =
@@ -7870,6 +8035,22 @@ Expected<Type> DESERIALIZE_TYPE(ARRAY_SLICE_TYPE)(
     return baseTy.takeError();
 
   return ArraySliceType::get(baseTy.get());
+}
+
+Expected<Type> DESERIALIZE_TYPE(INLINE_ARRAY_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID countID, elementID;
+  decls_block::InlineArrayTypeLayout::readRecord(scratch, countID, elementID);
+
+  auto countTy = MF.getTypeChecked(countID);
+  if (!countTy)
+    return countTy.takeError();
+
+  auto elementTy = MF.getTypeChecked(elementID);
+  if (!elementTy)
+    return elementTy.takeError();
+
+  return InlineArrayType::get(countTy.get(), elementTy.get());
 }
 
 Expected<Type> DESERIALIZE_TYPE(DICTIONARY_TYPE)(
@@ -8525,9 +8706,9 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
       auto unconsumedError =
         consumeExpectedError(conformance.takeError());
       if (unconsumedError) {
-        // Ignore if allowing errors, it's just doing a best effort to produce
-        // *some* module anyway.
-        if (allowCompilerErrors())
+        // Ignore when we're not building a binary, it's just doing a best
+        // effort to produce *some* module anyway.
+        if (enableExtendedDeserializationRecovery())
           diagnoseAndConsumeError(std::move(unconsumedError));
         else
           fatal(std::move(unconsumedError));
@@ -8595,6 +8776,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
+  TypeID globalActorTypeID;
   unsigned valueCount, typeCount, conformanceCount, rawOptions;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
@@ -8607,7 +8789,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   NormalProtocolConformanceLayout::readRecord(
       scratch, protoID, contextID, typeCount, valueCount, conformanceCount,
-      rawOptions, rawIDs);
+      rawOptions, globalActorTypeID, rawIDs);
+
+  const ProtocolDecl *proto = conformance->getProtocol();
 
   // Read requirement signature conformances.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
@@ -8616,14 +8800,28 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
     } else if (getContext().LangOpts.EnableDeserializationRecovery) {
-      diagnoseAndConsumeError(maybeConformance.takeError());
+      llvm::Error error = maybeConformance.takeError();
+      if (error.isA<ConformanceXRefError>() &&
+          !enableExtendedDeserializationRecovery()) {
+
+        std::string typeStr = conformance->getType()->getString();
+        auto &diags = getContext().Diags;
+        diags.diagnose(getSourceLoc(),
+                       diag::modularization_issue_conformance_xref_note,
+                       typeStr, proto->getName());
+
+        consumeError(std::move(error));
+        conformance->setInvalid();
+        return;
+      }
+
+      diagnoseAndConsumeError(std::move(error));
       reqConformances.push_back(ProtocolConformanceRef::forInvalid());
     } else {
       fatal(maybeConformance.takeError());
     }
   }
 
-  const ProtocolDecl *proto = conformance->getProtocol();
   if (proto->isObjC() && getContext().LangOpts.EnableDeserializationRecovery) {
     // Don't crash if inherited protocols are added or removed.
     // This is limited to Objective-C protocols because we know their only
@@ -8633,7 +8831,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     llvm::SmallDenseMap<ProtocolDecl *, ProtocolConformanceRef, 16>
         conformancesForProtocols;
     for (auto nextConformance : reqConformances) {
-      ProtocolDecl *confProto = nextConformance.getRequirement();
+      ProtocolDecl *confProto = nextConformance.getProtocol();
       conformancesForProtocols[confProto] = nextConformance;
     }
 
@@ -8642,6 +8840,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
+      ASSERT(req.getFirstType()->isEqual(proto->getSelfInterfaceType()));
       ProtocolDecl *proto = req.getProtocolDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
@@ -8653,10 +8852,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         // conformance to an Objective-C protocol for anything important.
         // There are no associated types and we don't emit a Swift conformance
         // record.
-        //
-        // FIXME: Passing an empty Type() here temporarily.
         reqConformances.push_back(ProtocolConformanceRef::forAbstract(
-            Type(), proto));
+            conformance->getType(), proto));
       }
     }
   } else {
@@ -8664,12 +8861,39 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       return req.getKind() == RequirementKind::Conformance;
     };
     auto requirements = proto->getRequirementSignature().getRequirements();
-    if (!allowCompilerErrors() &&
-        conformanceCount != llvm::count_if(requirements,
-                                           isConformanceReq)) {
-      fatal(llvm::make_error<llvm::StringError>(
-          "serialized conformances do not match requirement signature",
-          llvm::inconvertibleErrorCode()));
+    unsigned int conformanceRequirementCount =
+      llvm::count_if(requirements, isConformanceReq);
+    if (conformanceCount != conformanceRequirementCount) {
+      // Mismatch between the number of loaded conformances and the expected
+      // requirements. One or the other likely comes from a stale module.
+
+      if (!enableExtendedDeserializationRecovery()) {
+        // Error and print full context for visual inspection.
+        ASTContext &ctx = getContext();
+        std::string typeStr = conformance->getType()->getString();
+        ctx.Diags.diagnose(getSourceLoc(),
+                       diag::modularization_issue_conformance_error,
+                       typeStr, proto->getName(), conformanceCount,
+                       conformanceRequirementCount);
+        ctx.Diags.flushConsumers();
+
+        // Print context to stderr.
+        PrintOptions Opts;
+        llvm::errs() << "Requirements:\n";
+        for (auto req: requirements) {
+          req.print(llvm::errs(), Opts);
+          llvm::errs() << "\n";
+        }
+
+        llvm::errs() << "Conformances:\n";
+        for (auto req: reqConformances) {
+          req.print(llvm::errs());
+          llvm::errs() << "\n";
+        }
+      }
+
+      conformance->setInvalid();
+      return;
     }
   }
 
@@ -8765,9 +8989,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       fatal(deserializedWitness.takeError());
     }
 
-    assert(allowCompilerErrors() || !req || isOpaque || witness ||
-           req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->isUnavailable());
     if (!witness && !isOpaque) {
       trySetWitness(Witness());
       continue;
@@ -9085,13 +9306,16 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   bool isImmortal;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
+  bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
       scratch, targetIndex, isImmortal, hasInheritLifetimeParamIndices,
-      hasScopeLifetimeParamIndices, lifetimeDependenceData);
+      hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(numParams, false);
   SmallBitVector scopeLifetimeParamIndices(numParams, false);
+  SmallBitVector addressableParamIndices(numParams, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
@@ -9109,6 +9333,9 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   if (hasScopeLifetimeParamIndices) {
     pushData(scopeLifetimeParamIndices);
   }
+  if (hasAddressableParamIndices) {
+    pushData(addressableParamIndices);
+  }
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
@@ -9118,5 +9345,8 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal);
+      targetIndex, isImmortal,
+      hasAddressableParamIndices
+          ? IndexSubset::get(ctx, addressableParamIndices)
+          : nullptr);
 }

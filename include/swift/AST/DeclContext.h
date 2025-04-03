@@ -20,6 +20,7 @@
 #define SWIFT_DECLCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -576,6 +577,11 @@ public:
   LLVM_READONLY
   SourceFile *getOutermostParentSourceFile() const;
 
+  /// Returns true if the source file that contains the context is a
+  /// `.swiftinterface` file.
+  LLVM_READONLY
+  bool isInSwiftinterface() const;
+
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
@@ -661,6 +667,12 @@ public:
   void lookupAllObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
+
+  /// Look up the custom availability domains matching the given identifier that
+  /// are visible from this context.
+  void
+  lookupAvailabilityDomains(Identifier identifier,
+                            SmallVectorImpl<AvailabilityDomain> &results) const;
 
   /// Looks up an infix operator with a given \p name.
   ///
@@ -857,6 +869,8 @@ public:
   IterableDeclContextKind getIterableContextKind() const {
     return LastDeclAndKind.getInt();
   }
+
+  SourceRange getBraces() const;
 
   bool hasUnparsedMembers() const;
 

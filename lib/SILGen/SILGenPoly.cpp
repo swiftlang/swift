@@ -83,6 +83,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "silgen-poly"
+
+#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "FunctionInputGenerator.h"
 #include "Initialization.h"
@@ -94,6 +96,7 @@
 #include "Scope.h"
 #include "TupleGenerators.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -157,6 +160,14 @@ public:
     if (hasAddress()) return getAddress();
     return SGF.emitTemporaryAllocation(loc, getType());
   }
+  void print(llvm::raw_ostream &os) const {
+    if (hasAddress())
+      os << "Address: " << *getAddress();
+    else
+      os << "Type: " << getType();
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); llvm::dbgs() << '\n'; }
 };
 
 } // end anonymous namespace
@@ -254,7 +265,7 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(inputType)
+    CanType openedType = ExistentialArchetypeType::getAny(inputType)
         ->getCanonicalType();
     SILType loweredOpenedType = getLoweredType(openedType);
 
@@ -292,6 +303,67 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
                    [&](SGFContext C) -> ManagedValue {
                      return manageOpaqueValue(input, loc, C);
                    });
+}
+
+// Convert T.TangentVector to Optional<T>.TangentVector.
+// Optional<T>.TangentVector is a struct wrapping Optional<T.TangentVector>
+// So we just need to call appropriate .init on it.
+ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
+    SILLocation loc, ManagedValue input, CanType wrappedType, CanType inputType,
+    CanType outputType, SGFContext ctxt) {
+  // Look up the `Optional<T>.TangentVector.init` declaration.
+  auto *constructorDecl = getASTContext().getOptionalTanInitDecl(outputType);
+
+  // `Optional<T.TangentVector>`
+  CanType optionalOfWrappedTanType = inputType.wrapInOptionalType();
+
+  const TypeLowering &optTL = getTypeLowering(optionalOfWrappedTanType);
+  auto optVal = emitInjectOptional(
+      loc, optTL, SGFContext(), [&](SGFContext objectCtxt) { return input; });
+
+  auto *diffProto = getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto diffConf = lookupConformance(wrappedType, diffProto);
+  assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+  ConcreteDeclRef initDecl(
+      constructorDecl,
+      SubstitutionMap::get(constructorDecl->getGenericSignature(),
+                           {wrappedType}, {diffConf}));
+  PreparedArguments args({AnyFunctionType::Param(optionalOfWrappedTanType)});
+  args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
+
+  auto result = emitApplyAllocatingInitializer(loc, initDecl, std::move(args),
+                                               Type(), ctxt);
+  return std::move(result).getScalarValue();
+}
+
+ManagedValue SILGenFunction::emitOptionalTangentVectorToTangentVector(
+    SILLocation loc, ManagedValue input, CanType wrappedType, CanType inputType,
+    CanType outputType, SGFContext ctxt) {
+  // Optional<T>.TangentVector should be a struct with a single
+  // Optional<T.TangentVector> `value` property. This is an implementation
+  // detail of OptionalDifferentiation.swift
+  // TODO: Maybe it would be better to have explicit getters / setters here that we can
+  // call and hide this implementation detail?
+  VarDecl *wrappedValueVar = getASTContext().getOptionalTanValueDecl(inputType);
+  // `Optional<T.TangentVector>`
+  CanType optionalOfWrappedTanType = outputType.wrapInOptionalType();
+
+  FormalEvaluationScope scope(*this);
+
+  auto sig = wrappedValueVar->getDeclContext()->getGenericSignatureOfContext();
+  auto *diffProto =
+      getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto diffConf = lookupConformance(wrappedType, diffProto);
+  assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+
+  auto wrappedVal = emitRValueForStorageLoad(
+      loc, input, inputType, /*super*/ false, wrappedValueVar,
+      PreparedArguments(), SubstitutionMap::get(sig, {wrappedType}, {diffConf}),
+      AccessSemantics::Ordinary, optionalOfWrappedTanType, SGFContext());
+
+  return emitCheckedGetOptionalValueFrom(
+      loc, std::move(wrappedVal).getScalarValue(),
+      /*isImplicitUnwrap*/ true, getTypeLowering(optionalOfWrappedTanType), ctxt);
 }
 
 /// Apply this transformation to an arbitrary value.
@@ -642,7 +714,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
     auto layout = instanceType.getExistentialLayout();
     if (layout.getSuperclass()) {
-      CanType openedType = OpenedArchetypeType::getAny(inputSubstType)
+      CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
           ->getCanonicalType();
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
@@ -673,6 +745,54 @@ ManagedValue Transform::transform(ManagedValue v,
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);
+  }
+
+  // - T.TangentVector to Optional<T>.TangentVector
+  // Optional<T>.TangentVector is a struct wrapping Optional<T.TangentVector>
+  // So we just need to call appropriate .init on it.
+  // However, we might have T.TangentVector == T, so we need to calculate all
+  // required types first.
+  {
+    CanType optionalTy = isa<NominalType>(outputSubstType)
+                             ? outputSubstType.getNominalParent()
+                             : CanType(); // `Optional<T>`
+    if (optionalTy && (bool)optionalTy.getOptionalObjectType()) {
+      CanType wrappedType = optionalTy.getOptionalObjectType(); // `T`
+      // Check that T.TangentVector is indeed inputSubstType (this also handles
+      // case when T == T.TangentVector).
+      // Also check that outputSubstType is an Optional<T>.TangentVector.
+      auto inputTanSpace =
+          wrappedType->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      auto outputTanSpace =
+          optionalTy->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      if (inputTanSpace && outputTanSpace &&
+          inputTanSpace->getCanonicalType() == inputSubstType &&
+          outputTanSpace->getCanonicalType() == outputSubstType)
+        return SGF.emitTangentVectorToOptionalTangentVector(
+            Loc, v, wrappedType, inputSubstType, outputSubstType, ctxt);
+    }
+  }
+
+  // - Optional<T>.TangentVector to T.TangentVector.
+  {
+    CanType optionalTy = isa<NominalType>(inputSubstType)
+                             ? inputSubstType.getNominalParent()
+                             : CanType(); // `Optional<T>`
+    if (optionalTy && (bool)optionalTy.getOptionalObjectType()) {
+      CanType wrappedType = optionalTy.getOptionalObjectType(); // `T`
+      // Check that T.TangentVector is indeed outputSubstType (this also handles
+      // case when T == T.TangentVector)
+      // Also check that inputSubstType is an Optional<T>.TangentVector
+      auto inputTanSpace =
+          optionalTy->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      auto outputTanSpace =
+          wrappedType->getAutoDiffTangentSpace(LookUpConformanceInModule());
+      if (inputTanSpace && outputTanSpace &&
+          inputTanSpace->getCanonicalType() == inputSubstType &&
+          outputTanSpace->getCanonicalType() == outputSubstType)
+        return SGF.emitOptionalTangentVectorToTangentVector(
+            Loc, v, wrappedType, inputSubstType, outputSubstType, ctxt);
+    }
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -866,7 +986,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
     SmallVectorImpl<ManagedValue> *indirectResults,
-    SmallVectorImpl<ManagedValue> *indirectErrors) {
+    SmallVectorImpl<ManagedValue> *indirectErrors, ThunkGenOptions options) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes(
            getTypeExpansionContext())) {
@@ -902,7 +1022,16 @@ void SILGenFunction::collectThunkParams(
     // be lowered to their underlying type if allowed by resilience.
     auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
                                 .getCategoryType(paramTy.getCategory());
-    params.push_back(B.createInputFunctionArgument(inContextParamTy, loc));
+    auto functionArgument =
+        B.createInputFunctionArgument(inContextParamTy, loc);
+
+    // If we are told to not propagate the isolated parameter and this is the
+    // implicit leading/isolated parameter, continue.
+    if (options.contains(ThunkGenFlag::ConvertingToNonIsolatedCaller) &&
+        param.hasOption(SILParameterInfo::ImplicitLeading) &&
+        param.hasOption(SILParameterInfo::Isolated))
+      continue;
+    params.push_back(functionArgument);
   }
 }
 
@@ -1160,6 +1289,13 @@ public:
            (isIndirectFormalParameter(convention) &&
             SGF.silConv.useLoweredAddresses());
   }
+
+  void print(llvm::raw_ostream &os) const {
+    os << "ParamInfo. Slot: ";
+    slot.print(os);
+  };
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); llvm::dbgs() << '\n'; }
 };
 
 /// Given a list of inputs that are suited to the parameters of one
@@ -1328,15 +1464,18 @@ class TranslateArguments : public ExpanderBase<TranslateArguments, ParamInfo> {
   CanSILFunctionType InnerTypesFuncTy;
   ArrayRef<SILParameterInfo> InnerTypes;
   InnerPackArgGenerator InnerPacks;
+  SILGenFunction::ThunkGenOptions Options;
+
 public:
   TranslateArguments(SILGenFunction &SGF, SILLocation loc,
                      ArrayRef<ManagedValue> outerArgs,
                      SmallVectorImpl<ManagedValue> &innerArgs,
                      CanSILFunctionType innerTypesFuncTy,
-                     ArrayRef<SILParameterInfo> innerTypes)
-    : ExpanderBase(SGF, loc, outerArgs), InnerArgs(innerArgs),
-      InnerTypesFuncTy(innerTypesFuncTy), InnerTypes(innerTypes),
-      InnerPacks(*this) {}
+                     ArrayRef<SILParameterInfo> innerTypes,
+                     SILGenFunction::ThunkGenOptions options = {})
+      : ExpanderBase(SGF, loc, outerArgs), InnerArgs(innerArgs),
+        InnerTypesFuncTy(innerTypesFuncTy), InnerTypes(innerTypes),
+        InnerPacks(*this), Options(options) {}
 
   void process(AbstractionPattern innerOrigFunctionType,
                AnyFunctionType::CanParamArrayRef innerSubstTypes,
@@ -2779,12 +2918,18 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
 }
 
 /// Forward arguments according to a function type's ownership conventions.
-static void forwardFunctionArguments(SILGenFunction &SGF,
-                                     SILLocation loc,
-                                     CanSILFunctionType fTy,
-                                     ArrayRef<ManagedValue> managedArgs,
-                                     SmallVectorImpl<SILValue> &forwardedArgs) {
+static void
+forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
+                         CanSILFunctionType fTy,
+                         ArrayRef<ManagedValue> managedArgs,
+                         SmallVectorImpl<SILValue> &forwardedArgs,
+                         SILGenFunction::ThunkGenOptions options = {}) {
   auto argTypes = fTy->getParameters();
+  if (options.contains(
+          SILGenFunction::ThunkGenFlag::ConvertingFromNonIsolatedCaller)) {
+    argTypes = argTypes.drop_front();
+  }
+
   for (auto index : indices(managedArgs)) {
     auto arg = managedArgs[index];
     auto argTy = argTypes[index];
@@ -5290,12 +5435,39 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
                                          &SGF.F);
   auto thunkType = SGF.F.getLoweredFunctionType();
+  SWIFT_DEFER {
+    // If verify all is enabled, verify thunk bodies.
+    if (SGF.getASTContext().SILOpts.VerifyAll)
+      SGF.F.verify();
+  };
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
 
+  using ThunkGenFlag = SILGenFunction::ThunkGenFlag;
+  auto options = SILGenFunction::ThunkGenOptions();
+
+  // If our original function was nonisolated caller and our eventual type is
+  // just nonisolated, pop the isolated argument.
+  //
+  // NOTE: We do this early before thunk params so that we avoid pushing the
+  // isolated parameter preventing us from having to memcpy over the array.
+  if (outputSubstType->isAsync()) {
+    if (outputSubstType->getIsolation().getKind() ==
+            FunctionTypeIsolation::Kind::NonIsolatedCaller &&
+        inputSubstType->getIsolation().getKind() !=
+            FunctionTypeIsolation::Kind::NonIsolatedCaller)
+      options |= ThunkGenFlag::ConvertingToNonIsolatedCaller;
+
+    if (outputSubstType->getIsolation().getKind() !=
+            FunctionTypeIsolation::Kind::NonIsolatedCaller &&
+        inputSubstType->getIsolation().getKind() ==
+            FunctionTypeIsolation::Kind::NonIsolatedCaller)
+      options |= ThunkGenFlag::ConvertingFromNonIsolatedCaller;
+  }
+
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 4> indirectResultParams;
-  SGF.collectThunkParams(loc, params, &indirectResultParams);
+  SGF.collectThunkParams(loc, params, &indirectResultParams, nullptr, options);
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -5313,6 +5485,16 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     outputErasedIsolation = params.pop_back_val();
   }
 
+  if (!SGF.F.maybeGetIsolatedArgument() && argTypes.size() &&
+      argTypes.front().hasOption(SILParameterInfo::Isolated) &&
+      argTypes.front().hasOption(SILParameterInfo::ImplicitLeading))
+    options |= ThunkGenFlag::ConvertingFromNonIsolatedCaller;
+
+  // If we are converting to nonisolated caller, we are going to have an extra
+  // parameter in our argTypes that we need to drop.
+  if (options.contains(ThunkGenFlag::ConvertingFromNonIsolatedCaller))
+    argTypes = argTypes.drop_front();
+
   // We may need to establish the right executor for the input function.
   // If both function types are synchronous, whoever calls this thunk is
   // responsible for establishing the executor properly, so we don't need
@@ -5327,6 +5509,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     switch (inputIsolation.getKind()) {
     // Synchronous nonisolated functions are called on the current executor.
     case FunctionTypeIsolation::Kind::NonIsolated:
+      break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      hopToIsolatedParameter = true;
       break;
 
     // For a function with parameter isolation, we'll have to dig the
@@ -5379,11 +5565,9 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // other direction (the thunk receives an Int like a T, and passes it
   // like a normal Int when calling the inner function).
   SmallVector<ManagedValue, 8> args;
-  TranslateArguments(SGF, loc, params, args, fnType, argTypes)
-    .process(inputOrigType,
-             inputSubstType.getParams(),
-             outputOrigType,
-             outputSubstType.getParams());
+  TranslateArguments(SGF, loc, params, args, fnType, argTypes, options)
+      .process(inputOrigType, inputSubstType.getParams(), outputOrigType,
+               outputSubstType.getParams());
 
   SmallVector<SILValue, 8> argValues;
 
@@ -5411,11 +5595,35 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                               /*mandatory*/false);
   }
 
+  // If we are thunking a nonisolated caller to nonisolated or global actor, we
+  // need to load the actor.
+  if (options.contains(ThunkGenFlag::ConvertingFromNonIsolatedCaller)) {
+    auto outputIsolation = outputSubstType->getIsolation();
+    switch (outputIsolation.getKind()) {
+    case FunctionTypeIsolation::Kind::NonIsolated:
+      argValues.push_back(SGF.emitNonIsolatedIsolation(loc).getValue());
+      break;
+    case FunctionTypeIsolation::Kind::GlobalActor: {
+      auto globalActor =
+          outputIsolation.getGlobalActorType()->getCanonicalType();
+      argValues.push_back(
+          SGF.emitGlobalActorIsolation(loc, globalActor).getValue());
+      break;
+    }
+    case FunctionTypeIsolation::Kind::Parameter:
+    case FunctionTypeIsolation::Kind::Erased:
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      llvm_unreachable("Should never see this");
+      break;
+    }
+  }
+
   // Add the rest of the arguments.
-  forwardFunctionArguments(SGF, loc, fnType, args, argValues);
+  forwardFunctionArguments(SGF, loc, fnType, args, argValues, options);
 
   auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
                                           : fnValue.forward(SGF);
+
   SILValue innerResult =
       SGF.emitApplyWithRethrow(loc, fun,
                                /*substFnType*/ fnValue.getType(),
@@ -5548,18 +5756,28 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   auto toType = expectedType->getWithExtInfo(
       expectedType->getExtInfo().withNoEscape(false));
   CanType dynamicSelfType;
-  auto thunkType = SGF.buildThunkType(sourceType, toType,
-                                      inputSubstType,
-                                      outputSubstType,
-                                      genericEnv,
-                                      interfaceSubs,
-                                      dynamicSelfType);
-  // An actor-isolated non-async function can be converted to an async function
-  // by inserting a hop to the global actor.
+  auto thunkType =
+      SGF.buildThunkType(sourceType, toType, inputSubstType, outputSubstType,
+                         genericEnv, interfaceSubs, dynamicSelfType);
   CanType globalActorForThunk;
-  if (outputSubstType->isAsync()
-      && !inputSubstType->isAsync()) {
-    globalActorForThunk = CanType(inputSubstType->getGlobalActor());
+  // If our output type is async...
+  if (outputSubstType->isAsync()) {
+    // And our input type is not async, we can convert the actor-isolated
+    // non-async function to an async function by inserting a hop to the global
+    // actor.
+    if (!inputSubstType->isAsync()) {
+      globalActorForThunk = CanType(inputSubstType->getGlobalActor());
+    } else {
+      // If our inputSubstType is also async and we are converting from a
+      // nonisolated caller to a global actor from a global actor, attach the
+      // global actor for thunk so we mangle appropriately.
+      auto outputIsolation = outputSubstType->getIsolation();
+      if (outputIsolation.getKind() ==
+              FunctionTypeIsolation::Kind::GlobalActor &&
+          fn.getType().isNonIsolatedCallerFunction())
+        globalActorForThunk =
+            outputIsolation.getGlobalActorType()->getCanonicalType();
+    }
   }
 
   auto thunk = SGF.SGM.getOrCreateReabstractionThunk(

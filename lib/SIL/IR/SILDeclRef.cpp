@@ -451,6 +451,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   using Kind = SILDeclRef::Kind;
 
   auto *d = constant.getDecl();
+  ASSERT(ABIRoleInfo(d).providesAPI() && "getLinkageLimit() for ABI decl?");
 
   // Back deployment thunks and fallbacks are emitted into the client.
   if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
@@ -477,7 +478,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::OnDemand;
   }
   
-  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+  if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
@@ -1267,6 +1268,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     if (auto *ACE = getAbstractClosureExpr())
       return mangler.mangleClosureEntity(ACE, SKind);
 
+    ASSERT(ABIRoleInfo(getDecl()).providesAPI()
+              && "SILDeclRef mangling ABI decl directly?");
+
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
@@ -1841,4 +1845,15 @@ bool SILDeclRef::hasAsync() const {
     return false;
   }
   return getAbstractClosureExpr()->isBodyAsync();
+}
+
+bool SILDeclRef::isCalleeAllocatedCoroutine() const {
+  if (!hasDecl())
+    return false;
+
+  auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+  if (!accessor)
+    return false;
+
+  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
 }

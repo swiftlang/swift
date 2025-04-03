@@ -260,7 +260,7 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     }
 
     TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
-      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+      if (isa<StoreBorrowInst>(use->getUser()))
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }

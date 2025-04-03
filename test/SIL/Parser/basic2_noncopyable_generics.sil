@@ -29,6 +29,7 @@ struct NCG<T> : ~Copyable {
 // CHECK-NEXT:    var t: T
 struct NEG<T : ~Escapable> : ~Escapable {
   var t: T
+  @lifetime(copy t)
   init(_ t: consuming T) {
     self.t = t
   }

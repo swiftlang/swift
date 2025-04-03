@@ -184,6 +184,7 @@ public:
     bool IsFuture;
     bool IsGroupChildTask;
     bool IsAsyncLetTask;
+    bool IsSynchronousStartTask;
 
     // Task flags.
     unsigned MaxPriority;
@@ -193,6 +194,7 @@ public:
     bool HasIsRunning; // If false, the IsRunning flag is not valid.
     bool IsRunning;
     bool IsEnqueued;
+    bool IsComplete;
 
     bool HasThreadPort;
     uint32_t ThreadPort;
@@ -1038,10 +1040,12 @@ public:
       // Generic SIL @box type - there is always an instantiated metadata
       // pointer for the boxed type.
       if (auto Meta = readMetadata(*MetadataAddress)) {
-        auto GenericHeapMeta =
-          cast<TargetGenericBoxHeapMetadata<Runtime>>(Meta.getLocalBuffer());
-        return getMetadataTypeInfo(GenericHeapMeta->BoxedType,
-                                   ExternalTypeInfo);
+        if (auto *GenericHeapMeta = cast<TargetGenericBoxHeapMetadata<Runtime>>(
+                Meta.getLocalBuffer())) {
+          auto MetadataAddress = GenericHeapMeta->BoxedType;
+          auto TR = readTypeFromMetadata(MetadataAddress);
+          return getTypeInfo(TR, ExternalTypeInfo);
+        }
       }
       return nullptr;
     }
@@ -1776,6 +1780,7 @@ private:
         TaskStatusFlags & ActiveTaskStatusFlags::IsStatusRecordLocked;
     Info.IsEscalated = TaskStatusFlags & ActiveTaskStatusFlags::IsEscalated;
     Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
+    Info.IsComplete = TaskStatusFlags & ActiveTaskStatusFlags::IsComplete;
 
     setIsRunning(Info, AsyncTaskObj.get());
     std::tie(Info.HasThreadPort, Info.ThreadPort) =

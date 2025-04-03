@@ -938,6 +938,11 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
 
 bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  // ABI-only decls get this from their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isDynamic();
+
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
     return false;
@@ -1201,8 +1206,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
   // and incorrect diagnostics may be omitted for some decls.
-  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
-  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+  if (ED->getDeclContext()->isInSwiftinterface() && !ED->isObjC())
     return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
@@ -1689,6 +1693,14 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
 
+  auto contextForConformingDecl =
+      AvailabilityContext::forDeclSignature(dc->getAsDecl());
+
+  // If the conformance is unavailable then it's irrelevant whether the witness
+  // is potentially unavailable.
+  if (contextForConformingDecl.isUnavailable())
+    return true;
+
   // Make sure that any access of the witness through the protocol
   // can only occur when the witness is available. That is, make sure that
   // on every version where the conforming declaration is available, if the
@@ -1704,7 +1716,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   requirementInfo = AvailabilityInference::availableRange(requirement);
 
   AvailabilityRange infoForConformingDecl =
-      overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);
+      contextForConformingDecl.getPlatformRange();
 
   // Relax the requirements for @_spi witnesses by treating the requirement as
   // if it were introduced at the deployment target. This is not strictly sound
@@ -1725,7 +1737,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   requirementInfo.constrainWith(infoForConformingDecl);
 
   AvailabilityRange infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
+      AvailabilityContext::forDeclSignature(proto).getPlatformRange();
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);
@@ -2235,6 +2247,12 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   }
 
   auto typeRepr = param->getTypeRepr();
+
+  if (!typeRepr && !param->isImplicit()) {
+    // Untyped closure parameter.
+    return ParamSpecifier::Default;
+  }
+
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
@@ -2349,7 +2367,7 @@ static Type validateParameterType(ParamDecl *decl) {
                                    PlaceholderType::get,
                                    /*packElementOpener*/ nullptr);
 
-  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+  if (isa<VarargTypeRepr>(nestedRepr)) {
     Ty = resolution.resolveType(nestedRepr);
 
     // Monovariadic types (T...) for <T> resolve to [T].
@@ -2403,7 +2421,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
@@ -2546,7 +2563,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (thrownTy) {
       thrownTy = AFD->getThrownInterfaceType();
       ProtocolDecl *errorProto = Context.getErrorDecl();
-      if (thrownTy && errorProto) {
+      if (thrownTy && !thrownTy->hasError() && errorProto) {
         Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
         if (!checkConformance(thrownTyInContext, errorProto)) {
           SourceLoc loc;
@@ -2638,6 +2655,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
     maybeAddParameterIsolation(infoBuilder, argTy);
+
+    if (auto typeRepr = SD->getElementTypeRepr())
+      if (isa<SendingTypeRepr>(typeRepr))
+        infoBuilder = infoBuilder.withSendingResult();
 
     Type funcTy;
     // FIXME: Verify ExtInfo state is correct, not working by accident.

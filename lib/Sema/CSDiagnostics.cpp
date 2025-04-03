@@ -16,6 +16,7 @@
 
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
@@ -683,6 +684,20 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
+  if (isExpr<KeyPathExpr>(anchor)) {
+    if (auto *P = dyn_cast<ProtocolDecl>(protocolType->getAnyNominal())) {
+      if (P->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+        emitDiagnostic(diag::expr_keypath_noncopyable_type, nonConformingType);
+        return true;
+      }
+
+      if (P->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+        emitDiagnostic(diag::expr_keypath_nonescapable_type, nonConformingType);
+        return true;
+      }
+    }
+  }
+
   if (diagnoseAsAmbiguousOperatorRef())
     return true;
 
@@ -940,7 +955,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
   while (!path.empty()) {
     auto last = path.back();
-    if (last.is<LocatorPathElt::OptionalPayload>() ||
+    if (last.is<LocatorPathElt::OptionalInjection>() ||
         last.is<LocatorPathElt::GenericType>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path = path.drop_back();
@@ -2017,7 +2032,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     }
   } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(diagExpr)) {
+  } else if (isa<UnresolvedMemberExpr>(diagExpr)) {
     subElementDiagID = diag::assignment_lhs_is_immutable_property;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
@@ -2837,7 +2852,7 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
-  case ConstraintLocator::OptionalPayload: {
+  case ConstraintLocator::OptionalInjection: {
     // If this is an attempt at a Double <-> CGFloat conversion
     // through optional chaining, let's produce a tailored diagnostic.
     if (isExpr<OptionalEvaluationExpr>(getAnchor())) {
@@ -2868,7 +2883,7 @@ bool ContextualFailure::diagnoseAsError() {
 
   case ConstraintLocator::FunctionResult:
   case ConstraintLocator::KeyPathValue: {
-    if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
+    if (isExpr<KeyPathExpr>(anchor)) {
       diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
       break;
     } else {
@@ -4206,8 +4221,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
     } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
               cxxMethod->getReturnType()->getAsRecordDecl())) {
+        // `importerImpl` is set to nullptr here to avoid diagnostics during
+        // this CxxRecordSemantics evaluation.
         auto methodSemantics = evaluateOrDefault(
-            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {});
+            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx, nullptr}), {});
         if (methodSemantics == CxxRecordSemanticsKind::Iterator) {
           ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                              name.getBaseIdentifier().str());
@@ -6360,7 +6377,8 @@ bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
 SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
   auto *locator = getLocator();
 
-  if (locator->isKeyPathSubscriptComponent()) {
+  if (locator->isKeyPathSubscriptComponent() ||
+      locator->isKeyPathMemberComponent()) {
     auto *KPE = castToExpr<KeyPathExpr>(getAnchor());
     if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
       return KPE->getComponents()[kpElt->getIndex()].getLoc();
@@ -6370,7 +6388,9 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
 }
 
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_subscript_index_not_hashable,
+  auto *locator = getLocator();
+  emitDiagnostic(diag::expr_keypath_arg_or_index_not_hashable,
+                 !locator->isKeyPathMemberComponent(),
                  resolveType(NonConformingType));
   return true;
 }
@@ -6428,8 +6448,20 @@ bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
   return true;
 }
 
-bool InvalidMethodRefInKeyPath::diagnoseAsError() {
+bool UnsupportedMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::expr_keypath_not_property, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidMutatingMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_mutating_method, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::effectful_keypath_component, getKind(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
@@ -6488,7 +6520,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
   return true;
 }
 
-bool NotCompileTimeConstFailure::diagnoseAsError() {
+bool NotCompileTimeLiteralFailure::diagnoseAsError() {
   emitDiagnostic(diag::expect_compile_time_const);
   return true;
 }
@@ -9367,7 +9399,7 @@ bool DefaultExprTypeMismatch::diagnoseAsError() {
 
   auto overload = getSolution().getCalleeOverloadChoice(locator);
 
-  auto *PD = getParameterList(overload.choice.getDecl())->get(paramIdx);
+  auto *PD = overload.choice.getDecl()->getParameterList()->get(paramIdx);
 
   auto note = emitDiagnosticAt(PD->getLoc(), diag::default_value_declared_here);
 
@@ -9572,7 +9604,24 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
   return true;
 }
 
-bool IncorrectSlabLiteralCount::diagnoseAsError() {
-  emitDiagnostic(diag::slab_literal_incorrect_count, lhsCount, rhsCount);
+bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
+  emitDiagnostic(diag::inlinearray_literal_incorrect_count, lhsCount, rhsCount);
+  return true;
+}
+
+bool DisallowedIsolatedConformance::diagnoseAsError() {
+  emitDiagnostic(diag::isolated_conformance_with_sendable_simple,
+                 conformance->getType(),
+                 conformance->getProtocol()->getName(),
+                 conformance->getIsolation());
+
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return true;
+
+  if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
+    emitDiagnosticAt(decl, diag::decl_declared_here, decl);
+  }
+
   return true;
 }

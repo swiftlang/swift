@@ -649,6 +649,7 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   Expr *Result = ::foldSequence(dc, LHS, Elts, PrecedenceBound());
   assert(Elts.empty());
 
+  expr->setFoldedExpr(Result);
   return Result;
 }
 
@@ -707,11 +708,10 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
   SourceLoc loc = defaultExpr->getLoc();
   auto &ctx = param->getASTContext();
   switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-  case DefaultArgumentKind::NAME: \
-    return new (ctx) \
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::NAME, loc, \
-                                   /*implicit=*/true);
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  case DefaultArgumentKind::NAME:                                              \
+    return new (ctx) MagicIdentifierLiteralExpr(                               \
+        MagicIdentifierLiteralExpr::NAME, loc, /*implicit=*/true);
 #include "swift/AST/MagicIdentifierKinds.def"
 
   case DefaultArgumentKind::ExpressionMacro: {

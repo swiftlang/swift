@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,6 +18,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
 #include "swift/Basic/Assertions.h"
 
@@ -25,7 +26,8 @@ using namespace swift;
 
 /// Does the interface of this declaration use a type for which the
 /// given predicate returns true?
-static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
+static bool usesTypeMatching(const Decl *decl,
+                             llvm::function_ref<bool(Type)> fn) {
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
       return type.findIf(fn);
@@ -121,7 +123,9 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
+UNINTERESTING_FEATURE(AsyncCallerExecution)
+UNINTERESTING_FEATURE(ExtensibleEnums)
+UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -191,14 +195,16 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
+  return usesTypeMatching(D, [&](Type ty) {
+    return isa<InlineArrayType>(ty.getPointer());
+  });
+}
+
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
-UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
-UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
-UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -329,10 +335,8 @@ UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
-
-static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
-  return decl->getAttrs().hasAttribute<UnsafeAttr>();
-}
+UNINTERESTING_FEATURE(RawIdentifiers)
+UNINTERESTING_FEATURE(InferIsolatedConformances)
 
 static ABIAttr *getABIAttr(Decl *decl) {
   if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
@@ -348,12 +352,68 @@ static bool usesFeatureABIAttribute(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-UNINTERESTING_FEATURE(WarnUnsafe)
-UNINTERESTING_FEATURE(SafeInterop)
+static bool usesFeatureIsolatedConformances(Decl *decl) { 
+  // FIXME: Check conformances associated with this decl?
+  return false;
+}
+
+static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureCompileTimeValues(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ConstValAttr>() ||
+         decl->getAttrs().hasAttribute<ConstInitializedAttr>();
+}
+
+static bool usesFeatureClosureBodyMacro(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<SafeAttr>() ||
+      decl->getAttrs().hasAttribute<UnsafeAttr>())
+    return true;
+
+  IterableDeclContext *idc;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+    idc = nominal;
+  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    idc = ext;
+  else
+    idc = nullptr;
+
+  // Look for an @unsafe conformance ascribed to this declaration.
+  if (idc) {
+    auto conformances = idc->getLocalConformances();
+    for (auto conformance : conformances) {
+      auto rootConformance = conformance->getRootConformance();
+      if (auto rootNormalConformance =
+              dyn_cast<NormalProtocolConformance>(rootConformance)) {
+        if (rootNormalConformance->getExplicitSafety() == ExplicitSafety::Unsafe)
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
+UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(CXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
-UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
+UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
+
+static bool usesFeatureSwiftSettings(const Decl *decl) {
+  // We just need to guard `#SwiftSettings`.
+  auto *macro = dyn_cast<MacroDecl>(decl);
+  return macro && macro->isStdlibDecl() &&
+         macro->getMacroRoles().contains(MacroRole::Declaration) &&
+         macro->getBaseIdentifier().is("SwiftSettings");
+}
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
@@ -405,6 +465,58 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   default:
     return false;
   }
+}
+
+static bool usesFeatureCustomAvailability(Decl *decl) {
+  // FIXME: [availability] Check whether @available attributes for custom
+  // domains are attached to the decl.
+  return false;
+}
+
+static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
+  // Callers of 'Builtin.emplace' should explicitly guard the usage with #if.
+  return false;
+}
+
+static bool usesFeatureExecutionAttribute(Decl *decl) {
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution, decl)) {
+    return false;
+  }
+
+  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
+    return true;
+
+  auto hasExecutionAttr = [](TypeRepr *R) {
+    if (!R)
+      return false;
+
+    return R->findIf([](TypeRepr *repr) {
+      if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
+        return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
+          if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
+            return isa<ExecutionTypeAttr>(TA);
+          }
+          return false;
+        });
+      }
+      return false;
+    });
+  };
+
+  auto *VD = cast<ValueDecl>(decl);
+
+  // Check if any parameters that have `@execution` attribute.
+  if (auto *PL = VD->getParameterList()) {
+    for (auto *P : *PL) {
+      if (hasExecutionAttr(P->getTypeRepr()))
+        return true;
+    }
+  }
+
+  if (hasExecutionAttr(VD->getResultTypeRepr()))
+    return true;
+
+  return false;
 }
 
 // ----------------------------------------------------------------------------

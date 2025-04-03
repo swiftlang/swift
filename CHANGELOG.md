@@ -3,7 +3,66 @@
 > [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift 6.2
+
+* [SE-0419][]:
+  Introduced the new `Runtime` module, which contains a public API that can
+  generate backtraces, presently supported on macOS and Linux.  Capturing a
+  backtrace is as simple as
+
+  ```swift
+  import Runtime
+
+  func foo() {
+    // Without symbols
+    let backtrace = try! Backtrace.capture()
+
+    print(backtrace)
+
+    // With symbol lookup
+    let symbolicated = backtrace.symbolicated()!
+
+    print(symbolicated)
+  }
+  ```
+
+* [SE-0458][]:
+  Introduced an opt-in mode for strict checking of memory safety, which can be
+  enabled with the compiler flag `-strict-memory-safety`. In this mode,
+  the Swift compiler will produce warnings for uses of memory-unsafe constructs
+  and APIs. For example, 
+
+  ```swift
+  func evilMalloc(size: Int) -> Int {
+    // use of global function 'malloc' involves unsafe type 'UnsafeMutableRawPointer'
+    return Int(bitPattern: malloc(size))
+  }
+  ```
+
+  These warnings are in their own diagnostic group (`StrictMemorySafety`) and can
+  be suppressed by ackwnowledging the memory-unsafe behavior, for
+  example with an `unsafe` expression:
+
+  ```swift
+  func evilMalloc(size: Int) -> Int {
+    return unsafe Int(bitPattern: malloc(size)) // no warning
+  }
+  ```
+
 ## Swift 6.1
+
+* [#78389][]:
+  Errors pertaining to the enforcement of [`any` syntax][SE-0335] on boxed
+  protocol types (aka existential types), including those produced by enabling
+  the upcoming feature `ExistentialAny`, are downgraded to warnings until a
+  future language mode.
+
+  These warnings can be escalated back to errors with `-Werror ExistentialAny`.
+
+* Previous versions of Swift would incorrectly allow Objective-C `-init...`
+  methods with custom Swift names to be imported as initializers, but with base 
+  names other than `init`. The compiler now diagnoses these attributes and
+  infers a name for the initializer as though they are not present.
 
 * Projected value initializers are now correctly injected into calls when
   an argument exactly matches a parameter with an external property wrapper.
@@ -10665,12 +10724,14 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
 [SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0419]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0419-backtrace-api.md
 [SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
 [SE-0431]: https://github.com/apple/swift-evolution/blob/main/proposals/0431-isolated-any-functions.md
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
+[SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
@@ -10714,4 +10775,5 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#56139]: <https://github.com/apple/swift/issues/56139>
 [#70065]: <https://github.com/apple/swift/pull/70065>
 [#71075]: <https://github.com/apple/swift/pull/71075>
+[#78389]: <https://github.com/swiftlang/swift/pull/78389>
 [swift-syntax]: https://github.com/apple/swift-syntax

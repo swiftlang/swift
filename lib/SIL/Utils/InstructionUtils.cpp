@@ -379,7 +379,7 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User) ||
+  return isa<IsUniqueInst>(User) || isa<DestroyNotEscapedClosureInst>(User) ||
          isa<BeginCOWMutationInst>(User);
 }
 
@@ -558,6 +558,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DropDeinitInst:
@@ -782,7 +783,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst: {
     SILType allocType = cast<SingleValueInstruction>(inst)->getType();
     if (allocType.hasArchetype() && !allocType.isLoadable(*inst->getFunction())) {
@@ -931,7 +931,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
     return ifNonTrivial(inst->getOperand(0)->getType(),
@@ -1020,7 +1020,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::WitnessMethod: {
       auto conformance =
           as.getOrigCalleeType()->getWitnessMethodConformanceOrInvalid();
-      if (conformance.getRequirement()->requiresClass()) {
+      if (conformance.getProtocol()->requiresClass()) {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
       } else {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;

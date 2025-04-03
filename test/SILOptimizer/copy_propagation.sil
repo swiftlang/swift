@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
 
 // REQUIRES: asserts
 
@@ -836,14 +836,16 @@ bb4:
   return %v : $()
 }
 
-// Test a dead begin_borrow (with no scope ending uses). Make sure
-// copy-propagation doesn't end the lifetime before the dead borrow.
+// Test a dead begin_borrow (with no scope ending uses).
+//
+// TODO: with lifetime completion, both copies should be deleted.
 //
 // CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : {{.*}} {
 // CHECK: bb0:
-// CHECK-NOT: copy_value
-// CHECK:   begin_borrow
+// CHECK:   copy_value
 // CHECK:   destroy_value
+// CHECK:   copy_value
+// CHECK:   begin_borrow
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testDeadBorrow'
 sil hidden [ossa] @testDeadBorrow : $@convention(thin) () -> () {
@@ -1071,3 +1073,24 @@ sil [ossa] @dontShortenDeadMoveOnlyLifetime : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [ossa] @look_through_end_init_let_ref :
+// CHECK:         [[E:%.*]] = end_init_let_ref
+// CHECK:         [[D:%.*]] = function_ref @dummy
+// CHECK:         apply [[D]]
+// CHECK:         destroy_value [[E]]
+// CHECK-LABEL: } // end sil function 'look_through_end_init_let_ref'
+sil [ossa] @look_through_end_init_let_ref : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = move_value [lexical] %0
+  %2 = end_init_let_ref %1
+  %4 = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %4(%2) : $@convention(thin) (@guaranteed C) -> ()
+  %6 = function_ref @dummy : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  destroy_value %2
+  %3 = tuple ()
+  return %3
+}
+

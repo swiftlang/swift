@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -226,7 +226,7 @@ extension ArraySlice {
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer.subscriptBaseAddress + index
+    return unsafe _buffer.subscriptBaseAddress + index
   }
 }
 
@@ -277,12 +277,12 @@ extension ArraySlice: _ArrayProtocol {
   @inlinable
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
     @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
-    get { return _buffer.firstElementAddressIfContiguous }
+    get { return unsafe _buffer.firstElementAddressIfContiguous }
   }
 
   @inlinable
   internal var _baseAddress: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
+    return unsafe _buffer.firstElementAddress
   }
 }
 
@@ -545,9 +545,9 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      let address = _buffer.subscriptBaseAddress + index
+      let address = unsafe _buffer.subscriptBaseAddress + index
       defer { _endMutation() }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -587,7 +587,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
       _checkIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
+      if unsafe self[bounds]._buffer.identity != rhs._buffer.identity
       || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
@@ -703,10 +703,10 @@ extension ArraySlice: RangeReplaceableCollection {
     if count > 0 {
       _buffer = ArraySlice._allocateBufferUninitialized(minimumCapacity: count)
       _buffer.count = count
-      var p = _buffer.firstElementAddress
+      var p = unsafe _buffer.firstElementAddress
       for _ in 0..<count {
-        p.initialize(to: repeatedValue)
-        p += 1
+        unsafe p.initialize(to: repeatedValue)
+        unsafe p += 1
       }
     } else {
       _buffer = _Buffer()
@@ -752,7 +752,7 @@ extension ArraySlice: RangeReplaceableCollection {
     _ count: Int
   ) -> (ArraySlice, UnsafeMutablePointer<Element>) {
     let result = ArraySlice(_uninitializedCount: count)
-    return (result, result._buffer.firstElementAddress)
+    return (result, unsafe result._buffer.firstElementAddress)
   }
 
   //===--- basic mutations ------------------------------------------------===//
@@ -831,7 +831,7 @@ extension ArraySlice: RangeReplaceableCollection {
       let newBuffer = _ContiguousArrayBuffer<Element>(
         _uninitializedCount: count, minimumCapacity: minimumCapacity)
 
-      _buffer._copyContents(
+      unsafe _buffer._copyContents(
         subRange: _buffer.indices,
         initializing: newBuffer.firstElementAddress)
       _buffer = _Buffer(
@@ -850,7 +850,7 @@ extension ArraySlice: RangeReplaceableCollection {
     let newCount = oldCount &+ 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
-    _buffer._arrayOutOfPlaceUpdate(
+    unsafe _buffer._arrayOutOfPlaceUpdate(
       &newBuffer, oldCount, 0)
   }
 
@@ -892,7 +892,7 @@ extension ArraySlice: RangeReplaceableCollection {
     _internalInvariant(_buffer.capacity >= _buffer.count &+ 1)
 
     _buffer.count = oldCount &+ 1
-    (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
+    unsafe (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
   }
 
   /// Adds a new element at the end of the array.
@@ -952,15 +952,15 @@ extension ArraySlice: RangeReplaceableCollection {
     _ = _buffer.beginCOWMutation()
 
     let oldCount = self.count
-    let startNewElements = _buffer.firstElementAddress + oldCount
-    let buf = UnsafeMutableBufferPointer(
+    let startNewElements = unsafe _buffer.firstElementAddress + oldCount
+    let buf = unsafe UnsafeMutableBufferPointer(
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    let (remainder,writtenUpTo) = unsafe buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
-    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+    let writtenCount = unsafe buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount,
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
@@ -1090,9 +1090,9 @@ extension ArraySlice: RangeReplaceableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
+    return unsafe try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      return try body(&bufferPointer)
+      return try unsafe body(&bufferPointer)
     }
   }
 
@@ -1100,9 +1100,9 @@ extension ArraySlice: RangeReplaceableCollection {
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
+    return unsafe try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      return try body(&bufferPointer)
+      return try unsafe body(&bufferPointer)
     }
   }
 
@@ -1110,9 +1110,9 @@ extension ArraySlice: RangeReplaceableCollection {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try withUnsafeBufferPointer {
+    return unsafe try withUnsafeBufferPointer {
       (bufferPointer) -> R in
-      return try body(bufferPointer)
+      return try unsafe body(bufferPointer)
     }
   }
 
@@ -1154,12 +1154,12 @@ extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
 extension ArraySlice {
   @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
-    let p = _baseAddressIfContiguous
-    if _fastPath(p != nil || isEmpty) {
+    let p = unsafe _baseAddressIfContiguous
+    if unsafe _fastPath(p != nil || isEmpty) {
       return (_owner, UnsafeRawPointer(p))
     }
     let n = ContiguousArray(self._buffer)._buffer
-    return (n.owner, UnsafeRawPointer(n.firstElementAddress))
+    return unsafe (n.owner, UnsafeRawPointer(n.firstElementAddress))
   }
 }
 
@@ -1171,7 +1171,7 @@ extension ArraySlice {
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
+    return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.
@@ -1207,7 +1207,18 @@ extension ArraySlice {
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
+    return try unsafe _buffer.withUnsafeBufferPointer(body)
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 
   // Superseded by the typed-throws version of this function, but retained
@@ -1219,7 +1230,7 @@ extension ArraySlice {
   mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutableBufferPointer(body)
+    return try unsafe withUnsafeMutableBufferPointer(body)
   }
 
   /// Calls the given closure with a pointer to the array's mutable contiguous
@@ -1272,12 +1283,12 @@ extension ArraySlice {
     _makeMutableAndUnique()
 
     // Create an UnsafeBufferPointer that we can pass to body
-    let pointer = _buffer.firstElementAddress
-    var inoutBufferPointer = UnsafeMutableBufferPointer(
+    let pointer = unsafe _buffer.firstElementAddress
+    var inoutBufferPointer = unsafe UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
     defer {
-      _precondition(
+      unsafe _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "ArraySlice withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -1286,7 +1297,22 @@ extension ArraySlice {
     }
 
     // Invoke the body.
-    return try body(&inoutBufferPointer)
+    return try unsafe body(&inoutBufferPointer)
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(/*inout*/borrow self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      _makeMutableAndUnique()
+      // NOTE: We don't have the ability to schedule a call to
+      //       ContiguousArrayBuffer.endCOWMutation().
+      //       rdar://146785284 (lifetime analysis for end of mutation)
+      let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
   }
 
   @inlinable
@@ -1303,21 +1329,21 @@ extension ArraySlice {
     _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
 
-    if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
+    if let s = unsafe _baseAddressIfContiguous {
+      unsafe p.initialize(from: s, count: self.count)
       // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
     } else {
       for x in self {
-        p.initialize(to: x)
-        p += 1
+        unsafe p.initialize(to: x)
+        unsafe p += 1
       }
     }
 
     var it = IndexingIterator(_elements: self)
     it._position = endIndex
-    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
+    return (it,unsafe buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 
@@ -1401,7 +1427,7 @@ extension ArraySlice: Equatable where Element: Equatable {
     }
 
     // Test referential equality.
-    if lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
+    if unsafe lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
       return true
     }
 
@@ -1483,8 +1509,8 @@ extension ArraySlice {
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try self.withUnsafeMutableBufferPointer {
-      return try body(UnsafeMutableRawBufferPointer($0))
+    return try unsafe self.withUnsafeMutableBufferPointer {
+      return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
   }
 
@@ -1519,8 +1545,8 @@ extension ArraySlice {
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try self.withUnsafeBufferPointer {
-      try body(UnsafeRawBufferPointer($0))
+    return try unsafe self.withUnsafeBufferPointer {
+      try unsafe body(UnsafeRawBufferPointer($0))
     }
   }
 }
@@ -1546,8 +1572,8 @@ extension ArraySlice {
   // copy.)
   @_alwaysEmitIntoClient
   public func _copyToNewArray() -> [Element] {
-    Array(unsafeUninitializedCapacity: self.count) { buffer, count in
-      var (it, c) = self._buffer._copyContents(initializing: buffer)
+    unsafe Array(unsafeUninitializedCapacity: self.count) { buffer, count in
+      var (it, c) = unsafe self._buffer._copyContents(initializing: buffer)
       _precondition(it.next() == nil)
       count = c
     }

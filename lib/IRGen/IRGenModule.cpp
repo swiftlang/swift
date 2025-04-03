@@ -208,6 +208,24 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 }
 #endif
 
+static bool getIsCoroCCSupported(const clang::TargetInfo &targetInfo,
+                                 const IRGenOptions &IRGenOpts) {
+  // TODO: CoroutineAccessors: The one caller of this function should just be
+  //                           rewritten as follows (once clang::CC_CoroAsync is
+  //                           defined).
+  //
+  // clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_CoroAsync)
+  if (targetInfo.getTriple().isAArch64() && IRGenOpts.UseCoroCCArm64) {
+    return true;
+  }
+  if (targetInfo.getTriple().getArch() == llvm::Triple::x86_64 &&
+      IRGenOpts.UseCoroCCX8664) {
+    return true;
+  }
+
+  return false;
+}
+
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, StringRef ModuleName,
@@ -484,6 +502,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       RelativeAddressTy
     });
 
+  MethodDefaultOverrideDescriptorStructTy = createStructType(
+      *this, "swift.method_default_override_descriptor",
+      {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy});
+
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy
@@ -600,6 +622,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   } else {
     SwiftAsyncCC = SwiftCC;
     AsyncTailCallKind = llvm::CallInst::TCK_Tail;
+  }
+
+  bool isCoroCCSupported =
+      getIsCoroCCSupported(clangASTContext.getTargetInfo(), opts);
+  if (isCoroCCSupported) {
+    SwiftCoroCC = llvm::CallingConv::SwiftCoro;
+  } else {
+    SwiftCoroCC = SwiftCC;
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
@@ -724,6 +754,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftTaskOptionRecordTy, // Base option record
     SwiftExecutorTy,         // Executor
   });
+  SwiftInitialTaskNameTaskOptionRecordTy =
+      createStructType(*this, "swift.task_name_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    Int8PtrTy,               // Task name string (char*)
+  });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate
@@ -783,6 +818,24 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
+
+  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
+                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerPtrTy = CoroFunctionPointerTy->getPointerTo();
+  CoroAllocationTy = PtrTy;
+  CoroAllocateFnTy =
+      llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
+  CoroDeallocateFnTy =
+      llvm::FunctionType::get(VoidTy, CoroAllocationTy, /*isVarArg*/ false);
+  CoroAllocatorFlagsTy = Int32Ty;
+  // swift/ABI/Coro.h : CoroAllocator
+  CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
+                                     {
+                                         Int32Ty, // CoroAllocator.Flags
+                                         CoroAllocateFnTy->getPointerTo(),
+                                         CoroDeallocateFnTy->getPointerTo(),
+                                     });
+  CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }
 
 IRGenModule::~IRGenModule() {
@@ -1012,6 +1065,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getCoroutineAccessorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -1166,6 +1227,14 @@ llvm::Constant *swift::getRuntimeFn(
 llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
+}
+
+llvm::Constant *IRGenModule::
+    getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer() {
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+             LinkEntity::forKnownAsyncFunctionPointer(
+                 "swift_deletedCalleeAllocatedCoroutineMethodError"))
+      .getValue();
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
@@ -1362,6 +1431,34 @@ llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }
 
+bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
+  if (T == Context.TheEmptyTupleType || T == Context.TheNativeObjectType ||
+      T == Context.TheBridgeObjectType || T == Context.TheRawPointerType ||
+      T == Context.getAnyObjectType())
+    return true;
+
+  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
+    auto Width = IntTy->getWidth();
+    if (Width.isPointerWidth())
+      return true;
+    if (!Width.isFixedWidth())
+      return false;
+    switch (Width.getFixedWidth()) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+    case 128:
+    case 256:
+      return true;
+    default:
+      break;
+    }
+  }
+
+  return false;
+}
+
 GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
     std::move(LLVMContext),
@@ -1548,32 +1645,35 @@ swift::irgen::encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
 }
 
 llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
-                                                      StringRef library) {
+                                                      LinkLibrary library) {
   llvm::SmallString<32> buffer;
+  StringRef name = library.getName();
 
   if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
-    bool quote = library.contains(' ');
+    bool quote = name.contains(' ');
 
     buffer += "/DEFAULTLIB:";
     if (quote)
       buffer += '"';
-    buffer += library;
-    if (!library.ends_with_insensitive(".lib"))
+    if (library.isStaticLibrary() && !name.starts_with_insensitive("lib"))
+      buffer += "lib";
+    buffer += name;
+    if (!name.ends_with_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
   } else if (T.isPS4()) {
-    bool quote = library.contains(' ');
+    bool quote = name.contains(' ');
 
     buffer += "\01";
     if (quote)
       buffer += '"';
-    buffer += library;
+    buffer += name;
     if (quote)
       buffer += '"';
   } else {
     buffer += "-l";
-    buffer += library;
+    buffer += name;
   }
 
   return buffer;
@@ -1653,7 +1753,8 @@ void IRGenModule::addLinkLibraries() {
     });
 
   if (ObjCInterop)
-    registerLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+    registerLinkLibrary(
+        LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
@@ -1784,7 +1885,7 @@ void AutolinkKind::collectEntriesFromLibraries(
       switch (linkLib.getKind()) {
       case LibraryKind::Library: {
         llvm::SmallString<32> opt =
-            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+            getTargetDependentLibraryOption(IGM.Triple, linkLib);
         Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
         continue;
       }
@@ -1805,7 +1906,7 @@ void AutolinkKind::collectEntriesFromLibraries(
       switch (linkLib.getKind()) {
       case LibraryKind::Library: {
         llvm::SmallString<32> opt =
-            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+            getTargetDependentLibraryOption(IGM.Triple, linkLib);
         Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
         continue;
       }

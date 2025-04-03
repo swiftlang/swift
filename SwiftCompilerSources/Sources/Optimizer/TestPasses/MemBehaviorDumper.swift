@@ -74,6 +74,8 @@ private extension Instruction {
          is CopyAddrInst,
          is BuiltinInst,
          is StoreBorrowInst,
+         is MarkDependenceInst,
+         is MarkDependenceAddrInst,
          is DebugValueInst:
       return true
     default:

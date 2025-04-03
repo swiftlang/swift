@@ -381,7 +381,7 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
         ProtocolConformanceRef(conformance.getConcrete()->subst(IFS)));
     } else {
       auto origType = req.getFirstType();
-      auto substType = origType.subst(*this, IFS.getOptions());
+      auto substType = origType.subst(*this);
 
       newConformances.push_back(conformance.subst(substType, IFS));
     }
@@ -406,7 +406,7 @@ SubstitutionMap::getOverrideSubstitutions(
                                       const ValueDecl *baseDecl,
                                       const ValueDecl *derivedDecl) {
   // For overrides within a protocol hierarchy, substitute the Self type.
-  if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
+  if (baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     auto baseSig = baseDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
     return baseSig->getIdentitySubstitutionMap();

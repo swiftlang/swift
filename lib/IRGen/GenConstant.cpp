@@ -396,9 +396,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
     CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
 
-    if (irgen::classifyFunctionPointerKind(fn).isAsyncFunctionPointer()) {
+    auto fpKind = irgen::classifyFunctionPointerKind(fn);
+    if (fpKind.isAsyncFunctionPointer()) {
       llvm::Constant *asyncFnPtr = IGM.getAddrOfAsyncFunctionPointer(fn);
       fnPtr = llvm::ConstantExpr::getBitCast(asyncFnPtr, fnPtr->getType());
+    } else if (fpKind.isCoroFunctionPointer()) {
+      llvm::Constant *coroFnPtr = IGM.getAddrOfCoroFunctionPointer(fn);
+      fnPtr = llvm::ConstantExpr::getBitCast(coroFnPtr, fnPtr->getType());
     }
 
     auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
@@ -433,6 +437,24 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *atp = dyn_cast<AddressToPointerInst>(operand)) {
     auto *val = emitConstantValue(IGM, atp->getOperand()).claimNextConstant();
     return val;
+  } else if (auto *vector = dyn_cast<VectorInst>(operand)) {
+    if (flatten) {
+      Explosion out;
+      for (SILValue element : vector->getElements()) {
+        Explosion e = emitConstantValue(IGM, element, flatten);
+        out.add(e.claimAll());
+      }
+      return out;
+    }
+    llvm::SmallVector<llvm::Constant *, 8> elementValues;
+    for (SILValue element : vector->getElements()) {
+      auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfo(element->getType()));
+      Size paddingBytes = ti.getFixedStride() - ti.getFixedSize();
+      Explosion e = emitConstantValue(IGM, element, flatten);
+      elementValues.push_back(IGM.getConstantValue(std::move(e), paddingBytes.getValue()));
+    }
+    auto *arrTy = llvm::ArrayType::get(elementValues[0]->getType(), elementValues.size());
+    return llvm::ConstantArray::get(arrTy, elementValues);
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }

@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -41,8 +42,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 #include <optional>
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
 
 namespace clang {
   class Module;
@@ -51,20 +52,16 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
-  class ASTScope;
   class ASTWalker;
-  class AvailabilityScope;
-  class BraceStmt;
+  class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
   class TypeDecl;
   enum class DeclKind : uint8_t;
-  class ExtensionDecl;
   class DebuggerClient;
   class DeclName;
   class FileUnit;
   class FuncDecl;
-  class InfixOperatorDecl;
   enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
@@ -74,19 +71,11 @@ namespace swift {
   class PostfixOperatorDecl;
   class PrefixOperatorDecl;
   class ProtocolConformance;
-  class ProtocolDecl;
   struct PrintOptions;
   class SourceLookupCache;
-  class Token;
-  class TupleType;
   class Type;
   class ValueDecl;
-  class VarDecl;
   class VisibleDeclConsumer;
-
-namespace ast_scope {
-class ASTSourceFileScope;
-}
 
 /// Discriminator for file-units.
 enum class FileUnitKind {
@@ -360,6 +349,10 @@ private:
 
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
+
+  using AvailabilityDomainMap =
+      llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *>;
+  AvailabilityDomainMap AvailabilityDomains;
 
 public:
   using PopulateFilesFn = llvm::function_ref<void(
@@ -847,6 +840,14 @@ public:
     Bits.ModuleDecl.ObjCNameLookupCachePopulated = value;
   }
 
+  bool supportsExtensibleEnums() const {
+    return Bits.ModuleDecl.ExtensibleEnums;
+  }
+
+  void setSupportsExtensibleEnums(bool value = true) {
+    Bits.ModuleDecl.ExtensibleEnums = value;
+  }
+
   /// For the main module, retrieves the list of primary source files being
   /// compiled, that is, the files we're generating code for.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const;
@@ -855,6 +856,12 @@ public:
   /// returns itself. If this is a submodule such as \c Foo.Bar.Baz, this
   /// returns the module \c Foo.
   ModuleDecl *getTopLevelModule(bool overlay = false);
+
+  /// Returns whether or not this module is a submodule of the given module.
+  /// If `this == M`, this returns false. If this is a submodule such as
+  /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
+  /// returns true.
+  bool isSubmoduleOf(const ModuleDecl *M) const;
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
@@ -963,6 +970,12 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  /// Finds the custom availability domain defined by this module with the
+  /// given identifier and if one exists adds it to results.
+  void
+  lookupAvailabilityDomains(Identifier identifier,
+                            SmallVectorImpl<AvailabilityDomain> &results) const;
+
   // Is \p attr accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(const SpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
@@ -1046,11 +1059,6 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// Returns true if decl context or its content can be serialized by
-  /// cross-module-optimization.
-  /// The \p ctxt can e.g. be a NominalType or the context of a function.
-  bool canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const;
-
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -1094,15 +1102,6 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
-
-  /// Determines whether this module should be recursed into when calling
-  /// \c getDisplayDecls.
-  ///
-  /// Some modules should not call \c getDisplayDecls, due to assertions
-  /// in their implementation. These are usually implicit imports that would be
-  /// recursed into for parsed modules. This function provides a guard against
-  /// recusing into modules that should not have decls collected.
-  bool shouldCollectDisplayDecls() const;
 
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
@@ -1158,6 +1157,9 @@ public:
 
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
+
+  /// \returns true if this module is the "_Concurrency" standard library module.
+  bool isConcurrencyModule() const;
 
   /// \returns true if this module has standard substitutions for mangling.
   bool hasStandardSubstitutions() const;
@@ -1240,6 +1242,10 @@ public:
   /// Returns the language version that was used to compile this module.
   /// An empty `Version` is returned if the information is not available.
   version::Version getLanguageVersionBuiltWith() const;
+
+  void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
+    AvailabilityDomains = std::move(map);
+  }
 
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())

@@ -10,8 +10,7 @@ import def_debug
 
 // CHECK: sil_scope [[SCOPE_ONE:[0-9]+]] { loc "{{.*}}def_debug.swift":2:13 parent @$s9def_debug3foo1xs6UInt64VAE_tF : $@convention(thin) (UInt64) -> UInt64 inlined_at [[INLINE_SITE_ONE:[0-9]+]] }
 // CHECK: sil_scope [[SCOPE_TWO:[0-9]+]] { loc "{{.*}}def_debug.swift":3:5 parent [[SCOPE_ONE]] inlined_at [[INLINE_SITE_ONE]] }
-// CHECK: sil_scope {{[0-9]+}} { loc "{{.*}}def_debug.swift":3:18 parent [[SCOPE_TWO]] inlined_at [[INLINE_SITE_ONE]] }
-let simpleFunc = foo(x: 1)
+let simpleFunc = foo(x: UInt64.random(in: 1...200))
 
 // _transparent with Onone
 // NOOPT: sil_scope [[SCOPE_GENERIC_ONE:[0-9]+]] { loc "{{.*}}def_debug.swift":10:13 parent @$s9def_debug25specializedGenericInlinedSiyF : $@convention(thin) () -> Int }

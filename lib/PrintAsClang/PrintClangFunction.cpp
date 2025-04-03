@@ -348,7 +348,8 @@ public:
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {
-      ClangSyntaxPrinter(CT->getASTContext(), os).printBaseName(CT->getDecl());
+      ClangSyntaxPrinter(CT->getASTContext(), os)
+          .printPrimaryCxxTypeName(cd, moduleContext);
     });
     if (typeUseKind == FunctionSignatureTypeUse::ParamType)
       os << "&";
@@ -617,6 +618,15 @@ static bool isOptionalObjCExistential(Type ty) {
   return false;
 }
 
+static bool isOptionalForeignReferenceType(Type ty) {
+  if (auto obj = ty->getOptionalObjectType()) {
+    if (const auto *cd =
+            dyn_cast_or_null<ClassDecl>(obj->getNominalOrBoundGenericNominal()))
+      return cd->isForeignReferenceType();
+  }
+  return false;
+}
+
 // Returns false if the given direct type is not yet supported because
 // of its ABI.
 template <class T>
@@ -657,7 +667,8 @@ static bool printDirectReturnOrParamCType(
   if (isKnownCType(valueType, typeMapping) ||
       (Count == 1 && lastOffset.isZero() && !valueType->hasTypeParameter() &&
        (valueType->isAnyClassReferenceType() ||
-        isOptionalObjCExistential(valueType)))) {
+        isOptionalObjCExistential(valueType) ||
+        isOptionalForeignReferenceType(valueType)))) {
     prettifiedValuePrinter();
     return true;
   }
@@ -1321,7 +1332,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   signature.visitParameterList(
       [&](const LoweredFunctionSignature::IndirectResultValue &) {},
       [&](const LoweredFunctionSignature::DirectParameter &param) {
-        if (isConsumedParameterInCaller(param.getConvention()))
+        if (isConsumedParameterInCaller(param.getConvention()) &&
+            !hasKnownOptionalNullableCxxMapping(
+                param.getParamDecl().getInterfaceType()))
           emitParamCopyForConsume(param.getParamDecl());
         ++paramIndex;
       },
@@ -1393,7 +1406,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         },
         [&](const LoweredFunctionSignature::DirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/false,
-                        isConsumedParameterInCaller(param.getConvention()),
+                        isConsumedParameterInCaller(param.getConvention()) &&
+                            !hasKnownOptionalNullableCxxMapping(
+                                param.getParamDecl().getInterfaceType()),
                         encodeTypeInfo(param, moduleContext, typeMapping));
         },
         [&](const LoweredFunctionSignature::IndirectParameter &param) {
@@ -1501,10 +1516,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!nonOptResultType)
     nonOptResultType = resultTy;
   if (auto *classDecl = nonOptResultType->getClassOrBoundGenericClass();
-      classDecl || nonOptResultType->isObjCExistentialType()) {
+      (classDecl && isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) ||
+      nonOptResultType->isObjCExistentialType()) {
     assert(!classDecl || classDecl->hasClangNode());
-    assert(!classDecl ||
-           isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
     os << "return (__bridge_transfer ";
     declPrinter.withOutputStream(os).print(nonOptResultType);
     os << ")(__bridge void *)";
@@ -1755,11 +1769,16 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     Type type) {
   if (auto optionalObjectType = type->getOptionalObjectType()) {
-    if (optionalObjectType->getNominalOrBoundGenericNominal()) {
+    if (const auto *nominal =
+            optionalObjectType->getNominalOrBoundGenericNominal()) {
       if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
               optionalObjectType->getNominalOrBoundGenericNominal())) {
         return typeInfo->canBeNullable;
       }
+      if (const auto *cd = dyn_cast<ClassDecl>(nominal))
+        if (cd->isForeignReferenceType())
+          return true;
+      return isa_and_nonnull<clang::ObjCInterfaceDecl>(nominal->getClangDecl());
     }
   }
   return false;

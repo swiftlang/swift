@@ -317,7 +317,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
   // If the argument is existential, open it.
   if (argTy->isClassExistentialType()) {
     auto openedTy =
-        OpenedArchetypeType::get(argTy->getCanonicalType());
+        ExistentialArchetypeType::get(argTy->getCanonicalType());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     arg = SGF.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
   }
@@ -873,7 +873,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
-    auto openedTy = OpenedArchetypeType::get(sourceType->getCanonicalType());
+    auto openedTy = ExistentialArchetypeType::get(sourceType->getCanonicalType());
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
@@ -1636,6 +1636,14 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
+  ManagedValue taskName = [&] {
+    if (options & CreateTaskOptions::OptionalEverything) {
+      return nextArg().getAsSingleValue(SGF);
+    } else {
+     return emitOptionalNone(ctx.TheRawPointerType);
+    }
+  }();
+
   auto functionValue = [&] {
     // No reabstraction required.
     if (options & CreateTaskOptions::Discarding) {
@@ -1693,6 +1701,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     taskGroup.getUnmanagedValue(),
     taskExecutorDeprecated.getUnmanagedValue(),
     taskExecutorConsuming.forward(SGF),
+    taskName.forward(SGF),
     functionValue.forward(SGF)
   };
 
@@ -2088,6 +2097,26 @@ static ManagedValue emitBuiltinAddressOfRawLayout(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
 
+static ManagedValue emitBuiltinZeroInitializer(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SGFContext C) {
+  auto valueType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto &valueTL = SGF.getTypeLowering(valueType);
+  auto loweredValueTy = valueTL.getLoweredType().getObjectType();
+
+  if (valueTL.isLoadable() ||
+      !SGF.F.getConventions().useLoweredAddresses()) {
+    auto value = SGF.B.createZeroInitValue(loc, loweredValueTy);
+    return SGF.emitManagedRValueWithCleanup(value, valueTL);
+  }
+
+  SILValue valueAddr = SGF.getBufferForExprResult(loc, loweredValueTy, C);
+  SGF.B.createZeroInitAddr(loc, valueAddr);
+  return SGF.manageBufferForExprResult(valueAddr, valueTL, C);
+}
+
 static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
                                        SILLocation loc,
                                        SubstitutionMap subs,
@@ -2120,15 +2149,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   // Aside from providing a modicum of predictability if the memory isn't
   // actually initialized, this also serves to communicate to DI that the memory
   // is considered initialized from this point.
-  auto zeroInit = getBuiltinValueDecl(Ctx,
-                                      Ctx.getIdentifier("zeroInitializer"));
-  SGF.B.createBuiltin(loc, zeroInit->getBaseIdentifier(),
-                      SILType::getEmptyTupleType(Ctx),
-                      SubstitutionMap::get(zeroInit->getInnermostDeclContext()
-                                               ->getGenericSignatureOfContext(),
-                                           {resultASTTy},
-                                           LookUpConformanceInModule()),
-                      buffer);
+  SGF.B.createZeroInitAddr(loc, buffer);
 
   SILValue bufferPtr = SGF.B.createAddressToPointer(loc, buffer,
         SILType::getPrimitiveObjectType(SGF.getASTContext().TheRawPointerType),

@@ -27,9 +27,11 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityConstraint.cpp
   AvailabilityContext.cpp
   AvailabilityDomain.cpp
   AvailabilityScope.cpp
+  AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
@@ -41,6 +43,7 @@ add_swift_host_library(swiftAST STATIC
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
   DeclNameLoc.cpp
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp

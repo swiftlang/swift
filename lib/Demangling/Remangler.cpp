@@ -1051,6 +1051,16 @@ ManglingError Remangler::mangleAsyncFunctionPointer(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCoroFunctionPointer(Node *node, unsigned depth) {
+  Buffer << "Twc";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleDefaultOverride(Node *node, unsigned depth) {
+  Buffer << "Twd";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentAssociatedTypeRef(Node *node,
                                                           unsigned depth) {
   RETURN_IF_ERROR(mangleIdentifier(node->getFirstChild(), depth));
@@ -1836,6 +1846,8 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
       case Node::Kind::HasSymbolQuery:
+      case Node::Kind::CoroFunctionPointer:
+      case Node::Kind::DefaultOverride:
         mangleInReverseOrder = true;
         break;
       default:
@@ -2251,9 +2263,15 @@ ManglingError Remangler::mangleSending(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+ManglingError Remangler::mangleCompileTimeLiteral(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Yt";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleConstValue(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Yg";
   return ManglingError::Success;
 }
 
@@ -3050,6 +3068,16 @@ ManglingError Remangler::mangleKeyPathSetterThunkHelper(Node *node,
   return mangleKeyPathThunkHelper(node, "Tk", depth + 1);
 }
 
+ManglingError
+Remangler::mangleKeyPathUnappliedMethodThunkHelper(Node *node, unsigned depth) {
+  return mangleKeyPathThunkHelper(node, "Tkmu", depth + 1);
+}
+
+ManglingError Remangler::mangleKeyPathAppliedMethodThunkHelper(Node *node,
+                                                               unsigned depth) {
+  return mangleKeyPathThunkHelper(node, "TkMA", depth + 1);
+}
+
 ManglingError Remangler::mangleKeyPathEqualsThunkHelper(Node *node,
                                                         unsigned depth) {
   return mangleKeyPathThunkHelper(node, "TH", depth + 1);
@@ -3397,14 +3425,6 @@ ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
-                                                              unsigned depth) {
-  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
-  Buffer << "TT"
-         << "H";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tj";
@@ -3472,6 +3492,12 @@ ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
 ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
                                                        unsigned depth) {
   Buffer << "YA";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNonIsolatedCallerFunctionType(Node *node,
+                                                             unsigned depth) {
+  Buffer << "YC";
   return ManglingError::Success;
 }
 
@@ -3791,6 +3817,14 @@ ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
 ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
   Buffer << "XSa";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleSugaredInlineArray(Node *node, unsigned int depth) {
+  RETURN_IF_ERROR(mangleType(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
+  Buffer << "XSA";
   return ManglingError::Success;
 }
 

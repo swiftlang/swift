@@ -1378,11 +1378,6 @@ namespace {
                                const llvm::Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                                llvm::Value *capacity,
-                                const Twine &name) const override {
-      llvm_unreachable("should not call on an immovable opaque type");
-    }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                          SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -2321,7 +2316,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
 
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::ElementArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));

@@ -35,8 +35,7 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   if moduleContext.options.enableEmbeddedSwift {
     worklist.addAllNonGenericFunctions(of: moduleContext)
   } else {
-    worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
-    worklist.addAllAnnotatedGlobalInitOnceFunctions(of: moduleContext)
+    worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
@@ -80,11 +79,22 @@ fileprivate struct PathFunctionTuple: Hashable {
 
 private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
+
+  // ObjectOutliner replaces calls to findStringSwitchCase with _findStringSwitchCaseWithCache, but this happens as a late SIL optimization,
+  // which is a problem for Embedded Swift, because _findStringSwitchCaseWithCache will then reference non-specialized code. Solve this by
+  // eagerly linking and specializing _findStringSwitchCaseWithCache whenever findStringSwitchCase is found in the module.
+  if context.options.enableEmbeddedSwift {
+    if function.hasSemanticsAttribute("findStringSwitchCase"),
+        let f = context.lookupStdlibFunction(name: "_findStringSwitchCaseWithCache"),
+        context.loadFunction(function: f, loadCalleesRecursively: true) {
+      worklist.pushIfNotVisited(f)
+    }
+  }
   
   var changed = true
   while changed {
     changed = runSimplification(on: function, context, preserveDebugInfo: true) { instruction, simplifyCtxt in
-      if let i = instruction as? OnoneSimplifyable {
+      if let i = instruction as? OnoneSimplifiable {
         i.simplify(simplifyCtxt)
         if instruction.isDeleted {
           return
@@ -148,6 +158,14 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         {
           fri.referencedFunction.set(linkage: .public, moduleContext)
         }
+        
+      case let copy as CopyAddrInst:
+        if function.isGlobalInitOnceFunction, copy.source.type.isLoadable(in: function) {
+          // In global init functions we have to make sure that redundant load elimination can remove all
+          // loads (from temporary stack locations) so that globals can be statically initialized.
+          // For this it's necessary to load copy_addr instructions to loads and stores.
+          copy.replaceWithLoadAndStore(simplifyCtxt)
+        }
 
       default:
         break
@@ -159,7 +177,13 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     removeUnusedMetatypeInstructions(in: function, context)
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
-    changed = context.optimizeMemoryAccesses(in: function) || changed
+    if eliminateRedundantLoads(in: function,
+                               variant: function.isGlobalInitOnceFunction ? .mandatoryInGlobalInit : .mandatory,
+                               context)
+    {
+      changed = true
+    }
+
     changed = context.eliminateDeadAllocations(in: function) || changed
   }
 }
@@ -458,10 +482,29 @@ fileprivate struct FunctionWorklist {
     }
     return nil
   }
-
-  mutating func addAllPerformanceAnnotatedFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.performanceConstraints != .none {
-      pushIfNotVisited(f)
+  
+  mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions {
+      // Performance annotated functions
+      if f.performanceConstraints != .none {
+        pushIfNotVisited(f)
+      }
+      
+      // Annotated global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
+      
+      // @const global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
     }
   }
 
@@ -470,15 +513,6 @@ fileprivate struct FunctionWorklist {
       pushIfNotVisited(f)
     }
     return
-  }
-
-  mutating func addAllAnnotatedGlobalInitOnceFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.isGlobalInitOnceFunction {
-      if let global = f.getInitializedGlobal(),
-         global.mustBeInitializedStatically {
-        pushIfNotVisited(f)
-      }
-    }
   }
 
   mutating func addCallees(of function: Function) {

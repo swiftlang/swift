@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_WRAPPERTYPES_H
 #define SWIFT_SIL_WRAPPERTYPES_H
 
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -292,7 +293,7 @@ public:
     case SILInstructionKind::DifferentiableFunctionInst:
       return nullptr;
     case SILInstructionKind::MarkDependenceInst:
-      return &forwardingInst->getOperandRef(MarkDependenceInst::Value);
+      return &forwardingInst->getOperandRef(MarkDependenceInst::Dependent);
     case SILInstructionKind::RefToBridgeObjectInst:
       return
         &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);
@@ -361,6 +362,43 @@ public:
   // operation.
   bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
 };
+
+enum class FixedStorageSemanticsCallKind { None, CheckIndex, GetCount };
+
+struct FixedStorageSemanticsCall {
+  ApplyInst *apply = nullptr;
+  FixedStorageSemanticsCallKind kind = FixedStorageSemanticsCallKind::None;
+
+  FixedStorageSemanticsCall(SILInstruction *input) {
+    auto *applyInst = dyn_cast<ApplyInst>(input);
+    if (!applyInst) {
+      return;
+    }
+    auto *callee = applyInst->getReferencedFunctionOrNull();
+    if (!callee) {
+      return;
+    }
+    for (auto &attr : callee->getSemanticsAttrs()) {
+      if (attr == "fixed_storage.check_index") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::CheckIndex;
+        break;
+      } else if (attr == "fixed_storage.get_count") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::GetCount;
+        break;
+      }
+    }
+  }
+
+  FixedStorageSemanticsCallKind getKind() const { return kind; }
+  explicit operator bool() const { return apply != nullptr; }
+  const ApplyInst *operator->() const { return apply; }
+  ApplyInst *operator->() { return apply; }
+};
+
+bool isFixedStorageSemanticsCallKind(SILFunction *function);
+
 } // end namespace swift
 
 #endif

@@ -127,8 +127,7 @@ public:
   ///
   /// If the declaration is exported, the resulting context is restricted to
   /// referencing exported types only. Otherwise it can reference anything.
-  static ExportContext forDeclSignature(
-      Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses);
+  static ExportContext forDeclSignature(Decl *D);
 
   /// Create an instance describing the declarations that can be referenced
   /// from the given function's body.
@@ -165,10 +164,6 @@ public:
 
   AvailabilityContext getAvailability() const { return Availability; }
 
-  AvailabilityRange getAvailabilityRange() const {
-    return Availability.getPlatformRange();
-  }
-
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
 
@@ -189,10 +184,6 @@ public:
   /// or declarations from `@_implementationOnly` imports.
   bool isExported() const { return Exported; }
 
-  /// If true, the context is part of a deprecated declaration and can
-  /// reference other deprecated declarations without warning.
-  bool isDeprecated() const { return Availability.isDeprecated(); }
-
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
   /// because it is the function body context of an inlinable function.
@@ -201,20 +192,7 @@ public:
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
-
-  /// If \p decl is unconditionally unavailable in this context, and the context
-  /// is not also unavailable in the same way, then this returns the specific
-  /// `@available` attribute that makes the decl unavailable. Otherwise, returns
-  /// nullptr.
-  std::optional<SemanticAvailableAttr>
-  shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
-
-/// Check if a declaration is exported as part of a module's external interface.
-/// This includes public and @usableFromInline decls.
-bool isExported(const ValueDecl *VD);
-bool isExported(const ExtensionDecl *ED);
-bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
@@ -249,14 +227,6 @@ bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        const ValueDecl *base,
                                        SemanticAvailableAttr attr);
-
-/// Checks whether a declaration should be considered unavailable when referred
-/// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unsatisfied constraint.
-/// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint>
-getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                     AvailabilityContext availabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,

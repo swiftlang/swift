@@ -85,6 +85,9 @@ enum class ConstraintKind : char {
   /// class type).
   SubclassOf,
   /// The first type must conform to the second type (which is a
+  /// protocol type) and the conformance must not be an isolated conformance.
+  NonisolatedConformsTo,
+  /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
   /// The first type describes a literal that conforms to the second
@@ -150,6 +153,11 @@ enum class ConstraintKind : char {
   /// The key path type is chosen based on the selection of overloads for the
   /// member references along the path.
   KeyPath,
+  /// The first type will be equal to the second type, but only when the
+  /// second type has been fully determined (and mapped down to a concrete
+  /// type). At that point, this constraint will be treated like an `Equal`
+  /// constraint.
+  OneWayEqual,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -328,6 +336,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint,
                                   TypeVariableType *,
                                   ConstraintFix *,
+                                  DeclContext *,
+                                  ContextualTypeInfo,
                                   OverloadChoice> {
   friend TrailingObjects;
 
@@ -337,8 +347,16 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// Whether we have a fix.
+  /// The number of type variables referenced by this constraint.
+  ///
+  /// The type variables themselves are tail-allocated.
+  unsigned NumTypeVariables : 11;
+
+  /// Whether we have a tail-allocated fix.
   unsigned HasFix : 1;
+
+  /// Whether we have a tail-allocated DeclContext.
+  unsigned HasDeclContext : 1;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -367,17 +385,18 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// the rest of the constraint system. Currently only applies to conjunctions.
   unsigned IsIsolated : 1;
 
-  /// The number of type variables referenced by this constraint.
-  ///
-  /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 11;
-
   /// The kind of function reference, for member references.
   unsigned TheFunctionRefInfo : 3;
 
   /// The trailing closure matching for an applicable function constraint,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.
   unsigned trailingClosureMatching : 2;
+
+  /// For a SyntacticElement constraint, identify whether the result of this
+  /// node is unused.
+  unsigned isDiscarded : 1;
+
+  // 22 bits remaining
 
   union {
     struct {
@@ -410,30 +429,30 @@ class Constraint final : public llvm::ilist_node<Constraint>,
         /// Used for ValueWitness constraints.
         ValueDecl *Ref;
       } Member;
-
-      /// The DC in which the use appears.
-      DeclContext *UseDC;
     } Member;
 
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
 
     struct {
-      /// The first type
+      /// The first type.
       Type First;
-
-      /// The DC in which the use appears.
-      DeclContext *UseDC;
     } Overload;
 
     struct {
       /// The node itself.
       ASTNode Element;
-      /// Contextual information associated with the element (if any).
-      ContextualTypeInfo Context;
-      /// Identifies whether result of this node is unused.
-      bool IsDiscarded;
     } SyntacticElement;
+
+    struct {
+      /// The function type that is being applied where parameters
+      /// represent argument types passed to callee and result type
+      /// represents result type of the application.
+      FunctionType *AppliedFn;
+      /// The type being called, primarily a function type, but could
+      /// be a metatype, a tuple or a nominal type.
+      Type Callee;
+    } Apply;
   };
 
   /// The locator that describes where in the expression this
@@ -490,6 +509,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
+  Constraint(FunctionType *appliedFn, Type calleeType,
+             unsigned trailingClosureMatching, DeclContext *useDC,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
     return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
@@ -501,6 +525,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
     return HasFix ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DeclContext *>) const {
+    return HasDeclContext ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ContextualTypeInfo>) const {
+    return Kind == ConstraintKind::SyntacticElement ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<OverloadChoice>) const {
@@ -575,20 +607,20 @@ public:
 
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
-      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      ConstraintLocator *locator);
+      DeclContext *useDC, ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                            ASTNode node,
+                                            ConstraintLocator *locator,
+                                            bool isDiscarded = false);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ContextualTypeInfo context,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                            ASTNode node,
+                                            ContextualTypeInfo context,
+                                            ConstraintLocator *locator,
+                                            bool isDiscarded = false);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -668,6 +700,7 @@ public:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::SubclassOf:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::CheckedCast:
@@ -675,6 +708,7 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::OneWayEqual:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -733,6 +767,9 @@ public:
     case ConstraintKind::SyntacticElement:
       llvm_unreachable("closure body element constraint has no type operands");
 
+    case ConstraintKind::ApplicableFunction:
+      return Apply.AppliedFn;
+
     default:
       return Types.First;
     }
@@ -751,6 +788,9 @@ public:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       return Member.Second;
+
+    case ConstraintKind::ApplicableFunction:
+      return Apply.Callee;
 
     default:
       return Types.Second;
@@ -812,6 +852,11 @@ public:
     });
   }
 
+  /// Returns the number of resolved argument types for an applied disjunction
+  /// constraint. This is always zero for disjunctions that do not represent
+  /// an applied overload.
+  unsigned countResolvedArgumentTypes(ConstraintSystem &cs) const;
+
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.
   bool isExplicitConversion() const;
@@ -822,22 +867,18 @@ public:
 
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
-    assert(Kind == ConstraintKind::BindOverload);
+    ASSERT(Kind == ConstraintKind::BindOverload);
     return *getTrailingObjects<OverloadChoice>();
   }
 
-  /// Retrieve the DC in which the overload was used.
-  DeclContext *getOverloadUseDC() const {
-    assert(Kind == ConstraintKind::BindOverload);
-    return Overload.UseDC;
+  FunctionType *getAppliedFunctionType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.AppliedFn;
   }
 
-  /// Retrieve the DC in which the member was used.
-  DeclContext *getMemberUseDC() const {
-    assert(Kind == ConstraintKind::ValueMember ||
-           Kind == ConstraintKind::UnresolvedValueMember ||
-           Kind == ConstraintKind::ValueWitness);
-    return Member.UseDC;
+  Type getCalleeType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.Callee;
   }
 
   ASTNode getSyntacticElement() const {
@@ -846,13 +887,19 @@ public:
   }
 
   ContextualTypeInfo getElementContext() const {
-    assert(Kind == ConstraintKind::SyntacticElement);
-    return SyntacticElement.Context;
+    ASSERT(Kind == ConstraintKind::SyntacticElement);
+    return *getTrailingObjects<ContextualTypeInfo>();
   }
 
   bool isDiscardedElement() const {
     assert(Kind == ConstraintKind::SyntacticElement);
-    return SyntacticElement.IsDiscarded;
+    return isDiscarded;
+  }
+
+  /// Retrieve the DC in which the overload was used.
+  DeclContext *getDeclContext() const {
+    ASSERT(HasDeclContext);
+    return *getTrailingObjects<DeclContext *>();
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

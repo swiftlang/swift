@@ -38,6 +38,7 @@ extension Nillable: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapabl
 
 extension Nillable where Wrapped: ~Copyable & ~Escapable {
   @_transparent
+  @lifetime(copy some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 

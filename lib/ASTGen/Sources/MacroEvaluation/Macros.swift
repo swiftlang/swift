@@ -244,6 +244,9 @@ func checkMacroDefinition(
         case "IsolationMacro":
           return Int(BridgedMacroDefinitionKind.builtinIsolationMacro.rawValue)
 
+        case "SwiftSettingsMacro":
+          return Int(BridgedMacroDefinitionKind.builtinSwiftSettingsMacro.rawValue)
+
         // These builtins don't exist, but are put into the standard library at
         // least for documentation purposes right now. Don't emit a warning for
         // them, but do fail operation.
@@ -580,15 +583,15 @@ func expandAttachedMacro(
     return 1
   }
 
-  // Dig out the node for the declaration to which the custom attribute is
-  // attached.
-  guard
-    let declarationNode = findSyntaxNodeInSourceFile(
-      sourceFilePtr: declarationSourceFilePtr,
-      sourceLocationPtr: declarationSourceLocPointer,
-      type: DeclSyntax.self
-    )
-  else {
+  // Dig out the node for the closure or declaration to which the custom
+  // attribute is attached.
+  let node = findSyntaxNodeInSourceFile(
+    sourceFilePtr: declarationSourceFilePtr,
+    sourceLocationPtr: declarationSourceLocPointer,
+    where: { $0.is(DeclSyntax.self) || $0.is(ClosureExprSyntax.self) }
+  )
+
+  guard let node else {
     return 1
   }
 
@@ -619,7 +622,7 @@ func expandAttachedMacro(
     customAttrSourceFilePtr: customAttrSourceFilePtr,
     customAttrNode: customAttrNode,
     declarationSourceFilePtr: declarationSourceFilePtr,
-    attachedTo: declarationNode,
+    attachedTo: node,
     parentDeclSourceFilePtr: parentDeclSourceFilePtr,
     parentDeclNode: parentDeclNode
   )
@@ -654,7 +657,7 @@ func expandAttachedMacroImpl(
   customAttrSourceFilePtr: UnsafePointer<ExportedSourceFile>,
   customAttrNode: AttributeSyntax,
   declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
-  attachedTo declarationNode: DeclSyntax,
+  attachedTo declarationNode: Syntax,
   parentDeclSourceFilePtr: UnsafePointer<ExportedSourceFile>?,
   parentDeclNode: DeclSyntax?
 ) -> String? {
@@ -686,7 +689,7 @@ func expandAttachedMacroImpl(
   )!
 
   let declSyntax = PluginMessage.Syntax(
-    syntax: Syntax(declarationNode),
+    syntax: declarationNode,
     in: declarationSourceFilePtr
   )!
 
