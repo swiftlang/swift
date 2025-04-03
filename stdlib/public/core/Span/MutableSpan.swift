@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 // A MutableSpan<Element> represents a span of memory which
 // contains initialized `Element` instances.
 @safe
