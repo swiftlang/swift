@@ -475,6 +475,44 @@ static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                            false);
 }
 
+/// Special ranking rule for `.overlay(_:alignment)` and `.background(_:alignment)`.
+/// The disfavored overloads are always strictly worse for these methods.
+static std::optional<bool> compareSwiftUIOverlayOrBackground(ValueDecl *decl1,
+                                                             ValueDecl *decl2) {
+  auto *func1 = dyn_cast<FuncDecl>(decl1);
+  auto *func2 = dyn_cast<FuncDecl>(decl2);
+
+  if (!func1 || !func2)
+    return std::nullopt;
+
+  auto module1 = func1->getParentModule();
+  auto module2 = func2->getParentModule();
+
+  if (!(module1 == module2 && module1->getName().is("SwiftUICore")))
+    return std::nullopt;
+
+  auto isDisfavoredOverloadOfOverlayOrBackground = [](FuncDecl *F) {
+    if (!F->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+      return false;
+
+    auto *ext = dyn_cast_or_null<ExtensionDecl>(F->getDeclContext());
+    if (!ext || !ext->getExtendedNominal()->getName().is("View"))
+      return false;
+
+    auto name = F->getName();
+    return name.isCompoundName("overlay", {"", "alignment"}) ||
+           name.isCompoundName("background", {"", "alignment"});
+  };
+
+  if (isDisfavoredOverloadOfOverlayOrBackground(func1))
+    return false;
+
+  if (isDisfavoredOverloadOfOverlayOrBackground(func2))
+    return true;
+
+  return std::nullopt;
+}
+
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison, bool allowMissingConformances) const {
@@ -567,6 +605,10 @@ bool CompareDeclSpecializationRequest::evaluate(
     auto inProto2 = isa<ProtocolDecl>(outerDC2);
     if (inProto1 != inProto2)
       return completeResult(inProto2);
+  }
+
+  if (auto result = compareSwiftUIOverlayOrBackground(decl1, decl2)) {
+    return completeResult(result.value());
   }
 
   Type type1 = decl1->getInterfaceType();
