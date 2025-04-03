@@ -1144,7 +1144,7 @@ bool swift::isExported(const ValueDecl *VD) {
   return false;
 }
 
-static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+bool swift::hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
   auto nominal = ED->getExtendedNominal();
   if (!nominal)
     return false;
