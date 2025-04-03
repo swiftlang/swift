@@ -203,6 +203,31 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
+void NormalProtocolConformance::setSourceKindAndImplyingConformance(
+    ConformanceEntryKind sourceKind,
+    NormalProtocolConformance *implyingConformance) {
+  assert(sourceKind != ConformanceEntryKind::Inherited &&
+         "a normal conformance cannot be inherited");
+  assert((sourceKind == ConformanceEntryKind::Implied) ==
+             (bool)implyingConformance &&
+         "an implied conformance needs something that implies it");
+  assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
+         "cannot create conformance pre-macro-expansion");
+  Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
+  if (auto implying = implyingConformance) {
+    ImplyingConformance = implying;
+    PreconcurrencyLoc = implying->getPreconcurrencyLoc();
+    Bits.NormalProtocolConformance.Options =
+        implyingConformance->getOptions().toRaw();
+    if (getProtocol()->isMarkerProtocol()) {
+      setExplicitGlobalActorIsolation(nullptr);
+    } else if (auto globalActorIsolationType =
+                   implyingConformance->getExplicitGlobalActorIsolation()) {
+      setExplicitGlobalActorIsolation(globalActorIsolationType);
+    }
+  }
+}
+
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
@@ -494,10 +519,14 @@ void
 NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
   if (!typeExpr) {
     Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    Bits.NormalProtocolConformance.Options &=
+        ~(unsigned)ProtocolConformanceFlags::GlobalActorIsolated;
     return;
   }
 
   Bits.NormalProtocolConformance.HasExplicitGlobalActor = true;
+  Bits.NormalProtocolConformance.Options |=
+      (unsigned)ProtocolConformanceFlags::GlobalActorIsolated;
   ASTContext &ctx = getDeclContext()->getASTContext();
   ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this] = typeExpr;
 }

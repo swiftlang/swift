@@ -739,22 +739,7 @@ public:
 
   void setSourceKindAndImplyingConformance(
       ConformanceEntryKind sourceKind,
-      NormalProtocolConformance *implyingConformance) {
-    assert(sourceKind != ConformanceEntryKind::Inherited &&
-           "a normal conformance cannot be inherited");
-    assert((sourceKind == ConformanceEntryKind::Implied) ==
-               (bool)implyingConformance &&
-           "an implied conformance needs something that implies it");
-    assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
-           "cannot create conformance pre-macro-expansion");
-    Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
-    if (auto implying = implyingConformance) {
-      ImplyingConformance = implying;
-      PreconcurrencyLoc = implying->getPreconcurrencyLoc();
-      Bits.NormalProtocolConformance.Options =
-          implyingConformance->getOptions().toRaw();
-    }
-  }
+      NormalProtocolConformance *implyingConformance);
 
   /// Determine whether this conformance is lazily loaded.
   ///
