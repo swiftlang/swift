@@ -4060,7 +4060,15 @@ public:
       }
 
       numEmitted += 1;
-      diagnose(ext, diag::objc_implementation_missing_impl, req);
+
+      // Emit different diagnostic if there's an async alternative.
+      if (auto asyncAlternative = getAsyncAlternative(req)) {
+        diagnose(ext, diag::objc_implementation_missing_impl_either,
+                 asyncAlternative, req);
+        req = asyncAlternative;
+      } else {
+        diagnose(ext, diag::objc_implementation_missing_impl, req);
+      }
 
       // Append stub for this requirement into eventual fix-it.
       swift::printRequirementStub(req, ext, ext->getSelfInterfaceType(),
