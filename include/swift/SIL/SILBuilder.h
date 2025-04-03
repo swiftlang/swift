@@ -1728,6 +1728,9 @@ public:
                        EnumElementDecl *Element, SILType Ty,
                        ValueOwnershipKind forwardingOwnershipKind) {
     ASSERT(isLoadableOrOpaque(Ty));
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule())
                       EnumInst(getSILDebugLocation(Loc), Operand, Element, Ty,
                                forwardingOwnershipKind));
@@ -1751,6 +1754,9 @@ public:
                                                SILValue Operand,
                                                EnumElementDecl *Element,
                                                SILType Ty) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) InitEnumDataAddrInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1776,6 +1782,9 @@ public:
                           EnumElementDecl *Element, SILType Ty,
                           ValueOwnershipKind forwardingOwnershipKind) {
     ASSERT(isLoadableOrOpaque(Ty));
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) UncheckedEnumDataInst(
         getSILDebugLocation(Loc), Operand, Element, Ty,
         forwardingOwnershipKind));
@@ -1791,6 +1800,9 @@ public:
   UncheckedTakeEnumDataAddrInst *
   createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
                                   EnumElementDecl *Element, SILType Ty) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) UncheckedTakeEnumDataAddrInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1805,6 +1817,9 @@ public:
 
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,
                                            EnumElementDecl *Element) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) InjectEnumAddrInst(
         getSILDebugLocation(Loc), Operand, Element));
   }
