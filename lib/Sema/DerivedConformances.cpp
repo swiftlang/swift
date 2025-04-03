@@ -51,7 +51,12 @@ ModuleDecl *DerivedConformance::getParentModule() const {
 
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
-  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  IterableDeclContext *IDC;
+  if (auto ext = dyn_cast<ExtensionDecl>(ConformanceDecl)) {
+    IDC = cast<IterableDeclContext>(ext->getExtendedNominal());
+  } else {
+    IDC = cast<IterableDeclContext>(ConformanceDecl);
+  }
   for (auto child : children)
     IDC->addMember(child);
 }
