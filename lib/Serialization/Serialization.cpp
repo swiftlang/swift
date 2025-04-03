@@ -1187,11 +1187,6 @@ void Serializer::writeHeader() {
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
       }
 
-      if (M->supportsExtensibleEnums()) {
-        options_block::ExtensibleEnumsLayout ExtensibleEnums(Out);
-        ExtensibleEnums.emit(ScratchRecord);
-      }
-
       if (Options.SerializeOptionsForDebugging) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);

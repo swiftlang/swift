@@ -1501,8 +1501,6 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
-    if (Invocation.getLangOptions().hasFeature(Feature::ExtensibleEnums))
-      MainModule->setSupportsExtensibleEnums(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

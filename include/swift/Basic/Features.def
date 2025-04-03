@@ -505,11 +505,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
-/// Allow public enumerations to be extensible by default
-/// regardless of whether the module they are declared in
-/// is resilient or not.
-EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
-
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
