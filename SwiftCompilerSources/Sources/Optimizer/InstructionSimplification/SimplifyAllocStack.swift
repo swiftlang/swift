@@ -274,10 +274,10 @@ private extension AllocStackInst {
         //         `alloc_stack $any P` -> `alloc_stack $ConcreteType`
         concreteType = cft
       } else {
-        // The instruction which defines the existential archetype must dominate the alloc_stack, because
-        // after the transformation the alloc_stack will use the existential archetype.
-        for openArchetypeOp in initExistential.typeDependentOperands {
-          if !openArchetypeOp.value.triviallyDominates(self) {
+        // The instruction or argument which defines the archetype must dominate the alloc_stack
+        // because after the transformation, the alloc_stack will use the archetype.
+        for typeDependentOp in initExistential.typeDependentOperands {
+          if !typeDependentOp.value.triviallyDominates(self) {
             return nil
           }
         }
