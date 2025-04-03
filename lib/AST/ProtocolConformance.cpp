@@ -623,14 +623,6 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
   TypeWitnesses[assocType] = {type, typeDecl};
 }
 
-Type ProtocolConformance::getAssociatedType(Type assocType) const {
-  assert(assocType->isTypeParameter() &&
-         "associated type must be a type parameter");
-
-  ProtocolConformanceRef ref(const_cast<ProtocolConformance*>(this));
-  return ref.getAssociatedType(assocType);
-}
-
 ProtocolConformanceRef
 ProtocolConformance::getAssociatedConformance(Type assocType,
                                               ProtocolDecl *protocol) const {

@@ -210,13 +210,6 @@ Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
   return DependentMemberType::get(conformingType, assocType);
 }
 
-Type ProtocolConformanceRef::getAssociatedType(Type assocType) const {
-  if (isInvalid())
-    return ErrorType::get(assocType->getASTContext());
-
-  return assocType.subst(SubstitutionMap::getProtocolSubstitutions(*this));
-}
-
 ProtocolConformanceRef
 ProtocolConformanceRef::getAssociatedConformance(Type assocType,
                                                  ProtocolDecl *protocol) const {
