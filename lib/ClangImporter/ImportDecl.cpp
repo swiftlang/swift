@@ -2392,6 +2392,9 @@ namespace {
           // field type.
           synthesizer.makeUnionFieldAccessors(result, member);
 
+          // Union accessors are always unsafe.
+          member->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
+
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
           auto valueCtor =
