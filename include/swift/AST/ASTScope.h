@@ -1871,15 +1871,20 @@ public:
 class TryScope final : public ASTScopeImpl {
 public:
   AnyTryExpr *const expr;
-  TryScope(AnyTryExpr *e)
-      : ASTScopeImpl(ScopeKind::Try), expr(e) {}
+
+  /// The end location of the scope. This may be past the TryExpr for
+  /// cases where the `try` is at the top-level of an unfolded SequenceExpr. In
+  /// such cases, the `try` covers all elements to the right.
+  SourceLoc endLoc;
+
+  TryScope(AnyTryExpr *e, SourceLoc endLoc)
+      : ASTScopeImpl(ScopeKind::Try), expr(e), endLoc(endLoc) {
+    ASSERT(endLoc.isValid());
+  }
   virtual ~TryScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange

@@ -134,8 +134,37 @@ public:
 
         // If we have a try/try!/try?, we need to add a scope for it
         if (auto anyTry = dyn_cast<AnyTryExpr>(E)) {
-          scopeCreator.constructExpandAndInsert<TryScope>(parent, anyTry);
+          auto *scope = scopeCreator.constructExpandAndInsert<TryScope>(
+              parent, anyTry, anyTry->getEndLoc());
+          scopeCreator.addExprToScopeTree(anyTry->getSubExpr(), scope);
           return Action::SkipNode(E);
+        }
+
+        // If we have an unfolded SequenceExpr, make sure any `try` covers all
+        // the following elements in the sequence. It's possible it doesn't
+        // end up covering some of the following elements in the folded tree,
+        // e.g `0 * try foo() + bar()` and `_ = try foo() ^ bar()` where `^` is
+        // lower precedence than `=`, but those cases are invalid and will be
+        // diagnosed during sequence folding.
+        if (auto *seqExpr = dyn_cast<SequenceExpr>(E)) {
+          if (!seqExpr->getFoldedExpr()) {
+            auto *scope = parent;
+            for (auto *elt : seqExpr->getElements()) {
+              // Make sure we look through any always-left-folded expr,
+              // including e.g `await` and `unsafe`.
+              while (auto *subExpr = elt->getAlwaysLeftFoldedSubExpr()) {
+                // Only `try` current receives a scope.
+                if (auto *ATE = dyn_cast<AnyTryExpr>(elt)) {
+                  scope = scopeCreator.constructExpandAndInsert<TryScope>(
+                      scope, ATE, seqExpr->getEndLoc());
+                }
+                elt = subExpr;
+              }
+              scopeCreator.addExprToScopeTree(elt, scope);
+            }
+            // Already walked.
+            return Action::SkipNode(E);
+          }
         }
 
         return Action::Continue(E);
@@ -802,11 +831,11 @@ NO_NEW_INSERTION_POINT(MacroDefinitionScope)
 NO_NEW_INSERTION_POINT(MacroExpansionDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
-NO_NEW_INSERTION_POINT(TryScope)
 
 NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(SpecializeAttributeScope)
 NO_EXPANSION(DifferentiableAttributeScope)
+NO_EXPANSION(TryScope)
 
 #undef CREATES_NEW_INSERTION_POINT
 #undef NO_NEW_INSERTION_POINT
@@ -1431,11 +1460,6 @@ NullablePtr<ASTScopeImpl>
 IterableTypeBodyPortion::insertionPointForDeferredExpansion(
     IterableTypeScope *s) const {
   return s->getParent().get();
-}
-
-void TryScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(expr->getSubExpr(), this);
 }
 
 #pragma mark verification
