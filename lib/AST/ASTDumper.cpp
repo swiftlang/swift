@@ -2420,6 +2420,28 @@ namespace {
       printFoot();
     }
 
+    // Prints a mapping from the declared interface types of the opaque types to
+    // their equivalent existential type. This loses some information, but it is
+    // meant to make it easier to determine which protocols an opaque type
+    // conforms to when such a type appears elsewhere in an expression dump,
+    // farther away from where the opaque type is declared.
+    void printOpaqueTypeMapping(ArrayRef<OpaqueTypeDecl *> opaqueDecls) {
+      printRecArbitrary(
+          [&](Label label) {
+            printHead("opaque_to_existential_mapping", FieldLabelColor, label);
+            for (const auto OTD : opaqueDecls) {
+              Type interfaceType = OTD->getDeclaredInterfaceType();
+              Type existentialType =
+                  interfaceType->castTo<OpaqueTypeArchetypeType>()
+                      ->getExistentialType();
+              printTypeField(existentialType,
+                             Label::always(typeUSR(interfaceType)));
+            }
+            printFoot();
+          },
+          Label::always("opaque_to_existential_mapping"));
+    }
+
     void visitSourceFile(const SourceFile &SF) {
       Writer.setMainBufferID(SF.getBufferID());
 
@@ -2488,6 +2510,15 @@ namespace {
             }
           },
           Label::optional("items"));
+
+      if (Writer.isParsable() && isTypeChecked()) {
+        SmallVector<OpaqueTypeDecl *, 4> opaqueDecls;
+        SF.getOpaqueReturnTypeDecls(opaqueDecls);
+        if (!opaqueDecls.empty()) {
+          printOpaqueTypeMapping(opaqueDecls);
+        }
+      }
+
       printFoot();
     }
 
