@@ -782,19 +782,19 @@ extension Substring.UTF8View {
         let base: String.UTF8View = self._base
         let first = base._foreignDistance(from: base.startIndex, to: startIndex)
         let count = base._foreignDistance(from: startIndex, to: endIndex)
-        let span = unsafe base.span._extracting(first..<(first &+ count))
+        let span = base.span._extracting(first..<(first &+ count))
         return unsafe _overrideLifetime(span, borrowing: self)
       }
 #endif
       let first = _slice._startIndex._encodedOffset
       let end = _slice._endIndex._encodedOffset
       if _wholeGuts.isSmall {
-        let a = Builtin.addressOfBorrow(self)
-        let offset = first &+ (2 &* MemoryLayout<String.Index>.stride)
-        let start = unsafe UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
-        let span = unsafe Span(_unsafeStart: start, count: end &- first)
         fatalError("Span over the small string form is not supported yet.")
-        return unsafe _overrideLifetime(span, borrowing: self)
+//        let a = Builtin.addressOfBorrow(self)
+//        let offset = first &+ (2 &* MemoryLayout<String.Index>.stride)
+//        let start = unsafe UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
+//        let span = unsafe Span(_unsafeStart: start, count: end &- first)
+//        return unsafe _overrideLifetime(span, borrowing: self)
       }
       _internalInvariant(_wholeGuts.isFastUTF8)
       var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
