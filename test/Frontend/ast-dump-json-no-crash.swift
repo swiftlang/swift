@@ -263,6 +263,13 @@ func sb3() {
     }
 }
 
+func nestedOpaques0() -> some BinaryInteger { 2 }
+func nestedOpaques1() -> some FixedWidthInteger & SignedInteger { 2 }
+func nestedOpaques2() -> (some BinaryInteger, some Sequence) { (2, []) }
+func nestedOpaques3() -> (some BinaryInteger, some Sequence<Double>) { (2, []) }
+func nestedOpaques4() -> (some BinaryInteger)? { Bool.random() ? 2 : nil }
+func nestedOpaques5() -> [some BinaryInteger] { [2] }
+
 // Expressions
 
 func zz1() throws {

@@ -200,6 +200,33 @@ private:
   virtual void anchor() override {}
 };
 
+/// Replaces any local archetypes in the given type with their equivalent
+/// existential upper bounds so that they can be passed to the AST mangler. This
+/// loses information but is probably sufficient for most questions about these
+/// types that consumers of the JSON AST would ask.
+Type replaceLocalArchetypesWithExistentials(Type type) {
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+    if (auto LAT = dyn_cast<LocalArchetypeType>(t)) {
+      return LAT->getExistentialType();
+    }
+    return std::nullopt;
+  });
+}
+
+/// Replaces any opaque type archetypes in the given type with their equivalent
+/// existential upper bounds. This is used when dumping the mapping of all
+/// opaque types in the source file so that their conformances can be more
+/// easily reasoned about without having to find the declaring opaque result
+/// type deeper in the AST.
+Type replaceOpaqueArchetypesWithExistentials(Type type) {
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+    if (auto OT = dyn_cast<OpaqueTypeArchetypeType>(t)) {
+      return OT->getExistentialType();
+    }
+    return std::nullopt;
+  });
+}
+
 /// Returns the USR of the given declaration. Gracefully returns an empty
 /// string if D is null or invalid.
 std::string declUSR(const Decl *D) {
@@ -237,15 +264,7 @@ std::string typeUSR(Type type) {
     type = type->mapTypeOutOfContext();
   }
   if (type->hasLocalArchetype()) {
-    // If we have local archetypes, we can't mangle those. Replace them with
-    // their existential upper bounds, which loses information but is probably
-    // close enough for most purposes.
-    type = type.transformRec([&](TypeBase *t) -> std::optional<Type> {
-      if (auto LAT = dyn_cast<LocalArchetypeType>(t)) {
-        return LAT->getExistentialType();
-      }
-      return std::nullopt;
-    });
+    type = replaceLocalArchetypesWithExistentials(type);
   }
 
   std::string usr;
@@ -1323,27 +1342,19 @@ namespace {
 
       printField(requirement.getKind(), Label::optional("kind"));
 
-      if (requirement.getKind() != RequirementKind::Layout &&
-          requirement.getSecondType()) {
-        if (Writer.isParsable()) {
-          // If this is a conformance requirement, print the USR of the protocol
-          // decl instead of the type. The type USR for a protocol is based on
-          // the equivalent expanded existential, which drops suppressed
-          // protocols.
-          if (requirement.getKind() == RequirementKind::Conformance) {
-            printReferencedDeclField(requirement.getProtocolDecl(),
-                                     Label::optional("protocol"));
-          } else {
-            printTypeField(requirement.getSecondType(),
-                           Label::optional("second_type"), opts);
-          }
-        } else {
-          printTypeField(requirement.getSecondType(),
-                         Label::optional("second_type"), opts);
-        }
-      } else if (requirement.getLayoutConstraint())
+      switch (requirement.getKind()) {
+      case RequirementKind::Layout:
         printFieldQuoted(requirement.getLayoutConstraint(),
                          Label::optional("layout"));
+        break;
+      case RequirementKind::Conformance:
+        printReferencedDeclField(requirement.getProtocolDecl(),
+                                 Label::optional("protocol"));
+        break;
+      default:
+        printTypeField(requirement.getSecondType(),
+                       Label::optional("second_type"), opts);
+      }
 
       printFoot();
     }
@@ -2022,8 +2033,8 @@ namespace {
                 Label::always("conformances"));
 
             if (auto CD = dyn_cast<ClassDecl>(DC); CD && CD->hasSuperclass()) {
-              printReferencedDeclField(CD->getSuperclassDecl(),
-                                       Label::always("superclass_decl_usr"));
+              printTypeField(CD->getSuperclass(),
+                             Label::always("superclass_type"));
             }
 
             if (auto ED = dyn_cast<EnumDecl>(DC); ED && ED->hasRawType()) {
@@ -2432,8 +2443,7 @@ namespace {
             for (const auto OTD : opaqueDecls) {
               Type interfaceType = OTD->getDeclaredInterfaceType();
               Type existentialType =
-                  interfaceType->castTo<OpaqueTypeArchetypeType>()
-                      ->getExistentialType();
+                  replaceOpaqueArchetypesWithExistentials(interfaceType);
               printTypeField(existentialType,
                              Label::always(typeUSR(interfaceType)));
             }
