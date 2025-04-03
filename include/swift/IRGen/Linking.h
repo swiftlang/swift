@@ -453,6 +453,7 @@ class LinkEntity {
     ProtocolConformanceDescriptorRecord,
 
     // These are both type kinds and protocol-conformance kinds.
+    // TYPE KINDS: BEGIN {{
 
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
@@ -503,9 +504,6 @@ class LinkEntity {
     /// A coroutine continuation prototype function.
     CoroutineContinuationPrototype,
 
-    /// A global function pointer for dynamically replaceable functions.
-    DynamicallyReplaceableFunctionVariable,
-
     /// A reference to a metaclass-stub for a statically specialized generic
     /// class.
     /// The pointer is a canonical TypeBase*.
@@ -524,6 +522,16 @@ class LinkEntity {
     /// passed to swift_getCanonicalSpecializedMetadata.
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
+
+    /// Extended existential type shape.
+    /// Pointer is the (generalized) existential type.
+    /// SecondaryPointer is the GenericSignatureImpl*.
+    ExtendedExistentialTypeShape,
+
+    // TYPE KINDS: END }}
+
+    /// A global function pointer for dynamically replaceable functions.
+    DynamicallyReplaceableFunctionVariable,
 
     /// Provides the data required to invoke an async function using the async
     /// calling convention in the form of the size of the context to allocate
@@ -555,11 +563,6 @@ class LinkEntity {
     /// looked up by name by the runtime.
     /// The pointer is a SILFunction*.
     AccessibleFunctionRecord,
-
-    /// Extended existential type shape.
-    /// Pointer is the (generalized) existential type.
-    /// SecondaryPointer is the GenericSignatureImpl*.
-    ExtendedExistentialTypeShape,
 
     /// A global struct containing a relative pointer to the single-yield
     /// coroutine ramp function and the fixed-size to be allocated in the
@@ -624,7 +627,8 @@ class LinkEntity {
 
   static bool isDeclKind(Kind k) { return k <= Kind::CoroFunctionPointerAST; }
   static bool isTypeKind(Kind k) {
-    return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
+    return k >= Kind::ProtocolWitnessTableLazyAccessFunction &&
+           k < Kind::DynamicallyReplaceableFunctionVariable;
   }
 
   static bool isRootProtocolConformanceKind(Kind k) {
