@@ -365,3 +365,19 @@ bb0(%0 : @owned $C2):
   dealloc_stack %1
   return %5
 }
+
+// CHECK-LABEL: sil [ossa] @dont_replace_existential_with_escaping_addr :
+// CHECK:         alloc_stack $any P
+// CHECK:       } // end sil function 'dont_replace_existential_with_escaping_addr'
+sil [ossa] @dont_replace_existential_with_escaping_addr : $@convention(thin) <V> (@thick V.Type, @owned C2) -> @out V {
+bb0(%0 : $*V, %1 : $@thick V.Type, %2 : @owned $C2):
+  %114 = alloc_stack $any P
+  %117 = init_existential_addr %114, $C2
+  store %2 to [init] %117
+  %129 = unchecked_addr_cast %114 to $*V
+  copy_addr %129 to [init] %0
+  destroy_addr %114
+  dealloc_stack %114
+  %137 = tuple ()
+  return %137
+}
