@@ -492,11 +492,6 @@ ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 /// Allow custom availability domains to be defined and referenced.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
-/// Allow public enumerations to be extensible by default
-/// regardless of whether the module they are declared in
-/// is resilient or not.
-EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
-
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
 
