@@ -181,3 +181,9 @@ func testTypeOf2<let c: Int>(_: E<Int, c>.Type) -> Int {
   let x = E<Int, c>(b: "")
   return type(of: x).b // OK
 }
+
+struct H<let I: Int> { // expected-note {{'I' previously declared here}}
+  struct I {} // expected-error {{invalid redeclaration of 'I'}}
+}
+
+typealias J = E<Int, 123>.b // expected-error {{static property 'b' is not a member type of 'E<Int, 123>'}}
