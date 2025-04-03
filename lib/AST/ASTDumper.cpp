@@ -5636,11 +5636,9 @@ public:
       printTypeField(conformance->getType(), Label::always("type"));
       printReferencedDeclField(conformance->getProtocol(),
                                Label::always("protocol"));
-      if (isTypeChecked()) {
-        printField(conformance->getSourceKind(), Label::always("source_kind"));
-        printFlag(conformance->isRetroactive(), "retroactive");
-        printIsolation(conformance->getIsolation());
-      }
+      printField(conformance->getSourceKind(), Label::optional("source_kind"));
+      printFlag(conformance->isRetroactive(), "retroactive");
+      printIsolation(conformance->getIsolation());
       if (!Writer.isParsable())
         printFlag(!shouldPrintDetails, "<details printed above>");
     };
