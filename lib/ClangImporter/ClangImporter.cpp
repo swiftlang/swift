@@ -1869,12 +1869,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
   if (isPCHFilenameExtension(header)) {
-    Impl.ImportedHeaderOwners.push_back(adapter);
-    // We already imported this with -include-pch above, so we should have
-    // collected a bunch of PCH-encoded module imports that we just need to
-    // replay in handleDeferredImports.
-    Impl.handleDeferredImports(diagLoc);
-    return false;
+    return bindBridgingHeader(adapter, diagLoc);
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -1899,6 +1894,15 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   };
   return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
                            std::move(sourceBuffer), implicitImport);
+}
+
+bool ClangImporter::bindBridgingHeader(ModuleDecl *adapter, SourceLoc diagLoc) {
+  Impl.ImportedHeaderOwners.push_back(adapter);
+  // We already imported this with -include-pch above, so we should have
+  // collected a bunch of PCH-encoded module imports that we just need to
+  // replay in handleDeferredImports.
+  Impl.handleDeferredImports(diagLoc);
+  return false;
 }
 
 static llvm::Expected<llvm::cas::ObjectRef>

@@ -180,6 +180,8 @@ extension A {
     public func testA() {}
 }
 
+public class AB : B {}
+
 //--- user2.swift
 import Test
 
