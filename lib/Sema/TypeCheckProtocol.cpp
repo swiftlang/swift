@@ -3706,7 +3706,10 @@ bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS,
                      bool withExplicitObjCAttr) {
-  if (isa<ConstructorDecl>(Requirement)) {
+  // We sometimes use this for @implementation extensions too.
+  bool forProtocol = isa<ProtocolDecl>(Requirement->getDeclContext());
+
+  if (isa<ConstructorDecl>(Requirement) && forProtocol) {
     if (auto CD = Adopter->getSelfClassDecl()) {
       if (!CD->isSemanticallyFinal() && isa<ExtensionDecl>(Adopter)) {
         // In this case, user should mark class as 'final' or define
@@ -3774,7 +3777,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     Printer << "\n";
   } else {
-    if (isa<ConstructorDecl>(Requirement)) {
+    if (isa<ConstructorDecl>(Requirement) && forProtocol) {
       if (auto CD = Adopter->getSelfClassDecl()) {
         if (!CD->isFinal()) {
           Printer << "required ";
@@ -3809,9 +3812,12 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
-    if (isa<NominalTypeDecl>(Adopter)) {
-      // Create a variable declaration instead of a computed property in
-      // nominal types...
+
+    // Can the conforming declaration declare a stored property?
+    auto ImplementedAdopter = Adopter->getImplementedObjCContext();
+    if (isa<NominalTypeDecl>(ImplementedAdopter) &&
+          (!isa<EnumDecl>(ImplementedAdopter) || Requirement->isStatic())) {
+      // Create a variable declaration instead of a computed property...
       Options.PrintPropertyAccessors = false;
 
       // ...but a non-mutating setter requirement will force us into a
@@ -3822,6 +3828,11 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
           if (const auto Set = VD->getOpaqueAccessor(AccessorKind::Set))
             if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
               Options.PrintPropertyAccessors = true;
+
+      // If we're not printing the accessors, make them affect the introducer
+      // instead.
+      Options.InferPropertyIntroducerFromAccessors =
+          !Options.PrintPropertyAccessors;
     }
     Requirement->print(Printer, Options);
     Printer << "\n";

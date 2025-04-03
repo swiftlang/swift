@@ -231,6 +231,17 @@ import objc_implementation_private
     get { return 1 }
     set {}
   }
+
+  @objc var categoryPropertyFromHeader5: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
+    set {}
+  }
+
+  @objc var categoryReadonlyPropertyFromHeader1: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
+  }
 }
 
 @objc class SwiftClass {}

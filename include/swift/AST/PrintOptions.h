@@ -143,6 +143,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Use \c let for a read-only computed property.
+  bool InferPropertyIntroducerFromAccessors = false;
+
   /// Whether to print *any* accessors on subscript.
   bool PrintSubscriptAccessors = true;
 

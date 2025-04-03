@@ -85,6 +85,10 @@
 @property int categoryPropertyFromHeader2;
 @property int categoryPropertyFromHeader3;
 @property int categoryPropertyFromHeader4;
+@property int categoryPropertyFromHeader5;
+
+@property (readonly) int categoryReadonlyPropertyFromHeader1;
+
 
 @end
 

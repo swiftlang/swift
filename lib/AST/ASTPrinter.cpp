@@ -3940,11 +3940,18 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->isStatic() && Options.PrintStaticKeyword)
     printStaticKeyword(decl->getCorrectStaticSpelling());
   if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
+    // If InferPropertyIntroducerFromAccessors is set, turn all read-only
+    // properties to `let`.
+    auto introducer = decl->getIntroducer();
+    if (Options.InferPropertyIntroducerFromAccessors &&
+          !cast<VarDecl>(decl)->isSettable(nullptr))
+      introducer = VarDecl::Introducer::Let;
+
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
     
     Printer.printIntroducerKeyword(
-      decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
+      introducer == VarDecl::Introducer::Let ? "let" : "var",
       Options, " ");
   }
   printContextIfNeeded(decl);
