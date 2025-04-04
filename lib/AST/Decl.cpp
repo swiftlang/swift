@@ -10626,6 +10626,15 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
+std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  auto attr = getAttrs().getAttribute<CDeclAttr>();
+  if (!attr)
+    return std::nullopt;
+
+  return attr->Underscored ? ForeignLanguage::ObjectiveC
+                           : ForeignLanguage::C;
+}
+
 bool AbstractFunctionDecl::needsNewVTableEntry() const {
   auto &ctx = getASTContext();
   return evaluateOrDefault(
