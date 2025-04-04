@@ -7161,8 +7161,7 @@ bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsError() {
   }
 
   diagnosePrimary(/*asNote=*/false);
-  emitDiagnosticAt(builder, diag::kind_declname_declared_here,
-                   builder->getDescriptiveKind(), builder->getName());
+  emitDiagnosticAt(builder, diag::decl_declared_here_with_kind, builder);
   return true;
 }
 

@@ -1833,9 +1833,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredInterfaceType(),
                           inherited->getDeclaredInterfaceType());
-          inherited->diagnose(diag::kind_declname_declared_here,
-                              DescriptiveDeclKind::Protocol,
-                              inherited->getName());
+          inherited->diagnose(diag::decl_declared_here_with_kind, inherited);
           isObjC = std::nullopt;
         }
       }
