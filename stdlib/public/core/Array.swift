@@ -1732,7 +1732,7 @@ extension Array {
 
   @available(SwiftStdlib 6.2, *)
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @lifetime(/*inout*/borrow self)
     @_alwaysEmitIntoClient
     mutating get {
       _makeMutableAndUnique()
