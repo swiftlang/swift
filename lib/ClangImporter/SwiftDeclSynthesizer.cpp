@@ -2550,8 +2550,18 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         ctorDecl->getAccess() == clang::AS_protected ||
         ctorDecl->isCopyOrMoveConstructor() || ctorDecl->isVariadic())
       continue;
-    else
-      ctorDeclsForSynth.push_back(ctorDecl);
+    bool hasDefaultArg = false;
+    for (const clang::ParmVarDecl *param : ctorDecl->parameters()) {
+      if (param->hasDefaultArg()) {
+        hasDefaultArg = true;
+        break;
+      }
+    }
+    // Todo: Add support for default args in ctors for C++ foreign reference
+    // types
+    if (hasDefaultArg)
+      continue;
+    ctorDeclsForSynth.push_back(ctorDecl);
   }
 
   if (ctorDeclsForSynth.empty())
@@ -2616,11 +2626,17 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     llvm::SmallVector<clang::ParmVarDecl *, 4> synthParams;
     for (unsigned int i = 0; i < ctorParamCount; ++i) {
       auto *origParam = selectedCtorDecl->getParamDecl(i);
+      clang::IdentifierInfo *paramIdent = origParam->getIdentifier();
+      if (!paramIdent) {
+        std::string dummyName = "__unnamed_param_" + std::to_string(i);
+        paramIdent = &clangIdents.get(dummyName);
+      }
       auto *param = clang::ParmVarDecl::Create(
           clangCtx, synthCxxMethodDecl, cxxRecordDeclLoc, cxxRecordDeclLoc,
-          origParam->getIdentifier(), origParam->getType(),
+          paramIdent, origParam->getType(),
           clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
           clang::SC_None, /*DefArg=*/nullptr);
+      param->setIsUsed();
       synthParams.push_back(param);
     }
     synthCxxMethodDecl->setParams(synthParams);
@@ -2640,11 +2656,21 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
 
     llvm::SmallVector<clang::Expr *, 4> ctorArgs;
     for (auto *param : synthParams) {
-      ctorArgs.push_back(clang::DeclRefExpr::Create(
-          clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
-          param,
-          /*RefersToEnclosingVariableOrCapture=*/false, clang::SourceLocation(),
-          param->getType(), clang::VK_LValue));
+      clang::QualType paramTy = param->getType();
+      clang::QualType exprTy = paramTy.getNonReferenceType();
+      clang::Expr *argExpr = clang::DeclRefExpr::Create(
+          clangCtx, clang::NestedNameSpecifierLoc(), cxxRecordDeclLoc, param,
+          /*RefersToEnclosingVariableOrCapture=*/false, cxxRecordDeclLoc,
+          exprTy, clang::VK_LValue);
+      if (paramTy->isRValueReferenceType()) {
+        argExpr = clangSema
+                      .BuildCXXNamedCast(
+                          cxxRecordDeclLoc, clang::tok::kw_static_cast,
+                          clangCtx.getTrivialTypeSourceInfo(paramTy), argExpr,
+                          clang::SourceRange(), clang::SourceRange())
+                      .get();
+      }
+      ctorArgs.push_back(argExpr);
     }
     llvm::SmallVector<clang::Expr *, 4> ctorArgsToAdd;
     if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
