@@ -3455,17 +3455,10 @@ public:
     if (IsInvalid) {
       decl->setInvalidBit();
 
-      DeclName name;
-      if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-        name = VD->getName();
-      }
-
       auto diagId = MF.allowCompilerErrors()
                         ? diag::serialization_allowing_invalid_decl
                         : diag::serialization_invalid_decl;
-      ctx.Diags.diagnose(SourceLoc(), diagId, name,
-                         decl->getDescriptiveKind(),
-                         MF.getAssociatedModule()->getNameStr());
+      ctx.Diags.diagnose(SourceLoc(), diagId, decl, MF.getAssociatedModule());
     }
 
     if (DAttrs)

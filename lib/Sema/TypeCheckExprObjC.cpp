@@ -342,10 +342,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         diags.diagnose(componentNameLoc, diag::expr_keypath_non_objc_property,
                        var->getName());
         if (var->getLoc().isValid() && var->getDeclContext()->isTypeContext()) {
-          diags.diagnose(var, diag::make_decl_objc,
-                         var->getDescriptiveKind())
-            .fixItInsert(var->getAttributeInsertionLoc(false),
-                         "@objc ");
+          diags.diagnose(var, diag::make_decl_objc, var)
+              .fixItInsert(var->getAttributeInsertionLoc(false), "@objc ");
         }
       } else {
         // FIXME: Warn about non-KVC-compliant getter/setter names?

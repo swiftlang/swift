@@ -259,8 +259,7 @@ public:
     if (api->getKind() != abi->getKind()) {
       // FIXME: DescriptiveDeclKind is overly specific; we really just want to
       //        say that e.g. a `func` can't have the ABI of a `var`.
-      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_kind,
-                            api, abi->getDescriptiveKind());
+      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_kind, api, abi);
       return;
     }
 

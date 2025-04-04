@@ -3672,12 +3672,11 @@ static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
   // move it to another extension where the required level is possible;
   // otherwise, we simply mark decl as the required level.
   if (shouldMoveToAnotherExtension) {
-    diags.diagnose(decl, diag::witness_move_to_another_extension,
-                   decl->getDescriptiveKind(), requiredAccess);
+    diags.diagnose(decl, diag::witness_move_to_another_extension, decl,
+                   requiredAccess);
   } else {
-    auto fixItDiag = diags.diagnose(decl, diag::witness_fix_access,
-                                    decl->getDescriptiveKind(),
-                                    requiredAccess);
+    auto fixItDiag =
+        diags.diagnose(decl, diag::witness_fix_access, decl, requiredAccess);
     fixItAccess(fixItDiag, decl, requiredAccess, isForSetter,
                 shouldUseDefaultAccess);
   }
@@ -5532,8 +5531,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5552,8 +5551,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5572,8 +5571,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             fixItDiag->fixItInsert(witness->getAttributeInsertionLoc(false),
                                    "@objc ");
