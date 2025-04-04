@@ -94,7 +94,7 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 // CHECK-NEXT: void **vtable_ = *selfPtr_;
 // CHECK-NEXT: #endif
 // CHECK-NEXT: struct FTypeAddress {
-// CHECK-NEXT: decltype(_impl::$s8UseClass018CrossModuleDerivedB0C015virtualMethodInE0yyF) * func;
+// CHECK-NEXT: decltype(UseClass::_impl::$s8UseClass018CrossModuleDerivedB0C015virtualMethodInE0yyF) * func;
 // CHECK-NEXT: };
 // CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + 0) / sizeof(void *));
 // CHECK-NEXT: (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
