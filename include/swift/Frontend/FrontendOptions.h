@@ -284,6 +284,11 @@ public:
   /// \see ResilienceStrategy::Resilient
   bool EnableLibraryEvolution = false;
 
+  /// Enables the "fragile" resilience strategy.
+  ///
+  /// \see ResilienceStrategy::Fragile
+  bool NonResilientHideDependencies = false;
+
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;

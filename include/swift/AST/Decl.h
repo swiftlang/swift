@@ -735,7 +735,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -808,6 +808,10 @@ protected:
 
     /// Whether this module has enabled `ExtensibleEnums` feature.
     ExtensibleEnums : 1
+
+    /// Whether this module is fragile and doesn't transitively import non-
+    /// public dependencies
+    NonResilientHideDependencies : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -6602,12 +6606,11 @@ public:
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
 
-  /// Determines if this var is exposed as part of the layout of a
-  /// @frozen struct.
-  ///
-  /// From the standpoint of access control and exportability checking, this
-  /// var will behave as if it was public, even if it is internal or private.
-  bool isLayoutExposedToClients() const;
+  /// Determines if this var is exposed as part of the layout of its
+  /// containing type. If true is passed for the inFrozenContext
+  /// parameter, a stored var will behave as if it was public, even if
+  /// declared internal or private.
+  bool isLayoutExposedToClients(bool inFrozenContext) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
