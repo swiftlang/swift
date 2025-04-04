@@ -1771,10 +1771,10 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                                                       FuncDecl *setter) {
   assert((getter || setter) &&
          "getter or setter required to generate a pointee property");
-  auto &ctx = ImporterImpl.SwiftContext;
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
+  auto &ctx = getterImpl->getASTContext();
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();

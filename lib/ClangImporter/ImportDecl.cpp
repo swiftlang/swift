@@ -2636,7 +2636,7 @@ namespace {
           auto getterAndSetter = getterAndSetterIt->second;
 
           VarDecl *pointeeProperty =
-              synthesizer.makeDereferencedPointeeProperty(
+              SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
                   getterAndSetter.first, getterAndSetter.second);
 
           // Import the attributes from clang decl of dereference operator to

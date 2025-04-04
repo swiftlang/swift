@@ -301,7 +301,8 @@ public:
   /// \param getter function returning `UnsafePointer<T>`
   /// \param setter function returning `UnsafeMutablePointer<T>`
   /// \return computed property declaration
-  VarDecl *makeDereferencedPointeeProperty(FuncDecl *getter, FuncDecl *setter);
+  static VarDecl *makeDereferencedPointeeProperty(FuncDecl *getter,
+                                                  FuncDecl *setter);
 
   /// Given a C++ pre-increment operator (`operator++()`). create a non-mutating
   /// function `successor() -> Self`.
