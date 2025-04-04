@@ -255,22 +255,24 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     return flags;
   }
 
-  auto kind = [&] {
+  auto kindAndIsCalleeAllocatedCoroutine =
+      [&]() -> std::pair<typename Flags::Kind, bool> {
     auto accessor = dyn_cast<AccessorDecl>(fn);
-    if (!accessor) return Flags::Kind::Method;
+    if (!accessor)
+      return {Flags::Kind::Method, false};
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
-      return Flags::Kind::Getter;
+      return {Flags::Kind::Getter, false};
     case AccessorKind::Set:
-      return Flags::Kind::Setter;
+      return {Flags::Kind::Setter, false};
     case AccessorKind::Read:
-      return Flags::Kind::ReadCoroutine;
+      return {Flags::Kind::ReadCoroutine, false};
     case AccessorKind::Read2:
-      return Flags::Kind::Read2Coroutine;
+      return {Flags::Kind::ReadCoroutine, true};
     case AccessorKind::Modify:
-      return Flags::Kind::ModifyCoroutine;
+      return {Flags::Kind::ModifyCoroutine, false};
     case AccessorKind::Modify2:
-      return Flags::Kind::Modify2Coroutine;
+      return {Flags::Kind::ModifyCoroutine, true};
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
@@ -280,9 +282,20 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     }
     llvm_unreachable("bad kind");
   }();
-  bool hasAsync = false;
+  auto kind = kindAndIsCalleeAllocatedCoroutine.first;
+
+  // Because no async old-ABI accessor coroutines exist or presumably ever will
+  // (if async coroutines accessors are added, they will presumably be new-ABI),
+  // the pairs {Flags::Kind::ReadCoroutine, isAsync} and
+  // {Flags::Kind::ModifyCoroutine, isAsync} can't mean "async old-ABI
+  // accessor coroutine".  As such, we repurpose that pair to mean "new-ABI
+  // accessor coroutine".  This has the important virtue of resulting in ptrauth
+  // authing/signing coro function pointers as data on old OSes where the bit
+  // means "async" and where adding new accessor kinds requires a back
+  // deployment library.
+  bool hasAsync = kindAndIsCalleeAllocatedCoroutine.second;
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn))
-    hasAsync = afd->hasAsync();
+    hasAsync |= afd->hasAsync();
   return Flags(kind).withIsInstance(!fn->isStatic()).withIsAsync(hasAsync);
 }
 
