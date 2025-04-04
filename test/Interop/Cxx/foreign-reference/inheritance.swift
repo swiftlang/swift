@@ -23,7 +23,9 @@ InheritanceTestSuite.test("Templated cast to base") {
   let sc: BaseT = cast(s)
   expectFalse(sc.isBase)
   let sx: BaseT = cxxCast(s)  // should instantiate I to SubT and O to BaseT
-  expectFalse(sc.isBase)
+  expectFalse(sx.isBase)
+  let sy: BaseT = Foo.cxxCast(s)  // should instantiate I to SubT and O to BaseT
+  expectFalse(sy.isBase)
 }
 
 InheritanceTestSuite.test("Templated cast to itself") {
