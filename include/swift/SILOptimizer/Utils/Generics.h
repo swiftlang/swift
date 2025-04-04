@@ -204,7 +204,7 @@ public:
   ReabstractionInfo(ModuleDecl *targetModule, bool isModuleWholeModule,
                     ApplySite Apply, SILFunction *Callee,
                     SubstitutionMap ParamSubs, SerializedKind_t Serialized,
-                    bool ConvertIndirectToDirect, bool dropMetatypeArgs,
+                    bool ConvertIndirectToDirect, bool dropUnusedArguments,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with

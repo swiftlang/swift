@@ -2916,7 +2916,8 @@ static bool createPrespecialized(StringRef UnspecializedName,
   ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), ApplySite(),
                            UnspecFunc, Apply.getSubstitutionMap(),
                            IsNotSerialized,
-                           /*ConvertIndirectToDirect= */true, /*dropMetatypeArgs=*/ false);
+                           /*ConvertIndirectToDirect= */true,
+                           /*dropUnusedArguments=*/ false);
 
   if (!ReInfo.canBeSpecialized())
     return false;
@@ -3005,7 +3006,7 @@ static bool usePrespecialized(
                                       funcBuilder.getModule().isWholeModule(), apply, refF,
                                       apply.getSubstitutionMap(), IsNotSerialized,
                                       /*ConvertIndirectToDirect=*/ true,
-                                      /*dropMetatypeArgs=*/ false);
+                                      /*dropUnusedArguments=*/ false);
 
   for (auto *SA : refF->getSpecializeAttrs()) {
     if (!SA->isExported())
@@ -3149,7 +3150,8 @@ static bool usePrespecialized(
           funcBuilder.getModule().getSwiftModule(),
           funcBuilder.getModule().isWholeModule(), apply, refF, newSubstMap,
           apply.getFunction()->getSerializedKind(),
-          /*ConvertIndirectToDirect=*/ true, /*dropMetatypeArgs=*/ false, nullptr);
+          /*ConvertIndirectToDirect=*/ true,
+          /*dropUnusedArguments=*/ false, nullptr);
 
       if (layoutReInfo.getSpecializedType() == reInfo.getSpecializedType()) {
         layoutMatches.push_back(
@@ -3312,7 +3314,8 @@ void swift::trySpecializeApplyOfGeneric(
                            FuncBuilder.getModule().isWholeModule(), Apply, RefF,
                            Apply.getSubstitutionMap(), serializedKind,
                            /*ConvertIndirectToDirect=*/ true,
-                           /*dropMetatypeArgs=*/ canDropMetatypeArgs(Apply, RefF),
+                           /*dropUnusedArguments=*/
+                           canDropMetatypeArgs(Apply, RefF),
                            &ORE);
   if (!ReInfo.canBeSpecialized())
     return;
