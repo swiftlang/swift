@@ -863,37 +863,30 @@ static bool isLazy(PatternBindingDecl *PBD) {
   return false;
 }
 
-void TypeChecker::checkPatternBindingCaptures(IterableDeclContext *DC) {
-  for (auto member : DC->getMembers()) {
-    // Ignore everything other than PBDs.
-    auto *PBD = dyn_cast<PatternBindingDecl>(member);
-    if (!PBD) continue;
-    // Walk the initializers for all properties declared in the type with
-    // an initializer.
-    for (unsigned i : range(PBD->getNumPatternEntries())) {
-      if (PBD->isInitializerSubsumed(i))
-        continue;
+CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
+                                                       PatternBindingDecl *PBD,
+                                                       unsigned int idx) const {
+  auto *init = PBD->getExecutableInit(idx);
+  if (!init)
+    return CaptureInfo::empty();
 
-      auto *init = PBD->getInit(i);
-      if (init == nullptr)
-        continue;
+  // Only have captures when we have a PatternBindingInitializer context, i.e
+  // local variables don't have captures.
+  auto *DC = PBD->getInitContext(idx);
+  if (!DC)
+    return CaptureInfo::empty();
 
-      auto *DC = PBD->getInitContext(i);
-      FindCapturedVars finder(init->getLoc(),
-                              DC,
-                              /*NoEscape=*/false,
-                              /*ObjC=*/false,
-                              /*IsGenericFunction*/false);
-      init->walk(finder);
+  FindCapturedVars finder(init->getLoc(), DC,
+                          /*NoEscape=*/false,
+                          /*ObjC=*/false,
+                          /*IsGenericFunction*/ false);
+  init->walk(finder);
 
-      auto &ctx = DC->getASTContext();
-      if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
-        ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
-                           diag::dynamic_self_stored_property_init);
-      }
-
-      auto captures = finder.getCaptureInfo();
-      PBD->setCaptureInfo(i, captures);
-    }
+  auto &ctx = DC->getASTContext();
+  if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
+    ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                       diag::dynamic_self_stored_property_init);
   }
+
+  return finder.getCaptureInfo();
 }
