@@ -271,15 +271,26 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
-  for (auto attr : decl->getAttrs().getAttributes<LifetimeAttr>()) {
-    for (auto source : attr->getLifetimeEntry()->getSources()) {
-      if (source.getParsedLifetimeDependenceKind() ==
-          ParsedLifetimeDependenceKind::Inout) {
-        return true;
+  auto hasInoutLifetimeDependence = [](Decl *decl) {
+    for (auto attr : decl->getAttrs().getAttributes<LifetimeAttr>()) {
+      for (auto source : attr->getLifetimeEntry()->getSources()) {
+        if (source.getParsedLifetimeDependenceKind() ==
+            ParsedLifetimeDependenceKind::Inout) {
+          return true;
+        }
       }
     }
+    return false;
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasInoutLifetimeDependence);
   }
-  return false;
+  default:
+    return hasInoutLifetimeDependence(decl);
+  }
 }
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
