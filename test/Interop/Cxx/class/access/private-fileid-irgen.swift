@@ -1,5 +1,6 @@
 //--- blessed.swift
 // RUN: split-file %s %t
+// RUN: %target-swift-frontend -emit-ir -module-name main %t/blessed.swift -I %S/Inputs -cxx-interoperability-mode=default -Onone
 // RUN: %target-swift-frontend -emit-ir -module-name main %t/blessed.swift -I %S/Inputs -cxx-interoperability-mode=default -Onone | %FileCheck %s
 
 import NonPublic
