@@ -678,13 +678,12 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
-  void addAssociatedType(AssociatedType requirement) {
+  void addAssociatedType(AssociatedTypeDecl *assocType) {
     // Find the substitution info for the witness type.
-    auto td = requirement.getAssociation();
-    Type witness = Conformance->getTypeWitness(td);
+    Type witness = Conformance->getTypeWitness(assocType);
 
     // Emit the record for the type itself.
-    Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
+    Entries.push_back(SILWitnessTable::AssociatedTypeWitness{assocType,
                                                 witness->getCanonicalType()});
   }
 
@@ -692,11 +691,11 @@ public:
     auto assocConformance =
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
-    auto substType =
-      Conformance->getAssociatedType(req.getAssociation())->getCanonicalType();
-
     SGM.useConformance(assocConformance);
 
+    auto substType = (assocConformance
+                      ? assocConformance.getType()
+                      : ErrorType::get(SGM.getASTContext()))->getCanonicalType();
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), substType, assocConformance});
   }
@@ -1028,7 +1027,7 @@ public:
   void addAssociatedConformance(AssociatedConformance conformance) {
     llvm_unreachable("associated conformances not supported in self-conformance");
   }
-  void addAssociatedType(AssociatedType type) {
+  void addAssociatedType(AssociatedTypeDecl *assocType) {
     llvm_unreachable("associated types not supported in self-conformance");
   }
   void addPlaceholder(MissingMemberDecl *placeholder) {
@@ -1106,14 +1105,14 @@ public:
     DefaultWitnesses.push_back(entry);
   }
 
-  void addAssociatedType(AssociatedType req) {
-    Type witness = Proto->getDefaultTypeWitness(req.getAssociation());
+  void addAssociatedType(AssociatedTypeDecl *assocType) {
+    Type witness = Proto->getDefaultTypeWitness(assocType);
     if (!witness)
       return addMissingDefault();
 
     Type witnessInContext = Proto->mapTypeIntoContext(witness);
     auto entry = SILWitnessTable::AssociatedTypeWitness{
-                                          req.getAssociation(),
+                                          assocType,
                                           witnessInContext->getCanonicalType()};
     DefaultWitnesses.push_back(entry);
   }

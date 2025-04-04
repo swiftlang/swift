@@ -1352,8 +1352,7 @@ public:
     }
   }
 
-  Classification classifyConformance(Type type,
-                                     ProtocolConformanceRef conformanceRef,
+  Classification classifyConformance(ProtocolConformanceRef conformanceRef,
                                      EffectKind kind) {
     if (conformanceRef.isInvalid())
       return Classification::forInvalidCode();
@@ -1374,8 +1373,7 @@ public:
           conditional = ConditionalEffectKind::Always;
 
         // Use the Failure type witness, when present.
-        Type thrownError = conformanceRef.getTypeWitness(
-            type, failureAssocType);
+        Type thrownError = conformanceRef.getTypeWitness(failureAssocType);
         return Classification::forThrows(
             thrownError, conditional,
             /*FIXME*/PotentialEffectReason::forConformance());
@@ -1671,13 +1669,11 @@ public:
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
-          Type type = req.getFirstType().subst(substitutions);
-
           auto conformanceRef = substitutions.lookupConformance(
               req.getFirstType()->getCanonicalType(), req.getProtocolDecl());
           assert(conformanceRef);
 
-          result.merge(classifyConformance(type, conformanceRef, kind));
+          result.merge(classifyConformance(conformanceRef, kind));
         }
 
         // 'ByConformance' is a superset of 'ByClosure', so check for

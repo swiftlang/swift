@@ -443,7 +443,10 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
     IFS.lookupConformance(origBase->getCanonicalType(), substBase,
                           proto, level);
 
-  return conformance.getTypeWitness(substBase, assocType, IFS.getOptions());
+  auto result = conformance.getTypeWitness(assocType, IFS.getOptions());
+  if (result->is<ErrorType>())
+    return DependentMemberType::get(ErrorType::get(substBase), assocType);
+  return result;
 }
 
 SubstitutionMap TypeSubstituter::transformSubstitutionMap(SubstitutionMap subs) {
@@ -1093,22 +1096,22 @@ swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
 }
 
 static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
-    ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
+    ProtocolConformanceRef ref, const DeclContext *inContext,
     ResilienceExpansion contextExpansion, bool isWholeModuleContext,
     llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
-  return ref.subst(origType, replacer, replacer,
+  return ref.subst(replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes |
                    SubstFlags::PreservePackExpansionLevel);
 }
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
-    ProtocolConformanceRef ref, Type origType, TypeExpansionContext context) {
+    ProtocolConformanceRef ref, TypeExpansionContext context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return ref.subst(origType, replacer, replacer,
+  return ref.subst(replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -1163,8 +1166,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto partialSubstRef =
       subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
                               protocol);
-  auto substRef =
-      partialSubstRef.subst(partialSubstTy, outerSubs);
+  auto substRef = partialSubstRef.subst(outerSubs);
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
@@ -1179,7 +1181,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
-          substRef, substTy, inContext, contextExpansion, isContextWholeModule,
+          substRef, inContext, contextExpansion, isContextWholeModule,
           *alreadySeen);
       alreadySeen->erase(seenKey);
       return res;
@@ -1189,7 +1191,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       llvm::DenseSet<SeenDecl> seenDecls;
       seenDecls.insert(seenKey);
       return ::substOpaqueTypesWithUnderlyingTypesRec(
-          substRef, substTy, inContext, contextExpansion, isContextWholeModule,
+          substRef, inContext, contextExpansion, isContextWholeModule,
           seenDecls);
     }
   }

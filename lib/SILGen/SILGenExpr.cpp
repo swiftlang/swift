@@ -4144,15 +4144,15 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       
       Type formalTy = index.FormalType;
       ProtocolConformanceRef hashable = index.Hashable;
-      std::tie(formalTy, hashable)
-        = GenericEnvironment::mapConformanceRefIntoContext(genericEnv,
-                                                           formalTy,
-                                                           hashable);
-      auto formalCanTy = formalTy->getReducedType(genericSig);
+      if (genericEnv) {
+        formalTy = genericEnv->mapTypeIntoContext(formalTy);
+        hashable = hashable.subst(genericEnv->getForwardingSubstitutionMap());
+      }
+
+      auto formalCanTy = formalTy->getCanonicalType();
       
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
-          formalTy,
           GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
           equatableProtocol);
 
@@ -4321,9 +4321,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto hashable = index.Hashable;
       if (genericEnv) {
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
-        hashable = hashable.subst(index.FormalType,
-          [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInModule());
+        hashable = hashable.subst(
+          genericEnv->getForwardingSubstitutionMap());
       }
 
       // Set up a substitution of Self => IndexType.

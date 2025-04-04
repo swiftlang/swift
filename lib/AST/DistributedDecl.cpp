@@ -203,7 +203,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = lookupConformance(selfType, DA);
-  return conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
+  return conformance.getTypeWitnessByName(C.Id_ActorSystem);
 }
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
@@ -220,7 +220,7 @@ static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
   auto conformance = lookupConformance(selfType, protocol);
   if (!conformance || conformance.isInvalid())
     return Type();
-  return conformance.getTypeWitnessByName(selfType, member);
+  return conformance.getTypeWitnessByName(member);
 }
 
 Type swift::getDistributedActorSerializationType(
@@ -301,8 +301,7 @@ Type swift::getDistributedSerializationRequirementType(
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(selfType,
-                                          ctx.Id_SerializationRequirement);
+  return conformance.getTypeWitnessByName(ctx.Id_SerializationRequirement);
 }
 
 AbstractFunctionDecl *
@@ -365,11 +364,10 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto actorConformance =
       lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
-  if (!actorConformance || actorConformance.isInvalid())
+  if (actorConformance.isInvalid())
     return Type();
 
-  auto subs = SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
+  auto subs = SubstitutionMap::getProtocolSubstitutions(actorConformance);
 
   memberTy = memberTy.subst(subs);
 

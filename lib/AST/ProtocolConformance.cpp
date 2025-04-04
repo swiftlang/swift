@@ -623,14 +623,6 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
   TypeWitnesses[assocType] = {type, typeDecl};
 }
 
-Type ProtocolConformance::getAssociatedType(Type assocType) const {
-  assert(assocType->isTypeParameter() &&
-         "associated type must be a type parameter");
-
-  ProtocolConformanceRef ref(const_cast<ProtocolConformance*>(this));
-  return ref.getAssociatedType(getType(), assocType);
-}
-
 ProtocolConformanceRef
 ProtocolConformance::getAssociatedConformance(Type assocType,
                                               ProtocolDecl *protocol) const {
@@ -896,14 +888,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol);
 
-  auto subMap = getSubstitutionMap();
-
-  Type origType =
-    (conformance.isConcrete()
-       ? conformance.getConcrete()->getType()
-       : GenericConformance->getAssociatedType(assocType));
-
-  return conformance.subst(origType, subMap);
+  return conformance.subst(getSubstitutionMap());
 }
 
 ConcreteDeclRef

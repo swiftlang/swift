@@ -50,10 +50,9 @@ static bool canInvokeMoveByOnProperty(
     return true;
   // When the property is a `let`, the only case that would be supported is when
   // it has a `move(by:)` protocol requirement witness that is non-mutating.
-  auto interfaceType = vd->getInterfaceType();
   auto &C = vd->getASTContext();
   auto witness = diffableConformance.getWitnessByName(
-      interfaceType, DeclName(C, C.Id_move, {C.Id_by}));
+      DeclName(C, C.Id_move, {C.Id_by}));
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());
@@ -121,7 +120,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   assert(conf && "Contextual type must conform to `Differentiable`");
   if (!conf)
     return nullptr;
-  auto tanType = conf.getTypeWitnessByName(contextualType, C.Id_TangentVector);
+  auto tanType = conf.getTypeWitnessByName(C.Id_TangentVector);
   return tanType->hasArchetype() ? tanType->mapTypeOutOfContext() : tanType;
 }
 
@@ -150,7 +149,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
     auto conf = checkConformance(fieldType, diffableProto);
     if (!conf)
       return false;
-    auto tangentType = conf.getTypeWitnessByName(fieldType, C.Id_TangentVector);
+    auto tangentType = conf.getTypeWitnessByName(C.Id_TangentVector);
     if (!fieldType->isEqual(tangentType))
       return false;
   }

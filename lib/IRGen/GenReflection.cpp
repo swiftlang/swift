@@ -602,7 +602,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
-            conformance = conformance.subst(origType,
+            conformance = conformance.subst(
                 genericEnv->getForwardingSubstitutionMap());
           }
           auto ret = emitWitnessTableRef(IGF, type, conformance);

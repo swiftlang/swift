@@ -1678,7 +1678,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   }
 
   auto *ctx = const_cast<ASTContext *>(this);
-  witness = builtinConformance.getWitnessByName(type, initName(*ctx));
+  witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
     assert(false && "Missing required witness");
     witness = ConcreteDeclRef();
@@ -6486,7 +6486,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = type;
 
     // Find the Objective-C class type we bridge to.
-    Type witnessTy = conformance.getTypeWitnessByName(type, Id_ObjectiveCType);
+    Type witnessTy = conformance.getTypeWitnessByName(Id_ObjectiveCType);
     // If Objective-C import is broken, witness type would be a dependent member
     // with `<<error type>>` base.
     return (witnessTy && !witnessTy->hasError()) ? witnessTy : Type();

@@ -3302,7 +3302,7 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
     if (conformance && toErrorExistential) {
       Type errorType =
           conformance
-              .getTypeWitnessByName(errorCodeType, getASTContext().Id_ErrorType)
+              .getTypeWitnessByName(getASTContext().Id_ErrorType)
               ->getCanonicalType();
       if (errorType) {
         auto diagnostic = emitDiagnostic(diag::cannot_throw_error_code,
