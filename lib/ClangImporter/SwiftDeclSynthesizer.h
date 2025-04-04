@@ -127,13 +127,6 @@ public:
                                                  bool wantCtorParamNames,
                                                  bool wantBody);
 
-  /// Create a rawValue-ed constructor that bridges to its underlying storage.
-  ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,
-                                                     VarDecl *computedRawValue,
-                                                     VarDecl *storedRawValue,
-                                                     bool wantLabel,
-                                                     bool wantBody);
-
   /// Make a struct declaration into a raw-value-backed struct, with
   /// bridged computed rawValue property which differs from stored backing
   ///

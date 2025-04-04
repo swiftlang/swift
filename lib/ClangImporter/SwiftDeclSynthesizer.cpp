@@ -710,7 +710,7 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
   return {body, /*isTypeChecked=*/true};
 }
 
-ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
+static ConstructorDecl *createRawValueBridgingConstructor(
     StructDecl *structDecl, VarDecl *computedRawValue, VarDecl *storedRawValue,
     bool wantLabel, bool wantBody) {
   auto init = SwiftDeclSynthesizer::createValueConstructor(
