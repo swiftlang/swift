@@ -3717,7 +3717,8 @@ namespace {
       // call / subscript / dereference / increment. Those
       // operators do not need static versions.
       if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call) {
-        auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
+        auto opFuncDecl =
+            SwiftDeclSynthesizer::makeOperator(func, cxxOperatorKind);
         Impl.addAlternateDecl(func, opFuncDecl);
 
         Impl.markUnavailable(

@@ -2200,7 +2200,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   assert(opKind != clang::OverloadedOperatorKind::OO_None &&
          "expected a C++ operator");
 
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = operatorMethod->getASTContext();
   auto opName = clang::getOperatorSpelling(opKind);
   auto paramList = operatorMethod->getParameters();
   auto genericParamList = operatorMethod->getGenericParams();
