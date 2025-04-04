@@ -41,7 +41,7 @@ internal func _overrideLifetime<
 /// the `source` argument.
 @_unsafeNonescapableResult
 @_transparent
-@lifetime(borrow source)
+@lifetime(&source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -112,7 +112,7 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func getMutableSpan() -> MutableSpan {
     MutableSpan(p, c)
   }
