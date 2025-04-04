@@ -115,8 +115,12 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
 
   // If checkConformance() returns a valid conformance, then all conditional
   // requirements were satisfied.
-  if (checkConformance(source, TargetProtocol))
+  if (auto conformance = checkConformance(source, TargetProtocol)) {
+    if (!matchesActorIsolation(conformance, function))
+      return DynamicCastFeasibility::MaySucceed;
+
     return DynamicCastFeasibility::WillSucceed;
+  }
 
   auto *SourceNominalTy = source.getAnyNominal();
   if (!SourceNominalTy)
