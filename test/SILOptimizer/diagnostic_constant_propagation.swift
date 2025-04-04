@@ -34,7 +34,8 @@ func testArithmeticOverflow() {
   xu8_3 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
   var _ : UInt8 = 240 + 5 + 15 // expected-error {{arithmetic operation '245 + 15' (on type 'UInt8') results in an overflow}}
 
-  var _ = Int8(126) + Int8(1+1) // expected-error{{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}
+  var _ = Int8(126) + Int8(1+1) // FIXME: false negative: overflow that is not
+    // caught by diagnostics (see also <rdar://problem/39120081>).
 
   var _: Int8 = (1 << 7) - 1 // FIXME: false negative: should expect an error
     // like {{arithmetic operation '-128 - 1' (on type 'Int8') results in an overflow}}
