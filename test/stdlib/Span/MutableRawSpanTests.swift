@@ -36,6 +36,38 @@ suite.test("Basic Initializer")
   }
 }
 
+private struct Padded: BitwiseCopyable {
+  var storage: (Int64, Int8)
+}
+
+suite.test("Initializer from MutableSpan")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var array = [0, 1, 2].map({ Padded(storage: (Int64($0), Int8($0))) })
+  array.withUnsafeMutableBufferPointer {
+    var span = MutableSpan(_unsafeElements: $0)
+    var rawSpan = MutableRawSpan(_elements: &span)
+
+    expectEqual(rawSpan.byteCount, $0.count * MemoryLayout<Padded>.stride)
+
+    rawSpan.storeBytes(of: 15, as: Int64.self)
+  }
+  expectEqual(array[0].storage.0, 15)
+
+  var slice = array.prefix(1)
+  slice.withUnsafeMutableBufferPointer {
+    expectEqual($0.count, 1)
+    var span = MutableSpan(_unsafeElements: $0)
+    var rawSpan = MutableRawSpan(_elements: &span)
+
+    expectEqual(rawSpan.byteCount, MemoryLayout<Padded>.size)
+
+    rawSpan.storeBytes(of: 3, as: Int64.self)
+  }
+  expectEqual(slice[0].storage.0, 3)
+}
+
 suite.test("isEmpty property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
