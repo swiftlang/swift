@@ -9,7 +9,11 @@
 
 // BEGIN MyModule.swift
 
-public protocol ClassBound: AnyObject {
+public protocol Base: AnyObject {
+    func bar()
+}
+
+public protocol ClassBound: Base {
     func foo()
 }
 
@@ -18,6 +22,7 @@ class MyGenericClass<T> {
     init(typ: String) { self.typ = typ }
 }
 extension MyGenericClass: ClassBound {
+    func bar() { print("MyGenericClass<\(typ)>.bar()") }
     func foo() { print("MyGenericClass<\(typ)>.foo()") }
 }
 
@@ -32,3 +37,5 @@ import MyModule
 var arr: [any ClassBound] = [factory()]
 arr[0].foo()
 // CHECK: MyGenericClass<String>.foo()
+arr[0].foo()
+// CHECK: MyGenericClass<String>.bar()
