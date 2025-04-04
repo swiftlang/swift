@@ -721,6 +721,8 @@ endfunction()
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [ONLY_SWIFTMODULE]
+#     [NO_SWIFTMODULE]
 #     [IS_SDK_OVERLAY]
 #     [IS_FRAGILE]
 #     INSTALL_IN_COMPONENT comp
@@ -741,9 +743,6 @@ endfunction()
 #
 # STATIC
 #   Build a static library.
-#
-# ONLY_SWIFTMODULE
-#   Do not build either static or shared, build just the .swiftmodule.
 #
 # SDK sdk
 #   SDK to build for.
@@ -784,6 +783,12 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
+# NO_SWIFTMODULE
+#   Only build either static or shared, and skip the .swiftmodule.
+#
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
@@ -811,6 +816,7 @@ function(add_swift_target_library_single target name)
         SHARED
         STATIC
         ONLY_SWIFTMODULE
+        NO_SWIFTMODULE
         NO_LINK_NAME
         INSTALL_WITH_SHARED
         IS_FRAGILE)
@@ -1032,6 +1038,7 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
       ${SWIFTLIB_SINGLE_ONLY_SWIFTMODULE_keyword}
+      ${SWIFTLIB_SINGLE_NO_SWIFTMODULE_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ${SWIFTLIB_SINGLE_NO_LINK_NAME_keyword}
@@ -1683,6 +1690,8 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [ONLY_SWIFTMODULE]
+#     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
@@ -1791,6 +1800,12 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
+# NO_SWIFTMODULE
+#   Only build either static or shared, and skip the .swiftmodule.
+#
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
@@ -1879,6 +1894,8 @@ function(add_swift_target_library name)
         IS_STDLIB_CORE
         IS_SWIFT_ONLY
         NOSWIFTRT
+        ONLY_SWIFTMODULE
+        NO_SWIFTMODULE
         OBJECT_LIBRARY
         SHARED
         STATIC
@@ -2490,6 +2507,8 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
+        ${SWIFTLIB_ONLY_SWIFTMODULE_keyword}
+        ${SWIFTLIB_NO_SWIFTMODULE_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
