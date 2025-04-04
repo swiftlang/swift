@@ -31,8 +31,9 @@ using namespace swift;
 static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
   ClangSyntaxPrinter printer(type->getASTContext(), os);
   printer.printModuleNameCPrefix(*type->getParentModule());
-  if (!ClangSyntaxPrinter(type->getASTContext(), os).printNestedTypeNamespaceQualifiers(type))
-    os << "::";
+  if (!ClangSyntaxPrinter(type->getASTContext(), os)
+           .printNestedTypeNamespaceQualifiers(type, /*forC=*/true))
+    os << "_";
   printer.printBaseName(type);
 }
 
