@@ -874,11 +874,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
     }
 
-    // If it's an accessor, describe that and then switch to discussing its
-    // storage.
-    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-      Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " for ";
-      D = accessor->getStorage();
+    if (includeName) {
+      // If it's an accessor, describe that and then switch to discussing its
+      // storage.
+      if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+        Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " for ";
+        D = accessor->getStorage();
+      }
     }
 
     // If it's an extension, describe that and then switch to discussing its
