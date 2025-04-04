@@ -91,6 +91,11 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
+llvm::StructType *IRGenModule::createTransientStructType(
+    StringRef name, std::initializer_list<llvm::Type *> types, bool packed) {
+  return createStructType(*this, name, types, packed);
+}
+
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                       llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -705,7 +710,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
-    IntPtrTy              // Task.Status
   });
 
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
