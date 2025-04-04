@@ -149,17 +149,16 @@ static std::optional<SILDeclRef> getDeclRefForCallee(SILInstruction *inst) {
   }
 }
 
-static std::optional<std::pair<DescriptiveDeclKind, DeclName>>
-getSendingApplyCalleeInfo(SILInstruction *inst) {
+static std::optional<ValueDecl *> getSendingApplyCallee(SILInstruction *inst) {
   auto declRef = getDeclRefForCallee(inst);
   if (!declRef)
     return {};
 
   auto *decl = declRef->getDecl();
-  if (!decl || !decl->hasName())
+  if (!decl)
     return {};
 
-  return {{decl->getDescriptiveKind(), decl->getName()}};
+  return decl;
 }
 
 static Expr *inferArgumentExprFromApplyExpr(ApplyExpr *sourceApply,
@@ -672,10 +671,9 @@ public:
         getFunction());
   }
 
-  /// If we can find a callee decl name, return that. None otherwise.
-  std::optional<std::pair<DescriptiveDeclKind, DeclName>>
-  getSendingCalleeInfo() const {
-    return getSendingApplyCalleeInfo(sendingOp->getUser());
+  /// Attempts to retrieve and return the callee declaration.
+  std::optional<const ValueDecl *> getSendingCallee() const {
+    return getSendingApplyCallee(sendingOp->getUser());
   }
 
   void
@@ -697,12 +695,11 @@ public:
       }
     }
 
-    if (auto calleeInfo = getSendingCalleeInfo()) {
+    if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
           name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-          calleeInfo->first, calleeInfo->second,
-          isolationCrossing.getCallerIsolation());
+          callee.value(), isolationCrossing.getCallerIsolation());
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_info_send_yields_race,
                    name, descriptiveKindStr,
@@ -716,8 +713,7 @@ public:
   emitNamedIsolationCrossingError(SILLocation loc, Identifier name,
                                   SILIsolationInfo namedValuesIsolationInfo,
                                   ApplyIsolationCrossing isolationCrossing,
-                                  DeclName calleeDeclName,
-                                  DescriptiveDeclKind calleeDeclKind) {
+                                  const ValueDecl *callee) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
         .highlight(loc.getSourceRange())
@@ -736,7 +732,7 @@ public:
     diagnoseNote(
         loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
         name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-        calleeDeclKind, calleeDeclName, isolationCrossing.getCallerIsolation());
+        callee, isolationCrossing.getCallerIsolation());
     emitRequireInstDiagnostics();
   }
 
@@ -759,11 +755,10 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    if (auto calleeInfo = getSendingCalleeInfo()) {
+    if (auto callee = getSendingCallee()) {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send_callee,
                    inferredType, isolationCrossing.getCalleeIsolation(),
-                   calleeInfo->first, calleeInfo->second,
-                   isolationCrossing.getCallerIsolation());
+                   callee.value(), isolationCrossing.getCallerIsolation());
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send,
                    inferredType, isolationCrossing.getCalleeIsolation(),
@@ -793,10 +788,10 @@ public:
                   inferredType)
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
-    if (auto calleeInfo = getSendingCalleeInfo()) {
+    if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
                    diag::regionbasedisolation_typed_use_after_sending_callee,
-                   inferredType, calleeInfo->first, calleeInfo->second);
+                   inferredType, callee.value());
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_typed_use_after_sending,
                    inferredType);
@@ -1106,8 +1101,7 @@ struct UseAfterSendDiagnosticInferrer::AutoClosureWalker : ASTWalker {
           if (valueDecl->hasName()) {
             foundTypeInfo.diagnosticEmitter.emitNamedIsolationCrossingError(
                 foundTypeInfo.baseLoc, targetDecl->getBaseIdentifier(),
-                targetDeclIsolationInfo, *isolationCrossing,
-                valueDecl->getName(), valueDecl->getDescriptiveKind());
+                targetDeclIsolationInfo, *isolationCrossing, valueDecl);
             continue;
           }
 
@@ -1341,10 +1335,9 @@ public:
         getOperand()->getFunction());
   }
 
-  /// If we can find a callee decl name, return that. None otherwise.
-  std::optional<std::pair<DescriptiveDeclKind, DeclName>>
-  getSendingCalleeInfo() const {
-    return getSendingApplyCalleeInfo(sendingOperand->getUser());
+  /// Attempts to retrieve and return the callee declaration.
+  std::optional<const ValueDecl *> getSendingCallee() const {
+    return getSendingApplyCallee(sendingOperand->getUser());
   }
 
   SILLocation getLoc() const { return sendingOperand->getUser()->getLoc(); }
@@ -1384,12 +1377,12 @@ public:
       getIsolationRegionInfo().printForDiagnostics(os);
     }
 
-    if (auto calleeInfo = getSendingCalleeInfo()) {
+    if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc,
           diag::regionbasedisolation_typed_sendneversendable_via_arg_callee,
           descriptiveKindStr, inferredType, crossing.getCalleeIsolation(),
-          calleeInfo->first, calleeInfo->second);
+          callee.value());
     } else {
       diagnoseNote(
           loc, diag::regionbasedisolation_typed_sendneversendable_via_arg,
@@ -1428,11 +1421,10 @@ public:
       getIsolationRegionInfo().printForDiagnostics(os);
     }
 
-    if (auto calleeInfo = getSendingCalleeInfo()) {
+    if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc, diag::regionbasedisolation_typed_tns_passed_to_sending_callee,
-          descriptiveKindStr, inferredType, calleeInfo->first,
-          calleeInfo->second);
+          descriptiveKindStr, inferredType, callee.value());
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_typed_tns_passed_to_sending,
                    descriptiveKindStr, inferredType);
@@ -1494,8 +1486,7 @@ public:
           fArg->getType().is<SILBoxType>()) {
         auto diag = diag::
             regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated;
-        diagnoseNote(actualUse, diag, fArg->getDecl()->getName(),
-                     fArg->getDecl()->getDescriptiveKind());
+        diagnoseNote(actualUse, diag, fArg->getDecl());
         return;
       }
 
@@ -1632,12 +1623,12 @@ public:
         descriptiveKindStrWithSpace.push_back(' ');
       }
     }
-    if (auto calleeInfo = getSendingCalleeInfo()) {
+    if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
                    diag::regionbasedisolation_named_send_never_sendable_callee,
                    name, descriptiveKindStrWithSpace,
-                   isolationCrossing.getCalleeIsolation(), calleeInfo->first,
-                   calleeInfo->second, descriptiveKindStr);
+                   isolationCrossing.getCalleeIsolation(), callee.value(),
+                   descriptiveKindStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_send_never_sendable,
                    name, descriptiveKindStrWithSpace,

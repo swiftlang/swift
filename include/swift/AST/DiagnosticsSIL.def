@@ -315,12 +315,12 @@ ERROR(missing_never_call_closure,none,
       (Type))
 
 ERROR(missing_return_decl,none,
-      "missing return in %1 expected to return %0",
-      (Type, DescriptiveDeclKind))
+      "missing return in %kindonly1 expected to return %0",
+      (Type, const AbstractFunctionDecl *))
 ERROR(missing_never_call_decl,none,
-      "%1 with uninhabited return type %0 is missing "
+      "%kindonly1 with uninhabited return type %0 is missing "
       "call to another never-returning function on all paths",
-      (Type, DescriptiveDeclKind))
+      (Type, const AbstractFunctionDecl *))
 
 NOTE(missing_return_last_expr_note,none,
     "did you mean to return the last expression?", ())
@@ -701,8 +701,9 @@ WARNING(warning_int_to_fp_inexact, none,
 
 // Flow-isolation diagnostics
 ERROR(isolated_after_nonisolated, none,
-      "cannot access %1 %2 here in %select{nonisolated initializer|deinitializer}0",
-      (bool, DescriptiveDeclKind, DeclName))
+      "cannot access %kind1 here in "
+      "%select{nonisolated initializer|deinitializer}0",
+      (bool, const ValueDecl *))
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
      "only nonisolated properties of 'self' can be accessed from "
      "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
@@ -984,16 +985,16 @@ NOTE(regionbasedisolation_type_use_after_send, none,
       "sending value of non-Sendable type %0 to %1 callee risks causing data races between %1 and local %2 uses",
       (Type, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_type_use_after_send_callee, none,
-     "sending value of non-Sendable type %0 to %1 %2 %3 risks causing data "
-     "races between %1 and local %4 uses",
-     (Type, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+     "sending value of non-Sendable type %0 to %1 %kind2 risks causing data "
+     "races between %1 and local %3 uses",
+     (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
 
 NOTE(regionbasedisolation_named_info_send_yields_race, none,
      "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
      (Identifier, StringRef, ActorIsolation, ActorIsolation))
 NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
-     "sending %1%0 to %2 %3 %4 risks causing data races between %2 and local %5 uses",
-     (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+     "sending %1%0 to %2 %kind3 risks causing data races between %2 and local %4 uses",
+     (Identifier, StringRef, ActorIsolation, const ValueDecl *, ActorIsolation))
 
 // Use after send closure.
 NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
@@ -1016,8 +1017,8 @@ NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
       (Type))
 NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
-      "Passing value of non-Sendable type %0 as a 'sending' argument to %1 %2 risks causing races in between local and caller code",
-      (Type, DescriptiveDeclKind, DeclName))
+      "Passing value of non-Sendable type %0 as a 'sending' argument to %kind1 risks causing races in between local and caller code",
+      (Type, const ValueDecl *))
 
 //===
 // Sending Never Sendable Emitter
@@ -1026,8 +1027,8 @@ NOTE(regionbasedisolation_named_send_never_sendable, none,
       "sending %1%0 to %2 callee risks causing data races between %2 and %3 uses",
       (Identifier, StringRef, ActorIsolation, StringRef))
 NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
-      "sending %1%0 to %2 %3 %4 risks causing data races between %2 and %5 uses",
-      (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, StringRef))
+      "sending %1%0 to %2 %kind3 risks causing data races between %2 and %4 uses",
+      (Identifier, StringRef, ActorIsolation, const ValueDecl *, StringRef))
 
 NOTE(regionbasedisolation_named_send_into_sending_param, none,
      "%0%1 is passed as a 'sending' parameter; Uses in callee may race with "
@@ -1051,8 +1052,8 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_
      "closure captures %0 which is accessible to code in the current task",
      (DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
-     "closure captures reference to mutable %1 %0 which is accessible to code in the current task",
-     (DeclName, DescriptiveDeclKind))
+     "closure captures reference to mutable %kind0 which is accessible to code in the current task",
+     (const ValueDecl *))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
      "closure captures %1 which is accessible to %0 code",
      (StringRef, DeclName))
@@ -1068,8 +1069,8 @@ NOTE(regionbasedisolation_closure_captures_actor, none,
      (DeclName, StringRef))
 
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
-     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %2 %3 risks causing races inbetween %0 uses and uses reachable from %3",
-     (StringRef, Type, DescriptiveDeclKind, DeclName))
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %kind2 risks causing races inbetween %0 uses and uses reachable from %2",
+     (StringRef, Type, const ValueDecl *))
 
 NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
       "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
@@ -1078,8 +1079,8 @@ NOTE(regionbasedisolation_typed_sendneversendable_via_arg, none,
       "sending %0 value of non-Sendable type %1 to %2 callee risks causing races in between %0 and %2 uses",
       (StringRef, Type, ActorIsolation))
 NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
-      "sending %0 value of non-Sendable type %1 to %2 %3 %4 risks causing races in between %0 and %2 uses",
-      (StringRef, Type, ActorIsolation, DescriptiveDeclKind, DeclName))
+      "sending %0 value of non-Sendable type %1 to %2 %kind3 risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation, const ValueDecl *))
 
 NOTE(regionbasedisolation_isolated_conformance_introduced, none,
      "isolated conformance to %kind0 can be introduced here",
