@@ -1,8 +1,8 @@
-//===--- DerivedConformances.h - Derived protocol conformance ---*- C++ -*-===//
+//===--- DerivedConformance.h -----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,11 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_DERIVEDCONFORMANCES_H
-#define SWIFT_SEMA_DERIVEDCONFORMANCES_H
+#ifndef SWIFT_SEMA_DERIVEDCONFORMANCE_DERIVEDCONFORMANCE_H
+#define SWIFT_SEMA_DERIVEDCONFORMANCE_DERIVEDCONFORMANCE_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Builtins.h"
+#include "swift/Basic/LLVM.h"
 #include <utility>
 
 namespace swift {

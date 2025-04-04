@@ -1,8 +1,8 @@
-//===--- DerivedConformanceAdditiveArithmetic.cpp -------------------------===//
+//===--- DerivedConformanceAdditiveArithmetic.cpp ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2018 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformance.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -33,7 +34,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "DerivedConformances.h"
 
 using namespace swift;
 

@@ -1,8 +1,8 @@
-//===--- DerivedConformanceError.cpp - Derived Error ----------------------===//
+//===--- DerivedConformanceError.cpp ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,14 +16,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformance.h"
 #include "TypeChecker.h"
-#include "DerivedConformances.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/Types.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
