@@ -27,13 +27,13 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/TaskOptions.h"
+#include "swift/Basic/Casting.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/STLCompatibility.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <deque>
@@ -1661,7 +1661,7 @@ task_group_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
   auto resumeWithError =
-      std::bit_cast<AsyncVoidClosureResumeEntryPoint *>(context->ResumeParent);
+      function_cast<AsyncVoidClosureResumeEntryPoint *>(context->ResumeParent);
   return resumeWithError(context->Parent, context->errorResult);
 }
 
@@ -1713,7 +1713,7 @@ static void swift_taskGroup_wait_next_throwingImpl(
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   context->ResumeParent =
-      std::bit_cast<TaskContinuationFunction *>(resumeFunction);
+      function_cast<TaskContinuationFunction *>(resumeFunction);
   context->Parent = callerContext;
   context->errorResult = nullptr;
   context->successResultPointer = resultPointer;
@@ -1945,7 +1945,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   context->ResumeParent =
-      std::bit_cast<TaskContinuationFunction *>(resumeFunction);
+      function_cast<TaskContinuationFunction *>(resumeFunction);
   context->Parent = callerContext;
   context->errorResult = nullptr;
   context->successResultPointer = resultPointer;
