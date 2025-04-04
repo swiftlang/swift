@@ -857,12 +857,6 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   return finder.getCaptureInfo();
 }
 
-static bool isLazy(PatternBindingDecl *PBD) {
-  if (auto var = PBD->getSingleVar())
-    return var->getAttrs().hasAttribute<LazyAttr>();
-  return false;
-}
-
 CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
                                                        PatternBindingDecl *PBD,
                                                        unsigned int idx) const {
@@ -883,7 +877,7 @@ CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
   init->walk(finder);
 
   auto &ctx = DC->getASTContext();
-  if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
+  if (finder.getDynamicSelfCaptureLoc().isValid()) {
     ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
                        diag::dynamic_self_stored_property_init);
   }
