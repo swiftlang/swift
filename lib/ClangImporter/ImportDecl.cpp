@@ -3170,8 +3170,8 @@ namespace {
             new (Impl.SwiftContext) SynthesizedProtocolAttr(protocol, &Impl, false));
       } else {
         HeaderLoc attrLoc((*conformsToAttr)->getLocation());
-        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol,
-                      result->getDescriptiveKind(), result, conformsToValue);
+        Impl.diagnose(attrLoc, diag::conforms_to_not_protocol, result,
+                      conformsToValue);
       }
     }
 
