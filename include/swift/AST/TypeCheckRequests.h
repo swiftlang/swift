@@ -5134,6 +5134,26 @@ public:
   void cacheResult(CaptureInfo value) const;
 };
 
+class PatternBindingCaptureInfoRequest
+    : public SimpleRequest<PatternBindingCaptureInfoRequest,
+                           CaptureInfo(PatternBindingDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  CaptureInfo evaluate(Evaluator &evaluator, PatternBindingDecl *PBD,
+                       unsigned idx) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo info) const;
+};
+
 class SuppressesConformanceRequest
     : public SimpleRequest<SuppressesConformanceRequest,
                            bool(NominalTypeDecl *decl, KnownProtocolKind kp),

@@ -2134,6 +2134,20 @@ public struct VarValueMacro: DeclarationMacro, PeerMacro {
   }
 }
 
+struct StoredPropertyMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let argument = node.arguments.first?.expression else {
+      fatalError("boom")
+    }
+    return [
+      "var storedProperty = \(argument)"
+    ]
+  }
+}
+
 public struct GenericToVoidMacro: ExpressionMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
