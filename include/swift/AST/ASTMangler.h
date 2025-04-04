@@ -453,7 +453,8 @@ protected:
                   const ValueDecl *forDecl = nullptr);
   
   void appendDeclName(
-      const ValueDecl *decl, DeclBaseName name = DeclBaseName());
+      const ValueDecl *decl, DeclBaseName name = DeclBaseName(),
+      bool skipLocalDiscriminator = false);
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         GenericSignature sig,
