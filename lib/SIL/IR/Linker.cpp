@@ -429,6 +429,24 @@ void SILLinkerVisitor::visitInitExistentialRefInst(
   }
 }
 
+void SILLinkerVisitor::visitBuiltinInst(BuiltinInst *bi) {
+  switch (bi->getBuiltinInfo().ID) {
+    case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
+    case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
+      if (Mod.getOptions().EmbeddedSwift) {
+        // Those builtins act like init_existential_ref instructions and therefore
+        // it's important to have the Executor witness tables available in embedded
+        // mode.
+        auto executorConf = bi->getSubstitutions().getConformances()[0];
+        visitProtocolConformance(executorConf, true);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 void SILLinkerVisitor::visitAllocRefDynamicInst(AllocRefDynamicInst *ARI) {
   if (!isLinkAll())
     return;
