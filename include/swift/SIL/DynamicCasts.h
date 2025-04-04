@@ -69,6 +69,10 @@ DynamicCastFeasibility classifyDynamicCast(
     bool isSourceTypeExact = false,
     bool isWholeModuleOpts = false);
 
+/// Returns true if the conformance is not isolated or if its isolation matches
+/// the isolation `inFunction`.
+bool matchesActorIsolation(ProtocolConformanceRef conformance, SILFunction *inFunction);
+
 SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
                                                SILDynamicCastInst inst);
 
