@@ -38,9 +38,8 @@ class SILResultInfo;
 
 enum class ParsedLifetimeDependenceKind : uint8_t {
   Default = 0,
-  Borrow,
-  Inherit, // Only used with deserialized decls
-  Inout
+  Scope,
+  Inherit // Only used with deserialized decls
 };
 
 enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
@@ -183,7 +182,6 @@ public:
          ArrayRef<LifetimeDescriptor> sources,
          std::optional<LifetimeDescriptor> targetDescriptor = std::nullopt);
 
-  std::string getString() const;
   SourceLoc getLoc() const { return startLoc; }
   SourceLoc getStartLoc() const { return startLoc; }
   SourceLoc getEndLoc() const { return endLoc; }
@@ -194,6 +192,35 @@ public:
 
   std::optional<LifetimeDescriptor> getTargetDescriptor() const {
     return targetDescriptor;
+  }
+
+  std::string getString() const {
+    std::string result = "@lifetime(";
+    if (targetDescriptor.has_value()) {
+      result += targetDescriptor->getString();
+      result += ": ";
+    }
+
+    bool firstElem = true;
+    for (auto source : getSources()) {
+      if (!firstElem) {
+        result += ", ";
+      }
+      switch (source.getParsedLifetimeDependenceKind()) {
+      case ParsedLifetimeDependenceKind::Scope:
+        result += "borrow ";
+        break;
+      case ParsedLifetimeDependenceKind::Inherit:
+        result += "copy ";
+        break;
+      default:
+        break;
+      }
+      result += source.getString();
+      firstElem = false;
+    }
+    result += ")";
+    return result;
   }
 };
 
@@ -338,9 +365,6 @@ filterEscapableLifetimeDependencies(GenericSignature sig,
         ArrayRef<LifetimeDependenceInfo> inputs,
         SmallVectorImpl<LifetimeDependenceInfo> &outputs,
         llvm::function_ref<Type (unsigned targetIndex)> getSubstTargetType);
-
-StringRef
-getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind);
 
 } // namespace swift
 
