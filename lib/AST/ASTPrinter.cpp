@@ -402,6 +402,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
       DeclAttrKind::AllowFeatureSuppression,
+      DeclAttrKind::Extensible,
   };
 
   return result;
