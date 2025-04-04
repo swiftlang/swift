@@ -119,13 +119,13 @@ public:
                             AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
-  ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
+  static ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
 
   /// Create a constructor that initializes a struct from its members.
-  ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
-                                          ArrayRef<VarDecl *> members,
-                                          bool wantCtorParamNames,
-                                          bool wantBody);
+  static ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
+                                                 ArrayRef<VarDecl *> members,
+                                                 bool wantCtorParamNames,
+                                                 bool wantBody);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
   ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,

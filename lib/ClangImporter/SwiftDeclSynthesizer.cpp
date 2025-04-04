@@ -496,7 +496,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *
 SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
-  auto &context = ImporterImpl.SwiftContext;
+  auto &context = structDecl->getASTContext();
 
   auto emptyPL = ParameterList::createEmpty(context);
 
@@ -591,7 +591,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
     NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
     bool wantCtorParamNames, bool wantBody) {
-  auto &context = ImporterImpl.SwiftContext;
+  auto &context = structDecl->getASTContext();
 
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
@@ -713,9 +713,10 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
 ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
     StructDecl *structDecl, VarDecl *computedRawValue, VarDecl *storedRawValue,
     bool wantLabel, bool wantBody) {
-  auto init = createValueConstructor(structDecl, computedRawValue,
-                                     /*wantCtorParamNames=*/wantLabel,
-                                     /*wantBody=*/false);
+  auto init = SwiftDeclSynthesizer::createValueConstructor(
+      structDecl, computedRawValue,
+      /*wantCtorParamNames=*/wantLabel,
+      /*wantBody=*/false);
   // Insert our custom init body
   if (wantBody) {
     init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
@@ -813,13 +814,15 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   // Create constructors to initialize that value from a value of the
   // underlying type.
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
-    structDecl->addMember(createValueConstructor(structDecl, var,
-                                                 /*wantCtorParamNames=*/false,
-                                                 /*wantBody=*/true));
+    structDecl->addMember(SwiftDeclSynthesizer::createValueConstructor(
+        structDecl, var,
+        /*wantCtorParamNames=*/false,
+        /*wantBody=*/true));
 
-  auto *initRawValue = createValueConstructor(structDecl, var,
-                                              /*wantCtorParamNames=*/true,
-                                              /*wantBody=*/true);
+  auto *initRawValue =
+      SwiftDeclSynthesizer::createValueConstructor(structDecl, var,
+                                                   /*wantCtorParamNames=*/true,
+                                                   /*wantBody=*/true);
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);

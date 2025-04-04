@@ -1738,10 +1738,10 @@ namespace {
           // Create the _nsError initializer.
           //   public init(_nsError error: NSError)
           VarDecl *members[1] = {nsErrorProp};
-          auto nsErrorInit =
-              synthesizer.createValueConstructor(errorWrapper, members,
-                                                 /*wantCtorParamNames=*/true,
-                                                 /*wantBody=*/true);
+          auto nsErrorInit = SwiftDeclSynthesizer::createValueConstructor(
+              errorWrapper, members,
+              /*wantCtorParamNames=*/true,
+              /*wantBody=*/true);
           errorWrapper->addMember(nsErrorInit);
 
           // Add the domain error member.
@@ -2415,10 +2415,10 @@ namespace {
 
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
-          auto valueCtor =
-              synthesizer.createValueConstructor(result, member,
-                                                 /*want param names*/ true,
-                                                 /*wantBody=*/true);
+          auto valueCtor = SwiftDeclSynthesizer::createValueConstructor(
+              result, member,
+              /*want param names*/ true,
+              /*wantBody=*/true);
 
           if (isNonEscapable)
             markReturnsUnsafeNonescapable(valueCtor);
@@ -2462,7 +2462,7 @@ namespace {
         //    interop and might rely on the fact that C structs have a default
         //    constructor available in Swift.
         ConstructorDecl *defaultCtor =
-            synthesizer.createDefaultConstructor(result);
+            SwiftDeclSynthesizer::createDefaultConstructor(result);
         if (cxxRecordDecl) {
           auto attr = AvailableAttr::createUniversallyDeprecated(
               defaultCtor->getASTContext(),
@@ -2495,7 +2495,7 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        auto valueCtor = synthesizer.createValueConstructor(
+        auto valueCtor = SwiftDeclSynthesizer::createValueConstructor(
             result, members,
             /*want param names*/ true,
             /*want body*/ hasUnreferenceableStorage);
