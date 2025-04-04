@@ -1437,7 +1437,7 @@ AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
 AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
     SubscriptDecl *subscript, const FuncDecl *getter, Type elementTy,
     DeclContext *dc, ParamDecl *index) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = subscript->getASTContext();
   auto loc = getter->getLoc();
 
   auto *params = ParameterList::create(C, index);
@@ -1466,7 +1466,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
 AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
     SubscriptDecl *subscript, const FuncDecl *setter, Type elementInterfaceTy,
     DeclContext *dc, ParamDecl *index) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = subscript->getASTContext();
   auto loc = setter->getLoc();
 
   // Objective-C subscript setters are imported with a function type
@@ -1689,7 +1689,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
 
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = getterImpl->getASTContext();
 
   assert(getterImpl->getParameters()->size() == 1 &&
          "subscript can only have 1 parameter");

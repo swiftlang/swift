@@ -275,15 +275,17 @@ public:
                                          VarDecl *storedVar);
 
   /// Build a declaration for an Objective-C subscript getter.
-  AccessorDecl *buildSubscriptGetterDecl(SubscriptDecl *subscript,
-                                         const FuncDecl *getter, Type elementTy,
-                                         DeclContext *dc, ParamDecl *index);
+  static AccessorDecl *buildSubscriptGetterDecl(SubscriptDecl *subscript,
+                                                const FuncDecl *getter,
+                                                Type elementTy, DeclContext *dc,
+                                                ParamDecl *index);
 
   /// Build a declaration for an Objective-C subscript setter.
-  AccessorDecl *buildSubscriptSetterDecl(SubscriptDecl *subscript,
-                                         const FuncDecl *setter,
-                                         Type elementInterfaceTy,
-                                         DeclContext *dc, ParamDecl *index);
+  static AccessorDecl *buildSubscriptSetterDecl(SubscriptDecl *subscript,
+                                                const FuncDecl *setter,
+                                                Type elementInterfaceTy,
+                                                DeclContext *dc,
+                                                ParamDecl *index);
 
   /// Given either the getter, the setter, or both getter & setter
   /// for a subscript operation, create the Swift subscript declaration.
@@ -291,7 +293,7 @@ public:
   /// \param getter function returning `UnsafePointer<T>`
   /// \param setter function returning `UnsafeMutablePointer<T>`
   /// \return subscript declaration
-  SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
+  static SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
 
   /// Given an imported C++ dereference operator (`operator*()`), create a
   /// `pointee` computed property.

@@ -2617,8 +2617,8 @@ namespace {
             continue;
 
           auto getterAndSetter = subscriptInfo.second;
-          auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
-                                                     getterAndSetter.second);
+          auto subscript = SwiftDeclSynthesizer::makeSubscript(
+              getterAndSetter.first, getterAndSetter.second);
           // Also add subscripts directly because they won't be found from the
           // clang decl.
           result->addMember(subscript);
@@ -7800,7 +7800,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       if (existingSubscript->hasClangNode() &&
           !existingSubscript->supportsMutation()) {
         // Create the setter thunk.
-        auto setterThunk = synthesizer.buildSubscriptSetterDecl(
+        auto setterThunk = SwiftDeclSynthesizer::buildSubscriptSetterDecl(
             existingSubscript, setter, elementTy, setter->getDeclContext(),
             setterIndex);
 
@@ -7850,12 +7850,12 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   subscript->setSetterAccess(access);
 
   // Build the thunks.
-  AccessorDecl *getterThunk = synthesizer.buildSubscriptGetterDecl(
+  AccessorDecl *getterThunk = SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       subscript, getter, elementTy, dc, getterIndex);
 
   AccessorDecl *setterThunk = nullptr;
   if (setter)
-    setterThunk = synthesizer.buildSubscriptSetterDecl(
+    setterThunk = SwiftDeclSynthesizer::buildSubscriptSetterDecl(
         subscript, setter, elementTy, dc, setterIndex);
 
   // Record the subscript as an alternative declaration.
