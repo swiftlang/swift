@@ -612,10 +612,6 @@ public:
     return Instance.get();
   }
 
-  /// Writes the mangled name of \p clangDecl to \p os.
-  void getMangledName(clang::MangleContext *mangler,
-                      const clang::NamedDecl *clangDecl, raw_ostream &os);
-
   /// Whether the C++ interoperability compatibility version is at least
   /// 'major'.
   ///
@@ -1874,6 +1870,9 @@ public:
 };
 
 namespace importer {
+/// Writes the mangled name of \p clangDecl to \p os.
+void getMangledName(clang::MangleContext *mangler,
+                    const clang::NamedDecl *clangDecl, raw_ostream &os);
 
 /// Make \a storage a computed property with the given \a getter and \a setter.
 ///

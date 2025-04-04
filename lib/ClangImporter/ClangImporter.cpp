@@ -4643,12 +4643,12 @@ void ClangImporter::getMangledName(raw_ostream &os,
   if (!Impl.Mangler)
     Impl.Mangler.reset(getClangASTContext().createMangleContext());
 
-  return Impl.getMangledName(Impl.Mangler.get(), clangDecl, os);
+  return importer::getMangledName(Impl.Mangler.get(), clangDecl, os);
 }
 
-void ClangImporter::Implementation::getMangledName(
-    clang::MangleContext *mangler, const clang::NamedDecl *clangDecl,
-    raw_ostream &os) {
+void importer::getMangledName(clang::MangleContext *mangler,
+                              const clang::NamedDecl *clangDecl,
+                              raw_ostream &os) {
   if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
     auto ctorGlobalDecl =
         clang::GlobalDecl(ctor, clang::CXXCtorType::Ctor_Complete);
