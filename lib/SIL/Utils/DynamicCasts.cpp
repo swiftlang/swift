@@ -881,6 +881,25 @@ swift::classifyDynamicCast(ModuleDecl *M,
   return DynamicCastFeasibility::WillFail;
 }
 
+bool swift::matchesActorIsolation(ProtocolConformanceRef conformance, SILFunction *inFunction) {
+  return !conformance.forEachIsolatedConformance([&](ProtocolConformanceRef isolatedConf) -> bool {
+    if (!isolatedConf.isConcrete())
+      return false;
+
+    ActorIsolation isolation = isolatedConf.getConcrete()->getIsolation();
+    if (isolation.isNonisolated())
+      return false;
+
+    if (isolation.isGlobalActor()) {
+      if (auto functionIsolation = inFunction->getActorIsolation()) {
+        if (isolation == functionIsolation.value())
+          return false;
+      }
+    }
+    return true;
+  });
+}
+
 static unsigned getOptionalDepth(CanType type) {
   unsigned depth = 0;
   while (CanType objectType = type.getOptionalObjectType()) {
