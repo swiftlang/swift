@@ -1002,7 +1002,7 @@ namespace {
       // Emit the dispatch thunk.
       auto shouldEmitDispatchThunk =
           (Resilient || IGM.getOptions().WitnessMethodElimination) &&
-          !func.isDistributed();
+          (!func.isDistributed() || !func.isDistributedThunk());
       if (shouldEmitDispatchThunk) {
         IGM.emitDispatchThunk(func);
       }
