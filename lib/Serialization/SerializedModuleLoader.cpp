@@ -1100,8 +1100,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
-    if (loadedModuleFile->supportsExtensibleEnums())
-      M.setSupportsExtensibleEnums();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     M.setSwiftInterfaceCompilerVersion(
         loadedModuleFile->getSwiftInterfaceCompilerVersion());

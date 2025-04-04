@@ -94,3 +94,11 @@ public func testExecutionConcurrent() async {}
 @execution(caller)
 public func testExecutionCaller() async {}
 // CHECK: @execution(caller) public func testExecutionCaller() async
+
+// CHECK-NOT: @extensible
+// CHECK: public enum TestExtensible
+@extensible
+public enum TestExtensible {
+  case a
+  case b
+}
