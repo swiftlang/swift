@@ -726,6 +726,81 @@ static ConstructorDecl *createRawValueBridgingConstructor(
   return init;
 }
 
+// MARK: Struct RawValue getters
+
+/// Synthesizer for the rawValue getter for an imported struct.
+static std::pair<BraceStmt *, bool>
+synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  VarDecl *storedVar = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/ true);
+  selfRef->setType(selfDecl->getTypeInContext());
+
+  auto storedType = storedVar->getInterfaceType();
+  auto storedRef = new (ctx)
+      MemberRefExpr(selfRef, SourceLoc(), storedVar, DeclNameLoc(),
+                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
+  storedRef->setType(storedType);
+
+  Expr *result = storedRef;
+
+  Type computedType = getterDecl->getResultInterfaceType();
+  if (!computedType->isEqual(storedType)) {
+    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
+    bridge->setType(computedType);
+
+    result = CoerceExpr::createImplicit(ctx, bridge, computedType);
+  }
+
+  auto ret = ReturnStmt::createImplicit(ctx, result);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+/// Build the rawValue getter for a struct type.
+///
+/// \code
+/// struct SomeType: RawRepresentable {
+///   private var _rawValue: ObjCType
+///   var rawValue: SwiftType {
+///     return _rawValue as SwiftType
+///   }
+/// }
+/// \endcode
+static AccessorDecl *makeStructRawValueGetter(StructDecl *structDecl,
+                                              VarDecl *computedVar,
+                                              VarDecl *storedVar) {
+  assert(storedVar->hasStorage());
+
+  ASTContext &C = structDecl->getASTContext();
+
+  auto *params = ParameterList::createEmpty(C);
+
+  auto computedType = computedVar->getInterfaceType();
+
+  auto getterDecl = AccessorDecl::create(
+      C,
+      /*declLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false,
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), params, computedType,
+      structDecl);
+  getterDecl->setImplicit();
+  getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(false);
+
+  getterDecl->copyFormalAccessFrom(structDecl);
+  getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
+  return getterDecl;
+}
+
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
@@ -1369,70 +1444,6 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
   getterDecl->copyFormalAccessFrom(enumDecl);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
   importer::makeComputed(rawValueDecl, getterDecl, nullptr);
-}
-
-// MARK: Struct RawValue getters
-
-/// Synthesizer for the rawValue getter for an imported struct.
-static std::pair<BraceStmt *, bool>
-synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
-  auto getterDecl = cast<AccessorDecl>(afd);
-  VarDecl *storedVar = static_cast<VarDecl *>(context);
-
-  ASTContext &ctx = getterDecl->getASTContext();
-  auto *selfDecl = getterDecl->getImplicitSelfDecl();
-  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                       /*implicit*/ true);
-  selfRef->setType(selfDecl->getTypeInContext());
-
-  auto storedType = storedVar->getInterfaceType();
-  auto storedRef = new (ctx)
-      MemberRefExpr(selfRef, SourceLoc(), storedVar, DeclNameLoc(),
-                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
-  storedRef->setType(storedType);
-
-  Expr *result = storedRef;
-
-  Type computedType = getterDecl->getResultInterfaceType();
-  if (!computedType->isEqual(storedType)) {
-    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
-    bridge->setType(computedType);
-
-    result = CoerceExpr::createImplicit(ctx, bridge, computedType);
-  }
-
-  auto ret = ReturnStmt::createImplicit(ctx, result);
-  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                /*implicit*/ true);
-  return {body, /*isTypeChecked=*/true};
-}
-
-AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
-    StructDecl *structDecl, VarDecl *computedVar, VarDecl *storedVar) {
-  assert(storedVar->hasStorage());
-
-  ASTContext &C = ImporterImpl.SwiftContext;
-
-  auto *params = ParameterList::createEmpty(C);
-
-  auto computedType = computedVar->getInterfaceType();
-
-  auto getterDecl = AccessorDecl::create(
-      C,
-      /*declLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
-      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      params, computedType, structDecl);
-  getterDecl->setImplicit();
-  getterDecl->setIsObjC(false);
-  getterDecl->setIsDynamic(false);
-  getterDecl->setIsTransparent(false);
-
-  getterDecl->copyFormalAccessFrom(structDecl);
-  getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
-  return getterDecl;
 }
 
 // MARK: ObjC subscripts

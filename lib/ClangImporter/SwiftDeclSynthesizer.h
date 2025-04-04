@@ -253,20 +253,6 @@ public:
   /// reinterpret cast in order to preserve unknown or future cases from C.
   void makeEnumRawValueGetter(EnumDecl *enumDecl, VarDecl *rawValueDecl);
 
-  /// Build the rawValue getter for a struct type.
-  ///
-  /// \code
-  /// struct SomeType: RawRepresentable {
-  ///   private var _rawValue: ObjCType
-  ///   var rawValue: SwiftType {
-  ///     return _rawValue as SwiftType
-  ///   }
-  /// }
-  /// \endcode
-  AccessorDecl *makeStructRawValueGetter(StructDecl *structDecl,
-                                         VarDecl *computedVar,
-                                         VarDecl *storedVar);
-
   /// Build a declaration for an Objective-C subscript getter.
   static AccessorDecl *buildSubscriptGetterDecl(SubscriptDecl *subscript,
                                                 const FuncDecl *getter,
