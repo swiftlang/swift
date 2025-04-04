@@ -118,3 +118,31 @@ suite.test("InlineArray.span property (String)")
     expectEqual(span[i], s[i])
   }    
 }
+
+suite.test("InlineArray.mutableSpan property")
+.require(.stdlib_6_2).code
+{
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var v = InlineArray<5, Int>(repeating: 0)
+  let c = v.count
+  var span = v.mutableSpan
+  expectEqual(span.count, c)
+  span[3] = Int.random(in: .min..<0)
+  let r = span[3]
+  expectEqual(v[3], r)
+}
+
+suite.test("InlineArray.mutableSpan property (String)")
+.require(.stdlib_6_2).code
+{
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var v = InlineArray<5, String>(repeating: "0")
+  let c = v.count
+  var span = v.mutableSpan
+  expectEqual(span.count, c)
+  span[3] = String(repeating: "0", count: Int.random(in: 100..<500))
+  let s = span[3]
+  expectTrue(s._isIdentical(to: v[3]))
+}
