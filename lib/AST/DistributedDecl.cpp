@@ -488,8 +488,10 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // === Must be declared in a 'DistributedActorSystem' conforming type
-  ProtocolDecl *systemProto =
-      C.getDistributedActorSystemDecl();
+  ProtocolDecl *systemProto = C.getDistributedActorSystemDecl();
+  if (!systemProto) {
+    return false;
+  }
 
   auto systemNominal = DC->getSelfNominalTypeDecl();
   auto distSystemConformance = lookupConformance(
@@ -794,6 +796,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto protocolConformance = lookupConformance(
@@ -925,6 +930,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto protocolConformance = lookupConformance(
@@ -1051,6 +1059,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *encoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+    if (!encoderProto) {
+      return false;
+    }
 
     auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
@@ -1158,7 +1169,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *decoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder);
-
+    if (!decoderProto) {
+      return false;
+    }
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
         decoderNominal->getDeclaredInterfaceType(), decoderProto);
@@ -1251,6 +1264,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *decoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler);
+    if (!decoderProto) {
+      return false;
+    }
 
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
