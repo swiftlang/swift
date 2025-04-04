@@ -1234,11 +1234,18 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNonSendableKind cKind);
 
-SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:isUnsafe:)")
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonIsolatedModifier {
+  BridgedNonIsolatedModifierNone,
+  BridgedNonIsolatedModifierUnsafe,
+  BridgedNonIsolatedModifierNonSending
+};
+
+SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:modifier:)")
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange, bool isUnsafe);
+                                    BridgedSourceRange cRange,
+                                    BridgedNonIsolatedModifier modifier);
 
 SWIFT_NAME("BridgedObjCAttr.createParsedUnnamed(_:atLoc:attrNameLoc:)")
 BridgedObjCAttr

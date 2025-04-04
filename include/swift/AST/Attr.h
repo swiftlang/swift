@@ -226,8 +226,8 @@ protected:
       isEarlyAdopter : 1
     );
 
-    SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
-      isUnsafe : 1
+    SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, NumNonIsolatedModifierBits,
+      Modifier : NumNonIsolatedModifierBits
     );
 
     SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
@@ -2978,17 +2978,26 @@ public:
 /// Represents nonisolated modifier.
 class NonisolatedAttr final : public DeclAttribute {
 public:
-  NonisolatedAttr(SourceLoc atLoc, SourceRange range, bool unsafe,
-                  bool implicit)
+  NonisolatedAttr(SourceLoc atLoc, SourceRange range,
+                  NonIsolatedModifier modifier, bool implicit)
       : DeclAttribute(DeclAttrKind::Nonisolated, atLoc, range, implicit) {
-    Bits.NonisolatedAttr.isUnsafe = unsafe;
-    assert((isUnsafe() == unsafe) && "not enough bits for unsafe state");
+    Bits.NonisolatedAttr.Modifier = static_cast<unsigned>(modifier);
   }
 
   NonisolatedAttr(bool unsafe, bool implicit)
-      : NonisolatedAttr({}, {}, unsafe, implicit) {}
+      : NonisolatedAttr({}, {},
+                        unsafe ? NonIsolatedModifier::Unsafe
+                               : NonIsolatedModifier::None,
+                        implicit) {}
 
-  bool isUnsafe() const { return Bits.NonisolatedAttr.isUnsafe; }
+  NonIsolatedModifier getModifier() const {
+    return static_cast<NonIsolatedModifier>(Bits.NonisolatedAttr.Modifier);
+  }
+
+  bool isUnsafe() const { return getModifier() == NonIsolatedModifier::Unsafe; }
+  bool isNonSending() const {
+    return getModifier() == NonIsolatedModifier::NonSending;
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Nonisolated;
@@ -2996,11 +3005,11 @@ public:
 
   /// Create a copy of this attribute.
   NonisolatedAttr *clone(ASTContext &ctx) const {
-    return new (ctx) NonisolatedAttr(AtLoc, Range, isUnsafe(), isImplicit());
+    return new (ctx) NonisolatedAttr(AtLoc, Range, getModifier(), isImplicit());
   }
 
   bool isEquivalent(const NonisolatedAttr *other, Decl *attachedTo) const {
-    return isUnsafe() == other->isUnsafe();
+    return getModifier() == other->getModifier();
   }
 };
 

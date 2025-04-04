@@ -6513,11 +6513,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Nonisolated_DECL_ATTR: {
-        bool isUnsafe{};
+        unsigned modifier;
         bool isImplicit{};
         serialization::decls_block::NonisolatedDeclAttrLayout::readRecord(
-            scratch, isUnsafe, isImplicit);
-        Attr = new (ctx) NonisolatedAttr(isUnsafe, isImplicit);
+            scratch, modifier, isImplicit);
+        Attr = new (ctx) NonisolatedAttr(
+            {}, {}, static_cast<NonIsolatedModifier>(modifier), isImplicit);
         break;
       }
 

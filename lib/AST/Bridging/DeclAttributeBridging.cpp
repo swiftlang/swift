@@ -627,12 +627,26 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
       NonSendableAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
+static NonIsolatedModifier unbridged(BridgedNonIsolatedModifier modifier) {
+  switch (modifier) {
+  case BridgedNonIsolatedModifierNone:
+    return NonIsolatedModifier::None;
+  case BridgedNonIsolatedModifierUnsafe:
+    return NonIsolatedModifier::Unsafe;
+  case BridgedNonIsolatedModifierNonSending:
+    return NonIsolatedModifier::NonSending;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange, bool isUnsafe) {
+                                    BridgedSourceRange cRange,
+                                    BridgedNonIsolatedModifier modifier) {
   return new (cContext.unbridged()) NonisolatedAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), isUnsafe, /*implicit=*/false);
+      cAtLoc.unbridged(), cRange.unbridged(), unbridged(modifier),
+      /*implicit=*/false);
 }
 
 BridgedObjCAttr

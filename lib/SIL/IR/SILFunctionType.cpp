@@ -2622,6 +2622,10 @@ static CanSILFunctionType getSILFunctionType(
   {
     std::optional<ActorIsolation> actorIsolation;
     if (constant) {
+      // TODO: It should to be possible to `getActorIsolation` if
+      // reference is to a decl instead of trying to get isolation
+      // from the reference kind, the attributes, or the context.
+
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
         actorIsolation = ActorIsolation::forNonisolated(false);
       } else if (auto *decl = constant->getAbstractFunctionDecl()) {
@@ -2633,10 +2637,16 @@ static CanSILFunctionType getSILFunctionType(
           }
         }
 
-        if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
+        if (auto *nonisolatedAttr =
+                decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+          if (nonisolatedAttr->isNonSending())
+            actorIsolation = ActorIsolation::forCallerIsolationInheriting();
+        } else if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
           actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
         }
-      } else {
+      }
+
+      if (!actorIsolation) {
         actorIsolation =
             getActorIsolationOfContext(constant->getInnermostDeclContext());
       }

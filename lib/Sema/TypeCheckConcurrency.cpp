@@ -4938,8 +4938,12 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
-    // If the nonisolated async inherits isolation from context is set, return
-    // caller isolation inheriting.
+    // 'nonisolated(nonsending)' modifier is set on the decl.
+    if (nonisolatedAttr->isNonSending())
+      return ActorIsolation::forCallerIsolationInheriting();
+
+    // If the nonisolated async inherits isolation from context,
+    // return caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
             Feature::AsyncCallerExecution)) {
       if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);

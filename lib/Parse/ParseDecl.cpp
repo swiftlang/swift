@@ -3744,19 +3744,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::Nonisolated: {
     AttrRange = Loc;
-    std::optional<bool> isUnsafe(false);
+    std::optional<NonIsolatedModifier> Modifier(NonIsolatedModifier::None);
     if (EnableParameterizedNonisolated) {
-      isUnsafe =
-          parseSingleAttrOption<bool>(*this, Loc, AttrRange, AttrName, DK,
-                                      {{Context.Id_unsafe, true}}, *isUnsafe,
-                                      ParameterizedDeclAttributeKind::Nonisolated);
-      if (!isUnsafe) {
+      Modifier = parseSingleAttrOption<NonIsolatedModifier>(
+          *this, Loc, AttrRange, AttrName, DK,
+          {{Context.Id_unsafe, NonIsolatedModifier::Unsafe},
+           {Context.Id_nonsending, NonIsolatedModifier::NonSending}},
+          *Modifier, ParameterizedDeclAttributeKind::Nonisolated);
+      if (!Modifier) {
         return makeParserSuccess();
       }
     }
 
     if (!DiscardAttribute) {
-      Attributes.add(new (Context) NonisolatedAttr(AtLoc, AttrRange, *isUnsafe,
+      Attributes.add(new (Context) NonisolatedAttr(AtLoc, AttrRange, *Modifier,
                                                    /*implicit*/ false));
     }
     break;
@@ -5660,9 +5661,10 @@ static bool consumeIfParenthesizedUnowned(Parser &P) {
 }
 
 /// Given a current token of 'nonisolated', check to see if it is followed by an
-/// "(unsafe)" specifier and consumes if it is.
+/// "(unsafe)" or "(nonsending)" specifier and consumes if it is.
 static bool consumeIfParenthesizedNonisolated(Parser &P) {
-  return consumeIfParenthesizedModifier(P, "nonisolated", {"unsafe"});
+  return consumeIfParenthesizedModifier(P, "nonisolated",
+                                        {"unsafe", "nonsending"});
 }
 
 static void skipAttribute(Parser &P) {
