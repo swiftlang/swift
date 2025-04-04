@@ -2539,10 +2539,9 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
 
 clang::CXXMethodDecl *
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
-    const clang::CXXRecordDecl *cxxRecordDecl) {
+    clang::Sema &clangSema, const clang::CXXRecordDecl *cxxRecordDecl) {
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
-  clang::Sema &clangSema = ImporterImpl.getClangSema();
 
   clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
 

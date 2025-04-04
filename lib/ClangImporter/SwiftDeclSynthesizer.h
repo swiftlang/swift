@@ -333,8 +333,8 @@ public:
   /// Synthesize a static factory method for a C++ foreign reference type,
   /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
   /// allocation function is not found.
-  clang::CXXMethodDecl *synthesizeStaticFactoryForCXXForeignRef(
-      const clang::CXXRecordDecl *cxxRecordDecl);
+  static clang::CXXMethodDecl *synthesizeStaticFactoryForCXXForeignRef(
+      clang::Sema &clangSema, const clang::CXXRecordDecl *cxxRecordDecl);
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);

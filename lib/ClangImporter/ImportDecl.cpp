@@ -2534,9 +2534,9 @@ namespace {
                              });
                 });
             if (!hasUserProvidedStaticFactory) {
-              if (auto generatedCxxMethodDecl =
-                      synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                          cxxRecordDecl)) {
+              if (auto generatedCxxMethodDecl = SwiftDeclSynthesizer::
+                      synthesizeStaticFactoryForCXXForeignRef(
+                          Impl.getClangSema(), cxxRecordDecl)) {
                 if (Decl *importedInitDecl =
                         Impl.SwiftContext.getClangModuleLoader()
                             ->importDeclDirectly(generatedCxxMethodDecl))
