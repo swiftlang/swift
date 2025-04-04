@@ -64,7 +64,7 @@ atBest(DynamicCastFeasibility feasibility, DynamicCastFeasibility bestCase) {
 /// Classify the feasibility of a dynamic cast.  The source and target
 /// types should be unlowered formal types.
 DynamicCastFeasibility classifyDynamicCast(
-    ModuleDecl *context,
+    SILFunction *function,
     CanType sourceType, CanType targetType,
     bool isSourceTypeExact = false,
     bool isWholeModuleOpts = false);
@@ -390,7 +390,7 @@ public:
 
   DynamicCastFeasibility classifyFeasibility(bool allowWholeModule) const {
     return swift::classifyDynamicCast(
-        getModule().getSwiftModule(),
+        getFunction(),
         getSourceFormalType(), getTargetFormalType(),
         isSourceTypeExact(), allowWholeModule && getModule().isWholeModule());
   }
