@@ -39,7 +39,7 @@ public struct NEInt: ~Escapable {
   var iprop: NEInt {
     @lifetime(copy self)
     _read { yield self }
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify { yield &self }
   }
 
