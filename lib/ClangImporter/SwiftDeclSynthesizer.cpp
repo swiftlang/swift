@@ -2544,7 +2544,18 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
   clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
 
-  llvm::SmallVector<clang::CXXMethodDecl *, 4> synthesizedFactories;
+  llvm::SmallVector<clang::CXXConstructorDecl *, 4> ctorDeclsForSynth;
+  for (clang::CXXConstructorDecl *ctorDecl : cxxRecordDecl->ctors()) {
+    if (ctorDecl->isDeleted() || ctorDecl->getAccess() == clang::AS_private ||
+        ctorDecl->getAccess() == clang::AS_protected ||
+        ctorDecl->isCopyOrMoveConstructor() || ctorDecl->isVariadic())
+      continue;
+    else
+      ctorDeclsForSynth.push_back(ctorDecl);
+  }
+
+  if (ctorDeclsForSynth.empty())
+    return {};
 
   clang::FunctionDecl *operatorNew = nullptr;
   clang::FunctionDecl *operatorDelete = nullptr;
@@ -2556,7 +2567,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   if (findingAllocFuncFailed || !operatorNew || operatorNew->isDeleted() ||
       operatorNew->getAccess() == clang::AS_private ||
       operatorNew->getAccess() == clang::AS_protected)
-    return synthesizedFactories;
+    return {};
 
   clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
   // Adding `_Nonnull` to the return type of synthesized static factory
@@ -2570,14 +2581,9 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
 
   clang::IdentifierTable &clangIdents = clangCtx.Idents;
 
+  llvm::SmallVector<clang::CXXMethodDecl *, 4> synthesizedFactories;
   unsigned int selectedCtorDeclCounter = 0;
-  for (clang::CXXConstructorDecl *selectedCtorDecl : cxxRecordDecl->ctors()) {
-    if (selectedCtorDecl->isDeleted() ||
-        selectedCtorDecl->getAccess() == clang::AS_private ||
-        selectedCtorDecl->getAccess() == clang::AS_protected ||
-        selectedCtorDecl->isCopyOrMoveConstructor())
-      continue;
-
+  for (clang::CXXConstructorDecl *selectedCtorDecl : ctorDeclsForSynth) {
     unsigned int ctorParamCount = selectedCtorDecl->getNumParams();
     selectedCtorDeclCounter++;
 
@@ -2614,7 +2620,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
           clangCtx, synthCxxMethodDecl, cxxRecordDeclLoc, cxxRecordDeclLoc,
           origParam->getIdentifier(), origParam->getType(),
           clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
-          clang::SC_None, nullptr);
+          clang::SC_None, /*DefArg=*/nullptr);
       synthParams.push_back(param);
     }
     synthCxxMethodDecl->setParams(synthParams);
@@ -2632,7 +2638,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     synthCxxMethodDecl->addAttr(
         clang::SwiftNameAttr::Create(clangCtx, swiftInitStr));
 
-    llvm::SmallVector<clang::Expr *, 8> ctorArgs;
+    llvm::SmallVector<clang::Expr *, 4> ctorArgs;
     for (auto *param : synthParams) {
       ctorArgs.push_back(clang::DeclRefExpr::Create(
           clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
@@ -2670,7 +2676,7 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     auto *synthNewExpr = cast<clang::CXXNewExpr>(synthNewExprResult.get());
 
     clang::ReturnStmt *synthRetStmt = clang::ReturnStmt::Create(
-        clangCtx, cxxRecordDeclLoc, synthNewExpr, nullptr);
+        clangCtx, cxxRecordDeclLoc, synthNewExpr, /*NRVOCandidate=*/nullptr);
     assert(synthRetStmt && "Unable to synthesize return statement for "
                            "static factory of c++ foreign reference type");
 
