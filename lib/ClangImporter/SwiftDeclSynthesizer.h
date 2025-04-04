@@ -323,8 +323,8 @@ public:
   FuncDecl *makeInstanceToStaticOperatorCallMethod(
       const clang::CXXMethodDecl *clangMethodDecl);
 
-  VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
-                                              FuncDecl *setter);
+  static VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
+                                                     FuncDecl *setter);
 
   CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
                                 const swift::Type &swiftParamTy,

@@ -2604,8 +2604,8 @@ namespace {
                   cxxMethodBridging.importNameAsCamelCaseName()))
             continue;
 
-          auto p =
-              synthesizer.makeComputedPropertyFromCXXMethods(getter, setter);
+          auto p = SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(
+              getter, setter);
           // Add computed properties directly because they won't be found from
           // the clang decl during lazy member lookup.
           result->addMember(p);

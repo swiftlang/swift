@@ -2348,7 +2348,7 @@ synthesizeComputedSetterFromCXXMethod(AbstractFunctionDecl *afd,
 VarDecl *
 SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                          FuncDecl *setter) {
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = getter->getASTContext();
   auto dc = getter->getDeclContext();
 
   assert(isa<clang::CXXMethodDecl>(getter->getClangDecl()) &&
