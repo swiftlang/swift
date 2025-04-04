@@ -1305,6 +1305,10 @@ bool BridgedInstruction::AllocStackInst_usesMoveableValueDebugInfo() const {
   return getAs<swift::AllocStackInst>()->usesMoveableValueDebugInfo();
 }
 
+bool BridgedInstruction::AllocStackInst_isLexical() const {
+  return getAs<swift::AllocStackInst>()->isLexical();
+}
+
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {
   return getAs<swift::AllocRefInstBase>()->isObjC();
 }

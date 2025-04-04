@@ -1346,6 +1346,7 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
   public var isFromVarDecl: Bool { bridged.AllocStackInst_isFromVarDecl() }
   public var usesMoveableValueDebugInfo: Bool { bridged.AllocStackInst_usesMoveableValueDebugInfo() }
+  public override var isLexical: Bool { bridged.AllocStackInst_isLexical() }
 
   public var varDecl: VarDecl? {
     bridged.AllocStack_getDecl().getAs(VarDecl.self)
