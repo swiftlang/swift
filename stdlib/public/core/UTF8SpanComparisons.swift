@@ -6,7 +6,7 @@ extension UTF8Span {
   /// Whether this span has the same bytes as `other`.
   @_alwaysEmitIntoClient
   public func bytesEqual(to other: some Sequence<UInt8>) -> Bool {
-    _withUnsafeBufferPointer { $0.elementsEqual(other) }
+    unsafe _withUnsafeBufferPointer { unsafe $0.elementsEqual(other) }
   }
 
   /// Whether this span has the same `Unicode.Scalar`s as `other`.
@@ -57,9 +57,9 @@ extension UTF8Span {
   public func isCanonicallyEquivalent(
     to other: UTF8Span
   ) -> Bool {
-    self._withUnsafeBufferPointer { selfBufPtr in
-      other._withUnsafeBufferPointer { otherBufPtr in
-        _stringCompareFastUTF8(
+    unsafe self._withUnsafeBufferPointer { selfBufPtr in
+      unsafe other._withUnsafeBufferPointer { otherBufPtr in
+        unsafe _stringCompareFastUTF8(
           selfBufPtr,
           otherBufPtr,
           expecting: .equal,
@@ -73,9 +73,9 @@ extension UTF8Span {
   public func isCanonicallyLessThan(
     _ other: UTF8Span
   ) -> Bool {
-    self._withUnsafeBufferPointer { selfBufPtr in
-      other._withUnsafeBufferPointer { otherBufPtr in
-        _stringCompareFastUTF8(
+    unsafe self._withUnsafeBufferPointer { selfBufPtr in
+      unsafe other._withUnsafeBufferPointer { otherBufPtr in
+        unsafe _stringCompareFastUTF8(
           selfBufPtr,
           otherBufPtr,
           expecting: .less,
@@ -85,15 +85,16 @@ extension UTF8Span {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
-extension UTF8Span {
-  public static func ~=(_ lhs: StaticString, _ rhs: UTF8Span) -> Bool {
-    return lhs.withUTF8Buffer { str in
-      rhs._withUnsafeBufferPointer { span in
-        str.elementsEqual(span)
-      }
-    }
-  }
-}
+// // FIXME: remove
+// @available(SwiftStdlib 6.1, *)
+// extension UTF8Span {
+//   public static func ~=(_ lhs: StaticString, _ rhs: UTF8Span) -> Bool {
+//     return lhs.withUTF8Buffer { str in
+//       rhs._withUnsafeBufferPointer { span in
+//         str.elementsEqual(span)
+//       }
+//     }
+//   }
+// }
 
 

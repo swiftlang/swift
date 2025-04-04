@@ -15,7 +15,7 @@ extension UTF8Span {
   internal func _isScalarAligned(unchecked i: Int) -> Bool {
     if i == count || i == 0 { return true }
     _internalInvariant(_boundsCheck(i))
-    return _start()._isScalarAligned(i)
+    return unsafe _start()._isScalarAligned(i)
   }
 
   // internal func _roundDownToScalarBoundary(i: Int) -> Int {
@@ -120,7 +120,7 @@ extension UTF8Span {
   ) -> Int {
     _internalInvariant(_boundsCheck(i&-1))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._previousScalarStart(i)
+    return unsafe _start()._previousScalarStart(i)
   }
 
   // /// Decode the `Unicode.Scalar` starting at `i`. Return it and the start of
@@ -165,7 +165,7 @@ extension UTF8Span {
   ) -> (Unicode.Scalar, nextScalarStart: Int) {
     _internalInvariant(_boundsCheck(i))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._decodeScalar(startingAt: i)
+    return unsafe _start()._decodeScalar(startingAt: i)
   }
 
   /// Decode the `Unicode.Scalar` ending at `i`, i.e. the previous scalar.
@@ -210,7 +210,7 @@ extension UTF8Span {
   ) -> (Unicode.Scalar, previousScalarStart: Int) {
     _internalInvariant(_boundsCheck(i &- 1))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._decodeScalar(endingAt: i)
+    return unsafe _start()._decodeScalar(endingAt: i)
   }
 }
 
@@ -222,7 +222,7 @@ extension UTF8Span {
     if i == count || i == 0 { return i }
 
     precondition(_boundsCheck(i))
-    return _start()._scalarAlign(i)
+    return unsafe _start()._scalarAlign(i)
   }
 
   // /// Find the nearest scalar-aligned position `<= i`.
@@ -326,7 +326,7 @@ extension UTF8Span {
   ) -> Int {
     _internalInvariant(_boundsCheck(i))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._nextCharacterStart(i, limitedBy: count)
+    return unsafe _start()._nextCharacterStart(i, limitedBy: count)
   }
 
   /// Returns the start of the `Character` (i.e. grapheme cluster) ending at
@@ -369,7 +369,7 @@ extension UTF8Span {
   ) -> Int {
     _internalInvariant(_boundsCheck(i&-1))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._previousCharacterStart(i, limitedBy: count)
+    return unsafe _start()._previousCharacterStart(i, limitedBy: count)
   }
 
   /// Decode the `Character` starting at `i` Return it and the start of the
@@ -413,7 +413,7 @@ extension UTF8Span {
   ) -> (Character, nextCharacterStart: Int) {
     _internalInvariant(_boundsCheck(i))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._decodeCharacter(
+    return unsafe _start()._decodeCharacter(
       startingAt: i, limitedBy: count)
   }
 
@@ -456,7 +456,7 @@ extension UTF8Span {
   ) -> (Character, Int) {
     _internalInvariant(_boundsCheck(i &- 1))
     _internalInvariant(_isScalarAligned(unchecked: i))
-    return _start()._decodeCharacter(
+    return unsafe _start()._decodeCharacter(
       endingAt: i, limitedBy: count)
   }
 

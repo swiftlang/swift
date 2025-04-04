@@ -28,7 +28,7 @@ extension UTF8Span {
     }
 
     private var _start: UnsafeRawPointer {
-      codeUnits._start()
+      unsafe codeUnits._start()
     }
 
     /// Decode and return the scalar starting at `currentCodeUnitOffset`.
@@ -44,7 +44,7 @@ extension UTF8Span {
       }
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
-      let (result, newPos) = _start._decodeScalar(startingAt: currentCodeUnitOffset)
+      let (result, newPos) = unsafe _start._decodeScalar(startingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -62,7 +62,7 @@ extension UTF8Span {
       }
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
-      let (result, newPos) = _start._decodeScalar(endingAt: currentCodeUnitOffset)
+      let (result, newPos) = unsafe _start._decodeScalar(endingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -81,7 +81,7 @@ extension UTF8Span {
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
-      currentCodeUnitOffset &+= _start._scalarLength(startingAt: currentCodeUnitOffset)
+      currentCodeUnitOffset &+= unsafe _start._scalarLength(startingAt: currentCodeUnitOffset)
       return 1
     }
 
@@ -113,7 +113,7 @@ extension UTF8Span {
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
-      currentCodeUnitOffset = _start._previousScalarStart(currentCodeUnitOffset)
+      currentCodeUnitOffset = unsafe _start._previousScalarStart(currentCodeUnitOffset)
       return 1
     }
 
@@ -226,7 +226,7 @@ extension UTF8Span {
     }
 
     private var _start: UnsafeRawPointer {
-      codeUnits._start()
+      unsafe codeUnits._start()
     }
 
     /// Return the `Character` starting at `currentCodeUnitOffset`. After the
@@ -240,7 +240,7 @@ extension UTF8Span {
       guard currentCodeUnitOffset < codeUnits.count else { return nil }
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
-      let (result, newPos) = _start._decodeCharacter(
+      let (result, newPos) = unsafe _start._decodeCharacter(
         startingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count
       )
@@ -259,7 +259,7 @@ extension UTF8Span {
       guard currentCodeUnitOffset > 0 else { return nil }
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
-      let (result, newPos) = _start._decodeCharacter(
+      let (result, newPos) = unsafe _start._decodeCharacter(
         endingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count)
       self.currentCodeUnitOffset = newPos
@@ -279,7 +279,7 @@ extension UTF8Span {
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
-      self.currentCodeUnitOffset = _start._nextCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
+      self.currentCodeUnitOffset = unsafe _start._nextCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
       return 1
     }
 
@@ -311,7 +311,7 @@ extension UTF8Span {
 
       _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
-      currentCodeUnitOffset = _start._previousCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
+      currentCodeUnitOffset = unsafe _start._previousCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
       return 1
 
     }

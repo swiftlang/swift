@@ -69,7 +69,7 @@ extension Unicode.UTF8 {
    multi-byte scalar but is cut off before ending correctly). For all other
    errors (including overlong encodings, surrogates, and invalid code
    points), it will produce an error per byte.
-  
+
    // FIXME: without a checkAllErrors, we don't have these classification distinctions, should we drop it, ensure we will do it, or what?
 
    Since overlong encodings, surrogates, and invalid code points are erroneous
@@ -210,3 +210,52 @@ extension UTF8.ValidationError: CustomStringConvertible {
     "UTF8.ValidationError(\(kind), \(byteOffsets))"
   }
 }
+
+@available(SwiftStdlib 6.1, *)
+ extension UTF8 {
+    @usableFromInline // for testing purposes
+    internal static func _checkAllErrors(
+      _ s: some Sequence<UInt8>
+    ) -> Array<UTF8.ValidationError> {
+      // TODO: Span fast path
+      // TODO: Fixed size buffer for non-contig inputs
+      // TODO: Lifetime-dependent result variant
+      let cus = Array(s)
+      return unsafe cus.withUnsafeBytes {
+        var bufPtr = unsafe $0
+        var start = 0
+        var errors: Array<UTF8.ValidationError> = []
+
+        // Remember the previous error, so that we can
+        // apply it to subsequent bytes instead of reporting
+        // just `.unexpectedContinuation`.
+        var priorError: UTF8.ValidationError? = nil
+        while true {
+          do throws(UTF8.ValidationError) {
+            _ = unsafe try bufPtr.baseAddress!._validateUTF8(limitedBy: bufPtr.count)
+            return errors
+          } catch {
+            let adjustedRange =
+              error.byteOffsets.lowerBound + start ..< error.byteOffsets.upperBound + start
+
+            let kind: UTF8.ValidationError.Kind
+            if let prior = priorError,
+               prior.byteOffsets.upperBound == adjustedRange.lowerBound,
+               error.kind == .unexpectedContinuationByte
+            {
+              kind = prior.kind
+            } else {
+              kind = error.kind
+            }
+            let adjustedErr = UTF8.ValidationError(kind, adjustedRange)
+            priorError = adjustedErr
+
+            let errEnd = error.byteOffsets.upperBound
+            start += errEnd
+            unsafe bufPtr = .init(rebasing: bufPtr[errEnd...])
+            errors.append(adjustedErr)
+          }
+        }
+      }
+    }
+ }

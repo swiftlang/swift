@@ -3,6 +3,7 @@
 
 /// TODO: docs
 @frozen
+@safe
 @available(SwiftStdlib 6.1, *)
 public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   @usableFromInline
@@ -25,26 +26,36 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
 
   // @_alwaysEmitIntoClient
   @inline(__always)
-  @lifetime(borrow start)
+  @lifetime(borrow start) // TODO: borrow or copy?
   internal init(
     _unsafeAssumingValidUTF8 start: borrowing UnsafeRawPointer,
     _countAndFlags: UInt64
   ) {
-    self._unsafeBaseAddress = copy start
+    unsafe self._unsafeBaseAddress = copy start
     self._countAndFlags = _countAndFlags
 
     _invariantCheck()
+  }
+
+  @unsafe
+  @lifetime(copy uncheckedCodeUnits) // TODO: borrow or copy?
+  public init(
+    unsafeAssumingValidUTF8 uncheckedCodeUnits: Span<UInt8>,
+    isKnownASCII: Bool = false
+  ) {
+    self.init(
+      _uncheckedAssumingValidUTF8: uncheckedCodeUnits,
+      isKnownASCII: isKnownASCII,
+      isKnownNFC: false
+    )
   }
 
   // FIXME: we need to make sure ALL API are nil safe, that is they
   // at least check the count first
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
-    _unsafeBaseAddress._unsafelyUnwrappedUnchecked
+    unsafe _unsafeBaseAddress._unsafelyUnwrappedUnchecked
   }
-
-  // HACK: working around lack of internal plumbing work
-  internal var _str: String { _start()._str(0..<count) }
 }
 
 // TODO: try to convert code to be ran on Span instead of URP
@@ -67,18 +78,16 @@ extension UTF8Span {
   internal init(
     _validating codeUnits: consuming Span<UInt8>
   ) throws(UTF8.ValidationError) {
-    guard let ptr = codeUnits._pointer else {
-      self._unsafeBaseAddress = nil
+    guard let basePtr = unsafe codeUnits._pointer else {
+      unsafe self._unsafeBaseAddress = nil
       self._countAndFlags = 0
       return
     }
 
-    // FIXME: handle empty/null span
-    let basePtr = codeUnits._start()
     let count = codeUnits._count
-    let isASCII = try basePtr._validateUTF8(limitedBy: count)
+    let isASCII = unsafe try basePtr._validateUTF8(limitedBy: count)
 
-    self._unsafeBaseAddress = .init(basePtr)
+    unsafe self._unsafeBaseAddress = .init(basePtr)
     self._countAndFlags = UInt64(truncatingIfNeeded: count)
     if isASCII {
       _setIsASCII()
@@ -93,13 +102,13 @@ extension UTF8Span {
     isKnownASCII: Bool,
     isKnownNFC: Bool
   ) {
-    guard let ptr = codeUnits._pointer else {
-      self._unsafeBaseAddress = nil
+    guard let ptr = unsafe codeUnits._pointer else {
+      unsafe self._unsafeBaseAddress = nil
       self._countAndFlags = 0
       return
     }
 
-    self._unsafeBaseAddress = codeUnits._start()
+    unsafe self._unsafeBaseAddress = ptr
     self._countAndFlags = UInt64(truncatingIfNeeded: codeUnits.count)
     if isKnownASCII {
       _setIsASCII()
@@ -109,6 +118,9 @@ extension UTF8Span {
     }
     _internalInvariant(self.count == codeUnits.count)
   }
+
+  // HACK: working around lack of internal plumbing work
+  internal var _str: String { unsafe _start()._str(0..<count) }
 }
 
 
@@ -135,7 +147,7 @@ extension UTF8Span {
   >(
     _ body: (_ buffer: /*borrowing*/ UnsafeBufferPointer<UInt8>) throws(E) -> Result
   ) throws(E) -> Result {
-    try body(_start()._ubp(0..<count))
+    try unsafe body(_start()._ubp(0..<count))
   }
 
   // TODO: withSpan or similar?
@@ -164,29 +176,43 @@ extension UTF8Span {
   public var span: Span<UInt8> {
     @lifetime(copy self)
     get {
-      Span(_unchecked: _unsafeBaseAddress, count: self.count)
+      unsafe Span(_unchecked: _unsafeBaseAddress, count: self.count)
     }
   }
 
 
 }
 
-func UNSUPPORTED(_ message: String) -> Never {
-  fatalError("UNSUPPORTED: \(message)")
-}
-
 // TODO(toolchain): decide if we rebase on top of Guillaume's work
 @available(SwiftStdlib 6.1, *)
 extension String {
   public var utf8Span: UTF8Span {
-    UNSUPPORTED("utf8Span property pending compiler fixes")
+    @lifetime(borrow self)
+    borrowing get {
+      let isKnownASCII = _guts.isASCII
+      let utf8 = self.utf8
+      let span = utf8.span
+      let result = unsafe UTF8Span(
+        unsafeAssumingValidUTF8: span,
+        isKnownASCII: isKnownASCII)
+      return unsafe _overrideLifetime(result, borrowing: self)
+    }
   }
 }
 
 @available(SwiftStdlib 6.1, *)
 extension Substring {
   public var utf8Span: UTF8Span {
-    UNSUPPORTED("utf8Span property pending compiler fixes")
+    @lifetime(borrow self)
+    borrowing get {
+      let isKnownASCII = base._guts.isASCII
+      let utf8 = self.utf8
+      let span = utf8.span
+      let result = unsafe UTF8Span(
+        unsafeAssumingValidUTF8: span,
+        isKnownASCII: isKnownASCII)
+      return unsafe _overrideLifetime(result, borrowing: self)
+    }
   }
 }
 

@@ -126,7 +126,7 @@ extension _StringGutsSlice {
 
   internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
     unsafe withFastUTF8 { utf8 in
-      isNFCQC = _nfcQuickCheck(utf8, prevCCC: &prevCCC)
+      isNFCQC = unsafe _nfcQuickCheck(utf8, prevCCC: &prevCCC)
     }
   }
 }

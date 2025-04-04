@@ -24,8 +24,8 @@ extension UTF8Span {
   public mutating func checkForASCII() -> Bool {
     if isKnownASCII { return true }
 
-    let result = _withUnsafeBufferPointer {
-      _allASCII($0)
+    let result = unsafe _withUnsafeBufferPointer {
+      unsafe _allASCII($0)
     }
     if result {
       _setIsASCII()
@@ -72,9 +72,9 @@ extension UTF8Span {
     if isKnownNFC { return true }
 
     if quickCheck {
-      let result = _withUnsafeBufferPointer { utf8 in
+      let result = unsafe _withUnsafeBufferPointer { utf8 in
         var prevCCC: UInt8 = 0
-        return _nfcQuickCheck(utf8, prevCCC: &prevCCC)
+        return unsafe _nfcQuickCheck(utf8, prevCCC: &prevCCC)
       }
       if result {
         self._countAndFlags |= Self._nfcBit
@@ -84,7 +84,7 @@ extension UTF8Span {
 
     // TODO: use faster internal algorithm
     let normalized = _str._nfcCodeUnits
-    guard _start()._urbp(
+    guard unsafe _start()._urbp(
       0..<count
     ).elementsEqual(normalized) else {
       return false

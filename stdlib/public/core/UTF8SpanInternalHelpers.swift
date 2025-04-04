@@ -12,23 +12,23 @@ extension UnsafeRawPointer {
   // @_alwaysEmitIntoClient
   internal func _loadByte(_ i: Int) -> UInt8 {
     _internalInvariant(i >= 0)
-    return (self+i).loadUnaligned(as: UInt8.self)
+    return unsafe (self+i).loadUnaligned(as: UInt8.self)
   }
 
   // @_alwaysEmitIntoClient
   internal func _isUTF8Continuation(_ i: Int) -> Bool {
-    UTF8.isContinuation(_loadByte(i))
+    unsafe UTF8.isContinuation(_loadByte(i))
   }
 
   // @_alwaysEmitIntoClient
   internal func _isScalarAligned(_ i: Int) -> Bool {
     _internalInvariant(i >= 0)
-    return !_isUTF8Continuation(i)
+    return unsafe !_isUTF8Continuation(i)
   }
 
   // @_alwaysEmitIntoClient
   internal func _scalarLength(startingAt i: Int) -> Int {
-    _utf8ScalarLength(_loadByte(i))
+    unsafe _utf8ScalarLength(_loadByte(i))
   }
 
   // NOTE: Adaptation of `_decodeScalar` to work on URP
@@ -36,18 +36,18 @@ extension UnsafeRawPointer {
   internal func _decodeScalar(
     startingAt i: Int
   ) -> (Unicode.Scalar, nextScalarStart: Int) {
-    let cu0 = _loadByte(i)
+    let cu0 = unsafe _loadByte(i)
     let len = _utf8ScalarLength(cu0)
     let next = len &+ i
     switch  len {
     case 1: return (_decodeUTF8(cu0), next)
-    case 2: return (_decodeUTF8(cu0, _loadByte(i &+ 1)), next)
-    case 3: return (
+    case 2: return unsafe (_decodeUTF8(cu0, _loadByte(i &+ 1)), next)
+    case 3: return unsafe (
       _decodeUTF8(cu0, _loadByte(i &+ 1), _loadByte(i &+ 2)), next
     )
     case 4:
       return (
-        _decodeUTF8(
+        unsafe _decodeUTF8(
           cu0, _loadByte(i &+ 1), _loadByte(i &+ 2), _loadByte(i &+ 3)
         ),
         next
@@ -61,26 +61,26 @@ extension UnsafeRawPointer {
     endingAt i: Int
   ) -> (Unicode.Scalar, previousScalarStart: Int) {
     // TODO: no need to double load the bytes...
-    let start = _previousScalarStart(i)
-    return (_decodeScalar(startingAt: start).0, start)
+    let start = unsafe _previousScalarStart(i)
+    return unsafe (_decodeScalar(startingAt: start).0, start)
   }
 
   // @_alwaysEmitIntoClient
   internal func _previousScalarStart(_ i: Int) -> Int {
     var prev = i &- 1
     _internalInvariant(prev >= 0)
-    while _isUTF8Continuation(prev) {
+    while unsafe _isUTF8Continuation(prev) {
       prev &-= 1
       _internalInvariant(prev >= 0)
     }
-    _internalInvariant(i == prev + _utf8ScalarLength(_loadByte(prev)))
+    _internalInvariant(unsafe i == prev + _utf8ScalarLength(_loadByte(prev)))
     return prev
   }
 
   // @_alwaysEmitIntoClient
   internal func _scalarAlign(_ i: Int) -> Int {
     var i = i
-    while _slowPath(!_isScalarAligned(i)) {
+    while _slowPath(unsafe !_isScalarAligned(i)) {
       i &-= 1
     }
     return i
@@ -92,18 +92,18 @@ extension UnsafeRawPointer {
 
   // TODO: hook up to real grapheme breaking
   internal func _urbp(_ range: Range<Int>) -> UnsafeRawBufferPointer {
-    .init(start: self + range.lowerBound, count: range.count)
+    unsafe .init(start: self + range.lowerBound, count: range.count)
   }
 
   @_alwaysEmitIntoClient
   internal func _ubp(_ range: Range<Int>) -> UnsafeBufferPointer<UInt8> {
-    UnsafeBufferPointer<UInt8>(
+    unsafe UnsafeBufferPointer<UInt8>(
       start: UnsafePointer((self+range.lowerBound)._rawValue),
       count: range.count)
   }
 
   internal func _str(_ range: Range<Int>) -> String {
-    String(decoding: _urbp(range) , as: UTF8.self)
+    unsafe String(decoding: _urbp(range) , as: UTF8.self)
   }
 
   // // @usableFromInline
@@ -129,11 +129,11 @@ extension UnsafeRawPointer {
     _ i: Int, limitedBy end: Int
   ) -> Int {
     _internalInvariant((0..<end).contains(i))
-    _internalInvariant(_isScalarAligned(i))
+    _internalInvariant(unsafe _isScalarAligned(i))
 
     return _nextGraphemeClusterBoundary(startingAt: i) { idx in
       guard idx < end else { return nil }
-      let (scalar, end) = _decodeScalar(startingAt: idx)
+      let (scalar, end) = unsafe _decodeScalar(startingAt: idx)
       return (scalar, end)
     }
   }
@@ -143,11 +143,11 @@ extension UnsafeRawPointer {
     _ i: Int,
     limitedBy end: Int
   ) -> Int {
-    _internalInvariant(_isScalarAligned(i))
+    _internalInvariant(unsafe _isScalarAligned(i))
 
     return _previousGraphemeClusterBoundary(endingAt: i) { idx in
       guard idx > 0 else { return nil }
-      let (scalar, prior) = _decodeScalar(endingAt: idx)
+      let (scalar, prior) = unsafe _decodeScalar(endingAt: idx)
       return (scalar, prior)
     }
   }
@@ -156,8 +156,8 @@ extension UnsafeRawPointer {
   internal func _decodeCharacter(
     startingAt i: Int, limitedBy end: Int
   ) -> (Character, nextCharacterStart: Int) {
-    let nextStart = _nextCharacterStart(i, limitedBy: end)
-    return (Character(_str(i..<nextStart)), nextStart)
+    let nextStart = unsafe _nextCharacterStart(i, limitedBy: end)
+    return unsafe (Character(_str(i..<nextStart)), nextStart)
   }
 
   // @usableFromInline
@@ -165,10 +165,10 @@ extension UnsafeRawPointer {
     endingAt i: Int,
     limitedBy end: Int
   ) -> (Character, nextCharacterStart: Int) {
-    let start = _previousCharacterStart(i, limitedBy: end)
+    let start = unsafe _previousCharacterStart(i, limitedBy: end)
     _internalInvariant(start >= 0)
 
-    return (Character(_str(start..<i)), start)
+    return unsafe (Character(_str(start..<i)), start)
   }
 
 }
@@ -185,7 +185,7 @@ extension UnsafeRawPointer {
   internal func _validateUTF8(
     limitedBy end: Int
   ) throws(UTF8.ValidationError) -> Bool {
-    switch validateUTF8(_ubp(0..<end)) {
+    switch unsafe validateUTF8(_ubp(0..<end)) {
     case .success(let info):
       return info.isASCII
     case .error(let kind, let range):

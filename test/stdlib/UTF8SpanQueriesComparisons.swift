@@ -5,6 +5,17 @@
 import Swift
 import StdlibUnittest
 
+@available(SwiftStdlib 6.1, *)
+extension UTF8Span {
+  static func ~=(_ lhs: StaticString, _ rhs: UTF8Span) -> Bool {
+    return lhs.withUTF8Buffer { str in
+      rhs._withUnsafeBufferPointer { span in
+        str.elementsEqual(span)
+      }
+    }
+  }
+}
+
 var suite = TestSuite("UTF8SpanQueriesComparisons")
 defer { runAllTests() }
 
@@ -157,11 +168,11 @@ if #available(SwiftStdlib 6.1, *) {
         expectTrue(utf8Decomposed.unicodeScalarsEqual(to: decomposedStr.unicodeScalars))
         expectFalse(utf8Decomposed.unicodeScalarsEqual(to: precomposedStr.unicodeScalars))
 
-        expectTrue(utf8Precomposed.charactersEqual(to: precomposedStr.characters))
-        expectTrue(utf8Precomposed.charactersEqual(to: decomposedStr.characters))
+        expectTrue(utf8Precomposed.charactersEqual(to: precomposedStr))
+        expectTrue(utf8Precomposed.charactersEqual(to: decomposedStr))
 
-        expectTrue(utf8Decomposed.charactersEqual(to: decomposedStr.characters))
-        expectTrue(utf8Decomposed.charactersEqual(to: precomposedStr.characters))
+        expectTrue(utf8Decomposed.charactersEqual(to: decomposedStr))
+        expectTrue(utf8Decomposed.charactersEqual(to: precomposedStr))
 
         // Equivalence means no-one is less than the other
         expectFalse(utf8Decomposed.isCanonicallyLessThan(utf8Precomposed))
