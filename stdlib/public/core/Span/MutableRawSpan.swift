@@ -109,7 +109,8 @@ extension MutableRawSpan {
     let (start, count) = unsafe (elements._pointer, elements._count)
     let span = unsafe MutableRawSpan(
       _unchecked: start,
-      byteCount: count &* MemoryLayout<Element>.stride
+      byteCount: count == 1 ? MemoryLayout<Element>.size
+                 : count &* MemoryLayout<Element>.stride
     )
     self = unsafe _overrideLifetime(span, mutating: &elements)
   }
