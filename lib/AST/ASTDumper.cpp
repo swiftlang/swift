@@ -6532,6 +6532,7 @@ namespace {
       printCommon("integer_type", label);
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
+      printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
       printFoot();
     }
 

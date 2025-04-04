@@ -7884,10 +7884,27 @@ class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef Value;
+  // Integers may not be canonical, but don't have any structural type
+  // components from which to get the ASTContext, so we need to store a
+  // reference to it ourselves.
+  const ASTContext &Context;
+
+  static const ASTContext *
+  getCanonicalIntegerLiteralContext(StringRef value, const ASTContext &ctx) {
+    for (char c : value) {
+      // A canonical integer literal consists only of ASCII decimal digits.
+      if (c < '0' || c > '9') {
+        return nullptr;
+      }
+    }
+    return &ctx;
+  }
 
   IntegerType(StringRef value, bool isNegative, const ASTContext &ctx) :
-      TypeBase(TypeKind::Integer, &ctx, RecursiveTypeProperties()),
-      Value(value) {
+      TypeBase(TypeKind::Integer, getCanonicalIntegerLiteralContext(value, ctx),
+               RecursiveTypeProperties()),
+      Value(value),
+      Context(ctx) {
     Bits.IntegerType.IsNegative = isNegative;
   }
 
@@ -7917,6 +7934,8 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Integer;
   }
+  
+  const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 
