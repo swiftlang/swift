@@ -6916,9 +6916,8 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
     IDC->setMaybeHasDerivativeDeclarations();
 
     if (Flags.contains(PD_StubOnly)) {
-      diagnose(LBLoc, diag::stub_decl_cannot_have_body,
-               IDC->getDecl()->getDescriptiveKind())
-        .fixItRemove({LBLoc, RBLoc});
+      diagnose(LBLoc, diag::stub_decl_cannot_have_body, IDC->getDecl())
+          .fixItRemove({LBLoc, RBLoc});
 
       // Cache the empty result to prevent delayed parsing.
       Context.evaluator.cacheOutput(ParseMembersRequest{IDC},
@@ -8299,9 +8298,8 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
 
   // Reject accessors when we're parsing stubs only.
   if (Flags.contains(PD_StubOnly) && !accessors.Accessors.empty()) {
-    diagnose(Tok, diag::stub_decl_cannot_have_body,
-             PrimaryVar->getDescriptiveKind())
-      .fixItRemove({ accessors.LBLoc, accessors.RBLoc });
+    diagnose(Tok, diag::stub_decl_cannot_have_body, PrimaryVar)
+        .fixItRemove({accessors.LBLoc, accessors.RBLoc});
     Invalid = true;
   }
 
@@ -9027,9 +9025,8 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD,
   setIDEInspectionDelayedDeclStateIfNeeded();
 
   if (Flags.contains(PD_StubOnly)) {
-    diagnose(BodyRange.Start, diag::stub_decl_cannot_have_body,
-             AFD->getDescriptiveKind())
-      .fixItRemove(BodyRange);
+    diagnose(BodyRange.Start, diag::stub_decl_cannot_have_body, AFD)
+        .fixItRemove(BodyRange);
     AFD->setBody(nullptr, AbstractFunctionDecl::BodyKind::None);
   }
 }
