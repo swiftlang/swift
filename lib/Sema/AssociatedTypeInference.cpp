@@ -2496,7 +2496,11 @@ AssociatedTypeInference::computeFailureTypeWitness(
     if (!isAsyncIteratorProtocolNext(witness.first))
       continue;
 
-    if (!witness.second || witness.second->getDeclContext() != dc)
+    // Different extensions of the same nominal are OK, but if the witness is in
+    // a protocol extension or a superclass or something, give up.
+    if (!witness.second ||
+        witness.second->getDeclContext()->getSelfNominalTypeDecl()
+            != dc->getSelfNominalTypeDecl())
       continue;
 
     if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness.second)) {
