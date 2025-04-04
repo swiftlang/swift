@@ -5,6 +5,13 @@
 // A wrapper around C++'s static_cast(), which allows Swift to get around interop's current lack of support for inheritance.
 template <class I, class O> O cxxCast(I i) { return static_cast<O>(i); }
 
+namespace Foo {
+template <class I, class O>
+O cxxCast(I i) {
+  return static_cast<O>(i);
+}
+} // namespace Foo
+
 // A minimal foreign reference type.
 struct
 __attribute__((swift_attr("import_reference")))
