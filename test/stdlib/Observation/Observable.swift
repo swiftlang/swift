@@ -537,7 +537,7 @@ struct Validator {
       } onChange: {
         changed.state = true
       }
-      test = DeinitTriggeredObserver()
+      test = DeinitTriggeredObserver { }
       expectEqual(deinitialized.state, true)
       expectEqual(changed.state, true)
     }
