@@ -1,8 +1,8 @@
-//===--- DerivedConformanceActor.cpp - Derived Actor Conformance ----------===//
+//===--- DerivedConformanceActor.cpp ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance.h"
 #include "TypeCheckDistributed.h"
 #include "TypeChecker.h"
 #include "swift/AST/AvailabilityInference.h"
