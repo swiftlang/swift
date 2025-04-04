@@ -11,6 +11,11 @@ struct Empty {
   int getNum() const { return 42; }
 };
 
+struct HasNoUniqueAddressField {
+  MyClass simpleField;
+  [[no_unique_address]] MyClass noUniqueAddressField; // expected-warning {{Swift doesn't support fields marked with [[no_unique_address]]}}
+};
+
 struct HasZeroSizedField {
   int a;
   [[no_unique_address]] Empty b;
