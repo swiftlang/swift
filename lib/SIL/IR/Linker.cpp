@@ -342,8 +342,10 @@ void SILLinkerVisitor::visitProtocolConformance(
     // reading in most conformances until we need them for devirtualization.
     // However, we *must* pull in shared clang-importer-derived conformances
     // we potentially use, since we may not otherwise have a local definition.
-    if (mustDeserializeProtocolConformance(Mod, c))
+    if ((isEmbedded && referencedFromInitExistential) ||
+        mustDeserializeProtocolConformance(Mod, c)) {
       visitProtocolConformance(c, referencedFromInitExistential);
+    }
   };
   
   // For each entry in the witness table...
