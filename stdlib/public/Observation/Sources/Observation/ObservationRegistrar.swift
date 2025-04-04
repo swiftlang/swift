@@ -113,10 +113,12 @@ public struct ObservationRegistrar: Sendable {
     internal mutating func deinitialize() -> [@Sendable () -> Void] {
       var trackers = [@Sendable () -> Void]()
       for (keyPath, ids) in lookups {
-        if let tracker = observations[id]?.willSetTracker {
-           trackers.append({
-             tracker(keyPath)
-           })
+        for id in ids {
+          if let tracker = observations[id]?.willSetTracker {
+             trackers.append({
+               tracker(keyPath)
+             })
+          }
         }
       }
       observations.removeAll()
