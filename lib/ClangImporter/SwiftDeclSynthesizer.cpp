@@ -1929,7 +1929,7 @@ synthesizeSuccessorFuncBody(AbstractFunctionDecl *afd, void *context) {
 }
 
 FuncDecl *SwiftDeclSynthesizer::makeSuccessorFunc(FuncDecl *incrementFunc) {
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = incrementFunc->getASTContext();
   auto dc = incrementFunc->getDeclContext();
 
   auto returnTy = incrementFunc->getImplicitSelfDecl()->getInterfaceType();

@@ -306,7 +306,7 @@ public:
 
   /// Given a C++ pre-increment operator (`operator++()`). create a non-mutating
   /// function `successor() -> Self`.
-  FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
+  static FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::OverloadedOperatorKind opKind);

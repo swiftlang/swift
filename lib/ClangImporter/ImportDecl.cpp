@@ -3697,7 +3697,8 @@ namespace {
         if (func->getParameters()->size() == 0 && !isa<ClassDecl>(typeDecl)) {
           // This is a pre-increment operator. We synthesize a
           // non-mutating function called `successor() -> Self`.
-          FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(func);
+          FuncDecl *successorFunc =
+              SwiftDeclSynthesizer::makeSuccessorFunc(func);
 
           // Import the clang decl attributes to synthesized successor function.
           Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(func, successorFunc);
