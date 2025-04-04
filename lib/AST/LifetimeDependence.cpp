@@ -609,19 +609,20 @@ protected:
                                 ? ownership
                                 : getLoweredOwnership(afd);
 
-    if (parsedLifetimeKind == ParsedLifetimeDependenceKind::Default) {
+    switch (parsedLifetimeKind) {
+    case ParsedLifetimeDependenceKind::Default: {
       if (type->isEscapable()) {
         if (loweredOwnership == ValueOwnership::Shared ||
             loweredOwnership == ValueOwnership::InOut) {
           return LifetimeDependenceKind::Scope;
-        } else {
-          diagnose(
-              loc,
-              diag::lifetime_dependence_cannot_use_default_escapable_consuming,
-              getOwnershipSpelling(loweredOwnership));
-          return std::nullopt;
         }
-      } else if (useLazyInference()) {
+        diagnose(
+            loc,
+            diag::lifetime_dependence_cannot_use_default_escapable_consuming,
+            getOwnershipSpelling(loweredOwnership));
+        return std::nullopt;
+      }
+      if (useLazyInference()) {
         return LifetimeDependenceKind::Inherit;
       }
       diagnose(loc, diag::lifetime_dependence_cannot_infer_kind,
@@ -629,6 +630,8 @@ protected:
       return std::nullopt;
     }
 
+    case ParsedLifetimeDependenceKind::Borrow: LLVM_FALLTHROUGH;
+    case ParsedLifetimeDependenceKind::Inout: {
     // @lifetime(borrow x) is valid only for borrowing parameters.
     // @lifetime(inout x) is valid only for inout parameters.
     if (!isCompatibleWithOwnership(parsedLifetimeKind, type,
@@ -639,16 +642,17 @@ protected:
                getOwnershipSpelling(loweredOwnership));
       return std::nullopt;
     }
+    return LifetimeDependenceKind::Scope;
+  }
+  case ParsedLifetimeDependenceKind::Inherit:
     // @lifetime(copy x) is only invalid for Escapable types.
-    if (parsedLifetimeKind == ParsedLifetimeDependenceKind::Inherit &&
-        type->isEscapable()) {
+    if (type->isEscapable()) {
       diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
                descriptor.getString());
       return std::nullopt;
     }
-    return parsedLifetimeKind == ParsedLifetimeDependenceKind::Inherit
-               ? LifetimeDependenceKind::Inherit
-               : LifetimeDependenceKind::Scope;
+    return LifetimeDependenceKind::Inherit;
+  }
   }
 
   // Finds the ParamDecl* and its index from a LifetimeDescriptor
