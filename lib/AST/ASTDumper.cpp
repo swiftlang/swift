@@ -2389,6 +2389,8 @@ namespace {
               VD->getAttrs().getAttribute<NonisolatedAttr>()) {
         if (nonisolatedAttr->isUnsafe()) {
           printFlag(true, "nonisolated(unsafe)", DeclModifierColor);
+        } else if (nonisolatedAttr->isNonSending()) {
+          printFlag(true, "nonisolated(nonsending)", DeclModifierColor);
         } else {
           printFlag(true, "nonisolated", DeclModifierColor);
         }
@@ -5182,6 +5184,7 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *Attr, Label label) {
     printCommon(Attr, "nonisolated_attr", label);
     printFlag(Attr->isUnsafe(), "unsafe");
+    printFlag(Attr->isNonSending(), "nonsending");
     printFoot();
   }
   void visitObjCAttr(ObjCAttr *Attr, Label label) {

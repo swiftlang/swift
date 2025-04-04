@@ -1415,27 +1415,25 @@ extension ASTGenVisitor {
 
   // FIXME: This is a decl modifier
   func generateNonisolatedAttr(attribute node: AttributeSyntax) -> BridgedNonisolatedAttr? {
-    let isUnsafe = self.generateSingleAttrOption(
+    let modifier: BridgedNonIsolatedModifier? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {
-        case "unsafe":
-          return true
-        default:
-          // FIXME: Diagnose.
-          return nil
+        case "unsafe": return .unsafe
+        case "nonsending": return .nonSending
+        default: return nil
         }
       },
-      valueIfOmitted: false
+      valueIfOmitted: BridgedNonIsolatedModifier.none
     )
-    guard let isUnsafe else {
+    guard let modifier else {
       return nil
     }
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      isUnsafe: isUnsafe
+      modifier: modifier
     )
   }
 
@@ -2409,12 +2407,14 @@ extension ASTGenVisitor {
   }
 
   func generateNonisolatedAttr(declModifier node: DeclModifierSyntax) -> BridgedNonisolatedAttr? {
-    let isUnsafe: Bool
+    let modifier: BridgedNonIsolatedModifier
     switch node.detail?.detail.rawText {
     case "unsafe":
-      isUnsafe = true
+      modifier = .unsafe
+    case "nonsending":
+      modifier = .nonSending
     case nil:
-      isUnsafe = false
+      modifier = .none
     case let text?:
       // TODO: Diagnose
       _ = text
@@ -2425,7 +2425,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: nil,
       range: self.generateSourceRange(node),
-      isUnsafe: isUnsafe
+      modifier: modifier
     )
   }
 
