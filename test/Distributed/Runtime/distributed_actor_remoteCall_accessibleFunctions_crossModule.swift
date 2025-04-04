@@ -9,6 +9,7 @@
 // RUN:     -module-name FakeDistributedActorSystems                           \
 // RUN:      %S/../Inputs/FakeDistributedActorSystems.swift                    \
 // RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
 // RUN:     -o %t/%target-library-name(FakeDistributedActorSystems)
 
 /// Build the Lib
@@ -23,6 +24,7 @@
 // RUN:     %t/src/ResilientAPILib.swift                                       \
 // RUN:     -lFakeDistributedActorSystems                                      \
 // RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
 // RUN:     -o %t/%target-library-name(ResilientAPILib)
 
 /// Build the ActorLib
@@ -37,6 +39,7 @@
 // RUN:     -lFakeDistributedActorSystems                                      \
 // RUN:     -lResilientAPILib                                                  \
 // RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
 // RUN:     -o %t/%target-library-name(ResilientImplLib)
 
 /// Build the client
@@ -51,6 +54,7 @@
 // RUN:     -L %t                                                              \
 // RUN:     %s                                                                 \
 // RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
 // RUN:     -o %t/a.out
 
 // Sign the main binary and all libraries
