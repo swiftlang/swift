@@ -3354,9 +3354,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   // Determine the isolation of the requirement itself.
   auto requirementIsolation = getActorIsolation(requirement);
   if (requirementIsolation.requiresSubstitution()) {
-    auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
     auto subs = SubstitutionMap::getProtocolSubstitutions(
-        Proto, substitutingType, ProtocolConformanceRef(Conformance));
+        ProtocolConformanceRef(Conformance));
     requirementIsolation = requirementIsolation.subst(subs);
   }
 
@@ -3852,8 +3851,7 @@ filterProtocolRequirements(
   const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
     auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
     auto Conformance = lookupConformance(Adoptee, PD);
-    return SubstitutionMap::getProtocolSubstitutions(
-        PD, Adoptee, Conformance);
+    return SubstitutionMap::getProtocolSubstitutions(Conformance);
   };
 
   llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
@@ -5237,8 +5235,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
     typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
     conformanceInContext =
-      conformanceInContext.subst(conformance->getType(),
-                                 genericEnv->getForwardingSubstitutionMap());
+      conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, typeInContext, conformanceInContext);

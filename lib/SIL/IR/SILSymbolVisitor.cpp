@@ -852,8 +852,8 @@ public:
           }
         }
 
-        void addAssociatedType(AssociatedType associatedType) {
-          Visitor.addAssociatedTypeDescriptor(associatedType.getAssociation());
+        void addAssociatedType(AssociatedTypeDecl *assocType) {
+          Visitor.addAssociatedTypeDescriptor(assocType);
         }
 
         void addProtocolConformanceDescriptor() {

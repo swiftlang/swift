@@ -103,10 +103,10 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   auto parent = cast<ArchetypeType>(
     archetype->getGenericEnvironment()->mapTypeIntoContext(
       member->getBase())->getCanonicalType());
-  AssociatedType association(member->getAssocType());
+  auto *assocType = member->getAssocType();
 
   MetadataResponse response =
-    emitAssociatedTypeMetadataRef(IGF, parent, association, request);
+    emitAssociatedTypeMetadataRef(IGF, parent, assocType, request);
 
   setTypeMetadataName(IGF.IGM, response.getMetadata(), archetype);
 
@@ -321,11 +321,11 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 MetadataResponse
 irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      CanArchetypeType origin,
-                                     AssociatedType association,
+                                     AssociatedTypeDecl *assocType,
                                      DynamicMetadataRequest request) {
   // Find the conformance of the origin to the associated type's protocol.
   llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
-                                               association.getSourceProtocol());
+                                               assocType->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata =
@@ -333,7 +333,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
       .getMetadata();
 
   return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable,
-                                       association, request);
+                                       assocType, request);
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {

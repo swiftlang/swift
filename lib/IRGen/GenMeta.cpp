@@ -953,8 +953,7 @@ namespace {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
         if (auto &schema = IGM.getOptions().PointerAuth
                               .ProtocolAssociatedTypeAccessFunctions) {
-          addDiscriminator(flags, schema,
-                           AssociatedType(entry.getAssociatedType()));
+          addDiscriminator(flags, schema, entry.getAssociatedType());
         }
 
         // Look for a default witness.
@@ -2877,9 +2876,10 @@ namespace {
             substitutions.lookupConformance(underlyingDependentType, P);
 
         if (underlyingType->hasTypeParameter()) {
-          std::tie(underlyingType, underlyingConformance)
-              = GenericEnvironment::mapConformanceRefIntoContext(
-                    genericEnv, underlyingType, underlyingConformance);
+          underlyingType = genericEnv->mapTypeIntoContext(
+              underlyingType);
+          underlyingConformance = underlyingConformance.subst(
+            genericEnv->getForwardingSubstitutionMap());
         }
 
         return emitWitnessTableRef(IGF, underlyingType->getCanonicalType(),

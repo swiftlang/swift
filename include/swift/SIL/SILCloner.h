@@ -564,7 +564,7 @@ protected:
       if (Functor.hasLocalArchetypes())
         options |= SubstFlags::SubstituteLocalArchetypes;
 
-      C = C.subst(Ty, Functor, Functor, options);
+      C = C.subst(Functor, Functor, options);
       if (asImpl().shouldSubstOpaqueArchetypes())
         Ty = Ty.subst(Functor, Functor, options);
     }
@@ -576,7 +576,7 @@ protected:
           !context.shouldLookThroughOpaqueTypeArchetypes())
         return C;
 
-      return substOpaqueTypesWithUnderlyingTypes(C, Ty, context);
+      return substOpaqueTypesWithUnderlyingTypes(C, context);
     }
 
     return C;

@@ -95,7 +95,6 @@ SubstitutionMap SILGenModule::mapSubstitutionsForWitnessOverride(
   Type origProtoSelfType = origProto->getSelfInterfaceType();
   auto baseProto = cast<ProtocolDecl>(overridden->getDeclContext());
   return SubstitutionMap::getProtocolSubstitutions(
-      baseProto, origProtoSelfType.subst(subs),
       subs.lookupConformance(origProtoSelfType->getCanonicalType(), baseProto));
 }
 

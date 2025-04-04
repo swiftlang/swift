@@ -61,7 +61,7 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
     if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
       auto conformance = checkConformance(baseType, globalActor);
       if (conformance &&
-          conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
+          conformance.getWitnessByName(ctx.Id_shared) == declRef) {
         return ActorIsolation::forGlobalActor(baseType);
       }
     }
