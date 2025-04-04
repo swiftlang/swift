@@ -270,18 +270,6 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
-  for (auto attr : decl->getAttrs().getAttributes<LifetimeAttr>()) {
-    for (auto source : attr->getLifetimeEntry()->getSources()) {
-      if (source.getParsedLifetimeDependenceKind() ==
-          ParsedLifetimeDependenceKind::Inout) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)

@@ -62,7 +62,7 @@ public struct Wrapper : ~Escapable {
     _read {
       yield _view
     }
-    @lifetime(&self)
+    @lifetime(borrow self)
     _modify {
       yield &_view
     }
