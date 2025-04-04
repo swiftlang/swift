@@ -5,7 +5,6 @@
 // RUN:   %s %S/Inputs/availability_custom_domains_other.swift
 
 // REQUIRES: swift_feature_CustomAvailability
-// UNSUPPORTED: OS=windows-msvc
 
 // https://github.com/swiftlang/swift/issues/80058
 // UNSUPPORTED: OS=linux-android
