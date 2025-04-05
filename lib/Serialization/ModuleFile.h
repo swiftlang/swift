@@ -262,6 +262,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Abstract conformances referenced by this module.
+  MutableArrayRef<Serialized<AbstractConformance *>> AbstractConformances;
+
   /// Pack conformances referenced by this module.
   MutableArrayRef<Serialized<PackConformance *>> PackConformances;
 
@@ -710,11 +713,6 @@ public:
 
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
-
-  /// \c true if this module was built with `ExtensibleEnums` feature enabled.
-  bool supportsExtensibleEnums() const {
-    return Core->supportsExtensibleEnums();
-  }
 
   /// Associates this module file with the AST node representing it.
   ///

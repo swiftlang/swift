@@ -617,9 +617,6 @@ ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
 ///          returns a pointer to the declaration.
 const AbstractFunctionDecl *isActorInitOrDeInitContext(const DeclContext *dc);
 
-/// Determine whether this declaration is always accessed asynchronously.
-bool isAsyncDecl(ConcreteDeclRef declRef);
-
 /// Determine whether this declaration can throw errors.
 bool isThrowsDecl(ConcreteDeclRef declRef);
 
@@ -698,10 +695,6 @@ void introduceUnsafeInheritExecutorReplacements(
 /// we route them to the @_unsafeInheritExecutor versions implicitly.
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
-
-/// Determine the isolation of the given conformance. This only applies to
-/// the immediate conformance, not any conformances on which it depends.
-ActorIsolation getConformanceIsolation(ProtocolConformance *conformance);
 
 /// Check for correct use of isolated conformances in the given reference.
 ///

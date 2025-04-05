@@ -18,7 +18,6 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/AsyncLet.h"
-#include "swift/ABI/Coro.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 
@@ -128,26 +127,28 @@ void swift_task_dealloc(void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void swift_task_dealloc_through(void *ptr);
 
-// TODO: CoroutineAccessors: Eliminate this entry point and replace its uses
-//                           with direct references the globals.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
+/// Deallocate memory in a task.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_dealloc(void *ptr);
 
-// TODO: CoroutineAccessors: Mark the underlying struct const.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-CoroAllocator *const _swift_coro_task_allocator;
+/// Allocate memory in a job.
+///
+/// All allocations will be rounded to a multiple of MAX_ALIGNMENT;
+/// if the job does not support allocation, this will return NULL.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_job_allocate(Job *job, size_t size);
 
-// TODO: CoroutineAccessors: Move these declarations back to swiftCore {{
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void *swift_coro_alloc(CoroAllocator *allocator, size_t size);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void swift_coro_dealloc(CoroAllocator *allocator, void *ptr);
-
-// TODO: CoroutineAccessors: Mark the underlying struct const.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-CoroAllocator *const _swift_coro_malloc_allocator;
-// }} TODO: CoroutineAccessors
+/// Deallocate memory in a job.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_deallocate(Job *job, void *ptr);
 
 /// Cancel a task and all of its child tasks.
 ///
@@ -1023,6 +1024,7 @@ bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 /// this could be a pointer to a different enum instance if we need it to be.
 enum swift_task_is_current_executor_flag : uint64_t {
   /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode.
   None = 0x0,
 
   /// This is not used today, but is just future ABI reservation.
@@ -1047,9 +1049,15 @@ enum swift_task_is_current_executor_flag : uint64_t {
   /// The routine should assert on failure.
   Assert = 0x8,
 
+  /// The routine MUST NOT assert on failure.
+  /// Even at the cost of not calling 'checkIsolated' if it is available.
+  MustNotAssert = 0x10,
+
   /// The routine should use 'isIsolatingCurrentContext' function on the
   /// 'expected' executor instead of `checkIsolated`.
-  HasIsIsolatingCurrentContext = 0x10,
+  ///
+  /// This is a variant of `MustNotAssert`
+  UseIsIsolatingCurrentContext = 0x20,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)

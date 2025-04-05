@@ -50,19 +50,19 @@ public enum Y<T: ~Escapable>: ~Escapable {
 extension Y: Escapable where T: Escapable { }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: @lifetime(y)
+// CHECK: @lifetime(copy y)
 // CHECK: public func derive<T>(_ y: Test.Y<T>) -> Test.Y<T> where T : ~Escapable
 // CHECK: #endif
-@lifetime(y)
+@lifetime(copy y)
 public func derive<T : ~Escapable>(_ y: Y<T>) -> Y<T> {
   y
 }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: @lifetime(x)
+// CHECK: @lifetime(copy x)
 // CHECK: public func derive<T>(_ x: Test.X<T>) -> Test.X<T> where T : ~Escapable
 // CHECK: #endif
-@lifetime(x)
+@lifetime(copy x)
 public func derive<T : ~Escapable>(_ x: X<T>) -> X<T> {
   x
 }

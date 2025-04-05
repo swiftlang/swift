@@ -279,6 +279,14 @@ public:
   struct Implementation;
   Implementation &getImpl() const;
 
+  struct GlobalCache;
+
+  /// Retrieve a reference to the global cache within this ASTContext,
+  /// which is a place where we can stash side tables without having to
+  /// recompile the world every time we add a side table. See
+  /// "swift/AST/ASTContextGlobalCache.h"
+  GlobalCache &getGlobalCache() const;
+
   friend ConstraintCheckerArenaRAII;
 
   void operator delete(void *Data) throw();
@@ -674,6 +682,11 @@ public:
   /// Retrieve the type Swift.Any as an existential type.
   CanType getAnyExistentialType() const;
 
+  /// Retrieve the existential type 'any ~Copyable & ~Escapable'.
+  ///
+  /// This is the most permissive existential type.
+  CanType getUnconstrainedAnyExistentialType() const;
+
   /// Retrieve the type Swift.AnyObject as a constraint.
   CanType getAnyObjectConstraint() const;
 
@@ -1035,6 +1048,9 @@ public:
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
+  const CanType TheUnconstrainedAnyType;  /// This is 'any ~Copyable & ~Escapable',
+                                          /// the empty protocol composition
+                                          /// without any implicit constraints.
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
 #include "swift/AST/TypeNodes.def"
@@ -1176,12 +1192,14 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList,
-                           llvm::VersionTuple &foundVersion) const;
+                           bool isSourceCanImport,
+                           llvm::VersionTuple &foundVersion,
+                           llvm::VersionTuple &foundUnderlyingClangVersion) const;
 
   /// Add successful canImport modules.
-  void addSucceededCanImportModule(StringRef moduleName, bool underlyingVersion,
-                                   const llvm::VersionTuple &versionInfo);
+  void addSucceededCanImportModule(StringRef moduleName,
+                                   const llvm::VersionTuple &versionInfo,
+                                   const llvm::VersionTuple &underlyingVersionInfo);
 
 public:
   namelookup::ImportCache &getImportCache() const;

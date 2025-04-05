@@ -7,6 +7,7 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
@@ -18,6 +19,7 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
@@ -32,8 +34,10 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
+// REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
@@ -90,7 +94,7 @@ struct S4 {}
 @implementation extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 @implementation(Category) extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 
-@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of low-level parameters}}
+@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of parameters}}
 func fn(_: Int) {}
 
 @_alignment(8) struct AnyAlignment {}
@@ -215,13 +219,13 @@ struct OpTest {
 
 struct E {}
 struct NE : ~Escapable {}
-@lifetime(ne) func derive(_ ne: NE) -> NE { ne }
-@lifetime(borrow ne1, ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+@lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
+@lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
   if (Int.random(in: 1..<100) < 50) { return ne1 }
   return ne2
 }
 @lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
-@lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+@lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
 
 actor MyActor {
   nonisolated let constFlag: Bool = false
@@ -250,3 +254,13 @@ struct LayoutOuter {
   }
 }
 @_rawLayout(like: LayoutOuter.Nested<Int>) struct TypeExprTest: ~Copyable {}
+
+@reasync protocol ReasyncProtocol {}
+@rethrows protocol RethrowingProtocol {
+  func source() throws
+}
+
+@_typeEraser(AnyEraser) protocol EraserProto {}
+struct AnyEraser: EraserProto {
+  init<T: EraserProto>(erasing: T) {}
+}

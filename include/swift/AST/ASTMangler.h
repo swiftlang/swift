@@ -346,16 +346,20 @@ public:
                                      AutoDiffLinearMapKind linearMapKind,
                                      const AutoDiffConfig &config);
 
-  std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature signature,
-                                             CanType baseType,
-                                             SubstitutionMap subs,
-                                             ResilienceExpansion expansion);
+  std::string mangleKeyPathGetterThunkHelper(
+      const AbstractStorageDecl *property, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
+  std::string mangleKeyPathUnappliedMethodThunkHelper(
+      const AbstractFunctionDecl *method, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
+  std::string mangleKeyPathAppliedMethodThunkHelper(
+      const AbstractFunctionDecl *method, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
                                         GenericSignature signature,
                                         ResilienceExpansion expansion);
@@ -408,10 +412,18 @@ public:
   std::string mangleMacroExpansion(const FreestandingMacroExpansion *expansion);
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
+  std::string mangleAttachedMacroExpansion(
+      ClosureExpr *attachedTo, CustomAttr *attr, MacroDecl *macro);
 
   void appendMacroExpansion(const FreestandingMacroExpansion *expansion);
   void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC,
-                                   const FreestandingMacroExpansion *expansion);
+                                   Identifier macroName,
+                                   unsigned discriminator);
+
+  void appendMacroExpansion(ClosureExpr *attachedTo,
+                            CustomAttr *attr,
+                            MacroDecl *macro);
+
   void appendMacroExpansionOperator(
       StringRef macroName, MacroRole role, unsigned discriminator);
 
@@ -441,7 +453,8 @@ protected:
                   const ValueDecl *forDecl = nullptr);
   
   void appendDeclName(
-      const ValueDecl *decl, DeclBaseName name = DeclBaseName());
+      const ValueDecl *decl, DeclBaseName name = DeclBaseName(),
+      bool skipLocalDiscriminator = false);
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         GenericSignature sig,

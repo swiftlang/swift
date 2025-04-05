@@ -116,7 +116,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
   assert(!conformance.isInvalid());
 
   const auto kp = getKnownProtocolKind(ip);
-  assert(conformance.getRequirement()->isSpecificProtocol(kp));
+  assert(conformance.getProtocol()->isSpecificProtocol(kp));
 
   auto *nominalDecl = dc->getSelfNominalTypeDecl();
   assert(isa<StructDecl>(nominalDecl) ||

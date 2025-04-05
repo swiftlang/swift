@@ -23,6 +23,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
@@ -49,11 +50,16 @@ class SILModule::SerializationCallback final
 
   void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
     updateLinkage(var);
-    
-    // For globals we currently do not support available_externally.
-    // In the interpreter it would result in two instances for a single global:
-    // one in the imported module and one in the main module.
-    var->setDeclaration(true);
+
+    if (!M->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // For globals we currently do not support available_externally.
+      // In the interpreter it would result in two instances for a single
+      // global: one in the imported module and one in the main module.
+      //
+      // We avoid that in Embedded Swift where we do actually link globals from
+      // other modules into the client module.
+      var->setDeclaration(true);
+    }
   }
 
   void didDeserialize(ModuleDecl *M, SILVTable *vtable) override {
@@ -248,7 +254,7 @@ SILDefaultWitnessTable *
 SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
                                      bool deserializeLazily) {
   // Note: we only ever look up default witness tables in the translation unit
-  // that is currently being compiled, since they SILGen generates them when it
+  // that is currently being compiled, since SILGen generates them when it
   // visits the protocol declaration, and IRGen emits them when emitting the
   // protocol descriptor metadata for the protocol.
 
@@ -283,6 +289,38 @@ void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   getSILLoader()->invalidateWitnessTable(Wt);
   WitnessTableMap.erase(Conf);
   witnessTables.erase(Wt);
+}
+
+SILDefaultOverrideTable *SILModule::createDefaultOverrideTableDefinition(
+    const ClassDecl *decl, SILLinkage linkage,
+    ArrayRef<SILDefaultOverrideTable::Entry> entries) {
+  return SILDefaultOverrideTable::define(*this, linkage, decl, entries);
+}
+
+SILDefaultOverrideTable *
+SILModule::lookUpDefaultOverrideTable(const ClassDecl *decl,
+                                      bool deserializeLazily) {
+  // Note: we only ever look up default override tables in the translation unit
+  // that is currently being compiled, since SILGen generates them when it
+  // visits the class declaration, and IRGen emits them when emitting the
+  // class descriptor metadata for the class.
+
+  auto found = DefaultOverrideTableMap.find(decl);
+  if (found == DefaultOverrideTableMap.end()) {
+    if (deserializeLazily) {
+      SILLinkage linkage = getSILLinkage(getDeclLinkage(decl), ForDefinition);
+      SILDefaultOverrideTable *otable =
+          SILDefaultOverrideTable::declare(*this, linkage, decl);
+      otable = getSILLoader()->lookupDefaultOverrideTable(otable);
+      if (otable)
+        DefaultOverrideTableMap[decl] = otable;
+      return otable;
+    }
+
+    return nullptr;
+  }
+
+  return found->second;
 }
 
 const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
@@ -766,7 +804,8 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
     }
     ++idx;
   }
-  llvm_unreachable("enum element not found in enum decl");
+  ASSERT(false && "enum element not found in enum decl, broken AST?");
+  return 0;
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {

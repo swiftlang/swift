@@ -29,6 +29,7 @@
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
 #include "swift/Threading/ThreadSanitizer.h"
 #include <atomic>
@@ -90,10 +91,15 @@ AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 
 /// Cancel all the child tasks that belong to `group`.
 ///
-/// The caller must guarantee that this is either called from the
-/// owning task of the task group or while holding the owning task's
-/// status record lock.
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
 void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called from the owning task.
+void _swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
+                                                 AsyncTask *owningTask);
 
 /// Remove the given task from the given task group.
 ///
@@ -237,6 +243,16 @@ void removeStatusRecordWhere(
     AsyncTask *task,
     llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
+/// Remove and return a status record of the given type. This function removes a
+/// singlw record, and leaves subsequent records as-is if there are any.
+/// Returns `nullptr` if there are no matching records.
+///
+/// NOTE: When using this function with new record types, make sure to provide
+/// an explicit instantiation in TaskStatus.cpp.
+template <typename TaskStatusRecordT>
+SWIFT_CC(swift)
+TaskStatusRecordT* popStatusRecordOfType(AsyncTask *task);
 
 /// Remove a status record from the current task. This must be called
 /// synchronously with the task.
@@ -593,27 +609,25 @@ public:
 #endif
   }
 
-  /// Is there a lock on the linked list of status records?
+  /// Does some thread hold the status record lock?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
-  ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
+  ActiveTaskStatus withStatusRecordLocked() const {
     assert(!isStatusRecordLocked());
-    assert(lockRecord->Parent == Record);
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags | IsStatusRecordLocked,
+                            ExecutionLock);
 #else
-    return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked);
+    return ActiveTaskStatus(Record, Flags | IsStatusRecordLocked);
 #endif
   }
-  ActiveTaskStatus withoutLockingRecord() const {
+  ActiveTaskStatus withoutStatusRecordLocked() const {
     assert(isStatusRecordLocked());
-    assert(Record->getKind() == TaskStatusRecordKind::Private_RecordLock);
 
-    // Remove the lock record, and put the next one as the head
-    auto newRecord = Record->Parent;
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveTaskStatus(newRecord, Flags & ~IsStatusRecordLocked, ExecutionLock);
+    return ActiveTaskStatus(Record, Flags & ~IsStatusRecordLocked,
+                            ExecutionLock);
 #else
-    return ActiveTaskStatus(newRecord, Flags & ~IsStatusRecordLocked);
+    return ActiveTaskStatus(Record, Flags & ~IsStatusRecordLocked);
 #endif
   }
 
@@ -773,6 +787,9 @@ struct AsyncTask::PrivateStorage {
   /// Pointer to the task status dependency record. This is allocated from the
   /// async task stack when it is needed.
   TaskDependencyStatusRecord *dependencyRecord = nullptr;
+
+  // The lock used to protect more complicated operations on the task status.
+  RecursiveMutex statusLock;
 
   // Always create an async task with max priority in ActiveTaskStatus = base
   // priority. It will be updated later if needed.
@@ -1125,7 +1142,9 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // reference to the dependencyStatusRecord or its contents, once we have
     // published it in the ActiveTaskStatus since someone else could
     // concurrently made us runnable.
-    dependencyStatusRecord->performEscalationAction(newStatus.getStoredPriority());
+    dependencyStatusRecord->performEscalationAction(
+        oldStatus.getStoredPriority(),
+        newStatus.getStoredPriority());
 
     // Always add the dependency status record
     return true;

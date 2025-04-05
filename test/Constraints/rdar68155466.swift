@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %s
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 import Foundation
 
@@ -10,7 +11,8 @@ import Foundation
 }
 
 // FIXME: the diagnostic below ideally should have been emitted (rdar://106241733)
-struct Loop< // note {{required by generic struct 'Loop' where 'ID' = '() -> Int'}}
+struct Loop< 
+// expected-note@-1 {{required by generic struct 'Loop' where 'ID' = '() -> Int'}}
   Data : RandomAccessCollection,
   ID : Hashable,
   Content
@@ -25,6 +27,6 @@ func data() -> [A] {
   return []
 }
 
-_ = Loop(data(), id: \.uniqueID) { $0 } // expected-error {{key path cannot refer to instance method 'uniqueID()'}}
-// FIXME: the diagnostics below ideally should have been emitted (rdar://106241733)
-// error@-1 {{type '() -> Int' cannot conform to 'Hashable'}} note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+_ = Loop(data(), id: \.uniqueID) { $0 } 
+// expected-error@-1 {{type '() -> Int' cannot conform to 'Hashable'}}
+// expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}

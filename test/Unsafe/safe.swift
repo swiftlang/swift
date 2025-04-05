@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-memory-safety -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
 // The feature flag should be enabled.
 #if !hasFeature(StrictMemorySafety)
@@ -91,9 +91,9 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
-  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}{{7-7=unsafe }}
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
-  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}{{7-7=unsafe }}
+  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
   for unsafe _ in unsafe uas { } // okay
 }
@@ -195,7 +195,7 @@ func unsafeFun() {
   acceptBoolsUnsafeLabel(unsafe: unsafe, unsafe)
 
   let color: Color
-  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}{{11-18=}}
   color = unsafe .red
   _ = color
 
@@ -241,3 +241,33 @@ func testMyArray(ints: MyArray<Int>) {
     unsafe print(buffer.unsafeCount)
   }
 }
+
+func testUnsafeLHS() {
+  @unsafe var value: Int = 0
+  unsafe value = switch unsafe value {
+  case 0: 1
+  default: 0
+  }
+}
+
+@safe
+struct UnsafeWrapTest {
+  var pointer: UnsafeMutablePointer<Int>?
+
+  func test() {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to property 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>'}}
+      _ = unsafe pointer
+    }
+  }
+
+  func otherTest(pointer: UnsafeMutablePointer<Int>?) {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>}}
+      _ = unsafe pointer
+    }
+  }
+}
+
+@safe @unsafe
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}

@@ -1458,6 +1458,14 @@ public:
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
 
+  /// Whether the parser is at the start of an InlineArray type body.
+  bool isStartOfInlineArrayTypeBody();
+
+  /// Parse an InlineArray type '[' integer 'x' type ']'.
+  ///
+  /// NOTE: 'isStartOfInlineArrayTypeBody' must be true.
+  ParserResult<TypeRepr> parseTypeInlineArray(SourceLoc lSquare);
+
   /// Parse a collection type.
   ///   type-simple:
   ///     '[' type ']'
@@ -1691,7 +1699,13 @@ public:
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
 
+  bool canParseTypeSimple();
+  bool canParseTypeSimpleOrComposition();
+  bool canParseTypeScalar();
   bool canParseType();
+
+  bool canParseStartOfInlineArrayType();
+  bool canParseCollectionType();
 
   /// Returns true if a simple type identifier can be parsed.
   ///

@@ -33,7 +33,7 @@ internal func _overrideLifetime<
 /// the `source` argument.
 @_unsafeNonescapableResult
 @_transparent
-@lifetime(source)
+@lifetime(copy source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -57,6 +57,8 @@ internal func _overrideLifetime<
 ) -> T {
   dependent
 }
+
+struct NotEscapable: ~Escapable {}
 
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
@@ -83,6 +85,7 @@ public struct Span<T>: ~Escapable {
 }
 
 extension Span {
+  @lifetime(copy self)
   consuming func dropFirst() -> Span<T> {
     let nextPointer = self.base.flatMap { $0 + 1 }
     let local = Span(base: nextPointer, count: self.count - 1)
@@ -91,6 +94,7 @@ extension Span {
 }
 
 extension Span {
+  @lifetime(copy self)
   mutating func droppingPrefix(length: Int) -> /* */ Span<T> {
     let oldBase = base
     let result = Span(base: oldBase, count: length)
@@ -231,6 +235,7 @@ struct Outer {
 
 func parse(_ span: Span<Int>) {}
 
+@lifetime(copy arg)
 func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
 
 @lifetime(borrow arg)
@@ -270,6 +275,14 @@ struct Container<T> {
   var owner: AnyObject
   let pointer: UnsafeMutablePointer<T>
   let count: Int
+}
+
+// Dependence on an empty initialized value should be scoped to variable decl.
+@lifetime(copy x)
+func f(x: NotEscapable) -> NotEscapable {
+  let local = NotEscapable() // expected-error {{lifetime-dependent variable 'local' escapes its scope}}
+  // expected-note @-1{{it depends on the lifetime of this parent value}}
+  return local // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
 
 // =============================================================================

@@ -15,7 +15,9 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -153,6 +155,65 @@ AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
       AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
 
+AvailabilityContext
+AvailabilityContext::forLocation(SourceLoc loc, const DeclContext *declContext,
+                                 const AvailabilityScope **refinedScope) {
+  auto &ctx = declContext->getASTContext();
+  SourceFile *sf =
+      loc.isValid()
+          ? declContext->getParentModule()->getSourceFileContainingLocation(loc)
+          : declContext->getParentSourceFile();
+
+  // If our source location is invalid (this may be synthesized code), climb the
+  // decl context hierarchy until we find a location that is valid, merging
+  // availability contexts on the way up.
+  //
+  // Because we are traversing decl contexts, we will miss availability scopes
+  // in synthesized code that are introduced by AST elements that are themselves
+  // not decl contexts, such as `#available(..)` and property declarations.
+  // Therefore a reference with an invalid source location that is contained
+  // inside an `#available()` and with no intermediate decl context will not be
+  // refined. For now, this is fine, but if we ever synthesize #available(),
+  // this could become a problem..
+
+  // We can assume we are running on at least the minimum inlining target.
+  auto baseAvailability = AvailabilityContext::forInliningTarget(ctx);
+  auto isInvalidLoc = [sf](SourceLoc loc) {
+    return sf ? loc.isInvalid() : true;
+  };
+  while (declContext && isInvalidLoc(loc)) {
+    const Decl *decl = declContext->getInnermostDeclarationDeclContext();
+    if (!decl)
+      break;
+
+    baseAvailability.constrainWithDecl(decl);
+    loc = decl->getLoc();
+    declContext = decl->getDeclContext();
+  }
+
+  if (!sf || loc.isInvalid())
+    return baseAvailability;
+
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return baseAvailability;
+
+  auto *scope = rootScope->findMostRefinedSubContext(loc, ctx);
+  if (!scope)
+    return baseAvailability;
+
+  if (refinedScope)
+    *refinedScope = scope;
+
+  auto availability = scope->getAvailabilityContext();
+  availability.constrainWithContext(baseAvailability, ctx);
+  return availability;
+}
+
+AvailabilityContext AvailabilityContext::forDeclSignature(const Decl *decl) {
+  return forLocation(decl->getLoc(), decl->getInnermostDeclContext());
+}
+
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->platformRange;
 }
@@ -162,9 +223,8 @@ AvailabilityContext::getAvailabilityRange(AvailabilityDomain domain,
                                           const ASTContext &ctx) const {
   DEBUG_ASSERT(domain.supportsContextRefinement());
 
-  if (domain.isActiveForTargetPlatform(ctx)) {
+  if (domain.isActivePlatform(ctx))
     return storage->platformRange;
-  }
 
   for (auto domainInfo : storage->getDomainInfos()) {
     if (domain == domainInfo.getDomain() && !domainInfo.isUnavailable())
@@ -227,8 +287,9 @@ void AvailabilityContext::constrainWithPlatformRange(
 void AvailabilityContext::constrainWithAvailabilityRange(
     const AvailabilityRange &range, AvailabilityDomain domain,
     const ASTContext &ctx) {
+  DEBUG_ASSERT(domain.supportsContextRefinement());
 
-  if (domain.isActiveForTargetPlatform(ctx)) {
+  if (domain.isActivePlatform(ctx)) {
     constrainWithPlatformRange(range, ctx);
     return;
   }
@@ -284,7 +345,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       break;
     case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-        if (domain.isActiveForTargetPlatform(ctx)) {
+        if (domain.isActivePlatform(ctx)) {
           isConstrained |= constrainRange(platformRange, *introducedRange);
         } else {
           declDomainInfos.push_back({domain, *introducedRange});
@@ -343,12 +404,35 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
   os << "version=" << stringForAvailability(getPlatformRange());
 
   auto domainInfos = storage->getDomainInfos();
-  if (domainInfos.size() > 0) {
-    os << " unavailable=";
-    llvm::interleave(
-        domainInfos, os,
-        [&](const DomainInfo &domainInfo) { domainInfo.getDomain().print(os); },
-        ",");
+  if (!domainInfos.empty()) {
+    auto availableInfos = llvm::make_filter_range(
+        domainInfos, [](auto info) { return !info.isUnavailable(); });
+
+    if (!availableInfos.empty()) {
+      os << " available=";
+      llvm::interleave(
+          availableInfos, os,
+          [&](const DomainInfo &domainInfo) {
+            domainInfo.getDomain().print(os);
+            if (domainInfo.getDomain().isVersioned() &&
+                domainInfo.getRange().hasMinimumVersion())
+              os << ">=" << domainInfo.getRange().getAsString();
+          },
+          ",");
+    }
+
+    auto unavailableInfos = llvm::make_filter_range(
+        domainInfos, [](auto info) { return info.isUnavailable(); });
+
+    if (!unavailableInfos.empty()) {
+      os << " unavailable=";
+      llvm::interleave(
+          unavailableInfos, os,
+          [&](const DomainInfo &domainInfo) {
+            domainInfo.getDomain().print(os);
+          },
+          ",");
+    }
   }
 
   if (isDeprecated())

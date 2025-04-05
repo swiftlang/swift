@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@
 
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
@@ -938,6 +938,11 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
 
 bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  // ABI-only decls get this from their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isDynamic();
+
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
     return false;
@@ -1688,8 +1693,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
 
-  AvailabilityContext contextForConformingDecl =
-      availabilityForDeclSignature(dc->getAsDecl());
+  auto contextForConformingDecl =
+      AvailabilityContext::forDeclSignature(dc->getAsDecl());
 
   // If the conformance is unavailable then it's irrelevant whether the witness
   // is potentially unavailable.
@@ -1732,7 +1737,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   requirementInfo.constrainWith(infoForConformingDecl);
 
   AvailabilityRange infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
+      AvailabilityContext::forDeclSignature(proto).getPlatformRange();
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);
@@ -2603,7 +2608,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      if (lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type.
+      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2650,6 +2656,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
     maybeAddParameterIsolation(infoBuilder, argTy);
+
+    if (auto typeRepr = SD->getElementTypeRepr())
+      if (isa<SendingTypeRepr>(typeRepr))
+        infoBuilder = infoBuilder.withSendingResult();
 
     Type funcTy;
     // FIXME: Verify ExtInfo state is correct, not working by accident.

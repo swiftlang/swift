@@ -911,6 +911,9 @@ public:
   void dump() const;
   void print(raw_ostream &OS) const;
 
+  /// Pretty-print the value with DebugInfo.
+  void dump(bool DebugInfo) const;
+
   /// Pretty-print the value in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
@@ -3524,17 +3527,18 @@ public:
       return Value.DeclRef;
     }
   };
-  
-  enum class Kind: unsigned {
+
+  enum class Kind : unsigned {
     StoredProperty,
     GettableProperty,
     SettableProperty,
+    Method,
     TupleElement,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
   };
-  
+
   // Description of a captured index value and its Hashable conformance for a
   // subscript keypath.
   struct Index {
@@ -3560,6 +3564,7 @@ private:
       return PackedStored;
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return PackedComputed;
     case Kind::OptionalChain:
     case Kind::OptionalForce:
@@ -3588,7 +3593,7 @@ private:
     SILFunction *Hash;
   } IndexEquality;
   CanType ComponentType;
-  AbstractStorageDecl *ExternalStorage;
+  ValueDecl *ExternalStorage;
   SubstitutionMap ExternalSubstitutions;
 
   /// Constructor for stored components
@@ -3598,26 +3603,18 @@ private:
       ComponentType(ComponentType) {}
 
   /// Constructor for computed components
-  KeyPathPatternComponent(ComputedPropertyId id,
-                          SILFunction *getter,
-                          SILFunction *setter,
-                          ArrayRef<Index> indices,
-                          SILFunction *indicesEqual,
-                          SILFunction *indicesHash,
-                          AbstractStorageDecl *externalStorage,
+  KeyPathPatternComponent(ComputedPropertyId id, SILFunction *getter,
+                          SILFunction *setter, ArrayRef<Index> indices,
+                          SILFunction *indicesEqual, SILFunction *indicesHash,
+                          ValueDecl *externalStorage,
                           SubstitutionMap externalSubstitutions,
                           CanType ComponentType)
-    : ValueAndKind(getter, PackedComputed),
-      SetterAndIdKind{setter, id.Kind},
-      IdValue{id.Value},
-      Indices(indices),
-      IndexEquality{indicesEqual, indicesHash},
-      ComponentType(ComponentType),
-      ExternalStorage(externalStorage),
-      ExternalSubstitutions(externalSubstitutions)
-  {
-  }
-  
+      : ValueAndKind(getter, PackedComputed),
+        SetterAndIdKind{setter, id.Kind}, IdValue{id.Value},
+        Indices(indices), IndexEquality{indicesEqual, indicesHash},
+        ComponentType(ComponentType), ExternalStorage(externalStorage),
+        ExternalSubstitutions(externalSubstitutions) {}
+
   /// Constructor for optional components.
   KeyPathPatternComponent(Kind kind, CanType componentType)
     : ValueAndKind((void*)((uintptr_t)kind << KindPackingBits), Unpacked),
@@ -3647,9 +3644,21 @@ public:
     case PackedStored:
       return TupleIndex
         ? Kind::TupleElement : Kind::StoredProperty;
-    case PackedComputed:
-      return SetterAndIdKind.getPointer()
-        ? Kind::SettableProperty : Kind::GettableProperty;
+    case PackedComputed: {
+      if (SetterAndIdKind.getPointer()) {
+        return Kind::SettableProperty;
+      }
+      // Filter out AccessorDecls like subscript getter/setter to only handle
+      // methods.
+      auto computedId = ComputedPropertyId(IdValue, SetterAndIdKind.getInt());
+      if (computedId.getKind() == ComputedPropertyId::DeclRef) {
+        auto decl = computedId.getDeclRef().getDecl();
+        if (dyn_cast<AbstractFunctionDecl>(decl) && !isa<AccessorDecl>(decl)) {
+          return Kind::Method;
+        }
+      }
+      return Kind::GettableProperty;
+    }
     case Unpacked:
       return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
     }
@@ -3666,6 +3675,7 @@ public:
       return static_cast<VarDecl*>(ValueAndKind.getPointer());
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
@@ -3685,13 +3695,14 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return ComputedPropertyId(IdValue,
                                 SetterAndIdKind.getInt());
     }
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getComputedPropertyGetter() const {
+  SILFunction *getComputedPropertyForGettable() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3701,15 +3712,17 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return static_cast<SILFunction*>(ValueAndKind.getPointer());
     }
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getComputedPropertySetter() const {
+  SILFunction *getComputedPropertyForSettable() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::GettableProperty:
+    case Kind::Method:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
@@ -3721,7 +3734,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  ArrayRef<Index> getSubscriptIndices() const {
+  ArrayRef<Index> getArguments() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3731,12 +3744,13 @@ public:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return Indices;
     }
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getSubscriptIndexEquals() const {
+  SILFunction *getIndexEquals() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3746,11 +3760,12 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return IndexEquality.Equal;
     }
     llvm_unreachable("unhandled kind");
   }
-  SILFunction *getSubscriptIndexHash() const {
+  SILFunction *getIndexHash() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3760,6 +3775,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return IndexEquality.Hash;
     }
     llvm_unreachable("unhandled kind");
@@ -3771,8 +3787,8 @@ public:
                                                    CanType ty) {
     return KeyPathPatternComponent(property, ty);
   }
-  
-  AbstractStorageDecl *getExternalDecl() const {
+
+  ValueDecl *getExternalDecl() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3782,6 +3798,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return ExternalStorage;
     }
     llvm_unreachable("unhandled kind");
@@ -3797,6 +3814,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return ExternalSubstitutions;
     }
     llvm_unreachable("unhandled kind");
@@ -3810,11 +3828,22 @@ public:
     case Kind::OptionalWrap:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       llvm_unreachable("not a tuple element");
     case Kind::TupleElement:
       return TupleIndex - 1;
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  static KeyPathPatternComponent
+  forMethod(ComputedPropertyId identifier, SILFunction *method,
+            ArrayRef<Index> args, SILFunction *argsEquals,
+            SILFunction *argsHash, AbstractFunctionDecl *externalDecl,
+            SubstitutionMap externalSubs, CanType ty) {
+    return KeyPathPatternComponent(identifier, method, nullptr, args,
+                                   argsEquals, argsHash, externalDecl,
+                                   externalSubs, ty);
   }
 
   static KeyPathPatternComponent
@@ -3863,6 +3892,7 @@ public:
     case Kind::StoredProperty:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
     case Kind::TupleElement:
       llvm_unreachable("not an optional kind");
     }
@@ -6368,6 +6398,16 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
+/// Whether isolated conformances are allowed or not in a checked cast
+/// instruction.
+enum class CastingIsolatedConformances: uint8_t {
+  /// Allow isolated conformances so long as we are running within their
+  /// executor.
+  Allow,
+  /// Prohibit isolated conformances regardless of what executor is currently
+  /// active.
+  Prohibit
+};
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
@@ -6376,19 +6416,24 @@ class UnconditionalCheckedCastInst final
           UnconditionalCheckedCastInst,
           OwnershipForwardingSingleValueInstruction> {
   CanType DestFormalTy;
+  CastingIsolatedConformances IsolatedConformances;
   friend SILBuilder;
 
-  UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
+  UnconditionalCheckedCastInst(SILDebugLocation DebugLoc,
+                               CastingIsolatedConformances isolatedConformances,
+                               SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestLoweredTy, CanType DestFormalTy,
                                ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestLoweredTy,
             forwardingOwnershipKind),
-        DestFormalTy(DestFormalTy) {}
+        DestFormalTy(DestFormalTy),
+        IsolatedConformances(isolatedConformances) {}
 
   static UnconditionalCheckedCastInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestLoweredTy,
+  create(SILDebugLocation DebugLoc, CastingIsolatedConformances isolatedConformances,
+         SILValue Operand, SILType DestLoweredTy,
          CanType DestFormalTy, SILFunction &F,
          ValueOwnershipKind forwardingOwnershipKind);
 
@@ -6398,6 +6443,10 @@ public:
 
   CanType getTargetFormalType() const { return DestFormalTy; }
   SILType getTargetLoweredType() const { return getType(); }
+
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 };
 
 /// StructInst - Represents a constructed loadable struct.
@@ -8723,66 +8772,28 @@ enum class MarkDependenceKind {
 };
 static_assert(2 == SILNode::NumMarkDependenceKindBits, "Size mismatch");
 
-/// Indicates that the validity of the first operand ("the value") depends on
-/// the value of the second operand ("the base").  Operations that would destroy
-/// the base must not be moved before any instructions which depend on the
-/// result of this instruction, exactly as if the address had been obviously
-/// derived from that operand (e.g. using ``ref_element_addr``). The result is
-/// always equal to the first operand and thus forwards ownership through the
-/// first operand. This is a "regular" use of the second operand (i.e. the
-/// second operand must be live at the use point).
-///
-/// Example:
-///
-///   %base = ...
-///   %value = ... @trivial value ...
-///   %value_dependent_on_base = mark_dependence %value on %base
-///   ...
-///   use(%value_dependent_on_base)     (1)
-///   ...
-///   destroy_value %base               (2)
-///
-/// (2) can never move before (1). In English this is a way for the compiler
-/// writer to say to the optimizer: 'This subset of uses of "value" (the uses of
-/// result) have a dependence on "base" being alive. Do not allow for things
-/// that /may/ destroy base to be moved earlier than any of these uses of
-/// "value"'.
-///
-/// The dependent 'value' may be marked 'nonescaping', which guarantees that the
-/// lifetime dependence is statically enforceable. In this case, the compiler
-/// must be able to follow all values forwarded from the dependent 'value', and
-/// recognize all final (non-forwarded, non-escaping) use points. This implies
-/// that `findPointerEscape` is false. A diagnostic pass checks that the
-/// incoming SIL to verify that these use points are all initially within the
-/// 'base' lifetime. Regular 'mark_dependence' semantics ensure that
-/// optimizations cannot violate the lifetime dependence after diagnostics.
-class MarkDependenceInst
-    : public InstructionBase<SILInstructionKind::MarkDependenceInst,
-                             OwnershipForwardingSingleValueInstruction> {
-  friend SILBuilder;
-
+template <SILInstructionKind Kind, typename BaseTy>
+class MarkDependenceInstBase : public InstructionBase<Kind, BaseTy> {
   FixedOperandList<2> Operands;
 
-  USE_SHARED_UINT8;
+  TEMPLATE_USE_SHARED_UINT8(BaseTy);
 
-  MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
-                     ValueOwnershipKind forwardingOwnershipKind,
-                     MarkDependenceKind dependenceKind)
-      : InstructionBase(DebugLoc, value->getType(), forwardingOwnershipKind),
-        Operands{this, value, base} {
-    sharedUInt8().MarkDependenceInst.dependenceKind = uint8_t(dependenceKind);
+protected:
+  template <typename... Rest>
+  MarkDependenceInstBase(SILDebugLocation DebugLoc, SILValue value,
+                         SILValue base, MarkDependenceKind dependenceKind,
+                         Rest &&...rest)
+    : InstructionBase<Kind, BaseTy>(DebugLoc, std::forward<Rest>(rest)...),
+      Operands{this, value, base} {
+    sharedUInt8().MarkDependenceInstBase.dependenceKind =
+      uint8_t(dependenceKind);
   }
 
 public:
-  enum { Value, Base };
-
-  SILValue getValue() const { return Operands[Value].get(); }
+  enum { Dependent, Base };
 
   SILValue getBase() const { return Operands[Base].get(); }
 
-  void setValue(SILValue newVal) {
-    Operands[Value].set(newVal);
-  }
   void setBase(SILValue newVal) {
     Operands[Base].set(newVal);
   }
@@ -8791,9 +8802,14 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   MarkDependenceKind dependenceKind() const {
-    return MarkDependenceKind(sharedUInt8().MarkDependenceInst.dependenceKind);
+    return MarkDependenceKind(
+      sharedUInt8().MarkDependenceInstBase.dependenceKind);
   }
 
+  /// True if the lifetime dependence is statically enforceable. If so, the
+  /// compiler can follow all values forwarded from the result, and recognize
+  /// all final (non-forwarded, non-escaping) use points. This implies that
+  /// `findPointerEscape` is false.
   bool isNonEscaping() const {
     return dependenceKind() == MarkDependenceKind::NonEscaping;
   }
@@ -8806,13 +8822,41 @@ public:
   }
 
   void resolveToNonEscaping() {
-    sharedUInt8().MarkDependenceInst.dependenceKind =
+    sharedUInt8().MarkDependenceInstBase.dependenceKind =
       uint8_t(MarkDependenceKind::NonEscaping);
   }
 
   void settleToEscaping() {
-    sharedUInt8().MarkDependenceInst.dependenceKind =
+    sharedUInt8().MarkDependenceInstBase.dependenceKind =
       uint8_t(MarkDependenceKind::Escaping);
+  }  
+};
+  
+/// The result forwards the value of the first operand ('value') and depends on
+/// the second operand ('base').
+///
+/// The 'value' and the forwarded result are both either an object type or an
+/// address type. The semantics are the same in each case.
+///
+/// 'base' may have either object or address type independent from the type of
+/// 'value'. If 'base' is an address, then the dependency is on the current
+/// value stored at the address.
+class MarkDependenceInst
+  : public MarkDependenceInstBase<SILInstructionKind::MarkDependenceInst,
+                                  OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
+                     ValueOwnershipKind forwardingOwnershipKind,
+                     MarkDependenceKind dependenceKind)
+    : MarkDependenceInstBase(DebugLoc, value, base, dependenceKind,
+                             value->getType(), forwardingOwnershipKind) {}
+
+public:
+  SILValue getValue() const { return getAllOperands()[Dependent].get(); }
+
+  void setValue(SILValue newVal) {
+    getAllOperands()[Dependent].set(newVal);
   }
 
   // True if the dependence is limited to the scope of an OSSA lifetime. Only
@@ -8831,6 +8875,97 @@ public:
   bool visitNonEscapingLifetimeEnds(
     llvm::function_ref<bool (Operand*)> visitScopeEnd,
     llvm::function_ref<bool (Operand*)> visitUnknownUse);
+};
+
+/// The in-memory value at the first operand ('address') depends on the value of
+/// the second operand ('base'). This is as if the location at 'address' aliases
+/// 'base' on all paths reachable from this instruction.
+///
+/// 'base' may have either object or address type. If 'base' is an address, then
+/// the dependency is on the current value stored at the address.
+class MarkDependenceAddrInst
+  : public MarkDependenceInstBase<SILInstructionKind::MarkDependenceAddrInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  MarkDependenceAddrInst(SILDebugLocation DebugLoc, SILValue value,
+                         SILValue base, MarkDependenceKind dependenceKind)
+    : MarkDependenceInstBase(DebugLoc, value, base, dependenceKind) {}
+
+public:
+  SILValue getAddress() const { return getAllOperands()[Dependent].get(); }
+
+  void setAddress(SILValue newVal) {
+    getAllOperands()[Dependent].set(newVal);
+  }
+};
+
+/// Shared API for MarkDependenceInst and MarkDependenceAddrInst.
+class MarkDependenceInstruction {
+  const SILInstruction *inst = nullptr;
+
+public:
+  explicit MarkDependenceInstruction(const SILInstruction *inst) {
+    switch (inst->getKind()) {
+    case SILInstructionKind::MarkDependenceInst:
+    case SILInstructionKind::MarkDependenceAddrInst:
+      this->inst = inst;
+      break;
+    default:
+      break;
+    }
+  }
+
+  explicit operator bool() const { return inst != nullptr; }
+    
+  SILValue getBase() const {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        return cast<MarkDependenceInst>(inst)->getBase();
+      case SILInstructionKind::MarkDependenceAddrInst:
+        return cast<MarkDependenceAddrInst>(inst)->getBase();
+      default:
+        break;
+      }
+    }
+    return SILValue();
+  }
+
+  SILValue getDependent() const {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        return cast<MarkDependenceInst>(inst)->getValue();
+      case SILInstructionKind::MarkDependenceAddrInst:
+        return cast<MarkDependenceAddrInst>(inst)->getAddress();
+      default:
+        break;
+      }
+    }
+    return SILValue();
+  }
+
+  SILType getType() const {
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(inst))
+      return mdi->getType();
+
+    return SILType();
+  }
+
+  bool isNonEscaping() const {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        return cast<MarkDependenceInst>(inst)->isNonEscaping();
+      case SILInstructionKind::MarkDependenceAddrInst:
+        return cast<MarkDependenceAddrInst>(inst)->isNonEscaping();
+      default:
+        break;
+      }
+    }
+    return false;
+  }
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply
@@ -10989,8 +11124,10 @@ class CheckedCastBranchInst final
   SILType DestLoweredTy;
   CanType DestFormalTy;
   bool IsExact;
+  CastingIsolatedConformances IsolatedConformances;
 
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
+                        CastingIsolatedConformances isolatedConformances,
                         SILValue Operand, CanType SrcFormalTy,
                         ArrayRef<SILValue> TypeDependentOperands,
                         SILType DestLoweredTy, CanType DestFormalTy,
@@ -11004,10 +11141,12 @@ class CheckedCastBranchInst final
             Target1Count, Target2Count, forwardingOwnershipKind,
             preservesOwnership),
         SrcFormalTy(SrcFormalTy), DestLoweredTy(DestLoweredTy),
-        DestFormalTy(DestFormalTy), IsExact(IsExact) {}
+        DestFormalTy(DestFormalTy), IsExact(IsExact),
+        IsolatedConformances(isolatedConformances) {}
 
   static CheckedCastBranchInst *
-  create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
+  create(SILDebugLocation DebugLoc, bool IsExact,
+         CastingIsolatedConformances isolatedConformances, SILValue Operand,
          CanType SrcFormalTy, SILType DestLoweredTy, CanType DestFormalTy,
          SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
@@ -11015,6 +11154,10 @@ class CheckedCastBranchInst final
 
 public:
   bool isExact() const { return IsExact; }
+
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
   CanType getSourceFormalType() const { return SrcFormalTy; }
@@ -11034,8 +11177,10 @@ class CheckedCastAddrBranchInst final
               SILInstructionKind::CheckedCastAddrBranchInst,
               CheckedCastAddrBranchInst, CastBranchWithConsumptionKindBase> {
   friend SILBuilder;
+  CastingIsolatedConformances IsolatedConformances;
 
   CheckedCastAddrBranchInst(SILDebugLocation DebugLoc,
+                            CastingIsolatedConformances isolatedConformances,
                             CastConsumptionKind consumptionKind, SILValue src,
                             CanType srcType, SILValue dest, CanType targetType,
                             ArrayRef<SILValue> TypeDependentOperands,
@@ -11044,11 +11189,18 @@ class CheckedCastAddrBranchInst final
                             ProfileCounter Target2Count);
 
   static CheckedCastAddrBranchInst *
-  create(SILDebugLocation DebugLoc, CastConsumptionKind consumptionKind,
+  create(SILDebugLocation DebugLoc,
+         CastingIsolatedConformances isolatedConformances,
+         CastConsumptionKind consumptionKind,
          SILValue src, CanType srcType, SILValue dest, CanType targetType,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
          SILFunction &F);
+
+public:
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 };
 
 /// Converts a heap object reference to a different type without any runtime
@@ -11091,16 +11243,24 @@ class UnconditionalCheckedCastAddrInst final
                SILInstructionKind::UnconditionalCheckedCastAddrInst,
                UnconditionalCheckedCastAddrInst, NonValueInstruction> {
   friend SILBuilder;
+  CastingIsolatedConformances IsolatedConformances;
 
   UnconditionalCheckedCastAddrInst(SILDebugLocation Loc,
+                                   CastingIsolatedConformances isolatedConformances,
                                    SILValue src, CanType sourceType,
                                    SILValue dest, CanType targetType,
                                    ArrayRef<SILValue> TypeDependentOperands);
 
   static UnconditionalCheckedCastAddrInst *
-  create(SILDebugLocation DebugLoc, SILValue src, CanType sourceType,
+  create(SILDebugLocation DebugLoc, CastingIsolatedConformances isolatedConformances,
+         SILValue src, CanType sourceType,
          SILValue dest, CanType targetType,
          SILFunction &F);
+
+public:
+  CastingIsolatedConformances getIsolatedConformances() const {
+    return IsolatedConformances;
+  }
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.

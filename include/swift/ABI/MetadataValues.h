@@ -62,9 +62,6 @@ enum {
   /// in a non-default distributed actor.
   NumWords_NonDefaultDistributedActor = 12,
 
-  /// The number of words in a task.
-  NumWords_AsyncTask = 24,
-
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
 
@@ -313,6 +310,11 @@ enum class DynamicCastFlags : size_t {
   /// True if the cast should destroy the source value on failure;
   /// false if the value should be left in place.
   DestroyOnFailure = 0x4,
+
+  /// True if the cast should prohibit the use of any isolated conformances,
+  /// for example because there is a Sendable constraint on the existential
+  /// type we're casting to.
+  ProhibitIsolatedConformances = 0x8,
 };
 inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
   return (size_t(a) & size_t(b)) != 0;
@@ -372,8 +374,6 @@ public:
     Setter,
     ModifyCoroutine,
     ReadCoroutine,
-    Read2Coroutine,
-    Modify2Coroutine,
   };
 
 private:
@@ -436,21 +436,25 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isAsync() const { return Value & IsAsyncMask; }
+  bool _hasAsyncBitSet() const { return Value & IsAsyncMask; }
 
-  bool isCalleeAllocatedCoroutine() const {
+  bool isAsync() const { return !isCoroutine() && _hasAsyncBitSet(); }
+
+  bool isCoroutine() const {
     switch (getKind()) {
     case Kind::Method:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
+      return false;
     case Kind::ModifyCoroutine:
     case Kind::ReadCoroutine:
-      return false;
-    case Kind::Read2Coroutine:
-    case Kind::Modify2Coroutine:
       return true;
     }
+  }
+
+  bool isCalleeAllocatedCoroutine() const {
+    return isCoroutine() && _hasAsyncBitSet();
   }
 
   bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
@@ -613,8 +617,6 @@ public:
     ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
-    Read2Coroutine,
-    Modify2Coroutine,
   };
 
 private:
@@ -664,24 +666,28 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isAsync() const { return Value & IsAsyncMask; }
+  bool _hasAsyncBitSet() const { return Value & IsAsyncMask; }
 
-  bool isCalleeAllocatedCoroutine() const {
+  bool isAsync() const { return !isCoroutine() && _hasAsyncBitSet(); }
+
+  bool isCoroutine() const {
     switch (getKind()) {
     case Kind::BaseProtocol:
     case Kind::Method:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
-    case Kind::ReadCoroutine:
-    case Kind::ModifyCoroutine:
     case Kind::AssociatedTypeAccessFunction:
     case Kind::AssociatedConformanceAccessFunction:
       return false;
-    case Kind::Read2Coroutine:
-    case Kind::Modify2Coroutine:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
       return true;
     }
+  }
+
+  bool isCalleeAllocatedCoroutine() const {
+    return isCoroutine() && _hasAsyncBitSet();
   }
 
   bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
@@ -748,6 +754,14 @@ private:
     IsConformanceOfProtocolMask = 0x01u << 18,
     HasGlobalActorIsolation = 0x01u << 19,
 
+    // Used to detect if this is a conformance to SerialExecutor that has
+    // an user defined implementation of 'isIsolatingCurrentContext'. This
+    // requirement is special in the sense that if a non-default impl is present
+    // we will avoid calling the `checkIsolated` method which would lead to a
+    // crash. In other words, this API "soft replaces" 'checkIsolated' so we
+    // must at runtime the presence of a non-default implementation.
+    HasNonDefaultSerialExecutorIsIsolatingCurrentContext = 0x01u << 20,
+
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
   };
@@ -813,7 +827,15 @@ public:
                                  ? HasGlobalActorIsolation
                                  : 0));
   }
-  
+
+  ConformanceFlags withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
+                                           bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext) const {
+    return ConformanceFlags((Value & ~HasNonDefaultSerialExecutorIsIsolatingCurrentContext)
+                            | (hasNonDefaultSerialExecutorIsIsolatingCurrentContext
+                                 ? HasNonDefaultSerialExecutorIsIsolatingCurrentContext
+                                 : 0));
+  }
+
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -856,6 +878,10 @@ public:
   /// Does this conformance have a global actor to which it is isolated?
   bool hasGlobalActorIsolation() const {
     return Value & HasGlobalActorIsolation;
+  }
+
+  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
+    return Value & HasNonDefaultSerialExecutorIsIsolatingCurrentContext;
   }
 
   /// Retrieve the # of conditional requirements.
@@ -1740,7 +1766,7 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
-  const uint16_t EscalationNotificationFunction = 0xf59d; // = 62877
+  const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
@@ -1935,7 +1961,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
+    /// WARNING: 5 is the last bit!
+
     // Type-specific flags:
+
+    Class_HasDefaultOverrideTable = 6,
 
     /// Set if the class is an actor.
     ///
@@ -2042,6 +2072,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsActor,
                                 class_isActor,
                                 class_setIsActor)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
+                                class_hasDefaultOverrideTable,
+                                class_setHasDefaultOverrideTable)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,

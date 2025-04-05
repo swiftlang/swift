@@ -370,23 +370,6 @@ done:
   if (SequencedExprs.size() == 1)
     return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
-  // If the left-most sequence expr is a 'try', hoist it up to turn
-  // '(try x) + y' into 'try (x + y)'. This is necessary to do in the
-  // parser because 'try' nodes are represented in the ASTScope tree
-  // to look up catch nodes. The scope tree must be syntactic because
-  // it's constructed before sequence folding happens during preCheckExpr.
-  // Otherwise, catch node lookup would find the incorrect catch node for
-  // 'try x + y' at the source location for 'y'.
-  //
-  // 'try' has restrictions for where it can appear within a sequence
-  // expr. This is still diagnosed in TypeChecker::foldSequence.
-  if (auto *tryEval = dyn_cast<AnyTryExpr>(SequencedExprs[0])) {
-    SequencedExprs[0] = tryEval->getSubExpr();
-    auto *sequence = SequenceExpr::create(Context, SequencedExprs);
-    tryEval->setSubExpr(sequence);
-    return makeParserResult(SequenceStatus, tryEval);
-  }
-
   return makeParserResult(SequenceStatus,
                           SequenceExpr::create(Context, SequencedExprs));
 }
@@ -850,8 +833,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     }
 
     // Record the name we parsed.
-    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
-                                                      nameLoc.getBaseNameLoc());
+    auto component = KeyPathExpr::Component::forUnresolvedMember(
+        name, FunctionRefInfo::unappliedBaseName(), nameLoc.getBaseNameLoc());
     components.push_back(component);
 
     // After the first component, we can start parsing keywords.
@@ -3520,6 +3503,15 @@ ParserResult<Expr> Parser::parseExprCollection() {
   Parser::StructureMarkerRAII ParsingCollection(
                                 *this, LSquareLoc,
                                 StructureMarkerKind::OpenSquare);
+
+  // Check to see if we can parse an InlineArray type.
+  if (isStartOfInlineArrayTypeBody()) {
+    auto result = parseTypeInlineArray(LSquareLoc);
+    if (result.isNull() || result.isParseErrorOrHasCompletion())
+      return ParserStatus(result);
+
+    return makeParserResult(new (Context) TypeExpr(result.get()));
+  }
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {

@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
@@ -292,6 +293,9 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
+  /// Whether to verify after every optimizer change.
+  unsigned VerifyEach : 1;
+
   OptimizationMode OptMode;
 
   /// Which sanitizer is turned on.
@@ -487,6 +491,8 @@ public:
 
   unsigned ConditionalRuntimeRecords : 1;
 
+  unsigned AnnotateCondFailMessage : 1;
+
   unsigned InternalizeAtLink : 1;
 
   /// Internalize symbols (static library) - do not export any public symbols.
@@ -534,6 +540,9 @@ public:
   // Whether swiftcorocc should be used for yield_once_2 routines on arm64
   // variants.
   unsigned UseCoroCCArm64 : 1;
+
+  // Whether to emit mergeable or non-mergeable traps.
+  unsigned MergeableTraps : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -597,7 +606,7 @@ public:
 
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), OptMode(OptimizationMode::NotSet),
+        Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false), SanitizerUseStableABI(false),
@@ -631,6 +640,7 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
+        AnnotateCondFailMessage(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
         MergeableSymbols(false), EmitGenericRODatas(true),
         NoPreallocatedInstantiationCaches(false),
@@ -640,16 +650,13 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false),
+        MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {
-#ifndef NDEBUG
-    DisableRoundTripDebugTypes = false;
-#else
-    DisableRoundTripDebugTypes = true;
-#endif
+    DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 
   /// Appends to \p os an arbitrary string representing all options which

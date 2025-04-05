@@ -101,11 +101,11 @@ DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty, Size size,
 
 DebugTypeInfo DebugTypeInfo::getForwardDecl(swift::Type Ty) {
   DebugTypeInfo DbgTy(Ty.getPointer());
+  DbgTy.IsForwardDecl = true;
   return DbgTy;
 }
 
-DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
-                                       IRGenModule &IGM) {
+static TypeBase *getTypeForGlobal(SILGlobalVariable *GV, IRGenModule &IGM) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
   auto LowTy = GV->getLoweredType().getASTType();
@@ -115,6 +115,15 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
+  // If this global variable contains an opaque type, replace it with its
+  // underlying type.
+  Type = IGM.substOpaqueTypesWithUnderlyingTypes(Type).getPointer();
+  return Type;
+}
+
+DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
+                                       IRGenModule &IGM) {
+  auto *Type = getTypeForGlobal(GV, IGM);
   auto &TI = IGM.getTypeInfoForUnlowered(Type);
   DebugTypeInfo DbgTy = getFromTypeInfo(Type, TI, IGM);
   assert(!DbgTy.isContextArchetype() &&
@@ -123,17 +132,9 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
 }
 
 DebugTypeInfo DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
-                                                  Size SizeInBytes,
-                                                  Alignment Align) {
-  // Prefer the original, potentially sugared version of the type if
-  // the type hasn't been mucked with by an optimization pass.
-  auto LowTy = GV->getLoweredType().getASTType();
-  auto *Type = LowTy.getPointer();
-  if (auto *Decl = GV->getDecl()) {
-    auto DeclType = Decl->getTypeInContext();
-    if (DeclType->isEqual(LowTy))
-      Type = DeclType.getPointer();
-  }
+                                                  Alignment Align,
+                                                  IRGenModule &IGM) {
+  auto *Type = getTypeForGlobal(GV, IGM);
   DebugTypeInfo DbgTy(Type, Align, ::hasDefaultAlignment(Type),
                       /* IsMetadataType = */ false, /* IsFixedBuffer = */ true);
   assert(!DbgTy.isContextArchetype() &&
@@ -182,6 +183,8 @@ TypeDecl *DebugTypeInfo::getDecl() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
+  if (isForwardDecl())
+    llvm::errs() << "forward ";
   llvm::errs() << "Alignment " << Align.getValue() << "] ";
   if (auto *Type = getType())
     Type->dump(llvm::errs());
@@ -190,7 +193,8 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
 
 std::optional<CompletedDebugTypeInfo>
 CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
-                                        IRGenModule &IGM) {
+                                        IRGenModule &IGM,
+                                        std::optional<Size::int_type> Size) {
   if (!Ty || Ty->hasTypeParameter())
     return {};
   auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
@@ -201,6 +205,8 @@ CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
     SizeInBits = Size;
+  } else if (Size) {
+    SizeInBits = *Size * 8;
   }
 
   return CompletedDebugTypeInfo::get(

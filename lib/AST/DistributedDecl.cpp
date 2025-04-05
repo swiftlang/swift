@@ -203,7 +203,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = lookupConformance(selfType, DA);
-  return conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
+  return conformance.getTypeWitnessByName(C.Id_ActorSystem);
 }
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
@@ -220,7 +220,7 @@ static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
   auto conformance = lookupConformance(selfType, protocol);
   if (!conformance || conformance.isInvalid())
     return Type();
-  return conformance.getTypeWitnessByName(selfType, member);
+  return conformance.getTypeWitnessByName(member);
 }
 
 Type swift::getDistributedActorSerializationType(
@@ -301,8 +301,7 @@ Type swift::getDistributedSerializationRequirementType(
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(selfType,
-                                          ctx.Id_SerializationRequirement);
+  return conformance.getTypeWitnessByName(ctx.Id_SerializationRequirement);
 }
 
 AbstractFunctionDecl *
@@ -365,11 +364,10 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto actorConformance =
       lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
-  if (!actorConformance || actorConformance.isInvalid())
+  if (actorConformance.isInvalid())
     return Type();
 
-  auto subs = SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
+  auto subs = SubstitutionMap::getProtocolSubstitutions(actorConformance);
 
   memberTy = memberTy.subst(subs);
 
@@ -488,8 +486,10 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // === Must be declared in a 'DistributedActorSystem' conforming type
-  ProtocolDecl *systemProto =
-      C.getDistributedActorSystemDecl();
+  ProtocolDecl *systemProto = C.getDistributedActorSystemDecl();
+  if (!systemProto) {
+    return false;
+  }
 
   auto systemNominal = DC->getSelfNominalTypeDecl();
   auto distSystemConformance = lookupConformance(
@@ -794,6 +794,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto protocolConformance = lookupConformance(
@@ -925,6 +928,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto protocolConformance = lookupConformance(
@@ -1051,6 +1057,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *encoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+    if (!encoderProto) {
+      return false;
+    }
 
     auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
@@ -1158,7 +1167,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *decoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder);
-
+    if (!decoderProto) {
+      return false;
+    }
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
         decoderNominal->getDeclaredInterfaceType(), decoderProto);
@@ -1251,6 +1262,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *decoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler);
+    if (!decoderProto) {
+      return false;
+    }
 
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(

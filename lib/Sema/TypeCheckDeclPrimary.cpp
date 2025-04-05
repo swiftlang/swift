@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
@@ -1365,7 +1365,7 @@ DefaultArgumentInitializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
   auto *parentDC = param->getDeclContext();
-  auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
+  auto *paramList = cast<ValueDecl>(parentDC->getAsDecl())->getParameterList();
 
   // In order to compute the initializer context for this parameter, we need to
   // know its index in the parameter list. Therefore iterate over the parameters
@@ -2173,6 +2173,10 @@ void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
 
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  // Access notes don't apply to ABI-only attributes.
+  if (!ABIRoleInfo(VD).providesAPI())
+    return {};
+
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
   if (auto note = notes.lookup(VD))
     applyAccessNote(VD, *note.get(), notes);
@@ -2363,10 +2367,12 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // Check for actor isolation of top-level and local declarations.
+      // Check for actor isolation of top-level and local declarations, and
+      // protocol requirements.g
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
-      if (!VD->getDeclContext()->isTypeContext())
+      if (!VD->getDeclContext()->isTypeContext() ||
+          isa<ProtocolDecl>(VD->getDeclContext()))
         (void) getActorIsolation(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
@@ -3793,9 +3799,8 @@ public:
       if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
-          Ctx.Diags.diagnose(
-              CDeclAttr->getLocation(), diag::attr_decl_async,
-              CDeclAttr->getAttrName(), FD->getDescriptiveKind());
+          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::attr_decl_async,
+                             CDeclAttr, FD);
         } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
           Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);

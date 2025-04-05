@@ -468,6 +468,10 @@ def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
 
+def remark_abi_inference : Flag<["-"], "Rabi-inference">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark when an '@abi' attribute adds an attribute or modifier to the ABI declaration based on its presence in the API">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
@@ -984,6 +988,25 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
            "'targeted' ('Sendable' checking is enabled in code that uses the "
            "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
+
+def default_isolation : Separate<["-"], "default-isolation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the default actor isolation: MainActor or nonisolated. "
+  "Defaults to nonisolated.">,
+  MetaVarName<"MainActor|nonisolated">;
+def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
+  Flags<[FrontendOption]>,
+  Alias<default_isolation>;
+
+def executor_factory : JoinedOrSeparate<["-"], "executor-factory">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the factory to use to create the default executors for "
+           "Swift Concurrency.  This must be a type conforming to the "
+           "'ExecutorFactory' protocol.">,
+  MetaVarName<"<factory-type>">;
+def executor_factory_EQ : Joined<["-"], "executor-factory=">,
+  Flags<[FrontendOption]>,
+  Alias<executor_factory>;
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
@@ -1533,6 +1556,11 @@ def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
+def clang_target_variant : Separate<["-"], "clang-target-variant">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Separately set the target we should use for internal Clang instance"
+           " for the 'zippered' code for macCatalyst">;
 
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,
@@ -2162,6 +2190,10 @@ def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cach
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
 
+def sdk_module_cache_path : Separate<["-"], "sdk-module-cache-path">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Specifies the module cache path for explicitly-built SDK modules">;
+
 def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
@@ -2239,5 +2271,10 @@ def disable_sandbox:
   Flag<["-"], "disable-sandbox">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable using the sandbox when executing subprocesses">;
+
+def enable_deterministic_check :
+  Flag<["-"], "enable-deterministic-check">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
+  HelpText<"Check compiler output determinism by running it twice">;
 
 include "FrontendOptions.td"

@@ -1427,6 +1427,7 @@ public:
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
@@ -4040,8 +4041,9 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       Builder.emitBlock(typedErrorLoadBB);
 
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(errorType));
-      auto silResultTy = CurSILFn->mapTypeIntoContext(
-          substConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+      auto silResultTy =
+          substConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      ASSERT(!silResultTy.hasTypeParameter());
       auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
 
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
@@ -6135,6 +6137,11 @@ void IRGenSILFunction::visitMarkDependenceInst(swift::MarkDependenceInst *i) {
   }
 }
 
+void IRGenSILFunction::
+visitMarkDependenceAddrInst(swift::MarkDependenceAddrInst *i) {
+  // Dependency-marking is purely for SIL. No result.
+}
+
 void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *copied = emitBlockCopyCall(lowered.claimNext());
@@ -7179,7 +7186,8 @@ visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
                   src, i->getSourceFormalType(),
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional);
+                  CheckedCastMode::Unconditional,
+                  CastingIsolatedConformances::Allow);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -7409,6 +7417,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                         i->getTargetLoweredType(),
                         i->getTargetFormalType(),
                         CheckedCastMode::Unconditional,
+                        i->getIsolatedConformances(),
                         ex);
   setLoweredExplosion(i, ex);
 }
@@ -7597,7 +7606,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   src, i->getSourceFormalType(),
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional);
+                  CheckedCastMode::Unconditional,
+                  i->getIsolatedConformances());
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
@@ -7618,6 +7628,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                           i->getTargetLoweredType(),
                           i->getTargetFormalType(),
                           CheckedCastMode::Conditional,
+                          i->getIsolatedConformances(),
                           ex);
     auto val = ex.claimNext();
     castResult.casted = val;
@@ -7655,7 +7666,8 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
     emitCheckedCast(*this,
                     src, i->getSourceFormalType(),
                     dest, i->getTargetFormalType(),
-                    i->getConsumptionKind(), CheckedCastMode::Conditional);
+                    i->getConsumptionKind(), CheckedCastMode::Conditional,
+                    i->getIsolatedConformances());
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
@@ -8123,7 +8135,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   assert(member.requiresNewWitnessTableEntry());
 
   bool shouldUseDispatchThunk = false;
-  if (IGM.isResilient(conformance.getRequirement(), ResilienceExpansion::Maximal)) {
+  if (IGM.isResilient(conformance.getProtocol(), ResilienceExpansion::Maximal)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().WitnessMethodElimination) {
     // For WME, use a thunk if the target protocol is defined in another module.
@@ -8249,8 +8261,11 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
 
   llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  Builder.CreateCondBr(expectedCond, failBB, contBB);
-    
+  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
+
+  if (IGM.getOptions().AnnotateCondFailMessage && !i->getMessage().empty())
+    br->addAnnotationMetadata(i->getMessage());
+
   Builder.SetInsertPoint(&CurFn->back());
   Builder.emitBlock(failBB);
   if (IGM.DebugInfo)

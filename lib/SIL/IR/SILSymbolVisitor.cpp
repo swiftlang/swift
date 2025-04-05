@@ -491,6 +491,9 @@ public:
 
     addFunction(SILDeclRef(AFD));
 
+    ASSERT(ABIRoleInfo(AFD).providesAPI()
+              && "SILSymbolVisitorImpl visiting ABI-only decl?");
+
     if (auto dynKind = getDynamicKind(AFD)) {
       // Add the global function pointer for a dynamically replaceable function.
       Visitor.addDynamicFunction(AFD, *dynKind);
@@ -849,8 +852,8 @@ public:
           }
         }
 
-        void addAssociatedType(AssociatedType associatedType) {
-          Visitor.addAssociatedTypeDescriptor(associatedType.getAssociation());
+        void addAssociatedType(AssociatedTypeDecl *assocType) {
+          Visitor.addAssociatedTypeDescriptor(assocType);
         }
 
         void addProtocolConformanceDescriptor() {

@@ -154,7 +154,7 @@ class KlassA {
 
 @MainActor
 nonisolated struct Conflict {}
-// expected-error@-1 {{struct 'Conflict' has multiple actor-isolation attributes ('MainActor' and 'nonisolated')}}
+// expected-error@-1 {{struct 'Conflict' has multiple actor-isolation attributes (@MainActor and 'nonisolated')}}
 
 struct B: Sendable {
   // expected-error@+1 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NonSendable}}
@@ -165,4 +165,24 @@ final class KlassB: Sendable {
   // expected-note@+2 {{convert 'test' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
   // expected-error@+1 {{'nonisolated' cannot be applied to mutable stored properties}}
   nonisolated var test: Int = 1
+}
+
+class NotSendable {}
+
+@MainActor
+struct UnsafeInitialization {
+  nonisolated(unsafe) let ns: NotSendable
+
+  nonisolated init(ns: NotSendable) {
+    self.ns = ns // okay
+  }
+}
+
+// rdar://147965036 - Make sure we don't crash.
+func rdar147965036() {
+  func test(_: () -> Void) {}
+  test { @nonisolated in
+    // expected-error@-1 {{'nonisolated' is a declaration modifier, not an attribute}}
+    // expected-error@-2 {{'nonisolated' is not supported on a closure}}
+  }
 }

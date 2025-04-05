@@ -3299,7 +3299,8 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
   // We can only call next(isolation:) if we are in an availability context
   // that supports typed throws.
-  auto availability = overApproximateAvailabilityAtLocation(loc, dc);
+  auto availability =
+      AvailabilityContext::forLocation(loc, dc).getPlatformRange();
   if (availability.isContainedIn(ctx.getTypedThrowsAvailability()))
     return nextElement;
 

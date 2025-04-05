@@ -112,9 +112,6 @@ enum class ResolveWitnessResult {
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
-  /// Whether we already suggested adding `@preconcurrency` or 'isolated'.
-  bool suggestedPreconcurrencyOrIsolated = false;
-
 public:
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
@@ -183,7 +180,7 @@ public:
 RequirementMatch matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
+        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
         setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>

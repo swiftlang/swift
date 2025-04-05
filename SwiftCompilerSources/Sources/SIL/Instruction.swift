@@ -528,6 +528,14 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
   public var isTakeOfSrc: Bool { true }
   public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.UnconditionalCheckedCastAddr_getIsolatedConformances() {
+    case .Allow: .allow
+    case .Prohibit: .prohibit
+    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
+    }
+  }
 }
 
 final public class BeginDeallocRefInst : SingleValueInstruction, UnaryInstruction {
@@ -1032,6 +1040,14 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   public var targetFormalType: CanonicalType {
     CanonicalType(bridged: bridged.UnconditionalCheckedCast_getTargetFormalType())
   }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.UnconditionalCheckedCast_getIsolatedConformances() {
+    case .Allow: .allow
+    case .Prohibit: .prohibit
+    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
+    }
+  }
 }
 
 final public
@@ -1082,22 +1098,34 @@ class GetAsyncContinuationAddrInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ExtractExecutorInst : SingleValueInstruction {}
 
-final public
-class MarkDependenceInst : SingleValueInstruction {
-  public enum DependenceKind: Int32 {
-    case Unresolved = 0
-    case Escaping = 1
-    case NonEscaping = 2
-  }
+public enum MarkDependenceKind: Int32 {
+  case Unresolved = 0
+  case Escaping = 1
+  case NonEscaping = 2
+}
+
+public protocol MarkDependenceInstruction: Instruction {
+  var baseOperand: Operand { get }
+  var base: Value { get }
+  var dependenceKind: MarkDependenceKind { get }
+  func resolveToNonEscaping()
+  func settleToEscaping()
+}
+
+extension MarkDependenceInstruction {
+  public var isNonEscaping: Bool { dependenceKind == .NonEscaping }
+  public var isUnresolved: Bool { dependenceKind == .Unresolved }
+}
+
+final public class MarkDependenceInst : SingleValueInstruction, MarkDependenceInstruction {
   public var valueOperand: Operand { operands[0] }
   public var baseOperand: Operand { operands[1] }
   public var value: Value { return valueOperand.value }
   public var base: Value { return baseOperand.value }
-  public var dependenceKind: DependenceKind {
-    DependenceKind(rawValue: bridged.MarkDependenceInst_dependenceKind().rawValue)!
+
+  public var dependenceKind: MarkDependenceKind {
+    MarkDependenceKind(rawValue: bridged.MarkDependenceInst_dependenceKind().rawValue)!
   }
-  public var isNonEscaping: Bool { dependenceKind == .NonEscaping }
-  public var isUnresolved: Bool { dependenceKind == .Unresolved }
 
   public func resolveToNonEscaping() {
     bridged.MarkDependenceInst_resolveToNonEscaping()
@@ -1109,6 +1137,25 @@ class MarkDependenceInst : SingleValueInstruction {
 
   public var hasScopedLifetime: Bool {
     return isNonEscaping && type.isObject && ownership == .owned && type.isEscapable(in: parentFunction)
+  }
+}
+
+final public class MarkDependenceAddrInst : Instruction, MarkDependenceInstruction {
+  public var addressOperand: Operand { operands[0] }
+  public var baseOperand: Operand { operands[1] }
+  public var address: Value { return addressOperand.value }
+  public var base: Value { return baseOperand.value }
+
+  public var dependenceKind: MarkDependenceKind {
+    MarkDependenceKind(rawValue: bridged.MarkDependenceAddrInst_dependenceKind().rawValue)!
+  }
+
+  public func resolveToNonEscaping() {
+    bridged.MarkDependenceAddrInst_resolveToNonEscaping()
+  }
+
+  public func settleToEscaping() {
+    bridged.MarkDependenceAddrInst_settleToEscaping()
   }
 }
 
@@ -1182,10 +1229,15 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
-  /// WARNING: isOnStack incorrectly returns false for all closures prior to ClosureLifetimeFixup, even if they need to
-  /// be diagnosed as on-stack closures. Use has mayEscape instead.
+  /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
+  /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
+  /// non-escaping prior to ClosureLifetimeFixup.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
 
+  // Warning: ClosureLifetimeFixup does not promote all non-escaping closures to on-stack. When that promotion fails, it
+  // creates a fake destroy of the closure after the captured values that the closure depends on. This is invalid OSSA,
+  // so OSSA utilities need to bail-out when isOnStack is false even if hasNoescapeCapture is true to avoid encoutering
+  // an invalid nested lifetime.
   public var mayEscape: Bool { !isOnStack && !hasNoescapeCapture }
 
   /// True if this closure captures anything nonescaping.
@@ -1217,7 +1269,9 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}
 
-final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
+final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {
+  public var member: DeclRef { DeclRef(bridged: bridged.ClassMethodInst_getMember()) }
+}
 
 final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -1292,6 +1346,7 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
   public var isFromVarDecl: Bool { bridged.AllocStackInst_isFromVarDecl() }
   public var usesMoveableValueDebugInfo: Bool { bridged.AllocStackInst_usesMoveableValueDebugInfo() }
+  public override var isLexical: Bool { bridged.AllocStackInst_isLexical() }
 
   public var varDecl: VarDecl? {
     bridged.AllocStack_getDecl().getAs(VarDecl.self)
@@ -1733,6 +1788,18 @@ final public class DynamicMethodBranchInst : TermInst {
 final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
+public enum CastingIsolatedConformances {
+  case allow
+  case prohibit
+
+  var bridged: BridgedInstruction.CastingIsolatedConformances {
+    switch self {
+    case .allow: return .Allow
+    case .prohibit: return .Prohibit
+    }
+  }
+}
+
 final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var source: Value { operand.value }
   public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
@@ -1740,6 +1807,14 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 
   public func updateSourceFormalTypeFromOperandLoweredType() {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()
+  }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.CheckedCastBranch_getIsolatedConformances() {
+    case .Allow: return .allow
+    case .Prohibit: return .prohibit
+    default: fatalError("Bad CastingIsolatedConformances value")
+    }
   }
 }
 
@@ -1779,6 +1854,14 @@ final public class CheckedCastAddrBranchInst : TermInst {
     case .CopyOnSuccess: return .CopyOnSuccess
     default:
       fatalError("invalid cast consumption kind")
+    }
+  }
+
+  public var isolatedConformances: CastingIsolatedConformances {
+    switch bridged.CheckedCastAddrBranch_getIsolatedConformances() {
+    case .Allow: .allow
+    case .Prohibit: .prohibit
+    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
     }
   }
 }

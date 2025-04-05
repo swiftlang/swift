@@ -286,6 +286,7 @@ DependencyScanningTool::getDependencies(
   ModuleDependenciesCache cache(
       *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
       QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*QueryContext.ScanInstance.get(), 
@@ -316,6 +317,7 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
   ModuleDependenciesCache cache(
       *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
       QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
   auto DependenciesOrErr = performModulePrescan(*QueryContext.ScanInstance.get(), 
                                                 QueryContext.ScanDiagnostics.get(),

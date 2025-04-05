@@ -22,24 +22,6 @@
 using namespace swift;
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
-    return std::nullopt;
-
-  return forPlatform(platform);
-}
-
-std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetVariantPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetVariantPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
-    return std::nullopt;
-
-  return forPlatform(platform);
-}
-
-std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
                                            const DeclContext *declContext) {
   // This parameter is used in downstream forks, do not remove.
@@ -118,15 +100,11 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
-bool AvailabilityDomain::isActiveForTargetPlatform(
-    const ASTContext &ctx) const {
-  if (isPlatform()) {
-    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx)) {
-      auto compatibleDomain = targetDomain->getABICompatibilityDomain();
-      return compatibleDomain.contains(*this);
-    }
-  }
-  return false;
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+  if (!isPlatform())
+    return false;
+
+  return isActive(ctx);
 }
 
 static std::optional<llvm::VersionTuple>
@@ -212,14 +190,31 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   }
 }
 
-AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
+bool AvailabilityDomain::isRoot() const {
+  switch (getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::Platform:
+    return getRootDomain() == *this;
+  case AvailabilityDomain::Kind::Custom:
+    // For now, all custom domains are their own root.
+    return true;
+  }
+}
+
+AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   if (!isPlatform())
     return *this;
 
+  // iOS specifically contains a few other platforms.
   auto iOSDomain = AvailabilityDomain::forPlatform(PlatformKind::iOS);
   if (iOSDomain.contains(*this))
     return iOSDomain;
 
+  // App Extension domains are contained by their base platform domain.
   if (auto basePlatform = basePlatformForExtensionPlatform(getPlatformKind()))
     return AvailabilityDomain::forPlatform(*basePlatform);
 
@@ -280,25 +275,12 @@ CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
   ASSERT(mod);
 }
 
-CustomAvailabilityDomain *
-CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
-                                 ModuleDecl *mod, Kind kind) {
-  return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
-}
-
-static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(Identifier identifier,
-                             const DeclContext *declContext) {
-  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
-          identifier.str(), declContext))
-    return builtinDomain;
-
-  auto &ctx = declContext->getASTContext();
-  if (auto customDomain =
-          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
-    return customDomain;
-
-  return std::nullopt;
+void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
+                                       Identifier name, ModuleDecl *mod,
+                                       Kind kind) {
+  ID.AddPointer(name.getAsOpaquePointer());
+  ID.AddPointer(mod);
+  ID.AddInteger(static_cast<unsigned>(kind));
 }
 
 std::optional<AvailabilityDomain>
@@ -310,7 +292,13 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
   auto &diags = ctx.Diags;
   std::optional<AvailabilityDomain> domain;
   auto identifier = getAsIdentifier().value();
-  domain = getAvailabilityDomainForName(identifier, declContext);
+
+  llvm::SmallVector<AvailabilityDomain> results;
+  declContext->lookupAvailabilityDomains(identifier, results);
+  if (results.size() > 0) {
+    // FIXME: [availability] Diagnose ambiguity if necessary.
+    domain = results.front();
+  }
 
   if (!domain) {
     auto domainString = identifier.str();

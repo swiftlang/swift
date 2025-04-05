@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -33,8 +34,7 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   TinyPtrVector<ValueDecl *> result;
 
   if (id.isOperator()) {
-    auto underlyingId =
-        ctx.getIdentifier(getPrivateOperatorName(std::string(id)));
+    auto underlyingId = getOperatorName(ctx, id);
     TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
         ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
     for (auto it : underlyingFuncs) {
@@ -81,8 +81,6 @@ static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
   FuncDecl *insert = nullptr;
   for (auto candidate : inserts) {
     if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
-      if (!candidateMethod->hasParameterList())
-        continue;
       auto params = candidateMethod->getParameters();
       if (params->size() != 1)
         continue;
@@ -158,7 +156,7 @@ static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
   auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
     auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
-    if (!equalEqual || !equalEqual->hasParameterList())
+    if (!equalEqual)
       return false;
     auto params = equalEqual->getParameters();
     if (params->size() != 2)
@@ -187,7 +185,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
 
   auto isValid = [&](ValueDecl *minusOp) -> bool {
     auto minus = dyn_cast<FuncDecl>(minusOp);
-    if (!minus || !minus->hasParameterList())
+    if (!minus)
       return false;
     auto params = minus->getParameters();
     if (params->size() != 2)
@@ -218,7 +216,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
 static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
   auto isValid = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
-    if (!plusEqual || !plusEqual->hasParameterList())
+    if (!plusEqual)
       return false;
     auto params = plusEqual->getParameters();
     if (params->size() != 2)
@@ -1079,7 +1077,9 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
       decl, ctx.getIdentifier("value_type"));
   auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("const_iterator"));
-  if (!valueType || !iterType)
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+  if (!valueType || !iterType || !sizeType)
     return;
 
   ProtocolDecl *cxxRandomAccessIteratorProto =
@@ -1097,6 +1097,8 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
                                valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});

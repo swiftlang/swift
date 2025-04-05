@@ -255,22 +255,24 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     return flags;
   }
 
-  auto kind = [&] {
+  auto kindAndIsCalleeAllocatedCoroutine =
+      [&]() -> std::pair<typename Flags::Kind, bool> {
     auto accessor = dyn_cast<AccessorDecl>(fn);
-    if (!accessor) return Flags::Kind::Method;
+    if (!accessor)
+      return {Flags::Kind::Method, false};
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
-      return Flags::Kind::Getter;
+      return {Flags::Kind::Getter, false};
     case AccessorKind::Set:
-      return Flags::Kind::Setter;
+      return {Flags::Kind::Setter, false};
     case AccessorKind::Read:
-      return Flags::Kind::ReadCoroutine;
+      return {Flags::Kind::ReadCoroutine, false};
     case AccessorKind::Read2:
-      return Flags::Kind::Read2Coroutine;
+      return {Flags::Kind::ReadCoroutine, true};
     case AccessorKind::Modify:
-      return Flags::Kind::ModifyCoroutine;
+      return {Flags::Kind::ModifyCoroutine, false};
     case AccessorKind::Modify2:
-      return Flags::Kind::Modify2Coroutine;
+      return {Flags::Kind::ModifyCoroutine, true};
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
@@ -280,9 +282,20 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     }
     llvm_unreachable("bad kind");
   }();
-  bool hasAsync = false;
+  auto kind = kindAndIsCalleeAllocatedCoroutine.first;
+
+  // Because no async old-ABI accessor coroutines exist or presumably ever will
+  // (if async coroutines accessors are added, they will presumably be new-ABI),
+  // the pairs {Flags::Kind::ReadCoroutine, isAsync} and
+  // {Flags::Kind::ModifyCoroutine, isAsync} can't mean "async old-ABI
+  // accessor coroutine".  As such, we repurpose that pair to mean "new-ABI
+  // accessor coroutine".  This has the important virtue of resulting in ptrauth
+  // authing/signing coro function pointers as data on old OSes where the bit
+  // means "async" and where adding new accessor kinds requires a back
+  // deployment library.
+  bool hasAsync = kindAndIsCalleeAllocatedCoroutine.second;
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn))
-    hasAsync = afd->hasAsync();
+    hasAsync |= afd->hasAsync();
   return Flags(kind).withIsInstance(!fn->isStatic()).withIsAsync(hasAsync);
 }
 
@@ -953,8 +966,7 @@ namespace {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
         if (auto &schema = IGM.getOptions().PointerAuth
                               .ProtocolAssociatedTypeAccessFunctions) {
-          addDiscriminator(flags, schema,
-                           AssociatedType(entry.getAssociatedType()));
+          addDiscriminator(flags, schema, entry.getAssociatedType());
         }
 
         // Look for a default witness.
@@ -1182,14 +1194,17 @@ namespace {
 
       for (auto &entry : DefaultWitnesses->getEntries()) {
         if (!entry.isValid() ||
-            entry.getKind() != SILWitnessTable::AssociatedConformance ||
-            entry.getAssociatedConformanceWitness().Protocol != requirement ||
-            entry.getAssociatedConformanceWitness().Requirement != association)
+            entry.getKind() != SILWitnessTable::AssociatedConformance)
           continue;
 
-        auto witness = entry.getAssociatedConformanceWitness().Witness;
+        auto assocConf = entry.getAssociatedConformanceWitness();
+        if (assocConf.Requirement != association ||
+            assocConf.Witness.getProtocol() != requirement)
+          continue;
+
         AssociatedConformance conformance(Proto, association, requirement);
-        defineDefaultAssociatedConformanceAccessFunction(conformance, witness);
+        defineDefaultAssociatedConformanceAccessFunction(
+            conformance, assocConf.Witness);
         return IGM.getMangledAssociatedConformance(nullptr, conformance);
       }
 
@@ -2033,6 +2048,7 @@ namespace {
       maybeAddCanonicalMetadataPrespecializations();
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
+      maybeAddDefaultOverrideTable();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -2074,6 +2090,9 @@ namespace {
         if (getType()->isDefaultActor(IGM.getSwiftModule(),
                                       ResilienceExpansion::Maximal))
           flags.class_setIsDefaultActor(true);
+
+        if (getDefaultOverrideTable())
+          flags.class_setHasDefaultOverrideTable(true);
       }
 
       if (ResilientSuperClassRef) {
@@ -2278,6 +2297,71 @@ namespace {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
         descriptor.addRelativeAddressOrNull(nullptr);
+      }
+
+      descriptor.finishAndAddTo(B);
+    }
+
+    SILDefaultOverrideTable *getDefaultOverrideTable() {
+      auto *table = IGM.getSILModule().lookUpDefaultOverrideTable(getType());
+      if (!table)
+        return nullptr;
+
+      if (table->getEntries().size() == 0)
+        return nullptr;
+
+      return table;
+    }
+
+    void maybeAddDefaultOverrideTable() {
+      auto *table = getDefaultOverrideTable();
+      if (!table)
+        return;
+
+      LLVM_DEBUG(llvm::dbgs() << "Default Override Table entries for "
+                              << getType()->getName() << ":\n";
+                 for (auto entry
+                      : table->getEntries()) {
+                   llvm::dbgs() << "  ";
+                   llvm::dbgs() << "original(" << entry.original << ")";
+                   llvm::dbgs() << " -> ";
+                   llvm::dbgs() << "replacement(" << entry.method << ")";
+                   llvm::dbgs() << " -> ";
+                   llvm::dbgs() << "impl(" << entry.impl->getName() << ")";
+                   llvm::dbgs() << '\n';
+                 });
+
+      B.addInt32(table->getEntries().size());
+
+      for (auto entry : table->getEntries())
+        emitDefaultOverrideDescriptor(entry.method, entry.original, entry.impl);
+    }
+
+    void emitDefaultOverrideDescriptor(SILDeclRef replacement,
+                                       SILDeclRef original, SILFunction *impl) {
+      auto descriptor =
+          B.beginStruct(IGM.MethodDefaultOverrideDescriptorStructTy);
+
+      auto replacementEntity = LinkEntity::forMethodDescriptor(replacement);
+      auto replacementDescriptor =
+          IGM.getAddrOfLLVMVariableOrGOTEquivalent(replacementEntity);
+      descriptor.addRelativeAddress(replacementDescriptor);
+
+      auto originalEntity = LinkEntity::forMethodDescriptor(original);
+      auto originalDescriptor =
+          IGM.getAddrOfLLVMVariableOrGOTEquivalent(originalEntity);
+      descriptor.addRelativeAddress(originalDescriptor);
+
+      if (impl->isAsync()) {
+        llvm::Constant *implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
+        descriptor.addRelativeAddress(implFn);
+      } else if (impl->getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+        llvm::Constant *implFn = IGM.getAddrOfCoroFunctionPointer(impl);
+        descriptor.addRelativeAddress(implFn);
+      } else {
+        llvm::Function *implFn =
+            IGM.getAddrOfSILFunction(impl, NotForDefinition);
+        descriptor.addCompactFunctionReference(implFn);
       }
 
       descriptor.finishAndAddTo(B);
@@ -2805,9 +2889,10 @@ namespace {
             substitutions.lookupConformance(underlyingDependentType, P);
 
         if (underlyingType->hasTypeParameter()) {
-          std::tie(underlyingType, underlyingConformance)
-              = GenericEnvironment::mapConformanceRefIntoContext(
-                    genericEnv, underlyingType, underlyingConformance);
+          underlyingType = genericEnv->mapTypeIntoContext(
+              underlyingType);
+          underlyingConformance = underlyingConformance.subst(
+            genericEnv->getForwardingSubstitutionMap());
         }
 
         return emitWitnessTableRef(IGF, underlyingType->getCanonicalType(),
@@ -7063,6 +7148,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::TaskExecutor:
+  case KnownProtocolKind::ExecutorFactory:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:

@@ -4273,20 +4273,20 @@ public:
             printHead("optional_wrap", ASTNodeColor, label);
             break;
 
-          case KeyPathExpr::Component::Kind::Property:
-            printHead("property", ASTNodeColor, label);
+          case KeyPathExpr::Component::Kind::Member:
+            printHead("member", ASTNodeColor, label);
             printDeclRefField(component.getDeclRef(), Label::always("decl"));
+            break;
+
+          case KeyPathExpr::Component::Kind::UnresolvedMember:
+            printHead("unresolved_member", ASTNodeColor, label);
+            printFieldQuoted(component.getUnresolvedDeclName(),
+                             Label::always("decl_name"), IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::Subscript:
             printHead("subscript", ASTNodeColor, label);
             printDeclRefField(component.getDeclRef(), Label::always("decl"));
-            break;
-
-          case KeyPathExpr::Component::Kind::UnresolvedProperty:
-            printHead("unresolved_property", ASTNodeColor, label);
-            printFieldQuoted(component.getUnresolvedDeclName(),
-                             Label::always("decl_name"), IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -4309,10 +4309,16 @@ public:
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor, label);
             break;
+          case KeyPathExpr::Component::Kind::UnresolvedApply:
+            printHead("unresolved_apply", ASTNodeColor, label);
+            break;
+          case KeyPathExpr::Component::Kind::Apply:
+            printHead("apply", ASTNodeColor, label);
+            break;
           }
           printTypeField(GetTypeOfKeyPathComponent(E, i), Label::always("type"));
-          if (auto *args = component.getSubscriptArgs()) {
-            printRec(args, Label::optional("subscript_args"));
+          if (auto *args = component.getArgs()) {
+            printRec(args, Label::optional("args"));
           }
           printFoot();
         }, Label::optional("component"));
@@ -4538,6 +4544,13 @@ public:
     printFoot();
   }
 
+  void visitInlineArrayTypeRepr(InlineArrayTypeRepr *T, Label label) {
+    printCommon("type_inline_array", label);
+    printRec(T->getCount(), Label::always("count"));
+    printRec(T->getElement(), Label::always("element"));
+    printFoot();
+  }
+
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T, Label label) {
     printCommon("type_dictionary", label);
     printRec(T->getKey(), Label::optional("key"));
@@ -4635,6 +4648,12 @@ public:
 
   void visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T, Label label) {
     printCommon("_const", label);
+    printRec(T->getBase(), Label::optional("base"));
+    printFoot();
+  }
+                        
+  void visitConstValueTypeRepr(ConstValueTypeRepr *T, Label label) {
+    printCommon("@const", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
   }
@@ -4771,6 +4790,10 @@ public:
                   getTypeOfKeyPathComponent),
         Ctx(ctx), DC(dc) {}
 
+  bool isTypeChecked() const {
+    return PrintBase::isTypeChecked() && DC;
+  }
+
   void printCommon(DeclAttribute *Attr, StringRef name, Label label) {
     printHead(name, DeclAttributeColor, label);
     printFlag(Attr->isImplicit(), "implicit");
@@ -4802,6 +4825,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
   TRIVIAL_ATTR_PRINTER(CompileTimeLiteral, compile_time_literal)
   TRIVIAL_ATTR_PRINTER(ConstVal, compile_time_value)
+  TRIVIAL_ATTR_PRINTER(ConstInitialized, const_initialized)
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
@@ -4901,6 +4925,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
+  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5005,7 +5030,7 @@ public:
 
     if (Attr->getType()) {
       printTypeField(Attr->getType(), Label::always("type"));
-    } else if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
+    } else if (isTypeChecked()) {
       // If the type is null, it might be a macro reference. Try that if we're
       // dumping the fully type-checked AST.
       auto macroRef =
@@ -5197,7 +5222,8 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->OriginalModuleName, Label::always("original_module"));
+    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
+    printField(Attr->LinkerModuleName, Label::always("linker_module"));
     printField(Attr->Platform, Label::always("platform"));
     printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
                   Label::always("moved_version"));
@@ -5360,6 +5386,43 @@ public:
 
 } // end anonymous namespace
 
+void DeclAttribute::dump(const ASTContext &ctx) const {
+  dump(llvm::errs(), ctx);
+  llvm::errs() << '\n';
+}
+
+void DeclAttribute::dump(llvm::raw_ostream &os, const ASTContext &ctx) const {
+  DefaultWriter writer(os, /*indent=*/0);
+  PrintAttribute(writer, &ctx, nullptr)
+    .visit(const_cast<DeclAttribute*>(this), Label::optional(""));
+}
+
+void DeclAttribute::dump(const DeclContext *dc) const {
+  dump(llvm::errs(), dc);
+  llvm::errs() << '\n';
+}
+
+void DeclAttribute::dump(llvm::raw_ostream &os, const DeclContext *dc) const {
+  DefaultWriter writer(os, /*indent=*/0);
+  PrintAttribute(writer, &dc->getASTContext(), const_cast<DeclContext*>(dc))
+    .visit(const_cast<DeclAttribute*>(this), Label::optional(""));
+}
+
+
+void DeclAttributes::dump(const ASTContext &ctx) const {
+  for (auto attr : *this) {
+    attr->dump(llvm::errs(), ctx);
+    llvm::errs() << '\n';
+  }
+}
+
+void DeclAttributes::dump(const DeclContext *dc) const {
+  for (auto attr : *this) {
+    attr->dump(llvm::errs(), dc);
+    llvm::errs() << '\n';
+  }
+}
+
 void PrintBase::printRec(Decl *D, Label label) {
   printRecArbitrary([&](Label label) {
     if (!D) {
@@ -5465,7 +5528,13 @@ public:
       assert(conformance.isAbstract());
 
       printHead("abstract_conformance", ASTNodeColor, label);
-      printReferencedDeclField(conformance.getAbstract(),
+
+      PrintOptions PO;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::StableReference;
+
+      printTypeField(conformance.getType(), Label::always("type"), PO);
+      printReferencedDeclField(conformance.getProtocol(),
                                Label::always("protocol"));
       printFoot();
     }
@@ -5806,6 +5875,7 @@ namespace {
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
+      printFlag(paramFlags.isConstValue(), "constValue");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6258,6 +6328,22 @@ namespace {
             break;
           }
         }
+        auto isolation = T->getIsolation();
+        switch (isolation.getKind()) {
+        case FunctionTypeIsolation::Kind::NonIsolated:
+        case FunctionTypeIsolation::Kind::Parameter:
+          break;
+        case FunctionTypeIsolation::Kind::GlobalActor:
+          printRec(isolation.getGlobalActorType(),
+                   Label::always("global_actor"));
+          break;
+        case FunctionTypeIsolation::Kind::Erased:
+          printFlag("@isolated(any)");
+          break;
+        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+          printFlag("@execution(caller)");
+          break;
+        }
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
@@ -6338,6 +6424,13 @@ namespace {
     void visitArraySliceType(ArraySliceType *T, Label label) {
       printCommon("array_slice_type", label);
       printRec(T->getBaseType(), Label::optional("base_type"));
+      printFoot();
+    }
+
+    void visitInlineArrayType(InlineArrayType *T, Label label) {
+      printCommon("inline_array_type", label);
+      printRec(T->getCountType(), Label::always("count"));
+      printRec(T->getElementType(), Label::always("element"));
       printFoot();
     }
 
@@ -6440,6 +6533,7 @@ namespace {
       printCommon("integer_type", label);
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
+      printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
       printFoot();
     }
 

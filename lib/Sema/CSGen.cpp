@@ -194,7 +194,7 @@ namespace {
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (isa<VarDecl>(DRE->getDecl())) {
           if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
@@ -972,7 +972,7 @@ namespace {
           ty = ty->getInOutObjectType();
           flags = flags.withInOut(true);
         }
-        if (arg.isConst()) {
+        if (arg.isCompileTimeLiteral()) {
           flags = flags.withCompileTimeLiteral(true);
         }
         result.emplace_back(ty, arg.getLabel(), flags);
@@ -1170,6 +1170,48 @@ namespace {
         outputTy = fixedOutputType;
       }
 
+      return outputTy;
+    }
+
+    /// Add constraints for argument resolution for `UnresolvedApply` key path
+    /// component kind.
+    Type addApplyConstraints(
+        Expr *anchor, Type memberTy, ArgumentList *argList,
+        ConstraintLocator *memberComponentLoc,
+        ConstraintLocator *applyComponentLoc,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
+      // Locators used in this expression.
+      assert(applyComponentLoc != nullptr && "applyComponentLoc should not be null");
+
+      auto fnLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::ApplyFunction);
+
+      auto fnResultLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::FunctionResult);
+
+      CS.associateArgumentList(applyComponentLoc, argList);
+
+      Type outputTy = CS.createTypeVariable(
+          fnResultLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
+
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      SourceLoc loc =
+          CurDC->getAsDecl() ? CurDC->getAsDecl()->getLoc() : SourceLoc();
+      for (auto index : indices(params)) {
+        const auto &param = params[index];
+        CS.verifyThatArgumentIsHashable(index, param.getParameterType(),
+                                        memberComponentLoc, loc);
+      }
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
+                                  /*trailingClosureMatching=*/std::nullopt,
+                                  CurDC, fnLocator);
       return outputTy;
     }
 
@@ -2542,6 +2584,16 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
+        if (auto *execution =
+                closure->getAttrs().getAttribute<ExecutionAttr>()) {
+          switch (execution->getBehavior()) {
+          case ExecutionKind::Caller:
+            return FunctionTypeIsolation::forNonIsolatedCaller();
+          case ExecutionKind::Concurrent:
+            return FunctionTypeIsolation::forNonIsolated();
+          }
+        }
+
         return FunctionTypeIsolation::forNonIsolated();
       }();
       extInfo = extInfo.withIsolation(isolation);
@@ -3756,30 +3808,34 @@ namespace {
               resultLocator,
               TVO_CanBindToLValue | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           break;
-        case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        case KeyPathExpr::Component::Kind::UnresolvedMember:
         // This should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
-        case KeyPathExpr::Component::Kind::Property: {
+        case KeyPathExpr::Component::Kind::Member: {
           auto memberTy = CS.createTypeVariable(resultLocator,
                                                 TVO_CanBindToLValue |
                                                 TVO_CanBindToNoEscape);
           componentTypeVars.push_back(memberTy);
-          auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
-            ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
-            : component.getDeclRef().getDecl()->createNameRef();
+          auto lookupName =
+              kind == KeyPathExpr::Component::Kind::UnresolvedMember
+                  ? DeclNameRef(
+                        component.getUnresolvedDeclName()) // FIXME: type change
+                                                           // needed
+                  : component.getDeclRef().getDecl()->createNameRef();
 
+          auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
-                                      FunctionRefInfo::unapplied(lookupName),
+                                      refKind,
                                       /*outerAlternatives=*/{}, memberLocator);
           base = memberTy;
           break;
         }
-          
+
         case KeyPathExpr::Component::Kind::UnresolvedSubscript:
         // Subscript should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
-          auto *args = component.getSubscriptArgs();
+          auto *args = component.getArgs();
           base = addSubscriptConstraints(E, base, /*decl*/ nullptr, args,
                                          memberLocator, &componentTypeVars);
 
@@ -3799,6 +3855,16 @@ namespace {
             componentTypeVars.append(referencedVars.begin(),
                                      referencedVars.end());
           }
+          break;
+        }
+
+        case KeyPathExpr::Component::Kind::UnresolvedApply:
+        case KeyPathExpr::Component::Kind::Apply: {
+          auto prevMemberLocator = CS.getConstraintLocator(
+              locator, LocatorPathElt::KeyPathComponent(i - 1));
+          base = addApplyConstraints(E, base, component.getArgs(),
+                                     prevMemberLocator, memberLocator,
+                                     &componentTypeVars);
           break;
         }
 

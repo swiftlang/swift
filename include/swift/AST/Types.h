@@ -688,6 +688,10 @@ public:
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
+  /// Returns true if this type satisfies a conformance to Escapable in the
+  /// given generic signature.
+  bool isEscapable(GenericSignature sig);
+
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
 
@@ -751,6 +755,10 @@ public:
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
   }
+
+  /// True if this type is an existential or an archetype which may be an
+  /// existential.
+  bool canBeExistential();
 
   /// Determine whether the type involves an opened element archetype.
   bool hasElementArchetype() const {
@@ -1469,7 +1477,7 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  SWIFT_DEBUG_DUMPER(dumpPrint());
+  SWIFT_DEBUG_DUMPER(print());
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
@@ -2374,6 +2382,10 @@ enum class ParamSpecifier : uint8_t {
 
 StringRef getNameForParamSpecifier(ParamSpecifier name);
 
+/// What does \c ParamSpecifier::Default mean for a parameter that's directly
+/// attached to \p VD ? Pass \c nullptr for the value for a closure.
+ParamSpecifier getDefaultParamSpecifier(const ValueDecl *VD);
+
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
@@ -2389,7 +2401,8 @@ class ParameterTypeFlags {
     CompileTimeLiteral = 1 << 8,
     Sending = 1 << 9,
     Addressable = 1 << 10,
-    NumBits = 11
+    ConstValue = 1 << 11,
+    NumBits = 12
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2404,21 +2417,23 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeLiteral, bool isSending, bool isAddressable)
+                     bool compileTimeLiteral, bool isSending, bool isAddressable,
+                     bool isConstValue)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeLiteral ? CompileTimeLiteral : 0) |
               (isSending ? Sending : 0) |
-              (isAddressable ? Addressable : 0)) {}
+              (isAddressable ? Addressable : 0) |
+              (isConstValue ? ConstValue : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeLiteral,
-                    bool isSending, bool isAddressable);
+                    bool isSending, bool isAddressable, bool isConstVal);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2432,6 +2447,7 @@ public:
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool isSending() const { return value.contains(Sending); }
   bool isAddressable() const { return value.contains(Addressable); }
+  bool isConstValue() const { return value.contains(ConstValue); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2450,9 +2466,14 @@ public:
                                           : ParamSpecifier::Default);
   }
 
-  ParameterTypeFlags withCompileTimeLiteral(bool isConst) const {
-    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeLiteral
-                                      : value - ParameterTypeFlags::CompileTimeLiteral);
+  ParameterTypeFlags withCompileTimeLiteral(bool isLiteral) const {
+    return ParameterTypeFlags(isLiteral ? value | ParameterTypeFlags::CompileTimeLiteral
+                                        : value - ParameterTypeFlags::CompileTimeLiteral);
+  }
+  
+  ParameterTypeFlags withConst(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::ConstValue
+                                      : value - ParameterTypeFlags::ConstValue);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2598,9 +2619,10 @@ public:
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
-                              /*compileTimeLiteral*/ false,
+                              /*is compileTimeLiteral*/ false,
                               /*is sending*/ false,
-                              /*is addressable*/ false);
+                              /*is addressable*/ false,
+                              /*is constValue*/false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -3393,6 +3415,9 @@ public:
 
     /// Whether the parameter is 'isCompileTimeLiteral'.
     bool isCompileTimeLiteral() const { return Flags.isCompileTimeLiteral(); }
+    
+    /// Whether the parameter is 'isConstValue'.
+    bool isConstVal() const { return Flags.isConstValue(); }
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
@@ -3545,6 +3570,16 @@ protected:
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
+    
+    if (Info) {
+      unsigned maxLifetimeTarget = NumParams + 1;
+      if (auto outputFn = Output->getAs<AnyFunctionType>()) {
+        maxLifetimeTarget += outputFn->getNumParams();
+      }
+      for (auto &dep : Info->getLifetimeDependencies()) {
+        assert(dep.getTargetIndex() < maxLifetimeTarget);
+      }
+    }
   }
 
 public:
@@ -3791,6 +3826,12 @@ public:
 
   /// Return the function type without the throwing.
   AnyFunctionType *getWithoutThrowing() const;
+
+  /// Return the function type with the given \p isolation.
+  AnyFunctionType *withIsolation(FunctionTypeIsolation isolation) const;
+
+  /// Return the function type setting sendable to \p newValue.
+  AnyFunctionType *withSendable(bool newValue) const;
 
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
@@ -4142,7 +4183,6 @@ public:
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(SubstitutionMap subs,
                                  SubstOptions options = std::nullopt);
-  FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     std::optional<ExtInfo> info = std::nullopt;
@@ -4331,9 +4371,7 @@ inline bool isConsumedParameterInCaller(ParameterConvention conv) {
   return isConsumedParameter<false>(conv);
 }
 
-/// Returns true if conv is a guaranteed parameter. This may look unnecessary
-/// but this will allow code to generalize to handle Indirect_Guaranteed
-/// parameters when they are added.
+/// Returns true if conv is a guaranteed parameter.
 template <bool InCallee>
 bool isGuaranteedParameter(ParameterConvention conv) {
   switch (conv) {
@@ -4407,6 +4445,7 @@ inline bool isPackParameter(ParameterConvention conv) {
 StringRef getStringForParameterConvention(ParameterConvention conv);
 
 /// A parameter type and the rules for passing it.
+/// Must be kept consistent with `ParameterInfo.Flag` in `FunctionConvention.swift`
 class SILParameterInfo {
 public:
   enum Flag : uint8_t {
@@ -4443,6 +4482,9 @@ public:
     /// DISCUSSION: These are enforced by the SIL verifier to always be in
     /// between indirect results and the explicit parameters.
     ImplicitLeading = 0x8,
+    
+    /// Set if the given parameter is @const
+    Const = 0x10
   };
 
   using Options = OptionSet<Flag>;
@@ -4980,11 +5022,13 @@ enum class SILCoroutineKind : uint8_t {
 
 class SILFunctionConventions;
 
+Type substOpaqueTypesWithUnderlyingTypes(Type type,
+                                         TypeExpansionContext context);
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
 ProtocolConformanceRef
-substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref,
                                     TypeExpansionContext context);
 namespace Lowering {
   class TypeConverter;
@@ -5142,6 +5186,16 @@ public:
       const ASTContext &ctx,
       ProtocolConformanceRef witnessMethodConformance =
           ProtocolConformanceRef());
+          
+  /// Given an existing ExtInfo, and a set of interface parameters and results
+  /// destined for a new SILFunctionType, return a new ExtInfo with only the
+  /// lifetime dependencies relevant after substitution.
+  static ExtInfo
+  getSubstLifetimeDependencies(GenericSignature genericSig,
+                               ExtInfo origExtInfo,
+                               ArrayRef<SILParameterInfo> params,
+                               ArrayRef<SILYieldInfo> yields,
+                               ArrayRef<SILResultInfo> results);
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.
@@ -5576,6 +5630,8 @@ public:
     return NumLifetimeDependencies != 0;
   }
 
+  // Return lowered lifetime dependencies, which has remapped parameter indices
+  // relative to the original FunctionType.
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
       return std::nullopt;
@@ -5760,6 +5816,10 @@ public:
                    getLifetimeDependencies());
   }
 
+  /// Return a new SILFunctionType that is the same as this but has \p
+  /// newExtInfo as its ext info.
+  CanSILFunctionType withExtInfo(ExtInfo newExtInfo) const;
+
   /// Returns the language-level calling convention of the function.
   Language getLanguage() const {
     return getExtInfo().getLanguage();
@@ -5808,6 +5868,10 @@ public:
   /// must have the same signature as the new substitutions.
   CanSILFunctionType
   withPatternSubstitutions(SubstitutionMap subs) const;
+
+  /// Create a new SILFunctionType that is the same as this one with its
+  /// sendable bit changed to \p newValue.
+  CanSILFunctionType withSendable(bool newValue) const;
 
   /// Create a SILFunctionType with the same structure as this one,
   /// but replacing the invocation generic signature and pattern
@@ -6193,6 +6257,27 @@ public:
   }
 };
 
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayType : public SyntaxSugarType {
+  Type Count;
+  Type Elt;
+
+  InlineArrayType(const ASTContext &ctx, Type count, Type elt,
+                  RecursiveTypeProperties properties)
+      : SyntaxSugarType(TypeKind::InlineArray, ctx, properties), Count(count),
+        Elt(elt) {}
+
+public:
+  static InlineArrayType *get(Type count, Type elt);
+
+  Type getCountType() const { return Count; }
+  Type getElementType() const { return Elt; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::InlineArray;
+  }
+};
+
 /// The type T?, which is always sugar for a library type.
 class OptionalType : public UnarySyntaxSugarType {
   OptionalType(const ASTContext &ctx,Type base,
@@ -6333,6 +6418,12 @@ public:
 
   /// Constructs a protocol composition corresponding to the `Any` type.
   static Type theAnyType(const ASTContext &C);
+
+  /// Constructs a protocol composition corresponding to the `any ~Copyable &
+  /// ~Escapable` type.
+  ///
+  /// Note: This includes the inverse of all current invertible protocols.
+  static Type theUnconstrainedAnyType(const ASTContext &C);
 
   /// Constructs a protocol composition corresponding to the `AnyObject` type.
   static Type theAnyObjectType(const ASTContext &C);
@@ -7819,10 +7910,27 @@ class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef Value;
+  // Integers may not be canonical, but don't have any structural type
+  // components from which to get the ASTContext, so we need to store a
+  // reference to it ourselves.
+  const ASTContext &Context;
+
+  static const ASTContext *
+  getCanonicalIntegerLiteralContext(StringRef value, const ASTContext &ctx) {
+    for (char c : value) {
+      // A canonical integer literal consists only of ASCII decimal digits.
+      if (c < '0' || c > '9') {
+        return nullptr;
+      }
+    }
+    return &ctx;
+  }
 
   IntegerType(StringRef value, bool isNegative, const ASTContext &ctx) :
-      TypeBase(TypeKind::Integer, &ctx, RecursiveTypeProperties()),
-      Value(value) {
+      TypeBase(TypeKind::Integer, getCanonicalIntegerLiteralContext(value, ctx),
+               RecursiveTypeProperties()),
+      Value(value),
+      Context(ctx) {
     Bits.IntegerType.IsNegative = isNegative;
   }
 
@@ -7852,6 +7960,8 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Integer;
   }
+  
+  const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 
@@ -8077,7 +8187,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeLiteral, bool isSending, bool isAddressable) {
+    bool compileTimeLiteral, bool isSending, bool isAddressable,
+    bool isConstVal) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -8089,7 +8200,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
   }
   return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
           isolated,   isNoDerivative, compileTimeLiteral, isSending,
-          isAddressable};
+          isAddressable, isConstVal};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

@@ -185,6 +185,24 @@ extension Value {
     }
     return true
   }
+
+  /// Performs a simple dominance check without using the dominator tree.
+  /// Returns true if `instruction` is in the same block as this value, but "after" this value,
+  /// or if this value is a function argument.
+  func triviallyDominates(_ instruction: Instruction) -> Bool {
+    switch self {
+    case is FunctionArgument:
+      return true
+    case let arg as Argument:
+      return arg.parentBlock == instruction.parentBlock
+    case let svi as SingleValueInstruction:
+      return svi.dominatesInSameBlock(instruction)
+    case let mvi as MultipleValueInstructionResult:
+      return mvi.parentInstruction.dominatesInSameBlock(instruction)
+    default:
+      return false
+    }
+  }
 }
 
 extension FullApplySite {
@@ -478,7 +496,7 @@ extension Instruction {
        let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
        let mt = iemt.metatype as? MetatypeInst
     {
-      return mt.type.astType.instanceTypeOfMetatype
+      return mt.type.canonicalType.instanceTypeOfMetatype
     }
     // TODO: also handle open_existential_addr and open_existential_ref.
     // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
@@ -899,7 +917,9 @@ func getGlobalInitialization(
   return nil
 }
 
-func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
+                        in function: Function, sourceTypeIsExact: Bool
+) -> Bool? {
   switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
     case .willSucceed: return true
     case .maySucceed:  return nil

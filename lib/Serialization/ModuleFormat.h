@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 924; // ExtensibleEnums feature
+const uint16_t SWIFTMODULE_VERSION_MINOR = 935; // remove ExtensibleEnums feature
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -414,6 +414,7 @@ enum class SILParameterInfoFlags : uint8_t {
   Isolated = 0x2,
   Sending = 0x4,
   ImplicitLeading = 0x8,
+  Const = 0x10,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -973,8 +974,7 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY,
-    EXTENSIBLE_ENUMS,
+    STRICT_MEMORY_SAFETY
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1083,10 +1083,6 @@ namespace options_block {
   using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
-  >;
-
-  using ExtensibleEnumsLayout = BCRecordLayout<
-    EXTENSIBLE_ENUMS
   >;
 }
 
@@ -1335,6 +1331,7 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeLiteral
+                     BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
                      >;
@@ -1484,6 +1481,12 @@ namespace decls_block {
   SYNTAX_SUGAR_TYPE_LAYOUT(OptionalTypeLayout, OPTIONAL_TYPE);
   SYNTAX_SUGAR_TYPE_LAYOUT(VariadicSequenceTypeLayout, VARIADIC_SEQUENCE_TYPE);
   SYNTAX_SUGAR_TYPE_LAYOUT(ExistentialTypeLayout, EXISTENTIAL_TYPE);
+
+  TYPE_LAYOUT(InlineArrayTypeLayout,
+    INLINE_ARRAY_TYPE,
+    TypeIDField, // count type
+    TypeIDField  // element type
+  );
 
   TYPE_LAYOUT(DictionaryTypeLayout,
     DICTIONARY_TYPE,
@@ -1709,6 +1712,7 @@ namespace decls_block {
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
     BCFixed<1>,              // isCompileTimeLiteral?
+    BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
@@ -2086,6 +2090,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCVBR<5>, // options
+    TypeIDField, // global actor isolation of conformance
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.
@@ -2114,6 +2119,12 @@ namespace decls_block {
     TypeIDField, // the conforming type
     DeclIDField, // the protocol
     BCFixed<2>  // the builtin conformance kind
+  >;
+
+  using AbstractConformanceLayout = BCRecordLayout<
+    ABSTRACT_CONFORMANCE,
+    TypeIDField,                         // conforming type
+    DeclIDField                         // the protocol
   >;
 
   using PackConformanceLayout = BCRecordLayout<
@@ -2641,6 +2652,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    ABSTRACT_CONFORMANCE_OFFSETS,
     PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

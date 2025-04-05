@@ -156,6 +156,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::CoroFunctionPointer:
+    case Node::Kind::DefaultOverride:
       return true;
     default:
       return false;
@@ -1004,6 +1005,9 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeLiteral, popTypeAndGetChild()));
+  case 'g':
+    return createType(
+        createWithChild(Node::Kind::ConstValue, popTypeAndGetChild()));
   case 'T':
     return createNode(Node::Kind::SendingResultFunctionType);
   case 'u':
@@ -2933,8 +2937,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       addChild(Thunk, popNode(Node::Kind::Type));
       return Thunk;
     }
-    case 'g':
+    case 'g': {
       return demangleGenericSpecialization(Node::Kind::GenericSpecialization, nullptr);
+    }
     case 'G':
       return demangleGenericSpecialization(Node::Kind::
                                           GenericSpecializationNotReAbstracted, nullptr);
@@ -2966,8 +2971,15 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       return demangleFunctionSpecialization();
     case 'K':
     case 'k': {
-      auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
-                               : Node::Kind::KeyPathSetterThunkHelper;
+      Node::Kind nodeKind;
+      if (nextIf("mu")) {
+        nodeKind = Node::Kind::KeyPathUnappliedMethodThunkHelper;
+      } else if (nextIf("MA")) {
+        nodeKind = Node::Kind::KeyPathAppliedMethodThunkHelper;
+      } else {
+        nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
+                            : Node::Kind::KeyPathSetterThunkHelper;
+      }
 
       bool isSerialized = nextIf('q');
 
@@ -3134,6 +3146,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       case 'B': return createNode(Node::Kind::BackDeploymentFallback);
       case 'c':
         return createNode(Node::Kind::CoroFunctionPointer);
+      case 'd':
+        return createNode(Node::Kind::DefaultOverride);
       case 'S': return createNode(Node::Kind::HasSymbolQuery);
       default:
         return nullptr;
@@ -3919,6 +3933,12 @@ NodePointer Demangler::demangleSpecialType() {
       case 'a':
         return createType(createWithChild(Node::Kind::SugaredArray,
                                           popNode(Node::Kind::Type)));
+      case 'A': {
+        NodePointer element = popNode(Node::Kind::Type);
+        NodePointer count = popNode(Node::Kind::Type);
+        return createType(createWithChildren(Node::Kind::SugaredInlineArray,
+                                             count, element));
+      }
       case 'D': {
         NodePointer value = popNode(Node::Kind::Type);
         NodePointer key = popNode(Node::Kind::Type);
@@ -4478,7 +4498,7 @@ NodePointer Demangler::demangleMacroExpansion() {
     context = popContext();
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer result;
-  if (isAttached) {
+  if (isAttached && attachedName) {
     result = createWithChildren(
         kind, context, attachedName, macroName, discriminator);
   } else {

@@ -616,6 +616,29 @@ bool TypeBase::isTypeVariableOrMember() {
   return getDependentMemberRoot()->is<TypeVariableType>();
 }
 
+bool TypeBase::canBeExistential() {
+  if (isAnyExistentialType())
+    return true;
+
+  Type ty(this);
+  // Unwrap (potentially multiple levels of) metatypes.
+  while (auto *mt = ty->getAs<MetatypeType>())
+    ty = mt->getInstanceType();
+
+  if (auto *archeTy = ty->getAs<ArchetypeType>()) {
+    // Only if all conformances are self-conforming protocols, the archetype
+    // may be an existential.
+    for (auto *proto : archeTy->getConformsTo()) {
+      if (!proto->existentialConformsToSelf())
+        return false;
+    }
+    // If there are no requirements on the archetype at all (`getConformsTo`
+    // is empty), the archetype can still be `Any` and we have to return true.
+    return true;
+  }
+  return false;
+}
+
 bool TypeBase::isTypeParameter() {
   return getDependentMemberRoot()->is<GenericTypeParamType>();
 }
@@ -1336,13 +1359,11 @@ ParameterListInfo::ParameterListInfo(
     return;
 
   // Find the corresponding parameter list.
-  const ParameterList *paramList =
-      getParameterList(const_cast<ValueDecl *>(paramOwner));
+  auto *paramList = paramOwner->getParameterList();
 
   // No parameter list means no default arguments - hand back the zeroed
   // bitvector.
   if (!paramList) {
-    assert(!paramOwner->hasParameterList());
     return;
   }
 
@@ -1857,6 +1878,18 @@ CanType TypeBase::computeCanonicalType() {
     Result = ErrorUnionType::get(ctx, newTerms).getPointer();
     break;
   }
+  case TypeKind::Integer: {
+    auto intTy = cast<IntegerType>(this);
+    APInt value = intTy->getValue();
+    if (intTy->isNegative()) {
+      value = -value;
+    }
+    SmallString<20> canonicalText;
+    value.toStringUnsigned(canonicalText);
+    Result = IntegerType::get(canonicalText, intTy->isNegative(),
+                              intTy->getASTContext());
+    break;
+  }
   }
 
   // Cache the canonical type for future queries.
@@ -1974,6 +2007,9 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
     break;
+  case TypeKind::InlineArray:
+    implDecl = Context->getInlineArrayDecl();
+    break;
   case TypeKind::Optional:
     implDecl = Context->getOptionalDecl();
     break;
@@ -1989,8 +2025,11 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
     UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
   } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
-    UnderlyingType = BoundGenericType::get(implDecl, Type(),
-                                      { Ty->getKeyType(), Ty->getValueType() });
+    UnderlyingType = BoundGenericType::get(
+        implDecl, Type(), {Ty->getKeyType(), Ty->getValueType()});
+  } else if (auto Ty = dyn_cast<InlineArrayType>(this)) {
+    UnderlyingType = BoundGenericType::get(
+        implDecl, Type(), {Ty->getCountType(), Ty->getElementType()});
   } else {
     llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }
@@ -3831,6 +3870,15 @@ Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
                                       /*HasExplicitAnyObject=*/false);
 }
 
+/// Constructs a protocol composition corresponding to the `any ~Copyable &
+/// ~Escapable` type.
+///
+/// Note: This includes the inverse of all current invertible protocols.
+Type ProtocolCompositionType::theUnconstrainedAnyType(const ASTContext &C) {
+  return ProtocolCompositionType::get(C, {}, InvertibleProtocolSet::allKnown(),
+                                      /*HasExplicitAnyObject=*/false);
+}
+
 /// Constructs a protocol composition containing the `AnyObject` constraint.
 Type ProtocolCompositionType::theAnyObjectType(const ASTContext &C) {
   return ProtocolCompositionType::get(C, {}, /*Inverses=*/{},
@@ -4450,6 +4498,17 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
+AnyFunctionType *
+AnyFunctionType::withIsolation(FunctionTypeIsolation isolation) const {
+  auto info = getExtInfo().intoBuilder().withIsolation(isolation).build();
+  return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
+  auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
+  return withExtInfo(info);
+}
+
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())
@@ -4522,7 +4581,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
   auto conformance = swift::lookupConformance(this, differentiableProtocol);
-  auto assocTy = conformance.getTypeWitness(this, assocDecl);
+  auto assocTy = conformance.getTypeWitness(assocDecl);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 
@@ -4899,6 +4958,20 @@ SILFunctionType::withPatternSpecialization(CanGenericSignature sig,
                           subs, SubstitutionMap(),
                           const_cast<SILFunctionType*>(this)->getASTContext(),
                           witnessConformance);
+}
+
+CanSILFunctionType SILFunctionType::withSendable(bool newValue) const {
+  return withExtInfo(getExtInfo().withSendable(newValue));
+}
+
+CanSILFunctionType SILFunctionType::withExtInfo(ExtInfo newExtInfo) const {
+  return SILFunctionType::get(
+      getInvocationGenericSignature(), newExtInfo, getCoroutineKind(),
+      getCalleeConvention(), getParameters(), getYields(), getResults(),
+      getOptionalErrorResult(), getPatternSubstitutions(),
+      getInvocationSubstitutions(),
+      const_cast<SILFunctionType *>(this)->getASTContext(),
+      getWitnessMethodConformanceOrInvalid());
 }
 
 APInt IntegerType::getValue() const {

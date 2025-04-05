@@ -37,6 +37,9 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
     return Type(bridged: bridged.getType())
   }
 
+  public var proto: ProtocolDecl {
+    return bridged.getRequirement().getAs(ProtocolDecl.self)
+  }
   public var isSpecialized: Bool {
     assert(isConcrete)
     return bridged.isSpecializedConformance()
@@ -55,6 +58,16 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
   public var inheritedConformance: Conformance {
     assert(isInherited)
     return bridged.getInheritedConformance().conformance
+  }
+
+  public var rootConformance: Conformance {
+    if isInherited {
+      return inheritedConformance.rootConformance
+    }
+    if isSpecialized {
+      return genericConformance
+    }
+    return self
   }
 
   public var specializedSubstitutions: SubstitutionMap {

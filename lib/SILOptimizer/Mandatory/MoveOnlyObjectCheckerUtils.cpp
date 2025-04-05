@@ -512,7 +512,7 @@ void MoveOnlyObjectCheckerPImpl::check(
           //   %1 = load_borrow %0
           //   %2 = copy_value %1
           //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
-          if (auto *lbi = dyn_cast<LoadBorrowInst>(orig)) {
+          if (isa<LoadBorrowInst>(orig)) {
             for (auto *use : markedInst->getConsumingUses()) {
               destroys.push_back(cast<DestroyValueInst>(use->getUser()));
             }

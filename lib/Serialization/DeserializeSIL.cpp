@@ -193,6 +193,7 @@ SILDeserializer::SILDeserializer(
              kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
              kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+             kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES ||
              kind == sil_index_block::SIL_PROPERTY_OFFSETS ||
              kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)) &&
            "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
@@ -212,6 +213,8 @@ SILDeserializer::SILDeserializer(
       WitnessTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES)
       DefaultWitnessTableList = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES)
+      DefaultOverrideTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)
       DifferentiabilityWitnessList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
@@ -256,6 +259,11 @@ SILDeserializer::SILDeserializer(
               offKind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_DEFAULT_WITNESS_TABLE_OFFSETS record.");
       MF->allocateBuffer(DefaultWitnessTables, scratch);
+    } else if (kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS) &&
+             "Expect a SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS record.");
+      MF->allocateBuffer(DefaultOverrideTables, scratch);
     } else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind ==
@@ -1121,6 +1129,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   Builder.setCurrentDebugScope(fn->getDebugScope());
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
          kind != SIL_MOVEONLY_DEINIT && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_OVERRIDE_TABLE &&
          kind != SIL_DIFFERENTIABILITY_WITNESS) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
@@ -2409,6 +2418,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         MarkDependenceKind(Attr));
     break;
   }
+  case SILInstructionKind::MarkDependenceAddrInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultInst = Builder.createMarkDependenceAddr(
+        Loc,
+        getLocalValue(Builder.maybeGetFunction(), ValID,
+                      getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        getLocalValue(Builder.maybeGetFunction(), ValID2,
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        MarkDependenceKind(Attr));
+    break;
+  }
   case SILInstructionKind::BeginDeallocRefInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
@@ -2537,6 +2558,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
+    auto isolatedConformances = (ListOfValues[4] & 0x01)
+        ? CastingIsolatedConformances::Prohibit
+        : CastingIsolatedConformances::Allow;
+
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[1]),
                                         (SILValueCategory)ListOfValues[2], Fn);
     SILValue src = getLocalValue(Builder.maybeGetFunction(), ListOfValues[0],
@@ -2547,7 +2572,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     CanType targetFormalType =
         MF->getType(ListOfValues[3])->getCanonicalType();
     ResultInst = Builder.createUnconditionalCheckedCast(
-        Loc, src, targetLoweredType, targetFormalType);
+        Loc, isolatedConformances, src, targetLoweredType, targetFormalType);
     break;
   }
 
@@ -3510,7 +3535,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::CheckedCastBranchInst: {
     // Format: the cast kind, a typed value, a BasicBlock ID for success,
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
-    bool isExact = ListOfValues[0] != 0;
+    bool isExact = (ListOfValues[0] & 0x01) != 0;
+    auto isolatedConformances = (ListOfValues[0] & 0x02)
+        ? CastingIsolatedConformances::Prohibit
+        : CastingIsolatedConformances::Allow;
     CanType sourceFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType opTy = getSILType(MF->getType(ListOfValues[3]),
                               (SILValueCategory)ListOfValues[4], Fn);
@@ -3523,14 +3551,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *failureBB = getBBForReference(Fn, ListOfValues[7]);
 
     ResultInst =
-        Builder.createCheckedCastBranch(Loc, isExact, op, sourceFormalType, 
-                                        targetLoweredType, targetFormalType, 
+        Builder.createCheckedCastBranch(Loc, isExact, isolatedConformances,
+                                        op, sourceFormalType,
+                                        targetLoweredType, targetFormalType,
                                         successBB, failureBB,
                                         forwardingOwnership);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     // ignore attr.
+    auto isolatedConformances = (ListOfValues[6] & 0x01)
+        ? CastingIsolatedConformances::Prohibit
+        : CastingIsolatedConformances::Allow;
+
     CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
                                        (SILValueCategory)ListOfValues[3], Fn);
@@ -3544,11 +3577,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                   targetLoweredType);
 
     ResultInst = Builder.createUnconditionalCheckedCastAddr(
-        Loc, src, srcFormalType, dest, targetFormalType);
+        Loc, isolatedConformances, src, srcFormalType, dest, targetFormalType);
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
-    CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
+    unsigned flags = ListOfValues[0];
+    auto isolatedConformances = flags & 0x01
+      ? CastingIsolatedConformances::Prohibit
+      : CastingIsolatedConformances::Allow;
+    CastConsumptionKind consumption = getCastConsumptionKind(flags >> 1);
 
     CanType srcFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[3]),
@@ -3566,8 +3603,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultInst = Builder.createCheckedCastAddrBranch(
-        Loc, consumption, src, srcFormalType, dest, targetFormalType, successBB,
-        failureBB);
+        Loc, isolatedConformances, consumption, src, srcFormalType, dest,
+        targetFormalType, successBB, failureBB);
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {
@@ -3977,6 +4014,10 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
   return maybeFunc.get();
 }
 
+SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name) {
+  return getGlobalForReference(name);
+}
+
 SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;
@@ -4087,6 +4128,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
          kind != SIL_MOVEONLY_DEINIT && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_OVERRIDE_TABLE &&
          kind != SIL_DIFFERENTIABILITY_WITNESS) {
     if (readSILInstruction(nullptr, Builder, kind, scratch))
       MF->fatal("readSILInstruction returns error");
@@ -4215,7 +4257,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE && kind != SIL_FUNCTION &&
+         kind != SIL_DEFAULT_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_OVERRIDE_TABLE && kind != SIL_FUNCTION &&
          kind != SIL_PROPERTY && kind != SIL_MOVEONLY_DEINIT) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
@@ -4430,10 +4473,9 @@ void SILDeserializer::readWitnessTableEntries(
   unsigned kind = maybeKind.get();
 
   // Another record means the end of this WitnessTable.
-  while (kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_DIFFERENTIABILITY_WITNESS &&
-         kind != SIL_FUNCTION) {
+  while (kind != SIL_WITNESS_TABLE && kind != SIL_DEFAULT_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_OVERRIDE_TABLE &&
+         kind != SIL_DIFFERENTIABILITY_WITNESS && kind != SIL_FUNCTION) {
     if (kind == SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY) {
       witnessEntries.push_back(SILDefaultWitnessTable::Entry());
     } else if (kind == SIL_WITNESS_BASE_ENTRY) {
@@ -4446,16 +4488,16 @@ void SILDeserializer::readWitnessTableEntries(
         proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
-      TypeID assocId;
-      DeclID protoId;
+      TypeID origTypeId;
+      DeclID substTypeId;
       ProtocolConformanceID conformanceId;
-      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId,
+      WitnessAssocProtocolLayout::readRecord(scratch, origTypeId, substTypeId,
                                              conformanceId);
-      CanType type = MF->getType(assocId)->getCanonicalType();
-      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      CanType origType = MF->getType(origTypeId)->getCanonicalType();
+      CanType substType = MF->getType(substTypeId)->getCanonicalType();
       auto conformance = MF->getConformance(conformanceId);
       witnessEntries.push_back(SILWitnessTable::AssociatedConformanceWitness{
-        type, proto, conformance
+        origType, substType, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;
@@ -4819,6 +4861,181 @@ SILDeserializer::lookupDefaultWitnessTable(SILDefaultWitnessTable *existingWt) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
 
   return Wt;
+}
+
+void SILDeserializer::readDefaultOverrideTableEntries(
+    llvm::BitstreamEntry &entry,
+    std::vector<SILDefaultOverrideTable::Entry> &entries) {
+  SmallVector<uint64_t, 64> scratch;
+  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
+
+  // Another record means the end of this DefaultOverrideTable.
+  while (kind == SIL_DEFAULT_OVERRIDE_TABLE_ENTRY) {
+    ArrayRef<uint64_t> ListOfValues;
+    DeclID NameID;
+    DefaultOverrideTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
+    SILFunction *impl = nullptr;
+    if (NameID != 0) {
+      impl = getFuncForReference(MF->getIdentifierText(NameID));
+    }
+    if (impl || NameID == 0) {
+      unsigned NextValueIndex = 0;
+      auto method = getSILDeclRef(MF, ListOfValues, NextValueIndex);
+      auto original = getSILDeclRef(MF, ListOfValues, NextValueIndex);
+      entries.push_back(SILDefaultOverrideTable::Entry{method, original, impl});
+    }
+
+    // Fetch the next record.
+    scratch.clear();
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      MF->fatal(maybeEntry.takeError());
+    entry = maybeEntry.get();
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      // EndBlock means the end of this DefaultOverrideTable.
+      break;
+    maybeKind = SILCursor.readRecord(entry.ID, scratch);
+    if (!maybeKind)
+      MF->fatal(maybeKind.takeError());
+    kind = maybeKind.get();
+  }
+}
+
+SILDefaultOverrideTable *
+SILDeserializer::readDefaultOverrideTable(DeclID tableID,
+                                          SILDefaultOverrideTable *existingOt) {
+  if (tableID == 0)
+    return nullptr;
+  assert(tableID <= DefaultOverrideTables.size() &&
+         "invalid DefaultOverrideTable ID");
+
+  auto &oTableOrOffset = DefaultOverrideTables[tableID - 1];
+
+  if (oTableOrOffset.isFullyDeserialized())
+    return oTableOrOffset.get();
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  if (llvm::Error Err = SILCursor.JumpToBit(oTableOrOffset.getOffset()))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in "
+                               "readDefaultOverrideTable.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
+  assert(kind == SIL_DEFAULT_OVERRIDE_TABLE &&
+         "expect a sil default override table");
+  (void)kind;
+
+  unsigned rawLinkage;
+  DeclID classID;
+  DefaultOverrideTableLayout::readRecord(scratch, classID, rawLinkage);
+
+  auto Linkage = fromStableSILLinkage(rawLinkage);
+  if (!Linkage) {
+    LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+                            << " for SILFunction\n");
+    MF->fatal("invalid linkage code");
+  }
+
+  ClassDecl *decl = cast<ClassDecl>(MF->getDecl(classID));
+  if (decl == nullptr) {
+    LLVM_DEBUG(llvm::dbgs() << "invalid class code " << classID << "\n");
+    MF->fatal("invalid class code");
+  }
+
+  PrettyStackTraceDecl trace("deserializing default override table for", decl);
+
+  if (!existingOt)
+    existingOt =
+        SILMod.lookUpDefaultOverrideTable(decl, /*deserializeLazily=*/false);
+  auto oT = existingOt;
+
+  // If we have an existing default override table, verify that the class
+  // matches up.
+  if (oT) {
+    if (oT->getClass() != decl) {
+      MF->fatal("Protocol mismatch");
+    }
+
+    // Don't override the linkage of a default override table with an existing
+    // declaration.
+
+  } else {
+    // Otherwise, create a new override table declaration.
+    oT = SILDefaultOverrideTable::declare(SILMod, *Linkage, decl);
+    if (Callback)
+      Callback->didDeserialize(MF->getAssociatedModule(), oT);
+  }
+
+  // Fetch the next record.
+  scratch.clear();
+  maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  entry = maybeEntry.get();
+  if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+    return nullptr;
+
+  std::vector<SILDefaultOverrideTable::Entry> entries;
+  readDefaultOverrideTableEntries(entry, entries);
+
+  oT->define(entries);
+  oTableOrOffset.set(oT, /*fully deserialized*/ true);
+  if (Callback)
+    Callback->didDeserializeDefaultOverrideTableEntries(
+        MF->getAssociatedModule(), oT);
+  return oT;
+}
+
+SILDefaultOverrideTable *SILDeserializer::lookupDefaultOverrideTable(
+    SILDefaultOverrideTable *existingOt) {
+  assert(existingOt &&
+         "Cannot deserialize a null default override table declaration.");
+  assert(existingOt->isDeclaration() &&
+         "Cannot deserialize a default override table "
+         "definition.");
+
+  // If we don't have a default override table list, we can't look anything up.
+  if (!DefaultOverrideTableList)
+    return nullptr;
+
+  // Use the mangled name of the class to lookup the partially deserialized
+  // value from the default override table list.
+  auto iter = DefaultOverrideTableList->find(existingOt->getUniqueName());
+  if (iter == DefaultOverrideTableList->end())
+    return nullptr;
+
+  // Attempt to read the default override table.
+  auto Ot = readDefaultOverrideTable(*iter, existingOt);
+  if (Ot)
+    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Ot->dump());
+
+  return Ot;
+}
+
+void SILDeserializer::getAllDefaultOverrideTables() {
+  if (!DefaultOverrideTableList)
+    return;
+  for (unsigned index = 0, size = DefaultOverrideTables.size(); index < size;
+       ++index)
+    readDefaultOverrideTable(index + 1, nullptr);
 }
 
 SILDifferentiabilityWitness *

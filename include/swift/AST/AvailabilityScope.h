@@ -185,6 +185,10 @@ private:
                     SourceRange SrcRange, const AvailabilityContext Info);
 
 public:
+  /// Constructs the root availability scope for the given file and builds out
+  /// the scope tree for the top level contents of the file.
+  static AvailabilityScope *getOrBuildForSourceFile(SourceFile &SF);
+
   /// Create the root availability scope for the given SourceFile.
   static AvailabilityScope *createForSourceFile(SourceFile *SF,
                                                 const AvailabilityContext Info);

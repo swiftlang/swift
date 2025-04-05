@@ -906,6 +906,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, OPAQUE_RETURN_TYPE_DECLS);
+  BLOCK_RECORD(index_block, ABSTRACT_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
@@ -944,6 +945,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_WITNESS_CONDITIONAL_CONFORMANCE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_DEFAULT_OVERRIDE_TABLE);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
   BLOCK_RECORD(sil_block, SIL_ARG_EFFECTS_ATTR);
@@ -985,6 +987,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_DEFAULT_OVERRIDE_TABLE_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS);
 
   BLOCK(INCREMENTAL_INFORMATION_BLOCK);
   BLOCK_RECORD(fine_grained_dependencies::record_block, METADATA);
@@ -1180,11 +1184,6 @@ void Serializer::writeHeader() {
         options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
-      }
-
-      if (M->supportsExtensibleEnums()) {
-        options_block::ExtensibleEnumsLayout ExtensibleEnums(Out);
-        ExtensibleEnums.emit(ScratchRecord);
       }
 
       if (Options.SerializeOptionsForDebugging) {
@@ -1723,7 +1722,10 @@ void Serializer::writeRequirementSignature(
 
   for (const auto &typeAlias : requirementSig.getTypeAliases()) {
     rawData.push_back(addDeclBaseNameRef(typeAlias.getName()));
-    rawData.push_back(addTypeRef(typeAlias.getUnderlyingType()));
+
+    auto underlyingType = typeAlias.getUnderlyingType();
+    ASSERT(!underlyingType->findUnresolvedDependentMemberType());
+    rawData.push_back(addTypeRef(underlyingType));
   }
 
   RequirementSignatureLayout::emitRecord(
@@ -1927,6 +1929,24 @@ void Serializer::writeLocalNormalProtocolConformance(
       data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
   }, /*useResolver=*/true);
 
+  // Figure out the isolation of the conformance.
+  Type globalActorType;
+  switch (auto isolation = conformance->getIsolation()) {
+  case swift::ActorIsolation::Unspecified:
+  case swift::ActorIsolation::Nonisolated:
+    break;
+
+  case swift::ActorIsolation::GlobalActor:
+    globalActorType = isolation.getGlobalActor();
+    break;
+
+  case swift::ActorIsolation::ActorInstance:
+  case swift::ActorIsolation::NonisolatedUnsafe:
+  case swift::ActorIsolation::Erased:
+  case swift::ActorIsolation::CallerIsolationInheriting:
+    llvm_unreachable("Conformances cannot have this kind of isolation");
+  }
+
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
@@ -1937,6 +1957,7 @@ void Serializer::writeLocalNormalProtocolConformance(
                                               numValueWitnesses,
                                               numSignatureConformances,
                                               conformance->getOptions().toRaw(),
+                                              addTypeRef(globalActorType),
                                               data);
 }
 
@@ -1957,9 +1978,8 @@ Serializer::addConformanceRef(ProtocolConformanceRef ref) {
   }
 
   if (ref.isAbstract()) {
-    auto protocolID = addDeclRef(ref.getAbstract());
-    assert(protocolID != 0);
-    return ((protocolID << SerializedProtocolConformanceKind::Shift) |
+    auto rawID = AbstractConformancesToSerialize.addRef(ref.getAbstract());
+    return ((rawID << SerializedProtocolConformanceKind::Shift) |
             SerializedProtocolConformanceKind::Abstract);
   }
 
@@ -2056,6 +2076,20 @@ Serializer::writeASTBlockEntity(ProtocolConformance *conformance) {
         static_cast<unsigned>(builtin->getBuiltinConformanceKind()));
     break;
   }
+}
+
+void
+Serializer::writeASTBlockEntity(AbstractConformance *conformance) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[AbstractConformanceLayout::Code];
+
+  auto conformanceRef = ProtocolConformanceRef(conformance);
+  AbstractConformanceLayout::emitRecord(
+      Out, ScratchRecord,
+      abbrCode,
+      addTypeRef(conformanceRef.getType()),
+      addDeclRef(conformanceRef.getProtocol()));
 }
 
 void
@@ -3061,7 +3095,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           Moved, std::optional<llvm::VersionTuple>(theAttr->MovedVersion));
       auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
-      blob.append(theAttr->OriginalModuleName.str());
+      blob.append(theAttr->ManglingModuleName.str());
+      blob.push_back('\0');
+      blob.append(theAttr->LinkerModuleName.str());
       blob.push_back('\0');
       OriginallyDefinedInDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
@@ -3074,7 +3110,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     case DeclAttrKind::Available: {
       auto theAttr = D->getSemanticAvailableAttr(cast<AvailableAttr>(DA));
-      assert(theAttr);
+
+      // In lazy typechecking mode, it's possible that we just discovered that
+      // the attribute is invalid.
+      if (!theAttr)
+        return;
 
       ENCODE_VER_TUPLE(Introduced, theAttr->getIntroduced())
       ENCODE_VER_TUPLE(Deprecated, theAttr->getDeprecated())
@@ -4104,9 +4144,14 @@ public:
       uint64_t typeRef = S.addTypeRef(inherited.getType());
       uint64_t originalTypeRef = typeRef;
 
-      // Encode options in the low bits;
+      // Encode options in the low bits.
+      // Note that we drop the global actor isolation bit, because we don't
+      // serialize this information. This information is available in the
+      // conformance itself.
+      auto inheritedOptions =
+        inherited.getOptions() - ProtocolConformanceFlags::GlobalActorIsolated;
       typeRef = (typeRef << NumProtocolConformanceOptions) |
-                inherited.getOptions().toRaw();
+                inheritedOptions.toRaw();
 
       // Encode "suppressed" in the next bit.
       typeRef = (typeRef << 1) | (inherited.isSuppressed() ? 0x01 : 0x00);
@@ -4687,6 +4732,7 @@ public:
         param->isAutoClosure(),
         param->isIsolated(),
         param->isCompileTimeLiteral(),
+        param->isConstVal(),
         param->isSending(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
@@ -5387,6 +5433,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     options -= SILParameterInfo::ImplicitLeading;
     result |= SILParameterInfoFlags::ImplicitLeading;
   }
+  
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    result |= SILParameterInfoFlags::Const;
+  }
 
   // If we still have options left, this code is out of sync... return none.
   if (bool(options))
@@ -5778,8 +5829,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeLiteral(), paramFlags.isSending(),
-          paramFlags.isAddressable());
+          paramFlags.isCompileTimeLiteral(), paramFlags.isConstValue(),
+          paramFlags.isSending(), paramFlags.isAddressable());
     }
   }
 
@@ -5952,6 +6003,14 @@ public:
   void visitArraySliceType(const ArraySliceType *sliceTy) {
     using namespace decls_block;
     serializeSimpleWrapper<ArraySliceTypeLayout>(sliceTy->getBaseType());
+  }
+
+  void visitInlineArrayType(const InlineArrayType *T) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[InlineArrayTypeLayout::Code];
+    InlineArrayTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      S.addTypeRef(T->getCountType()),
+                                      S.addTypeRef(T->getElementType()));
   }
 
   void visitDictionaryType(const DictionaryType *dictTy) {
@@ -6264,6 +6323,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
   registerDeclTypeAbbr<IntegerTypeLayout>();
+  registerDeclTypeAbbr<InlineArrayTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
@@ -6336,6 +6396,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
+  registerDeclTypeAbbr<AbstractConformanceLayout>();
   registerDeclTypeAbbr<PackConformanceLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
@@ -6378,6 +6439,8 @@ void Serializer::writeAllDeclsAndTypes() {
         writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(ConformancesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(AbstractConformancesToSerialize);
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
@@ -6994,6 +7057,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, GenericEnvironmentsToSerialize);
     writeOffsets(Offsets, SubstitutionMapsToSerialize);
     writeOffsets(Offsets, ConformancesToSerialize);
+    writeOffsets(Offsets, AbstractConformancesToSerialize);
     writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
 

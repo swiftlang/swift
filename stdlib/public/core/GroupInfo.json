@@ -96,6 +96,7 @@
       ],
       "Lazy Views": [
         "Algorithm.swift",
+        "EnumeratedSequence.swift",
         "Flatten.swift",
         "FlatMap.swift",
         "Map.swift",
@@ -199,6 +200,8 @@
     "UnsafeRawBufferPointer.swift"
   ],
   "Span": [
+    "MutableRawSpan.swift",
+    "MutableSpan.swift",
     "RawSpan.swift",
     "Span.swift"
   ],

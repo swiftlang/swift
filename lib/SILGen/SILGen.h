@@ -389,6 +389,10 @@ public:
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
 
+  void emitDefaultOverrideTable(ClassDecl *decl);
+
+  SILFunction *emitDefaultOverride(SILDeclRef replacement, SILDeclRef original);
+
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
@@ -420,24 +424,17 @@ public:
   /// Is the self method of the given nonmutating method passed indirectly?
   bool isNonMutatingSelfIndirect(SILDeclRef method);
 
-  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor,
-                                ResilienceExpansion expansion);
+  SILDeclRef getFuncDeclRef(FuncDecl *funcDecl, ResilienceExpansion expansion);
 
   bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                            ResilienceExpansion expansion);
 
-  KeyPathPatternComponent
-  emitKeyPathComponentForDecl(SILLocation loc,
-                              GenericEnvironment *genericEnv,
-                              ResilienceExpansion expansion,
-                              unsigned &baseOperand,
-                              bool &needsGenericContext,
-                              SubstitutionMap subs,
-                              AbstractStorageDecl *storage,
-                              ArrayRef<ProtocolConformanceRef> indexHashables,
-                              CanType baseTy,
-                              DeclContext *useDC,
-                              bool forPropertyDescriptor);
+  KeyPathPatternComponent emitKeyPathComponentForDecl(
+      SILLocation loc, GenericEnvironment *genericEnv,
+      ResilienceExpansion expansion, unsigned &baseOperand,
+      bool &needsGenericContext, SubstitutionMap subs, ValueDecl *decl,
+      ArrayRef<ProtocolConformanceRef> indexHashables, CanType baseTy,
+      DeclContext *useDC, bool forPropertyDescriptor, bool isApplied = false);
 
   /// Emit all differentiability witnesses for the given function, visiting its
   /// `@differentiable` and `@derivative` attributes.
@@ -561,6 +558,15 @@ public:
   FuncDecl *getDeinitOnExecutor();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
+
+  /// Get the configured ExecutorFactory type.
+  Type getConfiguredExecutorFactory();
+
+  /// Get the DefaultExecutorFactory type.
+  Type getDefaultExecutorFactory();
+
+  /// Get the swift_createExecutors function.
+  FuncDecl *getCreateExecutors();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

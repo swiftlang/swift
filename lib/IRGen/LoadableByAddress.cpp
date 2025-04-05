@@ -3100,10 +3100,15 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case SILInstructionKind::BranchInst:
               case SILInstructionKind::StructInst:
               case SILInstructionKind::DebugValueInst:
                 break;
               default:
+#ifndef NDEBUG
+                currInstr->dump();
+                currInstr->getFunction()->dump();
+#endif
                 llvm_unreachable("Unhandled use of FunctionRefInst");
               }
             }
@@ -4160,9 +4165,9 @@ protected:
         BuiltinValueKind::ZeroInitializer) {
       auto build = assignment.getBuilder(++bi->getIterator());
       auto newAddr = assignment.createAllocStack(bi->getType());
+      build.createZeroInitAddr(bi->getLoc(), newAddr);
       assignment.mapValueToAddress(origValue, newAddr);
-      build.createStore(bi->getLoc(), origValue, newAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      assignment.markForDeletion(bi);
     } else {
       singleValueInstructionFallback(bi);
     }

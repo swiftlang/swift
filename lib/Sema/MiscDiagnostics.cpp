@@ -344,7 +344,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
                                  diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind());
+                                 asd->getDescriptiveKind(),
+                                 /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
@@ -3655,9 +3656,18 @@ public:
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
+
+        // Type checking did not set a range for this query (it may be invalid).
+        // Treat the condition as if it were always true.
+        if (!availabilityRange.has_value()) {
+          alwaysAvailableCount++;
+          continue;
+        }
+
         // If there is no lower endpoint it means that the condition has no
         // OS version specification that matches the target platform.
-        if (!availabilityRange.hasLowerEndpoint()) {
+        // FIXME: [availability] Handle empty ranges (never available).
+        if (!availabilityRange->hasLowerEndpoint()) {
           // An inactive #unavailable condition trivially evaluates to false.
           if (condition->isUnavailability()) {
             neverAvailableCount++;
@@ -3670,7 +3680,7 @@ public:
         }
 
         conditions.push_back(
-            {availabilityRange, condition->isUnavailability()});
+            {*availabilityRange, condition->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this
@@ -5741,7 +5751,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
         assert(keyPathExpr->getComponents().size() > 0);
         auto &component = keyPathExpr->getComponents().back();
-        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+        if (component.getKind() == KeyPathExpr::Component::Kind::Member) {
           auto *storage =
             cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
           if (!storage->isSettable(nullptr) ||
@@ -5817,7 +5827,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
       for (auto *keyPathArg : keyPathArgs) {
         auto lastComponent = keyPathArg->getComponents().back();
-        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Member)
           continue;
         auto property = lastComponent.getDeclRef().getDecl();
         if (!property)

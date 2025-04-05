@@ -160,6 +160,8 @@ public:
 private:
   Implementation &Impl;
 
+  bool requiresBuiltinHeadersInSystemModules = false;
+
   ClangImporter(ASTContext &ctx,
                 DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
@@ -198,13 +200,17 @@ public:
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
 
-  static std::vector<std::string>
+  std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
-  static std::optional<std::vector<std::string>>
-  getClangCC1Arguments(ClangImporter *importer, ASTContext &ctx,
+  std::optional<std::vector<std::string>>
+  getClangCC1Arguments(ASTContext &ctx,
                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                        bool ignoreClangTarget = false);
+
+  std::vector<std::string>
+  getClangDepScanningInvocationArguments(ASTContext &ctx,
+      std::optional<StringRef> sourceFileName = std::nullopt);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
@@ -330,7 +336,7 @@ public:
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
   /// enum of an error wrapper struct.
-  ClangNode getEffectiveClangNode(const Decl *decl) const;
+  ClangNode getEffectiveClangNode(const Decl *decl) const override;
 
   /// Look for textually included declarations from the bridging header.
   ///
@@ -485,10 +491,11 @@ public:
   bridgeClangModuleDependencies(
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
+      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+      RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
@@ -756,7 +763,16 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
 /// and should be parsed using swift::SourceFile::FileIDStr::parse().
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-getPrivateFileIDAttrs(const clang::Decl *decl);
+getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl);
+
+/// Use some heuristics to determine whether the clang::Decl associated with
+/// \a decl would not exist without C++ interop.
+///
+/// For instance, a namespace is C++-only, but a plain struct is valid in both
+/// C and C++.
+///
+/// Returns false if \a decl was not imported by ClangImporter.
+bool declIsCxxOnly(const Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

@@ -419,10 +419,12 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   PrettyStackTraceLocation stackTrace(Context, "type-checking-target",
                                       target.getLoc());
 
-  // First, pre-check the target, validating any types that occur in the
-  // expression and folding sequence expressions.
-  if (ConstraintSystem::preCheckTarget(target))
-    return errorResult();
+  if (!options.contains(TypeCheckExprFlags::AvoidInvalidatingAST)) {
+    // First, pre-check the target, validating any types that occur in the
+    // expression and folding sequence expressions.
+    if (ConstraintSystem::preCheckTarget(target))
+      return errorResult();
+  }
 
   // Check whether given target has a code completion token which requires
   // special handling. Returns true if handled, in which case we've already
@@ -509,6 +511,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   auto paramInterfaceTy = paramType->mapTypeOutOfContext();
 
+  // Attempt to pre-check expression first, if that fails - skip type-checking.
+  // This would make sure that diagnostics about invalid AST are never dropped.
+  if (ConstraintSystem::preCheckTarget(defaultExprTarget))
+    return Type();
+
   {
     // Buffer all of the diagnostics produced by \c typeCheckExpression
     // since in some cases we need to try type-checking again with a
@@ -531,8 +538,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     // First, let's try to type-check default expression using
     // archetypes, which guarantees that it would work for any
     // substitution of the generic parameter (if they are involved).
-    if (auto result = typeCheckExpression(
-            defaultExprTarget, options, &diagnostics)) {
+    if (auto result =
+            typeCheckTarget(defaultExprTarget, options, &diagnostics)) {
       defaultValue = result->getAsExpr();
       return defaultValue->getType();
     }

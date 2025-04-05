@@ -295,12 +295,12 @@ void verifyKeyPathComponent(SILModule &M,
   auto getTypeInExpansionContext = [&](CanType ty) -> CanType {
     return M.Types.getLoweredType(opaque, ty, typeExpansionContext).getASTType();
   };
-  auto checkIndexEqualsAndHash = [&]{
-    if (!component.getSubscriptIndices().empty()) {
+  auto checkIndexEqualsAndHash = [&] {
+    if (!component.getArguments().empty()) {
       // Equals should be
       // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
       {
-        auto equals = component.getSubscriptIndexEquals();
+        auto equals = component.getIndexEquals();
         require(equals, "key path pattern with indexes must have equals "
                         "operator");
         
@@ -332,7 +332,7 @@ void verifyKeyPathComponent(SILModule &M,
       {
         // Hash should be
         // <Sig...> @convention(thin) (RawPointer) -> Int
-        auto hash = component.getSubscriptIndexHash();
+        auto hash = component.getIndexHash();
         require(hash, "key path pattern with indexes must have hash "
                       "operator");
         
@@ -359,8 +359,7 @@ void verifyKeyPathComponent(SILModule &M,
                 "result should be Int");
       }
     } else {
-      require(!component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(!component.getIndexEquals() && !component.getIndexHash(),
               "component without indexes must not have equals/hash");
     }
   };
@@ -395,18 +394,18 @@ void verifyKeyPathComponent(SILModule &M,
   }
     
   case KeyPathPatternComponent::Kind::GettableProperty:
-  case KeyPathPatternComponent::Kind::SettableProperty: {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
     if (forPropertyDescriptor) {
-      require(component.getSubscriptIndices().empty()
-              && !component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(component.getArguments().empty() && !component.getIndexEquals() &&
+                  !component.getIndexHash(),
               "property descriptor should not have index information");
-      
+
       require(component.getExternalDecl() == nullptr
               && component.getExternalSubstitutions().empty(),
               "property descriptor should not refer to another external decl");
     } else {
-      require(hasIndices == !component.getSubscriptIndices().empty(),
+      require(hasIndices == !component.getArguments().empty(),
               "component for subscript should have indices");
     }
     
@@ -414,7 +413,7 @@ void verifyKeyPathComponent(SILModule &M,
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
-      auto getter = component.getComputedPropertyGetter();
+      auto getter = component.getComputedPropertyForGettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 getter->hasValidLinkageForFragileRef(serializedKind),
@@ -460,8 +459,8 @@ void verifyKeyPathComponent(SILModule &M,
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
       // Setter should be
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
-      
-      auto setter = component.getComputedPropertySetter();
+
+      auto setter = component.getComputedPropertyForSettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 setter->hasValidLinkageForFragileRef(serializedKind),
@@ -510,7 +509,7 @@ void verifyKeyPathComponent(SILModule &M,
     }
     
     if (!forPropertyDescriptor) {
-      for (auto &index : component.getSubscriptIndices()) {
+      for (auto &index : component.getArguments()) {
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
@@ -712,6 +711,7 @@ struct ImmutableAddressUseVerifier {
         break;
       }
       case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
@@ -1009,6 +1009,11 @@ public:
   }
 #define requireAddressType(type, value, valueDescription) \
   _requireAddressType<type>(value, valueDescription, #type)
+
+  void requireVoidObjectType(SILType type, const Twine &valueDescription) {
+    _require(type.isObject() && type.isVoid(),
+             valueDescription + " must be a scalar of type ()");
+  }
 
   template <class T>
   typename CanTypeWrapperTraits<T>::type
@@ -2194,13 +2199,16 @@ public:
               "mark_dependence [nonescaping] must be an owned value");
     }
   }
-  
+
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
     verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
+
+    require(PAI->getType().isNoEscapeFunction() == PAI->isOnStack(),
+            "closure must be on stack to have a noescape function type");
 
     // We rely on all indirect captures to be in the argument list.
     require(PAI->getCallee()->getType().isObject(),
@@ -2372,6 +2380,23 @@ public:
 
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
+
+    if (builtinKind == BuiltinValueKind::ZeroInitializer) {
+      require(!BI->getSubstitutions(),
+              "zeroInitializer has no generic arguments as a SIL builtin");
+      if (arguments.size() == 0) {
+        require(!fnConv.useLoweredAddresses()
+                || BI->getType().isLoadable(*BI->getFunction()),
+                "scalar zeroInitializer must have a loadable result type");
+      } else {
+        require(arguments.size() == 1,
+                "zeroInitializer cannot have multiple arguments");
+        require(arguments[0]->getType().isAddress(),
+                "zeroInitializer argument must have address type");
+        requireVoidObjectType(BI->getType(),
+                              "result of zeroInitializer");
+      }
+    }
 
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
@@ -4805,7 +4830,7 @@ public:
     }
 
     for (auto i : indices(conformances)) {
-      require(conformances[i].getRequirement() == protocols[i]->getDecl(),
+      require(conformances[i].getProtocol() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
     }
@@ -5900,7 +5925,8 @@ public:
         switch (component.getKind()) {
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty:
-          hasIndices = !component.getSubscriptIndices().empty();
+        case KeyPathPatternComponent::Kind::Method:
+          hasIndices = !component.getArguments().empty();
           break;
         
         case KeyPathPatternComponent::Kind::StoredProperty:

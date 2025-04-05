@@ -66,6 +66,7 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
   )
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-strict-memory-safety")
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowUnsafeAttribute")
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
@@ -79,6 +80,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorBridge.cpp
   ExecutorChecks.cpp
   Setup.cpp
   Task.cpp
@@ -92,33 +94,13 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   linker-support/magic-symbols-for-install-name.c
 )
 
-if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    DispatchGlobalExecutor.cpp
-  )
-elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    CooperativeGlobalExecutor.cpp
-  )
-elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked" OR
-    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    NonDispatchGlobalExecutor.cpp
-  )
-endif()
-
-set(LLVM_OPTIONAL_SOURCES
-  CooperativeGlobalExecutor.cpp
-  DispatchGlobalExecutor.cpp
-  NonDispatchGlobalExecutor.cpp
-)
-
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
   AsyncLet.swift
   CheckedContinuation.swift
   Errors.swift
   Executor.swift
+  ExecutorBridge.swift
   ExecutorAssertions.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -136,10 +118,11 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  PartialAsyncTask.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
-  PartialAsyncTask.swift
+  PriorityQueue.swift
   SourceCompatibilityShims.swift
   Task.swift
   Task+PriorityEscalation.swift
@@ -176,12 +159,51 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
+  DummyExecutor.swift
+  CooperativeExecutor.swift
+  PlatformExecutorDarwin.swift
+  PlatformExecutorLinux.swift
+  PlatformExecutorWindows.swift
+)
+
+set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
+set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES)
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    DispatchGlobalExecutor.cpp
+  )
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    DispatchExecutor.swift
+    CFExecutor.swift
+    ExecutorImpl.swift
+  )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorCooperative.swift
+    )
+else()
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorNone.swift
+  )
+endif()
+
+set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+  PlatformExecutorNone.swift
+  )
+
+set(LLVM_OPTIONAL_SOURCES
+  DispatchGlobalExecutor.cpp
+  CooperativeGlobalExecutor.cpp
+  DispatchGlobalExecutor.cpp
 )
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+  ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES}
 
   GYB_SOURCES
     TaskGroup+addTask.swift.gyb
@@ -260,8 +282,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       if("${mod}" MATCHES "armv6m")
         continue()
       endif()
-      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding -stdlib=libc++)
-      set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
+
+      if("${mod}" MATCHES "-macos$")
+        set(extra_c_compile_flags -ffreestanding -stdlib=libc++)
+        set(extra_swift_compile_flags -Xcc -ffreestanding)
+      endif()
+
+    elseif (SWIFT_HOST_VARIANT STREQUAL "wasi")
+      set(extra_c_compile_flags)
+      set(extra_swift_compile_flags)
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
@@ -279,6 +308,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
@@ -304,7 +334,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       COMPONENT "stdlib"
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
-    set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    if(NOT "${arch}" MATCHES "wasm32")
+      set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+    endif()
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
@@ -358,4 +391,3 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
   add_dependencies(embedded-concurrency "copy_executor_impl_header")
 endif()
-

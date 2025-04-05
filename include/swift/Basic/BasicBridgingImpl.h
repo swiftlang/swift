@@ -146,7 +146,11 @@ swift_ASTGen_bridgedSwiftClosureCall_1(const void *_Nonnull closure,
                                        const void *_Nullable arg1);
 
 void BridgedSwiftClosure::operator()(const void *_Nullable arg1) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
   swift_ASTGen_bridgedSwiftClosureCall_1(closure, arg1);
+#else
+  llvm_unreachable("Must not be used in C++-only build");
+#endif
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

@@ -31,11 +31,6 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let lifetimeDependenceInsertionPass = FunctionPass(
   name: "lifetime-dependence-insertion")
 { (function: Function, context: FunctionPassContext) in
-#if os(Windows)
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-#endif
   log(prefix: false, "\n--- Inserting lifetime dependence markers in \(function.name)")
 
   for instruction in function.instructions {
@@ -138,7 +133,8 @@ extension LifetimeDependentApply {
       // for consistency, we use yieldAddress if any yielded value is an address.
       let targetKind = beginApply.yieldedValues.contains(where: { $0.type.isAddress })
         ? TargetKind.yieldAddress : TargetKind.yield
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: .scope(addressable: false),
+      info.sources.push(LifetimeSource(targetKind: targetKind,
+                                       convention: .scope(addressable: false, addressableForDeps: false),
                                        value: beginApply.token))
     }
     for operand in applySite.parameterOperands {
@@ -218,7 +214,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
       // addressable dependencies directly depend on the incoming address.
-      if context.options.enableAddressDependencies() && source.convention.isAddressable {
+      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value) {
         bases.append(source.value)
         return
       }
@@ -272,6 +268,9 @@ private func insertParameterDependencies(apply: LifetimeDependentApply, target: 
 
   sources.initializeBases(context)
 
+  assert(target.value.type.isAddress,
+         "lifetime-dependent parameter must be 'inout'")
+
   Builder.insert(after: apply.applySite, context) {
     insertMarkDependencies(value: target.value, initializer: nil, bases: sources.bases, builder: $0, context)
   }
@@ -282,26 +281,21 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
                                     _ context: FunctionPassContext) {
   var currentValue = value
   for base in bases {
-    let markDep = builder.createMarkDependence(
-      value: currentValue, base: base, kind: .Unresolved)
-
-    // Address dependencies cannot be represented as SSA values, so it does not make sense to replace any uses of the
-    // dependent address.
-    //
-    // TODO: either (1) insert a separate mark_dependence_addr instruction with no return value, or (2) perform data
-    // flow to replace all reachable address uses, and if any aren't dominated by base, then insert an extra
-    // escaping mark_dependence at this apply site that directly uses the mark_dependence [nonescaping] to force
-    // diagnostics to fail.
-    if !value.type.isAddress {
-      let uses = currentValue.uses.lazy.filter {
-        if $0.isScopeEndingUse {
-          return false
-        }
-        let inst = $0.instruction
-        return inst != markDep && inst != initializer && !(inst is Deallocation)
-      }
-      uses.replaceAll(with: markDep, context)
+    if value.type.isAddress {
+      // Address dependencies cannot be represented as SSA values, so it does not make sense to replace any uses of the
+      // dependent address.
+      _ = builder.createMarkDependenceAddr(value: currentValue, base: base, kind: .Unresolved)
+      continue
     }
+    let markDep = builder.createMarkDependence(value: currentValue, base: base, kind: .Unresolved)
+    let uses = currentValue.uses.lazy.filter {
+      if $0.isScopeEndingUse {
+        return false
+      }
+      let inst = $0.instruction
+      return inst != markDep && inst != initializer && !(inst is Deallocation)
+    }
+    uses.replaceAll(with: markDep, context)
     currentValue = markDep
   }
 }

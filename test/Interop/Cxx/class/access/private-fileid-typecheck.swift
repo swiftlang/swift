@@ -3,9 +3,6 @@
 // in the contexts where they should be accessible (i.e., the files blessed by
 // the SWIFT_PRIVATE_FILEID annotation).
 //
-// For now, it requires the following feature to import private members:
-// REQUIRES: swift_feature_ImportNonPublicCxxMembers
-//
 // The private_fileid mechanism relies on fileIDs, so we need some control over
 // file names:
 //
@@ -19,37 +16,37 @@
 // members are private (default) or protected. The result should be the same
 // no matter the configuration.
 //
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 //
 // This test also includes a "cursed.swift", which expects to not have access to
 // non-public members:
 //
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/cursed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/cursed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 //
 // To check that fileID is agnostic about directory structure within a module,
 // we move blessed.swift into a subdirectory (but keep its filename).
 //
 // RUN: mkdir -p %t/subdir/subsubdir
 // RUN: mv %t/blessed.swift %t/subdir/subsubdir/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/subdir/subsubdir/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 //
 // To check that fileID is sensitive to module names, rename cursed.swift to
 // "blessed.swift", but typecheck in a module not called "main".
 //
 // RUN: mv %t/cursed.swift %t/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name brain %t/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name brain %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 
 //--- blessed.swift
 
@@ -107,20 +104,20 @@ extension MyClass {
         let _: privEnumFlag
 
         // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-        // let _ = publEnum.publEnumValue1
-        // let _ = privEnum.privEnumValue1
+        // let _ = variantPublEnum
+        // let _ = variantPrivEnum
         //
-        // let _ = publEnumClass.publEnumClassValue1
-        // let _ = privEnumClass.privEnumClassValue1
-        //
-        // let _ = publEnumAnonValue1
-        // let _ = privEnumAnonValue1
-        //
-        // let _ = publEnumClosed.Value1
-        // let _ = privEnumClosed.Value1
-        //
-        // let _ = publEnumOpen.Value1
-        // let _ = privEnumOpen.Value1
+        // let _ = publEnumAnonVariant
+        // let _ = privEnumAnonVariant
+
+        let _ = publEnumClass.variantPublEnumClass
+        let _ = privEnumClass.variantPrivEnumClass
+
+        let _ = publEnumClosed.variantPublEnumClosed
+        let _ = privEnumClosed.variantPrivEnumClosed
+
+        let _ = publEnumOpen.variantPublEnumOpen
+        let _ = privEnumOpen.variantPrivEnumOpen
     }
 
     func fcutd(_ _: publTypedef) { }
@@ -165,20 +162,21 @@ func notExt(_ c: inout MyClass) {
     let _: MyClass.privEnumFlag // expected-error {{'privEnumFlag' is inaccessible due to 'private' protection level}}
 
     // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-    // let _ = MyClass.publEnum.publEnumValue1
-    // let _ = MyClass.privEnum.privEnumValue1
     //
-    // let _ = MyClass.publEnumClass.publEnumClassValue1
-    // let _ = MyClass.privEnumClass.privEnumClassValue1
+    // let _ = MyClass.variantPublEnum
+    // let _ = MyClass.variantPrivEnum // TODO-error {{'variantPrivEnum' is inaccessible due to 'private' protection level}}
     //
-    // let _ = MyClass.publEnumAnonValue1
-    // let _ = MyClass.privEnumAnonValue1
-    //
-    // let _ = MyClass.publEnumClosed.Value1
-    // let _ = MyClass.privEnumClosed.Value1
-    //
-    // let _ = MyClass.publEnumOpen.Value1
-    // let _ = MyClass.privEnumOpen.Value1
+    // let _ = MyClass.publEnumAnonVariant
+    // let _ = MyClass.privEnumAnonVariant // TODO-error {{'privEnumAnonVariant' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClass.variantPublEnumClass
+    let _ = MyClass.privEnumClass.variantPrivEnumClass // expected-error {{'privEnumClass' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClosed.variantPublEnumClosed
+    let _ = MyClass.privEnumClosed.variantPrivEnumClosed // expected-error {{'privEnumClosed' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumOpen.variantPublEnumOpen
+    let _ = MyClass.privEnumOpen.variantPrivEnumOpen // expected-error {{'privEnumOpen' is inaccessible due to 'private' protection level}}
 }
 
 //--- cursed.swift
@@ -231,20 +229,20 @@ extension MyClass {
         let _: privEnumFlag // expected-error {{'privEnumFlag' is inaccessible due to 'private' protection level}}
 
         // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-        // let _ = publEnum.publEnumValue1
-        // let _ = privEnum.privEnumValue1
+        // let _ = variantPublEnum
+        // let _ = variantPrivEnum // TODO-error {{'variantPrivEnum' is inaccessible due to 'private' protection level}}
         //
-        // let _ = publEnumClass.publEnumClassValue1
-        // let _ = privEnumClass.privEnumClassValue1
-        //
-        // let _ = publEnumAnonValue1
-        // let _ = privEnumAnonValue1
-        //
-        // let _ = publEnumClosed.Value1
-        // let _ = privEnumClosed.Value1
-        //
-        // let _ = publEnumOpen.Value1
-        // let _ = privEnumOpen.Value1
+        // let _ = publEnumAnonVariant
+        // let _ = privEnumAnonVariant // TODO-error {{'privEnumAnonVariant' is inaccessible due to 'private' protection level}}
+
+        let _ = publEnumClass.variantPublEnumClass
+        let _ = privEnumClass.variantPrivEnumClass// expected-error {{'privEnumClass' is inaccessible due to 'private' protection level}}
+
+        let _ = publEnumClosed.variantPublEnumClosed
+        let _ = privEnumClosed.variantPrivEnumClosed // expected-error {{'privEnumClosed' is inaccessible due to 'private' protection level}}
+
+        let _ = publEnumOpen.variantPublEnumOpen
+        let _ = privEnumOpen.variantPrivEnumOpen // expected-error {{'privEnumOpen' is inaccessible due to 'private' protection level}}
     }
 }
 
@@ -286,18 +284,18 @@ func notExt(_ c: inout MyClass) {
     let _: MyClass.privEnumFlag // expected-error {{'privEnumFlag' is inaccessible due to 'private' protection level}}
 
     // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-    // let _ = MyClass.publEnum.publEnumValue1
-    // let _ = MyClass.privEnum.privEnumValue1
+    // let _ = MyClass.variantPublEnum
+    // let _ = MyClass.variantPrivEnum // TODO-error {{'variantPrivEnum' is inaccessible due to 'private' protection level}}
     //
-    // let _ = MyClass.publEnumClass.publEnumClassValue1
-    // let _ = MyClass.privEnumClass.privEnumClassValue1
-    //
-    // let _ = MyClass.publEnumAnonValue1
-    // let _ = MyClass.privEnumAnonValue1
-    //
-    // let _ = MyClass.publEnumClosed.Value1
-    // let _ = MyClass.privEnumClosed.Value1
-    //
-    // let _ = MyClass.publEnumOpen.Value1
-    // let _ = MyClass.privEnumOpen.Value1
+    // let _ = MyClass.publEnumAnonVariant
+    // let _ = MyClass.privEnumAnonVariant // TODO-error {{'privEnumAnonVariant' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClass.variantPublEnumClass
+    let _ = MyClass.privEnumClass.variantPrivEnumClass// expected-error {{'privEnumClass' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClosed.variantPublEnumClosed
+    let _ = MyClass.privEnumClosed.variantPrivEnumClosed // expected-error {{'privEnumClosed' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumOpen.variantPublEnumOpen
+    let _ = MyClass.privEnumOpen.variantPrivEnumOpen // expected-error {{'privEnumOpen' is inaccessible due to 'private' protection level}}
 }

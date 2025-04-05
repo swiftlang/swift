@@ -173,16 +173,20 @@ bool importer::recordHasReferenceSemantics(
   // return MissingLifetimeOperation if the type is not a foreign reference
   // type. Note that this doesn't affect the correctness of this function, since
   // those implicit members aren't required for foreign reference types.
-
-  // To avoid emitting spurious diagnostics, let's disable them here. Types with
-  // missing lifetime operations would get diagnosed later, once their members
-  // are fully instantiated.
   auto semanticsKind = evaluateOrDefault(
       importerImpl->SwiftContext.evaluator,
-      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl,
-                          /* shouldDiagnoseLifetimeOperations */ false}),
+      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl}),
       {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
+}
+
+bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "retain:immortal" ||
+                    swiftAttr->getAttribute() == "release:immortal";
+           return false;
+         });
 }
 
 #ifndef NDEBUG
@@ -2036,9 +2040,20 @@ namespace {
     }
 
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
-      fd->getAttrs().add(new (Impl.SwiftContext)
-                             UnsafeNonEscapableResultAttr(/*Implicit=*/true));
       fd->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
+
+      unsigned resultIndex = fd->getParameters()->size();
+      if (fd->hasImplicitSelfDecl()) {
+        ++resultIndex;
+      }
+      SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, resultIndex,
+                                              /*isImmortal*/ true);
+      lifetimeDependencies.push_back(immortalLifetime);
+      Impl.SwiftContext.evaluator.cacheOutput(
+        LifetimeDependenceInfoRequest{fd},
+        Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+      return;
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
@@ -2377,6 +2392,9 @@ namespace {
           // field type.
           synthesizer.makeUnionFieldAccessors(result, member);
 
+          // Union accessors are always unsafe.
+          member->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
+
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
           auto valueCtor =
@@ -2472,13 +2490,42 @@ namespace {
         ctors.push_back(valueCtor);
       }
 
-      // Do not allow Swift to construct foreign reference types (at least, not
-      // yet).
       if (isa<StructDecl>(result)) {
         for (auto ctor : ctors) {
           // Add ctors directly as they cannot always be looked up from the
           // clang decl (some are synthesized by Swift).
           result->addMember(ctor);
+        }
+      } else {
+        if (Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::CXXForeignReferenceTypeInitializers)) {
+          assert(
+              isa<ClassDecl>(result) &&
+              "Expected result to be a ClassDecl as it cannot be a StructDecl");
+          // When we add full support for C foreign reference types then we
+          // should synthesize static factories for them as well
+          if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+            bool hasUserProvidedStaticFactory = llvm::any_of(
+                cxxRecordDecl->methods(),
+                [](const clang::CXXMethodDecl *method) {
+                  return method->isStatic() &&
+                         llvm::any_of(
+                             method->specific_attrs<clang::SwiftNameAttr>(),
+                             [](const auto *attr) {
+                               return attr->getName().starts_with("init(");
+                             });
+                });
+            if (!hasUserProvidedStaticFactory) {
+              if (auto generatedCxxMethodDecl =
+                      synthesizer.synthesizeStaticFactoryForCXXForeignRef(
+                          cxxRecordDecl)) {
+                if (Decl *importedInitDecl =
+                        Impl.SwiftContext.getClangModuleLoader()
+                            ->importDeclDirectly(generatedCxxMethodDecl))
+                  result->addMember(importedInitDecl);
+              }
+            }
+          }
         }
       }
 
@@ -2967,6 +3014,17 @@ namespace {
           // members once they're instantiated.
           !Impl.importSymbolicCXXDecls) {
 
+        HeaderLoc loc(decl->getLocation());
+        if (hasUnsafeAPIAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_unsafe",
+                        decl->getNameAsString());
+        if (hasOwnedValueAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_owned",
+                        decl->getNameAsString());
+        if (hasIteratorAPIAttr(decl))
+          Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_iterator",
+                        decl->getNameAsString());
+
         if (semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
           Impl.addImportDiagnostic(
               decl, Diagnostic(diag::record_unsupported_default_args),
@@ -3017,6 +3075,10 @@ namespace {
               /*Obsoleted=*/{});
           classDecl->getAttrs().add(AvAttr);
         }
+
+        if (decl->isEffectivelyFinal())
+          classDecl->getAttrs().add(new (Impl.SwiftContext)
+                                    FinalAttr(/*IsImplicit=*/true));
       }
 
       // If this module is declared as a C++ module, try to synthesize
@@ -3277,9 +3339,6 @@ namespace {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available
         // independently.
-
-        // FIXME: This is gross. We shouldn't have to import
-        // everything to get at the individual constants.
         return nullptr;
       }
       }
@@ -3671,6 +3730,13 @@ namespace {
       return nullptr;
     }
 
+    static bool isClangNamespace(const DeclContext *dc) {
+      if (const auto *ed = dc->getSelfEnumDecl())
+        return isa<clang::NamespaceDecl>(ed->getClangDecl());
+
+      return false;
+    }
+
     Decl *importFunctionDecl(
         const clang::FunctionDecl *decl, ImportedName importedName,
         std::optional<ImportedName> correctSwiftName,
@@ -3806,7 +3872,8 @@ namespace {
 
       bool importFuncWithoutSignature =
           isa<clang::CXXMethodDecl>(decl) && Impl.importSymbolicCXXDecls;
-      if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
+      if (!dc->isModuleScopeContext() && !isClangNamespace(dc) &&
+          !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName().isConstructor()) {
           assert(!accessorInfo);
@@ -4060,6 +4127,9 @@ namespace {
                    CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
       };
 
+      // FIXME: this uses '0' as the result index. That only works for
+      // standalone functions with no parameters.
+      // See markReturnsUnsafeNonescapable() for a general approach.
       auto &ASTContext = result->getASTContext();
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
@@ -9186,6 +9256,34 @@ void ClangImporter::Implementation::importAttributes(
       MappedDecl->getAttrs().add(AvAttr);
     }
 
+    // __attribute__((availability(domain:)))
+    //
+    if (auto avail = dyn_cast<clang::DomainAvailabilityAttr>(*AI)) {
+      auto *declContext = MappedDecl->getInnermostDeclContext();
+
+      // FIXME: [availability] Don't look up the availability domain. Clang
+      // should be serializing the resolved VarDecl for the availability domain
+      // it found when type checking the attribute.
+      auto domainIdentifier = SwiftContext.getIdentifier(avail->getDomain());
+      llvm::SmallVector<AvailabilityDomain, 4> results;
+      declContext->lookupAvailabilityDomains(domainIdentifier, results);
+
+      if (results.size() > 0) {
+        // FIXME: [availability] Diagnose ambiguous availabilty domain name?
+        auto AttrKind = avail->getUnavailable()
+                            ? AvailableAttr::Kind::Unavailable
+                            : AvailableAttr::Kind::Default;
+
+        auto avAttr = new (C) AvailableAttr(
+            SourceLoc(), SourceRange(), results.front(), SourceLoc(), AttrKind,
+            /*Message=*/"", /*Rename=*/"", /*Introduced=*/{}, SourceRange(),
+            /*Deprecated=*/{}, SourceRange(), /*Obsoleted=*/{}, SourceRange(),
+            /*Implicit=*/false, /*IsSPI=*/false);
+
+        MappedDecl->getAttrs().add(avAttr);
+      }
+    }
+
     // __attribute__((swift_attr("attribute"))) are handled by
     // importSwiftAttrAttributes(). Other attributes are ignored.
   }
@@ -9964,6 +10062,17 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
 void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord,
     ClangInheritanceInfo inheritance) {
+
+  // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
+  // to import all non-public members by default; if that is disabled, we only
+  // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
+  // are the only classes that need non-public members.)
+  auto *baseRecord = dyn_cast<clang::CXXRecordDecl>(swiftDecl->getClangDecl());
+  auto skipIfNonPublic = !swiftDecl->getASTContext().LangOpts.hasFeature(
+                             Feature::ImportNonPublicCxxMembers) &&
+                         baseRecord &&
+                         importer::getPrivateFileIDAttrs(baseRecord).empty();
+
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
@@ -9971,17 +10080,25 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     if (!nd)
       continue;
 
-    if (!swiftDecl->getASTContext().LangOpts.hasFeature(
-            Feature::ImportNonPublicCxxMembers)) {
-      auto access = nd->getAccess();
-      if ((access == clang::AS_private || access == clang::AS_protected) &&
-          (inheritance || !isa<clang::FieldDecl>(nd)))
-        // 'nd' is a non-public member and ImportNonPublicCxxMembers is not
-        // enabled. Don't import it unless it is a non-inherited field, which
-        // we must import because it may affect implicit conformances that
-        // iterate through all of a struct's fields, e.g., Sendable (#76892).
-        continue;
-    }
+    // We should not import 'found' if the following are all true:
+    //
+    // -  Feature::ImportNonPublicCxxMembers is not enabled
+    // -  'found' is not a member of a SWIFT_PRIVATE_FILEID-annotated class
+    // -  'found' is a non-public member.
+    // -  'found' is not a non-inherited FieldDecl; we must import private
+    //    fields because they may affect implicit conformances that iterate
+    //    through all of a struct's fields, e.g., Sendable (#76892).
+    //
+    // Note that we can skip inherited FieldDecls because implicit conformances
+    // handle those separately.
+    //
+    // The first two conditions are captured by skipIfNonPublic. The next two
+    // are conveyed by the following:
+    auto nonPublic = nd->getAccess() == clang::AS_private ||
+                     nd->getAccess() == clang::AS_protected;
+    auto noninheritedField = !inheritance && isa<clang::FieldDecl>(nd);
+    if (skipIfNonPublic && nonPublic && !noninheritedField)
+      continue;
 
     // Currently, we don't import unnamed bitfields.
     if (isa<clang::FieldDecl>(m) &&
@@ -10050,9 +10167,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
-      if (!swiftDecl->getASTContext().LangOpts.hasFeature(
-              Feature::ImportNonPublicCxxMembers) &&
-          base.getAccessSpecifier() != clang::AS_public)
+      if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;
 
       clang::QualType baseType = base.getType();

@@ -297,6 +297,20 @@ NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
   }
 }
 
+bool ASTScopeImpl::isDeclAttribute() const {
+  switch (getKind()) {
+#define DECL_ATTRIBUTE_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return true;
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+#define DECL_ATTRIBUTE_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return false;
+  }
+}
+
 SourceManager &ASTScopeImpl::getSourceManager() const {
   return getASTContext().SourceMgr;
 }

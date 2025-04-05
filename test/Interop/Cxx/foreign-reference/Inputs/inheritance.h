@@ -5,6 +5,13 @@
 // A wrapper around C++'s static_cast(), which allows Swift to get around interop's current lack of support for inheritance.
 template <class I, class O> O cxxCast(I i) { return static_cast<O>(i); }
 
+namespace Foo {
+template <class I, class O>
+O cxxCast(I i) {
+  return static_cast<O>(i);
+}
+} // namespace Foo
+
 // A minimal foreign reference type.
 struct
 __attribute__((swift_attr("import_reference")))
@@ -71,6 +78,27 @@ DerivedOutOfOrder : public BaseT, public DerivedWithVirtualDestructor {
     }
 };
 
+struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")))
+BaseAlign8 {
+  long long field8 = 123;
+}; // sizeof=8, dsize=8, align=8
+
+struct DerivedHasTailPadding : public BaseAlign8 {
+  int field4 = 456;
+}; // sizeof=16, dsize=12, align=8
+
+struct DerivedUsesBaseTailPadding : public DerivedHasTailPadding {
+  short field2 = 789;
+
+  static DerivedUsesBaseTailPadding& getInstance() {
+    static DerivedUsesBaseTailPadding singleton;
+    return singleton;
+  }
+}; // sizeof=16, dsize=14, align=8
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace ImmortalRefereceExample {
@@ -109,7 +137,7 @@ DerivedFromValueTypeAndAnnotated *returnDerivedFromValueTypeAndAnnotated() { // 
     return new DerivedFromValueTypeAndAnnotated();
 }
 
-struct DerivedFromRefType : RefType {};
+struct DerivedFromRefType final : RefType {};
 DerivedFromRefType *returnDerivedFromRefType() {
     return new DerivedFromRefType();
 }
@@ -180,7 +208,7 @@ __attribute__((swift_attr("release:RCRelease"))) RefType {};
 
 RefType *returnRefType() { return new RefType(); }; // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENC}}
 
-struct DerivedFromRefType : RefType {};
+struct DerivedFromRefType final : RefType {};
 DerivedFromRefType *returnDerivedFromRefType() { // TODO: rdar://145098078 Missing SWIFT_RETURNS_(UN)RETAINED annotation warning should trigger for inferred foreeign reference types as well
   return new DerivedFromRefType();
 };

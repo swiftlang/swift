@@ -2,6 +2,39 @@
 
 import Synchronization
 
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal12emptyTrivials11InlineArrayVy$_SiGyF : $@convention(thin) () -> InlineArray<0, Int> {
+// CHECK:         [[EMPTY_TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:    [[IA:%.*]] = unchecked_trivial_bit_cast [[EMPTY_TUPLE]] to $InlineArray<0, Int>
+// CHECK-NEXT:    return [[IA]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal12emptyTrivials11InlineArrayVy$_SiGyF'
+func emptyTrivial() -> InlineArray<0, Int> {
+  []
+}
+
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal15emptyNontrivials11InlineArrayVy$_SSGyF : $@convention(thin) () -> @owned InlineArray<0, String> {
+// CHECK:         [[EMPTY_TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:    [[IA:%.*]] = unchecked_bitwise_cast [[EMPTY_TUPLE]] to $InlineArray<0, String>
+// CHECK-NEXT:    [[COPY_IA:%.*]] = copy_value [[IA]]
+// CHECK-NEXT:    return [[COPY_IA]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal15emptyNontrivials11InlineArrayVy$_SSGyF'
+func emptyNontrivial() -> InlineArray<0, String> {
+  []
+}
+
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal16emptyNoncopyables11InlineArrayVy$_15Synchronization6AtomicVySiGGyF : $@convention(thin) () -> @out InlineArray<0, Atomic<Int>> {
+// CHECK:       bb0([[IA_RETURN:%.*]] : $*InlineArray<0, Atomic<Int>>):
+// CHECK-NEXT:    [[IA_ALLOC:%.*]] = alloc_stack $InlineArray<0, Atomic<Int>>
+// CHECK:         [[IA_CAST:%.*]] = unchecked_addr_cast [[IA_ALLOC]] to $*InlineArray<0, Atomic<Int>>
+// CHECK-NEXT:    [[IA_BOX:%.*]] = alloc_box
+// CHECK-NEXT:    [[BORROW_BOX:%.*]] =  begin_borrow [lexical] [[IA_BOX]]
+// CHECK-NEXT:    [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]], 0
+// CHECK-NEXT:    copy_addr [take] [[IA_CAST]] to [init] [[PROJECT_BOX]]
+// CHECK-NEXT:    dealloc_stack [[IA_ALLOC]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal16emptyNoncopyables11InlineArrayVy$_15Synchronization6AtomicVySiGGyF'
+func emptyNoncopyable() -> InlineArray<0, Atomic<Int>> {
+  []
+}
+
 // CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal7trivials11InlineArrayVy$3_SiGyF : $@convention(thin) () -> InlineArray<4, Int> {
 // CHECK:         [[SLAB_ALLOC:%.*]] = alloc_stack $InlineArray<4, Int>
 // CHECK-NEXT:    [[ELEMENT_PTR:%.*]] = unchecked_addr_cast [[SLAB_ALLOC]] to $*Int
@@ -72,4 +105,18 @@ func nontrivial() -> InlineArray<2, String> {
 // CHECK-LABEL: } // end sil function '$s19inlinearray_literal11noncopyables11InlineArrayVy$1_15Synchronization6AtomicVySiGGyF'
 func noncopyable() -> InlineArray<2, Atomic<Int>> {
   [Atomic(0), Atomic(1)]
+}
+
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal7closures11InlineArrayVy$0_S2icGyF : $@convention(thin) () -> @owned InlineArray<1, (Int) -> Int> {
+// CHECK:         [[IA_ALLOC:%.*]] = alloc_stack $InlineArray<1, (Int) -> Int>
+// CHECK-NEXT:    [[ADDR_CAST:%.*]] = unchecked_addr_cast [[IA_ALLOC]] to $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
+// CHECK:         [[FN_REF:%.*]] = function_ref
+// CHECK-NEXT:    [[THIN_TO_THICK_FN:%.*]] = thin_to_thick_function [[FN_REF]] to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
+// CHECK-NEXT:    store [[THIN_TO_THICK_FN]] to [init] [[ADDR_CAST]]
+// CHECK-NEXT:    [[IA:%.*]] = load [take] [[IA_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[IA_ALLOC]]
+// CHECK-NEXT:    return [[IA]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal7closures11InlineArrayVy$0_S2icGyF'
+func closure() -> InlineArray<1, (Int) -> Int> {
+  [{$0 * 2}]
 }

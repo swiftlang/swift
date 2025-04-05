@@ -970,10 +970,11 @@ NOTE(regionbasedisolation_type_is_non_sendable, none,
 //===
 // Use After Send Emitter
 
-ERROR(regionbasedisolation_named_send_yields_race, none,
+GROUPED_ERROR(regionbasedisolation_named_send_yields_race,
+      SendingRisksDataRace, none,
       "sending %0 risks causing data races",
       (Identifier))
-ERROR(regionbasedisolation_type_send_yields_race, none,
+GROUPED_ERROR(regionbasedisolation_type_send_yields_race, SendingRisksDataRace, none,
       "sending value of non-Sendable type %0 risks causing data races",
       (Type))
 NOTE(regionbasedisolation_type_use_after_send, none,
@@ -1132,6 +1133,15 @@ NOTE(rbi_add_nominal_sendable_conformance,none,
 NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
+
+// Concurrency related diagnostics
+ERROR(cannot_find_executor_factory_type, none,
+      "the specified executor factory '%0' could not be found", (StringRef))
+ERROR(executor_factory_must_conform, none,
+      "the executor factory '%0' does not conform to 'ExecutorFactory'",
+      (StringRef))
+ERROR(executor_factory_not_supported, none,
+      "deployment target too low for executor factory specification", ())
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics

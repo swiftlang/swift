@@ -26,6 +26,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -466,13 +467,13 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
-    bool hasConst = sv->getAttrs().getAttribute<CompileTimeLiteralAttr>();
-    if (!hasConst)
+    bool hasUnderscoreConst = sv->getAttrs().getAttribute<CompileTimeLiteralAttr>();
+    if (!hasUnderscoreConst)
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
     if (shouldRequireStatic && !hasStatic) {
-      binding->diagnose(diag::require_static_for_const);
+      binding->diagnose(diag::require_static_for_literal);
       continue;
     }
     if (isReq) {
@@ -484,15 +485,15 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     }
     // var is only allowed in a protocol.
     if (!sv->isLet()) {
-      binding->diagnose(diag::require_let_for_const);
+      binding->diagnose(diag::require_let_for_literal);
     }
     // Diagnose when an init isn't given and it's not a compile-time constant
     if (auto *init = binding->getInit(entryNumber)) {
       if (!init->isSemanticallyConstExpr()) {
-        binding->diagnose(diag::require_const_initializer_for_const);
+        binding->diagnose(diag::require_literal_initializer_for_literal);
       }
     } else {
-      binding->diagnose(diag::require_const_initializer_for_const);
+      binding->diagnose(diag::require_literal_initializer_for_literal);
     }
   }
 
@@ -1431,7 +1432,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //- (id)copyWithZone:(NSZone *)zone;
   DeclName copyWithZoneName(Ctx, Ctx.getIdentifier("copy"), { Ctx.Id_with });
   FuncDecl *copyMethod = nullptr;
-  for (auto member : conformance.getRequirement()->getMembers()) {
+  for (auto member : conformance.getProtocol()->getMembers()) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       if (func->getName() == copyWithZoneName) {
         copyMethod = func;
@@ -1909,7 +1910,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
     ConcreteDeclRef ref(observer, subs);
-    auto type = observer->getInterfaceType().subst(subs);
+    auto type = observer->getInterfaceType();
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
     Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
     Callee->setType(type);
 
@@ -2100,7 +2103,9 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
 
   auto callDidSet = [&]() {
     ConcreteDeclRef ref(DidSet, subs);
-    auto type = DidSet->getInterfaceType().subst(subs);
+    auto type = DidSet->getInterfaceType();
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
     Expr *Callee = new (ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/ true);
     Callee->setType(type);
 
@@ -2693,7 +2698,7 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
   if (!ctx.supportsVersionedAvailability())
     return true;
 
-  auto modifyAvailability = TypeChecker::availabilityAtLocation({}, accessor);
+  auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
   auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.
@@ -3732,6 +3737,11 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
 
 bool HasStorageRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  // ABI decl inherits this from API.
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->hasStorage();
+
   // Parameters are always stored.
   if (isa<ParamDecl>(storage))
     return true;
@@ -3742,8 +3752,12 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
     return false;
 
   // @_hasStorage implies that it... has storage.
-  if (var->getAttrs().hasAttribute<HasStorageAttr>())
-    return true;
+  if (var->getAttrs().hasAttribute<HasStorageAttr>()) {
+    // Except in contexts where it would be invalid. This is diagnosed in
+    // StorageImplInfoRequest.
+    return !isa<ProtocolDecl, ExtensionDecl, EnumDecl>(
+               storage->getDeclContext()->getImplementedObjCContext());
+  }
 
   // Protocol requirements never have storage.
   if (isa<ProtocolDecl>(storage->getDeclContext()))
@@ -3817,7 +3831,11 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
     return;
   
   if (auto varDecl = dyn_cast<VarDecl>(decl)) {
-    if (hasStorage && !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
+    auto abiRole = ABIRoleInfo(varDecl);
+    bool abiOnly = !abiRole.providesAPI() && abiRole.getCounterpart();
+
+    if (hasStorage && !abiOnly &&
+          !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
       varDecl->getAttrs().add(new (varDecl->getASTContext())
                               HasStorageAttr(/*isImplicit=*/true));
   }
@@ -3833,10 +3851,21 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
         : StorageIsMutable);
   }
 
-  if (auto *var = dyn_cast<VarDecl>(storage)) {
+  // If we're in an @implementation extension, we care about the semantics of
+  // the decl it implements.
+  auto *DC = storage->getDeclContext()->getImplementedObjCContext();
+
+  if (auto attr = storage->getParsedAttrs().getAttribute<HasStorageAttr>()) {
+    // If we see `@_hasStorage` in a context with no stored properties, diagnose
+    // and ignore it.
+    if (isa<ExtensionDecl, EnumDecl, ProtocolDecl>(DC)) {
+      storage->diagnose(diag::attr_invalid_in_context, attr,
+                        DC->getAsDecl()->getDescriptiveKind())
+        .warnInSwiftInterface(storage->getDeclContext());
+
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
-    if (var->getParsedAttrs().hasAttribute<HasStorageAttr>()) {
+    } else if (auto *var = dyn_cast<VarDecl>(storage)) {
       // The SIL rules for @_hasStorage are slightly different from the non-SIL
       // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
       // and the only thing that determines mutability is the existence of the
@@ -3931,7 +3960,6 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
 
-  auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {

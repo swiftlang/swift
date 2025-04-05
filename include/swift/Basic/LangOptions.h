@@ -96,6 +96,11 @@ namespace swift {
     TaskToThread,
   };
 
+  enum class DefaultIsolation : uint8_t {
+    MainActor,
+    Nonisolated
+  };
+
   /// Describes the code size optimization behavior for code associated with
   /// declarations that are marked unavailable.
   enum class UnavailableDeclOptimization : uint8_t {
@@ -148,6 +153,7 @@ namespace swift {
     /// The lowering triple may result in multiple versions of the same Clang
     /// modules being built.
     std::optional<llvm::Triple> ClangTarget;
+    std::optional<llvm::Triple> ClangTargetVariant;
 
     /// The SDK version, if known.
     std::optional<llvm::VersionTuple> SDKVersion;
@@ -263,6 +269,9 @@ namespace swift {
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
+    /// Emit a remark when \c \@abi infers an attribute or modifier.
+    bool EnableABIInferenceRemarks = false;
+
     ///
     /// Support for alternate usage modes
     ///
@@ -327,6 +336,10 @@ namespace swift {
     /// The C++ interoperability source compatibility version. Defaults
     /// to the Swift language version.
     version::Version cxxInteropCompatVersion;
+
+    /// What version of C++ interoperability a textual interface was originally
+    /// generated with (if at all).
+    std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
                                swift::DiagnosticEngine &Diags);
@@ -395,6 +408,10 @@ namespace swift {
 
     /// Specifies how strict concurrency checking will be.
     StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
+
+    /// Specifies the name of the executor factory to use to create the
+    /// default executors for Swift Concurrency.
+    std::optional<std::string> ExecutorFactory;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
@@ -593,7 +610,7 @@ namespace swift {
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = true;
+    bool EnableExperimentalLifetimeDependenceInference = false;
 
     /// Skips decls that cannot be referenced externally.
     bool SkipNonExportableDecls = false;
@@ -626,6 +643,9 @@ namespace swift {
 
     /// Disables `DynamicActorIsolation` feature.
     bool DisableDynamicActorIsolation = false;
+
+    /// Defines the default actor isolation.
+    DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
     /// Whether or not to allow experimental features that are only available
     /// in "production".
@@ -794,6 +814,8 @@ namespace swift {
         hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
       if (ClangTarget.has_value())
         hashValue = llvm::hash_combine(hashValue, ClangTarget.value().str());
+      if (ClangTargetVariant.has_value())
+        hashValue = llvm::hash_combine(hashValue, ClangTargetVariant.value().str());
       if (SDKVersion.has_value())
         hashValue = llvm::hash_combine(hashValue, SDKVersion.value().getAsString());
       if (VariantSDKVersion.has_value())
@@ -809,8 +831,9 @@ namespace swift {
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
 
   public:
+    //==========================================================================
     // MARK: Features
-    // =========================================================================
+    //==========================================================================
 
     /// A wrapper around the feature state enumeration.
     struct FeatureState {

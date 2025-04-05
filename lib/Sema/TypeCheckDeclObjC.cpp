@@ -650,6 +650,11 @@ bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention) {
+  auto abiRole = ABIRoleInfo(AFD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason,
+                                 asyncConvention, errorConvention);
+
   // Clear out the async and error conventions. They will be added later if
   // needed.
   asyncConvention = std::nullopt;
@@ -1104,6 +1109,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (VD->isInvalid())
     return false;
 
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
@@ -1160,6 +1169,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
 bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
+  auto abiRole = ABIRoleInfo(SD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   ASTContext &ctx = SD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
@@ -1769,6 +1782,11 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
+
+  // ABI-only decls inherit objc-ness from their API.
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isObjC();
 
   // Access notes may add attributes that affect this calculus.
   TypeChecker::applyAccessNote(VD);
@@ -3307,19 +3325,6 @@ public:
   }
 
 private:
-  static bool hasAsync(ValueDecl *member) {
-    if (!member)
-      return false;
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member))
-      return func->hasAsync();
-
-    if (auto storage = dyn_cast<AbstractStorageDecl>(member))
-      return hasAsync(storage->getEffectfulGetAccessor());
-
-    return false;
-  }
-
   static ValueDecl *getAsyncAlternative(ValueDecl *req) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(req)) {
       auto asyncFunc = func->getAsyncAlternative();
@@ -3394,7 +3399,7 @@ private:
 
     // Skip async versions of members. We'll match against the completion
     // handler versions, hopping over to `getAsyncAlternative()` if needed.
-    if (hasAsync(VD))
+    if (VD->isAsync())
       return;
 
     auto inserted = unmatchedRequirements.insert(VD);
@@ -3859,7 +3864,7 @@ private:
                        ObjCSelector explicitObjCName) const {
     // If the candidate we're considering is async, see if the requirement has
     // an async alternate and try to match against that instead.
-    if (hasAsync(cand))
+    if (cand->isAsync())
       if (auto asyncAltReq = getAsyncAlternative(req))
         return matchesImpl(asyncAltReq, cand, explicitObjCName);
 
@@ -3889,12 +3894,27 @@ private:
       diagnoseVTableUse(cand);
       return;
 
-    case MatchOutcome::WrongSendability:
+    case MatchOutcome::WrongSendability: {
+      auto concurrencyLevel = req->getASTContext().LangOpts.StrictConcurrencyLevel;
+
+      DiagnosticBehavior behavior;
+      switch (concurrencyLevel) {
+      case StrictConcurrency::Complete:
+        behavior = DiagnosticBehavior::Warning;
+        break;
+
+      case StrictConcurrency::Targeted:
+      case StrictConcurrency::Minimal:
+        behavior = DiagnosticBehavior::Ignore;
+        break;
+      }
+
       diagnose(cand, diag::objc_implementation_sendability_mismatch, cand,
                getMemberType(cand), getMemberType(req))
-          .limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
+          .limitBehaviorWithPreconcurrency(behavior,
                                            /*preconcurrency*/ true);
       return;
+    }
 
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
@@ -4113,6 +4133,9 @@ public:
 
 evaluator::SideEffect TypeCheckObjCImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *D) const {
+  if (!ABIRoleInfo(D).providesAPI())
+    return evaluator::SideEffect();
+
   PrettyStackTraceDecl trace("checking member implementations of", D);
 
   // FIXME: Because we check extension-by-extension, candidates and requirements

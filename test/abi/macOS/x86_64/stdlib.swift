@@ -795,13 +795,13 @@ Added: _$sSS5IndexVs28CustomDebugStringConvertiblesWP
 // SE-0447 Span and RawSpan
 Added: _$ss4SpanVMa
 Added: _$ss4SpanVMn
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
-Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
-Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE5countSivpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE7indicesSnySiGvpMV
-Added: _$ss4SpanVsRi_zRi0_zrlE7isEmptySbvpMV
+Added: _$ss4SpanVsRi_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zrlE6_countSivpMV
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvg
+Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvpMV
+Added: _$ss4SpanVsRi_zrlE5countSivpMV
+Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
+Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV
 Added: _$ss7RawSpanV11byteOffsetsSnySiGvpMV
@@ -814,6 +814,39 @@ Added: _$ss7RawSpanV9byteCountSivpMV
 Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
+
+// SE-0467 MutableSpan and MutableRawSpan
+Added: _$ss11MutableSpanVMa
+Added: _$ss11MutableSpanVMn
+Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
+Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
+Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
+Added: _$ss14MutableRawSpanV6_countSivg
+Added: _$ss14MutableRawSpanV8_pointerSvSgvg
+Added: _$ss14MutableRawSpanVMa
+Added: _$ss14MutableRawSpanVMn
+Added: _$ss14MutableRawSpanVN
+
+// SE-0456 Span-providing properties
+Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSW5bytess7RawSpanVvpMV
+Added: _$sSa4spans4SpanVyxGvpMV
+Added: _$sSrsRi_zrlE4spans4SpanVyxGvpMV
+Added: _$sSw5bytess7RawSpanVvpMV
+Added: _$ss10ArraySliceV4spans4SpanVyxGvpMV
+Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
+Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
+Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
+
+// SE-0467 mutableSpan properties
+Added: _$sSa11mutableSpans07MutableB0VyxGvr
+Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
+Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
@@ -910,3 +943,26 @@ Added: _$ss12SwiftSettingVABycfC
 Added: _$ss12SwiftSettingVMa
 Added: _$ss12SwiftSettingVMn
 Added: _$ss12SwiftSettingVN
+
+// EnumeratedSequence Collection conformances
+Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
+Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE10startIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMa
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMn
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5countSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
+Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
+
+// Indirect tagged string creation
+Added: __swift_stdlib_CreateIndirectTaggedPointerString

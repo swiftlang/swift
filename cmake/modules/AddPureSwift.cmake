@@ -28,6 +28,10 @@ function(_add_host_swift_compile_options name)
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
   endif()
 
+  # Emitting module seprately doesn't give us any benefit.
+  target_compile_options(${name} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:-no-emit-module-separately-wmo>")
+
   if(SWIFT_ANALYZE_CODE_COVERAGE)
      set(_cov_flags $<$<COMPILE_LANGUAGE:Swift>:-profile-generate -profile-coverage-mapping>)
      target_compile_options(${name} PRIVATE ${_cov_flags})

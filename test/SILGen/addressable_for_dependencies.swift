@@ -99,10 +99,10 @@ extension Bar {
     }
 }
 
-// CHECK-LABEL: sil {{.*}}@$s28addressable_for_dependencies14defaulArgument1iySi_tFfA_ :
+// CHECK-LABEL: sil {{.*}}@$s28addressable_for_dependencies14defaulArgument1iAA3DepVSi_tFfA_ :
 // CHECK-SAME: $@convention(thin) () -> Int {
 
-// CHECK-LABEL: sil {{.*}}@$s28addressable_for_dependencies14defaulArgument1iySi_tF :
-// CHECK-SAME: $@convention(thin) (Int) -> @lifetime(borrow 0) () {
+// CHECK-LABEL: sil {{.*}}@$s28addressable_for_dependencies14defaulArgument1iAA3DepVSi_tF :
+// CHECK-SAME: $@convention(thin) (Int) -> @lifetime(borrow 0) @owned Dep {
 @lifetime(borrow i)
-func defaulArgument(i: Int = 0) {}
+func defaulArgument(i: Int = 0) -> Dep {}

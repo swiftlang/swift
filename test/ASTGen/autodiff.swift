@@ -17,6 +17,10 @@ func testDifferentiableTypeAttr(_ fn: @escaping @differentiable(reverse) (Float)
     -> @differentiable(reverse) (Float) -> Float {
   return fn
 }
+func testDifferentiableTypeAttrLinear(_ fn: @escaping @differentiable(_linear) (Float) -> Float)
+    -> @differentiable(_linear) (Float) -> Float {
+  return fn
+}
 
 @differentiable(reverse)
 func testDifferentiableSimple(_ x: Float) -> Float { return x * x }

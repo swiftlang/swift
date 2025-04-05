@@ -208,7 +208,8 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 /// - forwardingUse(of:isInnerlifetime:)
 /// - interiorPointerUse(of:into:)
 /// - pointerEscapingUse(of:)
-/// - dependentUse(of:into:)
+/// - dependentUse(of:dependentValue:)
+/// - dependentUse(of:dependentAddress:)
 /// - borrowingUse(of:by:)
 ///
 /// This only visits the first level of uses. The implementation may transitively visit forwarded, borrowed, dependent,
@@ -269,7 +270,13 @@ protocol OwnershipUseVisitor {
   /// there are no explicit scope-ending operations. Instead
   /// BorrowingInstruction.scopeEndingOperands will return the final
   /// consumes in the dependent value's forwarding chain.
-  mutating func dependentUse(of operand: Operand, into value: Value) -> WalkResult
+  mutating func dependentUse(of operand: Operand, dependentValue value: Value) -> WalkResult
+
+  /// A use that creates an implicit borrow scope over all reachable uses of a value stored in
+  /// `dependentAddress`. This could conservatively be handled has `pointerEscapingUse`, but note that accessing the
+  /// `dependentAddress` only keeps the original owner alive, it cannot modify the original (modifying a dependent
+  /// address is still just a "read" of the dependence source.
+  mutating func dependentUse(of operand: Operand, dependentAddress address: Value) -> WalkResult
 
   /// A use that is scoped to an inner borrow scope.
   mutating func borrowingUse(of operand: Operand, by borrowInst: BorrowingInstruction) -> WalkResult
@@ -384,6 +391,9 @@ extension OwnershipUseVisitor {
       return forwardingUse(of: operand, isInnerLifetime: false)
 
     case .pointerEscape:
+      if let mdai = operand.instruction as? MarkDependenceAddrInst, operand == mdai.baseOperand {
+        return dependentUse(of: operand, dependentAddress: mdai.address)
+      }
       return pointerEscapingUse(of: operand)
 
     case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape:
@@ -413,6 +423,9 @@ extension OwnershipUseVisitor {
       if operand.instruction is ProjectBoxInst {
         return visitInteriorPointerUse(of: operand)
       }
+      if let mdai = operand.instruction as? MarkDependenceAddrInst, operand == mdai.baseOperand {
+        return dependentUse(of: operand, dependentAddress: mdai.address)
+      }
       return pointerEscapingUse(of: operand)
 
     case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape, .endBorrow, .reborrow:
@@ -436,12 +449,14 @@ extension OwnershipUseVisitor {
     switch operand.instruction {
     case let pai as PartialApplyInst:
       assert(!pai.mayEscape)
-      return dependentUse(of: operand, into: pai)
+      return dependentUse(of: operand, dependentValue: pai)
     case let mdi as MarkDependenceInst:
+      // .borrow operand ownership only applies to the base operand of a non-escaping markdep that forwards a
+      // non-address value.
       assert(operand == mdi.baseOperand && mdi.isNonEscaping)
-      return dependentUse(of: operand, into: mdi)
+      return dependentUse(of: operand, dependentValue: mdi)
     case let bfi as BorrowedFromInst where !bfi.borrowedPhi.isReborrow:
-      return dependentUse(of: operand, into: bfi)
+      return dependentUse(of: operand, dependentValue: bfi)
     default:
       return borrowingUse(of: operand,
                           by: BorrowingInstruction(operand.instruction)!)
@@ -586,7 +601,7 @@ extension InteriorUseWalker: OwnershipUseVisitor {
   }
 
   // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
-  mutating func dependentUse(of operand: Operand, into value: Value) -> WalkResult {
+  mutating func dependentUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
     // OSSA lifetime ignores trivial types.
     if value.type.isTrivial(in: function) {
       return .continueWalk
@@ -600,6 +615,12 @@ extension InteriorUseWalker: OwnershipUseVisitor {
       return .abortWalk
     }
     return walkDownUses(of: value)
+  }
+
+  mutating func dependentUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+    // An mutable local variable depends a value that depends on the original interior pointer. This would require data
+    // flow to find local uses. InteriorUseWalker only walks the SSA uses.
+    pointerEscapingUse(of: operand)
   }
 
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
@@ -699,12 +720,12 @@ extension InteriorUseWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value)
     -> WalkResult {
     return .continueWalk
   }    
 
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand)
     -> WalkResult {
     return .continueWalk
   }
@@ -713,9 +734,23 @@ extension InteriorUseWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value)
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value)
     -> WalkResult {
-    walkDownUses(of: value)
+    // For Escapable values, simply continue the walk.
+    if value.mayEscape {
+      return walkDownUses(of: value)
+    }
+    // TODO: Handle non-escapable values by walking through copies as done by LifetimeDependenceDefUseWalker or
+    // NonEscapingClosureDefUseWalker. But this code path also handles non-escaping closures that have not been promoted
+    // to [on_stack] (and still have an escapable function type). Such closures may be incorrectly destroyed after their
+    // captures. To avoid this problem, either rewrite ClosureLifetimeFixup to produce correct OSSA lifetimes, or check
+    // for that special case and continue to bailout here.
+    return escapingAddressUse(of: operand)
+  }
+
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+    // TODO: consider data flow that finds reachable uses of `dependentAddress`.
+    return escapingAddressUse(of: operand)
   }    
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
@@ -830,12 +865,14 @@ let linearLivenessTest = FunctionTest("linear_liveness_swift") {
 let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   function, arguments, context in
   let value = arguments.takeValue()
-  print("Interior liveness: \(value)")
+  let visitInnerUses = arguments.hasUntaken ? arguments.takeBool() : false
+
+  print("Interior liveness\(visitInnerUses ? " with inner uses" : ""): \(value)")
 
   var range = InstructionRange(for: value, context)
   defer { range.deinitialize() }
 
-  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: false, context) {
+  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: visitInnerUses, context) {
     range.insert($0.instruction)
     return .continueWalk
   }

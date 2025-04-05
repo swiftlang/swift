@@ -315,6 +315,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "enable-destroy-hoisting=">,
     HelpText<"Whether to enable destroy hoisting">,
     MetaVarName<"true|false">;
+  def formal_cxx_interoperability_mode :
+    Joined<["-"], "formal-cxx-interoperability-mode=">,
+    HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
+    MetaVarName<"<cxx-interop-version>|off">;
 }
 
 // Flags that are saved into module interfaces
@@ -591,6 +595,12 @@ def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llv
 
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
+
+def enable_llvm_verify_each : Flag<["-"], "enable-llvm-verify-each">,
+  HelpText<"Run the LLVM IR verifier after every pass.">;
+
+def disable_llvm_verify_each : Flag<["-"], "disable-llvm-verify-each">,
+  HelpText<"Don't run the LLVM IR verifier after every pass.">;
 
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
@@ -1165,6 +1175,12 @@ def enable_arm64_corocc : Flag<["-"], "enable-arm64-corocc">,
 def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
   HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
 
+def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
+  HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
+
+def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
+  HelpText<"Disable cond_fail message annotation.">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,
@@ -1385,6 +1401,10 @@ def disable_split_cold_code :
   Flag<["-"], "disable-split-cold-code">,
   HelpText<"Disable splitting of cold code when optimizing">;
 
+def mergeable_traps :
+  Flag<["-"], "mergeable-traps">,
+  HelpText<"Emit mergeable traps even in optimized builds">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
@@ -1415,9 +1435,6 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
-def enable_deterministic_check :
-  Flag<["-"], "enable-deterministic-check">,
-  HelpText<"Check compiler output determinism by running it twice">;
 def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;
@@ -1491,6 +1508,9 @@ def platform_availability_inheritance_map_path
 
 def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
   HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
+
+def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
+  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 

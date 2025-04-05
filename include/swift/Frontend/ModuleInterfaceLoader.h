@@ -672,7 +672,8 @@ private:
     return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
-  inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
+  inheritOptionsForBuildingInterface(FrontendOptions::ActionType requestedAction,
+                                     const SearchPathOptions &SearchPathOpts,
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
@@ -712,6 +713,7 @@ public:
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef sdkPath,
+                                  std::optional<StringRef> sysroot,
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -720,6 +722,7 @@ public:
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,
                                            StringRef sdkPath,
+                                           std::optional<StringRef> sysroot,
                                            StringRef outputPath,
                                            SourceLoc diagLoc,
                                            bool silenceErrors,

@@ -1628,6 +1628,20 @@ public struct FooExtensionMacro: ExtensionMacro {
   }
 }
 
+public struct BadExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    // Note this is purposefully not using `providingExtensionsOf`.
+    let unqualifiedName = declaration.as(StructDeclSyntax.self)!.name.trimmed
+    return [try ExtensionDeclSyntax("extension \(unqualifiedName) {}")]
+  }
+}
+
 public struct ConformanceViaExtensionMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,

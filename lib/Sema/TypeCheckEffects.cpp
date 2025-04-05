@@ -398,7 +398,7 @@ public:
                  .getParameterType();
 
     case Kind::Function: {
-      auto params = getParameterList(static_cast<ValueDecl *>(getFunction()));
+      auto *params = getFunction()->getParameters();
       auto origIndex = params->getOrigParamIndex(getSubstitutions(), substIndex);
       return params->get(origIndex)->getInterfaceType();
     }
@@ -621,7 +621,7 @@ public:
     } else if (auto KPE = dyn_cast<KeyPathExpr>(E)) {
       for (auto &component : KPE->getComponents()) {
         switch (component.getKind()) {
-        case KeyPathExpr::Component::Kind::Property:
+        case KeyPathExpr::Component::Kind::Member:
         case KeyPathExpr::Component::Kind::Subscript: {
           (void)asImpl().checkDeclRef(KPE, component.getDeclRef(),
                                       component.getLoc(),
@@ -633,8 +633,10 @@ public:
 
         case KeyPathExpr::Component::Kind::TupleElement:
         case KeyPathExpr::Component::Kind::Invalid:
-        case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        case KeyPathExpr::Component::Kind::UnresolvedMember:
         case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+        case KeyPathExpr::Component::Kind::UnresolvedApply:
+        case KeyPathExpr::Component::Kind::Apply:
         case KeyPathExpr::Component::Kind::OptionalChain:
         case KeyPathExpr::Component::Kind::OptionalWrap:
         case KeyPathExpr::Component::Kind::OptionalForce:
@@ -644,7 +646,10 @@ public:
           break;
         }
       }
+    } else if (auto TE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+      recurse = asImpl().checkTemporarilyEscapable(TE);
     }
+
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
     // invalid.
@@ -663,7 +668,10 @@ public:
       recurse = asImpl().checkThrow(thr);
     } else if (auto forEach = dyn_cast<ForEachStmt>(S)) {
       recurse = asImpl().checkForEach(forEach);
+    } else if (auto labeled = dyn_cast<LabeledConditionalStmt>(S)) {
+      asImpl().noteLabeledConditionalStmt(labeled);
     }
+
     if (!recurse)
       return Action::SkipNode(S);
 
@@ -685,6 +693,8 @@ public:
   }
 
   void visitExprPre(Expr *expr) { asImpl().visitExprPre(expr); }
+
+  void noteLabeledConditionalStmt(LabeledConditionalStmt *stmt) { }
 };
 
 /// A potential reason why something might have an effect.
@@ -1090,6 +1100,15 @@ public:
     return result;
   }
 
+  /// Return a potentially-unsafe classification by recording all of the
+  /// provided unsafe uses.
+  static Classification forUnsafe(ArrayRef<UnsafeUse> unsafeUses) {
+    Classification result;
+    for (const auto &unsafeUse : unsafeUses)
+      result.recordUnsafeUse(unsafeUse);
+    return result;
+  }
+
   /// Return a classification for a given declaration reference.
   static Classification
   forDeclRef(ConcreteDeclRef declRef, ConditionalEffectKind conditionalKind,
@@ -1333,13 +1352,12 @@ public:
     }
   }
 
-  Classification classifyConformance(Type type,
-                                     ProtocolConformanceRef conformanceRef,
+  Classification classifyConformance(ProtocolConformanceRef conformanceRef,
                                      EffectKind kind) {
     if (conformanceRef.isInvalid())
       return Classification::forInvalidCode();
 
-    auto proto = conformanceRef.getRequirement();
+    auto proto = conformanceRef.getProtocol();
     if (kind == EffectKind::Throws &&
         (proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence) ||
          proto->isSpecificProtocol(
@@ -1355,8 +1373,7 @@ public:
           conditional = ConditionalEffectKind::Always;
 
         // Use the Failure type witness, when present.
-        Type thrownError = conformanceRef.getTypeWitness(
-            type, failureAssocType);
+        Type thrownError = conformanceRef.getTypeWitness(failureAssocType);
         return Classification::forThrows(
             thrownError, conditional,
             /*FIXME*/PotentialEffectReason::forConformance());
@@ -1365,7 +1382,7 @@ public:
 
     if (conformanceRef.hasEffect(kind)) {
       assert(kind == EffectKind::Throws); // there is no async
-      ASTContext &ctx = conformanceRef.getRequirement()->getASTContext();
+      ASTContext &ctx = conformanceRef.getProtocol()->getASTContext();
       // FIXME: typed throws, if it becomes a thing for conformances
       return Classification::forThrows(
           ctx.getErrorExistentialType(),
@@ -1598,7 +1615,7 @@ public:
     const bool hasAnyConformances =
         llvm::any_of(substitutions.getConformances(),
                      [](const ProtocolConformanceRef conformance) {
-                       auto *requirement = conformance.getRequirement();
+                       auto *requirement = conformance.getProtocol();
                        return !requirement->getInvertibleProtocolKind();
                      });
 
@@ -1652,13 +1669,11 @@ public:
           if (req.getKind() != RequirementKind::Conformance)
             continue;
 
-          Type type = req.getFirstType().subst(substitutions);
-
           auto conformanceRef = substitutions.lookupConformance(
               req.getFirstType()->getCanonicalType(), req.getProtocolDecl());
           assert(conformanceRef);
 
-          result.merge(classifyConformance(type, conformanceRef, kind));
+          result.merge(classifyConformance(conformanceRef, kind));
         }
 
         // 'ByConformance' is a superset of 'ByClosure', so check for
@@ -1717,8 +1732,12 @@ public:
         }
 
         // Use the most significant result from the arguments.
-        auto *fnSubstType = fnInterfaceType.subst(fnRef.getSubstitutions())
-            ->getAs<AnyFunctionType>();
+        FunctionType *fnSubstType = nullptr;
+        if (auto *fnGenericType = fnInterfaceType->getAs<GenericFunctionType>())
+          fnSubstType = fnGenericType->substGenericArgs(fnRef.getSubstitutions());
+        else
+          fnSubstType = fnInterfaceType->getAs<FunctionType>();
+
         if (!fnSubstType)  {
           result.merge(Classification::forInvalidCode());
           return;
@@ -1854,6 +1873,38 @@ public:
     result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Unsafe));
 
     return result;
+  }
+
+  Classification classifyTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+    auto opaqueValue = E->getOpaqueValue();
+    if (!opaqueValue)
+      return Classification();
+
+    auto type = opaqueValue->getType();
+    if (!type)
+      return Classification();
+
+    auto fnType = type->getAs<AnyFunctionType>();
+    if (!fnType)
+      return Classification();
+
+    // Runtime safety checks for temporarily-escapable functions aren't
+    // always available.
+    switch (fnType->getRepresentation()) {
+    case FunctionTypeRepresentation::Swift:
+      // Swift performs runtime checking to ensure that the function did not
+      // escape.
+      return Classification();
+
+    case FunctionTypeRepresentation::Block:
+      return Classification::forUnsafe({UnsafeUse::forTemporarilyEscaping(E)});
+
+    case FunctionTypeRepresentation::Thin:
+    case FunctionTypeRepresentation::CFunctionPointer:
+      // Thin and C functions cannot carry any state with them, so escaping
+      // the pointers does not introduce a memory-safety issue.
+      return Classification();
+    }
   }
 
 private:
@@ -2073,6 +2124,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+      return ShouldRecurse;
+    }
+
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -2214,6 +2269,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+      return ShouldRecurse;
+    }
+
     void visitExprPre(Expr *expr) { return; }
   };
 
@@ -2324,6 +2383,11 @@ private:
             Classification::forType(type, loc).onlyUnsafe());
       }
 
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+      classification.merge(Self.classifyTemporarilyEscapable(E));
       return ShouldRecurse;
     }
 
@@ -3357,6 +3421,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// passed directly into an explicitly `@safe` function.
   llvm::DenseSet<const Expr *> assumedSafeArguments;
 
+  /// Keeps track of the expressions that were synthesized as initializers for
+  /// the "if let x" shorthand syntax.
+  llvm::SmallPtrSet<const Expr *, 4> synthesizedIfLetInitializers;
+
   /// Tracks all of the uncovered uses of unsafe constructs based on their
   /// anchor expression, so we can emit diagnostics at the end.
   llvm::MapVector<Expr *, std::vector<UnsafeUse>> uncoveredUnsafeUses;
@@ -3770,6 +3838,13 @@ private:
     if (assumedSafeArguments.contains(E))
       classification = classification.withoutUnsafe();
 
+    checkEffectSite(E, /*requiresTry=*/false, classification);
+    return ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+    auto classification = getApplyClassifier().
+        classifyTemporarilyEscapable(E);
     checkEffectSite(E, /*requiresTry=*/false, classification);
     return ShouldRecurse;
   }
@@ -4356,9 +4431,70 @@ private:
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe);
+    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+      .fixItRemove(E->getUnsafeLoc());
   }
-  
+
+  void noteLabeledConditionalStmt(LabeledConditionalStmt *stmt) {
+    // Make a note of any initializers that are the synthesized right-hand side
+    // for an "if let x".
+    for (const auto &condition: stmt->getCond()) {
+      switch (condition.getKind()) {
+      case StmtConditionElement::CK_Availability:
+      case StmtConditionElement::CK_Boolean:
+      case StmtConditionElement::CK_HasSymbol:
+        continue;
+
+      case StmtConditionElement::CK_PatternBinding:
+        break;
+      }
+
+      auto init = condition.getInitializer();
+      if (!init)
+        continue;
+
+      auto pattern = condition.getPattern();
+      if (!pattern)
+        continue;
+
+      auto optPattern = dyn_cast<OptionalSomePattern>(pattern);
+      if (!optPattern)
+        continue;
+
+      auto var = optPattern->getSubPattern()->getSingleVar();
+      if (!var)
+        continue;
+
+      // If the right-hand side has the same location as the variable, it was
+      // synthesized.
+      if (var->getLoc().isValid() &&
+          var->getLoc() == init->getStartLoc() &&
+          init->getStartLoc() == init->getEndLoc())
+        synthesizedIfLetInitializers.insert(init);
+    }
+  }
+
+  /// Determine whether this is the synthesized right-hand-side when we have
+  /// expanded an "if let x" into its semantic equivalent, "if let x = x".
+  VarDecl *isShorthandIfLetSyntax(const Expr *expr) const {
+    // Check whether this is referencing a variable.
+    VarDecl *var = nullptr;
+    if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+      var = dyn_cast_or_null<VarDecl>(declRef->getDecl());
+    } else if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+      var = dyn_cast_or_null<VarDecl>(memberRef->getMember().getDecl());
+    }
+
+    if (!var)
+      return nullptr;
+
+    // If we identified this as one of the bindings, return the variable.
+    if (synthesizedIfLetInitializers.contains(expr))
+      return var;
+
+    return nullptr;
+  }
+
   std::pair<SourceLoc, std::string>
   getFixItForUncoveredSite(const Expr *anchor, StringRef keyword) const {
     SourceLoc insertLoc = anchor->getStartLoc();
@@ -4371,13 +4507,10 @@ private:
         insertLoc = tryExpr->getSubExpr()->getStartLoc();
       // Supply a tailored fixIt including the identifier if we are
       // looking at a shorthand optional binding.
-    } else if (anchor->isImplicit()) {
-      if (auto declRef = dyn_cast<DeclRefExpr>(anchor))
-        if (auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl())) {
-          insertText = (" = " + keyword).str() + " " + var->getNameStr().str();
-          insertLoc = Lexer::getLocForEndOfToken(Ctx.Diags.SourceMgr,
-                                                 anchor->getStartLoc());
-        }
+    } else if (auto var = isShorthandIfLetSyntax(anchor)) {
+      insertText = (" = " + keyword).str() + " " + var->getNameStr().str();
+      insertLoc = Lexer::getLocForEndOfToken(Ctx.Diags.SourceMgr,
+                                             anchor->getStartLoc());
     }
     return std::make_pair(insertLoc, insertText);
   }
@@ -4760,7 +4893,11 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
       return ThrownErrorClassification::AnyError;
   }
 
-  if (type->hasTypeVariable() || type->hasTypeParameter())
+  // All three cases come up. The first one from the "real" witness matcher,
+  // and the other two from associated type inference.
+  if (type->hasTypeVariable() ||
+      type->hasTypeParameter() ||
+      type->hasPrimaryArchetype())
     return ThrownErrorClassification::Dependent;
 
   return ThrownErrorClassification::Specific;

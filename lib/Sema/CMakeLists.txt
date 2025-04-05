@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
+  AsyncCallerExecutionMigration.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
@@ -23,18 +24,18 @@ add_swift_host_library(swiftSema STATIC
   ConstraintSystem.cpp
   CompletionContextFinder.cpp
   DebuggerTestingTransform.cpp
-  DerivedConformanceActor.cpp
-  DerivedConformanceDistributedActor.cpp
-  DerivedConformanceAdditiveArithmetic.cpp
-  DerivedConformanceCaseIterable.cpp
-  DerivedConformanceCodable.cpp
-  DerivedConformanceCodingKey.cpp
-  DerivedConformanceDifferentiable.cpp
-  DerivedConformanceEquatableHashable.cpp
-  DerivedConformanceComparable.cpp
-  DerivedConformanceError.cpp
-  DerivedConformanceRawRepresentable.cpp
-  DerivedConformances.cpp
+  DerivedConformance/DerivedConformance.cpp
+  DerivedConformance/DerivedConformanceActor.cpp
+  DerivedConformance/DerivedConformanceAdditiveArithmetic.cpp
+  DerivedConformance/DerivedConformanceCaseIterable.cpp
+  DerivedConformance/DerivedConformanceCodable.cpp
+  DerivedConformance/DerivedConformanceCodingKey.cpp
+  DerivedConformance/DerivedConformanceComparable.cpp
+  DerivedConformance/DerivedConformanceDifferentiable.cpp
+  DerivedConformance/DerivedConformanceDistributedActor.cpp
+  DerivedConformance/DerivedConformanceEquatableHashable.cpp
+  DerivedConformance/DerivedConformanceError.cpp
+  DerivedConformance/DerivedConformanceRawRepresentable.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
   LookupVisibleDecls.cpp
@@ -49,6 +50,7 @@ add_swift_host_library(swiftSema STATIC
   TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
+  TypeCheckAttrABI.cpp
   TypeCheckAvailability.cpp
   TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp

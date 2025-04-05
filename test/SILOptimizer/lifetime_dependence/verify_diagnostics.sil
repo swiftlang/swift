@@ -29,8 +29,13 @@ struct NEObject : ~Escapable {
   init()
 }
 
+public struct Holder {
+  var c: C
+}
+
 sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
 sil @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+sil @useNE : $@convention(thin) (NE) -> ()
 
 // Test returning a owned dependence on a trivial value
 sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
@@ -54,4 +59,24 @@ entry(%0 : @guaranteed $C):
   // expected-note  @-4{{it depends on the lifetime of this parent value}}
   %mark = mark_dependence [unresolved] %call : $NEObject on %zero : $Builtin.Int1
   return %mark // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+// OK: Test that the range initialized by a store_borrow covers dependent uses.
+sil [ossa] @testStoreBorrowRange : $@convention(thin) (@owned Holder) -> () {
+bb0(%0 : @owned $Holder):
+  %val = move_value [lexical] [var_decl] %0
+  %stk = alloc_stack $Holder
+  %sb = store_borrow %val to %stk
+  %f1 = function_ref @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  %c1 = apply %f1() : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  %md = mark_dependence [unresolved] %c1 on %sb
+  %mv = move_value [var_decl] %md
+  %f2 = function_ref @useNE : $@convention(thin) (NE) -> ()
+  %c2 = apply %f2(%mv) : $@convention(thin) (NE) -> ()
+  destroy_value %mv
+  end_borrow %sb
+  dealloc_stack %stk
+  destroy_value %val
+  %99 = tuple ()
+  return %99
 }

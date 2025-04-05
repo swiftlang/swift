@@ -41,6 +41,7 @@
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 #include <cctype>
@@ -3548,10 +3549,12 @@ static bool installLazyClassNameHook() {
   return false;
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor)) SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static bool
 supportsLazyObjcClassNames() {
   return SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 static void setUpGenericClassObjCName(ClassMetadata *theClass) {
   if (supportsLazyObjcClassNames()) {
@@ -3643,10 +3646,49 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #endif
 }
 
+template <typename GetImpl>
+static void installOverrideInVTable(ContextDescriptor const *baseContext,
+                                    MethodDescriptor const *baseMethod,
+                                    GetImpl getImpl, void const *table,
+                                    void **classWords) {
+  // Get the base class and method.
+  auto *baseClass = cast_or_null<ClassDescriptor>(baseContext);
+
+  // If the base method is null, it's an unavailable weak-linked
+  // symbol.
+  if (baseClass == nullptr || baseMethod == nullptr)
+    return;
+
+  // Calculate the base method's vtable offset from the
+  // base method descriptor. The offset will be relative
+  // to the base class's vtable start offset.
+  auto baseClassMethods = baseClass->getMethodDescriptors();
+
+  // If the method descriptor doesn't land within the bounds of the
+  // method table, abort.
+  if (baseMethod < baseClassMethods.begin() ||
+      baseMethod >= baseClassMethods.end()) {
+    fatalError(0,
+               "resilient vtable at %p contains out-of-bounds "
+               "method descriptor %p\n",
+               table, baseMethod);
+  }
+
+  // Install the method override in our vtable.
+  auto baseVTable = baseClass->getVTableDescriptor();
+  auto offset = (baseVTable->getVTableOffset(baseClass) +
+                 (baseMethod - baseClassMethods.data()));
+  swift_ptrauth_init_code_or_data(&classWords[offset], getImpl(),
+                                  baseMethod->Flags.getExtraDiscriminator(),
+                                  !baseMethod->Flags.isData());
+}
+
 /// Using the information in the class context descriptor, fill in in the
-/// immediate vtable entries for the class and install overrides of any
-/// superclass vtable entries.
-static void initClassVTable(ClassMetadata *self) {
+/// immediate vtable entries for the class install overrides of any
+/// superclass vtable entries, and install any default overrides if appropriate.
+static void initClassVTable(ClassMetadata *self,
+                            llvm::SmallVectorImpl<const ClassDescriptor *>
+                                &superclassesWithDefaultOverrides) {
   const auto *description = self->getDescription();
   auto *classWords = reinterpret_cast<void **>(self);
 
@@ -3663,43 +3705,49 @@ static void initClassVTable(ClassMetadata *self) {
     }
   }
 
-  if (description->hasOverrideTable()) {
-    auto *overrideTable = description->getOverrideTable();
-    auto overrideDescriptors = description->getMethodOverrideDescriptors();
+  if (!description->hasOverrideTable()) {
+    // The class didn't override anything, so we're done.
+    return;
+  }
 
-    for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
-      auto &descriptor = overrideDescriptors[i];
+  auto hasSuperclassWithDefaultOverride =
+      superclassesWithDefaultOverrides.size() > 0;
+  std::unordered_set<const MethodDescriptor *> seenDescriptors;
 
-      // Get the base class and method.
-      auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
-      auto *baseMethod = descriptor.Method.get();
+  // Install our overrides.
+  auto *overrideTable = description->getOverrideTable();
+  auto overrideDescriptors = description->getMethodOverrideDescriptors();
+  for (auto &descriptor : overrideDescriptors) {
+    if (hasSuperclassWithDefaultOverride)
+      seenDescriptors.insert(descriptor.Method);
 
-      // If the base method is null, it's an unavailable weak-linked
-      // symbol.
-      if (baseClass == nullptr || baseMethod == nullptr)
+    installOverrideInVTable(
+        descriptor.Class.get(), descriptor.Method.get(),
+        [&descriptor]() { return descriptor.getImpl(); }, overrideTable,
+        classWords);
+  }
+
+  if (!hasSuperclassWithDefaultOverride) {
+    // No ancestor had default overrides to consider, so we're done.
+    return;
+  }
+
+  // Install any necessary default overrides.
+  for (auto *description : superclassesWithDefaultOverrides) {
+    assert(description->hasDefaultOverrideTable());
+    auto *header = description->getDefaultOverrideTable();
+    assert(header->NumEntries > 0 && "default override table with 0 entries");
+    auto entries = description->getDefaultOverrideDescriptors();
+    for (auto &entry : entries) {
+      auto *original = entry.Original.get();
+      if (!seenDescriptors.count(original))
         continue;
-
-      // Calculate the base method's vtable offset from the
-      // base method descriptor. The offset will be relative
-      // to the base class's vtable start offset.
-      auto baseClassMethods = baseClass->getMethodDescriptors();
-
-      // If the method descriptor doesn't land within the bounds of the
-      // method table, abort.
-      if (baseMethod < baseClassMethods.begin() ||
-          baseMethod >= baseClassMethods.end()) {
-        fatalError(0, "resilient vtable at %p contains out-of-bounds "
-                   "method descriptor %p\n",
-                   overrideTable, baseMethod);
-      }
-
-      // Install the method override in our vtable.
-      auto baseVTable = baseClass->getVTableDescriptor();
-      auto offset = (baseVTable->getVTableOffset(baseClass) +
-                     (baseMethod - baseClassMethods.data()));
-      swift_ptrauth_init_code_or_data(&classWords[offset], descriptor.getImpl(),
-                                      baseMethod->Flags.getExtraDiscriminator(),
-                                      !baseMethod->Flags.isData());
+      auto *replacement = entry.Replacement.get();
+      if (seenDescriptors.count(replacement))
+        continue;
+      installOverrideInVTable(
+          description, replacement, [&entry]() { return entry.getImpl(); },
+          header, classWords);
     }
   }
 }
@@ -4006,7 +4054,7 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
 
 SWIFT_CC(swift)
 static std::pair<MetadataDependency, const ClassMetadata *>
-getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
+getSuperclassMetadata(const ClassMetadata *self, bool allowDependency) {
   MetadataRequest request(allowDependency ? MetadataState::NonTransitiveComplete
                                           : /*FIXME*/ MetadataState::Abstract,
                           /*non-blocking*/ allowDependency);
@@ -4047,6 +4095,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   auto superDependencyAndSuper = getSuperclassMetadata(self, allowDependency);
   if (superDependencyAndSuper.first)
     return superDependencyAndSuper.first;
+
   auto super = superDependencyAndSuper.second;
 
   self->Superclass = super;
@@ -4067,6 +4116,28 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
       nullptr);
 #endif
 
+  // To populate the vtable, we must check our ancestors for default overloads.
+  // We may obstructed by dependencies, however, so do it now before doing any
+  // setup.
+  llvm::SmallVector<const ClassDescriptor *, 16>
+      superclassesWithDefaultOverrides;
+  if (self->getDescription()->hasOverrideTable()) {
+    const ClassMetadata *super = superDependencyAndSuper.second;
+    while (super && !super->isPureObjC()) {
+      const auto *description = super->getDescription();
+      if (description->hasDefaultOverrideTable()) {
+        // This superclass has default overrides.  Record it for later
+        // traversal.
+        superclassesWithDefaultOverrides.push_back(description);
+      }
+      auto superDependencyAndSuper =
+          getSuperclassMetadata(super, allowDependency);
+      if (superDependencyAndSuper.first)
+        return superDependencyAndSuper.first;
+      super = superDependencyAndSuper.second;
+    }
+  }
+
   // Copy field offsets, generic arguments and (if necessary) vtable entries
   // from our superclass.
   copySuperclassMetadataToSubclass(self, layoutFlags);
@@ -4074,7 +4145,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
   if (!hasStaticVTable(layoutFlags))
-    initClassVTable(self);
+    initClassVTable(self, superclassesWithDefaultOverrides);
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
@@ -6091,9 +6162,7 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
-  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
                                     reqt.Flags.getExtraDiscriminator(),
                                     !reqt.Flags.isData());
@@ -6134,9 +6203,7 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
-  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(
         dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isData(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
@@ -7977,10 +8044,28 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
           Tag);
     }
 
+    // If we allocated a new page, then we need to do a store-release to ensure
+    // the initialization writes are properly ordered when viewed from other
+    // threads that read from the new page. If we did not allocate a new page,
+    // then we need a load-consume to cover the other side of that.
+    std::memory_order successOrder = allocatedNewPage
+                                         ? std::memory_order_release
+                                         : SWIFT_MEMORY_ORDER_CONSUME;
+
     // Swap in the new state.
     if (AllocationPool.compare_exchange_weak(curState, newState,
-                                             std::memory_order_relaxed,
+                                             successOrder,
                                              std::memory_order_relaxed)) {
+      // If the program is using Thread Sanitizer, it can't see our memory
+      // ordering, so inform it manually. TSan will track the consume ordering
+      // in __swift_instantiateConcreteTypeFromMangledName so we register the
+      // correct ordering with threads that get a metadata pointer from a cache
+      // variable too.
+      if (allocatedNewPage)
+        swift::tsan::release(&AllocationPool);
+      else
+        swift::tsan::acquire(&AllocationPool);
+
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);

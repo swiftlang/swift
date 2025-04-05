@@ -1965,6 +1965,9 @@ private:
   SILValue promoteMarkDepBase(MarkDependenceInst *md,
                               ArrayRef<AvailableValue> availableValues);
 
+  void promoteMarkDepAddrBase(MarkDependenceAddrInst *md,
+                              ArrayRef<AvailableValue> availableValues);
+  
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
   /// aggregated result to the caller and expects the caller to eventually RAUW
@@ -2067,6 +2070,9 @@ bool OptimizeDeadAlloc::canRemoveDeadAllocation() {
         if (use->getOperandOwnership() == OperandOwnership::ForwardingUnowned)
           return false;
       }
+      // FIXME: Lifetime completion on Boundary::Liveness requires that 'src'
+      // has no escaping uses. Check escaping uses here and either bailout or
+      // request completion on Boundary::Availability.
       valuesNeedingLifetimeCompletion.insert(src);
     }
   }
@@ -2204,9 +2210,13 @@ bool OptimizeDeadAlloc::canPromoteTake(
 
 void OptimizeDeadAlloc::removeDeadAllocation() {
   for (auto idxVal : llvm::enumerate(promotions.markDepBases.instructions())) {
-    auto *md = cast<MarkDependenceInst>(idxVal.value());
     auto vals = promotions.markDepBases.availableValues(idxVal.index());
-    promoteMarkDepBase(md, vals);
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(idxVal.value())) {
+      promoteMarkDepBase(mdi, vals);
+      continue;
+    }
+    auto *mda = cast<MarkDependenceAddrInst>(idxVal.value());
+    promoteMarkDepAddrBase(mda, vals);
   }
 
   // If our memory is trivially typed, we can just remove it without needing to
@@ -2331,6 +2341,22 @@ SILValue OptimizeDeadAlloc::promoteMarkDepBase(
   md->replaceAllUsesWith(dependentValue);
   deleter.deleteIfDead(md);
   return dependentValue;
+}
+
+void OptimizeDeadAlloc::promoteMarkDepAddrBase(
+  MarkDependenceAddrInst *md, ArrayRef<AvailableValue> availableValues) {
+
+  SILValue dependentAddress = md->getAddress();
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting mark_dependence_addr base: "
+             << *md
+             << "      To address: " << dependentAddress);
+  SILBuilderWithScope B(md);
+  for (auto &availableValue : availableValues) {
+    B.createMarkDependenceAddr(md->getLoc(), dependentAddress,
+                               availableValue.getValue(),
+                               md->dependenceKind());
+  }
+  deleter.deleteIfDead(md);
 }
 
 SILValue

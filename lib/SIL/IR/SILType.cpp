@@ -157,6 +157,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
   if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
@@ -168,6 +169,13 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
+  if (auto bfa = getAs<BuiltinFixedArrayType>()) {
+    if (auto size = bfa->getFixedInhabitedSize()) {
+      return size == 0;
+    }
+  }
+
   return false;
 }
 
@@ -1099,18 +1107,6 @@ SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   return tl.getLoweredType();
 }
 
-bool SILType::isOrContainsObjectiveCClass() const {
-  return getASTType().findIf([](Type ty) {
-    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
-      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
-        return true;
-    }
-    if (ty->is<ProtocolCompositionType>())
-      return true;
-    return false;
-  });
-}
-
 static bool hasImmortalAttr(NominalTypeDecl *nominal) {
   if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
     if (semAttr->Value == semantics::ARC_IMMORTAL) {
@@ -1150,6 +1146,13 @@ bool SILType::isMarkedAsImmortal() const {
     }
   }
   return false;
+}
+
+bool SILType::isAddressableForDeps(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto &tl = function.getTypeLowering(contextType);
+  return tl.getRecursiveProperties().isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {

@@ -1203,6 +1203,11 @@ ManglingError Remangler::mangleCoroFunctionPointer(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDefaultOverride(Node *node, unsigned depth) {
+  Buffer << "Twd";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDeallocator(Node *node, EntityContext &ctx,
                                            unsigned depth) {
   return mangleSimpleEntity(node, 'F', "D", ctx, depth + 1);
@@ -1971,6 +1976,11 @@ ManglingError Remangler::mangleCompileTimeLiteral(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
+ManglingError Remangler::mangleConstValue(Node *node, unsigned depth) {
+  Buffer << "Yg";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   Buffer << 'k';
   return mangleSingleChildNode(node, depth + 1); // type
@@ -2709,6 +2719,18 @@ ManglingError Remangler::mangleKeyPathSetterThunkHelper(Node *node,
   return mangleChildNodes(node, depth + 1);
 }
 
+ManglingError
+Remangler::mangleKeyPathUnappliedMethodThunkHelper(Node *node, unsigned depth) {
+  Buffer << "Tkmu";
+  return mangleChildNodes(node, depth + 1);
+}
+
+ManglingError Remangler::mangleKeyPathAppliedMethodThunkHelper(Node *node,
+                                                               unsigned depth) {
+  Buffer << "TkMA";
+  return mangleChildNodes(node, depth + 1);
+}
+
 ManglingError Remangler::mangleKeyPathEqualsThunkHelper(Node *node,
                                                         unsigned depth) {
   Buffer << "TH";
@@ -2851,6 +2873,10 @@ ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleSugaredInlineArray(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 

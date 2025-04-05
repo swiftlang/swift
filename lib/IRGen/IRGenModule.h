@@ -92,7 +92,6 @@ namespace clang {
 namespace swift {
   class GenericSignature;
   class AssociatedConformance;
-  class AssociatedType;
   class ASTContext;
   class BaseConformance;
   class BraceStmt;
@@ -112,6 +111,7 @@ namespace swift {
   class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
+  class SILDefaultOverrideTable;
   class SILProperty;
   class SILType;
   class SILVTable;
@@ -464,6 +464,8 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  void ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot);
+
   llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
   metadataPrespecializationsForType(NominalTypeDecl *type) {
     return MetadataPrespecializationsForGenericTypes.lookup(type);
@@ -789,6 +791,7 @@ public:
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
+  llvm::StructType *MethodDefaultOverrideDescriptorStructTy; /// %swift.method_default_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
@@ -856,6 +859,11 @@ public:
 
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
+
+  llvm::StructType *
+  createTransientStructType(StringRef name,
+                            std::initializer_list<llvm::Type *> types,
+                            bool packed = false);
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -1114,6 +1122,7 @@ public:
   clang::CodeGen::CodeGenModule &getClangCGM() const;
   
   CanType getRuntimeReifiedType(CanType type);
+  Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
   SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
   std::pair<CanType, ProtocolConformanceRef>
@@ -1237,7 +1246,9 @@ public:
       bool setIsNoInline = false, bool forPrologue = false,
       bool isPerformanceConstraint = false,
       IRLinkage *optionalLinkage = nullptr,
-      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt);
+      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt,
+      std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+          transformAttrs = std::nullopt);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1667,6 +1678,9 @@ public:
                                             ConstantInit init);
   SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
+  llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
+
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
   void emitDispatchThunk(SILDeclRef declRef);
@@ -1939,6 +1953,8 @@ public:
 
   /// Add the swiftself attribute.
   void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
+
+  void addSwiftCoroAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   void addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                       unsigned argIndex);

@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift \
+// RUN:   -enable-experimental-feature LifetimeDependence  \
 // RUN:   -debug-diagnostic-names -target arm64-apple-macos14.4 
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
 

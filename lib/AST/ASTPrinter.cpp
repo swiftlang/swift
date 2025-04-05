@@ -402,6 +402,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
       DeclAttrKind::AllowFeatureSuppression,
+      DeclAttrKind::Extensible,
   };
 
   return result;
@@ -1284,6 +1285,15 @@ void PrintAST::printAttributes(const Decl *D) {
   // for each decl They cannot be shared across different decls.
   assert(Options.ExcludeCustomAttrList.empty());
 
+  // If there is an `@abi` attr, we need to print it first so that it isn't
+  // affected by subsequent mutation of `Options.ExcludeAttrList`.
+  if (auto abiAttr = attrs.getAttribute<ABIAttr>()) {
+    if (Options.PrintImplicitAttrs && !Options.excludeAttr(abiAttr)) {
+      abiAttr->print(Printer, Options, D);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ABI);
+    }
+  }
+
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
@@ -1323,8 +1333,8 @@ void PrintAST::printAttributes(const Decl *D) {
 
       if (!Options.PrintForSIL) {
         // Don't print @_hasStorage if the value is simply stored, or the
-        // decl is resilient.
-        if (vd->isResilient() ||
+        // decl is resilient or in an `@objc @implementation` extension.
+        if (vd->isResilient() || isInObjCImpl(vd) ||
             (vd->getImplInfo().isSimpleStored() &&
              !hasLessAccessibleSetter(vd)))
           Options.ExcludeAttrList.push_back(DeclAttrKind::HasStorage);
@@ -1334,7 +1344,8 @@ void PrintAST::printAttributes(const Decl *D) {
     // Add SPIs to both private and package interfaces
     if (!Options.printPublicInterface() &&
         DeclAttribute::canAttributeAppearOnDeclKind(
-            DeclAttrKind::SPIAccessControl, D->getKind())) {
+            DeclAttrKind::SPIAccessControl, D->getKind()) &&
+        !Options.excludeAttrKind(DeclAttrKind::SPIAccessControl)) {
       interleave(D->getSPIGroups(),
              [&](Identifier spiName) {
                Printer.printAttrName("_spi", true);
@@ -1358,7 +1369,7 @@ void PrintAST::printAttributes(const Decl *D) {
     // If the declaration is implicitly @objc, print the attribute now.
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isObjC() && !isa<EnumElementDecl>(VD) &&
-          !attrs.hasAttribute<ObjCAttr>()) {
+          !attrs.hasAttribute<ObjCAttr>() && ABIRoleInfo(D).providesAPI()) {
         Printer.printAttrName("@objc");
         Printer << " ";
       }
@@ -2750,8 +2761,24 @@ static void addNamespaceMembers(Decl *decl,
           auto clangMember = found.get<clang::NamedDecl *>();
           if (auto importedDecl =
                   ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-            if (addedMembers.insert(importedDecl).second)
+            if (addedMembers.insert(importedDecl).second) {
               members.push_back(importedDecl);
+
+              // Handle macro-expanded declarations.
+              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
+                auto valueDecl = dyn_cast<ValueDecl>(decl);
+                if (!valueDecl)
+                  return;
+
+                // Bail out if the auxiliary decl was not produced by a macro.
+                auto module = decl->getDeclContext()->getParentModule();
+                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+                  return;
+
+                members.push_back(valueDecl);
+              });
+            }
           }
         }
       };
@@ -2924,6 +2951,18 @@ void PrintAST::printInherited(const Decl *decl) {
           Printer << "@unsafe ";
         break;
       }
+
+      if (auto globalActor = inherited.getGlobalActorIsolationType()) {
+        TypeLoc globalActorTL(globalActor->getTypeRepr(),
+                              globalActor->getInstanceType());
+        Printer << "@";
+        printTypeLoc(globalActorTL);
+        Printer << " ";
+      }
+
+      if (inherited.isNonisolated())
+        Printer << "nonisolated ";
+
       if (inherited.isSuppressed())
         Printer << "~";
     });
@@ -3883,6 +3922,9 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
+  
+  if (flags.isConstValue())
+    printer.printKeyword("@const", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -4479,6 +4521,13 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
+    if (!Options.SuppressSendingArgsAndResults) {
+      if (decl->getElementTypeRepr()) {
+        if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
+          Printer << "sending ";
+      }
+    }
+
     PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
       elementTy, decl->isImplicitlyUnwrappedOptional());
@@ -5046,21 +5095,21 @@ void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::C
         case ComponentKind::Invalid: {
           break;
         }
-        case ComponentKind::UnresolvedProperty: {
+        case ComponentKind::UnresolvedMember: {
           Printer << component.getUnresolvedDeclName();
           break;
         }
         case ComponentKind::UnresolvedSubscript: {
-          auto args = component.getSubscriptArgs();
+          auto args = component.getArgs();
           printArgumentList(args, /*forSubscript*/ true);
           break;
         }
-        case ComponentKind::Property: {
+        case ComponentKind::Member: {
           Printer << component.getUnresolvedDeclName();
           break;
         }
         case ComponentKind::Subscript: {
-          auto args = component.getSubscriptArgs();
+          auto args = component.getArgs();
           printArgumentList(args, /*forSubscript*/ true);
           break;
         }
@@ -5088,6 +5137,12 @@ void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::C
           break;
         }
         case ComponentKind::CodeCompletion: {
+          break;
+        }
+        case ComponentKind::UnresolvedApply:
+        case ComponentKind::Apply: {
+          auto args = component.getArgs();
+          printArgumentList(args, /*forSubscript*/ false);
           break;
         }
       }
@@ -5952,7 +6007,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
         Name = Mod->getASTContext()
           .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
-                         ->OriginalModuleName);
+                         ->ManglingModuleName);
         break;
       }
     }
@@ -6600,7 +6655,7 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance.getRequirement()->getDeclaredType()
+            witnessMethodConformance.getProtocol()->getDeclaredType()
                 ->castTo<ProtocolType>());
         break;
       case SILFunctionType::Representation::Closure:
@@ -7028,6 +7083,18 @@ public:
     } else {
       Printer << "[";
       visit(T->getBaseType());
+      Printer << "]";
+    }
+  }
+
+  void visitInlineArrayType(InlineArrayType *T) {
+    if (Options.AlwaysDesugarInlineArrayTypes) {
+      visit(T->getDesugaredType());
+    } else {
+      Printer << "[";
+      visit(T->getCountType());
+      Printer << " x ";
+      visit(T->getElementType());
       Printer << "]";
     }
   }
@@ -7679,6 +7746,11 @@ void SILParameterInfo::print(
     options -= SILParameterInfo::Isolated;
     Printer << "@sil_isolated ";
   }
+      
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    Printer << "@const ";
+  }
 
   if (lifetimeDependence) {
     Printer.printLifetimeDependence(*lifetimeDependence);
@@ -7777,7 +7849,7 @@ std::string TypeBase::getStringAsComponent(const PrintOptions &PO) const {
   return OS.str();
 }
 
-void TypeBase::dumpPrint() const {
+void TypeBase::print() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
@@ -7915,8 +7987,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   if (auto superclassTy = genericSig->getSuperclassBound(
         proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
-                         ProtocolConformanceOptions(),
-                         /*isPreconcurrency=*/false);
+                         ProtocolConformanceOptions());
   }
 
   InvertibleProtocolSet inverses = InvertibleProtocolSet::allKnown();

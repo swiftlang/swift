@@ -5,8 +5,7 @@
 /// Build the library
 // RUN: %target-swift-frontend -emit-module %t/src/Lib.swift \
 // RUN:   -module-name Lib \
-// RUN:   -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-experimental-feature ExtensibleEnums
+// RUN:   -emit-module-path %t/Lib.swiftmodule
 
 // Check that the errors are produced when using enums from module with `ExtensibleEnums` feature enabled.
 // RUN: %target-swift-frontend -typecheck %t/src/TestChecking.swift \
@@ -19,8 +18,7 @@
 // RUN: %target-swift-frontend -emit-module %t/src/Lib.swift \
 // RUN:   -module-name Lib \
 // RUN:   -package-name Test \
-// RUN:   -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-experimental-feature ExtensibleEnums
+// RUN:   -emit-module-path %t/Lib.swiftmodule
 
 // Different module but the same package
 // RUN: %target-swift-frontend -typecheck %t/src/TestSamePackage.swift \
@@ -28,10 +26,9 @@
 // RUN:   -package-name Test \
 // RUN:   -verify
 
-// REQUIRES: swift_feature_ExtensibleEnums
-
 //--- Lib.swift
 
+@extensible
 public enum E {
   case a
 }
@@ -57,10 +54,10 @@ func test_same_module(e: E, f: F) {
 import Lib
 
 func test(e: E, f: F) {
-  // `E` is not marked as `@frozen` which means it gets new semantics
+  // `E` is marked as `@extensible` which means it gets new semantics
 
   switch e {
-  // expected-error@-1 {{switch covers known cases, but 'E' may have additional unknown values, possibly added in future versions}}
+  // expected-warning@-1 {{switch covers known cases, but 'E' may have additional unknown values, possibly added in future versions; this is an error in the Swift 6 language mode}}
   // expected-note@-2 {{handle unknown values using "@unknown default"}}
   case .a: break
   }
@@ -70,7 +67,7 @@ func test(e: E, f: F) {
   @unknown default: break
   }
 
-  // `F` is marked as `@frozen` which means regular rules apply even with `ExtensibleEnums` feature enabled.  
+  // `F` is marked as `@frozen` which means regular rules apply.
 
   switch f { // Ok (no errors because `F` is `@frozen`)
   case .a: break

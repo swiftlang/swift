@@ -298,7 +298,18 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[14];
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
+    static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
+#else
+    static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
+#endif
+
+    // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
+    // the ActiveTaskStatus, and a RecursiveMutex.
+    static constexpr size_t PrivateStorageSize =
+        6 * sizeof(void *) + 16 + ActiveTaskStatusSize + sizeof(RecursiveMutex);
+
+    void *Storage[PrivateStorageSize];
 
     /// Initialize this storage during the creation of a task.
     void initialize(JobPriority basePri);
@@ -755,8 +766,6 @@ private:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
-              "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 #pragma clang diagnostic push

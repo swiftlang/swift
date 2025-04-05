@@ -28,7 +28,9 @@
 namespace swift {
 class ASTContext;
 class AvailableAttr;
+class AvailabilityScope;
 class Decl;
+class DeclContext;
 
 /// An `AvailabilityContext` summarizes the availability constraints for a
 /// specific scope, such as within a declaration or at a particular source
@@ -62,6 +64,17 @@ public:
   /// set to the deployment target.
   static AvailabilityContext forDeploymentTarget(const ASTContext &ctx);
 
+  /// Returns the most refined `AvailabilityContext` for the given source
+  /// location. If `refinedScope` is not `nullptr`, it will be set to the most
+  /// refined scope that contains the location.
+  static AvailabilityContext
+  forLocation(SourceLoc loc, const DeclContext *declContext,
+              const AvailabilityScope **refinedScope = nullptr);
+
+  /// Returns the availability context of the signature (rather than the body)
+  /// of the given declaration.
+  static AvailabilityContext forDeclSignature(const Decl *decl);
+
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
   // FIXME: [availability] Remove; superseded by getAvailableRange().
@@ -86,9 +99,9 @@ public:
   void constrainWithContext(const AvailabilityContext &other,
                             const ASTContext &ctx);
 
-  /// Constrain the platform availability range with `platformRange`.
+  /// Constrain the platform version range with `range`.
   // FIXME: [availability] Remove; superseded by constrainWithAvailableRange().
-  void constrainWithPlatformRange(const AvailabilityRange &platformRange,
+  void constrainWithPlatformRange(const AvailabilityRange &range,
                                   const ASTContext &ctx);
 
   /// Constrain the available range for `domain` by `range`.

@@ -142,14 +142,12 @@ func invalidDeclarationMacro() {
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l0L_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l018AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
 
-  struct LocalThing1 {
-    func f() {
-      #accidentalCodeItem
-      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-      // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l0L_18AccidentalCodeItemfMp_.swift
-    }
+  do {
+    @AccidentalCodeItem struct S {}
+    // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+    // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l118AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
   }
 }
 #endif
@@ -648,6 +646,19 @@ struct HasNestedType {
   #DefineComparableType
 }
 
+@attached(accessor)
+macro AddGetter() = #externalMacro(module: "MacroDefinition", type: "AddGetterMacro")
+
+// Make sure the mangling for the accessor macro doesn't kick local
+// discriminator assignment, which would miss the autoclosure.
+func testLocalAccessorMacroWithAutoclosure() {
+  @AddGetter
+  var x: Int = 2
+
+  func takesAutoclosure(_ x: @autoclosure () -> Int) {}
+  takesAutoclosure(1)
+}
+
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
 macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
@@ -655,4 +666,18 @@ macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah
 @freestanding(expression)
 macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
 // FIXME: xpected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+
+// Because this is a method in a local decl, it ends up getting delayed, so
+// we need to check it at the end of the file.
+// FIXME: We either need to switch to using CHECK-DAG, or ideally teach
+// the diagnostic verifier about macro expansion buffers.
+func invalidDeclarationMacro2() {
+  struct LocalThing1 {
+    func f() {
+      #accidentalCodeItem
+      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+      // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-3]]_6_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+    }
+  }
+}
 #endif

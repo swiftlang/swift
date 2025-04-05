@@ -13,6 +13,7 @@
 #ifndef SWIFT_IRGEN_LINKING_H
 #define SWIFT_IRGEN_LINKING_H
 
+#include "swift/ABI/Coro.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
@@ -24,8 +25,8 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalObject.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 
 namespace llvm {
@@ -165,6 +166,9 @@ class LinkEntity {
     ExtendedExistentialIsUniqueMask = 0x100,
     ExtendedExistentialIsSharedShift = 9,
     ExtendedExistentialIsSharedMask = 0x200,
+
+    // Used by CoroAllocator.  2 bits.
+    CoroAllocatorKindShift = 8, CoroAllocatorKindMask = 0x300,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -449,6 +453,7 @@ class LinkEntity {
     ProtocolConformanceDescriptorRecord,
 
     // These are both type kinds and protocol-conformance kinds.
+    // TYPE KINDS: BEGIN {{
 
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
@@ -499,9 +504,6 @@ class LinkEntity {
     /// A coroutine continuation prototype function.
     CoroutineContinuationPrototype,
 
-    /// A global function pointer for dynamically replaceable functions.
-    DynamicallyReplaceableFunctionVariable,
-
     /// A reference to a metaclass-stub for a statically specialized generic
     /// class.
     /// The pointer is a canonical TypeBase*.
@@ -520,6 +522,16 @@ class LinkEntity {
     /// passed to swift_getCanonicalSpecializedMetadata.
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
+
+    /// Extended existential type shape.
+    /// Pointer is the (generalized) existential type.
+    /// SecondaryPointer is the GenericSignatureImpl*.
+    ExtendedExistentialTypeShape,
+
+    // TYPE KINDS: END }}
+
+    /// A global function pointer for dynamically replaceable functions.
+    DynamicallyReplaceableFunctionVariable,
 
     /// Provides the data required to invoke an async function using the async
     /// calling convention in the form of the size of the context to allocate
@@ -551,11 +563,6 @@ class LinkEntity {
     /// looked up by name by the runtime.
     /// The pointer is a SILFunction*.
     AccessibleFunctionRecord,
-
-    /// Extended existential type shape.
-    /// Pointer is the (generalized) existential type.
-    /// SecondaryPointer is the GenericSignatureImpl*.
-    ExtendedExistentialTypeShape,
 
     /// A global struct containing a relative pointer to the single-yield
     /// coroutine ramp function and the fixed-size to be allocated in the
@@ -590,10 +597,13 @@ class LinkEntity {
     /// The pointer is a const char* of the name.
     KnownCoroFunctionPointer,
 
-    /// An coro function pointer for a distributed accessor (method or
+    /// A coro function pointer for a distributed accessor (method or
     /// property).
     /// The pointer is a SILFunction*.
     DistributedAccessorCoroFunctionPointer,
+
+    /// An allocator to be passed to swift_coro_alloc and swift_coro_dealloc.
+    CoroAllocator,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -617,7 +627,8 @@ class LinkEntity {
 
   static bool isDeclKind(Kind k) { return k <= Kind::CoroFunctionPointerAST; }
   static bool isTypeKind(Kind k) {
-    return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
+    return k >= Kind::ProtocolWitnessTableLazyAccessFunction &&
+           k < Kind::DynamicallyReplaceableFunctionVariable;
   }
 
   static bool isRootProtocolConformanceKind(Kind k) {
@@ -1498,6 +1509,15 @@ public:
     return entity;
   }
 
+  static LinkEntity forCoroAllocator(CoroAllocatorKind kind) {
+    LinkEntity entity;
+    entity.Pointer = nullptr;
+    entity.SecondaryPointer = nullptr;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::CoroAllocator)) |
+                  LINKENTITY_SET_FIELD(CoroAllocatorKind, unsigned(kind));
+    return entity;
+  }
+
   static LinkEntity forCoroFunctionPointer(LinkEntity other) {
     LinkEntity entity;
     entity.Pointer = other.Pointer;
@@ -1707,6 +1727,11 @@ public:
            getKind() == Kind::MethodDescriptorDerivative);
     return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
         SecondaryPointer);
+  }
+
+  CoroAllocatorKind getCoroAllocatorKind() const {
+    assert(getKind() == Kind::CoroAllocator);
+    return CoroAllocatorKind(LINKENTITY_GET_FIELD(Data, CoroAllocatorKind));
   }
 
   CanGenericSignature getExtendedExistentialTypeShapeGenSig() const {

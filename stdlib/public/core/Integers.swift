@@ -2696,6 +2696,7 @@ extension FixedWidthInteger {
 extension FixedWidthInteger {
   @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @_semantics("optimize.sil.inline.constant.arguments")
   public // @testable
   static func _convert<Source: BinaryFloatingPoint>(
     from source: Source
@@ -3040,8 +3041,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned {
@@ -3056,8 +3056,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   }
 
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init?<T: BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source < (0 as T) {
@@ -3255,8 +3254,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth {
@@ -3273,8 +3271,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   }
 
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init?<T: BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth && source < Self.min {

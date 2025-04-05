@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,12 +16,12 @@
 
 #include "CodeSynthesis.h"
 
+#include "DerivedConformance/DerivedConformance.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "DerivedConformances.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -666,7 +666,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
       .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
+  auto type = superclassCtor->getInitializerInterfaceType();
+  if (auto *genericFnType = type->getAs<GenericFunctionType>())
+    type = genericFnType->substGenericArgs(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);

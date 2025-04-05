@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -56,29 +57,27 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   }
 
   // Map the highlight ranges.
-  SmallVector<const void *, 2> highlightRanges;
+  SmallVector<BridgedCharSourceRange, 2> highlightRanges;
   for (const auto &range : info.Ranges) {
-    if (range.isInvalid())
-      continue;
-
-    highlightRanges.push_back(range.getStart().getOpaquePointerValue());
-    highlightRanges.push_back(range.getEnd().getOpaquePointerValue());
+    if (range.isValid())
+      highlightRanges.push_back(range);
   }
 
-  StringRef documentationPath;
-  if (info.EducationalNotePaths.size() > 0)
-    documentationPath = info.EducationalNotePaths[0];
+  StringRef documentationPath = info.CategoryDocumentationURL;
 
-  // FIXME: Translate Fix-Its.
-  swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, perFrontendState,
-                                   text.data(), text.size(),
-                                   severity, info.Loc.getOpaquePointerValue(),
-                                   info.Category.data(),
-                                   info.Category.size(),
-                                   documentationPath.data(),
-                                   documentationPath.size(),
-                                   highlightRanges.data(),
-                                   highlightRanges.size() / 2);
+  SmallVector<BridgedFixIt, 2> fixIts;
+  for (const auto &fixIt : info.FixIts) {
+    fixIts.push_back(BridgedFixIt{ fixIt.getRange(), fixIt.getText() });
+  }
+
+  swift_ASTGen_addQueuedDiagnostic(
+      queuedDiagnostics, perFrontendState,
+      text.str(),
+      severity, info.Loc,
+      info.Category,
+      documentationPath,
+      highlightRanges.data(), highlightRanges.size(),
+      llvm::ArrayRef<BridgedFixIt>(fixIts));
 
   // TODO: A better way to do this would be to pass the notes as an
   // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires

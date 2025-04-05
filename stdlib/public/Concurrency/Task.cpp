@@ -377,9 +377,8 @@ static SerialExecutorRef executorForEnqueuedJob(Job *job) {
     return SerialExecutorRef::generic();
   }
 
-  if (auto identity = reinterpret_cast<HeapObject *>(jobQueue)) {
-    return SerialExecutorRef::forOrdinary(
-        identity, _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+  if (jobQueue == (void *)dispatch_get_main_queue()) {
+    return swift_task_getMainExecutor();
   }
 
   return SerialExecutorRef::generic();
@@ -1761,18 +1760,27 @@ swift_task_addCancellationHandlerImpl(
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
   bool fireHandlerNow = false;
-
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     if (oldStatus.isCancelled()) {
-      fireHandlerNow = true;
       // We don't fire the cancellation handler here since this function needs
       // to be idempotent
+      fireHandlerNow = true;
+
+      // don't add the record, because that would risk triggering it from
+      // task_cancel, concurrently with the record->run() we're about to do below.
+      return false;
     }
-    return true;
+    return true; // add the record
   });
 
   if (fireHandlerNow) {
     record->run();
+
+    // we have not added the record to the task because it has fired immediately,
+    // and therefore we can clean it up immediately rather than wait until removeCancellationHandler
+    // which would be triggered at the end of the withTaskCancellationHandler block.
+    swift_task_dealloc(record);
+    return nullptr; // indicate to the remove... method, that there was no task added
   }
   return record;
 }
@@ -1780,8 +1788,19 @@ swift_task_addCancellationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  removeStatusRecordFromSelf(record);
-  swift_task_dealloc(record);
+  if (!record) {
+    // seems we never added the record but have run it immediately,
+    // so we make no attempts to remove it.
+    return;
+  }
+
+  auto task = swift_task_getCurrent();
+  assert(task->_private()._status().load(std::memory_order_relaxed).getInnermostRecord() == record &&
+    "We expect that the popped record will be exactly first as well as that it is of the expected type");
+  if (auto poppedRecord =
+      popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
+    swift_task_dealloc(record);
+  }
 }
 
 SWIFT_CC(swift)

@@ -130,12 +130,19 @@ bool BindingSet::isDelayed() const {
         return true;
 
       if (Bindings[0].BindingType->is<ProtocolType>()) {
-        auto *locator = Bindings[0].getLocator();
-        // If the binding got inferred from a contextual type
-        // this set shouldn't be delayed because there won't
-        // be any other inference sources for this leading-dot
-        // syntax member.
-        if (!locator->findLast<LocatorPathElt::ContextualType>())
+        auto *bindingLoc = Bindings[0].getLocator();
+        // This set shouldn't be delayed because there won't be any
+        // other inference sources when the protocol binding got
+        // inferred from a contextual type and the leading-dot chain
+        // this type variable is a base of, is connected directly to it.
+
+        if (!bindingLoc->findLast<LocatorPathElt::ContextualType>())
+          return true;
+
+        auto *chainResult =
+            getAsExpr<UnresolvedMemberChainResultExpr>(bindingLoc->getAnchor());
+        if (!chainResult || CS.getParentExpr(chainResult) ||
+            chainResult->getChainBase() != getAsExpr(locator->getAnchor()))
           return true;
       }
     }

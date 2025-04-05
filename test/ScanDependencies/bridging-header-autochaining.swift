@@ -121,7 +121,15 @@
 // RUN: %target-swift-frontend -module-name User -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -disable-implicit-swift-modules \
 // RUN:   -explicit-swift-module-map-file %t/map3.json @%t/User2.cmd %t/user2.swift \
+// RUN:   -emit-objc-header -emit-objc-header-path %t/User-Swift.h \
 // RUN:   -emit-module -o %t/User2.swiftmodule
+
+/// Generated ObjC Header should reference original header name, not the chained bridging header.
+// RUN: %FileCheck %s --check-prefix OBJC-HEADER --input-file=%t/User-Swift.h
+// OBJC-HEADER: import B
+// OBJC-HEADER: import
+// OBJC-HEADER-SAME: Bridging2.h
+// OBJC-HEADER-NOT: ChainedBridgingHeader.h
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name User -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
@@ -193,6 +201,8 @@ extension Bridging2 {
     public func testA() {}
 }
 
+public class BB : B {}
+public class Foo3 : Bridging2 {}
 
 //--- Bridging.h
 #include "Foo.h"

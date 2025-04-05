@@ -2097,6 +2097,26 @@ static ManagedValue emitBuiltinAddressOfRawLayout(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
 
+static ManagedValue emitBuiltinZeroInitializer(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SGFContext C) {
+  auto valueType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto &valueTL = SGF.getTypeLowering(valueType);
+  auto loweredValueTy = valueTL.getLoweredType().getObjectType();
+
+  if (valueTL.isLoadable() ||
+      !SGF.F.getConventions().useLoweredAddresses()) {
+    auto value = SGF.B.createZeroInitValue(loc, loweredValueTy);
+    return SGF.emitManagedRValueWithCleanup(value, valueTL);
+  }
+
+  SILValue valueAddr = SGF.getBufferForExprResult(loc, loweredValueTy, C);
+  SGF.B.createZeroInitAddr(loc, valueAddr);
+  return SGF.manageBufferForExprResult(valueAddr, valueTL, C);
+}
+
 static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
                                        SILLocation loc,
                                        SubstitutionMap subs,
@@ -2110,6 +2130,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
                                              resultASTTy);
   bool didEmitInto;
   Initialization *dest;
+  TemporaryInitialization *destTemporary = nullptr;
   std::unique_ptr<Initialization> destOwner;
   
   // Use the context destination if available.
@@ -2119,8 +2140,9 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     dest = C.getEmitInto();
   } else {
     didEmitInto = false;
-    destOwner = SGF.emitTemporary(loc, loweredBufferTy);
-    dest = destOwner.get();
+    auto destTempOwner = SGF.emitTemporary(loc, loweredBufferTy);
+    dest = destTemporary = destTempOwner.get();
+    destOwner = std::move(destTempOwner);
   }
   
   auto buffer = dest->getAddressForInPlaceInitialization(SGF, loc);
@@ -2129,15 +2151,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   // Aside from providing a modicum of predictability if the memory isn't
   // actually initialized, this also serves to communicate to DI that the memory
   // is considered initialized from this point.
-  auto zeroInit = getBuiltinValueDecl(Ctx,
-                                      Ctx.getIdentifier("zeroInitializer"));
-  SGF.B.createBuiltin(loc, zeroInit->getBaseIdentifier(),
-                      SILType::getEmptyTupleType(Ctx),
-                      SubstitutionMap::get(zeroInit->getInnermostDeclContext()
-                                               ->getGenericSignatureOfContext(),
-                                           {resultASTTy},
-                                           LookUpConformanceInModule()),
-                      buffer);
+  SGF.B.createZeroInitAddr(loc, buffer);
 
   SILValue bufferPtr = SGF.B.createAddressToPointer(loc, buffer,
         SILType::getPrimitiveObjectType(SGF.getASTContext().TheRawPointerType),
@@ -2175,16 +2189,19 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     return ManagedValue::forInContext();
   }
   
+  assert(destTemporary
+         && "didn't emit into context but also didn't emit into temporary?");
+  auto result = destTemporary->getManagedAddress();
   auto resultTy = SGF.getLoweredType(subs.getReplacementTypes()[0]);
   
   // If the result is naturally address-only, then we can adopt the stack slot
   // as the value directly.
   if (resultTy == loweredBufferTy.getLoweredType().getAddressType()) {
-    return SGF.emitManagedRValueWithCleanup(buffer);
+    return result;
   }
   
   // If the result is loadable, load it.
-  return SGF.B.createLoadTake(loc, ManagedValue::forLValue(buffer));
+  return SGF.B.createLoadTake(loc, result);
 }
 
 std::optional<SpecializedEmitter>

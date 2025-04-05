@@ -394,7 +394,8 @@ public:
       if (*existing.Value == value) {
         P.diagnose(loc, diag::duplicate_attribute, /*modifier*/ 1);
       } else {
-        P.diagnose(loc, diag::mutually_exclusive_attrs, name, existing.Name,
+        P.diagnose(loc, diag::mutually_exclusive_attr_names, name,
+                   existing.Name,
                    /*modifier*/ 1);
       }
       P.diagnose(existing.Loc, diag::previous_attribute, /*modifier*/ 1);
@@ -410,7 +411,7 @@ public:
     if (allowed)
       setEnum(existing, value, name, loc);
     else
-      P.diagnose(loc, diag::unknown_attribute, name);
+      P.diagnose(loc, diag::unknown_attr_name, name);
   }
 };
 

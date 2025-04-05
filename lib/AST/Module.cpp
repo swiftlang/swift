@@ -21,7 +21,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -62,6 +61,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -694,13 +694,17 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
-  if (!accessPath.empty()) {
-    for (auto &member : ClassMembers) {
-      // Non-simple names are also stored under their simple name, so make
-      // sure to only report them once.
-      if (!member.first.isSimpleName())
-        continue;
+  std::vector<std::pair<DeclName, TinyPtrVector<ValueDecl *>>> OrderedMembers;
+  for (auto &member : ClassMembers) {
+    if (!member.first.isSimpleName())
+      continue;
+    OrderedMembers.emplace_back(member.first, member.second);
+  }
+  llvm::sort(OrderedMembers,
+             [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });
 
+  if (!accessPath.empty()) {
+    for (auto &member : OrderedMembers) {
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().Item)
@@ -712,12 +716,7 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
     return;
   }
 
-  for (auto &member : ClassMembers) {
-    // Non-simple names are also stored under their simple name, so make sure to
-    // only report them once.
-    if (!member.first.isSimpleName())
-      continue;
-
+  for (auto &member : OrderedMembers) {
     for (ValueDecl *vd : member.second)
       if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
         consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
@@ -912,20 +911,6 @@ ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
   return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
 }
 
-SourceFile *IDEInspectionFileRequest::evaluate(Evaluator &evaluator,
-                                               ModuleDecl *mod) const {
-  const auto &SM = mod->getASTContext().SourceMgr;
-  assert(mod->isMainModule() && "Can only do completion in the main module");
-  assert(SM.hasIDEInspectionTargetBuffer() && "Not in IDE inspection mode?");
-
-  for (auto *file : mod->getFiles()) {
-    auto *SF = dyn_cast<SourceFile>(file);
-    if (SF && SF->getBufferID() == SM.getIDEInspectionTargetBufferID())
-      return SF;
-  }
-  llvm_unreachable("Couldn't find the completion file?");
-}
-
 #define FORWARD(name, args)                                                    \
   for (const FileUnit *file : getFiles()) {                                    \
     file->name args;                                                           \
@@ -1088,6 +1073,18 @@ void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
+void ModuleDecl::lookupAvailabilityDomains(
+    Identifier identifier,
+    llvm::SmallVectorImpl<AvailabilityDomain> &results) const {
+  auto iter = AvailabilityDomains.find(identifier);
+  if (iter != AvailabilityDomains.end()) {
+    results.push_back(AvailabilityDomain::forCustom(iter->getSecond()));
+    return;
+  }
+
+  FORWARD(lookupAvailabilityDomains, (identifier, results));
 }
 
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
@@ -2018,6 +2015,10 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
 
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
+}
+
+bool ModuleDecl::isConcurrencyModule() const {
+  return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
 
 bool ModuleDecl::hasStandardSubstitutions() const {
@@ -3147,7 +3148,7 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  const Decl *D = abstractSyntaxDeclForAvailableAttribute(this);
+  const Decl *D = getAbstractSyntaxDeclForAttributes();
 
   if (!isa<ValueDecl>(D) &&
       !isa<ExtensionDecl>(D))
@@ -3163,6 +3164,11 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   // Applies only to public ValueDecls and ExtensionDecls.
   assert (isa<ValueDecl>(decl) ||
           isa<ExtensionDecl>(decl));
+
+  // ABI decls share the SPI groups of their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSPIGroups();
 
   // First, look for local attributes.
   llvm::SetVector<Identifier> spiGroups;
@@ -3740,6 +3746,10 @@ void SourceFile::setAvailabilityScope(AvailabilityScope *scope) {
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
   for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
+    if (vd->getDeclContext()->getInnermostSkippedFunctionContext()) {
+      // Ignore things in skipped functions.
+      continue;
+    }
     if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
       auto inserted = ValidatedOpaqueReturnTypes.insert(
                 {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
@@ -4172,24 +4182,23 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   return version::Version();
 }
 
-std::optional<AvailabilityDomain>
-ModuleDecl::getAvailabilityDomainForIdentifier(Identifier identifier) const {
-  auto iter = AvailabilityDomains.find(identifier);
-  if (iter == AvailabilityDomains.end())
-    return std::nullopt;
-
-  return AvailabilityDomain::forCustom(iter->getSecond());
-}
-
 //===----------------------------------------------------------------------===//
 //                            MARK: SwiftSettings
 //===----------------------------------------------------------------------===//
+
+static llvm::cl::opt<bool> AllowForDuplicateSwiftSettings(
+    "swift-settings-allow-duplicates",
+    llvm::cl::desc("Option that allows for duplicate SwiftSettings. Just for "
+                   "compiler testing"),
+    llvm::cl::Hidden);
 
 namespace {
 
 enum class SwiftSettingKind {
   Unknown = 0,
   DefaultIsolation,
+
+  LastKind = DefaultIsolation,
 };
 
 struct SwiftSettingsWalker : ASTWalker {
@@ -4197,8 +4206,21 @@ struct SwiftSettingsWalker : ASTWalker {
   ASTContext &ctx;
   SourceFileLangOptions result;
 
+  SmallVector<Expr *, 1> swiftSettingIndexToOriginalExprMap;
+
   SwiftSettingsWalker(SourceFile &sf, ASTContext &ctx)
-      : sf(sf), ctx(ctx), result() {}
+      : sf(sf), ctx(ctx), result() {
+    // NOTE: We do not store a value for Unknown.
+    for (unsigned i : range(unsigned(SwiftSettingKind::LastKind))) {
+      (void)i;
+      swiftSettingIndexToOriginalExprMap.push_back(nullptr);
+    }
+  }
+
+  Expr *&getOriginalSwiftSetting(SwiftSettingKind kind) {
+    assert(kind != SwiftSettingKind::Unknown);
+    return swiftSettingIndexToOriginalExprMap[unsigned(kind) - 1];
+  }
 
   /// Given a specific CallExpr, pattern matches the CallExpr's first argument
   /// to validate it is MainActor.self. Returns CanType() if the CallExpr has
@@ -4257,13 +4279,30 @@ struct SwiftSettingsWalker : ASTWalker {
         continue;
 
       case SwiftSettingKind::DefaultIsolation:
+        auto *&expr =
+            getOriginalSwiftSetting(SwiftSettingKind::DefaultIsolation);
+
+        // If we already have an expr, emit an error and continue.
+        if (!AllowForDuplicateSwiftSettings && expr) {
+          ctx.Diags.diagnose(arg.getStartLoc(),
+                             diag::swift_settings_duplicate_setting);
+          ctx.Diags.diagnose(
+              expr->getLoc(),
+              diag::swift_settings_duplicate_setting_original_loc);
+          foundValidArg = true;
+          continue;
+        }
+
+        // Otherwise, set things up appropriately.
         if (auto actor = patternMatchDefaultIsolationMainActor(callExpr)) {
+          expr = callExpr;
           result.defaultIsolation = actor;
           foundValidArg = true;
           continue;
         }
 
         if (isa<NilLiteralExpr>(callExpr->getArgs()->getExpr(0))) {
+          expr = callExpr;
           result.defaultIsolation = {Type()};
           foundValidArg = true;
           continue;
@@ -4278,11 +4317,6 @@ struct SwiftSettingsWalker : ASTWalker {
 };
 
 } // namespace
-
-static bool isConcurrencyModule(DeclContext *dc) {
-  auto *m = dc->getParentModule();
-  return !m->getParent() && m->getName() == m->getASTContext().Id_Concurrency;
-}
 
 bool SwiftSettingsWalker::isSwiftSettingsMacroExpr(
     MacroExpansionExpr *macroExpr) {
@@ -4339,7 +4373,7 @@ SwiftSettingsWalker::getSwiftSettingArgDecl(Argument arg) {
     return {};
 
   // Now lookup our swiftSettingDecl.
-  NominalTypeDecl *swiftSettingsDecl;
+  NominalTypeDecl *swiftSettingsDecl = nullptr;
   {
     SmallVector<ValueDecl *, 1> decls;
     ctx.lookupInSwiftModule("SwiftSetting", decls);
@@ -4400,7 +4434,8 @@ SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
   if (!nomDecl)
     return CanType();
   auto *nomDeclDC = nomDecl->getDeclContext();
-  if (!nomDeclDC->isModuleScopeContext() || !isConcurrencyModule(nomDeclDC))
+  auto *nomDeclModule = nomDecl->getParentModule();
+  if (!nomDeclDC->isModuleScopeContext() || !nomDeclModule->isConcurrencyModule())
     return CanType();
 
   return nomDecl->getDeclaredType()->getCanonicalType();

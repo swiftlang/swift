@@ -165,3 +165,13 @@ extension ASTGenDiagnostic {
     )
   }
 }
+
+extension ASTGenDiagnostic {
+  static func poundDiagnostic(_ node: StringLiteralExprSyntax, message: String, isError: Bool) -> Self {
+    Self(
+      node: node,
+      message: node.representedLiteralValue!,
+      severity: isError ? .error : .warning
+    )
+  }
+}

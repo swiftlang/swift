@@ -368,6 +368,8 @@ $sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specializat
 $s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
 $s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
+@$s8keypaths1KV3valACSi_tcfcACmTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, K>)
+@$s8keypaths1KVACycfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out K)
 $s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq  ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
 $s18resilient_protocol24ResilientDerivedProtocolPxAA0c4BaseE0Tn --> associated conformance descriptor for resilient_protocol.ResilientDerivedProtocol.A: resilient_protocol.ResilientBaseProtocol
 $s3red4testyAA3ResOyxSayq_GAEs5ErrorAAq_sAFHD1__HCg_GADyxq_GsAFR_r0_lF ---> red.test<A, B where B: Swift.Error>(red.Res<A, B>) -> red.Res<A, [B]>
@@ -487,9 +489,10 @@ $s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabs
 $s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)
 $s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(@execution(caller) () async throws -> A) async throws -> A
 $s5thing1PP1sAA1SVvxTwc ---> coro function pointer to thing.P.s.modify2 : thing.S
-
 _$s15raw_identifiers0020foospace_liaADEDGcjayyF ---> raw_identifiers.`foo space`() -> ()
 _$s15raw_identifiers0018_3times_pgaIGJCFbhayyF ---> raw_identifiers.`3 times`() -> ()
 _$s15raw_identifiers0019test_yeaIIBCEapkagayyF ---> raw_identifiers.`test +`() -> ()
 _$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo`() -> ()
 _$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()
+$s7Library1BC1iSivxTwd ---> default override of Library.B.i.modify2 : Swift.Int
+$s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.modify2 : Swift.Int

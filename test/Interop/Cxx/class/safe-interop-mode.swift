@@ -21,7 +21,7 @@ module Test {
 struct SWIFT_NONESCAPABLE View {
     __attribute__((swift_attr("@lifetime(immortal)")))
     View() : member(nullptr) {}
-    __attribute__((swift_attr("@lifetime(p)")))
+    __attribute__((swift_attr("@lifetime(copy p)")))
     View(const int *p [[clang::lifetimebound]]) : member(p) {}
     View(const View&) = default;
 private:
@@ -91,9 +91,11 @@ func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer)
 }
 
 func useCfType(x: CFArray) {
+  _ = x
 }
 
 func useString(x: std.string) {
+  _ = x
 }
 
 func useVecOfPtr(x: VecOfPtr) {
@@ -102,9 +104,11 @@ func useVecOfPtr(x: VecOfPtr) {
 }
 
 func useVecOfInt(x: VecOfInt) {
+  _ = x
 }
 
 func useSafeTuple(x: SafeTuple) {
+  _ = x
 }
 
 func useUnsafeTuple(x: UnsafeTuple) {

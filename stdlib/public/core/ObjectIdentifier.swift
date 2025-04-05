@@ -61,8 +61,15 @@ public struct ObjectIdentifier: Sendable {
   ///
   /// - Parameters:
   ///   - x: A metatype.
-  @inlinable // trivial-implementation
+  @_alwaysEmitIntoClient
+  public init(_ x: any (~Copyable & ~Escapable).Type) {
+    self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
+
+  @inlinable
   public init(_ x: Any.Type) {
+    // FIXME: This ought to be obsoleted in favor of the generalized overload
+    // above. Unfortunately, that one sometimes causes a runtime hang.
     self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
@@ -80,7 +87,7 @@ public struct ObjectIdentifier: Sendable {
   }
 
   @inlinable // trivial-implementation
-  public init<Object>(_ x: Object.Type) {
+  public init<T: ~Copyable & ~Escapable>(_ x: T.Type) {
     self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }

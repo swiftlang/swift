@@ -463,7 +463,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (StringRef))
+      "unexpected attribute %0 in operator declaration", (DeclAttribute))
 WARNING(operator_decl_remove_designated_types,none,
         "designated types are no longer used by the compiler; please remove "
         "the designated type list from this operator declaration", ())
@@ -763,6 +763,14 @@ ERROR(sil_witness_assoc_conf_not_found,none,
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
+// SIL default override table
+ERROR(sil_default_override_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_default_override_class_not_found,none,
+      "sil class not found %0", (Identifier))
+ERROR(sil_default_override_decl_not_class,none,
+      "sil decl found for %0 is not a class", (Identifier))
+
 // SIL differentiability witnesses
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
@@ -877,6 +885,10 @@ NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
      "the elements", ())
 NOTE(subscript_array_element_fix_it_remove_space, none,
      "remove the space between the elements to silence this warning", ())
+
+// Inline Array
+ERROR(expected_rsquare_inline_array,none,
+      "expected ']' in inline array type", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
@@ -1472,8 +1484,15 @@ ERROR(multiple_access_level_modifiers,none,
       "multiple incompatible access-level modifiers specified", ())
 NOTE(previous_access_level_modifier,none,
      "previous modifier specified here", ())
-ERROR(mutually_exclusive_attrs,none,
-      "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
+ERROR(mutually_exclusive_decl_attrs,none,
+      "%0 contradicts previous %select{attribute|modifier}2 %1",
+      (DeclAttribute, DeclAttribute, bool))
+ERROR(mutually_exclusive_type_attrs,none,
+      "%0 contradicts previous %1",
+      (const TypeAttribute *, const TypeAttribute *))
+ERROR(mutually_exclusive_attr_names,none,
+      "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
+      (StringRef, StringRef, bool))
 
 ERROR(invalid_infix_on_func,none,
       "'infix' modifier is not required or allowed on func declarations", ())
@@ -1548,6 +1567,8 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
+      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
 // availability
