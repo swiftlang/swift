@@ -1340,7 +1340,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *
 SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
-  ASTContext &C = ImporterImpl.SwiftContext;
+  ASTContext &C = enumDecl->getASTContext();
   auto rawTy = enumDecl->getRawType();
 
   auto param = new (C) ParamDecl(SourceLoc(), SourceLoc(), C.Id_rawValue,
