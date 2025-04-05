@@ -403,15 +403,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                   decl->getDeclaredType(), existingIsolation, isolation)
                 .warnUntilSwiftVersion(6);
               if (previousVar) {
-                previousVar->diagnose(
-                    diag::property_requires_actor,
-                    previousVar->getDescriptiveKind(),
-                    previousVar->getName(), existingIsolation);
+                previousVar->diagnose(diag::property_requires_actor,
+                                      previousVar, existingIsolation);
               }
-              var->diagnose(
-                  diag::property_requires_actor,
-                  var->getDescriptiveKind(),
-                  var->getName(), isolation);
+              var->diagnose(diag::property_requires_actor, var, isolation);
               hasError = true;
               return false;
             }

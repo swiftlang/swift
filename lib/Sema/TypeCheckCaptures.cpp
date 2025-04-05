@@ -364,9 +364,8 @@ public:
         // }
         if (!isa<FuncDecl>(D)) {
           if (DC->isLocalContext()) {
-            Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
-                                   NTD->getDescriptiveKind(),
-                                   D->getBaseIdentifier());
+            Context.Diags.diagnose(DRE->getLoc(),
+                                   diag::capture_across_type_decl, NTD, D);
 
             NTD->diagnose(diag::kind_declared_here,
                           DescriptiveDeclKind::Type);

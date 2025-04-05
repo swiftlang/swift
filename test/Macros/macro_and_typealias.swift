@@ -9,11 +9,11 @@
 @freestanding(expression) public macro ConcretePrint(_ value: Any) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 @freestanding(expression) public macro MultiPrint(_ value: Any) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 
-public struct Printer<Value> { // expected-note {{generic type 'Printer' declared here}}
+public struct Printer<Value> { // expected-note {{generic struct 'Printer' declared here}}
   init(_: (Value) -> Void) {}
 }
 
-public struct MultiPrinter<T, U> { // expected-note {{generic type 'MultiPrinter' declared here}}
+public struct MultiPrinter<T, U> { // expected-note {{generic struct 'MultiPrinter' declared here}}
 }
 
 typealias Print = Printer

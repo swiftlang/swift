@@ -451,8 +451,7 @@ GlobalActorAttributeRequest::evaluate(
     // to have a global actor attribute.
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       if (!accessor->isGetter()) {
-        decl->diagnose(diag::global_actor_disallowed,
-                       decl->getDescriptiveKind())
+        decl->diagnose(diag::global_actor_disallowed, decl)
             .warnUntilSwiftVersion(6)
             .fixItRemove(globalActorAttr->getRangeWithAt());
 
@@ -493,7 +492,7 @@ GlobalActorAttributeRequest::evaluate(
     // Functions are okay.
   } else {
     // Everything else is disallowed.
-    decl->diagnose(diag::global_actor_disallowed, decl->getDescriptiveKind());
+    decl->diagnose(diag::global_actor_disallowed, decl);
     return std::nullopt;
   }
 
@@ -1853,7 +1852,7 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
     if (*useKind == VarRefUseEnv::Read)
       decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
     else
-      decl->diagnose(diag::actor_mutable_state, decl->getDescriptiveKind());
+      decl->diagnose(diag::actor_mutable_state, decl);
 
   } else {
     decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
@@ -4622,10 +4621,8 @@ namespace {
 
           if (derivedConformanceType) {
             auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
-            ctx.Diags.diagnose(loc, diag::in_derived_witness,
-                               decl->getDescriptiveKind(),
-                               requirementName,
-                               derivedConformanceType);
+            ctx.Diags.diagnose(loc, diag::in_derived_witness, decl,
+                               requirementName, derivedConformanceType);
           }
 
           noteIsolatedActorMember(decl, context);
@@ -5676,8 +5673,8 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
   // Suggest removing global-actor attributes written on it, as its ignored.
   if (auto attr = value->getGlobalActorAttr()) {
     if (!attr->first->isImplicit()) {
-      value->diagnose(diag::isolated_parameter_combined_global_actor_attr,
-                      value->getDescriptiveKind())
+      value
+          ->diagnose(diag::isolated_parameter_combined_global_actor_attr, value)
           .fixItRemove(attr->first->getRangeWithAt())
           .warnUntilSwiftVersion(6);
     }
@@ -5686,8 +5683,7 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
   // Suggest removing `nonisolated` as it is also ignored
   if (auto attr = value->getAttrs().getAttribute<NonisolatedAttr>()) {
     if (!attr->isImplicit()) {
-      value->diagnose(diag::isolated_parameter_combined_nonisolated,
-                      value->getDescriptiveKind())
+      value->diagnose(diag::isolated_parameter_combined_nonisolated, value)
           .fixItRemove(attr->getRangeWithAt())
           .warnUntilSwiftVersion(6);
     }
@@ -7874,13 +7870,9 @@ ActorReferenceResult ActorReferenceResult::forReference(
 
 bool swift::diagnoseNonSendableFromDeinit(
     SourceLoc refLoc, VarDecl *var, DeclContext *dc) {
-  return diagnoseIfAnyNonSendableTypes(var->getTypeInContext(),
-                                SendableCheckContext(dc),
-                                Type(),
-                                SourceLoc(),
-                                refLoc,
-                                diag::non_sendable_from_deinit,
-                                var->getDescriptiveKind(), var->getName());
+  return diagnoseIfAnyNonSendableTypes(
+      var->getTypeInContext(), SendableCheckContext(dc), Type(), SourceLoc(),
+      refLoc, diag::non_sendable_from_deinit, var);
 }
 
 ActorIsolation ProtocolConformance::getIsolation() const {

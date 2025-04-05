@@ -176,7 +176,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(InfixOperator);
   TRIVIAL_KIND(PrefixOperator);
   TRIVIAL_KIND(PostfixOperator);
-  TRIVIAL_KIND(TypeAlias);
   TRIVIAL_KIND(GenericTypeParam);
   TRIVIAL_KIND(AssociatedType);
   TRIVIAL_KIND(Protocol);
@@ -189,6 +188,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
+
+  case DeclKind::TypeAlias:
+    return cast<TypeAliasDecl>(this)->getGenericParams()
+             ? DescriptiveDeclKind::GenericTypeAlias
+             : DescriptiveDeclKind::TypeAlias;
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -350,6 +354,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(PrefixOperator, "prefix operator");
   ENTRY(PostfixOperator, "postfix operator");
   ENTRY(TypeAlias, "type alias");
+  ENTRY(GenericTypeAlias, "generic type alias");
   ENTRY(GenericTypeParam, "generic parameter");
   ENTRY(AssociatedType, "associated type");
   ENTRY(Type, "type");
@@ -364,7 +369,6 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericClass, "generic class");
   ENTRY(GenericActor, "generic actor");
   ENTRY(GenericDistributedActor, "generic distributed actor");
-  ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(StaticSubscript, "static subscript");
   ENTRY(ClassSubscript, "class subscript");

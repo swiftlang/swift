@@ -343,8 +343,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
             if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
-                                 diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind(),
+                                 diag::effectful_keypath_component, asd,
                                  /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
@@ -807,9 +806,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         declParent = VD->getDeclContext()->getParentModule();
       }
 
-      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                         VD->getBaseIdentifier(),
-                         VD->getDescriptiveKind(),
+      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access, VD,
                          declParent);
       Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD);
 
@@ -847,14 +844,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
       for (const ModuleValuePair &pair : sortedResults) {
-        DescriptiveDeclKind k = pair.second->getDescriptiveKind();
-
         SmallString<32> namePlusDot = pair.first->getName().str();
         namePlusDot.push_back('.');
 
-        Ctx.Diags.diagnose(DRE->getLoc(), topLevelDiag,
-                           namePlusDot, k, pair.first->getName())
-          .fixItInsert(DRE->getStartLoc(), namePlusDot);
+        Ctx.Diags
+            .diagnose(DRE->getLoc(), topLevelDiag, namePlusDot, pair.second,
+                      pair.first)
+            .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
     

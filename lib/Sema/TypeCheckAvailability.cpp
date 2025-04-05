@@ -655,9 +655,9 @@ static void fixAvailabilityForDecl(
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
-  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
-  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
-    KindForDiagnostic = D->getDescriptiveKind();
+  const auto *DeclForDiagnostic = ConcDecl;
+  if (isa<PatternBindingDecl>(DeclForDiagnostic)) {
+    DeclForDiagnostic = D;
   }
 
   SourceLoc InsertLoc =
@@ -668,7 +668,7 @@ static void fixAvailabilityForDecl(
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
 
-  D->diagnose(diag::availability_add_attribute, KindForDiagnostic)
+  D->diagnose(diag::availability_add_attribute, DeclForDiagnostic)
       .fixItInsert(InsertLoc, diag::insert_available_attr,
                    Domain.getNameForAttributePrinting(),
                    RequiredAvailability.getVersionString(), OriginalIndent);

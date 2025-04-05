@@ -42,6 +42,8 @@ NOTE(opaque_return_type_declared_here,none,
      "opaque return type declared here", ())
 NOTE(default_value_declared_here,none,
      "default value declared here", ())
+NOTE(requirement_declared_here,none,
+     "requirement %0 declared here", (const ValueDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -166,8 +168,8 @@ ERROR(init_candidate_inaccessible,none,
       (Type, AccessLevel))
 
 ERROR(candidate_from_missing_import,none,
-      "%0 %1 is not available due to missing import of defining module %2",
-      (DescriptiveDeclKind, DeclName, ModuleDecl *))
+      "%kind0 is not available due to missing import of defining module %1",
+      (const ValueDecl *, ModuleDecl *))
 NOTE(candidate_add_import,none,
      "add import of module %0", (ModuleDecl *))
 
@@ -594,8 +596,8 @@ ERROR(cannot_convert_assign,none,
       "cannot assign value of type %0 to type %1",
       (Type,Type))
 NOTE(assign_protocol_conformance_fix_it,none,
-     "add missing conformance to %0 to %1 %2",
-     (Type, DescriptiveDeclKind, Type))
+     "add missing conformance to %0 to %kind1",
+     (Type, const NominalTypeDecl *))
 ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
       (Type, Type))
@@ -783,11 +785,11 @@ ERROR(expr_selector_not_objc,none,
       "Objective-C",
       (const ValueDecl *))
 NOTE(make_decl_objc,none,
-     "add '@objc' to expose this %0 to Objective-C",
-     (DescriptiveDeclKind))
+     "add '@objc' to expose this %kindonly0 to Objective-C",
+     (const ValueDecl *))
 NOTE(make_decl_objc_for_implementation,none,
-     "add '@objc' to implement an Objective-C %0",
-     (DescriptiveDeclKind))
+     "add '@objc' to implement an Objective-C %kindonly0",
+     (const Decl *))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -932,11 +934,12 @@ ERROR(serialization_fatal,Fatal,
       (StringRef))
 
 ERROR(serialization_invalid_decl,Fatal,
-      "deserialized invalid declaration %0 (%1) in module '%2'",
-      (DeclName, DescriptiveDeclKind, StringRef))
+      "deserialized invalid declaration %0 (%kindonly0) in module %1",
+      (const Decl *, const ModuleDecl *))
 ERROR(serialization_allowing_invalid_decl,none,
-      "allowing deserialization of invalid declaration %0 (%1) in module '%2'",
-      (DeclName, DescriptiveDeclKind, StringRef))
+      "allowing deserialization of invalid declaration %0 (%kindonly0) in "
+      "module %1",
+      (const Decl *, const ModuleDecl *))
 ERROR(serialization_error_type,Fatal,
       "deserialized error type '%0' in module '%1'",
       (StringRef, StringRef))
@@ -1066,8 +1069,8 @@ ERROR(invalid_redecl_init,none,
       (const ValueDecl *, bool))
 ERROR(invalid_redecl_implicit,none,
       "invalid redeclaration of synthesized "
-      "%select{%0|implementation for protocol requirement}1 %2",
-      (DescriptiveDeclKind, bool, const ValueDecl *))
+      "%select{%kindonly0|implementation for protocol requirement}1 %2",
+      (const ValueDecl *, bool, const ValueDecl *))
 WARNING(invalid_redecl_swift5_warning,Deprecation,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (const ValueDecl *))
@@ -1743,9 +1746,9 @@ ERROR(nominal_type_not_attribute,none,
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 is not valid on %1s in " 
+ERROR(mutating_invalid_classes,none, "%0 is not valid on %kindonly1s in "
       "%select{classes|class-bound protocols}2",
-      (SelfAccessKind, DescriptiveDeclKind, bool))
+      (SelfAccessKind, const FuncDecl *, bool))
 
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
@@ -1888,13 +1891,13 @@ ERROR(member_of_objc_implementation_not_objc_or_final,none,
       "did you use the %kindonly0's Swift name?",
       (ValueDecl *, ValueDecl *))
 NOTE(fixit_add_private_for_objc_implementation,none,
-     "add 'private' or 'fileprivate' to define an Objective-C-compatible %0 "
-     "not declared in the header",
-     (DescriptiveDeclKind))
+     "add 'private' or 'fileprivate' to define an Objective-C-compatible "
+     "%kindonly0 not declared in the header",
+     (const ValueDecl *))
 NOTE(fixit_add_nonobjc_or_final_for_objc_implementation,none,
-     "add '%select{@nonobjc|final}1' to define a Swift-only %0"
+     "add '%select{@nonobjc|final}1' to define a Swift-only %kindonly0"
      "%select{| that cannot be overridden}1",
-     (DescriptiveDeclKind, /*suggestFinal=*/bool))
+     (const ValueDecl *, /*suggestFinal=*/bool))
 
 ERROR(objc_implementation_wrong_category,none,
       "%kind0 should be implemented in extension for "
@@ -1903,13 +1906,13 @@ ERROR(objc_implementation_wrong_category,none,
       (ValueDecl *, Identifier, Identifier))
 
 ERROR(objc_implementation_wrong_decl_kind,none,
-      "%kind0 does not match the %1 declared by the header",
-      (ValueDecl *, DescriptiveDeclKind))
+      "%kind0 does not match the %kindonly1 declared by the header",
+      (const ValueDecl *, const ValueDecl *))
 
 ERROR(objc_implementation_must_be_settable,none,
-      "%kind0 should be settable to match the settable %1 declared by the "
-      "header",
-      (ValueDecl *, DescriptiveDeclKind))
+      "%kind0 should be settable to match the settable %kindonly1 declared by "
+      "the header",
+      (const ValueDecl *, const ValueDecl *))
 
 ERROR(objc_implementation_type_mismatch,none,
       "%kind0 of type %1 does not match type %2 declared by the header",
@@ -1921,9 +1924,9 @@ ERROR(objc_implementation_sendability_mismatch,none,
       (ValueDecl *, Type, Type))
 
 ERROR(objc_implementation_required_attr_mismatch,none,
-      "%kind0 %select{should not|should}2 be 'required' to match %1 declared "
+      "%kind0 should%select{ not|}2 be 'required' to match %kindonly1 declared "
       "by the header",
-      (ValueDecl *, DescriptiveDeclKind, bool))
+      (const ValueDecl *, const ValueDecl *, bool))
 
 ERROR(objc_implementation_candidate_has_error_convention,none,
       "%kind0 does not match the declaration in the header because it throws an "
@@ -1983,8 +1986,8 @@ ERROR(objc_implementation_missing_impl,none,
       (Identifier, ValueDecl *))
 
 ERROR(objc_implementation_class_or_instance_mismatch,none,
-      "%kind0 does not match %1 declared in header",
-      (ValueDecl *, DescriptiveDeclKind))
+      "%kind0 does not match %kindonly1 declared in header",
+      (const ValueDecl *, const ValueDecl *))
 
 ERROR(objc_implementation_multiple_matching_candidates,none,
       "found multiple implementations that could match %kind0 with selector %1",
@@ -2182,8 +2185,8 @@ ERROR(access_control_setter_more,none,
 WARNING(access_control_setter_redundant,none,
       "'%select{private|fileprivate|internal|package|public|open}0(set)' modifier is "
       "redundant for %select{a private|a fileprivate|an internal|a package|a public|an open}2 "
-      "%1",
-      (AccessLevel, DescriptiveDeclKind, AccessLevel))
+      "%kindonly1",
+      (AccessLevel, const Decl *, AccessLevel))
 WARNING(access_control_ext_member_more,none,
     "'%select{%error|fileprivate|internal|package|public|open}0' modifier conflicts "
     "with extension's default access of "
@@ -2191,18 +2194,18 @@ WARNING(access_control_ext_member_more,none,
     (AccessLevel, AccessLevel))
 WARNING(access_control_ext_member_redundant,none,
     "'%select{%error|fileprivate|internal|package|public|%error}0' modifier is redundant "
-    "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
+    "for %kindonly1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
     "|an internal|a package|a public|%error}2 extension",
-    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+    (AccessLevel, const Decl *, AccessLevel))
 ERROR(access_control_ext_requirement_member_more,none,
-    "cannot declare %select{%error|a fileprivate|an internal|a package|a public|an open}0 %1 "
+    "cannot declare %select{%error|a fileprivate|an internal|a package|a public|an open}0 %kindonly1 "
     "in an extension with %select{private|fileprivate|internal|package|public|%error}2 "
     "requirements",
-    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+    (AccessLevel, const Decl *, AccessLevel))
 ERROR(access_control_extension_more,none,
-      "extension of %select{private|fileprivate|internal|package|%error|%error}0 %1 cannot "
+      "extension of %select{private|fileprivate|internal|package|%error|%error}0 %kindonly1 cannot "
       "be declared %select{%error|fileprivate|internal|package|public|%error}2",
-      (AccessLevel, DescriptiveDeclKind, AccessLevel))
+      (AccessLevel, const NominalTypeDecl *, AccessLevel))
 ERROR(access_control_extension_open,none,
       "extensions cannot be declared 'open'; declare individual members as 'open' instead",
       ())
@@ -2220,11 +2223,11 @@ ERROR(access_control_requires_package_name, none,
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,
-      "'%0' attribute cannot be applied to %1 declarations",
-      (DeclAttribute, DescriptiveDeclKind))
+      "'%0' attribute cannot be applied to %kindonly1 declarations",
+      (DeclAttribute, const Decl *))
 ERROR(attr_invalid_in_context,none,
-      "'%0' attribute cannot be applied to declaration in %1",
-      (DeclAttribute, DescriptiveDeclKind))
+      "'%0' attribute cannot be applied to declaration in %kindonly1",
+      (DeclAttribute, const Decl *))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,none,
@@ -2336,8 +2339,8 @@ ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 
 ERROR(effectful_not_representable_objc,none,
-      "%0 with 'throws' or 'async' is not representable in Objective-C",
-      (DescriptiveDeclKind))
+      "%kindonly0 with 'throws' or 'async' is not representable in Objective-C",
+      (const AbstractStorageDecl *))
 
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
@@ -2571,10 +2574,10 @@ WARNING(function_type_usable_from_inline_warn,none,
         (unsigned, bool, bool))
 
 ERROR(spi_attribute_on_non_public,none,
-      "%select{private|fileprivate|internal|package|%error|%error}0 %1 "
+      "%select{private|fileprivate|internal|package|%error|%error}0 %kindonly1 "
       "cannot be declared '@_spi' because only public and open "
       "declarations can be '@_spi'",
-      (AccessLevel, DescriptiveDeclKind))
+      (AccessLevel, const ValueDecl *))
 ERROR(spi_attribute_on_protocol_requirement,none,
       "protocol requirement %0 cannot be declared '@_spi' without "
       "a default implementation in a protocol extension",
@@ -2990,12 +2993,15 @@ ERROR(type_witness_objc_generic_parameter,none,
       "used for associated type %3 of protocol %4",
       (Type, Type, bool, const AssociatedTypeDecl *, const ProtocolDecl *))
 NOTE(witness_fix_access,none,
-     "mark the %0 as '%select{%error|fileprivate|internal|package|public|%error}1' to "
-     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+     "mark the %kindonly0 as "
+     "'%select{%error|fileprivate|internal|package|public|%error}1' to "
+     "satisfy the requirement",
+     (const ValueDecl *, AccessLevel))
 NOTE(witness_move_to_another_extension,none,
-     "move the %0 to another extension where it can be declared "
+     "move the %kindonly0 to another extension where it can be declared "
      "'%select{%error|%error|internal|package|public|%error}1' to "
-     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+     "satisfy the requirement",
+     (const ValueDecl *, AccessLevel))
 WARNING(assoc_type_default_conformance_failed,none,
         "default type %0 for associated type %1 does not satisfy constraint "
         "%2: %3", (Type, const AssociatedTypeDecl *, Type, Type))
@@ -3366,7 +3372,8 @@ WARNING(typealias_override_associated_type,none,
         (Identifier, Type))
 WARNING(associated_type_override_typealias,none,
         "associated type %0 is redundant with type %0 declared in inherited "
-        "%1 %2", (Identifier, DescriptiveDeclKind, Type))
+        "%kind1",
+        (Identifier, const NominalTypeDecl *))
 
 ERROR(requirement_machine_completion_failed,none,
       "cannot build rewrite system for %select{generic signature|protocol}0; "
@@ -3380,30 +3387,30 @@ ERROR(associated_type_objc,none,
       (Identifier, Identifier))
 
 ERROR(generic_param_access,none,
-      "%0 %select{must be declared %select{"
+      "%kindonly0 %select{must be declared %select{"
       "%select{private|fileprivate|internal|package|%error|%error}3|private or fileprivate}4"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|package|public|open}2}1 "
       "because its generic %select{parameter|requirement}5 uses "
       "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3 type",
-      (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
+      (const Decl *, bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(generic_param_access_warn,none,
-        "%0 %select{should be declared "
+        "%kindonly0 %select{should be declared "
         "%select{private|fileprivate|internal|package|%error|%error}3"
         "|should not be declared %select{in this context|fileprivate|internal|package|public|open}2}1 "
         "because its generic %select{parameter|requirement}5 uses "
         "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3 type",
-        (DescriptiveDeclKind, bool, AccessLevel, AccessLevel, bool, bool))
+        (const Decl *, bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(generic_param_usable_from_inline,none,
       "type referenced from a "
-      "generic %select{parameter|requirement}1 of a '@usableFromInline' %0 "
-      "must be '@usableFromInline' or public",
-      (DescriptiveDeclKind, bool))
+      "generic %select{parameter|requirement}1 of a '@usableFromInline' "
+      "%kindonly0 must be '@usableFromInline' or public",
+      (const Decl *, bool))
 WARNING(generic_param_usable_from_inline_warn,none,
         "type referenced from a "
-        "generic %select{parameter|requirement}1 of a '@usableFromInline' %0 "
-        "should be '@usableFromInline' or public",
-        (DescriptiveDeclKind, bool))
+        "generic %select{parameter|requirement}1 of a '@usableFromInline' "
+        "%kindonly0 should be '@usableFromInline' or public",
+        (const Decl *, bool))
 
 ERROR(override_multiple_decls_base,none,
       "declaration %0 cannot override more than one superclass declaration",
@@ -3458,13 +3465,13 @@ ERROR(override_let_property,none,
 
 
 ERROR(override_not_accessible,none,
-      "%select{|setter of }0overriding %1 must be as accessible as "
+      "%select{|setter of }0overriding %kindonly1 must be as accessible as "
       "%select{its enclosing type|the declaration it overrides}2",
-      (bool, DescriptiveDeclKind, bool))
+      (bool, const ValueDecl *, bool))
 
 ERROR(override_of_non_open,none,
-      "overriding non-open %0 outside of its defining module",
-      (DescriptiveDeclKind))
+      "overriding non-open %kindonly0 outside of its defining module",
+      (const ValueDecl *))
 
 ERROR(method_does_not_override,none,
       "method does not override any method from its %select{parent protocol|superclass}0", (bool))
@@ -3488,8 +3495,8 @@ NOTE(subscript_override_here,none,
 NOTE(convenience_init_override_here,none,
      "attempt to override convenience initializer here", ())
 NOTE(override_type_mismatch_with_fixits,none,
-     "type does not match superclass %0 with type %1",
-     (DescriptiveDeclKind, Type))
+     "type does not match superclass %kindonly0 with type %1",
+     (const ValueDecl *, Type))
 NOTE(override_type_mismatch_with_fixits_init,none,
      "type does not match superclass initializer with %select{no arguments|argument %1|arguments %1}0",
      (unsigned, Type))
@@ -3525,11 +3532,11 @@ ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
 ERROR(override_with_more_effects,none,
-      "cannot override non-%1 %0 with %1 %0",
-      (DescriptiveDeclKind, StringRef))
+      "cannot override non-%1 %kindonly0 with %1 %kindonly0",
+      (const ValueDecl *, StringRef))
 ERROR(override_typed_throws,none,
-      "%0 that throws %1 cannot override one that throws %2",
-      (DescriptiveDeclKind, Type, Type))
+      "%kindonly0 that throws %1 cannot override one that throws %2",
+      (const AbstractFunctionDecl *, Type, Type))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
@@ -3538,21 +3545,21 @@ ERROR(satisfy_throws_objc,none,
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
 ERROR(override_optional_mismatch,none,
-      "cannot override %0 %select{parameter|index}1 of type %2 with "
+      "cannot override %kindonly0 %select{parameter|index}1 of type %2 with "
       "non-optional type %3",
-      (DescriptiveDeclKind, bool, Type, Type))
+      (const ValueDecl *, bool, Type, Type))
 ERROR(override_optional_result_mismatch,none,
-      "cannot override %0 %select{result|element}1 type %2 with "
+      "cannot override %kindonly0 %select{result|element}1 type %2 with "
       "optional type %3",
-      (DescriptiveDeclKind, bool, Type, Type))
+      (const ValueDecl *, bool, Type, Type))
 WARNING(override_unnecessary_IUO,none,
-      "overriding %0 parameter of type %1 with implicitly unwrapped optional "
-      "type %2",
-      (DescriptiveDeclKind, Type, Type))
-WARNING(override_unnecessary_result_IUO,none,
-      "overriding %0 optional result type %1 with implicitly unwrapped "
+      "overriding %kindonly0 parameter of type %1 with implicitly unwrapped "
       "optional type %2",
-      (DescriptiveDeclKind, Type, Type))
+      (const ValueDecl *, Type, Type))
+WARNING(override_unnecessary_result_IUO,none,
+      "overriding %kindonly0 optional result type %1 with implicitly unwrapped "
+      "optional type %2",
+      (const ValueDecl *, Type, Type))
 NOTE(override_unnecessary_IUO_remove,none,
      "remove '!' to make the parameter required", ())
 NOTE(override_unnecessary_IUO_use_strict,none,
@@ -3569,7 +3576,8 @@ ERROR(override_mutable_covariant_subscript,none,
 ERROR(static_decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
-      "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
+      "%kindonly0 cannot be declared both 'final' and 'open'",
+      (const Decl *))
 ERROR(implicitly_final_cannot_be_open,none,
       "%select{'let' properties|members of 'final' classes|"
       "static declarations}0 are implicitly 'final'; use 'public' instead of "
@@ -3822,11 +3830,13 @@ ERROR(implementation_only_override_changed_type,none,
       "'@_implementationOnly' override must have the same type as the "
       "declaration it overrides (%0)", (Type))
 ERROR(implementation_only_override_without_attr,none,
-      "override of '@_implementationOnly' %0 should also be declared "
-      "'@_implementationOnly'", (DescriptiveDeclKind))
+      "override of '@_implementationOnly' %kindonly0 should also be declared "
+      "'@_implementationOnly'",
+      (const ValueDecl *))
 ERROR(implementation_only_override_import_without_attr,none,
-      "override of %0 imported as implementation-only must be declared "
-      "'@_implementationOnly'", (DescriptiveDeclKind))
+      "override of %kindonly0 imported as implementation-only must be declared "
+      "'@_implementationOnly'",
+      (const ValueDecl *))
 
 ERROR(import_attr_conflict,none,
       "%0 inconsistently imported with %1",
@@ -3955,8 +3965,8 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "of %3 to %2",
      (unsigned, Type, Type, Type))
 NOTE(automatic_protocol_synthesis_unsupported,none,
-    "automatic synthesis of '%0' is not supported for %1 declarations",
-    (StringRef, DescriptiveDeclKind))
+    "automatic synthesis of %0 is not supported for %kindonly1 declarations",
+    (const ProtocolDecl *, const NominalTypeDecl *))
 NOTE(comparable_synthesis_raw_value_not_allowed, none,
      "enum declares raw type %0, preventing synthesized conformance of %1 to %2", 
      (Type, Type, Type))
@@ -4028,10 +4038,11 @@ ERROR(attr_contains_multiple_versions_for_platform,none,
       "'%0' contains multiple versions for %1", (DeclAttribute, StringRef))
 
 ERROR(override_final,none,
-      "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
+      "%kindonly0 overrides a 'final' %kindonly1",
+      (const ValueDecl *, const ValueDecl *))
 
 ERROR(override_static,none,
-      "cannot override %0", (DescriptiveDeclKind))
+      "cannot override %kindonly0", (const ValueDecl *))
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
@@ -4042,16 +4053,16 @@ ERROR(final_not_allowed_here,none,
       "subscripts", ())
 
 ERROR(attr_incompatible_with_non_final,none,
-      "'%0' cannot be applied to a non-final %1",
-      (DeclAttribute, DescriptiveDeclKind))
+      "'%0' cannot be applied to a non-final %kindonly1",
+      (DeclAttribute, const ValueDecl *))
 
 ERROR(attr_incompatible_with_override,none,
       "'%0' cannot be combined with 'override'",
       (DeclAttribute))
 
 ERROR(attr_incompatible_with_objc,none,
-      "'%0' must not be used on an '@objc' %1",
-      (DeclAttribute, DescriptiveDeclKind))
+      "'%0' must not be used on an '@objc' %kindonly1",
+      (DeclAttribute, const ValueDecl *))
 
 ERROR(attr_unusable_in_protocol,none,
       "'%0' cannot be used inside a protocol declaration",
@@ -4369,22 +4380,23 @@ NOTE(transpose_attr_static_method_mismatch_fix,none,
 ERROR(autodiff_attr_original_decl_ambiguous,none,
       "referenced declaration %0 is ambiguous", (DeclNameRef))
 NOTE(autodiff_attr_original_decl_ambiguous_candidate,none,
-     "candidate %0 found here", (DescriptiveDeclKind))
+     "candidate %kindonly0 found here", (const AbstractFunctionDecl *))
 ERROR(autodiff_attr_original_decl_none_valid,none,
       "referenced declaration %0 could not be resolved", (DeclNameRef))
 NOTE(autodiff_attr_original_decl_invalid_kind,none,
-     "candidate %0 is not a 'func', 'init', 'subscript', or 'var' computed "
-     "property declaration", (DescriptiveDeclKind))
+     "candidate %kindonly0 is not a 'func', 'init', 'subscript', or 'var' "
+     "computed property declaration",
+     (const ValueDecl *))
 NOTE(autodiff_attr_original_decl_missing_accessor,none,
-     "candidate %0 does not have a %1",
-     (DescriptiveDeclKind, /*accessorDeclKind*/ DescriptiveDeclKind))
+     "candidate %kindonly0 does not have a %1",
+     (const ValueDecl *, /*accessorDeclKind*/ DescriptiveDeclKind))
 NOTE(autodiff_attr_original_decl_type_mismatch,none,
-     "candidate %0 does not have "
+     "candidate %kindonly0 does not have "
      "%select{expected type|type equal to or less constrained than}2 %1",
-     (DescriptiveDeclKind, Type, /*hasGenericSignature*/ bool))
+     (const ValueDecl *, Type, /*hasGenericSignature*/ bool))
 NOTE(autodiff_attr_original_decl_not_same_type_context,none,
-     "candidate %0 is not defined in the current type context",
-     (DescriptiveDeclKind))
+     "candidate %kindonly0 is not defined in the current type context",
+     (const ValueDecl *))
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_result_not_differentiable,none,
@@ -4847,8 +4859,8 @@ NOTE(add_self_to_type,none,
      "use '.self' to reference the type object", ())
 
 WARNING(warn_unqualified_access,none,
-        "use of %0 treated as a reference to %1 in %kind2",
-        (Identifier, DescriptiveDeclKind, const ValueDecl *))
+        "use of %base0 treated as a reference to %kindonly0 in %kind1",
+        (const ValueDecl *, const ValueDecl *))
 WARNING(self_refers_to_method,none,
        "'self' refers to the method '%0.self', which may be unexpected",
        (StringRef))
@@ -4857,22 +4869,22 @@ NOTE(fix_unqualified_access_member,none,
 NOTE(fix_unqualified_access_member_named_self,none,
      "use '%0.self' to silence this warning", (StringRef))
 NOTE(fix_unqualified_access_top_level,none,
-     "use '%0' to reference the %1",
-     (StringRef, DescriptiveDeclKind, Identifier))
+     "use '%0' to reference the %kindonly1",
+     (StringRef, const ValueDecl *, const ModuleDecl *))
 NOTE(fix_unqualified_access_top_level_multi,none,
-     "use '%0' to reference the %1 in module %2",
-     (StringRef, DescriptiveDeclKind, Identifier))
+     "use '%0' to reference the %kindonly1 in module %2",
+     (StringRef, const ValueDecl *, const ModuleDecl *))
 
 WARNING(warn_deprecated_conditional_conformance_outer_access,Deprecation,
-        "use of %0 as reference to %1 in %kind2 will change in future versions "
-        "of Swift to reference %3 in %kind4 which comes via a conditional "
-        "conformance",
+        "use of %0 as reference to %kindonly1 in %kind2 will change in future "
+        "versions of Swift to reference %kindonly3 in %kind4 which comes via "
+        "a conditional conformance",
         (DeclNameRef,
-         /*current*/DescriptiveDeclKind, const ValueDecl *,
-         /*future*/ DescriptiveDeclKind, const ValueDecl *))
+         /*current*/const ValueDecl *, const ValueDecl *,
+         /*future*/const ValueDecl *, const ValueDecl *))
 NOTE(fix_deprecated_conditional_conformance_outer_access,none,
-     "use '%0' to continue to reference the %1",
-     (StringRef, DescriptiveDeclKind))
+     "use '%0' to continue to reference the %kindonly1",
+     (StringRef, const ValueDecl *))
 
 ERROR(unsupported_special_decl_ref, none,
       "referencing %0 as a function value is not implemented", (Identifier))
@@ -5002,8 +5014,9 @@ ERROR(converting_func_loses_global_actor,none,
       "converting function value of type %0 to %1 loses global actor %2",
       (Type, Type, Type))
 ERROR(capture_across_type_decl,none,
-      "%0 declaration cannot close over value %1 defined in outer scope",
-      (DescriptiveDeclKind, Identifier))
+      "%kindonly0 declaration cannot close over value %base1 defined in outer "
+      "scope",
+      (const NominalTypeDecl *, const ValueDecl *))
 
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
@@ -5107,8 +5120,8 @@ NOTE(change_to_mutating,none,
      "mark %select{method|%1}0 'mutating' to make 'self' mutable",
      (bool, StringRef))
 NOTE(masked_mutable_property,none,
-     "add explicit '%0' to refer to mutable %1 of %2",
-     (StringRef, DescriptiveDeclKind, Type))
+     "add explicit '%0' to refer to mutable %kindonly1 of %2",
+     (StringRef, const VarDecl *, Type))
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
@@ -5216,8 +5229,8 @@ GROUPED_ERROR(opaque_type_var_no_underlying_type,OpaqueTypeInference,none,
 // MARK: Discard Statement
 //------------------------------------------------------------------------------
 ERROR(discard_wrong_context_decl,none,
-      "'discard' statement cannot appear in %0",
-      (DescriptiveDeclKind))
+      "'discard' statement cannot appear in %kindonly0",
+      (const Decl *))
 ERROR(discard_no_deinit,none,
       "'discard' has no effect for type %0 unless it has a deinitializer",
       (Type))
@@ -5229,10 +5242,10 @@ ERROR(discard_wrong_context_misc,none,
       ())
 ERROR(discard_wrong_context_copyable,none,
       "'discard' statement can only appear in noncopyable type's member",
-      (DescriptiveDeclKind))
+      ())
 ERROR(discard_wrong_context_nonconsuming,none,
-      "'discard' statement can only appear in consuming %0",
-      (DescriptiveDeclKind))
+      "'discard' statement can only appear in consuming %kindonly0",
+      (const FuncDecl *))
 ERROR(discard_wrong_not_self,none,
       "you can only discard 'self'", ())
 ERROR(discard_wrong_module,none,
@@ -5283,8 +5296,8 @@ ERROR(closure_tuple_parameter_destructuring_implicit,none,
       "closure tuple parameter %0 does not support destructuring "
       "with implicit parameters", (Type))
 ERROR(single_tuple_parameter_mismatch_special,none,
-      "%0 expects a single parameter of type %1%2",
-      (DescriptiveDeclKind, Type, StringRef))
+      "%kindonly0 expects a single parameter of type %1%2",
+      (const ValueDecl *, Type, StringRef))
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%kindbase0 expects a single parameter of type %1%2",
       (const ValueDecl *, Type, StringRef))
@@ -5467,7 +5480,8 @@ ERROR(main_function_must_be_mainActor,none,
       "main() must be '@MainActor'", ())
 
 ERROR(not_objc_function_async,none,
-      "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
+      "'async' %kindonly0 cannot be represented in Objective-C",
+      (const AbstractFunctionDecl *))
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
 ERROR(actor_isolated_objc,none,
@@ -5567,8 +5581,8 @@ ERROR(conflicting_stored_property_isolation,none,
       "%select{default|memberwise}0 initializer for %1 cannot be both %2 and %3",
       (bool, Type, ActorIsolation, ActorIsolation))
 NOTE(property_requires_actor,none,
-      "initializer for %0 %1 is %2",
-      (DescriptiveDeclKind, Identifier, ActorIsolation))
+      "initializer for %kind0 is %1",
+      (const VarDecl *, ActorIsolation))
 ERROR(isolated_default_argument_context,none,
       "%0 default value in a %1 context", 
       (ActorIsolation, ActorIsolation))
@@ -5603,8 +5617,9 @@ ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to %0 %kind1",
       (ActorIsolation, const ValueDecl *))
 ERROR(effectful_keypath_component,none,
-      "cannot form %select{key path|dynamic key path member lookup}1 to %0 with 'throws' or 'async'",
-      (DescriptiveDeclKind, bool))
+      "cannot form %select{key path|dynamic key path member lookup}1 to "
+      "%kindonly0 with 'throws' or 'async'",
+      (const ValueDecl *, bool))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %kind0 must be marked as '@Sendable'",
       (const ValueDecl *))
@@ -5663,8 +5678,9 @@ ERROR(distributed_local_cannot_be_used,none,
       "'local' cannot be used in user-defined code currently",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
-      (StringRef, Type, DescriptiveDeclKind, StringRef))
+      "parameter %0 of type %1 in %kindonly2 does not conform to "
+      "serialization requirement '%3'",
+      (Identifier, Type, const AbstractFunctionDecl *, StringRef))
 ERROR(distributed_actor_target_result_not_codable,none,
       "result type %0 of %kindbase1 does not conform to serialization requirement '%2'",
       (Type, const ValueDecl *, StringRef))
@@ -5692,8 +5708,8 @@ ERROR(conformance_missing_distributed,none,
 NOTE(note_add_distributed_multi,none,
      "mark all declarations used in the conformance 'distributed'", ())
 NOTE(actor_mutable_state,none,
-     "mutation of this %0 is only permitted within the actor",
-     (DescriptiveDeclKind))
+     "mutation of this %kindonly0 is only permitted within the actor",
+     (const ValueDecl *))
 ERROR(shared_mutable_state_access,none,
       "reference to %kind0 is not concurrency-safe because it involves shared "
       "mutable state", (const ValueDecl *))
@@ -5740,15 +5756,15 @@ ERROR(isolated_parameter_duplicate_type,none,
 NOTE(isolated_parameter_previous_note,none,
      "previous 'isolated' parameter %0", (DeclName))
 ERROR(isolated_parameter_combined_global_actor_attr,none,
-      "%0 with 'isolated' parameter cannot have a global actor",
-      (DescriptiveDeclKind))
+      "%kindonly0 with 'isolated' parameter cannot have a global actor",
+      (const ValueDecl *))
 ERROR(isolated_parameter_closure_combined_global_actor_attr,none,
       "closure with 'isolated' parameter %0 cannot have a global actor", (DeclName))
 ERROR(isolated_parameter_global_actor_type,none,
       "function type cannot have global actor and 'isolated' parameter", ())
 ERROR(isolated_parameter_combined_nonisolated,none,
-      "%0 with 'isolated' parameter cannot be 'nonisolated'",
-      (DescriptiveDeclKind))
+      "%kindonly0 with 'isolated' parameter cannot be 'nonisolated'",
+      (const ValueDecl *))
 ERROR(isolated_parameter_isolated_attr_type,none,
       "function with 'isolated' parameter cannot also be '@isolated(%0)'",
       (StringRef))
@@ -5763,8 +5779,8 @@ NOTE(in_derived_conformance, none,
      "in derived conformance to %0",
      (Type))
 NOTE(in_derived_witness, none,
-     "in %0 %1 for derived conformance to %2",
-     (DescriptiveDeclKind, DeclName, Type))
+     "in %kindonly0 %1 for derived conformance to %2",
+     (const ValueDecl *, DeclName, Type))
 
 ERROR(non_sendable_arg_into_actor,none,
       "non-sendable type %0 cannot be sent into %2 context in call to %kind1",
@@ -5913,9 +5929,9 @@ WARNING(nonisolated_unsafe_sendable_actor_constant,none,
      "property with 'Sendable' type %0, consider removing it",
      (Type))
 WARNING(nonisolated_unsafe_uneffective_on_funcs,none,
-     "'nonisolated(unsafe)' has no effect on %0 %1, "
+     "'nonisolated(unsafe)' has no effect on %kind0, "
      "consider using 'nonisolated'",
-     (DescriptiveDeclKind, const ValueDecl*))
+     (const ValueDecl *))
 ERROR(nonisolated_non_sendable,none,
       "'nonisolated' can not be applied to variable with non-'Sendable' "
       "type %0",
@@ -5934,8 +5950,9 @@ ERROR(nonisolated_lazy,none,
       ())
 
 ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
-        (Type, DescriptiveDeclKind, DeclName))
+        "cannot access %kind1 with a non-sendable type %0 from nonisolated "
+        "deinit",
+        (Type, const VarDecl *))
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
@@ -5985,7 +6002,7 @@ ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
       (Identifier, Identifier))
 ERROR(global_actor_disallowed,none,
-      "%0 cannot have a global actor", (DescriptiveDeclKind))
+      "%kindonly0 cannot have a global actor", (const Decl *))
 ERROR(global_actor_on_actor_class,none,
       "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
@@ -6030,8 +6047,8 @@ ERROR(actor_isolation_superclass_mismatch,none,
       (ActorIsolation, const ClassDecl *, ActorIsolation, const ClassDecl *))
 
 ERROR(async_decl_must_be_available_from_async,none,
-        "asynchronous %0 must be available from asynchronous contexts",
-        (DescriptiveDeclKind))
+        "asynchronous %kindonly0 must be available from asynchronous contexts",
+        (const Decl *))
 ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %kind0 must be available from asynchronous contexts",
         (const ValueDecl *))
@@ -6411,8 +6428,9 @@ ERROR(objc_in_generic_extension,none,
       "extensions of %select{classes from generic context|generic classes}0 "
       "cannot contain '@objc' members", (bool))
 ERROR(objc_in_resilient_extension,none,
-      "'@objc' %0 in extension of subclass of %1 requires %2 %3",
-      (DescriptiveDeclKind, Identifier, AvailabilityDomain, AvailabilityRange))
+      "'@objc' %kindonly0 in extension of subclass of %1 requires %2 %3",
+      (const ValueDecl *, const ClassDecl *, AvailabilityDomain,
+       AvailabilityRange))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -6436,7 +6454,7 @@ ERROR(objc_setter_for_nonobjc_subscript,none,
 ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,
-      "'@objc' %0 must have a simple name", (DescriptiveDeclKind))
+      "'@objc' %kindonly0 must have a simple name", (const Decl *))
 ERROR(objc_name_subscript,none,
       "'@objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
@@ -6460,12 +6478,12 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 ERROR(objc_name_not_valid_identifier,none,
-      "'@objc' %0 name is not a valid Objective-C identifier",
-      (DescriptiveDeclKind))
+      "'@objc' %kindonly0 name is not a valid Objective-C identifier",
+      (const ValueDecl *))
 ERROR(objc_cannot_infer_name_raw_identifier,none,
-      "cannot infer '@objc' %0 name because the Swift name is not a valid "
-      "Objective-C identifier; specify the name in '@objc' explicitly",
-      (DescriptiveDeclKind))
+      "cannot infer '@objc' %kindonly0 name because the Swift name is not a "
+      "valid Objective-C identifier; specify the name in '@objc' explicitly",
+      (const ValueDecl *))
 
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @objc @implementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
@@ -6477,13 +6495,16 @@ ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_static_subscript,none,
-      "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
+      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1",
+      (const SubscriptDecl *, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
-      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic parameters",
-      (DescriptiveDeclKind, unsigned))
+      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic "
+      "parameters",
+      (const ValueDecl *, unsigned))
 ERROR(objc_invalid_with_generic_requirements,none,
-      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has a 'where' clause",
-      (DescriptiveDeclKind, unsigned))
+      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has a 'where' "
+      "clause",
+      (const ValueDecl *, unsigned))
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
@@ -6533,7 +6554,8 @@ ERROR(no_opaque_return_type_of,none,
       "unable to resolve type for _opaqueReturnTypeOf attribute", ())
 
 ERROR(objc_observing_accessor, none,
-      "observers (%0) are not allowed to be marked '@objc'", (DescriptiveDeclKind))
+      "observers (%kindonly0) are not allowed to be marked '@objc'",
+      (const AccessorDecl *))
 ERROR(objc_init_accessor, none,
       "init accessors cannot be marked @objc", ())
 ERROR(objc_addressor, none,
@@ -6574,9 +6596,9 @@ ERROR(objc_invalid_on_failing_init,none,
       (unsigned))
 
 ERROR(objc_in_objc_runtime_visible,none,
-      "%0 cannot be %" OBJC_ATTR_SELECT "1 because class %2 is only visible "
-      "via the Objective-C runtime",
-      (DescriptiveDeclKind, unsigned, Identifier))
+      "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because class %2 is only "
+      "visible via the Objective-C runtime",
+      (const ValueDecl *, unsigned, const ClassDecl *))
 
 ERROR(objc_override_method_selector_mismatch,none,
       "Objective-C method has a different selector from the "
@@ -6696,14 +6718,15 @@ ERROR(exclusivity_on_computed_property,none,
 // MARK: @_borrowed
 //------------------------------------------------------------------------------
 ERROR(borrowed_with_objc_dynamic,none,
-      "%0 cannot be '@_borrowed' if it is '@objc dynamic'",
-      (DescriptiveDeclKind))
+      "%kindonly0 cannot be '@_borrowed' if it is '@objc dynamic'",
+      (const AbstractStorageDecl *))
 ERROR(borrowed_on_objc_protocol_requirement,none,
-      "%0 cannot be '@_borrowed' if it is an @objc protocol requirement",
-      (DescriptiveDeclKind))
+      "%kindonly0 cannot be '@_borrowed' if it is an @objc protocol "
+      "requirement",
+      (const AbstractStorageDecl *))
 ERROR(borrowed_with_effect,none,
-      "%0 cannot be '@_borrowed' if it is 'async' or 'throws'",
-      (DescriptiveDeclKind))
+      "%kindonly0 cannot be '@_borrowed' if it is 'async' or 'throws'",
+      (const AccessorDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: dynamic
@@ -6859,12 +6882,12 @@ NOTE(note_deprecated_rename, none,
      "use '%0' instead", (StringRef))
 
 ERROR(availability_decl_more_than_enclosing, none,
-      "%0 cannot be more available than enclosing scope",
-      (DescriptiveDeclKind))
+      "%kindonly0 cannot be more available than enclosing scope",
+      (const Decl *))
 
 NOTE(availability_implicit_decl_here, none,
-     "%0 implicitly declared here with availability of %1 %2 or newer",
-     (DescriptiveDeclKind, AvailabilityDomain, AvailabilityRange))
+     "%kindonly0 implicitly declared here with availability of %1 %2 or newer",
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
@@ -6921,7 +6944,7 @@ NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
 
 NOTE(availability_add_attribute, none,
-     "add @available attribute to enclosing %0", (DescriptiveDeclKind))
+     "add @available attribute to enclosing %kindonly0", (const Decl *))
 FIXIT(insert_available_attr,
       "@available(%0 %1, *)\n%2",
       (StringRef, StringRef, StringRef))
@@ -7370,8 +7393,8 @@ ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (Identifier))
 ERROR(property_wrapper_param_not_supported,none,
-      "property wrapper attribute on parameter not yet supported on %0",
-      (DescriptiveDeclKind))
+      "property wrapper attribute on parameter not yet supported on %kindonly0",
+      (const ValueDecl *))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
 ERROR(invalid_projection_argument,none,
@@ -7404,8 +7427,9 @@ ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
 ERROR(property_wrapper_effectful,none,
-      "property wrapper's 'wrappedValue' property cannot define an 'async' or 'throws' %0",
-    (DescriptiveDeclKind))
+      "property wrapper's 'wrappedValue' property cannot define an 'async' or "
+      "'throws' %kindonly0",
+      (const AccessorDecl *))
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
@@ -7649,23 +7673,23 @@ ERROR(atomics_ordering_must_be_constant, none,
 #define WHICH_ACCESS_NOTE(reason) "specified by access note for %" #reason
 
 REMARK(attr_added_by_access_note, none,
-       "implicitly added '%1' to this %2, as " WHICH_ACCESS_NOTE(0),
-       (StringRef, StringRef, DescriptiveDeclKind))
+       "implicitly added '%1' to this %kindonly2, as " WHICH_ACCESS_NOTE(0),
+       (StringRef, StringRef, const ValueDecl *))
 NOTE(fixit_attr_added_by_access_note, none,
      "add '%0' explicitly to silence this warning",
      (StringRef))
 
 REMARK(attr_removed_by_access_note, none,
-       "implicitly removed '%1' from this %3, as " WHICH_ACCESS_NOTE(0),
-       (StringRef, StringRef, DescriptiveDeclKind))
+       "implicitly removed '%1' from this %kindonly2, as " WHICH_ACCESS_NOTE(0),
+       (StringRef, StringRef, const ValueDecl *))
 NOTE(fixit_attr_removed_by_access_note, none,
      "remove '%0' explicitly to silence this warning",
      (StringRef))
 
 REMARK(attr_objc_name_changed_by_access_note, none,
-       "implicitly changed Objective-C name of this %1 to %2, as "
+       "implicitly changed Objective-C name of this %kindonly1 to %2, as "
        WHICH_ACCESS_NOTE(0),
-       (StringRef, DescriptiveDeclKind, ObjCSelector))
+       (StringRef, const ValueDecl *, ObjCSelector))
 NOTE(fixit_attr_objc_name_changed_by_access_note, none,
      "change Objective-C name explicitly to silence this warning",
      ())
@@ -7674,13 +7698,13 @@ NOTE(fixit_attr_objc_name_changed_by_access_note, none,
 // '-Raccess-note=all-validate' emits them as errors.
 
 ERROR(attr_objc_name_conflicts_with_access_note, none,
-      "ignored access note: did not change Objective-C name of this %1 from %2 "
-      "to %3, even though it was " WHICH_ACCESS_NOTE(0),
-      (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
+      "ignored access note: did not change Objective-C name of this "
+      "%kindonly1 from %2 to %3, even though it was " WHICH_ACCESS_NOTE(0),
+      (StringRef, const ValueDecl *, ObjCSelector, ObjCSelector))
 ERROR(wrap_invalid_attr_added_by_access_note, none,
-      "ignored access note: %0; did not implicitly add '%2' to this %3, even "
-      "though it was " WHICH_ACCESS_NOTE(1),
-      (DiagnosticInfo *, StringRef, StringRef, DescriptiveDeclKind))
+      "ignored access note: %0; did not implicitly add '%2' to this "
+      "%kindonly3, even though it was " WHICH_ACCESS_NOTE(1),
+      (DiagnosticInfo *, StringRef, StringRef, const ValueDecl *))
 
 #undef WHICH_ACCESS_NOTE
 
@@ -7821,8 +7845,8 @@ ERROR(external_macro_arg_not_type_name,none,
       "argument to `#externalMacro` must be a string literal naming "
       "the external macro's %select{module|type}0", (unsigned))
 ERROR(invalid_decl_in_macro_expansion,none,
-      "macro expansion cannot introduce %0",
-      (DescriptiveDeclKind))
+      "macro expansion cannot introduce %kindonly0",
+      (const Decl *))
 ERROR(let_accessor_expansion,none,
       "cannot expand accessor macro on variable declared with 'let'",
       ())
@@ -7848,8 +7872,8 @@ ERROR(macro_nonobserving_accessor_missing_from_expansion,none,
       "(such as 'get') as expected",
       (DeclName))
 ERROR(macro_nonobserver_unexpected_in_expansion,none,
-      "expansion of macro %0 produced an unexpected %1",
-      (DeclName, DescriptiveDeclKind))
+      "expansion of %kind0 produced an unexpected %kindonly1",
+      (const MacroDecl *, const AccessorDecl *))
 ERROR(macro_init_accessor_not_documented,none,
       "expansion of macro %0 produced an unexpected 'init' accessor",
       (DeclName))
@@ -7864,8 +7888,8 @@ ERROR(extension_macro_invalid_conformance,none,
       "invalid protocol conformance %0 in extension macro",
       (Type))
 ERROR(macro_attached_to_invalid_decl,none,
-      "'%0' macro cannot be attached to %1 (%base2)",
-      (StringRef, DescriptiveDeclKind, const Decl *))
+      "'%0' macro cannot be attached to %kindonly1 (%base1)",
+      (StringRef, const Decl *))
 ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
@@ -8026,7 +8050,8 @@ NOTE(noncopyable_generics_implicit_composition, none,
      "'%noformat0 & %noformat1' is implicit here",
      (Type, Type))
 ERROR(noncopyable_effectful_getter,none,
-      "%0 of noncopyable type cannot be 'async' or 'throws'", (DescriptiveDeclKind))
+      "%kindonly0 of noncopyable type cannot be 'async' or 'throws'",
+      (const AccessorDecl *))
 ERROR(noncopyable_enums_do_not_support_indirect,none,
       "noncopyable enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(noncopyable_cast,none,
@@ -8085,9 +8110,9 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
 //------------------------------------------------------------------------------
 
 ERROR(init_accessor_can_refer_only_to_properties,none,
-      "init accessor cannot refer to %0 %1; init accessors can refer only"
+      "init accessor cannot refer to %kind0; init accessors can refer only"
       " to stored properties",
-      (DescriptiveDeclKind, DeclNameRef))
+      (const ValueDecl *))
 
 ERROR(storage_restrictions_attribute_not_on_init_accessor,none,
       "@storageRestrictions attribute could only be used with init accessors",
@@ -8310,14 +8335,15 @@ GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
      "indicate that the conformance is not memory-safe",
      (Type, const ValueDecl *))
 NOTE(note_witness_unsafe,none,
-     "unsafe %0 %1 cannot satisfy safe requirement",
-      (DescriptiveDeclKind, DeclName))
+     "unsafe %kind0 cannot satisfy safe requirement",
+      (const ValueDecl *))
 NOTE(note_type_witness_unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
 
 GROUPED_WARNING(override_safe_with_unsafe,StrictMemorySafety,none,
-      "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
+      "override of safe %kindonly0 with unsafe %kindonly0",
+      (const Decl *))
 
 GROUPED_WARNING(preconcurrency_import_unsafe,StrictMemorySafety,none,
       "@preconcurrency import is not memory-safe because it can silently "
@@ -8375,8 +8401,8 @@ ERROR(inline_array_type_backwards,none,
 //===----------------------------------------------------------------------===//
 
 ERROR(attr_abi_mismatched_kind,none,
-      "cannot give %kind0 the ABI of a %1",
-      (Decl *, DescriptiveDeclKind))
+      "cannot give %kind0 the ABI of a %kindonly1",
+      (const Decl *, const Decl *))
 
 ERROR(attr_abi_mismatched_arity,none,
       "cannot give %kind0 the ABI of a %kindonly0 with a different number of "
@@ -8401,9 +8427,9 @@ ERROR(attr_abi_mismatched_var,none,
       (Decl *, /*isABI=*/bool))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
-      "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
-      "the same purpose",
-      (DescriptiveDeclKind))
+      "cannot use '@_silgen_name' and '@abi' on the same %kindonly0 because "
+      "they serve the same purpose",
+      (const Decl *))
 
 ERROR(attr_abi_missing_attr,none,
       "missing '%0' %select{attribute|modifier}1 in '@abi'",
