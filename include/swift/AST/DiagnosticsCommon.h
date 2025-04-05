@@ -24,6 +24,10 @@
 #include "swift/Config.h"
 
 namespace swift {
+  class ConstructorDecl;
+  class SwitchStmt;
+  class TypeAliasDecl;
+
   template<typename ...ArgTypes>
   struct Diag;
 

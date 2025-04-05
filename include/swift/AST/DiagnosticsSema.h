@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticsCommon.h"
 
 namespace swift {
-  class SwitchStmt;
   namespace diag {
 
     /// Describes the kind of requirement in a protocol.

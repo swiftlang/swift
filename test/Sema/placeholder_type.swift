@@ -54,7 +54,7 @@ let _: [String: _] = dictionary(ofType: [_: Int].self)
 let _: [_: _] = dictionary(ofType: [String: Int].self)
 let _: [String: Int] = dictionary(ofType: _.self) // expected-error {{type placeholder not allowed here}}
 
-let _: @convention(c) _ = { 0 } // expected-error {{@convention attribute only applies to function types}}
+let _: @convention(c) _ = { 0 } // expected-error {{'@convention' only applies to function types}}
 let _: @convention(c) (_) -> _ = { (x: Double) in 0 }
 let _: @convention(c) (_) -> Int = { (x: Double) in 0 }
 

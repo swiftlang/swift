@@ -1090,6 +1090,26 @@ static void formatDiagnosticArgument(StringRef Modifier,
     }
     break;
   }
+  case DiagnosticArgumentKind::TypeAttribute: {
+    bool useAtStyle = true;
+    if (Modifier == "kind") {
+      useAtStyle = false;
+    } else {
+      ASSERT(Modifier.empty() &&
+             "Improper modifier for TypeAttribute argument");
+    }
+
+    if (!useAtStyle) {
+      Out << "attribute ";
+    }
+    Out << FormatOpts.OpeningQuotationMark;
+    if (useAtStyle) {
+      Out << '@';
+    }
+    Out << Arg.getAsTypeAttribute()->getAttrName();
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
+  }
   case DiagnosticArgumentKind::AvailabilityDomain:
     assert(Modifier.empty() &&
            "Improper modifier for AvailabilityDomain argument");

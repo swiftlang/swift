@@ -2687,10 +2687,6 @@ NOTE(invalid_extension_rewrite,none,
 ERROR(cannot_extend_nominal,none,
       "cannot extend %kind0", (const NominalTypeDecl *))
 
-ERROR(retroactive_not_in_extension_inheritance_clause,none,
-      "'retroactive' attribute only applies in inheritance clauses in "
-      "extensions", ())
-
 ERROR(retroactive_attr_does_not_apply,none,
       "'retroactive' attribute does not apply; %0 is declared in "
       "%select{the same package|this module}1",
@@ -5863,9 +5859,14 @@ ERROR(sendable_raw_storage,none,
       "struct %0 with @_rawLayout does not conform to the 'Sendable' protocol", (DeclName))
 
 ERROR(typeattr_not_inheritance_clause,none,
-      "'%0' attribute only applies in inheritance clauses", (StringRef))
+      "%0 only applies in inheritance clauses",
+      (const TypeAttribute *))
+ERROR(typeattr_not_extension_inheritance_clause,none,
+      "%0 only applies in inheritance clauses in extensions",
+      (const TypeAttribute *))
 ERROR(typeattr_not_existential,none,
-      "'%0' attribute cannot apply to non-protocol type %1", (StringRef, Type))
+      "%0 cannot apply to non-protocol type %1",
+      (const TypeAttribute *, Type))
 
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
@@ -6263,8 +6264,8 @@ NOTE(overridden_required_initializer_here,none,
      "overridden required initializer is here", ())
 
 // Functions
-ERROR(attribute_requires_function_type,none,
-      "@%0 attribute only applies to function types", (StringRef))
+ERROR(type_attr_requires_function_type,none,
+      "%0 only applies to function types", (const TypeAttribute *))
 ERROR(generic_function_type,none,
       "function values cannot be generic", ())
 ERROR(unsupported_convention,none,
@@ -7611,8 +7612,8 @@ ERROR(marker_protocol_conditional_conformance,none,
 //------------------------------------------------------------------------------
 
 ERROR(differentiable_programming_attr_used_without_required_module, none,
-      "'@%0' attribute used without importing module %1",
-      (StringRef, Identifier))
+      "%0 used without importing module %1",
+      (const TypeAttribute *, Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: OSLog
