@@ -299,14 +299,13 @@ bool LangOptions::FeatureState::isEnabled() const {
 }
 
 bool LangOptions::FeatureState::isEnabledForAdoption() const {
-  ASSERT(isFeatureAdoptable(feature) &&
-         "You forgot to make the feature adoptable!");
+  ASSERT(feature.isAdoptable() && "You forgot to make the feature adoptable!");
 
   return state == FeatureState::Kind::EnabledForAdoption;
 }
 
 LangOptions::FeatureStateStorage::FeatureStateStorage()
-    : states(numFeatures(), FeatureState::Kind::Off) {}
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
 
 void LangOptions::FeatureStateStorage::setState(Feature feature,
                                                 FeatureState::Kind state) {
@@ -327,7 +326,7 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   if (state.isEnabled())
     return state;
 
-  if (auto version = getFeatureLanguageVersion(feature)) {
+  if (auto version = feature.getLanguageVersion()) {
     if (isSwiftVersionAtLeast(*version)) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
@@ -340,7 +339,7 @@ bool LangOptions::hasFeature(Feature feature) const {
   if (featureStates.getState(feature).isEnabled())
     return true;
 
-  if (auto version = getFeatureLanguageVersion(feature))
+  if (auto version = feature.getLanguageVersion())
     return isSwiftVersionAtLeast(*version);
 
   return false;
@@ -360,11 +359,12 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
 
 void LangOptions::enableFeature(Feature feature, bool forAdoption) {
   if (forAdoption) {
-    ASSERT(isFeatureAdoptable(feature));
+    ASSERT(feature.isAdoptable());
     featureStates.setState(feature, FeatureState::Kind::EnabledForAdoption);
-  } else {
-    featureStates.setState(feature, FeatureState::Kind::Enabled);
+    return;
   }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
 }
 
 void LangOptions::disableFeature(Feature feature) {

@@ -144,7 +144,7 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
 
   const ExecutionAttr attr(ExecutionKind::Concurrent, /*implicit=*/true);
 
-  const auto featureName = getFeatureName(feature);
+  const auto featureName = feature.getName();
   if (decl) {
     // Diagnose the function, but slap the attribute on the storage declaration
     // instead if the function is an accessor.
