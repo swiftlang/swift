@@ -1532,14 +1532,15 @@ final public class EndUnpairedAccessInst : Instruction {}
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
+  public var isCalleeAllocated: Bool { bridged.BeginApplyInst_isCalleeAllocated() }
 
   public var singleDirectResult: Value? { nil }
   public var singleDirectErrorResult: Value? { nil }
 
-  public var token: Value { getResult(index: resultCount - 1) }
+  public var token: Value { getResult(index: resultCount - (isCalleeAllocated ? 2 : 1)) }
 
   public var yieldedValues: Results {
-    Results(inst: self, numResults: resultCount - 1)
+    Results(inst: self, numResults: resultCount - (isCalleeAllocated ? 2 : 1))
   }
 }
 
