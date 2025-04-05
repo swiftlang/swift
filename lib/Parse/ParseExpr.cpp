@@ -1972,7 +1972,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(TokenLoc),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =

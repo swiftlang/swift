@@ -4602,8 +4602,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
 
-    auto *makeIteratorRef = UnresolvedDotExpr::createImplicit(
-        ctx, sequenceExpr, makeIterator->getName());
+    auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
+        sequenceExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     Expr *makeIteratorCall =
@@ -4666,11 +4667,13 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
-    auto *nextRef = UnresolvedDotExpr::createImplicit(
-        ctx,
+    auto *makeIteratorVarRef =
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                              /*Implicit=*/true),
-        nextId, labels);
+                              /*Implicit=*/true);
+    auto *nextRef = new (ctx)
+        UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
+                          DeclNameRef(DeclName(ctx, nextId, labels)),
+                          DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     ArgumentList *nextArgs;
