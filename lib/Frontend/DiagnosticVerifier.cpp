@@ -1330,10 +1330,15 @@ bool DiagnosticVerifier::finishProcessing() {
     }
     if (bufferID) {
       additionalBufferIDs.push_back(*bufferID);
-      llvm::errs() << "Got additional file: [[" << *bufferID << "]]: " << path << "\n";
+      llvm::errs() << "Got additional file: [[" << *bufferID << "]]::" << path << "\n";
     } else {
       llvm::errs() << "Could not open additional file: " << path << "\n";
     }
+  }
+
+  for (auto captured : CapturedDiagnostics) {
+    auto id = *captured.SourceBufferID;
+    llvm::errs() << "Captured error in [[" << id << "]]::" << SM.getIdentifierForBuffer(id) << ": " << captured.Line << "\n";
   }
 
   ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, additionalBufferIDs };
