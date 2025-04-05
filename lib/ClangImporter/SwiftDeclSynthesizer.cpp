@@ -2489,24 +2489,23 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
-CallExpr *
-SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
-                                          const swift::Type &swiftParamTy,
-                                          SourceLoc paramLoc) {
+std::pair<FuncDecl *, CallExpr *> SwiftDeclSynthesizer::makeDefaultArgument(
+    const clang::ParmVarDecl *param, const swift::Type &swiftParamTy,
+    SourceLoc paramLoc, DeclContext *funcDC) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
   if (!param->getIdentifier())
     // Work around an assertion failure in CXXNameMangler::mangleUnqualifiedName
     // when mangling std::__fs::filesystem::path::format.
-    return nullptr;
+    return {nullptr, nullptr};
 
-  ASTContext &ctx = ImporterImpl.SwiftContext;
+  ASTContext &ctx = swiftParamTy->getASTContext();
   clang::ASTContext &clangCtx = param->getASTContext();
   auto clangFunc =
       cast<clang::FunctionDecl>(param->getParentFunctionOrMethod());
   if (isa<clang::CXXConstructorDecl>(clangFunc))
     // TODO: support default arguments of constructors
     // (https://github.com/apple/swift/issues/70124)
-    return nullptr;
+    return {nullptr, nullptr};
 
   std::string s;
   llvm::raw_string_ostream os(s);
@@ -2520,12 +2519,9 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
                     ParameterList::createEmpty(ctx));
   auto funcDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, funcName, paramLoc, false, false, Type(),
-      {}, ParameterList::createEmpty(ctx), swiftParamTy,
-      ImporterImpl.ImportedHeaderUnit);
+      {}, ParameterList::createEmpty(ctx), swiftParamTy, funcDC);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
-
-  ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
   auto declRefExpr = new (ctx)
       DeclRefExpr(ConcreteDeclRef(funcDecl), DeclNameLoc(), /*Implicit*/ true);
@@ -2537,7 +2533,7 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   callExpr->setType(funcDecl->getResultInterfaceType());
   callExpr->setThrows(nullptr);
 
-  return callExpr;
+  return {funcDecl, callExpr};
 }
 
 // MARK: C++ foreign reference type constructors

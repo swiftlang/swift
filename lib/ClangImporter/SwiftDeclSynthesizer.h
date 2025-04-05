@@ -312,9 +312,10 @@ public:
   static VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                      FuncDecl *setter);
 
-  CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
-                                const swift::Type &swiftParamTy,
-                                SourceLoc paramLoc);
+  static std::pair<FuncDecl *, CallExpr *>
+  makeDefaultArgument(const clang::ParmVarDecl *param,
+                      const swift::Type &swiftParamTy, SourceLoc paramLoc,
+                      DeclContext *funcDC);
 
   /// Synthesize a static factory method for a C++ foreign reference type,
   /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
