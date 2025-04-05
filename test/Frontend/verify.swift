@@ -31,5 +31,5 @@ fn(())    // expected-error {{argument passed to call that takes no arguments}} 
 fn(())    // expected-error {{argument passed to call that takes no arguments}} {{none}}
 
 // CHECK: [[@LINE+2]]:8: error: unexpected error produced: generic type 'Array' specialized with too many type parameters
-// CHECK: note: diagnostic produced elsewhere: generic type 'Array' declared here
+// CHECK: note: diagnostic produced elsewhere: generic struct 'Array' declared here
 let x: Array<Int, Int>

@@ -737,8 +737,7 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
     }
   }
 
-  decl->diagnose(diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::GenericType, decl->getName());
+  decl->diagnose(diag::decl_declared_here_with_kind, decl);
 }
 
 namespace {
@@ -1346,9 +1345,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
 
-    decl->diagnose(diag::kind_declname_declared_here,
-                   DescriptiveDeclKind::GenericType,
-                   decl->getName());
+    decl->diagnose(diag::decl_declared_here_with_kind, decl);
   } else {
     ty.findIf([&](Type t) -> bool {
       if (t->is<UnboundGenericType>()) {

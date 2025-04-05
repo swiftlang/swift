@@ -499,7 +499,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::generic_param_usable_from_inline_warn;
     auto diag =
-        Context.Diags.diagnose(ownerDecl, diagID, ownerDecl->getDescriptiveKind(),
+        Context.Diags.diagnose(ownerDecl, diagID, ownerDecl,
                                accessControlErrorKind == ACEK::Requirement);
     highlightOffendingType(diag, complainRepr);
     noteLimitingImport(/*userDecl*/nullptr, Context, minImportLimit, complainRepr);
@@ -515,9 +515,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::generic_param_access_warn;
   auto diag = Context.Diags.diagnose(
-      ownerDecl, diagID, ownerDecl->getDescriptiveKind(), isExplicit,
-      contextAccess, minAccess, isa<FileUnit>(DC),
-      accessControlErrorKind == ACEK::Requirement);
+      ownerDecl, diagID, ownerDecl, isExplicit, contextAccess, minAccess,
+      isa<FileUnit>(DC), accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(diag, complainRepr);
   noteLimitingImport(/*userDecl*/nullptr, Context, minImportLimit, complainRepr);
 }

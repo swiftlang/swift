@@ -3672,12 +3672,11 @@ static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
   // move it to another extension where the required level is possible;
   // otherwise, we simply mark decl as the required level.
   if (shouldMoveToAnotherExtension) {
-    diags.diagnose(decl, diag::witness_move_to_another_extension,
-                   decl->getDescriptiveKind(), requiredAccess);
+    diags.diagnose(decl, diag::witness_move_to_another_extension, decl,
+                   requiredAccess);
   } else {
-    auto fixItDiag = diags.diagnose(decl, diag::witness_fix_access,
-                                    decl->getDescriptiveKind(),
-                                    requiredAccess);
+    auto fixItDiag =
+        diags.diagnose(decl, diag::witness_fix_access, decl, requiredAccess);
     fixItAccess(fixItDiag, decl, requiredAccess, isForSetter,
                 shouldUseDefaultAccess);
   }
@@ -4334,9 +4333,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
         });
     }
     if (best.Kind == MatchKind::RequiresNonSendable) {
@@ -4485,9 +4483,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
       });
       break;
     }
@@ -4517,9 +4514,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                          conformance->getProtocol(), EncodedMessage.Message);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
         });
       break;
 
@@ -4536,9 +4532,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            witness, conformance->getProtocol()->getName(),
                            EncodedMessage.Message);
             emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-            diags.diagnose(requirement, diag::kind_declname_declared_here,
-                           DescriptiveDeclKind::Requirement,
-                           requirement->getName());
+            diags.diagnose(requirement, diag::requirement_declared_here,
+                           requirement);
           });
         break;
     }
@@ -5193,9 +5188,8 @@ static bool diagnoseTypeWitnessAvailability(
               .warnUntilSwiftVersion(warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
-          ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                             DescriptiveDeclKind::Requirement,
-                             assocType->getName());
+          ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
+                             assocType);
         });
   }
 
@@ -5532,8 +5526,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5552,8 +5546,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5572,8 +5566,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             fixItDiag->fixItInsert(witness->getAttributeInsertionLoc(false),
                                    "@objc ");
@@ -5587,9 +5581,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                              "@nonobjc ");
           }
 
-          requirement->diagnose(diag::kind_declname_declared_here,
-                                DescriptiveDeclKind::Requirement,
-                                requirement->getName());
+          requirement->diagnose(diag::requirement_declared_here, requirement);
 
           Conformance->setInvalid();
           return;
@@ -6275,8 +6267,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
         .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
   }
 
-  req->diagnose(diag::kind_declname_declared_here,
-                DescriptiveDeclKind::Requirement, req->getName());
+  req->diagnose(diag::requirement_declared_here, req);
 }
 
 /// Whether the given protocol is "NSCoding".

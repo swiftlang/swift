@@ -856,12 +856,10 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     if (auto *getter = storage->getEffectfulGetAccessor()) {
       switch (kind) {
       case DiagKind::NoncopyableType:
-        getter->diagnose(diag::noncopyable_effectful_getter,
-                         getter->getDescriptiveKind());
+        getter->diagnose(diag::noncopyable_effectful_getter, getter);
         break;
       case DiagKind::BorrowedAttr:
-        getter->diagnose(diag::borrowed_with_effect,
-                         getter->getDescriptiveKind());
+        getter->diagnose(diag::borrowed_with_effect, getter);
         break;
       }
     }
@@ -3859,9 +3857,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     // If we see `@_hasStorage` in a context with no stored properties, diagnose
     // and ignore it.
     if (isa<ExtensionDecl, EnumDecl, ProtocolDecl>(DC)) {
-      storage->diagnose(diag::attr_invalid_in_context, attr,
-                        DC->getAsDecl()->getDescriptiveKind())
-        .warnInSwiftInterface(storage->getDeclContext());
+      storage->diagnose(diag::attr_invalid_in_context, attr, DC->getAsDecl())
+          .warnInSwiftInterface(storage->getDeclContext());
 
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.

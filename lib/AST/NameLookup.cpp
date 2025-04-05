@@ -3953,9 +3953,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                 .diagnose(loc, diag::warn_property_wrapper_module_scope, name,
                           moduleName)
                 .fixItInsert(loc, moduleName.str().str() + ".");
-            ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                               assocType->getDescriptiveKind(),
-                               assocType->getName());
+            ctx.Diags.diagnose(assocType, diag::decl_declared_here_with_kind,
+                               assocType);
 
             auto *baseTR = UnqualifiedIdentTypeRepr::create(
                 ctx, nameLoc, DeclNameRef(moduleName));

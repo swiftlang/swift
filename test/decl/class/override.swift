@@ -236,7 +236,7 @@ class IUOTestSubclassOkay : IUOTestBaseClass {
   override func oneC(_ x: AnyObject) {}
 }
 
-class GenericBase<T> { // expected-note{{generic type 'GenericBase' declared here}}
+class GenericBase<T> { // expected-note{{generic class 'GenericBase' declared here}}
   var values: Int { 0 } // expected-note{{attempt to override property here}}
 }
 

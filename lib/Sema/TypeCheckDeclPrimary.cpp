@@ -1081,8 +1081,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                     return req->getName() == VD->getName();
                   });
             }
-            declToDiagnose->diagnose(diag::invalid_redecl_implicit,
-                                     current->getDescriptiveKind(),
+            declToDiagnose->diagnose(diag::invalid_redecl_implicit, current,
                                      isProtocolRequirement, other);
 
             // Emit a specialized note if the one of the declarations is
@@ -2002,9 +2001,8 @@ static StringRef prettyPrintAttrs(const ValueDecl *VD,
 }
 
 static void diagnoseChangesByAccessNote(
-    ValueDecl *VD,
-    ArrayRef<const DeclAttribute *> attrs,
-    Diag<StringRef, StringRef, DescriptiveDeclKind> diagID,
+    ValueDecl *VD, ArrayRef<const DeclAttribute *> attrs,
+    Diag<StringRef, StringRef, const ValueDecl *> diagID,
     Diag<StringRef> fixItID,
     llvm::function_ref<void(InFlightDiagnostic, StringRef)> addFixIts) {
   if (!VD->getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess() ||
@@ -2018,7 +2016,7 @@ static void diagnoseChangesByAccessNote(
   SourceLoc fixItLoc;
 
   auto reason = VD->getModuleContext()->getAccessNotes().Reason;
-  auto diag = VD->diagnose(diagID, reason, attrText, VD->getDescriptiveKind());
+  auto diag = VD->diagnose(diagID, reason, attrText, VD);
   for (auto attr : attrs) {
     diag.highlight(attr->getRangeWithAt());
     if (fixItLoc.isInvalid())
@@ -2072,8 +2070,8 @@ swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
   auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
   return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
                                D->getModuleContext()->getAccessNotes().Reason,
-                               ctx.AllocateCopy(attrText), D->getDescriptiveKind())
-                        .limitBehavior(behavior));
+                               ctx.AllocateCopy(attrText), VD)
+                       .limitBehavior(behavior));
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
@@ -2114,8 +2112,8 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
       if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
         return;
 
-      VD->diagnose(diag::attr_objc_name_changed_by_access_note,
-                   notes.Reason, VD->getDescriptiveKind(), newName);
+      VD->diagnose(diag::attr_objc_name_changed_by_access_note, notes.Reason,
+                   VD, newName);
 
       auto fixIt =
           VD->diagnose(diag::fixit_attr_objc_name_changed_by_access_note);
@@ -2126,8 +2124,7 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
       auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
 
       VD->diagnose(diag::attr_objc_name_conflicts_with_access_note,
-                   notes.Reason, VD->getDescriptiveKind(),
-                   attr->getName().value(), newName)
+                   notes.Reason, VD, attr->getName().value(), newName)
           .highlight(attr->getRangeWithAt())
           .limitBehavior(behavior);
     }

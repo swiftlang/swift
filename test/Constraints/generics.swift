@@ -261,23 +261,23 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic struct 'FullyGeneric' declared here}}
 
-struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
+struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic struct 'AnyClassBound' declared here}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject'}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject' [with Foo = Any]}}
 
-struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic type 'ProtoBound' declared here}}
+struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic struct 'ProtoBound' declared here}}
 struct ProtoBound2<Foo> where Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound2'}}
 
-struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic type 'ObjCProtoBound' declared here}}
+struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic struct 'ObjCProtoBound' declared here}}
 struct ObjCProtoBound2<Foo> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound2'}}
 
-struct ClassBound<Foo: X> {} // expected-note {{generic type 'ClassBound' declared here}}
-struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic type 'ClassBound2' declared here}}
+struct ClassBound<Foo: X> {} // expected-note {{generic struct 'ClassBound' declared here}}
+struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic struct 'ClassBound2' declared here}}
 
-struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic type 'ProtosBound' declared here}}
+struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic struct 'ProtosBound' declared here}}
 struct ProtosBound2<Foo: SubProto & NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound2'}}
 struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound3'}}
 

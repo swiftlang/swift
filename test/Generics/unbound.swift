@@ -8,11 +8,11 @@
 // Places where generic arguments are always required
 // --------------------------------------------------
 
-struct Foo<T> { // expected-note 3{{generic type 'Foo' declared here}}
+struct Foo<T> { // expected-note 3{{generic struct 'Foo' declared here}}
   struct Wibble { }
 }
 
-class Dict<K, V> { } // expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}}
+class Dict<K, V> { } // expected-note 3 {{generic class 'Dict' declared here}}
 
 // The underlying type of a typealias can only have unbound generic arguments
 // at the top level.
@@ -94,8 +94,8 @@ var innerProperty: Outer.Middle.Inner = makeInner()
 // expected-error@-1 {{reference to generic type 'Outer' requires arguments in <...>}}
 
 // Some nested generic cases
-struct OuterStruct<T> { // expected-note 2{{generic type 'OuterStruct' declared here}}
-  struct InnerStruct<U> {} // expected-note {{generic type 'InnerStruct' declared here}}
+struct OuterStruct<T> { // expected-note 2{{generic struct 'OuterStruct' declared here}}
+  struct InnerStruct<U> {} // expected-note {{generic struct 'InnerStruct' declared here}}
 }
 
 func nested(_: OuterStruct.InnerStruct) {}
@@ -141,7 +141,7 @@ do {
 // https://github.com/apple/swift/issues/60922
 
 enum E<T> {}
-// expected-note@-1 2 {{generic type 'E' declared here}}
+// expected-note@-1 2 {{generic enum 'E' declared here}}
 
 extension E? {}
 // expected-error@-1{{reference to generic type 'E' requires arguments in <...>}}
@@ -149,7 +149,7 @@ extension Optional<E> {}
 // expected-error@-1{{reference to generic type 'E' requires arguments in <...>}}
 
 struct G<T> {}
-// expected-note@-1{{generic type 'G' declared here}}
+// expected-note@-1{{generic struct 'G' declared here}}
 
 extension G? {}
 // expected-error@-1{{reference to generic type 'G' requires arguments in <...>}}

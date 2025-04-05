@@ -3411,9 +3411,8 @@ namespace {
       auto &DE = ctx.Diags;
       DE.diagnose(UDE->getLoc(),
                   diag::warn_deprecated_conditional_conformance_outer_access,
-                  UDE->getName(),
-                  choice->getDescriptiveKind(), choiceParentDecl,
-                  innerChoice->getDescriptiveKind(), innerParentDecl);
+                  UDE->getName(), choice, choiceParentDecl, innerChoice,
+                  innerParentDecl);
 
       auto name = choiceParentDecl->getName().getBaseIdentifier();
       SmallString<32> namePlusDot = name.str();
@@ -3421,7 +3420,7 @@ namespace {
 
       DE.diagnose(UDE->getLoc(),
                   diag::fix_deprecated_conditional_conformance_outer_access,
-                  namePlusDot, choice->getDescriptiveKind())
+                  namePlusDot, choice)
           .fixItInsert(UDE->getStartLoc(), namePlusDot);
     }
 
@@ -5052,8 +5051,7 @@ namespace {
 
         de.diagnose(E->getLoc(), diag::expr_selector_not_objc, foundDecl)
             .highlight(subExpr->getSourceRange());
-        de.diagnose(foundDecl, diag::make_decl_objc,
-                    foundDecl->getDescriptiveKind())
+        de.diagnose(foundDecl, diag::make_decl_objc, foundDecl)
             .fixItInsert(foundDecl->getAttributeInsertionLoc(false), "@objc ");
         return E;
       }
