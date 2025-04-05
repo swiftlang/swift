@@ -4338,7 +4338,17 @@ namespace {
       if (decl->getOverloadedOperator() ==
               clang::OverloadedOperatorKind::OO_Call &&
           decl->isStatic()) {
-        auto result = synthesizer.makeInstanceToStaticOperatorCallMethod(decl);
+        auto *clangDC = decl->getParent();
+        auto newMethod = synthesizer.synthesizeCXXForwardingMethod(
+            clangDC, clangDC, decl, ForwardingMethodKind::Base,
+            ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+            /*forceConstQualifier*/ true);
+
+        newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
+            decl->getASTContext(), "callAsFunction"));
+
+        auto *result = dyn_cast_or_null<FuncDecl>(
+            Impl.importDecl(newMethod, Impl.CurrentVersion));
         if (result)
           return result;
       }
@@ -4377,13 +4387,24 @@ namespace {
             // Create a thunk that will perform dynamic dispatch.
             // TODO: we don't have to import the actual `method` in this case,
             // we can just synthesize a thunk and import that instead.
-            auto result = synthesizer.makeVirtualMethod(decl);
-            if (result) {
+            assert(!decl->isStatic() &&
+                   "C++ virtual functions cannot be static");
+            auto clangDC = decl->getParent();
+
+            auto newMethod = synthesizer.synthesizeCXXForwardingMethod(
+                clangDC, clangDC, decl, ForwardingMethodKind::Virtual,
+                ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                    KeepReference,
+                /*forceConstQualifier*/ false);
+
+            auto *result = dyn_cast_or_null<FuncDecl>(
+                Impl.importDecl(newMethod, Impl.CurrentVersion));
+
+            if (result)
               return result;
-            } else {
-              Impl.markUnavailable(
-                  funcDecl, "virtual function is not available in Swift");
-            }
+
+            Impl.markUnavailable(funcDecl,
+                                 "virtual function is not available in Swift");
           }
         }
       }

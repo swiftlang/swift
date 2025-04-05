@@ -302,13 +302,6 @@ public:
               ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       bool forceConstQualifier = false);
 
-  /// Given an overload of a C++ virtual method on a reference type, create a
-  /// method that dispatches the call dynamically.
-  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl);
-
-  FuncDecl *makeInstanceToStaticOperatorCallMethod(
-      const clang::CXXMethodDecl *clangMethodDecl);
-
   static VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                      FuncDecl *setter);
 
