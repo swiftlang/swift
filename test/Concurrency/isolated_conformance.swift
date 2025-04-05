@@ -153,3 +153,37 @@ func testIsolationConformancesFromOutside(c: C) {
   let _: any P = c // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
   let _ = PWrapper<C>() // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
 }
+
+protocol HasAssociatedType {
+  associatedtype A
+}
+
+func acceptHasAssocWithP<T: HasAssociatedType>(_: T) where T.A: P { }
+
+func acceptSendableHasAssocWithP<T: Sendable & HasAssociatedType>(_: T) where T.A: P { }
+// expected-note@-1{{'acceptSendableHasAssocWithP' declared here}}
+
+
+struct HoldsC: HasAssociatedType {
+  typealias A = C
+}
+
+extension HasAssociatedType {
+  static func acceptAliased<T: P>(_: T.Type) where A == T { }
+}
+
+extension HasAssociatedType where Self: Sendable {
+  static func acceptSendableAliased<T: P>(_: T.Type) where A == T { }
+}
+
+func testIsolatedConformancesOnAssociatedTypes(hc: HoldsC, c: C) {
+  acceptHasAssocWithP(hc)
+  acceptSendableHasAssocWithP(hc) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter }}
+
+  HoldsC.acceptAliased(C.self) // okay
+
+  // FIXME: the following should produce an error, because the isolated
+  // conformance of C: P can cross isolation boundaries via the Sendable Self's
+  // associated type.
+  HoldsC.acceptSendableAliased(C.self)
+}

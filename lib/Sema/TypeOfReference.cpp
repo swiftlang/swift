@@ -1230,8 +1230,8 @@ void ConstraintSystem::openGenericRequirement(
 
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
-    if (typeParameterProhibitsIsolatedConformance(req.getFirstType(),
-                                                  signature))
+    if (signature &&
+        signature->prohibitsIsolatedConformance(req.getFirstType()))
       prohibitIsolatedConformance = true;
 
     openedReq = Requirement(kind, openedFirst, req.getSecondType());
