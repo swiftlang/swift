@@ -337,6 +337,34 @@ public:
   int val = 1;
   ParameterizedCtor(int x) : val(x) {}
 };
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain16")))
+__attribute__((swift_attr("release:Release16"))) ParameterizedCtor2 {
+public:
+  int val1 = 1;
+  int val2 = 1;
+  ParameterizedCtor2() {};
+  ParameterizedCtor2(int x) : val1(x) {}
+  ParameterizedCtor2(int x, int y) : val1(x), val2(y) {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain17")))
+__attribute__((swift_attr("release:Release17"))) VariadicCtors {
+public:
+  int val1 = 1;
+  int val2 = 2;
+  VariadicCtors(...) {};
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain18")))
+__attribute__((swift_attr("release:Release18"))) NoIdentifierInCtorParam {
+public:
+  int val = 10;
+  NoIdentifierInCtorParam(int) {};
+};
 } // namespace SwiftInitSynthesisForCXXRefTypes
 
 void Retain1(SwiftInitSynthesisForCXXRefTypes::CompilerGeneratedDefaultCtor
@@ -397,5 +425,15 @@ void Retain15(
     SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
 void Release15(
     SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
+void Retain16(
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {};
+void Release16(
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {};
+void Retain17(SwiftInitSynthesisForCXXRefTypes::VariadicCtors *_Nonnull v) {};
+void Release17(SwiftInitSynthesisForCXXRefTypes::VariadicCtors *_Nonnull v) {};
+void Retain18(
+    SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {};
+void Release18(
+    SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {};
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
