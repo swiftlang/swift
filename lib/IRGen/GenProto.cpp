@@ -1678,7 +1678,7 @@ public:
               IGM.FunctionPtrTy);
         } else if (isCalleeAllocatedCoroutineRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer(),
+              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer(),
               IGM.CoroFunctionPointerPtrTy);
         } else {
           witness = llvm::ConstantExpr::getBitCast(
