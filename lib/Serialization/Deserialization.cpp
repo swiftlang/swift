@@ -2824,6 +2824,12 @@ giveUpFastPath:
   if (M)
     return diagnoseFatal();
 
+  if (values.size() > 1) {
+    // Apply shadowing filtering after other local filters so we don't rule out
+    // valid candidates shadowed by invalid ones.
+    removeShadowedDecls(values, baseModule);
+  }
+
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
     return llvm::make_error<XRefError>("result is ambiguous", pathTrace,
