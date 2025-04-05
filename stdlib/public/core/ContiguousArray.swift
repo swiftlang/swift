@@ -1244,7 +1244,7 @@ extension ContiguousArray {
 
   @available(SwiftStdlib 6.2, *)
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(/*inout*/borrow self)
+    @lifetime(&self)
     @_alwaysEmitIntoClient
     mutating get {
       _makeMutableAndUnique()

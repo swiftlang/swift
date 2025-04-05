@@ -106,7 +106,7 @@ struct EscapableNonTrivialSelf {
   @lifetime(self)
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutatingMethodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
   func methodOneParam(_: Int) -> NEImmortal { NEImmortal() } // OK
@@ -122,7 +122,7 @@ struct EscapableNonTrivialSelf {
   @lifetime(self) // OK
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self) // OK
+  @lifetime(&self) // OK
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 }
 
@@ -351,7 +351,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       yield ne
     }
 
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify {
       yield &ne
     }
@@ -411,7 +411,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @lifetime(borrow self)
+    @lifetime(&self)
     set {
       ne = newValue
     }
@@ -423,7 +423,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       yield ne
     }
 
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify {
       yield &ne
     }

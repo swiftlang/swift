@@ -40,7 +40,7 @@ public struct NonEscapableSelf : ~Swift.Escapable {
   public mutating func mutatingMethodNoParamCopy() -> lifetime_depend_infer.NonEscapableSelf
   #endif
   #if $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodNoParamBorrow() -> lifetime_depend_infer.NonEscapableSelf
   #endif
   #if $LifetimeDependence
@@ -67,7 +67,7 @@ public struct NonEscapableSelf : ~Swift.Escapable {
   public mutating func mutatingMethodOneParamCopy(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
   #endif
   #if $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
   #endif
 }
@@ -85,7 +85,7 @@ public struct EscapableTrivialSelf {
   public mutating func mutatingMethodNoParamLifetime() -> lifetime_depend_infer.NEImmortal
   #endif
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodNoParamBorrow() -> lifetime_depend_infer.NEImmortal
   #endif
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
@@ -101,7 +101,7 @@ public struct EscapableTrivialSelf {
   public mutating func mutatingMethodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
   #endif
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
   #endif
 }
@@ -126,7 +126,7 @@ public struct EscapableNonTrivialSelf {
   public mutating func mutatingMethodNoParamLifetime() -> lifetime_depend_infer.NEImmortal
   #endif
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodNoParamBorrow() -> lifetime_depend_infer.NEImmortal
   #endif
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
@@ -148,7 +148,7 @@ public struct EscapableNonTrivialSelf {
   public mutating func mutatingMethodOneParamLifetime(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
   #endif
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NEImmortal
   #endif
 }
@@ -256,7 +256,7 @@ public struct NonescapableSelfAccessors : ~Swift.Escapable {
   #if $LifetimeDependence
   public var neYielded: lifetime_depend_infer.NE {
     _read
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify
   }
   #endif
@@ -272,7 +272,7 @@ public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
   #if $LifetimeDependence
   public var neYielded: lifetime_depend_infer.NE {
     _read
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify
   }
   #endif
@@ -312,7 +312,7 @@ public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
   public var neComputedBorrow: lifetime_depend_infer.NE {
     @lifetime(borrow self)
     get
-    @lifetime(borrow self)
+    @lifetime(&self)
     set
   }
   #endif
@@ -320,7 +320,7 @@ public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
   public var neYieldedBorrow: lifetime_depend_infer.NE {
     @lifetime(borrow self)
     _read
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify
   }
   #endif
@@ -346,7 +346,7 @@ public struct NonEscapableMutableSelf : ~Swift.Escapable {
   public mutating func mutatingMethodOneParamCopy(_: lifetime_depend_infer.NE)
   #endif
   #if $LifetimeDependence
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func mutatingMethodOneParamBorrow(_: lifetime_depend_infer.NE)
   #endif
 }

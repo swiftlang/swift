@@ -1302,7 +1302,7 @@ extension ArraySlice {
 
   @available(SwiftStdlib 6.2, *)
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(/*inout*/borrow self)
+    @lifetime(/*inout*/&self)
     @_alwaysEmitIntoClient
     mutating get {
       _makeMutableAndUnique()

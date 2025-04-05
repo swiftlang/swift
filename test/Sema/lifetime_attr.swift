@@ -63,3 +63,9 @@ do {
 // rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
 @lifetime(span: borrow holder)
 func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter must be 'inout'}}
+
+@lifetime(&ne)
+func inoutLifetimeDependence(_ ne: inout NE) -> NE {
+  ne
+}
+
