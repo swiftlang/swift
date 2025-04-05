@@ -16,6 +16,13 @@ struct
   void play() const;
 };
 
+struct __attribute__((swift_attr("conforms_to:SwiftTest.Testable")))
+__attribute__((swift_attr(
+    "conforms_to:SwiftTest.Playable"))) MultipleConformanceHasTestAndPlay {
+  void test() const;
+  void play() const;
+};
+
 struct
     __attribute__((swift_attr("conforms_to:ImportedModule.ProtocolFromImportedModule")))
     HasImportedConf {
@@ -24,6 +31,8 @@ struct
 
 struct DerivedFromHasTest : HasTest {};
 struct DerivedFromDerivedFromHasTest : HasTest {};
+struct DerivedFromMultipleConformanceHasTestAndPlay
+    : MultipleConformanceHasTestAndPlay {};
 
 struct __attribute__((swift_attr("conforms_to:SwiftTest.Testable")))
 DerivedFromDerivedFromHasTestWithDuplicateArg : HasTest {};
