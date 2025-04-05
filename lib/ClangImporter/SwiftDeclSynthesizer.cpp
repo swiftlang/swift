@@ -81,11 +81,10 @@ static DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl,
   return paramRefExpr;
 }
 
-static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+static AccessorDecl *makeFieldGetterDecl(NominalTypeDecl *importedDecl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
-  auto &C = Impl.SwiftContext;
+  auto &C = importedDecl->getASTContext();
 
   auto *params = ParameterList::createEmpty(C);
 
@@ -105,11 +104,10 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   return getterDecl;
 }
 
-static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+static AccessorDecl *makeFieldSetterDecl(NominalTypeDecl *importedDecl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
-  auto &C = Impl.SwiftContext;
+  auto &C = importedDecl->getASTContext();
   auto newValueDecl = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                         SourceLoc(), C.Id_value, importedDecl);
   newValueDecl->setSpecifier(ParamSpecifier::Default);
@@ -441,7 +439,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
   var->getAttrs().add(nonisolatedAttr);
 
   // Set the function up as the getter.
-  ImporterImpl.makeComputed(var, func, nullptr);
+  importer::makeComputed(var, func, nullptr);
 
   return var;
 }
@@ -496,7 +494,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *
 SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
-  auto &context = ImporterImpl.SwiftContext;
+  auto &context = structDecl->getASTContext();
 
   auto emptyPL = ParameterList::createEmpty(context);
 
@@ -591,7 +589,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
     NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
     bool wantCtorParamNames, bool wantBody) {
-  auto &context = ImporterImpl.SwiftContext;
+  auto &context = structDecl->getASTContext();
 
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
@@ -619,8 +617,8 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                                 var->getName(), structDecl);
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(var->getInterfaceType());
-    ImporterImpl.recordImplicitUnwrapForDecl(
-        param, var->isImplicitlyUnwrappedOptional());
+    importer::recordImplicitUnwrapForDecl(param,
+                                          var->isImplicitlyUnwrappedOptional());
 
     // Don't allow the parameter to accept temporary pointer conversions.
     param->setNonEphemeralIfPossible();
@@ -710,12 +708,13 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
   return {body, /*isTypeChecked=*/true};
 }
 
-ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
+static ConstructorDecl *createRawValueBridgingConstructor(
     StructDecl *structDecl, VarDecl *computedRawValue, VarDecl *storedRawValue,
     bool wantLabel, bool wantBody) {
-  auto init = createValueConstructor(structDecl, computedRawValue,
-                                     /*wantCtorParamNames=*/wantLabel,
-                                     /*wantBody=*/false);
+  auto init = SwiftDeclSynthesizer::createValueConstructor(
+      structDecl, computedRawValue,
+      /*wantCtorParamNames=*/wantLabel,
+      /*wantBody=*/false);
   // Insert our custom init body
   if (wantBody) {
     init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
@@ -725,14 +724,85 @@ ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
   return init;
 }
 
+// MARK: Struct RawValue getters
+
+/// Synthesizer for the rawValue getter for an imported struct.
+static std::pair<BraceStmt *, bool>
+synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  VarDecl *storedVar = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/ true);
+  selfRef->setType(selfDecl->getTypeInContext());
+
+  auto storedType = storedVar->getInterfaceType();
+  auto storedRef = new (ctx)
+      MemberRefExpr(selfRef, SourceLoc(), storedVar, DeclNameLoc(),
+                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
+  storedRef->setType(storedType);
+
+  Expr *result = storedRef;
+
+  Type computedType = getterDecl->getResultInterfaceType();
+  if (!computedType->isEqual(storedType)) {
+    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
+    bridge->setType(computedType);
+
+    result = CoerceExpr::createImplicit(ctx, bridge, computedType);
+  }
+
+  auto ret = ReturnStmt::createImplicit(ctx, result);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+/// Build the rawValue getter for a struct type.
+///
+/// \code
+/// struct SomeType: RawRepresentable {
+///   private var _rawValue: ObjCType
+///   var rawValue: SwiftType {
+///     return _rawValue as SwiftType
+///   }
+/// }
+/// \endcode
+static AccessorDecl *makeStructRawValueGetter(StructDecl *structDecl,
+                                              VarDecl *computedVar,
+                                              VarDecl *storedVar) {
+  assert(storedVar->hasStorage());
+
+  ASTContext &C = structDecl->getASTContext();
+
+  auto *params = ParameterList::createEmpty(C);
+
+  auto computedType = computedVar->getInterfaceType();
+
+  auto getterDecl = AccessorDecl::create(
+      C,
+      /*declLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false,
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), params, computedType,
+      structDecl);
+  getterDecl->setImplicit();
+  getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(false);
+
+  getterDecl->copyFormalAccessFrom(structDecl);
+  getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
+  return getterDecl;
+}
+
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     bool makeUnlabeledValueInit) {
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
+  auto &ctx = structDecl->getASTContext();
 
   auto storedVarName = ctx.getIdentifier("_rawValue");
   auto computedVarName = ctx.Id_rawValue;
@@ -756,7 +826,7 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   // Create the getter for the computed value variable.
   auto computedVarGetter =
       makeStructRawValueGetter(structDecl, computedVar, storedVar);
-  ImporterImpl.makeComputed(computedVar, computedVarGetter, nullptr);
+  importer::makeComputed(computedVar, computedVarGetter, nullptr);
 
   // Create a pattern binding to describe the variable.
   Pattern *computedBindingPattern = createTypedNamedPattern(computedVar);
@@ -782,20 +852,12 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   structDecl->addMember(storedVar);
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
-
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       bridgedType);
-  ImporterImpl.RawTypes[structDecl] = bridgedType;
 }
 
 void SwiftDeclSynthesizer::makeStructRawValued(
     StructDecl *structDecl, Type underlyingType,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     MakeStructRawValuedOptions options, AccessLevel setterAccess) {
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
+  auto &ctx = structDecl->getASTContext();
 
   // Create a variable to store the underlying value.
   VarDecl *var;
@@ -813,20 +875,18 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   // Create constructors to initialize that value from a value of the
   // underlying type.
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
-    structDecl->addMember(createValueConstructor(structDecl, var,
-                                                 /*wantCtorParamNames=*/false,
-                                                 /*wantBody=*/true));
+    structDecl->addMember(SwiftDeclSynthesizer::createValueConstructor(
+        structDecl, var,
+        /*wantCtorParamNames=*/false,
+        /*wantBody=*/true));
 
-  auto *initRawValue = createValueConstructor(structDecl, var,
-                                              /*wantCtorParamNames=*/true,
-                                              /*wantBody=*/true);
+  auto *initRawValue =
+      SwiftDeclSynthesizer::createValueConstructor(structDecl, var,
+                                                   /*wantCtorParamNames=*/true,
+                                                   /*wantBody=*/true);
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
-
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       underlyingType);
-  ImporterImpl.RawTypes[structDecl] = underlyingType;
 }
 
 // MARK: Unions
@@ -943,21 +1003,19 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 std::pair<AccessorDecl *, AccessorDecl *>
 SwiftDeclSynthesizer::makeUnionFieldAccessors(
     NominalTypeDecl *importedUnionDecl, VarDecl *importedFieldDecl) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = importedFieldDecl->getASTContext();
 
-  auto getterDecl =
-      makeFieldGetterDecl(ImporterImpl, importedUnionDecl, importedFieldDecl);
+  auto getterDecl = makeFieldGetterDecl(importedUnionDecl, importedFieldDecl);
   getterDecl->setBodySynthesizer(synthesizeUnionFieldGetterBody,
                                  importedFieldDecl);
   getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  auto setterDecl =
-      makeFieldSetterDecl(ImporterImpl, importedUnionDecl, importedFieldDecl);
+  auto setterDecl = makeFieldSetterDecl(importedUnionDecl, importedFieldDecl);
   setterDecl->setBodySynthesizer(synthesizeUnionFieldSetterBody,
                                  importedFieldDecl);
   setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
   return {getterDecl, setterDecl};
 }
 
@@ -976,7 +1034,7 @@ getAccessorDeclarationName(clang::ASTContext &Ctx, NominalTypeDecl *structDecl,
 std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
     clang::RecordDecl *structDecl, NominalTypeDecl *importedStructDecl,
     clang::FieldDecl *fieldDecl, VarDecl *importedFieldDecl) {
-  clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
+  clang::ASTContext &Ctx = structDecl->getASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
   auto recordType = Ctx.getRecordType(structDecl);
@@ -997,8 +1055,8 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   cGetterDecl->setImplicitlyInline();
   assert(!cGetterDecl->isExternallyVisible());
 
-  auto getterDecl = makeFieldGetterDecl(ImporterImpl, importedStructDecl,
-                                        importedFieldDecl, cGetterDecl);
+  auto getterDecl =
+      makeFieldGetterDecl(importedStructDecl, importedFieldDecl, cGetterDecl);
 
   // Setter: static inline void set(FieldType newValue, RecordType *self);
   SmallVector<clang::QualType, 8> cSetterParamTypes;
@@ -1019,10 +1077,10 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   cSetterDecl->setImplicitlyInline();
   assert(!cSetterDecl->isExternallyVisible());
 
-  auto setterDecl = makeFieldSetterDecl(ImporterImpl, importedStructDecl,
-                                        importedFieldDecl, cSetterDecl);
+  auto setterDecl =
+      makeFieldSetterDecl(importedStructDecl, importedFieldDecl, cSetterDecl);
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   // Synthesize the getter body
   {
@@ -1181,17 +1239,15 @@ std::pair<AccessorDecl *, AccessorDecl *>
 SwiftDeclSynthesizer::makeIndirectFieldAccessors(
     const clang::IndirectFieldDecl *indirectField, ArrayRef<VarDecl *> members,
     NominalTypeDecl *importedStructDecl, VarDecl *importedFieldDecl) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = importedStructDecl->getASTContext();
 
-  auto getterDecl =
-      makeFieldGetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
+  auto getterDecl = makeFieldGetterDecl(importedStructDecl, importedFieldDecl);
   getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  auto setterDecl =
-      makeFieldSetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
+  auto setterDecl = makeFieldSetterDecl(importedStructDecl, importedFieldDecl);
   setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
+  importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   auto containingField = indirectField->chain().front();
   VarDecl *anonymousFieldDecl = nullptr;
@@ -1268,7 +1324,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *
 SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
-  ASTContext &C = ImporterImpl.SwiftContext;
+  ASTContext &C = enumDecl->getASTContext();
   auto rawTy = enumDecl->getRawType();
 
   auto param = new (C) ParamDecl(SourceLoc(), SourceLoc(), C.Id_rawValue,
@@ -1344,7 +1400,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
 // cast in order to preserve unknown or future cases from C.
 void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
                                                   VarDecl *rawValueDecl) {
-  ASTContext &C = ImporterImpl.SwiftContext;
+  ASTContext &C = enumDecl->getASTContext();
 
   auto rawTy = enumDecl->getRawType();
 
@@ -1365,71 +1421,7 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
 
   getterDecl->copyFormalAccessFrom(enumDecl);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
-  ImporterImpl.makeComputed(rawValueDecl, getterDecl, nullptr);
-}
-
-// MARK: Struct RawValue getters
-
-/// Synthesizer for the rawValue getter for an imported struct.
-static std::pair<BraceStmt *, bool>
-synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
-  auto getterDecl = cast<AccessorDecl>(afd);
-  VarDecl *storedVar = static_cast<VarDecl *>(context);
-
-  ASTContext &ctx = getterDecl->getASTContext();
-  auto *selfDecl = getterDecl->getImplicitSelfDecl();
-  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                       /*implicit*/ true);
-  selfRef->setType(selfDecl->getTypeInContext());
-
-  auto storedType = storedVar->getInterfaceType();
-  auto storedRef = new (ctx)
-      MemberRefExpr(selfRef, SourceLoc(), storedVar, DeclNameLoc(),
-                    /*Implicit=*/true, AccessSemantics::DirectToStorage);
-  storedRef->setType(storedType);
-
-  Expr *result = storedRef;
-
-  Type computedType = getterDecl->getResultInterfaceType();
-  if (!computedType->isEqual(storedType)) {
-    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
-    bridge->setType(computedType);
-
-    result = CoerceExpr::createImplicit(ctx, bridge, computedType);
-  }
-
-  auto ret = ReturnStmt::createImplicit(ctx, result);
-  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                /*implicit*/ true);
-  return {body, /*isTypeChecked=*/true};
-}
-
-AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
-    StructDecl *structDecl, VarDecl *computedVar, VarDecl *storedVar) {
-  assert(storedVar->hasStorage());
-
-  ASTContext &C = ImporterImpl.SwiftContext;
-
-  auto *params = ParameterList::createEmpty(C);
-
-  auto computedType = computedVar->getInterfaceType();
-
-  auto getterDecl = AccessorDecl::create(
-      C,
-      /*declLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
-      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      params, computedType, structDecl);
-  getterDecl->setImplicit();
-  getterDecl->setIsObjC(false);
-  getterDecl->setIsDynamic(false);
-  getterDecl->setIsTransparent(false);
-
-  getterDecl->copyFormalAccessFrom(structDecl);
-  getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
-  return getterDecl;
+  importer::makeComputed(rawValueDecl, getterDecl, nullptr);
 }
 
 // MARK: ObjC subscripts
@@ -1437,7 +1429,7 @@ AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
 AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
     SubscriptDecl *subscript, const FuncDecl *getter, Type elementTy,
     DeclContext *dc, ParamDecl *index) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = subscript->getASTContext();
   auto loc = getter->getLoc();
 
   auto *params = ParameterList::create(C, index);
@@ -1466,7 +1458,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
 AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
     SubscriptDecl *subscript, const FuncDecl *setter, Type elementInterfaceTy,
     DeclContext *dc, ParamDecl *index) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = subscript->getASTContext();
   auto loc = setter->getLoc();
 
   // Objective-C subscript setters are imported with a function type
@@ -1689,7 +1681,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
 
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = getterImpl->getASTContext();
 
   assert(getterImpl->getParameters()->size() == 1 &&
          "subscript can only have 1 parameter");
@@ -1755,10 +1747,10 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(subscript, getterDecl, setterDecl);
+  importer::makeComputed(subscript, getterDecl, setterDecl);
 
   // Implicitly unwrap Optional types for T *operator[].
-  ImporterImpl.recordImplicitUnwrapForDecl(
+  importer::recordImplicitUnwrapForDecl(
       subscript, getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
@@ -1771,10 +1763,10 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                                                       FuncDecl *setter) {
   assert((getter || setter) &&
          "getter or setter required to generate a pointee property");
-  auto &ctx = ImporterImpl.SwiftContext;
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
+  auto &ctx = getterImpl->getASTContext();
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1860,7 +1852,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
+  importer::makeComputed(result, getterDecl, setterDecl);
   return result;
 }
 
@@ -1929,7 +1921,7 @@ synthesizeSuccessorFuncBody(AbstractFunctionDecl *afd, void *context) {
 }
 
 FuncDecl *SwiftDeclSynthesizer::makeSuccessorFunc(FuncDecl *incrementFunc) {
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = incrementFunc->getASTContext();
   auto dc = incrementFunc->getDeclContext();
 
   auto returnTy = incrementFunc->getImplicitSelfDecl()->getInterfaceType();
@@ -2011,12 +2003,15 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 }
 
 clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
-    const clang::CXXRecordDecl *derivedClass,
+    ASTContext &ctx, const clang::CXXRecordDecl *derivedClass,
     const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
     ForwardingMethodKind forwardingMethodKind,
     ReferenceReturnTypeBehaviorForBaseMethodSynthesis
         referenceReturnTypeBehavior,
     bool forceConstQualifier) {
+
+  auto &ImporterImpl =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader())->Impl;
 
   auto &clangCtx = ImporterImpl.getClangASTContext();
   auto &clangSema = ImporterImpl.getClangSema();
@@ -2200,7 +2195,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   assert(opKind != clang::OverloadedOperatorKind::OO_None &&
          "expected a C++ operator");
 
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = operatorMethod->getASTContext();
   auto opName = clang::getOperatorSpelling(opKind);
   auto paramList = operatorMethod->getParameters();
   auto genericParamList = operatorMethod->getGenericParams();
@@ -2266,47 +2261,6 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   return topLevelStaticFuncDecl;
 }
 
-// MARK: C++ virtual methods
-
-FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
-    const clang::CXXMethodDecl *clangMethodDecl) {
-  auto clangDC = clangMethodDecl->getParent();
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  assert(!clangMethodDecl->isStatic() &&
-         "C++ virtual functions cannot be static");
-
-  auto newMethod = synthesizeCXXForwardingMethod(
-      clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Virtual,
-      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
-      /*forceConstQualifier*/ false);
-
-  auto result = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
-  return result;
-}
-
-// MARK: C++ operators
-
-FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
-    const clang::CXXMethodDecl *clangMethodDecl) {
-  auto clangDC = clangMethodDecl->getParent();
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  assert(clangMethodDecl->isStatic() && "Expected a static operator");
-
-  auto newMethod = synthesizeCXXForwardingMethod(
-      clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Base,
-      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
-      /*forceConstQualifier*/ true);
-  newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
-      clangMethodDecl->getASTContext(), "callAsFunction"));
-
-  auto result = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
-  return result;
-}
-
 // MARK: C++ properties
 
 static std::pair<BraceStmt *, bool>
@@ -2345,7 +2299,7 @@ synthesizeComputedSetterFromCXXMethod(AbstractFunctionDecl *afd,
 VarDecl *
 SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                                          FuncDecl *setter) {
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = getter->getASTContext();
   auto dc = getter->getDeclContext();
 
   assert(isa<clang::CXXMethodDecl>(getter->getClangDecl()) &&
@@ -2411,7 +2365,7 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
     }
   }
 
-  ImporterImpl.makeComputed(result, getterDecl, setterDecl);
+  importer::makeComputed(result, getterDecl, setterDecl);
 
   return result;
 }
@@ -2481,43 +2435,39 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
-CallExpr *
-SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
-                                          const swift::Type &swiftParamTy,
-                                          SourceLoc paramLoc) {
+std::tuple<FuncDecl *, CallExpr *> SwiftDeclSynthesizer::makeDefaultArgument(
+    const clang::ParmVarDecl *param, const swift::Type &swiftParamTy,
+    SourceLoc paramLoc, DeclContext *funcDC) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
   if (!param->getIdentifier())
     // Work around an assertion failure in CXXNameMangler::mangleUnqualifiedName
     // when mangling std::__fs::filesystem::path::format.
-    return nullptr;
+    return {nullptr, nullptr};
 
-  ASTContext &ctx = ImporterImpl.SwiftContext;
+  ASTContext &ctx = swiftParamTy->getASTContext();
   clang::ASTContext &clangCtx = param->getASTContext();
   auto clangFunc =
       cast<clang::FunctionDecl>(param->getParentFunctionOrMethod());
   if (isa<clang::CXXConstructorDecl>(clangFunc))
     // TODO: support default arguments of constructors
     // (https://github.com/apple/swift/issues/70124)
-    return nullptr;
+    return {nullptr, nullptr};
 
   std::string s;
   llvm::raw_string_ostream os(s);
   std::unique_ptr<clang::ItaniumMangleContext> mangler{
       clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
   os << "__defaultArg_" << param->getFunctionScopeIndex() << "_";
-  ImporterImpl.getMangledName(mangler.get(), clangFunc, os);
+  importer::getMangledName(mangler.get(), clangFunc, os);
 
   // Synthesize `func __defaultArg_XYZ() -> ParamTy { ... }`.
   DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
                     ParameterList::createEmpty(ctx));
   auto funcDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, funcName, paramLoc, false, false, Type(),
-      {}, ParameterList::createEmpty(ctx), swiftParamTy,
-      ImporterImpl.ImportedHeaderUnit);
+      {}, ParameterList::createEmpty(ctx), swiftParamTy, funcDC);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
-
-  ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
   auto declRefExpr = new (ctx)
       DeclRefExpr(ConcreteDeclRef(funcDecl), DeclNameLoc(), /*Implicit*/ true);
@@ -2529,17 +2479,16 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   callExpr->setType(funcDecl->getResultInterfaceType());
   callExpr->setThrows(nullptr);
 
-  return callExpr;
+  return {funcDecl, callExpr};
 }
 
 // MARK: C++ foreign reference type constructors
 
 clang::CXXMethodDecl *
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
-    const clang::CXXRecordDecl *cxxRecordDecl) {
+    clang::Sema &clangSema, const clang::CXXRecordDecl *cxxRecordDecl) {
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
-  clang::Sema &clangSema = ImporterImpl.getClangSema();
 
   clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
 

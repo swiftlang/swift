@@ -612,10 +612,6 @@ public:
     return Instance.get();
   }
 
-  /// Writes the mangled name of \p clangDecl to \p os.
-  void getMangledName(clang::MangleContext *mangler,
-                      const clang::NamedDecl *clangDecl, raw_ostream &os);
-
   /// Whether the C++ interoperability compatibility version is at least
   /// 'major'.
   ///
@@ -876,25 +872,6 @@ public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
                          ImportPath::Module path);
-
-  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
-    if (!isIUO)
-      return;
-
-#if !defined(NDEBUG)
-    Type ty;
-    if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-      ty = FD->getResultInterfaceType();
-    } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      ty = CD->getResultInterfaceType();
-    } else {
-      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
-    }
-    assert(ty->getOptionalObjectType());
-#endif
-
-    decl->setImplicitlyUnwrappedOptional(true);
-  }
 
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
@@ -1213,13 +1190,15 @@ public:
   void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
                                Type underlyingType);
 
+  /// Add a synthesized typealias to the given nominal type, and record the
+  /// underlying type as a raw type.
+  void recordRawType(NominalTypeDecl *nominal, Identifier name,
+                     Type underlyingType);
+
   void addSynthesizedProtocolAttrs(
       NominalTypeDecl *nominal,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
       bool isUnchecked = false);
-
-  void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
-                    AccessorDecl *setter);
 
   /// Retrieve the standard library module.
   ModuleDecl *getStdlibModule();
@@ -1896,6 +1875,15 @@ public:
 };
 
 namespace importer {
+/// Writes the mangled name of \p clangDecl to \p os.
+void getMangledName(clang::MangleContext *mangler,
+                    const clang::NamedDecl *clangDecl, raw_ostream &os);
+
+/// Make \a storage a computed property with the given \a getter and \a setter.
+///
+/// \a getter must be non-null.
+void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                  AccessorDecl *setter);
 
 /// Returns true if the given C/C++ record should be imported as a reference
 /// type into Swift.
@@ -1905,6 +1893,9 @@ bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
 bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+/// Set \a decl as an implicitly unwrapped optional if \a isUIO.
+void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO);
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
@@ -2082,7 +2073,6 @@ bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
-
 } // end namespace importer
 } // end namespace swift
 
