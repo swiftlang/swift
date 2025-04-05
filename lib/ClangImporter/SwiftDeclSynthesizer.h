@@ -251,7 +251,7 @@ public:
   ///
   /// Unlike a standard init(rawValue:) enum initializer, this does a
   /// reinterpret cast in order to preserve unknown or future cases from C.
-  void makeEnumRawValueGetter(EnumDecl *enumDecl, VarDecl *rawValueDecl);
+  static void makeEnumRawValueGetter(EnumDecl *enumDecl, VarDecl *rawValueDecl);
 
   /// Build a declaration for an Objective-C subscript getter.
   static AccessorDecl *buildSubscriptGetterDecl(SubscriptDecl *subscript,

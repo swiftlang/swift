@@ -1416,7 +1416,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
 // cast in order to preserve unknown or future cases from C.
 void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
                                                   VarDecl *rawValueDecl) {
-  ASTContext &C = ImporterImpl.SwiftContext;
+  ASTContext &C = enumDecl->getASTContext();
 
   auto rawTy = enumDecl->getRawType();
 

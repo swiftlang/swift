@@ -1813,7 +1813,7 @@ namespace {
             C, StaticSpellingKind::None, varPattern, /*InitExpr*/ nullptr,
             enumDecl);
 
-        synthesizer.makeEnumRawValueGetter(enumDecl, rawValue);
+        SwiftDeclSynthesizer::makeEnumRawValueGetter(enumDecl, rawValue);
 
         enumDecl->addMember(rawValueConstructor);
         enumDecl->addMember(rawValue);
