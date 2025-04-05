@@ -87,6 +87,7 @@ sil @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
 sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
 sil @closure : $@convention(thin) (@inout_aliasable Klass) -> ()
+sil @lendC : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
 sil @useC : $@convention(thin) (@guaranteed C) -> () {
 [global:]
 }
@@ -2201,4 +2202,21 @@ bb2:
 bb3:
   %r = tuple ()
   return %r
+}
+
+
+// CHECK-LABEL: sil [ossa] @keep_yield2ed_copy : {{.*}} {
+// CHECK:         copy_value
+// CHECK:       } // end sil function 'keep_yield2ed_copy'
+sil [ossa] @keep_yield2ed_copy : $@convention(thin) () -> () {
+  %lendC = function_ref @lendC : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
+  (%c, %token, %alloc) = begin_apply %lendC()  : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
+  %copy = copy_value %c : $C
+  end_apply %token as $()
+  dealloc_stack %alloc : $*Builtin.SILToken
+  %useC = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  apply %useC(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %copy : $C
+  %retval = tuple ()
+  return %retval : $()
 }
