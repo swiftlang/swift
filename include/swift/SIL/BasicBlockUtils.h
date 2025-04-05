@@ -158,6 +158,9 @@ void findJointPostDominatingSet(
 bool checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock);
 #endif
 
+void findLoopHeaders(SmallPtrSetImpl<SILBasicBlock *> &loopHeaders,
+                     SILFunction *func);
+
 /// Walk depth-first the region backwards reachable from the provided roots
 /// constrained by \p region's \p isInRegion member function.
 ///
