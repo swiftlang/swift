@@ -402,27 +402,10 @@ GlobalActorAttributeRequest::evaluate(
   if (decl->getDeclContext()->getParentSourceFile() == nullptr)
     return result;
 
-  auto isStoredInstancePropertyOfStruct = [](VarDecl *var) {
-    if (var->isStatic() || !var->isOrdinaryStoredProperty())
-      return false;
+  auto *const globalActorAttr = result->first;
 
-    auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl();
-    return isa_and_nonnull<StructDecl>(nominal) &&
-           !isWrappedValueOfPropWrapper(var);
-  };
-
-  auto globalActorAttr = result->first;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    // Nominal types are okay...
-    if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
-      if (classDecl->isActor()) {
-        // ... except for actors.
-        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
-            .highlight(globalActorAttr->getRangeWithAt());
-        return std::nullopt;
-      }
-    }
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+  const auto isGlobalActorAnErrorOnStorage = [&](AbstractStorageDecl *storage,
+                                                 bool diagnose) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
 
@@ -431,66 +414,75 @@ GlobalActorAttributeRequest::evaluate(
           (var->getDeclContext()->isAsyncContext() ||
            var->getASTContext().LangOpts.StrictConcurrencyLevel >=
              StrictConcurrency::Complete)) {
-        var->diagnose(diag::global_actor_top_level_var)
-            .highlight(globalActorAttr->getRangeWithAt());
-        return std::nullopt;
+        if (diagnose) {
+          var->diagnose(diag::global_actor_top_level_var)
+              .highlight(globalActorAttr->getRangeWithAt());
+        }
+        return true;
       }
 
       // ... and not if it's local property
       if (var->getDeclContext()->isLocalContext()) {
-        var->diagnose(diag::global_actor_on_local_variable, var->getName())
+        if (diagnose) {
+          var->diagnose(diag::global_actor_on_local_variable, var->getName())
+              .highlight(globalActorAttr->getRangeWithAt());
+        }
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    // Nominal types are okay...
+    if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+      if (classDecl->isActor()) {
+        // ... except for actors.
+        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return std::nullopt;
       }
     }
-  } else if (isa<ExtensionDecl>(decl)) {
-    // Extensions are okay.
-  } else if (isa<ConstructorDecl>(decl) || isa<FuncDecl>(decl) ||
-             isa<DestructorDecl>(decl)) {
-    // None of the accessors/addressors besides a getter are allowed
-    // to have a global actor attribute.
-    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
-      if (!accessor->isGetter()) {
-        decl->diagnose(diag::global_actor_disallowed,
-                       decl->getDescriptiveKind())
-            .warnUntilSwiftVersion(6)
-            .fixItRemove(globalActorAttr->getRangeWithAt());
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (isGlobalActorAnErrorOnStorage(storage, /*diagnose=*/true)) {
+      return std::nullopt;
+    }
+  } else if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto &diags = decl->getASTContext().Diags;
 
-        auto &ctx = decl->getASTContext();
-        auto *storage = accessor->getStorage();
-        // Let's suggest to move the attribute to the storage if
-        // this is an accessor/addressor of a property of subscript.
-        if (storage->getDeclContext()->isTypeContext()) {
-          auto canMoveAttr = [&]() {
-            // If enclosing declaration has a global actor,
-            // skip the suggestion.
-            if (storage->getGlobalActorAttr())
-              return false;
+    // Complain about a global actor attribute on an accessor.
+    const auto isError =
+        diags
+            .diagnose(accessor->getLoc(), diag::global_actor_disallowed,
+                      decl->getDescriptiveKind())
+            .warnUntilSwiftVersion(accessor->isGetter() ? 7 : 6)
+            .isError();
 
-            // Global actor attribute cannot be applied to
-            // an instance stored property of a struct.
-            if (auto *var = dyn_cast<VarDecl>(storage)) {
-              return !isStoredInstancePropertyOfStruct(var);
-            }
+    auto *storage = accessor->getStorage();
 
-            return true;
-          };
-
-          if (canMoveAttr()) {
-            decl->diagnose(diag::move_global_actor_attr_to_storage_decl,
-                           storage)
-                .fixItInsert(
-                    storage->getAttributeInsertionLoc(/*forModifier=*/false),
-                    llvm::Twine("@", result->second->getNameStr()).str());
-          }
-        }
-
-        // In Swift 6, once the diag above is an error, it is disallowed.
-        if (ctx.isSwiftVersionAtLeast(6))
-          return std::nullopt;
+    // Suggest to move the attribute to the storage if it is legal and the
+    // storage does not specify some kind of explicit isolation.
+    if (!isGlobalActorAnErrorOnStorage(storage, /*diagnose=*/false)) {
+      auto storageIsolation = getInferredActorIsolation(storage);
+      if (storageIsolation.source.kind != IsolationSource::Explicit) {
+        diags
+            .diagnose(accessor->getLoc(),
+                      diag::move_global_actor_attr_to_storage_decl, storage)
+            .highlight(globalActorAttr->getRangeWithAt())
+            .fixItRemove(globalActorAttr->getRangeWithAt())
+            .fixItInsertAttribute(storage->getAttributeInsertionLoc(
+                                      globalActorAttr->isDeclModifier()),
+                                  globalActorAttr);
       }
     }
-    // Functions are okay.
+
+    // Fail if we emitted an error.
+    if (isError)
+      return std::nullopt;
+
+  } else if (isa<ExtensionDecl>(decl) || isa<AbstractFunctionDecl>(decl)) {
+    // Other functions and extensions are okay.
   } else {
     // Everything else is disallowed.
     decl->diagnose(diag::global_actor_disallowed, decl->getDescriptiveKind());
@@ -5470,9 +5462,11 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
 /// Check rules related to global actor attributes on a class declaration.
 ///
 /// \returns true if an error occurred.
-static bool checkClassGlobalActorIsolation(
-    ClassDecl *classDecl, ActorIsolation isolation) {
-  assert(isolation.isGlobalActor());
+static bool checkClassIsolation(ClassDecl *classDecl,
+                                ActorIsolation isolation) {
+  if (!isolation.isGlobalActor()) {
+    return false;
+  }
 
   // A class can only be annotated with a global actor if it has no
   // superclass, the superclass is annotated with the same global actor, or
@@ -5843,6 +5837,32 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
 
+/// Check that a global actor isolation on an accessor does not conflict with
+/// the storage's isolation.
+static void checkAccessorIsolation(const AccessorDecl *accessor,
+                                   const ActorIsolation &isolation) {
+  if (!isolation.isGlobalActor()) {
+    return;
+  }
+
+  auto *storage = accessor->getStorage();
+  auto storageIsolation = getInferredActorIsolation(storage);
+
+  if (isolation == storageIsolation.isolation) {
+    return;
+  }
+
+  auto *attr = accessor->getGlobalActorAttr().value().first;
+
+  // Complain about the isolation mismatch.
+  accessor
+      ->diagnose(diag::actor_isolation_accessor_vs_storage_mismatch, isolation,
+                 accessor, storageIsolation.isolation,
+                 storageIsolation.source.kind == IsolationSource::Explicit,
+                 storage)
+      .highlight(attr->getRangeWithAt());
+}
+
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -5908,8 +5928,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
         if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
                            mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
+          fd->diagnose(diag::main_function_must_be_mainActor);
         }
       }
       return {
@@ -5919,17 +5938,27 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     }
   }
 
-  // If this declaration has one of the actor isolation attributes, report
-  // that.
+  // If this declaration has one of the actor isolation attributes, consider
+  // reporting that.
   if (isolationFromAttr) {
-    // Classes with global actors have additional rules regarding inheritance.
-    if (isolationFromAttr->isGlobalActor()) {
-      if (auto classDecl = dyn_cast<ClassDecl>(value))
-        checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
+    auto *accessor = dyn_cast<AccessorDecl>(value);
+    if (!accessor) {
+      // Classes with global actors have additional rules regarding inheritance.
+      if (auto classDecl = dyn_cast<ClassDecl>(value)) {
+        checkClassIsolation(classDecl, *isolationFromAttr);
+      }
+
+      return {*isolationFromAttr,
+              IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
     }
 
-    return {*isolationFromAttr,
-            IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
+    checkAccessorIsolation(accessor, *isolationFromAttr);
+    // Proceed to grab the storage's isolation.
+  }
+
+  // For an accessor, use the actor isolation of its storage declaration.
+  if (auto *accessor = dyn_cast<AccessorDecl>(value)) {
+    return getInferredActorIsolation(accessor->getStorage());
   }
 
   InferredActorIsolation defaultIsolation;
@@ -6043,12 +6072,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
         };
       }
     }
-  }
-
-  // If this is an accessor, use the actor isolation of its storage
-  // declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    return getInferredActorIsolation(accessor->getStorage());
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
@@ -6173,10 +6196,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
       if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-        return {
-          inferredIsolation(*isolationFromAttr, onlyGlobal),
-          IsolationSource(ext, IsolationSource::Explicit)
-        };
+        return {inferredIsolation(*isolationFromAttr, onlyGlobal),
+                IsolationSource(ext, IsolationSource::LexicalContext)};
       }
     }
 
@@ -6196,8 +6217,15 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
           isolation = ActorIsolation::forCallerIsolationInheriting();
         }
 
-        return {inferredIsolation(isolation, onlyGlobal),
-                selfTypeIsolation.source};
+        // If the type context has explicit isolation, this one is inferred from
+        // context.
+        auto isolationSource = selfTypeIsolation.source;
+        if (isolationSource.kind == IsolationSource::Explicit) {
+          isolationSource =
+              IsolationSource(selfTypeDecl, IsolationSource::LexicalContext);
+        }
+
+        return {inferredIsolation(isolation, onlyGlobal), isolationSource};
       }
     }
   }

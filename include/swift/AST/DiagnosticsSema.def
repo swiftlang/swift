@@ -6027,6 +6027,11 @@ ERROR(actor_isolation_override_mismatch,none,
 ERROR(actor_isolation_superclass_mismatch,none,
       "%0 class %1 has different actor isolation from %2 superclass %3",
       (ActorIsolation, const ClassDecl *, ActorIsolation, const ClassDecl *))
+ERROR(actor_isolation_accessor_vs_storage_mismatch,none,
+      "%0 %1 must match the isolation of the %select{implicitly |}3"
+      "%2 %kindonly4",
+      (ActorIsolation, const AccessorDecl *, ActorIsolation,
+       /*isStorageIsolationExplicit*/bool, const AbstractStorageDecl *))
 
 ERROR(async_decl_must_be_available_from_async,none,
         "asynchronous %0 must be available from asynchronous contexts",

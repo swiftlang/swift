@@ -437,6 +437,11 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   return *this;
 }
 
+bool InFlightDiagnostic::isError() const {
+  return Engine->getActiveDiagnostic().getBehaviorLimit() ==
+         DiagnosticBehavior::Error;
+}
+
 InFlightDiagnostic &
 InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
   Engine->getActiveDiagnostic().setBehaviorLimit(limit);

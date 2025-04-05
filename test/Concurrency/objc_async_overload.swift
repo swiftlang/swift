@@ -54,6 +54,7 @@ extension Delegate {
 @MainActor class C {
   func finish() { }
   // expected-note@-1 {{calls to instance method 'finish()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from enclosing context}}
 
   func handle(_ req: Request, with delegate: Delegate) {
     delegate.makeRequest1(req) {

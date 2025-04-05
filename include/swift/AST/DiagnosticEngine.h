@@ -43,6 +43,7 @@ class Type;
 }
 
 namespace swift {
+  class AccessorDecl;
   class ConstructorDecl;
   class ClosureExpr;
   class Decl;
@@ -708,6 +709,9 @@ namespace swift {
     /// Returns the \c SourceManager associated with \c SourceLoc s for this
     /// diagnostic.
     SourceManager &getSourceManager();
+
+    /// Returns whether this diagnostic is set to behave as an error.
+    bool isError() const;
 
     /// Prevent the diagnostic from behaving more severely than \p limit. For
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
