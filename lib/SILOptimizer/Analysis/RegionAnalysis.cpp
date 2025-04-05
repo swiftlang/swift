@@ -868,10 +868,16 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
 RegionAnalysisValueMap::UnderlyingTrackedValueInfo
 RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
-  // Before a check if the value we are attempting to access is Sendable. In
-  // such a case, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value))
-    return UnderlyingTrackedValueInfo(value);
+  do {
+    auto *di = value->getDefiningInstruction();
+    if (di && isStaticallyLookThroughInst(di) && value->getType().isAddress())
+      break;
+
+    // Before a check if the value we are attempting to access is Sendable. In
+    // such a case, just return early.
+    if (!SILIsolationInfo::isNonSendableType(value))
+      return UnderlyingTrackedValueInfo(value);
+  } while (false);
 
   // Look through a project_box, so that we process it like its operand object.
   if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
@@ -2539,11 +2545,15 @@ public:
     auto trackableDest = tryToTrackValue(dest);
     if (!trackableDest)
       return;
+
+    if (requireOperands) {
+      builder.addRequire(trackableDest->getRepresentative().getValue());
+    }
+
     for (Operand *op : srcCollection) {
       if (auto trackableSrc = tryToTrackValue(op->get())) {
         if (requireOperands) {
           builder.addRequire(trackableSrc->getRepresentative().getValue());
-          builder.addRequire(trackableDest->getRepresentative().getValue());
         }
         builder.addMerge(trackableDest->getRepresentative().getValue(), op);
       }
