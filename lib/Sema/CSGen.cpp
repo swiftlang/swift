@@ -1723,9 +1723,15 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
-      auto paramType = CS.DC->mapTypeIntoContext(ty);
-      E->setParamType(paramType);
+      auto declRefRepr = cast<DeclRefTypeRepr>(E->getRepr());
+      auto resolvedTy = resolveTypeReferenceInExpression(declRefRepr,
+                                                         TypeResolverContext::InExpression,
+                                                         CS.getConstraintLocator(E));
+
+      if (!resolvedTy || resolvedTy->hasError())
+        return Type();
+
+      E->setParamType(resolvedTy);
       return E->getParamDecl()->getValueType();
     }
 
