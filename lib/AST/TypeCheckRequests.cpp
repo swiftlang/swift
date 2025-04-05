@@ -2745,6 +2745,23 @@ void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
 }
 
 //----------------------------------------------------------------------------//
+// PatternBindingCaptureInfoRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<CaptureInfo>
+PatternBindingCaptureInfoRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  return PBD->getPatternList()[idx].getCachedCaptureInfo();
+}
+
+void PatternBindingCaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setCaptureInfo(info);
+}
+
+//----------------------------------------------------------------------------//
 // SemanticAvailableAttrRequest computation.
 //----------------------------------------------------------------------------//
 

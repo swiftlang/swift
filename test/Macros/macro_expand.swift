@@ -63,6 +63,9 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 
 #endif
 
+@freestanding(declaration, names: named(storedProperty))
+public macro AddStoredProperty<T>(_ x: T) = #externalMacro(module: "MacroDefinition", type: "StoredPropertyMacro")
+
 #if TEST_DIAGNOSTICS
 @freestanding(declaration)
 macro NotCovered() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
@@ -72,7 +75,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX70_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-5]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }
@@ -126,6 +129,11 @@ struct Bad {}
 // CHECK-DIAGS: typealias _ImageLiteralType = Void
 // CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
 // CHECK-DIAGS: END CONTENTS OF FILE
+
+class HasStoredPropertyClassInvalid {
+  #AddStoredProperty((Self.self, 0).1) // expected-note {{in expansion of macro 'AddStoredProperty' here}}
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-2]]_2_33_{{.*}}AddStoredPropertyfMf_.swift:1:22: error: covariant 'Self' type cannot be referenced from a stored property initializer
+}
 #endif
 
 @freestanding(declaration)
@@ -138,7 +146,7 @@ macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "Fa
 func invalidDeclarationMacro() {
   #accidentalCodeItem
   // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX138_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-3]]_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
@@ -681,3 +689,11 @@ func invalidDeclarationMacro2() {
   }
 }
 #endif
+
+// Make sure we compute captures for the introduced stored property here.
+struct HasStoredProperty {
+  #AddStoredProperty(0)
+}
+class HasStoredPropertyClass {
+  #AddStoredProperty(0)
+}

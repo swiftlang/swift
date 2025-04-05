@@ -619,6 +619,9 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeExpr(init, initContext);
   }
+
+  // Compute captures in case diagnostics are emitted.
+  (void)binding->getCaptureInfo(i);
 }
 
 Expr *PatternBindingCheckedAndContextualizedInitRequest::evaluate(

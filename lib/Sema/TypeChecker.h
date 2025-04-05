@@ -798,9 +798,6 @@ bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
 
-/// Check for invalid captures from stored property initializers.
-void checkPatternBindingCaptures(IterableDeclContext *DC);
-
 /// Update the DeclContexts for AST nodes in a given DeclContext. This is
 /// necessary after type-checking since autoclosures may have been introduced.
 void contextualizeExpr(Expr *E, DeclContext *DC);
