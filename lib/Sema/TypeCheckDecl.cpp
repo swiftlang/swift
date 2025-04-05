@@ -3033,11 +3033,14 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic, we're done: it's a pass-through alias.
   if (!nominalSig) return true;
 
-  // Check that the type parameters are the same the whole way through.
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
+
+  // Check for inferred types.
   if (nominalGenericParams.size() != typealiasGenericParams.size())
-    return false;
+    return isTypeInferredByTypealias(typealias, nominal);
+
+  // Check that the type parameters are the same the whole way through.
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
                   typealiasGenericParams.begin(),
                   [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
@@ -3054,6 +3057,38 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   }
 
   return false;
+}
+
+bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
+                                            NominalTypeDecl *nominal) {
+  bool isInferredType = false;
+  auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
+                                     .getPointer()
+                                     ->getAs<BoundGenericType>()
+                                     ->getGenericArgs();
+  auto typealiasGenericArguments = typealias->getUnderlyingType()
+                                       .getPointer()
+                                       ->getAs<BoundGenericType>()
+                                       ->getGenericArgs();
+
+  for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
+    auto nominalBoundGenericType = nominalGenericArguments[i];
+    auto typealiasBoundGenericType = typealiasGenericArguments[i];
+    if (nominalBoundGenericType.getPointer()->getKind() ==
+        typealiasBoundGenericType.getPointer()->getKind()) {
+      continue;
+    }
+
+    if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr &&
+        dyn_cast<StructType>(typealiasBoundGenericType) != nullptr) {
+      isInferredType = true;
+    } else {
+      isInferredType = false;
+      break;
+    }
+  }
+
+  return isInferredType;
 }
 
 Type
