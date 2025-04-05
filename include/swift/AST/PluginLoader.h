@@ -52,10 +52,17 @@ private:
   /// Get or lazily create and populate 'PluginMap'.
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
+  /// Resolved plugin path remappings.
+  std::vector<std::string> PathRemap;
+
 public:
   PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker,
+               std::optional<std::vector<std::string>> Remap = std::nullopt,
                bool disableSandbox = false)
-      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {}
+      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {
+    if (Remap)
+      PathRemap = std::move(*Remap);
+  }
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();

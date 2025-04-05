@@ -878,6 +878,7 @@ bool CompilerInstance::setUpPluginLoader() {
   /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
   auto loader = std::make_unique<PluginLoader>(
       *Context, getDependencyTracker(),
+      Invocation.getFrontendOptions().CacheReplayPrefixMap,
       Invocation.getFrontendOptions().DisableSandbox);
   Context->setPluginLoader(std::move(loader));
   return false;

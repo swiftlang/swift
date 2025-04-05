@@ -2263,6 +2263,10 @@ def load_resolved_plugin:
            "and exectuable path can be empty if not used">,
   MetaVarName<"<library-path>#<executable-path>#<module-names>">;
 
+def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,
+                                   Flags<[FrontendOption, NoDriverOption]>,
+                                   HelpText<"verify resolved plugins">;
+
 def in_process_plugin_server_path : Separate<["-"], "in-process-plugin-server-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Path to dynamic library plugin server">;
