@@ -1,8 +1,8 @@
-//===--- DerivedConformanceCodable.cpp - Derived Codable ------------------===//
+//===--- DerivedConformanceCodable.cpp --------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformance.h"
 #include "TypeChecker.h"
-#include "llvm/ADT/STLExtras.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -28,7 +28,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
-#include "DerivedConformances.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
