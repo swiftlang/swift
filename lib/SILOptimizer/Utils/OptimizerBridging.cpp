@@ -530,10 +530,7 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, Bri
   static_assert((int)DynamicCastFeasibility::WillFail    == (int)BridgedDynamicCastResult::willFail);
 
   return static_cast<BridgedDynamicCastResult>(
-    classifyDynamicCast(function.getFunction()->getModule().getSwiftModule(),
-                        sourceTy.unbridged(),
-                        destTy.unbridged(),
-                        sourceTypeIsExact));
+    classifyDynamicCast(function.getFunction(), sourceTy.unbridged(), destTy.unbridged(), sourceTypeIsExact));
 }
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst) {
