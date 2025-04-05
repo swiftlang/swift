@@ -13,7 +13,7 @@
 #include "TypeCheckDistributed.h"
 
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
