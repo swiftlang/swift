@@ -19,6 +19,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -4038,18 +4039,46 @@ private:
 
 public:
   void diagnoseUnmatchedRequirements() {
+    auto ext = dyn_cast<ExtensionDecl>(decl);
+    if (!ext)
+      return;
+
+    llvm::SmallString<128> stubs;
+    llvm::raw_svector_ostream stubStream(stubs);
+
+    unsigned numEmitted = 0;
+
     for (auto req : unmatchedRequirements) {
       // Ignore `@optional` protocol requirements.
       if (isOptionalObjCProtocolRequirement(req))
         continue;
 
-      auto ext = cast<IterableDeclContext>(req->getDeclContext()->getAsDecl())
-                        ->getImplementationContext();
+      if (numEmitted == 0) {
+        // Emit overall diagnostic for all the notes to attach to.
+        diagnose(ext, diag::objc_implementation_missing_impls,
+                 getCategoryName(req->getDeclContext()));
+      }
 
-      diagnose(ext->getDecl(), diag::objc_implementation_missing_impl,
-               getCategoryName(req->getDeclContext()), req);
+      numEmitted += 1;
 
-      // FIXME: Should give fix-it to add stub implementation
+      // Emit different diagnostic if there's an async alternative.
+      if (auto asyncAlternative = getAsyncAlternative(req)) {
+        diagnose(ext, diag::objc_implementation_missing_impl_either,
+                 asyncAlternative, req);
+        req = asyncAlternative;
+      } else {
+        diagnose(ext, diag::objc_implementation_missing_impl, req);
+      }
+
+      // Append stub for this requirement into eventual fix-it.
+      swift::printRequirementStub(req, ext, ext->getSelfInterfaceType(),
+                                  ext->getStartLoc(), stubStream,
+                                  /*objCAttr=*/true);
+    }
+
+    if (!stubs.empty()) {
+      diagnose(ext, diag::objc_implementation_missing_impls_fixit, numEmitted)
+        .fixItInsertAfter(ext->getBraces().Start, stubs);
     }
   }
 

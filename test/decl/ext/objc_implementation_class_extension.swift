@@ -4,12 +4,14 @@
 @_implementationOnly import objc_implementation_class_extension_internal
 
 @_objcImplementation extension ObjCClass {
-  // expected-warning@-1 {{extension for main class interface should provide implementation for instance method 'method(fromHeader2:)'}}
-  // expected-warning@-2 {{extension for main class interface should provide implementation for property 'propertyFromHeader2'}}
-  // expected-warning@-3 {{extension for main class interface should provide implementation for instance method 'otherModuleExtensionMethod(fromHeader2:)'}}
-  // expected-warning@-4 {{extension for main class interface should provide implementation for property 'otherModuleExtensionPropertyFromHeader2'}}
-  // expected-warning@-5 {{extension for main class interface should provide implementation for instance method 'extensionMethod(fromHeader2:)'}}
-  // expected-warning@-6 {{extension for main class interface should provide implementation for property 'extensionPropertyFromHeader2'}}
+  // expected-warning@-1 {{extension for main class interface does not provide all required implementations}}
+  // expected-note@-2 {{missing instance method 'method(fromHeader2:)'}} {{none}}
+  // expected-note@-3 {{missing property 'propertyFromHeader2'}} {{none}}
+  // expected-note@-4 {{missing instance method 'otherModuleExtensionMethod(fromHeader2:)'}} {{none}}
+  // expected-note@-5 {{missing property 'otherModuleExtensionPropertyFromHeader2'}} {{none}}
+  // expected-note@-6 {{missing instance method 'extensionMethod(fromHeader2:)'}} {{none}}
+  // expected-note@-7 {{missing property 'extensionPropertyFromHeader2'}} {{none}}
+  // expected-note@-8 {{add stubs for missing '@implementation' requirements}} {{43-43=\n    @objc(methodFromHeader2:)\n    open func method(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader2)\n    open var propertyFromHeader2: Int32\n\n    @objc(otherModuleExtensionMethodFromHeader2:)\n    open func otherModuleExtensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(otherModuleExtensionPropertyFromHeader2)\n    open var otherModuleExtensionPropertyFromHeader2: Int32\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(extensionPropertyFromHeader2)\n    open var extensionPropertyFromHeader2: Int32\n}}
 
   @objc func method(fromHeader1: CInt) {}
   @objc private func method(fromHeader2: CInt) {}
