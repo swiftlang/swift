@@ -185,7 +185,7 @@ func testStaticMethodsReturningNonFRT() {
     // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_copy{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
 }
 
-func testtFreeFunctionsTemplated(frt : FRTStruct) {
+func testtFreeFunctionsTemplated(frt : FRTStruct, nonFrt: NonFRTStruct) {
     let frtLocalVar1 : Int = 1;
     
     let frtLocalVar2 = global_templated_function_returning_FRT(frtLocalVar1)
@@ -227,6 +227,8 @@ func testtFreeFunctionsTemplated(frt : FRTStruct) {
     let frtLocalVar14 = global_function_returning_templated_retrun_frt_owned(frt)
     // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt_owned{{.*}} : $@convention(c) (FRTStruct) -> @owned FRTStruct
 
+    let nonFrtLocalVar1 = global_function_returning_templated_retrun_frt_owned(nonFrt)
+    // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt_owned{{.*}} : $@convention(c) (NonFRTStruct) -> NonFRTStruct
 }
 
 func testVirtualMethods(base: Base, derived: Derived) {
