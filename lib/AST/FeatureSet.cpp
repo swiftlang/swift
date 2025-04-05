@@ -518,6 +518,15 @@ static bool usesFeatureExecutionAttribute(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureWeakLet(Decl *decl) {
+  if (auto *VD = dyn_cast<VarDecl>(decl)) {
+    if (auto *refAttr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      return VD->isLet() && refAttr->get() == ReferenceOwnership::Weak;
+    }
+  }
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
