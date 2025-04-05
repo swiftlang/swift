@@ -110,9 +110,20 @@ public struct ObservationRegistrar: Sendable {
       }
     }
 
-    internal mutating func cancelAll() {
+    internal mutating func deinitialize() -> [@Sendable () -> Void] {
+      var trackers = [@Sendable () -> Void]()
+      for (keyPath, ids) in lookups {
+        for id in ids {
+          if let tracker = observations[id]?.willSetTracker {
+             trackers.append({
+               tracker(keyPath)
+             })
+          }
+        }
+      }
       observations.removeAll()
       lookups.removeAll()
+      return trackers
     }
     
     internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable (AnyKeyPath) -> Void] {
@@ -157,8 +168,11 @@ public struct ObservationRegistrar: Sendable {
       state.withCriticalRegion { $0.cancel(id) }
     }
 
-    internal func cancelAll() {
-      state.withCriticalRegion { $0.cancelAll() }
+    internal func deinitialize() {
+      let tracking = state.withCriticalRegion { $0.deinitialize() }
+      for action in tracking {
+        action()
+      }
     }
     
     internal func willSet<Subject: Observable, Member>(
@@ -189,7 +203,7 @@ public struct ObservationRegistrar: Sendable {
     }
 
     deinit {
-      context.cancelAll()
+      context.deinitialize()
     }
   }
   
