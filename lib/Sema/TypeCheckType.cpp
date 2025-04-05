@@ -1468,7 +1468,7 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
   if (parentType.isNull()) {
     // Tailored diagnostic for custom attributes.
     if (resolution.getOptions().is(TypeResolverContext::CustomAttr)) {
-      diags.diagnose(repr->getNameLoc(), diag::unknown_attribute,
+      diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name,
                      repr->getNameRef().getBaseIdentifier().str());
 
       return ErrorType::get(ctx);
@@ -3240,9 +3240,8 @@ void TypeAttrSet::diagnoseConflict(TypeAttrKind representativeKind,
   }
 
   // Generic conflict diagnostic
-  diagnose(secondAttr->getStartLoc(), diag::mutually_exclusive_attr_names,
-           secondAttr->getAttrName(), firstAttr->getAttrName(),
-           /*modifier*/ false);
+  diagnose(secondAttr->getStartLoc(), diag::mutually_exclusive_type_attrs,
+           secondAttr, firstAttr);
 }
 
 void TypeAttrSet::diagnoseUnclaimed(const TypeResolution &resolution,
@@ -3297,7 +3296,7 @@ void TypeAttrSet::diagnoseUnclaimed(CustomAttr *attr,
     typeName = attr->getType().getString();
   }
 
-  diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+  diagnose(attr->getLocation(), diag::unknown_attr_name, typeName);
 }
 
 static bool isFunctionAttribute(TypeAttrKind attrKind) {
@@ -3333,7 +3332,7 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
   // Use a special diagnostic for SIL attributes.
   if (!(options & TypeResolutionFlags::SILType) &&
       TypeAttribute::isSilOnly(attr->getKind())) {
-    diagnose(attr->getStartLoc(), diag::unknown_attribute, attr->getAttrName());
+    diagnose(attr->getStartLoc(), diag::unknown_type_attr, attr);
     return;
   }
 
@@ -3354,8 +3353,7 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
     }
 
     auto diagnostic = diagnose(attr->getStartLoc(),
-                               diag::attribute_requires_function_type,
-                               attr->getAttrName());
+                               diag::type_attr_requires_function_type, attr);
     if (isa<EscapingTypeAttr>(attr))
       diagnostic.fixItRemove(attr->getSourceRange());
     return;
@@ -3502,12 +3500,11 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     if (!options.is(TypeResolverContext::Inherited) ||
         getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, attr->getAtLoc(),
-                      diag::typeattr_not_inheritance_clause,
-                      attr->getAttrName());
+                      diag::typeattr_not_inheritance_clause, attr);
       ty = ErrorType::get(getASTContext());
     } else if (!ty->isConstraintType()) {
-      diagnoseInvalid(repr, attr->getAtLoc(),
-                      diag::typeattr_not_existential, attr->getAttrName(), ty);
+      diagnoseInvalid(repr, attr->getAtLoc(), diag::typeattr_not_existential,
+                      attr, ty);
       ty = ErrorType::get(getASTContext());
     }
 
@@ -3535,7 +3532,8 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     bool isInInheritanceClause = options.is(TypeResolverContext::Inherited);
     if (!isInInheritanceClause || !extension) {
       diagnoseInvalid(repr, retroactiveAttr->getAtLoc(),
-                      diag::retroactive_not_in_extension_inheritance_clause)
+                      diag::typeattr_not_extension_inheritance_clause,
+                      retroactiveAttr)
           .fixItRemove(retroactiveAttr->getSourceRange());
       ty = ErrorType::get(getASTContext());
     }
@@ -3642,8 +3640,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
       diagnose(
           noDerivativeAttr->getAtLoc(),
           diag::differentiable_programming_attr_used_without_required_module,
-          TypeAttribute::getAttrName(TypeAttrKind::NoDerivative),
-          getASTContext().Id_Differentiation);
+          noDerivativeAttr, getASTContext().Id_Differentiation);
     } else if (!isNoDerivativeAllowed) {
       bool isVariadicFunctionParam =
           options.is(TypeResolverContext::VariadicFunctionInput) &&
@@ -4083,7 +4080,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       diagnoseInvalid(
           repr, diffAttr->getAtLoc(),
           diag::differentiable_programming_attr_used_without_required_module,
-          diffAttr->getAttrName(), ctx.Id_Differentiation);
+          diffAttr, ctx.Id_Differentiation);
     }
   }
 
@@ -4502,7 +4499,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       diagnoseInvalid(
           repr, diffAttr->getAtLoc(),
           diag::differentiable_programming_attr_used_without_required_module,
-          diffAttr->getAttrName(), getASTContext().Id_Differentiation);
+          diffAttr, getASTContext().Id_Differentiation);
       hasError = true;
     }
   }
@@ -5034,7 +5031,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       // Tailored diagnostic for custom attributes.
       if (options.is(TypeResolverContext::CustomAttr)) {
         auto &ctx = resolution.getASTContext();
-        ctx.Diags.diagnose(repr->getNameLoc(), diag::unknown_attribute,
+        ctx.Diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name,
                            repr->getNameRef().getBaseIdentifier().str());
 
         return ErrorType::get(ctx);

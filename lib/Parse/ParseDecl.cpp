@@ -4343,7 +4343,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
     diagnose(Tok, diag::type_attribute_applied_to_decl);
   else if (Tok.isContextualKeyword("unknown")) {
-    diagnose(Tok, diag::unknown_attribute, "unknown");
+    diagnose(Tok, diag::unknown_attr_name, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
     auto customAttr = parseCustomAttribute(AtLoc);
@@ -4713,7 +4713,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
         } else {
           // We could use diag::only_allowed_in_sil here, but it's better
           // not to mention SIL in general diagnostics.
-          diagnose(AtLoc, diag::unknown_attribute, Text);
+          diagnose(AtLoc, diag::unknown_attr_name, Text);
         }
       }
       return makeParserSuccess();
@@ -5457,7 +5457,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   for (auto it = fixityAttrs.begin(); it != fixityAttrs.end(); ++it) {
     if (it != fixityAttrs.begin()) {
       auto *attr = *it;
-      P.diagnose(attr->getLocation(), diag::mutually_exclusive_attrs, attr,
+      P.diagnose(attr->getLocation(), diag::mutually_exclusive_decl_attrs, attr,
                  fixityAttrs.front(), attr->isDeclModifier())
           .fixItRemove(attr->getRange());
       attr->setInvalid();

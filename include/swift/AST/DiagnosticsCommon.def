@@ -251,8 +251,10 @@ REMARK(remark_scanner_invalidate_missing_cas, none,
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(unknown_attribute,none,
+ERROR(unknown_attr_name,none,
       "unknown attribute '%0'", (StringRef))
+ERROR(unknown_type_attr,none,
+      "unknown %kind0", (const TypeAttribute *))
 
 //------------------------------------------------------------------------------
 // MARK: macro diagnostics
