@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 16{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 18{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -96,8 +96,22 @@ class DerivedFromClassInC: DerivedClassInC {
 
 struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}
 
-func testDerivedMethodAccess() {
-  DerivedClassInC().methodInC()
-  DerivedClassInC().methodInB() // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
-  DerivedFromClassInC().methodInB()
+func testInheritedMethods(
+  a: BaseClassInA,
+  c: DerivedClassInC,
+) {
+  let b = c.asDerivedClassInB()
+
+  a.methodInA()
+  b.methodInA()
+  c.methodInA()
+
+  b.methodInB() // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
+  c.methodInB() // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
+
+  c.methodInC()
+
+  a.overriddenMethod()
+  b.overriddenMethod() // expected-member-visibility-error{{instance method 'overriddenMethod()' is not available due to missing import of defining module 'members_B'}}
+  c.overriddenMethod()
 }
