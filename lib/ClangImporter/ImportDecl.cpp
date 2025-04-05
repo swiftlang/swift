@@ -1794,7 +1794,7 @@ namespace {
         // C enum without additional knowledge that the type has no
         // undeclared values, and won't ever add cases.
         auto rawValueConstructor =
-            synthesizer.makeEnumRawValueConstructor(enumDecl);
+            SwiftDeclSynthesizer::makeEnumRawValueConstructor(enumDecl);
 
         auto varName = C.Id_rawValue;
         auto rawValue = new (C) VarDecl(/*IsStatic*/false,

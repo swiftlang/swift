@@ -237,7 +237,7 @@ public:
   ///
   /// Unlike a standard init(rawValue:) enum initializer, this does a
   /// reinterpret cast in order to preserve unknown or future cases from C.
-  ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl);
+  static ConstructorDecl *makeEnumRawValueConstructor(EnumDecl *enumDecl);
 
   /// Build the rawValue getter for an imported NS_ENUM.
   ///
