@@ -179,7 +179,7 @@ public:
   /// \endcode
   ///
   /// \returns a pair of the getter and setter function decls.
-  std::pair<AccessorDecl *, AccessorDecl *>
+  static std::pair<AccessorDecl *, AccessorDecl *>
   makeUnionFieldAccessors(NominalTypeDecl *importedUnionDecl,
                           VarDecl *importedFieldDecl);
 
@@ -195,7 +195,7 @@ public:
   /// \endcode
   ///
   /// \returns a pair of the getter and setter function decls.
-  std::pair<FuncDecl *, FuncDecl *> makeBitFieldAccessors(
+  static std::pair<FuncDecl *, FuncDecl *> makeBitFieldAccessors(
       clang::RecordDecl *structDecl, NominalTypeDecl *importedStructDecl,
       clang::FieldDecl *fieldDecl, VarDecl *importedFieldDecl);
 
@@ -219,7 +219,7 @@ public:
   /// \endcode
   ///
   /// \returns a pair of getter and setter function decls.
-  std::pair<AccessorDecl *, AccessorDecl *>
+  static std::pair<AccessorDecl *, AccessorDecl *>
   makeIndirectFieldAccessors(const clang::IndirectFieldDecl *indirectField,
                              ArrayRef<VarDecl *> members,
                              NominalTypeDecl *importedStructDecl,

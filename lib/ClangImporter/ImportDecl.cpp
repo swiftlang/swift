@@ -2393,7 +2393,7 @@ namespace {
             hasUnreferenceableStorage = true;
             isBitField = true;
 
-            synthesizer.makeBitFieldAccessors(
+            SwiftDeclSynthesizer::makeBitFieldAccessors(
                 const_cast<clang::RecordDecl *>(decl), result,
                 const_cast<clang::FieldDecl *>(field), member);
           }
@@ -2402,13 +2402,14 @@ namespace {
         if (auto ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
           // Indirect fields are created as computed property accessible the
           // fields on the anonymous field from which they are injected.
-          synthesizer.makeIndirectFieldAccessors(ind, members, result, member);
+          SwiftDeclSynthesizer::makeIndirectFieldAccessors(ind, members, result,
+                                                           member);
         } else if (decl->isUnion() && !isBitField) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
           // field type.
-          synthesizer.makeUnionFieldAccessors(result, member);
+          SwiftDeclSynthesizer::makeUnionFieldAccessors(result, member);
 
           // Union accessors are always unsafe.
           member->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));

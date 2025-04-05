@@ -81,11 +81,10 @@ static DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl,
   return paramRefExpr;
 }
 
-static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+static AccessorDecl *makeFieldGetterDecl(NominalTypeDecl *importedDecl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
-  auto &C = Impl.SwiftContext;
+  auto &C = importedDecl->getASTContext();
 
   auto *params = ParameterList::createEmpty(C);
 
@@ -105,11 +104,10 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   return getterDecl;
 }
 
-static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+static AccessorDecl *makeFieldSetterDecl(NominalTypeDecl *importedDecl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
-  auto &C = Impl.SwiftContext;
+  auto &C = importedDecl->getASTContext();
   auto newValueDecl = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                         SourceLoc(), C.Id_value, importedDecl);
   newValueDecl->setSpecifier(ParamSpecifier::Default);
@@ -1021,16 +1019,14 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 std::pair<AccessorDecl *, AccessorDecl *>
 SwiftDeclSynthesizer::makeUnionFieldAccessors(
     NominalTypeDecl *importedUnionDecl, VarDecl *importedFieldDecl) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = importedFieldDecl->getASTContext();
 
-  auto getterDecl =
-      makeFieldGetterDecl(ImporterImpl, importedUnionDecl, importedFieldDecl);
+  auto getterDecl = makeFieldGetterDecl(importedUnionDecl, importedFieldDecl);
   getterDecl->setBodySynthesizer(synthesizeUnionFieldGetterBody,
                                  importedFieldDecl);
   getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  auto setterDecl =
-      makeFieldSetterDecl(ImporterImpl, importedUnionDecl, importedFieldDecl);
+  auto setterDecl = makeFieldSetterDecl(importedUnionDecl, importedFieldDecl);
   setterDecl->setBodySynthesizer(synthesizeUnionFieldSetterBody,
                                  importedFieldDecl);
   setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
@@ -1054,7 +1050,7 @@ getAccessorDeclarationName(clang::ASTContext &Ctx, NominalTypeDecl *structDecl,
 std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
     clang::RecordDecl *structDecl, NominalTypeDecl *importedStructDecl,
     clang::FieldDecl *fieldDecl, VarDecl *importedFieldDecl) {
-  clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
+  clang::ASTContext &Ctx = structDecl->getASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
   auto recordType = Ctx.getRecordType(structDecl);
@@ -1075,8 +1071,8 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   cGetterDecl->setImplicitlyInline();
   assert(!cGetterDecl->isExternallyVisible());
 
-  auto getterDecl = makeFieldGetterDecl(ImporterImpl, importedStructDecl,
-                                        importedFieldDecl, cGetterDecl);
+  auto getterDecl =
+      makeFieldGetterDecl(importedStructDecl, importedFieldDecl, cGetterDecl);
 
   // Setter: static inline void set(FieldType newValue, RecordType *self);
   SmallVector<clang::QualType, 8> cSetterParamTypes;
@@ -1097,8 +1093,8 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   cSetterDecl->setImplicitlyInline();
   assert(!cSetterDecl->isExternallyVisible());
 
-  auto setterDecl = makeFieldSetterDecl(ImporterImpl, importedStructDecl,
-                                        importedFieldDecl, cSetterDecl);
+  auto setterDecl =
+      makeFieldSetterDecl(importedStructDecl, importedFieldDecl, cSetterDecl);
 
   importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
@@ -1259,14 +1255,12 @@ std::pair<AccessorDecl *, AccessorDecl *>
 SwiftDeclSynthesizer::makeIndirectFieldAccessors(
     const clang::IndirectFieldDecl *indirectField, ArrayRef<VarDecl *> members,
     NominalTypeDecl *importedStructDecl, VarDecl *importedFieldDecl) {
-  auto &C = ImporterImpl.SwiftContext;
+  auto &C = importedStructDecl->getASTContext();
 
-  auto getterDecl =
-      makeFieldGetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
+  auto getterDecl = makeFieldGetterDecl(importedStructDecl, importedFieldDecl);
   getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
-  auto setterDecl =
-      makeFieldSetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
+  auto setterDecl = makeFieldSetterDecl(importedStructDecl, importedFieldDecl);
   setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   importer::makeComputed(importedFieldDecl, getterDecl, setterDecl);
