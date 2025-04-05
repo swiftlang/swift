@@ -1538,7 +1538,7 @@ public:
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   llvm::Constant *
-  getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer();
+  getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
