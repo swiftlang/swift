@@ -197,6 +197,46 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   }
 }
 
+extension DefaultStringInterpolation {
+  @backDeployed(before: SwiftStdlib 6.2)
+  public mutating func appendInterpolation<T>(
+    _ value: T?, 
+    default: @autoclosure () -> String
+  ) where T: TextOutputStreamable {
+    if let value {
+      self.appendInterpolation(value)
+    } else {
+      self.appendInterpolation(`default`())
+    }
+  }
+
+  @backDeployed(before: SwiftStdlib 6.2)
+  @_disfavoredOverload
+  public mutating func appendInterpolation<T>(
+    _ value: T?, 
+    default: @autoclosure () -> String
+  ) where T: CustomStringConvertible {
+    if let value {
+      self.appendInterpolation(value)
+    } else {
+      self.appendInterpolation(`default`())
+    }
+  }
+
+  @backDeployed(before: SwiftStdlib 6.2)
+  @_disfavoredOverload
+  public mutating func appendInterpolation<T>(
+    _ value: T?, 
+    default: @autoclosure () -> String
+  ) {
+    if let value {
+      self.appendInterpolation(value)
+    } else {
+      self.appendInterpolation(`default`())
+    }
+  }
+}
+
 extension DefaultStringInterpolation: CustomStringConvertible {
   @inlinable
   public var description: String {
