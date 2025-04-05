@@ -2290,31 +2290,49 @@ function Build-ExperimentalRuntime {
   }
 }
 
-function Write-SDKSettingsPlist([Hashtable] $Platform) {
+function Write-SDKSettingsPlist([OS] $OS) {
   $SDKSettings = @{
     DefaultProperties = @{
     }
   }
-  if ($Platform.OS -eq [OS]::Windows) {
+  if ($OS -eq [OS]::Windows) {
     $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
   }
-  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $Platform.OS)\SDKSettings.plist"
+  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS)\SDKSettings.plist"
 
   $SDKSettings = @{
-    CanonicalName = "$($Platform.Triple)"
-    DisplayName = "$($Platform.OS.ToString())"
+    CanonicalName = $OS.ToString()
+    DisplayName = $OS.ToString()
     IsBaseSDK = "NO"
     Version = "${ProductVersion}"
     VersionMap = @{}
     DefaultProperties = @{
-      PLATFORM_NAME = "$($Platform.OS.ToString())"
+      PLATFORM_NAME = $OS.ToString()
       DEFAULT_COMPILER = "${ToolchainIdentifier}"
     }
+    SupportedTargets = @{
+      $OS.ToString() = @{
+        PlatformFamilyDisplayName = $OS.ToString()
+        PlatformFamilyName = $OS.ToString()
+      }
+    }
   }
-  if ($Platform.OS -eq [OS]::Windows) {
-    $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
+  switch ($OS) {
+    Windows {
+      $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
+      $SDKSettings.SupportedTargets.Windows.LLVMTargetVendor = "unknown"
+      $SDKSettings.SupportedTargets.Windows.LLVMTargetSys = "windows"
+      $SDKSettings.SupportedTargets.Windows.LLVMTargetTripleEnvironment = "msvc"
+      $SDKSettings.SupportedTargets.Windows.Archs = $WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+    }
+    Android {
+      $SDKSettings.SupportedTargets.Android.LLVMTargetVendor = "unknown"
+      $SDKSettings.SupportedTargets.Android.LLVMTargetSys = "linux"
+      $SDKSettings.SupportedTargets.Android.LLVMTargetTripleEnvironment = "android${AndroidAPILevel}"
+      $SDKSettings.SupportedTargets.Android.Archs = $AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+    }
   }
-  $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$(Get-SwiftSDK $Platform.OS)\SDKSettings.json"
+  $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS)\SDKSettings.json"
 }
 
 function Build-Dispatch([Hashtable] $Platform) {
@@ -2501,18 +2519,18 @@ function Test-Testing {
   throw "testing Testing is not supported"
 }
 
-function Write-PlatformInfoPlist([Hashtable] $Platform) {
+function Write-PlatformInfoPlist([OS] $OS) {
   $Settings = @{
     DefaultProperties = @{
       SWIFT_TESTING_VERSION = "$ProductVersion"
       XCTEST_VERSION = "$ProductVersion"
     }
   }
-  if ($Platform.OS -eq [OS]::Windows) {
+  if ($OS -eq [OS]::Windows) {
     $Settings.DefaultProperties.SWIFTC_FLAGS = @( "-use-ld=lld" )
   }
 
-  Write-PList -Settings $Settings -Path "$(Get-PlatformRoot $Platform.OS)\Info.plist"
+  Write-PList -Settings $Settings -Path "$(Get-PlatformRoot $OS)\Info.plist"
 }
 
 # Copies files installed by CMake from the arch-specific platform root,
@@ -2532,10 +2550,42 @@ function Install-Platform([Hashtable[]] $Platforms, [OS] $OS) {
     $PlatformResources = "$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString().ToLowerInvariant())"
     Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
       if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
         Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
       }
     }
   }
+}
+
+function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
+  if ($IncludeDS2) {
+    Invoke-BuildStep Build-DS2 $Platform
+  }
+
+  # Third Party Dependencies
+  Invoke-BuildStep Build-ZLib $Platform
+  Invoke-BuildStep Build-XML2 $Platform
+  Invoke-BuildStep Build-CURL $Platform
+  Invoke-BuildStep Build-LLVM $Platform
+
+  # Libraries
+  Invoke-BuildStep Build-Runtime $Platform
+  Invoke-BuildStep Build-Dispatch $Platform
+  if ($IncludeMacros) {
+    Invoke-BuildStep Build-FoundationMacros $Platform
+    Invoke-BuildStep Build-TestingMacros $Platform
+  }
+  Invoke-BuildStep Build-Foundation $Platform
+  Invoke-BuildStep Build-Sanitizers $Platform
+  Invoke-BuildStep Build-XCTest $Platform
+  Invoke-BuildStep Build-Testing $Platform
+}
+
+function Build-ExperimentalSDK([Hashtable] $Platform) {
+  # TODO(compnerd) we currently build the experimental SDK with just the static
+  # variant. We should aim to build both dynamic and static variants.
+  Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+  Invoke-BuildStep Build-Foundation $Platform -Static
 }
 
 function Build-SQLite([Hashtable] $Platform) {
@@ -3167,69 +3217,44 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-XML2 $HostPlatform
   Invoke-BuildStep Build-Compilers $HostPlatform
 
+  Invoke-BuildStep Build-SDK $BuildPlatform -IncludeMacros
+
   foreach ($Platform in $WindowsSDKPlatforms) {
-    Invoke-BuildStep Build-ZLib $Platform
-    Invoke-BuildStep Build-XML2 $Platform
-    Invoke-BuildStep Build-CURL $Platform
-    Invoke-BuildStep Build-LLVM $Platform
+    Invoke-BuildStep Build-SDK $Platform
+    Invoke-BuildStep Build-ExperimentalSDK $Platform
 
-    # Build platform: SDK, Redist and XCTest
-    Invoke-BuildStep Build-Runtime $Platform
-    Invoke-BuildStep Build-Dispatch $Platform
-    # FIXME(compnerd) ensure that the _build_ is the first arch and don't rebuild on each arch
-    if ($Platform -eq $BuildPlatform) {
-      Invoke-BuildStep Build-FoundationMacros $BuildPlatform
-      Invoke-BuildStep Build-TestingMacros $BuildPlatform
+    Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
     }
-    Invoke-BuildStep Build-Foundation $Platform
-    Invoke-BuildStep Build-Sanitizers $Platform
-    Invoke-BuildStep Build-XCTest $Platform
-    Invoke-BuildStep Build-Testing $Platform
-    Invoke-BuildStep Write-SDKSettingsPlist $Platform
 
-    Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
-    Invoke-BuildStep Build-Foundation $Platform -Static
-
-    Copy-File "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\*.lib" "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\"
     if ($Platform -eq $HostPlatform) {
-      Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion))\usr"
+      Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion))\usr"
     }
   }
   Install-Platform $WindowsSDKPlatforms Windows
-  Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
+  Write-PlatformInfoPlist Windows
+  Write-SDKSettingsPlist Windows
 
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
-      if ($IncludeDS2) {
-        Invoke-BuildStep Build-DS2 $Platform
+      Invoke-BuildStep Build-SDK $Platform
+      Invoke-BuildStep Build-ExperimentalSDK $Platform
+
+      Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\" | Out-Null
       }
-      Invoke-BuildStep Build-ZLib $Platform
-      Invoke-BuildStep Build-XML2 $Platform
-      Invoke-BuildStep Build-CURL $Platform
-      Invoke-BuildStep Build-LLVM $Platform
-
-      # Build platform: SDK, Redist and XCTest
-      Invoke-BuildStep Build-Runtime $Platform
-      Invoke-BuildStep Build-Dispatch $Platform
-      Invoke-BuildStep Build-Foundation $Platform
-      Invoke-BuildStep Build-Sanitizers $Platform
-      Invoke-BuildStep Build-XCTest $Platform
-      Invoke-BuildStep Build-Testing $Platform
-
-      # Android swift-inspect only supports 64-bit platforms.
-      if ($Platform.Architecture.ABI -in @("arm64-v8a", "x86_64")) {
-        Invoke-BuildStep Build-Inspect $Platform
-      }
-      Invoke-BuildStep Write-SDKSettingsPlist $Platform
-
-      Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
-      Invoke-BuildStep Build-Foundation $Platform -Static
-
-      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
-      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
     }
+
     Install-Platform $AndroidSDKPlatforms Android
-    Invoke-BuildStep Write-PlatformInfoPlist $Platform
+    Write-PlatformInfoPlist Android
+    Write-SDKSettingsPlist Android
+
+    # Android swift-inspect only supports 64-bit platforms.
+    $AndroidSDKPlatforms | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
+      Invoke-BuildStep Build-Inspect $_
+    }
   }
 
   # Build Macros for distribution
