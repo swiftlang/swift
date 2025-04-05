@@ -801,12 +801,8 @@ static AccessorDecl *makeStructRawValueGetter(StructDecl *structDecl,
 
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     bool makeUnlabeledValueInit) {
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
+  auto &ctx = structDecl->getASTContext();
 
   auto storedVarName = ctx.getIdentifier("_rawValue");
   auto computedVarName = ctx.Id_rawValue;
@@ -856,20 +852,12 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   structDecl->addMember(storedVar);
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
-
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       bridgedType);
-  ImporterImpl.RawTypes[structDecl] = bridgedType;
 }
 
 void SwiftDeclSynthesizer::makeStructRawValued(
     StructDecl *structDecl, Type underlyingType,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     MakeStructRawValuedOptions options, AccessLevel setterAccess) {
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
+  auto &ctx = structDecl->getASTContext();
 
   // Create a variable to store the underlying value.
   VarDecl *var;
@@ -899,10 +887,6 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
-
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       underlyingType);
-  ImporterImpl.RawTypes[structDecl] = underlyingType;
 }
 
 // MARK: Unions

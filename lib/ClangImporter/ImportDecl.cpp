@@ -495,6 +495,13 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
   nominal->addMember(typealias);
 }
 
+void ClangImporter::Implementation::recordRawType(NominalTypeDecl *nominal,
+                                                  Identifier name,
+                                                  Type underlyingType) {
+  addSynthesizedTypealias(nominal, name, underlyingType);
+  RawTypes[nominal] = underlyingType;
+}
+
 void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     NominalTypeDecl *nominal,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs, bool isUnchecked) {
@@ -1642,11 +1649,14 @@ namespace {
         options -= MakeStructRawValuedFlags::IsLet;
         options -= MakeStructRawValuedFlags::IsImplicit;
 
-        synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                        {KnownProtocolKind::RawRepresentable,
-                                         KnownProtocolKind::Equatable,
-                                         KnownProtocolKind::Hashable},
-                                        options, /*setterAccess=*/access);
+        SwiftDeclSynthesizer::makeStructRawValued(
+            structDecl, underlyingType, options, /*setterAccess=*/access);
+        Impl.addSynthesizedProtocolAttrs(structDecl,
+                                         {KnownProtocolKind::RawRepresentable,
+                                          KnownProtocolKind::Equatable,
+                                          KnownProtocolKind::Hashable});
+        Impl.recordRawType(structDecl, Impl.SwiftContext.Id_RawValue,
+                           underlyingType);
 
         result = structDecl;
         break;
@@ -1819,8 +1829,7 @@ namespace {
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
 
-        Impl.addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
-        Impl.RawTypes[enumDecl] = underlyingType;
+        Impl.recordRawType(enumDecl, C.Id_RawValue, underlyingType);
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
@@ -6618,15 +6627,19 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (unlabeledCtor)
       options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
 
-    synthesizer.makeStructRawValued(structDecl, storedUnderlyingType,
-                                    synthesizedProtocols, options);
+    SwiftDeclSynthesizer::makeStructRawValued(structDecl, storedUnderlyingType,
+                                              options);
+    Impl.addSynthesizedProtocolAttrs(structDecl, synthesizedProtocols);
+    Impl.recordRawType(structDecl, ctx.Id_RawValue, storedUnderlyingType);
   } else {
     // We need to make a stored rawValue or storage type, and a
     // computed one of bridged type.
-    synthesizer.makeStructRawValuedWithBridge(
+    SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
         structDecl, storedUnderlyingType, computedPropertyUnderlyingType,
-        synthesizedProtocols,
         /*makeUnlabeledValueInit=*/unlabeledCtor);
+    Impl.addSynthesizedProtocolAttrs(structDecl, synthesizedProtocols);
+    Impl.recordRawType(structDecl, ctx.Id_RawValue,
+                       computedPropertyUnderlyingType);
   }
 
   if (wantsObjCBridgeableTypealias) {
@@ -6807,8 +6820,9 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   if (!underlyingType)
     return nullptr;
 
-  synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                  {KnownProtocolKind::OptionSet});
+  SwiftDeclSynthesizer::makeStructRawValued(structDecl, underlyingType);
+  Impl.addSynthesizedProtocolAttrs(structDecl, {KnownProtocolKind::OptionSet});
+  Impl.recordRawType(structDecl, ctx.Id_RawValue, underlyingType);
   auto selfType = structDecl->getDeclaredInterfaceType();
   Impl.addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
   Impl.addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement,

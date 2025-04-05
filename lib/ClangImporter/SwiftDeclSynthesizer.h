@@ -133,23 +133,21 @@ public:
   /// \param structDecl the struct to make a raw value for
   /// \param storedUnderlyingType the type of the stored raw value
   /// \param bridgedType the type of the 'rawValue' computed property bridge
-  /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
   ///
   /// This will perform most of the work involved in making a new Swift struct
   /// be backed by a stored raw value and computed raw value of bridged type.
   /// This will populated derived protocols and synthesized protocols, add the
   /// new variable and pattern bindings, and create the inits parameterized
   /// over a bridged type that will cast to the stored type, as appropriate.
-  void makeStructRawValuedWithBridge(
-      StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
-      ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-      bool makeUnlabeledValueInit = false);
+  static void
+  makeStructRawValuedWithBridge(StructDecl *structDecl,
+                                Type storedUnderlyingType, Type bridgedType,
+                                bool makeUnlabeledValueInit = false);
 
   /// Make a struct declaration into a raw-value-backed struct
   ///
   /// \param structDecl the struct to make a raw value for
   /// \param underlyingType the type of the raw value
-  /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
   /// \param setterAccess the access level of the raw value's setter
   ///
   /// This will perform most of the work involved in making a new Swift struct
@@ -157,11 +155,11 @@ public:
   /// synthesized protocols, add the new variable and pattern bindings, and
   /// create the inits parameterized over a raw value
   ///
-  void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
-                           ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-                           MakeStructRawValuedOptions options =
-                               getDefaultMakeStructRawValuedOptions(),
-                           AccessLevel setterAccess = AccessLevel::Private);
+  static void
+  makeStructRawValued(StructDecl *structDecl, Type underlyingType,
+                      MakeStructRawValuedOptions options =
+                          getDefaultMakeStructRawValuedOptions(),
+                      AccessLevel setterAccess = AccessLevel::Private);
 
   /// Build the union field getter and setter.
   ///

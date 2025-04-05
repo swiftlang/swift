@@ -1190,6 +1190,11 @@ public:
   void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
                                Type underlyingType);
 
+  /// Add a synthesized typealias to the given nominal type, and record the
+  /// underlying type as a raw type.
+  void recordRawType(NominalTypeDecl *nominal, Identifier name,
+                     Type underlyingType);
+
   void addSynthesizedProtocolAttrs(
       NominalTypeDecl *nominal,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
