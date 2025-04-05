@@ -525,6 +525,10 @@ public:
         X->getKind(), X->getType(),
         llvm::hash_combine_range(Operands.begin(), Operands.end()));
   }
+
+  hash_code visitKeyPathInst(KeyPathInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getPattern());
+  }
 };
 } // end anonymous namespace
 
@@ -1265,6 +1269,10 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // issue.
   case SILInstructionKind::OpenExistentialRefInst:
     return !Inst->getFunction()->hasOwnership();
+
+  case SILInstructionKind::KeyPathInst:
+    // If our keypath doesn't reference operands, then we can CSE.
+    return Inst->getNumOperands() == 0;
   default:
     return false;
   }
