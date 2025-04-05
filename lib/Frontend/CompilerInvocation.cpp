@@ -409,7 +409,7 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 }
 
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
-  LangOpts.setTarget(Triple);
+  LangOpts.setTarget(Triple, /*Diags*/nullptr);
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
 }
 
@@ -1479,12 +1479,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SkipNonExportableDecls = false;
 
   llvm::Triple Target = Opts.Target;
-  StringRef TargetArg;
-  std::string TargetArgScratch;
-
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
-    TargetArg = A->getValue();
 
     const bool targetNeedsRemapping = Target.isXROS();
     if (targetNeedsRemapping && Target.getOSMajorVersion() == 0) {
@@ -1511,8 +1507,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (tripleInfersSimulatorEnvironment(Target)) {
       // Set the simulator environment.
       Target.setEnvironment(llvm::Triple::EnvironmentType::Simulator);
-      TargetArgScratch = Target.str();
-      TargetArg = TargetArgScratch;
     }
   }
 
@@ -1567,21 +1561,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Must be processed after any other language options that could affect
   // platform conditions.
-  bool UnsupportedOS, UnsupportedArch;
-  std::tie(UnsupportedOS, UnsupportedArch) = Opts.setTarget(Target);
-
-  SmallVector<StringRef, 3> TargetComponents;
-  TargetArg.split(TargetComponents, "-");
-
-  if (UnsupportedArch) {
-    auto TargetArgArch = TargetComponents.size() ? TargetComponents[0] : "";
-    Diags.diagnose(SourceLoc(), diag::error_unsupported_target_arch, TargetArgArch);
-  }
-
-  if (UnsupportedOS) {
-    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents[2] : "";
-    Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
-  }
+  Opts.setTarget(Target, &Diags);
 
   // First, set up default minimum inlining target versions.
   auto getDefaultMinimumInliningTargetVersion =
@@ -1853,7 +1833,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::ParserValidation);
   }
 #endif
-  return HadError || UnsupportedOS || UnsupportedArch;
+  return HadError || Diags.hasFatalErrorOccurred();
 }
 
 static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
