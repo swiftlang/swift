@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -4339,8 +4340,9 @@ namespace {
               clang::OverloadedOperatorKind::OO_Call &&
           decl->isStatic()) {
         auto *clangDC = decl->getParent();
-        auto newMethod = synthesizer.synthesizeCXXForwardingMethod(
-            clangDC, clangDC, decl, ForwardingMethodKind::Base,
+        auto newMethod = SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+            Impl.SwiftContext, clangDC, clangDC, decl,
+            ForwardingMethodKind::Base,
             ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
             /*forceConstQualifier*/ true);
 
@@ -4391,11 +4393,13 @@ namespace {
                    "C++ virtual functions cannot be static");
             auto clangDC = decl->getParent();
 
-            auto newMethod = synthesizer.synthesizeCXXForwardingMethod(
-                clangDC, clangDC, decl, ForwardingMethodKind::Virtual,
-                ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                    KeepReference,
-                /*forceConstQualifier*/ false);
+            auto newMethod =
+                SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+                    Impl.SwiftContext, clangDC, clangDC, decl,
+                    ForwardingMethodKind::Virtual,
+                    ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                        KeepReference,
+                    /*forceConstQualifier*/ false);
 
             auto *result = dyn_cast_or_null<FuncDecl>(
                 Impl.importDecl(newMethod, Impl.CurrentVersion));

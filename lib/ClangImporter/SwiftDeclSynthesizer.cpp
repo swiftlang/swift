@@ -2019,12 +2019,15 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 }
 
 clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
-    const clang::CXXRecordDecl *derivedClass,
+    ASTContext &ctx, const clang::CXXRecordDecl *derivedClass,
     const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
     ForwardingMethodKind forwardingMethodKind,
     ReferenceReturnTypeBehaviorForBaseMethodSynthesis
         referenceReturnTypeBehavior,
     bool forceConstQualifier) {
+
+  auto &ImporterImpl =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader())->Impl;
 
   auto &clangCtx = ImporterImpl.getClangASTContext();
   auto &clangSema = ImporterImpl.getClangSema();

@@ -293,8 +293,8 @@ public:
   // Synthesize a C++ method that invokes the method from the base
   // class. This lets Clang take care of the cast from the derived class
   // to the base class during the invocation of the method.
-  clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
-      const clang::CXXRecordDecl *derivedClass,
+  static clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
+      ASTContext &ctx, const clang::CXXRecordDecl *derivedClass,
       const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
       ForwardingMethodKind forwardingMethodKind,
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis
