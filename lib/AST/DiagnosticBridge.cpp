@@ -87,9 +87,10 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   }
 }
 
-void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
-                                         const DiagnosticInfo &Info,
-                                         unsigned innermostBufferID) {
+void DiagnosticBridge::enqueueDiagnostic(
+    SourceManager &SM,
+    const DiagnosticInfo &Info,
+    std::optional<unsigned> innermostBufferID) {
   // If we didn't have per-frontend state before, create it now.
   if (!perFrontendState) {
     perFrontendState = swift_ASTGen_createPerFrontendDiagnosticState();
@@ -100,7 +101,8 @@ void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
   if (!queuedDiagnostics)
     queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
 
-  queueBuffer(SM, innermostBufferID);
+  if (innermostBufferID)
+    queueBuffer(SM, *innermostBufferID);
   addQueueDiagnostic(queuedDiagnostics, perFrontendState, Info, SM);
 }
 
