@@ -1,9 +1,6 @@
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=upcoming-swift -verify-additional-file %S/Inputs/inheritance.h -Xcc -Wno-return-type -Xcc -Wno-inaccessible-base
 
-// TODO: Fix this lit test failure on windows rdar://145218056
-// XFAIL: OS=windows-msvc
-
 import Inheritance
 
 let _ = ImmortalRefereceExample.returnImmortalRefType()

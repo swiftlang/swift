@@ -261,8 +261,11 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
                const ExpectedDiagnosticInfo &Expected, unsigned BufferID) {
   auto fallbackI = CapturedDiagnostics.end();
 
+  llvm::errs() << "Looking for expected error in [[" << BufferID << "]]:" << Expected.LineNo << ": " << Expected.MessageStr << "\n";
   for (auto I = CapturedDiagnostics.begin(), E = CapturedDiagnostics.end();
        I != E; ++I) {
+
+    llvm::errs() << "    >>> Comparing against [[" << I->SourceBufferID << "]]:" << I->Line << ": " << I->Message << "\n";
     // Verify the file and line of the diagnostic.
     if (I->Line != Expected.LineNo || I->SourceBufferID != BufferID)
       continue;
@@ -282,10 +285,15 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
       continue;
     }
 
+    llvm::errs() << "    <<< Found a match!\n~~~~\n";
     // Okay, we found a match, hurray!
     return { I, true };
   }
 
+  if (fallbackI == CapturedDiagnostics.end())
+      llvm::errs() << "     <<< Did not find a match.\n~~~~\n";
+  else
+      llvm::errs() << "     <<< Did not find a match, but found a fallback.\n~~~~\n";
   // No perfect match; we'll return the fallback or `end()` instead.
   return { fallbackI, false };
 }
@@ -1306,7 +1314,15 @@ bool DiagnosticVerifier::finishProcessing() {
     }
     if (bufferID) {
       additionalBufferIDs.push_back(*bufferID);
+      llvm::errs() << "Got additional file: [[" << *bufferID << "]]::" << path << "\n";
+    } else {
+      llvm::errs() << "Could not open additional file: " << path << "\n";
     }
+  }
+
+  for (auto captured : CapturedDiagnostics) {
+    auto id = *captured.SourceBufferID;
+    llvm::errs() << "Captured error in [[" << id << "]]::" << SM.getIdentifierForBuffer(id) << ": " << captured.Line << "\n";
   }
 
   ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, additionalBufferIDs };
