@@ -269,9 +269,6 @@ namespace swift {
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
-    /// Emit a remark when \c \@abi infers an attribute or modifier.
-    bool EnableABIInferenceRemarks = false;
-
     ///
     /// Support for alternate usage modes
     ///
