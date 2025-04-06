@@ -54,3 +54,11 @@ extension SubstitutionMap {
     return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged))
   }
 }
+
+extension Conformance {
+  /// Returns true if the conformance is not isolated or if its isolation matches
+  /// the isolation in `function`.
+  public func matchesActorIsolation(in function: Function) -> Bool {
+    return function.bridged.conformanceMatchesActorIsolation(bridged)
+  }
+}
