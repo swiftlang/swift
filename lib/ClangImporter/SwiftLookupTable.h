@@ -486,10 +486,6 @@ private:
   /// The list of Objective-C categories and extensions.
   llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
 
-  /// A mapping from availability domain name strings to their corresponding
-  /// declarations.
-  llvm::SmallDenseMap<StringRef, clang::VarDecl *> AvailabilityDomains;
-
   /// A mapping from stored contexts to the set of global declarations that
   /// are mapped to members within that context.
   ///
@@ -553,9 +549,6 @@ public:
 
   /// Add an Objective-C category or extension to the table.
   void addCategory(clang::ObjCCategoryDecl *category);
-
-  /// Add an entry for a Clang availability domain.
-  void addAvailabilityDomainDecl(StringRef name, clang::VarDecl *decl);
 
   /// Resolve any unresolved entries.
   ///
@@ -638,10 +631,6 @@ public:
   SmallVector<SingleEntry, 4>
   lookupGlobalsAsMembers(SerializedSwiftName baseName,
                          EffectiveClangContext searchContext);
-
-  /// Retrieve the `VarDecl` that represents the availability domain with the
-  /// given name, or `nullptr` if there isn't one.
-  clang::VarDecl *lookupAvailabilityDomainDecl(StringRef name);
 
   SmallVector<SingleEntry, 4>
   allGlobalsAsMembersInContext(EffectiveClangContext context);
