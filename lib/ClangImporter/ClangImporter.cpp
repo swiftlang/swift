@@ -4114,15 +4114,30 @@ void ClangModuleUnit::lookupObjCMethods(
 
 void ClangModuleUnit::lookupAvailabilityDomains(
     Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
-  auto lookupTable = owner.findLookupTable(clangModule);
-  if (!lookupTable)
+  auto domainName = identifier.str();
+  auto &clangASTContext = getClangASTContext();
+
+  // First, check the Clang AST context for a decl matching this availability
+  // domain name. If the domain was defined in the bridging header and that
+  // bridging header wasn't precompiled, this is where it will be found.
+  auto *domainDecl = clangASTContext.getFeatureAvailDecl(domainName);
+  if (!domainDecl) {
+    // Next, try external sources (.pcm/.pch).
+    auto externalSource = clangASTContext.getExternalSource();
+    if (externalSource)
+      domainDecl = dyn_cast_or_null<clang::VarDecl>(
+          externalSource->getAvailabilityDomainDecl(domainName));
+  }
+
+  if (!domainDecl)
     return;
 
-  auto varDecl = lookupTable->lookupAvailabilityDomainDecl(identifier.str());
-  if (!varDecl)
+  // The decl that was found may belong to a different Clang module.
+  if (domainDecl->getOwningModule() != getClangModule())
     return;
 
-  auto featureInfo = getClangASTContext().getFeatureAvailInfo(varDecl);
+  // Construct a CustomAvailabilityDomain for the decl that was found.
+  auto featureInfo = clangASTContext.getFeatureAvailInfo(domainDecl);
   if (featureInfo.first.empty())
     return;
 
