@@ -4223,12 +4223,11 @@ struct SwiftSettingsWalker : ASTWalker {
   }
 
   /// Given a specific CallExpr, pattern matches the CallExpr's first argument
-  /// to validate it is MainActor.self. Returns CanType() if the CallExpr has
-  /// multiple parameters or if its first parameter is not a MainActor.self.
+  /// to validate it is MainActor.self.
   ///
-  /// This is used when pattern matching against
-  /// .defaultIsolation(MainActor.self).
-  CanType patternMatchDefaultIsolationMainActor(CallExpr *callExpr);
+  /// \returns \c true if the call has one argument that matches
+  /// \c MainActor.self, and \c false otherwise.
+  bool patternMatchDefaultIsolationMainActor(CallExpr *callExpr);
 
   /// Validates that macroExpr is a well formed "SwiftSettings" macro. Returns
   /// true if we can process it and false otherwise.
@@ -4294,16 +4293,16 @@ struct SwiftSettingsWalker : ASTWalker {
         }
 
         // Otherwise, set things up appropriately.
-        if (auto actor = patternMatchDefaultIsolationMainActor(callExpr)) {
+        if (patternMatchDefaultIsolationMainActor(callExpr)) {
           expr = callExpr;
-          result.defaultIsolation = actor;
+          result.defaultIsolation = DefaultIsolation::MainActor;
           foundValidArg = true;
           continue;
         }
 
         if (isa<NilLiteralExpr>(callExpr->getArgs()->getExpr(0))) {
           expr = callExpr;
-          result.defaultIsolation = {Type()};
+          result.defaultIsolation = DefaultIsolation::Nonisolated;
           foundValidArg = true;
           continue;
         }
@@ -4405,18 +4404,18 @@ SwiftSettingsWalker::getSwiftSettingArgDecl(Argument arg) {
   return {{callExpr, f}};
 }
 
-CanType
+bool
 SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
   // Grab the dot self expr.
   auto *selfExpr = dyn_cast<DotSelfExpr>(callExpr->getArgs()->getExpr(0));
   if (!selfExpr)
-    return CanType();
+    return false;
 
   // Then validate we have something that is MainActor.
   auto *declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(selfExpr->getSubExpr());
   if (!declRefExpr ||
       !declRefExpr->getName().getBaseName().getIdentifier().is("MainActor"))
-    return CanType();
+    return false;
 
   // Then use unqualified lookup descriptor to find our MainActor.
   UnqualifiedLookupDescriptor lookupDesc{
@@ -4425,20 +4424,20 @@ SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{lookupDesc}, {});
   if (lookup.allResults().empty())
-    return CanType();
+    return false;
 
   // Then grab our nominal type decl and make sure it is from the concurrency
   // module.
   auto *nomDecl =
       dyn_cast<NominalTypeDecl>(lookup.allResults().front().getValueDecl());
   if (!nomDecl)
-    return CanType();
+    return false;
   auto *nomDeclDC = nomDecl->getDeclContext();
   auto *nomDeclModule = nomDecl->getParentModule();
   if (!nomDeclDC->isModuleScopeContext() || !nomDeclModule->isConcurrencyModule())
-    return CanType();
+    return false;
 
-  return nomDecl->getDeclaredType()->getCanonicalType();
+  return true;
 }
 
 SourceFileLangOptions

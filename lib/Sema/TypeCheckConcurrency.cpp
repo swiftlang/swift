@@ -5739,12 +5739,21 @@ static std::tuple<InferredActorIsolation, ValueDecl *,
 computeDefaultInferredActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
 
-  // If we are supposed to infer main actor isolation by default for entities
-  // within our module, make our default isolation main actor.
+  // Determine whether default isolation is set to MainActor, either for
+  // the entire module or in this specific file.
   if (value->getModuleContext() == ctx.MainModule) {
-    auto globalActorHelper = [&](Type globalActor)
-        -> std::optional<std::tuple<InferredActorIsolation, ValueDecl *,
-                                    std::optional<ActorIsolation>>> {
+    // See if we have one specified by our file unit.
+    auto defaultIsolation = ctx.LangOpts.DefaultIsolationBehavior;
+    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
+      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
+        auto options = sourceFile->getLanguageOptions();
+        if (auto isolation = options.defaultIsolation) {
+          defaultIsolation = *isolation;
+        }
+      }
+    }
+
+    if (defaultIsolation == DefaultIsolation::MainActor) {
       // Default global actor isolation does not apply to any declarations
       // within actors and distributed actors.
       bool inActorContext = false;
@@ -5756,44 +5765,18 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         dc = dc->getParent();
       }
 
+      auto mainActorType = ctx.getMainActorType()->mapTypeOutOfContext();
       if (!inActorContext) {
         // FIXME: deinit should be implicitly MainActor too.
         if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
             isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
             isa<ConstructorDecl>(value)) {
-          return {
-              {{ActorIsolation::forGlobalActor(globalActor), {}}, nullptr, {}}};
-        }
-      }
-
-      return {};
-    };
-
-    // Otherwise, see if we have one specified by our file unit.
-    bool ignoreUnspecifiedMeansMainActorIsolated = false;
-    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
-      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
-        auto options = sourceFile->getLanguageOptions();
-        if (auto isolation = options.defaultIsolation) {
-          if (*isolation) {
-            auto result = globalActorHelper(*options.defaultIsolation);
-            if (result)
-              return *result;
-          } else {
-            // If we found a nil type, then we know we should ignore unspecified
-            // means main actor isolated.
-            ignoreUnspecifiedMeansMainActorIsolated = true;
-          }
+          auto mainActorIsolation =
+              ActorIsolation::forGlobalActor(mainActorType);
+          return {{mainActorIsolation, {}}, nullptr, {}};
         }
       }
     }
-
-    // If we are required to use main actor... just use that.
-    if (!ignoreUnspecifiedMeansMainActorIsolated &&
-        ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
-      if (auto result =
-              globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
-        return *result;
   }
 
   // If we have an async function... by default we inherit isolation.
