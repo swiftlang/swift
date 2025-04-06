@@ -17,6 +17,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
@@ -100,7 +101,7 @@ SourceManager::addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   assert(Buffer);
   StringRef BufIdentifier = Buffer->getBufferIdentifier();
   auto ID = LLVMSourceMgr.AddNewSourceBuffer(std::move(Buffer), llvm::SMLoc());
-  BufIdentIDMap[BufIdentifier] = ID;
+  BufIdentIDMap[llvm::sys::path::convert_to_slash(BufIdentifier)] = ID;
   return ID;
 }
 
@@ -208,8 +209,8 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
 }
 
 std::optional<unsigned>
-SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
-  auto It = BufIdentIDMap.find(BufIdentifier);
+SourceManager::getIDForBufferIdentifier(StringRef BufIdent) const {
+  auto It = BufIdentIDMap.find(llvm::sys::path::convert_to_slash(BufIdent));
   if (It == BufIdentIDMap.end())
     return std::nullopt;
   return It->second;
@@ -706,7 +707,7 @@ std::optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
 }
 
 unsigned SourceManager::getExternalSourceBufferID(StringRef Path) {
-  auto It = BufIdentIDMap.find(Path);
+  auto It = BufIdentIDMap.find(llvm::sys::path::convert_to_slash(Path));
   if (It != BufIdentIDMap.end()) {
     return It->getSecond();
   }

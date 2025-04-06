@@ -145,6 +145,9 @@ private:
   unsigned IDEInspectionTargetOffset;
 
   /// Associates buffer identifiers to buffer IDs.
+  ///
+  /// On Windows, '/' and '\' are both valid path separators, so '/' is
+  /// normalized to '\' to ensure a consistent mapping.
   llvm::DenseMap<StringRef, unsigned> BufIdentIDMap;
 
   /// A cache mapping buffer identifiers to vfs Status entries.
