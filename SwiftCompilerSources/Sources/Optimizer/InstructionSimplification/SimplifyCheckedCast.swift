@@ -81,7 +81,9 @@ private extension UnconditionalCheckedCastInst {
       return
     }
     let conformance = sourceFormalType.instanceTypeOfMetatype.checkConformance(to: proto)
-    guard conformance.isValid else {
+    guard conformance.isValid,
+          conformance.matchesActorIsolation(in: parentFunction)
+    else {
       return
     }
     
