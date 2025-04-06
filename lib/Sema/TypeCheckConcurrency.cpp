@@ -5732,6 +5732,75 @@ static void addAttributesForActorIsolation(ValueDecl *value,
     }
 }
 
+std::optional<DefaultIsolation>
+DefaultActorIsolationRequest::evaluate(Evaluator &evaluator,
+                                       SourceFile *sourceFile) const {
+  if (!sourceFile)
+    return std::nullopt;
+
+  auto &ctx = sourceFile->getASTContext();
+  auto defaultModuleIsolaton = ctx.LangOpts.DefaultIsolationBehavior;
+  auto mainActorType = ctx.getMainActorType();
+  if (!mainActorType)
+    return defaultModuleIsolaton;
+
+  if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
+    auto options = sourceFile->getLanguageOptions();
+    if (auto isolation = options.defaultIsolation) {
+      return *isolation;
+    }
+  }
+
+  if (ctx.LangOpts.hasFeature(Feature::DefaultIsolationTypealias)) {
+    auto nonisolatedType = ctx.getnonisolatedType();
+
+    auto decls = sourceFile->getTopLevelDecls();
+    if (decls.empty())
+      return defaultModuleIsolaton;
+
+    auto locInFile = decls.front()->getStartLoc();
+    auto defaultIsolationResult = TypeChecker::lookupUnqualified(
+      sourceFile->getModuleScopeContext(),
+      DeclNameRef(ctx.Id_DefaultIsolation),
+      locInFile);
+    for (auto found : defaultIsolationResult) {
+      auto *decl = found.getValueDecl();
+      if (!decl)
+        continue;
+
+      auto *typealias = dyn_cast<TypeAliasDecl>(decl);
+      if (!typealias ||
+          !typealias->getDeclContext()->isModuleScopeContext())
+        continue;
+
+      // We have a top-level 'DefaultIsolation' typealias. We can assume
+      // it's the only one, because multiple top-level typealiases with
+      // the same name is a redeclaration error, and default isolation
+      // cannot be set by an imported library.
+
+      // The typealias can only be used to set default isolation per file.
+      if (typealias->getFormalAccess() >= AccessLevel::Internal) {
+        typealias->diagnose(diag::default_isolation_internal);
+        break;
+      }
+
+      auto type = typealias->getUnderlyingType();
+      if (type->isEqual(mainActorType))
+        return DefaultIsolation::MainActor;
+
+      if (type->isEqual(nonisolatedType))
+        return DefaultIsolation::Nonisolated;
+
+      // The underlying type of the typealias must either be 'MainActor'
+      // or 'nonisolated'.
+      typealias->diagnose(diag::default_isolation_custom);
+      break;
+    }
+  }
+
+  return defaultModuleIsolaton;
+}
+
 /// Determine the default isolation and isolation source for this declaration,
 /// which may still be overridden by other inference rules.
 static std::tuple<InferredActorIsolation, ValueDecl *,
@@ -5741,17 +5810,13 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
 
   // Determine whether default isolation is set to MainActor, either for
   // the entire module or in this specific file.
-  if (value->getModuleContext() == ctx.MainModule) {
+  auto mainActorType = ctx.getMainActorType();
+  if (mainActorType && value->getModuleContext() == ctx.MainModule) {
     // See if we have one specified by our file unit.
-    auto defaultIsolation = ctx.LangOpts.DefaultIsolationBehavior;
-    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
-      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
-        auto options = sourceFile->getLanguageOptions();
-        if (auto isolation = options.defaultIsolation) {
-          defaultIsolation = *isolation;
-        }
-      }
-    }
+    auto *sourceFile = value->getDeclContext()->getParentSourceFile();
+    auto defaultIsolation = evaluateOrDefault(
+        ctx.evaluator, DefaultActorIsolationRequest{sourceFile},
+        ctx.LangOpts.DefaultIsolationBehavior);
 
     if (defaultIsolation == DefaultIsolation::MainActor) {
       // Default global actor isolation does not apply to any declarations
@@ -5765,7 +5830,6 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         dc = dc->getParent();
       }
 
-      auto mainActorType = ctx.getMainActorType()->mapTypeOutOfContext();
       if (!inActorContext) {
         // FIXME: deinit should be implicitly MainActor too.
         if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||

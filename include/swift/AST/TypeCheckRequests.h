@@ -33,6 +33,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Basic/TypeID.h"
@@ -1615,6 +1616,25 @@ private:
 
   InferredActorIsolation evaluate(Evaluator &evaluator,
                                   ValueDecl *value) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Determine the default actor isolation for the given source file.
+class DefaultActorIsolationRequest :
+    public SimpleRequest<DefaultActorIsolationRequest,
+                         std::optional<DefaultIsolation>(SourceFile *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<DefaultIsolation>
+  evaluate(Evaluator &evaluator, SourceFile *file) const;
 
 public:
   // Caching

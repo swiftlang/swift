@@ -6029,6 +6029,13 @@ ERROR(global_actor_not_usable_from_inline,none,
 NOTE(move_global_actor_attr_to_storage_decl,none,
      "move global actor attribute to %kind0", (const ValueDecl *))
 
+ERROR(default_isolation_internal,none,
+      "default isolation can only be set per file",
+      ())
+ERROR(default_isolation_custom,none,
+      "default isolation can only be set to 'MainActor' or 'nonisolated'",
+      ())
+
 ERROR(actor_isolation_multiple_attr_2,none,
       "%kind0 has multiple actor-isolation attributes (%1 and %2)",
       (const Decl *, DeclAttribute, DeclAttribute))

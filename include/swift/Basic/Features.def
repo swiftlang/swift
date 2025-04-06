@@ -501,6 +501,9 @@ EXPERIMENTAL_FEATURE(InferIsolatedConformances, true)
 /// Allow SwiftSettings
 EXPERIMENTAL_FEATURE(SwiftSettings, false)
 
+/// Enable setting default isolation per file via typealias.
+EXPERIMENTAL_FEATURE(DefaultIsolationTypealias, true)
+
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
