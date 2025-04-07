@@ -2101,14 +2101,14 @@ static SILValue getArrayValue(ApplyInst *ai) {
     auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
     if (!dti)
       continue;
-    assert(!arrayValue && "Array value already found");
+    DEBUG_ASSERT(!arrayValue && "Array value already found");
     // The first `destructure_tuple` result is the `Array` value.
     arrayValue = dti->getResult(0);
-#ifdef NDEBUG
+#ifndef DEBUG_ASSERT_enabled
     break;
 #endif
   }
-  assert(arrayValue);
+  ASSERT(arrayValue);
   return arrayValue;
 }
 
@@ -2567,15 +2567,12 @@ bool PullbackCloner::Implementation::run() {
           // invariants hold and then skip.
           if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
                   bbActiveValue)) {
-#ifndef NDEBUG
-            assert(isa<PointerToAddressInst>(bbActiveValue));
-
+            ASSERT(isa<PointerToAddressInst>(bbActiveValue));
             SILValue arrayValue = getArrayValue(ai);
-            assert(llvm::find(bbActiveValues, arrayValue) !=
+            ASSERT(llvm::find(bbActiveValues, arrayValue) !=
                    bbActiveValues.end());
-            assert(vjpCloner.getLoopInfo()->getLoopFor(
+            ASSERT(vjpCloner.getLoopInfo()->getLoopFor(
                        arrayValue->getParentBlock()) == loop);
-#endif
             LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
             break;
           }
