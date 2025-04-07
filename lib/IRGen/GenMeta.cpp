@@ -4623,7 +4623,7 @@ namespace {
         } else if (accessor && requiresFeatureCoroutineAccessors(
                                    accessor->getAccessorKind())) {
           ptr = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer(),
+              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer(),
               IGM.FunctionPtrTy);
         } else {
           ptr = llvm::ConstantExpr::getBitCast(IGM.getDeletedMethodErrorFn(),

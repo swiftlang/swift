@@ -1233,9 +1233,9 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
 }
 
 llvm::Constant *IRGenModule::
-    getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer() {
+    getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
-             LinkEntity::forKnownAsyncFunctionPointer(
+             LinkEntity::forKnownCoroFunctionPointer(
                  "swift_deletedCalleeAllocatedCoroutineMethodError"))
       .getValue();
 }
