@@ -8077,20 +8077,6 @@ class InitExistentialMetatypeInst final
          SILFunction *parent);
 
 public:
-  /// Return the object type which was erased.  That is, if this
-  /// instruction erases Decoder<T>.Type.Type to Printable.Type.Type,
-  /// this method returns Decoder<T>.
-  CanType getFormalErasedObjectType() const {
-    auto exType = getType().getASTType();
-    auto concreteType = getOperand()->getType().getASTType();
-    while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-      exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
-      concreteType = cast<MetatypeType>(concreteType).getInstanceType();
-    }
-    assert(exType.isExistentialType());
-    return concreteType;
-  }
-
   ArrayRef<ProtocolConformanceRef> getConformances() const;
 };
 
