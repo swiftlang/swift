@@ -66,8 +66,6 @@ public:
   struct AssociatedConformanceWitness {
     /// The subject type of the associated requirement.
     CanType Requirement;
-    /// FIXME: Temporary.
-    CanType SubstType;
     /// The ProtocolConformanceRef satisfying the requirement.
     ProtocolConformanceRef Witness;
   };

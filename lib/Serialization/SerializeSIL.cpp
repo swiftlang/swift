@@ -3401,13 +3401,12 @@ void SILSerializer::writeSILWitnessTableEntry(
     auto &assoc = entry.getAssociatedConformanceWitness();
 
     auto requirementID = S.addTypeRef(assoc.Requirement);
-    auto substTypeID = S.addTypeRef(assoc.SubstType);
     auto conformanceID = S.addConformanceRef(assoc.Witness);
 
     WitnessAssocProtocolLayout::emitRecord(
       Out, ScratchRecord,
       SILAbbrCodes[WitnessAssocProtocolLayout::Code],
-      requirementID, substTypeID, conformanceID);
+      requirementID, conformanceID);
     return;
   }
 

@@ -4350,7 +4350,7 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
       conformance.getConcrete()->printName(out, options);
     else {
       out << "dependent ";
-      assocProtoWitness.SubstType->print(out, options);
+      assocProtoWitness.Witness.getType()->print(out, options);
     }
     break;
   }

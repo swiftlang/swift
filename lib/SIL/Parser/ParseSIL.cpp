@@ -8229,7 +8229,6 @@ static bool parseSILWitnessTableEntry(
         P.parseToken(tok::colon, diag::expected_sil_witness_colon))
       return true;
 
-    CanType substType;
     ProtocolConformanceRef conformance;
     if (P.Tok.getText() != "dependent") {
       auto concrete =
@@ -8237,7 +8236,6 @@ static bool parseSILWitnessTableEntry(
       // Ignore invalid and abstract witness entries.
       if (concrete.isInvalid() || !concrete.isConcrete())
         return false;
-      substType = concrete.getConcrete()->getType()->getCanonicalType();
       conformance = concrete;
     } else {
       P.consumeToken();
@@ -8261,7 +8259,6 @@ static bool parseSILWitnessTableEntry(
       if (Ty->hasError())
         return true;
 
-      substType = Ty->getCanonicalType();
       conformance = ProtocolConformanceRef::forAbstract(
           Ty->getCanonicalType(), proto);
     }
@@ -8269,7 +8266,6 @@ static bool parseSILWitnessTableEntry(
     if (EntryKeyword.str() == "associated_conformance")
       witnessEntries.push_back(
           SILWitnessTable::AssociatedConformanceWitness{assocOrSubject,
-                                                        substType,
                                                         conformance});
     else
       conditionalConformances.push_back(conformance);
