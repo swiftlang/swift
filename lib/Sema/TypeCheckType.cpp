@@ -6590,7 +6590,7 @@ private:
     if (Ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption()) {
       diag->limitBehavior(DiagnosticBehavior::Warning);
     } else {
-      diag->warnUntilSwiftVersion(getFeatureLanguageVersion(feature).value());
+      diag->warnUntilSwiftVersion(feature.getLanguageVersion().value());
     }
 
     emitInsertAnyFixit(*diag, T);

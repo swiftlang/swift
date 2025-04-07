@@ -1644,7 +1644,7 @@ static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
   // syntax, or you're using Feature::CImplementation. Either way, no go.
   ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
                      attr->getAttrName(), attr->isDeclModifier(),
-                     getFeatureName(requiredFeature));
+                     requiredFeature.getName());
   return false;
 }
 
@@ -1855,7 +1855,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
             && !D->getASTContext().LangOpts.hasFeature(*feature)) {
         Checker.diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature,
                                       attr->getAttrName(), false,
-                                      getFeatureName(*feature));
+                                      feature->getName());
         continue;
       }
     }
