@@ -706,6 +706,29 @@ bool SILFunctionType::isNoReturnFunction(SILModule &M,
   return false;
 }
 
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
+  SILParameterInfo paramInfo = getParameters()[paramIdx];
+  for (auto &depInfo : getLifetimeDependencies()) {
+    auto *addressableIndices = depInfo.getAddressableIndices();
+    if (addressableIndices && addressableIndices->contains(paramIdx)) {
+      return true;
+    }
+    auto *condAddressableIndices = depInfo.getConditionallyAddressableIndices();
+    if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
+      CanType argType = paramInfo.getArgumentType(
+        caller->getModule(), this, caller->getTypeExpansionContext());
+      CanType contextType =
+        argType->hasTypeParameter()
+        ? caller->mapTypeIntoContext(argType)->getCanonicalType()
+        : argType;
+      auto &tl = caller->getTypeLowering(contextType);
+      if (tl.getRecursiveProperties().isAddressableForDependencies())
+        return true;
+    }
+  }
+  return false;
+}
+
 #ifndef NDEBUG
 static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   assert(type1->isLegalSILType());
