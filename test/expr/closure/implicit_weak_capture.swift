@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -swift-version 6)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -swift-version 6 -enable-experimental-feature WeakLet)
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test

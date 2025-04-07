@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-experimental-feature WeakLet -emit-ir -g -o - | %FileCheck %s
 public class ClosureMaker {
     var a : Int
 
