@@ -2291,6 +2291,13 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
   return PBD;
 }
 
+CaptureInfo PatternBindingDecl::getCaptureInfo(unsigned i) const {
+  auto *mutableThis = const_cast<PatternBindingDecl *>(this);
+  PatternBindingCaptureInfoRequest req(mutableThis, i);
+  return evaluateOrDefault(getASTContext().evaluator, req,
+                           CaptureInfo::empty());
+}
+
 PatternBindingInitializer *
 PatternBindingInitializer::createDeserialized(PatternBindingDecl *PBD,
                                               unsigned index) {
