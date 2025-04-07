@@ -801,8 +801,7 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
   }
   try {
     & $Block
-  }
-  finally {
+  } finally {
     Remove-Item env:*
     foreach ($Var in $OldVars.GetEnumerator()) {
       New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
