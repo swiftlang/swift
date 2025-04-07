@@ -1338,6 +1338,10 @@ SwiftInt BridgedInstruction::BeginApplyInst_numArguments() const {
   return getAs<swift::BeginApplyInst>()->getNumArguments();
 }
 
+bool BridgedInstruction::BeginApplyInst_isCalleeAllocated() const {
+  return getAs<swift::BeginApplyInst>()->isCalleeAllocated();
+}
+
 SwiftInt BridgedInstruction::TryApplyInst_numArguments() const {
   return getAs<swift::TryApplyInst>()->getNumArguments();
 }
