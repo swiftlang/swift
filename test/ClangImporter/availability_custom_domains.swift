@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
 // RUN:   -import-objc-header %S/Inputs/availability_domains_bridging_header.h \
-// RUN:   -I %S/Inputs/custom-modules/availability-domains \
+// RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   %s %S/Inputs/availability_custom_domains_other.swift
 
@@ -12,7 +12,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
 // RUN:   -import-objc-header %t/bridging-header.pch \
-// RUN:   -I %S/Inputs/custom-modules/availability-domains \
+// RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   %s %S/Inputs/availability_custom_domains_other.swift
 
