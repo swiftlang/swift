@@ -75,6 +75,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -3728,13 +3729,6 @@ namespace {
           return attr;
       }
       return nullptr;
-    }
-
-    static bool isClangNamespace(const DeclContext *dc) {
-      if (const auto *ed = dc->getSelfEnumDecl())
-        return isa<clang::NamespaceDecl>(ed->getClangDecl());
-
-      return false;
     }
 
     Decl *importFunctionDecl(
