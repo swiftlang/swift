@@ -590,11 +590,7 @@ protected:
           !context.shouldLookThroughOpaqueTypeArchetypes())
         return Subs;
 
-      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        context.getContext(), context.getResilienceExpansion(),
-        context.isWholeModuleContext());
-      return Subs.subst(replacer, replacer,
-                        SubstFlags::SubstituteOpaqueArchetypes);
+      return Subs.mapIntoTypeExpansionContext(context);
     }
 
     return Subs;
