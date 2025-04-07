@@ -84,7 +84,8 @@ class ReabstractionInfo {
   /// specializer.
   bool ConvertIndirectToDirect = true;
 
-  /// If true, drop unused arguments.
+  /// If true, drop unused arguments. Dropping unused arguments is a
+  /// prerequisite before promoting an indirect argument to a direct argument.
   /// See `droppedArguments`.
   bool dropUnusedArguments = false;
 
