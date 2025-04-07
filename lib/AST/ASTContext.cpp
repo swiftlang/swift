@@ -3724,8 +3724,9 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
   IntegerType::Profile(id, value, isNegative);
 
   void *insertPos;
-  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos))
+  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos)) {
     return intType;
+  }
 
   auto strCopy = ctx.AllocateCopy(value);
 
