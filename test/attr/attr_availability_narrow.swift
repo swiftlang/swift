@@ -32,7 +32,7 @@ func useFooUnaffectedSimilarText() {
 }
 
 func useFooWayOff() {
-  // expected-note@-1 2 {{add @available attribute to enclosing global function}}
+  // expected-note@-1 2 {{add '@available' attribute to enclosing global function}}
   if #available(OSX 10.10, *) {
     foo() // expected-error {{'foo()' is only available in macOS 50.2 or newer}}
     // expected-note@-1{{add 'if #available' version check}}
@@ -83,7 +83,7 @@ func useFoo10() {
 }
 
 func useFoo10WayOff() {
-    // expected-note@-1 3 {{add @available attribute to enclosing global function}}
+    // expected-note@-1 3 {{add '@available' attribute to enclosing global function}}
   if #available(OSX 10.10, *) {
     foo10() // expected-error {{'foo10()' is only available in macOS 10.50.2 or newer}}
     // expected-note@-1{{add 'if #available' version check}}

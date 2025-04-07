@@ -13,12 +13,12 @@ class SomeMethods {
 
   @objc
   func cannotRepresentInObjC(x: SwiftClass & ObjCProtocol) {}
-  // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing class 'SwiftClass' cannot be represented in Objective-C}}
 
   @objc
   func alsoCannotRepresentInObjC(x: ObjCClass & SwiftProtocol) {}
-  // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'SwiftProtocol' cannot be represented in Objective-C}}
 }
 

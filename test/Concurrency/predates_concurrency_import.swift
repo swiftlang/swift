@@ -13,7 +13,7 @@
 @preconcurrency import NonStrictModule
 @_predatesConcurrency import StrictModule // expected-warning{{'@_predatesConcurrency' has been renamed to '@preconcurrency'}}
 @preconcurrency import OtherActors
-// expected-warning@-1{{'@preconcurrency' attribute on module 'OtherActors' has no effect}}{{1-17=}}
+// expected-warning@-1{{'@preconcurrency' on module 'OtherActors' has no effect}}{{1-17=}}
 
 @preconcurrency
 class MyPredatesConcurrencyClass { }

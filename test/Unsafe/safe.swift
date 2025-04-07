@@ -68,17 +68,17 @@ func acceptP(_: some P) { }
 
 func testConformance(i: Int) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  acceptP(i) // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  acceptP(i) // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsOpaqueP() -> some P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsExistentialP() -> any P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 // FIXME: Should work even if the IteratorProtocol conformance is safe
@@ -142,7 +142,7 @@ func casting(value: Any, i: Int) {
   _ = unsafe value as! UnsafeType
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  _ = i as any P // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  _ = i as any P // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func metatypes() {
@@ -270,7 +270,7 @@ struct UnsafeWrapTest {
 }
 
 @safe @unsafe
-struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both '@safe' and '@unsafe'}}
 
 @unsafe
 struct UnsafeContainingUnspecified {

@@ -19,7 +19,7 @@ class C {
   func method() { } // expected-note{{overridden declaration is here}}
 }
 
-class D1: C { // expected-note{{make class 'D1' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
+class D1: C { // expected-note{{make class 'D1' '@unsafe' to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
   @unsafe
   override func method() { } // expected-warning{{override of safe instance method with unsafe instance method}}{{documentation-file=strict-memory-safety}}
 }
@@ -143,7 +143,7 @@ struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
 
 func forEachLoop(us: UnsafeSequence) {
   for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{12-12=unsafe }}
-  // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
   // expected-warning@-2{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
   for _ in unsafe us { }
   // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}

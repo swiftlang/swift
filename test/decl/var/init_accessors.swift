@@ -57,14 +57,14 @@ func test_use_of_initializes_accesses_on_non_inits() {
       get { y }
 
       @storageRestrictions(initializes: y)
-      // expected-error@-1 {{@storageRestrictions attribute could only be used with init accessors}}
+      // expected-error@-1 {{'@storageRestrictions' could only be used with init accessors}}
       set(initialValue) {}
     }
 
     var _q: String {
       get { y }
       @storageRestrictions(accesses: x)
-      // expected-error@-1 {{@storageRestrictions attribute could only be used with init accessors}}
+      // expected-error@-1 {{'@storageRestrictions' could only be used with init accessors}}
       set(initialValue) {}
     }
 
@@ -653,7 +653,7 @@ func test_invalid_storage_restrictions() {
 
     var g: Int {
       @storageRestrictions(initializes: _a)
-      // expected-error@-1 {{@storageRestrictions attribute could only be used with init accessors}}
+      // expected-error@-1 {{'@storageRestrictions' could only be used with init accessors}}
       get { 0 }
     }
 
