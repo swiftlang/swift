@@ -29,6 +29,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -71,15 +72,11 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
 void ASTScopeImpl::abortWithVerificationError(
     llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const {
-  llvm::SmallString<0> errorStr;
-  llvm::raw_svector_ostream out(errorStr);
-
-  out << "ASTScopeImpl verification error in source file '"
-      << getSourceFile()->getFilename() << "':\n";
-  messageFn(out);
-
-  llvm::PrettyStackTraceString trace(errorStr.c_str());
-  abort();
+  abortWithPrettyStackTraceMessage([&](auto &out) {
+    out << "ASTScopeImpl verification error in source file '"
+        << getSourceFile()->getFilename() << "':\n";
+    messageFn(out);
+  });
 }
 
 #pragma mark printing
