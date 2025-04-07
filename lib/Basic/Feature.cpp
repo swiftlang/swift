@@ -16,8 +16,8 @@
 
 using namespace swift;
 
-bool swift::isFeatureAvailableInProduction(Feature feature) {
-  switch (feature) {
+bool Feature::isAvailableInProduction() const {
+  switch (kind) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:                                                   \
     return true;
@@ -29,8 +29,8 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-llvm::StringRef swift::getFeatureName(Feature feature) {
-  switch (feature) {
+llvm::StringRef Feature::getName() const {
+  switch (kind) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:                                                   \
     return #FeatureName;
@@ -39,7 +39,7 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
+std::optional<Feature> Feature::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
@@ -48,7 +48,7 @@ std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
       .Default(std::nullopt);
 }
 
-std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
+std::optional<Feature> Feature::getExperimentalFeature(llvm::StringRef name) {
   return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
@@ -57,8 +57,8 @@ std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
       .Default(std::nullopt);
 }
 
-std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
-  switch (feature) {
+std::optional<unsigned> Feature::getLanguageVersion() const {
+  switch (kind) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
   case Feature::FeatureName:                                                   \
@@ -69,8 +69,8 @@ std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   }
 }
 
-bool swift::isFeatureAdoptable(Feature feature) {
-  switch (feature) {
+bool Feature::isAdoptable() const {
+  switch (kind) {
 #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
@@ -87,8 +87,8 @@ bool swift::isFeatureAdoptable(Feature feature) {
   }
 }
 
-bool swift::includeInModuleInterface(Feature feature) {
-  switch (feature) {
+bool Feature::includeInModuleInterface() const {
+  switch (kind) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:                                                   \
     return true;
