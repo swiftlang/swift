@@ -773,6 +773,9 @@ getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl);
 ///
 /// Returns false if \a decl was not imported by ClangImporter.
 bool declIsCxxOnly(const Decl *decl);
+
+/// Is this DeclContext an `enum` that represents a C++ namespace?
+bool isClangNamespace(const DeclContext *dc);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

@@ -8793,3 +8793,10 @@ bool importer::declIsCxxOnly(const Decl *decl) {
   }
   return false;
 }
+
+bool importer::isClangNamespace(const DeclContext *dc) {
+  if (const auto *ed = dc->getSelfEnumDecl())
+    return isa_and_nonnull<clang::NamespaceDecl>(ed->getClangDecl());
+
+  return false;
+}
