@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -I %S/Inputs %s -emit-ir | %FileCheck %s
 
 import CustomDestructor
 
