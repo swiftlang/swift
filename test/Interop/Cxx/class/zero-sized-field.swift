@@ -21,7 +21,8 @@ FieldsTestSuite.test("Zero sized field") {
   expectEqual(s2.c, 7)
   expectEqual(s2.c, s2.get_c())
   expectEqual(takesZeroSizedInCpp(s2), 5)
-  expectEqual(s.b.getNum(), 42)
+  // TODO: rdar://148437848 Swift doesn't support fields marked with [[no_unique_address]] 
+  // expectEqual(s.b.getNum(), 42)
 }
 
 runAllTests()

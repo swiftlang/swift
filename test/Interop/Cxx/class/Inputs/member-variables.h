@@ -11,6 +11,16 @@ struct Empty {
   int getNum() const { return 42; }
 };
 
+struct HasNoUniqueAddressField {
+  MyClass simpleField;
+#if __is_target_os(windows)
+  [[msvc::no_unique_address]]
+#else
+  [[no_unique_address]]
+#endif
+  MyClass noUniqueAddressField; // expected-warning {{Swift doesn't support fields marked with [[no_unique_address]]}}
+};
+
 struct HasZeroSizedField {
   int a;
   [[no_unique_address]] Empty b;

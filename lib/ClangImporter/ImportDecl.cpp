@@ -4383,6 +4383,16 @@ namespace {
       std::optional<ImportedName> correctSwiftName;
       ImportedName importedName;
 
+      if (decl->hasAttr<clang::NoUniqueAddressAttr>()) {
+        // TODO: rdar://148437848 Swift doesn't support fields marked with [[no_unique_address]] 
+
+        Impl.addImportDiagnostic(
+            decl,
+            Diagnostic(diag::unsupported_attribute, "[[no_unique_address]]"),
+            decl->getLocation());
+        return nullptr;
+      }
+
       std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName) {
         return nullptr;
