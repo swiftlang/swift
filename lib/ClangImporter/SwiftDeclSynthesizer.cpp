@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftDeclSynthesizer.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
@@ -426,7 +427,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, type, dc);
   func->setStatic(isStatic);
-  func->setAccess(getOverridableAccessLevel(dc));
+  func->setAccess(makeOverridableIf(isOverridable(dc), access));
   func->setIsObjC(false);
   func->setIsDynamic(false);
 
@@ -1452,7 +1453,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, elementTy, dc, getter->getClangNode());
 
-  thunk->setAccess(getOverridableAccessLevel(dc));
+  thunk->setAccess(subscript->getFormalAccess());
 
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
     thunk->getAttrs().add(objcAttr->clone(C));
@@ -1496,7 +1497,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
       valueIndicesPL, TupleType::getEmpty(C), dc,
       setter->getClangNode());
 
-  thunk->setAccess(getOverridableAccessLevel(dc));
+  thunk->setAccess(subscript->getSetterFormalAccess());
 
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
     thunk->getAttrs().add(objcAttr->clone(C));

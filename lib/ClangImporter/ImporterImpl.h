@@ -23,6 +23,7 @@
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
@@ -2082,6 +2083,41 @@ bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
+
+inline bool isOverridable(const DeclContext *dc) {
+  return (bool)dc->getSelfClassDecl();
+}
+
+inline AccessLevel makeOverridableIf(bool overridable, AccessLevel access) {
+  return overridable && access == AccessLevel::Public ? AccessLevel::Open
+                                                      : access;
+}
+
+/// Map the access specifier of a Clang record member to a Swift access level.
+///
+/// This mapping is conservative: the resulting Swift access should be at _most_
+/// as permissive as the input C++ access.
+inline AccessLevel convertClangAccess(clang::AccessSpecifier access,
+                                      bool overridable = false) {
+  switch (access) {
+  case clang::AS_public:
+    // C++ 'public' is actually closer to Swift 'open' than Swift 'public',
+    // but we only return 'open' if the caller needs it.
+  case clang::AS_none:
+    // The fictional 'none' specifier is given to top-level C++ declarations,
+    // for which C++ lacks the syntax to give an access specifier. They are
+    // globally visible and thus correspond to Swift 'open'/'public'.
+    return overridable ? AccessLevel::Open : AccessLevel::Public;
+
+  case clang::AS_protected:
+    // Swift does not have a notion of protected fields, so map C++ 'protected'
+    // to Swift 'private'.
+  case clang::AS_private:
+    // N.B. Swift 'private' is more restrictive than C++ 'private' because it
+    // also cares about what source file the member is accessed.
+    return AccessLevel::Private;
+  }
+}
 
 } // end namespace importer
 } // end namespace swift

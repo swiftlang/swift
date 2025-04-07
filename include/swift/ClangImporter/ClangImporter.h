@@ -748,12 +748,6 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
-/// Map the access specifier of a Clang record member to a Swift access level.
-///
-/// This mapping is conservative: the resulting Swift access should be at _most_
-/// as permissive as the input C++ access.
-AccessLevel convertClangAccess(clang::AccessSpecifier access);
-
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///
 /// May return >1 fileID when a decl is annotated more than once, which should
