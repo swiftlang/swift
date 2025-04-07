@@ -38,7 +38,7 @@
 // RUN:     %target-rpath(%t) \
 // RUN:     -o %t/main
 
-// RUN: %target-codesign %t/main
+// RUN: %target-codesign %t/main %t/%target-library-name(Library)
 // RUN: %target-run %t/main %t/%target-library-name(Library) | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
