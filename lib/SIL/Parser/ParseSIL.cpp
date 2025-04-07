@@ -8157,8 +8157,7 @@ static bool parseSILWitnessTableEntry(
          GenericParamList *witnessParams,
          SILParser &witnessState,
          std::vector<SILWitnessTable::Entry> &witnessEntries,
-         std::vector<SILWitnessTable::ConditionalConformance>
-           &conditionalConformances) {
+         std::vector<ProtocolConformanceRef> &conditionalConformances) {
   Identifier EntryKeyword;
   SourceLoc KeywordLoc;
   if (P.parseIdentifier(EntryKeyword, KeywordLoc,
@@ -8273,9 +8272,7 @@ static bool parseSILWitnessTableEntry(
                                                         substType,
                                                         conformance});
     else
-      conditionalConformances.push_back(
-          SILWitnessTable::ConditionalConformance{assocOrSubject,
-                                                  conformance});
+      conditionalConformances.push_back(conformance);
 
     return false;
   }
@@ -8420,7 +8417,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   Lexer::SILBodyRAII Tmp(*P.L);
   // Parse the entry list.
   std::vector<SILWitnessTable::Entry> witnessEntries;
-  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+  std::vector<ProtocolConformanceRef> conditionalConformances;
 
   if (P.Tok.isNot(tok::r_brace)) {
     do {
@@ -8481,7 +8478,7 @@ bool SILParserState::parseSILDefaultWitnessTable(Parser &P) {
 
   // Parse the entry list.
   std::vector<SILWitnessTable::Entry> witnessEntries;
-  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+  std::vector<ProtocolConformanceRef> conditionalConformances;
 
   if (P.Tok.isNot(tok::r_brace)) {
     do {

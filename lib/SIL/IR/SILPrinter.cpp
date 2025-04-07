@@ -4392,18 +4392,21 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto conditionalConformance : getConditionalConformances()) {
     // conditional_conformance (TypeName: Protocol):
     // <conformance>
-    if (conditionalConformance.Conformance.isInvalid())
+    if (conditionalConformance.isInvalid()) {
+      OS << "  conditional_conformance invalid";
       continue;
+    }
 
     OS << "  conditional_conformance (";
-    conditionalConformance.Requirement.print(OS, Options);
-    OS << ": " << conditionalConformance.Conformance.getProtocol()->getName()
+    conditionalConformance.getType().print(OS, Options);
+    OS << ": " << conditionalConformance.getProtocol()->getName()
        << "): ";
-    if (conditionalConformance.Conformance.isConcrete())
-      conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
+    if (conditionalConformance.isConcrete())
+      conditionalConformance.getConcrete()->printName(OS, Options);
     else {
+      ASSERT(conditionalConformance.isAbstract() && "Handle pack conformance here");
       OS << "dependent ";
-      conditionalConformance.Requirement->print(OS, Options);
+      conditionalConformance.getType()->print(OS, Options);
     }
 
     OS << '\n';

@@ -3374,12 +3374,11 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   }
 
   for (auto conditional : wt.getConditionalConformances()) {
-    auto requirementID = S.addTypeRef(conditional.Requirement);
-    auto conformanceID = S.addConformanceRef(conditional.Conformance);
+    auto conformanceID = S.addConformanceRef(conditional);
     WitnessConditionalConformanceLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[WitnessConditionalConformanceLayout::Code],
-        requirementID, conformanceID);
+        conformanceID);
   }
 }
 

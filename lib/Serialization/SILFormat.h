@@ -261,7 +261,6 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField, // ID of associated type
     ProtocolConformanceIDField // ID of conformance
   >;
 

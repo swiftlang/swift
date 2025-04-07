@@ -219,8 +219,8 @@ class DeadFunctionAndGlobalElimination {
     }
 
     for (const auto &conf : WT->getConditionalConformances()) {
-      if (conf.Conformance.isConcrete())
-        ensureAliveConformance(conf.Conformance.getConcrete());
+      if (conf.isConcrete())
+        ensureAliveConformance(conf.getConcrete());
     }
   }
 

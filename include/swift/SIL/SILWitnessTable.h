@@ -154,15 +154,6 @@ public:
                const PrintOptions &options) const;
   };
 
-  /// An entry for a conformance requirement that makes the requirement
-  /// conditional. These aren't public, but any witness thunks need to feed them
-  /// into the true witness functions.
-  struct ConditionalConformance {
-    /// FIXME: Temporary.
-    CanType Requirement;
-    ProtocolConformanceRef Conformance;
-  };
-
 private:
   /// The module which contains the SILWitnessTable.
   SILModule &Mod;
@@ -186,7 +177,7 @@ private:
   ///
   /// (If other private entities are introduced this could/should be switched
   /// into a private version of Entries.)
-  MutableArrayRef<ConditionalConformance> ConditionalConformances;
+  MutableArrayRef<ProtocolConformanceRef> ConditionalConformances;
 
   /// Whether or not this witness table is a declaration. This is separate from
   /// whether or not entries is empty since you can have an empty witness table
@@ -201,7 +192,7 @@ private:
   SILWitnessTable(SILModule &M, SILLinkage Linkage, SerializedKind_t Serialized,
                   StringRef name, ProtocolConformance *conformance,
                   ArrayRef<Entry> entries,
-                  ArrayRef<ConditionalConformance> conditionalConformances);
+                  ArrayRef<ProtocolConformanceRef> conditionalConformances);
 
   /// Private constructor for making SILWitnessTable declarations.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
@@ -214,7 +205,7 @@ public:
   static SILWitnessTable *
   create(SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
          ProtocolConformance *conformance, ArrayRef<Entry> entries,
-         ArrayRef<ConditionalConformance> conditionalConformances);
+         ArrayRef<ProtocolConformanceRef> conditionalConformances);
 
   /// Create a new SILWitnessTable declaration.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
@@ -271,7 +262,7 @@ public:
   ArrayRef<Entry> getEntries() const { return Entries; }
 
   /// Return all of the conditional conformances.
-  ArrayRef<ConditionalConformance> getConditionalConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConditionalConformances() const {
     return ConditionalConformances;
   }
 
@@ -300,7 +291,7 @@ public:
   /// Change a SILWitnessTable declaration into a SILWitnessTable definition.
   void
   convertToDefinition(ArrayRef<Entry> newEntries,
-                      ArrayRef<ConditionalConformance> conditionalConformances,
+                      ArrayRef<ProtocolConformanceRef> conditionalConformances,
                       SerializedKind_t serializedKind);
 
   // Gets conformance serialized kind.
