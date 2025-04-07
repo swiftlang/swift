@@ -5297,6 +5297,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '__shared' attribute-list-clause attribute-list
 ///     '__owned' attribute-list-clause attribute-list
 ///     'some' attribute-list-clause attribute-list
+///     'nonisolated(nonsending)' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
@@ -5320,6 +5321,43 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("_const")) {
       Tok.setKind(tok::contextual_keyword);
       ConstLoc = P.consumeToken();
+      continue;
+    }
+
+    // nonisolated(nonsending)
+    if (Tok.isContextualKeyword("nonisolated")) {
+      Tok.setKind(tok::contextual_keyword);
+
+      auto kwLoc = P.consumeToken();
+
+      if (CallerIsolatedLoc.isValid()) {
+        P.diagnose(kwLoc, diag::nonisolated_nonsending_repeated)
+            .fixItRemove(SpecifierLoc);
+      }
+
+      // '('
+      if (!P.consumeIfAttributeLParen()) {
+        P.diagnose(Tok, diag::nonisolated_nonsending_expected_lparen);
+        status.setIsParseError();
+        continue;
+      }
+
+      if (!Tok.isContextualKeyword("nonsending")) {
+        P.diagnose(Tok, diag::nonisolated_nonsending_incorrect_modifier);
+        status.setIsParseError();
+        continue;
+      }
+
+      (void)P.consumeToken();
+
+      // ')'
+      if (!P.consumeIf(tok::r_paren)) {
+        P.diagnose(Tok, diag::nonisolated_nonsending_expected_rparen);
+        status.setIsParseError();
+        continue;
+      }
+
+      CallerIsolatedLoc = kwLoc;
       continue;
     }
 

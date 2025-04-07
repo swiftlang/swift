@@ -4646,6 +4646,12 @@ public:
     printFoot();
   }
 
+  void visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T, Label label) {
+    printCommon("caller_isolated", label);
+    printRec(T->getBase(), Label::optional("base"));
+    printFoot();
+  }
+
   void visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T, Label label) {
     printCommon("_const", label);
     printRec(T->getBase(), Label::optional("base"));
