@@ -79,6 +79,9 @@
 // but we primarily care about macOS in this test
 // UNSUPPORTED: OS=linux-gnu
 
+// %env does not seem to work on Windows
+// UNSUPPORTED: OS=windows-msvc
+
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: remote_run || device_run
