@@ -1274,14 +1274,14 @@ nonisolated(nonsending) func isolation19() async {}
 }
 
 struct CustomAttrPropertyWrapper {
-  @abi(@PropertyWrapper var v1: Int) // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
-  @PropertyWrapper var v1: Int // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
+  @abi(@PropertyWrapper var v1: Int) // expected-error {{property 'v1' with a wrapper cannot also be '@abi'}}
+  @PropertyWrapper var v1: Int // expected-error {{property 'v1' with a wrapper cannot also be '@abi'}}
 
-  @abi(@PropertyWrapper var v2: Int) // expected-error {{property 'v2' with a wrapper cannot also be @abi}}
+  @abi(@PropertyWrapper var v2: Int) // expected-error {{property 'v2' with a wrapper cannot also be '@abi'}}
   var v2: Int
 
   @abi(var v3: Int)
-  @PropertyWrapper var v3: Int // expected-error {{property 'v3' with a wrapper cannot also be @abi}}
+  @PropertyWrapper var v3: Int // expected-error {{property 'v3' with a wrapper cannot also be '@abi'}}
 }
 
 // CustomAttr for attached macro -- see Macros/macro_expand_peers.swift

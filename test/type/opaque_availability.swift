@@ -5,7 +5,7 @@
 protocol P {}
 struct X: P {}
 
-func alwaysOpaque() -> some P { return X() } // expected-only-available-error{{'some' return types are only available}} expected-only-available-note{{add @available}}
+func alwaysOpaque() -> some P { return X() } // expected-only-available-error{{'some' return types are only available}} expected-only-available-note{{add '@available'}}
 
 @available(SwiftStdlib 5.1, *)
 func sometimesOpaque() -> some P { return X() }
