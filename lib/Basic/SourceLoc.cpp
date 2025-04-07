@@ -101,7 +101,8 @@ SourceManager::addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   assert(Buffer);
   StringRef BufIdentifier = Buffer->getBufferIdentifier();
   auto ID = LLVMSourceMgr.AddNewSourceBuffer(std::move(Buffer), llvm::SMLoc());
-  BufIdentIDMap[llvm::sys::path::convert_to_slash(BufIdentifier)] = ID;
+  auto Key = llvm::sys::path::convert_to_slash(BufIdentifier);
+  BufIdentIDMap[Key] = ID;
   return ID;
 }
 
@@ -209,8 +210,9 @@ SourceManager::getVirtualFile(SourceLoc Loc) const {
 }
 
 std::optional<unsigned>
-SourceManager::getIDForBufferIdentifier(StringRef BufIdent) const {
-  auto It = BufIdentIDMap.find(llvm::sys::path::convert_to_slash(BufIdent));
+SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
+  auto Key = llvm::sys::path::convert_to_slash(BufIdentifier);
+  auto It = BufIdentIDMap.find(Key);
   if (It == BufIdentIDMap.end())
     return std::nullopt;
   return It->second;
@@ -707,7 +709,8 @@ std::optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
 }
 
 unsigned SourceManager::getExternalSourceBufferID(StringRef Path) {
-  auto It = BufIdentIDMap.find(llvm::sys::path::convert_to_slash(Path));
+  auto Key = llvm::sys::path::convert_to_slash(Path);
+  auto It = BufIdentIDMap.find(Key);
   if (It != BufIdentIDMap.end()) {
     return It->getSecond();
   }
