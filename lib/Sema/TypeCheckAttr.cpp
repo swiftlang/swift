@@ -2364,11 +2364,13 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // Only top-level func decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level);
+    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level,
+             attr);
 
   // The name must not be empty.
   if (attr->Name.empty())
-    diagnose(attr->getLocation(), diag::cdecl_empty_name);
+    diagnose(attr->getLocation(), diag::cdecl_empty_name,
+             attr);
 
   // The standard library can use @_cdecl to implement runtime functions.
   if (!canDeclareSymbolName(attr->Name, D->getModuleContext())) {

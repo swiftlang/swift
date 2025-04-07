@@ -53,7 +53,7 @@ func hasNested() {
 }
 
 // TODO: Handle error conventions in SILGen for toplevel functions.
-@_cdecl("throwing") // expected-error{{raising errors from '@_cdecl' functions is not supported}}
+@_cdecl("throwing") // expected-error{{raising errors from @_cdecl functions is not supported}}
 func throwing() throws { }
 
 // TODO: cdecl name collisions
