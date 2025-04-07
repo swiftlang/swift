@@ -21,8 +21,8 @@ let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg(1)  // expected-erro
 let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg(1, 2)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg' cannot be constructed because it has no accessible initializers}}
 let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
 let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg(1)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
-let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg(1,2)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
-let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg(1,2,3)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
+let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg(1, 2)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
+let _ = SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg(1, 2, 3)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg' cannot be constructed because it has no accessible initializers}}
 
-let _ = SwiftInitSynthesisForCXXRefTypes.VariadicCtors(); // expected-error {{'SwiftInitSynthesisForCXXRefTypes.VariadicCtors' cannot be constructed because it has no accessible initializers}}
-let _ = SwiftInitSynthesisForCXXRefTypes.VariadicCtors(1); // expected-error {{'SwiftInitSynthesisForCXXRefTypes.VariadicCtors' cannot be constructed because it has no accessible initializers}}
+let _ = SwiftInitSynthesisForCXXRefTypes.VariadicCtors()  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.VariadicCtors' cannot be constructed because it has no accessible initializers}}
+let _ = SwiftInitSynthesisForCXXRefTypes.VariadicCtors(1)  // expected-error {{'SwiftInitSynthesisForCXXRefTypes.VariadicCtors' cannot be constructed because it has no accessible initializers}}
