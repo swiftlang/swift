@@ -542,8 +542,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse '@' sign, 'inout' or 'nonisolated' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      Tok.isContextualKeyword("nonisolated")) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);

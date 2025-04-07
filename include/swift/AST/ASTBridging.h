@@ -2782,6 +2782,12 @@ BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedTypeRepr base,
                                     BridgedSourceLoc cSpecifierLoc);
 
+SWIFT_NAME("BridgedCallerIsolatedTypeRepr.createParsed(_:base:specifierLoc:)")
+BridgedCallerIsolatedTypeRepr
+BridgedCallerIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+                                           BridgedTypeRepr base,
+                                           BridgedSourceLoc cSpecifierLoc);
+
 SWIFT_NAME(
     "BridgedTupleTypeRepr.createParsed(_:elements:leftParenLoc:rightParenLoc:)")
 BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(

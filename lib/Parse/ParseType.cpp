@@ -59,6 +59,10 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
+  if (CallerIsolatedLoc.isValid()) {
+    ty = new (p.Context) CallerIsolatedTypeRepr(ty, CallerIsolatedLoc);
+  }
+
   if (lifetimeEntry) {
     ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntry);
   }
@@ -1728,12 +1732,50 @@ bool Parser::canParseTypeSimpleOrComposition() {
   return true;
 }
 
+bool Parser::canParseNonisolatedAsTypeModifier() {
+  assert(Tok.isContextualKeyword("nonisolated"));
+
+  BacktrackingScope scope(*this);
+
+  // Consume 'nonisolated'
+  consumeToken();
+
+  // Something like:
+  //
+  // nonisolated
+  //  (42)
+  if (Tok.isAtStartOfLine())
+    return false;
+
+  // Always requires `(<<argument>>)`
+  if (!Tok.is(tok::l_paren))
+    return false;
+
+  // Consume argument list
+  skipSingle();
+
+  // if consumed '(...)' ended up being followed
+  // by `[async, throws, ...] -> ...` this means
+  // the `nonisolated` is invalid as a modifier.
+  return !isAtFunctionTypeArrow();
+}
+
 bool Parser::canParseTypeScalar() {
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
 
   if (Tok.isContextualKeyword("sending"))
     consumeToken();
+
+  if (Tok.isContextualKeyword("nonisolated")) {
+    if (!canParseNonisolatedAsTypeModifier())
+      return false;
+
+    // consume 'nonisolated'
+    consumeToken();
+    // skip '(nonsending)'
+    skipSingle();
+  }
 
   if (!canParseTypeSimpleOrComposition())
     return false;

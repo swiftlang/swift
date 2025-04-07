@@ -2169,5 +2169,18 @@ ERROR(sil_thunkinst_failed_to_parse_kind,none,
 ERROR(sil_failed_to_parse_sil_optional,none,
       "Expected SIL optional value of the form '[' NAME ']'", ())
 
+//------------------------------------------------------------------------------
+// MARK: nonisolated(nonsending)
+//------------------------------------------------------------------------------
+
+ERROR(nonisolated_nonsending_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following 'nonisolated'", ())
+ERROR(nonisolated_nonsending_incorrect_modifier,PointsToFirstBadToken,
+      "expected 'nonsending' in modifier", ())
+ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
+      "expected ')' after 'nonisolated' modifier", ())
+ERROR(nonisolated_nonsending_repeated,none,
+      "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

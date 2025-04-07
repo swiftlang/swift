@@ -162,6 +162,10 @@ public:
     return visit(T->getBase());
   }
 
+  FoundResult visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
   FoundResult visitArrayTypeRepr(ArrayTypeRepr *T) {
     return handleParent(T, T->getBase());
   }
