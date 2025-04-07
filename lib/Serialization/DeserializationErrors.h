@@ -707,6 +707,24 @@ public:
   }
 };
 
+class InavalidAvailabilityDomainError
+    : public llvm::ErrorInfo<InavalidAvailabilityDomainError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  InavalidAvailabilityDomainError() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Invalid availability domain";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;
   const ModuleFile &MF;

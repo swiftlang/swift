@@ -4115,49 +4115,28 @@ void ClangModuleUnit::lookupObjCMethods(
 void ClangModuleUnit::lookupAvailabilityDomains(
     Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
   auto domainName = identifier.str();
+  auto &ctx = getASTContext();
   auto &clangASTContext = getClangASTContext();
 
-  // First, check the Clang AST context for a decl matching this availability
-  // domain name. If the domain was defined in the bridging header and that
-  // bridging header wasn't precompiled, this is where it will be found.
-  auto *domainDecl = clangASTContext.getFeatureAvailDecl(domainName);
-  if (!domainDecl) {
-    // Next, try external sources (.pcm/.pch).
-    auto externalSource = clangASTContext.getExternalSource();
-    if (externalSource)
-      domainDecl = dyn_cast_or_null<clang::VarDecl>(
-          externalSource->getAvailabilityDomainDecl(domainName));
-  }
+  auto domainInfo = clangASTContext.getFeatureAvailInfo(domainName);
+  if (domainInfo.Kind == clang::FeatureAvailKind::None)
+    return;
 
-  if (!domainDecl)
+  auto *varDecl = dyn_cast_or_null<clang::VarDecl>(domainInfo.Decl);
+  if (!varDecl)
     return;
 
   // The decl that was found may belong to a different Clang module.
-  if (domainDecl->getOwningModule() != getClangModule())
+  if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  // Construct a CustomAvailabilityDomain for the decl that was found.
-  auto featureInfo = clangASTContext.getFeatureAvailInfo(domainDecl);
-  if (featureInfo.first.empty())
+  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  if (!imported)
     return;
 
-  auto getDomainKind = [](clang::FeatureAvailKind featureAvailKind) {
-    switch (featureAvailKind) {
-    case clang::FeatureAvailKind::None:
-      llvm_unreachable("unexpected kind");
-    case clang::FeatureAvailKind::Available:
-      return CustomAvailabilityDomain::Kind::Enabled;
-    case clang::FeatureAvailKind::Unavailable:
-      return CustomAvailabilityDomain::Kind::Disabled;
-    case clang::FeatureAvailKind::Dynamic:
-      return CustomAvailabilityDomain::Kind::Dynamic;
-    }
-  };
-
-  auto domain = AvailabilityDomain::forCustom(CustomAvailabilityDomain::get(
-      featureInfo.first, getParentModule(),
-      getDomainKind(featureInfo.second.Kind), getASTContext()));
-  results.push_back(domain);
+  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  ASSERT(customDomain);
+  results.push_back(*customDomain);
 }
 
 void ClangModuleUnit::collectLinkLibraries(
