@@ -26,7 +26,7 @@ extension Future {
   func flatMap<NewValue>(file: StaticString = #file, line: UInt = #line, _ callback: @escaping (T) -> Future<NewValue>) -> Future<NewValue> { // #2
     // expected-complete-and-tns-note @-1 {{parameter 'callback' is implicitly non-sendable}}
     return self.flatMap(callback)
-    // expected-complete-and-tns-warning @-1 {{passing non-sendable parameter 'callback' to function expecting a @Sendable closure}}
+    // expected-complete-and-tns-warning @-1 {{passing non-sendable parameter 'callback' to function expecting a '@Sendable' closure}}
   }
 
   @inlinable

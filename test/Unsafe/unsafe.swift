@@ -73,7 +73,7 @@ class Super {
   @unsafe func g() { }
 }
 
-class Sub: Super { // expected-note{{make class 'Sub' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
+class Sub: Super { // expected-note{{make class 'Sub' '@unsafe' to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
   @unsafe override func f() { } // expected-warning{{override of safe instance method with unsafe instance method}}{{documentation-file=strict-memory-safety}}
   @unsafe override func g() { }  
 }
@@ -104,9 +104,9 @@ class ExclusivityChecking {
 
   func next() -> Int {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{5-5=unsafe }}
-    value += 1 // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+    value += 1 // expected-note{{reference to '@exclusivity(unchecked)' property 'value' is unsafe}}
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
-    return value  // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+    return value  // expected-note{{reference to '@exclusivity(unchecked)' property 'value' is unsafe}}
   }
 }
 

@@ -23,7 +23,7 @@ actor SomeActor {}
 struct AlwaysAvailableWithAlwaysAvailableGA {}
 
 @Available51GA // expected-error {{'Available51GA' is only available in macOS 51 or newer}}
-struct AlwaysAvailableWithAvailable51GA {} // expected-note {{add @available attribute to enclosing struct}}
+struct AlwaysAvailableWithAvailable51GA {} // expected-note {{add '@available' attribute to enclosing struct}}
 
 @available(macOS 51, *)
 @Available51GA

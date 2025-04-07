@@ -14,7 +14,7 @@ struct S0 : NeedsF0 {  // expected-error {{type 'S0' does not conform to protoco
   func gg0() {
   }
 
-  @_implements(Int, zz) // expected-error {{non-protocol type in @_implements attribute}}
+  @_implements(Int, zz) // expected-error {{non-protocol type in '@_implements'}}
   static func gg1(x:S0, y:S0) -> Bool {
   }
 

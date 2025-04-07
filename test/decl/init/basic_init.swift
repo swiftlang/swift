@@ -25,7 +25,7 @@ class InitSubclass: InitClass {}
 // expected-note@-1{{implicit initializer 'init(baz:)' declared here}}
 // expected-note@-2{{implicit initializer 'init(bar:)' declared here}}
 extension InitSubclass {
-  convenience init(arg: Bool) {} // expected-error{{non-@objc initializer 'init(arg:)' declared in 'InitClass' cannot be overridden from extension}}
+  convenience init(arg: Bool) {} // expected-error{{non-'@objc' initializer 'init(arg:)' declared in 'InitClass' cannot be overridden from extension}}
   convenience override init(baz: Int) {}
   // expected-error@-1 {{initializer 'init(baz:)' with Objective-C selector 'initWithBaz:' conflicts with implicit initializer 'init(baz:)' with the same Objective-C selector}}
   // expected-error@-2 {{cannot override a non-dynamic class declaration from an extension}}

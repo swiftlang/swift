@@ -42,14 +42,14 @@ import NonTrivial
 
 @objc
 class ObjCObject: NSObject {
-  @objc var prop: NonTrivial // expected-error {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  @objc var prop: NonTrivial // expected-error {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-1 {{non-trivial C++ classes cannot be represented in Objective-C}}
 
   @objc var trivProp: Trivial
 
   override init() { fatalError() }
 
-  @objc func getNonTrivial() -> NonTrivialDestrOnly { // expected-error {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc func getNonTrivial() -> NonTrivialDestrOnly { // expected-error {{method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
     // expected-note@-1 {{non-trivial C++ classes cannot be represented in Objective-C}}
     fatalError()
   }

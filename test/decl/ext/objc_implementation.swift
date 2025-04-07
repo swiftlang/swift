@@ -432,20 +432,20 @@ protocol EmptySwiftProto {}
 }
 
 @objc(TypeMatchOptionalityInvalid) @implementation extension ObjCClass {
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @objc(InvalidMembers) @implementation extension ObjCClass {
   // expected-error@-1 {{extension for category 'InvalidMembers' should provide implementation for instance method 'unimplementedMember()'}}
 
   func nonObjCMethod(_: EmptySwiftProto) {
-    // expected-error@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+    // expected-error@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
 
   private func privateNonObjCMethod(_: EmptySwiftProto) {
-    // expected-error@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+    // expected-error@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
 
@@ -633,7 +633,7 @@ extension CImplStruct {
   @implementation @_cdecl("CImplStructStaticFunc1")
   static func staticFunc1(_: Int32) {
     // FIXME: Add underlying support for this
-    // expected-error@-3 {{@_cdecl can only be applied to global functions}}
+    // expected-error@-3 {{'@_cdecl' can only be applied to global functions}}
     // FIXME: Lookup in an enclosing type is not working yet
     // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure your umbrella or bridging header imports the header that declares it}}
   }

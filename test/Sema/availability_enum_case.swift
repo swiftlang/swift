@@ -11,7 +11,7 @@
 import availability_enum_case_other
 
 func ride(horse: Horse) {
-  // expected-note@-1 {{add @available attribute to enclosing global function}}
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}
 
   _ = Horse.kevin
   // expected-error@-1 {{'kevin' is only available in macOS 50 or newer}}

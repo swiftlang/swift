@@ -100,7 +100,7 @@ public struct FuncFooBarNoAttrsMacro: DeclarationMacro {
 @available(SwiftStdlib 9999, *)
 #globalDecls
 
-func testGlobal() { // expected-note 2 {{add @available attribute to enclosing global function}}
+func testGlobal() { // expected-note 2 {{add '@available' attribute to enclosing global function}}
   globalFunc() // expected-error {{'globalFunc()' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
   _ = globalVar // expected-error {{'globalVar' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
 }
@@ -109,7 +109,7 @@ struct S {
   @available(SwiftStdlib 9999, *)
   #memberDecls
 }
-func testMember(value: S) { // expected-note 2 {{add @available attribute to enclosing global function}}
+func testMember(value: S) { // expected-note 2 {{add '@available' attribute to enclosing global function}}
   value.memberFunc() // expected-error {{'memberFunc()' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
   _ = value.memberVar // expected-error {{'memberVar' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
 }
@@ -159,7 +159,7 @@ struct S1 {
 }
 
 // FIXME: Diagnostics could be better.
-struct S2 { // expected-note 4 {{add @available attribute to enclosing struct}}
+struct S2 { // expected-note 4 {{add '@available' attribute to enclosing struct}}
   // expected-note@+3 6 {{in expansion of macro 'funcFromClosureMacro' here}}
   // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}}
   // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}} expected-note@+2 {{add 'if #available' version check}}

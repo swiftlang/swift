@@ -70,5 +70,5 @@ extension MainProtocol {
 // CHECK-IS-ASYNC: (func_decl {{.*}}implicit "$main()" interface_type="(MyMain.Type) -> () async -> ()"
 // CHECK-IS-ASYNC:       (declref_expr implicit type="(MyMain.Type) -> () async -> ()"
 
-// CHECK-IS-ERROR1: error: 'MyMain' is annotated with @main and must provide a main static function of type {{\(\) -> Void or \(\) throws -> Void|\(\) -> Void, \(\) throws -> Void, \(\) async -> Void, or \(\) async throws -> Void}}
+// CHECK-IS-ERROR1: error: 'MyMain' is annotated with '@main' and must provide a main static function of type {{\(\) -> Void or \(\) throws -> Void|\(\) -> Void, \(\) throws -> Void, \(\) async -> Void, or \(\) async throws -> Void}}
 // CHECK-IS-ERROR2: error: ambiguous use of 'main'
