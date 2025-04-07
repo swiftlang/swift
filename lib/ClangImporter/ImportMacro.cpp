@@ -75,9 +75,8 @@ createMacroConstant(ClangImporter::Implementation &Impl,
                     bool isStatic,
                     ClangNode ClangN) {
   Impl.ImportedMacroConstants[macro] = {value, type};
-  return SwiftDeclSynthesizer(Impl).createConstant(name, dc, type, value,
-                                                   convertKind, isStatic,
-                                                   ClangN, AccessLevel::Public);
+  return Impl.createConstant(name, dc, type, value, convertKind, isStatic,
+                             ClangN, AccessLevel::Public);
 }
 
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
@@ -204,9 +203,9 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!unicode::isWellFormedUTF8(text))
     return nullptr;
 
-  return SwiftDeclSynthesizer(Impl).createConstant(
-      name, DC, importTy, text, ConstantConvertKind::None,
-      /*static*/ false, ClangN, AccessLevel::Public);
+  return Impl.createConstant(name, DC, importTy, text,
+                             ConstantConvertKind::None,
+                             /*static*/ false, ClangN, AccessLevel::Public);
 }
 
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,

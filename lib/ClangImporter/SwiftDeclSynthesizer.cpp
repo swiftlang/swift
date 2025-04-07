@@ -178,13 +178,13 @@ using ConstantGetterBodyContextData =
     llvm::PointerIntPair<Expr *, 2, ConstantConvertKind>;
 }
 
-Type SwiftDeclSynthesizer::getConstantLiteralType(
+Type ClangImporter::Implementation::getConstantLiteralType(
     Type type, ConstantConvertKind convertKind) {
   switch (convertKind) {
   case ConstantConvertKind::Construction:
   case ConstantConvertKind::ConstructionWithUnwrap: {
-    auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
-    assert(found != ImporterImpl.RawTypes.end());
+    auto found = RawTypes.find(type->getAnyNominal());
+    assert(found != RawTypes.end());
     return found->second;
   }
 
@@ -193,13 +193,11 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
   }
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                const clang::APValue &value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
-  auto &context = ImporterImpl.SwiftContext;
+ValueDecl *ClangImporter::Implementation::createConstant(
+    Identifier name, DeclContext *dc, Type type, const clang::APValue &value,
+    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN,
+    AccessLevel access) {
+  auto &context = SwiftContext;
 
   // Create the integer literal value.
   Expr *expr = nullptr;
@@ -297,13 +295,11 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                         access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                StringRef value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
-  ASTContext &ctx = ImporterImpl.SwiftContext;
+ValueDecl *ClangImporter::Implementation::createConstant(
+    Identifier name, DeclContext *dc, Type type, StringRef value,
+    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN,
+    AccessLevel access) {
+  auto &ctx = SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
 
@@ -390,17 +386,15 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
           /*isTypeChecked=*/true};
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                Expr *valueExpr,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
-  auto &C = ImporterImpl.SwiftContext;
+ValueDecl *ClangImporter::Implementation::createConstant(
+    Identifier name, DeclContext *dc, Type type, Expr *valueExpr,
+    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN,
+    AccessLevel access) {
+  auto &C = SwiftContext;
 
   VarDecl *var = nullptr;
   if (ClangN) {
-    var = ImporterImpl.createDeclWithClangNode<VarDecl>(
+    var = createDeclWithClangNode<VarDecl>(
         ClangN, access,
         /*IsStatic*/ isStatic, VarDecl::Introducer::Var, SourceLoc(), name, dc);
   } else {

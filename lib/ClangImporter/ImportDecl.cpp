@@ -3338,7 +3338,7 @@ namespace {
 
         // Create the global constant.
         bool isStatic = dc->isTypeContext();
-        auto result = synthesizer.createConstant(
+        auto result = Impl.createConstant(
             name, dc, type, clang::APValue(decl->getInitVal()),
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
                                           : ConstantConvertKind::None,
@@ -6715,7 +6715,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
   auto convertKind = ConstantConvertKind::Construction;
   if (isa<EnumDecl>(theStruct))
     convertKind = ConstantConvertKind::ConstructionWithUnwrap;
-  Decl *CD = synthesizer.createConstant(
+  Decl *CD = Impl.createConstant(
       name, theStruct, theStruct->getDeclaredInterfaceType(),
       clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl,
       importer::convertClangAccess(clangEnum->getAccess()));
@@ -6782,7 +6782,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
     result->setType(original->getInterfaceType());
   }
 
-  Decl *CD = synthesizer.createConstant(
+  Decl *CD = Impl.createConstant(
       name, importIntoDC, importedEnumTy, result, ConstantConvertKind::None,
       /*isStatic*/ true, alias,
       importer::convertClangAccess(clangEnum->getAccess()));
