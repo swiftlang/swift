@@ -20,26 +20,6 @@ namespace swift {
 
 class CallExpr;
 
-enum class MakeStructRawValuedFlags {
-  /// whether to also create an unlabeled init
-  MakeUnlabeledValueInit = 0x01,
-
-  /// whether the raw value should be a let
-  IsLet = 0x02,
-
-  /// whether to mark the rawValue as implicit
-  IsImplicit = 0x04,
-};
-using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
-
-inline MakeStructRawValuedOptions getDefaultMakeStructRawValuedOptions() {
-  MakeStructRawValuedOptions opts;
-  opts -= MakeStructRawValuedFlags::MakeUnlabeledValueInit; // default off
-  opts |= MakeStructRawValuedFlags::IsLet;                  // default on
-  opts |= MakeStructRawValuedFlags::IsImplicit;             // default on
-  return opts;
-}
-
 inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
   return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
 }
@@ -84,42 +64,6 @@ public:
                                                  ArrayRef<VarDecl *> members,
                                                  bool wantCtorParamNames,
                                                  bool wantBody);
-
-  /// Make a struct declaration into a raw-value-backed struct, with
-  /// bridged computed rawValue property which differs from stored backing
-  ///
-  /// \param structDecl the struct to make a raw value for
-  /// \param storedUnderlyingType the type of the stored raw value
-  /// \param bridgedType the type of the 'rawValue' computed property bridge
-  /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
-  ///
-  /// This will perform most of the work involved in making a new Swift struct
-  /// be backed by a stored raw value and computed raw value of bridged type.
-  /// This will populated derived protocols and synthesized protocols, add the
-  /// new variable and pattern bindings, and create the inits parameterized
-  /// over a bridged type that will cast to the stored type, as appropriate.
-  void makeStructRawValuedWithBridge(
-      StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
-      ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-      bool makeUnlabeledValueInit = false);
-
-  /// Make a struct declaration into a raw-value-backed struct
-  ///
-  /// \param structDecl the struct to make a raw value for
-  /// \param underlyingType the type of the raw value
-  /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
-  /// \param setterAccess the access level of the raw value's setter
-  ///
-  /// This will perform most of the work involved in making a new Swift struct
-  /// be backed by a raw value. This will populated derived protocols and
-  /// synthesized protocols, add the new variable and pattern bindings, and
-  /// create the inits parameterized over a raw value
-  ///
-  void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
-                           ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-                           MakeStructRawValuedOptions options =
-                               getDefaultMakeStructRawValuedOptions(),
-                           AccessLevel setterAccess = AccessLevel::Private);
 
   /// Build the union field getter and setter.
   ///

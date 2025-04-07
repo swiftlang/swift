@@ -1643,11 +1643,11 @@ namespace {
         options -= MakeStructRawValuedFlags::IsLet;
         options -= MakeStructRawValuedFlags::IsImplicit;
 
-        synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                        {KnownProtocolKind::RawRepresentable,
-                                         KnownProtocolKind::Equatable,
-                                         KnownProtocolKind::Hashable},
-                                        options, /*setterAccess=*/access);
+        Impl.makeStructRawValued(structDecl, underlyingType,
+                                 {KnownProtocolKind::RawRepresentable,
+                                  KnownProtocolKind::Equatable,
+                                  KnownProtocolKind::Hashable},
+                                 options, /*setterAccess=*/access);
 
         result = structDecl;
         break;
@@ -6622,12 +6622,12 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (unlabeledCtor)
       options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
 
-    synthesizer.makeStructRawValued(structDecl, storedUnderlyingType,
-                                    synthesizedProtocols, options);
+    Impl.makeStructRawValued(structDecl, storedUnderlyingType,
+                             synthesizedProtocols, options);
   } else {
     // We need to make a stored rawValue or storage type, and a
     // computed one of bridged type.
-    synthesizer.makeStructRawValuedWithBridge(
+    Impl.makeStructRawValuedWithBridge(
         structDecl, storedUnderlyingType, computedPropertyUnderlyingType,
         synthesizedProtocols,
         /*makeUnlabeledValueInit=*/unlabeledCtor);
@@ -6811,8 +6811,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   if (!underlyingType)
     return nullptr;
 
-  synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                  {KnownProtocolKind::OptionSet});
+  Impl.makeStructRawValued(structDecl, underlyingType,
+                           {KnownProtocolKind::OptionSet});
   auto selfType = structDecl->getDeclaredInterfaceType();
   Impl.addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
   Impl.addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement,

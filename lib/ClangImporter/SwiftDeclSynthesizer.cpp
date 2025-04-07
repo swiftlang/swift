@@ -21,6 +21,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/CXXMethodBridging.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 
@@ -793,14 +794,13 @@ static AccessorDecl *makeStructRawValueGetter(StructDecl *structDecl,
   return getterDecl;
 }
 
-void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
+void ClangImporter::Implementation::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     bool makeUnlabeledValueInit) {
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = SwiftContext;
 
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
+  addSynthesizedProtocolAttrs(structDecl, synthesizedProtocolAttrs);
 
   auto storedVarName = ctx.getIdentifier("_rawValue");
   auto computedVarName = ctx.Id_rawValue;
@@ -808,9 +808,11 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   // Create a variable to store the underlying value.
   VarDecl *storedVar;
   PatternBindingDecl *storedPatternBinding;
-  std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
-      structDecl, storedVarName, storedUnderlyingType, VarDecl::Introducer::Var,
-      /*isImplicit=*/true, AccessLevel::Private, AccessLevel::Private);
+  std::tie(storedVar, storedPatternBinding) =
+      SwiftDeclSynthesizer::createVarWithPattern(
+          structDecl, storedVarName, storedUnderlyingType,
+          VarDecl::Introducer::Var,
+          /*isImplicit=*/true, AccessLevel::Private, AccessLevel::Private);
 
   // Create a computed value variable.
   auto computedVar = new (ctx) VarDecl(
@@ -827,7 +829,8 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   importer::makeComputed(computedVar, computedVarGetter, nullptr);
 
   // Create a pattern binding to describe the variable.
-  Pattern *computedBindingPattern = createTypedNamedPattern(computedVar);
+  Pattern *computedBindingPattern =
+      SwiftDeclSynthesizer::createTypedNamedPattern(computedVar);
   auto *computedPatternBinding = PatternBindingDecl::createImplicit(
       ctx, StaticSpellingKind::None, computedBindingPattern,
       /*InitExpr*/ nullptr, structDecl);
@@ -851,19 +854,17 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
 
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       bridgedType);
-  ImporterImpl.RawTypes[structDecl] = bridgedType;
+  addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
+  RawTypes[structDecl] = bridgedType;
 }
 
-void SwiftDeclSynthesizer::makeStructRawValued(
+void ClangImporter::Implementation::makeStructRawValued(
     StructDecl *structDecl, Type underlyingType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
     MakeStructRawValuedOptions options, AccessLevel setterAccess) {
-  auto &ctx = ImporterImpl.SwiftContext;
+  auto &ctx = SwiftContext;
 
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
+  addSynthesizedProtocolAttrs(structDecl, synthesizedProtocolAttrs);
 
   // Create a variable to store the underlying value.
   VarDecl *var;
@@ -871,7 +872,7 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   auto introducer = (options.contains(MakeStructRawValuedFlags::IsLet)
                          ? VarDecl::Introducer::Let
                          : VarDecl::Introducer::Var);
-  std::tie(var, patternBinding) = createVarWithPattern(
+  std::tie(var, patternBinding) = SwiftDeclSynthesizer::createVarWithPattern(
       structDecl, ctx.Id_rawValue, underlyingType, introducer,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
       structDecl->getFormalAccess(), setterAccess);
@@ -894,9 +895,8 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
 
-  ImporterImpl.addSynthesizedTypealias(structDecl, ctx.Id_RawValue,
-                                       underlyingType);
-  ImporterImpl.RawTypes[structDecl] = underlyingType;
+  addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
+  RawTypes[structDecl] = underlyingType;
 }
 
 // MARK: Unions
