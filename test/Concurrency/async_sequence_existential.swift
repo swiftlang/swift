@@ -9,7 +9,8 @@ extension Error {
 }
 
 func test(seq: any AsyncSequence) async {
-  // CHECK: "error" interface_type="any Error"
+  // CHECK-LABEL: (catch_stmts
+  // CHECK:         (var_decl {{.*}} "error" interface_type="any Error"
   do {
     for try await _ in seq { }
   } catch {
