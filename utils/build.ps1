@@ -97,10 +97,6 @@ The path to a directory where built msi's and the installer executable should be
 The name of a build step after which the script should terminate.
 For example: -BuildTo ToolsSupportCore
 
-.PARAMETER ToBatch
-When set, runs the script in a special mode which outputs a listing of command invocations
-in batch file format instead of executing them.
-
 .PARAMETER HostArchName
 The architecture where the toolchain will execute.
 
@@ -116,7 +112,7 @@ PS> .\Build.ps1
 .EXAMPLE
 PS> .\Build.ps1 -WindowsSDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
 #>
-[CmdletBinding(PositionalBinding = $false)]
+[CmdletBinding(PositionalBinding = $false, SupportsShouldProcess)]
 param
 (
   [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
@@ -181,6 +177,10 @@ Set-StrictMode -Version 3.0
 # different architectures, and these variables cause confusion.
 if ($env:VSCMD_ARG_HOST_ARCH -or $env:VSCMD_ARG_TGT_ARCH) {
   throw "At least one of VSCMD_ARG_HOST_ARCH and VSCMD_ARG_TGT_ARCH is set, which is incompatible with this script. Likely need to run outside of a Developer shell."
+}
+
+if ($ToBatch) {
+  Write-Warning "-ToBatch is deprecated; use -WhatIf instead."
 }
 
 # Prevent elsewhere-installed swift modules from confusing our builds.
@@ -387,6 +387,8 @@ $KnownNDKs = @{
   }
 }
 
+$SCCacheMinVersion = [System.Version]::new(0, 7, 4)
+
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 # TODO: Support other cross-compilation scenarios.
 $BuildOS = [OS]::Windows
@@ -474,35 +476,40 @@ function Add-TimingData {
 }
 
 function Write-Summary {
-  Write-Host "Summary:" -ForegroundColor Cyan
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
 
-  $TotalTime = [TimeSpan]::Zero
-  foreach ($Entry in $TimingData) {
-    $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
-  }
+  if ($PSCmdlet.ShouldProcess("Performing the operation `"$($MyInvocation.MyCommand.Name)`".", "", "")) {
+    Write-Host "Summary:" -ForegroundColor Cyan
 
-  $SortedData = $TimingData | ForEach-Object {
-    $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
-    $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $_."Elapsed Time"
-    [PSCustomObject]@{
-      "Build Step" = $_."Build Step"
-      Platform = $_.Platform
-      Arch = $_.Arch
-      "Elapsed Time" = $FormattedTime
-      "%" = "$Percentage%"
+    $TotalTime = [TimeSpan]::Zero
+    foreach ($Entry in $TimingData) {
+      $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
     }
-  } | Sort-Object -Descending -Property "Elapsed Time"
 
-  $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
-  $TotalRow = [PSCustomObject]@{
-    "Build Step" = "TOTAL"
-    Platform = ""
-    Arch = ""
-    "Elapsed Time" = $FormattedTotalTime
-    "%" = "100.0%"
+    $SortedData = $TimingData | ForEach-Object {
+      $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
+      $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $_."Elapsed Time"
+      [PSCustomObject]@{
+        "Build Step" = $_."Build Step"
+        Platform = $_.Platform
+        Arch = $_.Arch
+        "Elapsed Time" = $FormattedTime
+        "%" = "$Percentage%"
+      }
+    } | Sort-Object -Descending -Property "Elapsed Time"
+
+    $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
+    $TotalRow = [PSCustomObject]@{
+      "Build Step" = "TOTAL"
+      Platform = ""
+      Arch = ""
+      "Elapsed Time" = $FormattedTotalTime
+      "%" = "100.0%"
+    }
+
+    @($SortedData) + $TotalRow | Format-Table -AutoSize
   }
-
-  @($SortedData) + $TotalRow | Format-Table -AutoSize
 }
 
 function Get-AndroidNDK {
@@ -676,38 +683,44 @@ function Get-ModuleTriple([Hashtable] $Platform) {
   return (Get-TargetInfo $Platform).moduleTriple
 }
 
-function Copy-File($Src, $Dst) {
-  # Create the directory tree first so Copy-Item succeeds
-  # If $Dst is the target directory, make sure it ends with "\"
-  $DstDir = [IO.Path]::GetDirectoryName($Dst)
-  if ($ToBatch) {
-    Write-Output "md `"$DstDir`""
-    Write-Output "copy /Y `"$Src`" `"$Dst`""
-  } else {
+function Copy-File {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([string] $Src, [string] $Dst)
+
+  if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
+    # Create the directory tree first so Copy-Item succeeds
+    # If $Dst is the target directory, make sure it ends with "\"
+    $DstDir = [IO.Path]::GetDirectoryName($Dst)
     New-Item -ItemType Directory -ErrorAction Ignore $DstDir | Out-Null
     Copy-Item -Force $Src $Dst
   }
 }
 
-function Copy-Directory($Src, $Dst) {
-  if ($ToBatch) {
-    Write-Output "md `"$Dst`""
-    Write-Output "copy /Y `"$Src`" `"$Dst`""
-  } else {
+function Copy-Directory {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([string] $Src, [string] $Dst)
+
+  if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
     New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
     Copy-Item -Force -Recurse $Src $Dst
   }
 }
 
-function Move-Directory($Src, $Dst) {
-  if ($ToBatch) {
-  } else {
-    $Destination = Join-Path -Path $Dst -ChildPath (Split-Path -Path $Src -Leaf)
-    if (Test-Path -Path $Destination -Type Container) {
-      Remove-Item -Path $Destination -Recurse -Force | Out-Null
-    }
-    Move-Item -Path $Src -Destination $Dst -Force | Out-Null
+function Move-File {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([string] $Src, [string] $Dst)
+
+  if ($PSCmdlet.ShouldProcess("$Src -> $Dst")) {
+    Move-Item $Src $Dst
   }
+}
+
+function Move-Directory($Src, $Dst) {
+  $Destination = Join-Path -Path $Dst -ChildPath (Split-Path -Path $Src -Leaf)
+  if (Test-Path -Path $Destination -Type Container) {
+    Remove-Item -Path $Destination -Recurse -Force | Out-Null
+  }
+  Move-Item -Path $Src -Destination $Dst -Force | Out-Null
 }
 
 function Invoke-Program() {
@@ -724,107 +737,76 @@ function Invoke-Program() {
     [string[]] $ExecutableArgs
   )
 
-  if ($ToBatch) {
-    # Print the invocation in batch file-compatible format
-    $OutputLine = "`"$Executable`""
-    $ShouldBreakLine = $false
-    for ($i = 0; $i -lt $ExecutableArgs.Length; $i++) {
-      if ($ShouldBreakLine -or $OutputLine.Length -ge 40) {
-        $OutputLine += " ^"
-        Write-Output $OutputLine
-        $OutputLine = "  "
-      }
-
-      $Arg = $ExecutableArgs[$i]
-      if ($Arg.Contains(" ")) {
-        $OutputLine += " `"$Arg`""
-      } else {
-        $OutputLine += " $Arg"
-      }
-
-      # Break lines after non-switch arguments
-      $ShouldBreakLine = -not $Arg.StartsWith("-")
-    }
-
-    if ($OutNull) {
-      $OutputLine += " > nul"
-    } elseif ($Silent) {
-      $OutputLine += " *> nul"
-    } else {
-      if ($OutFile) { $OutputLine += " > `"$OutFile`"" }
-      if ($ErrorFile) { $OutputLine += " 2> `"$ErrorFile`"" }
-    }
-
-    Write-Output $OutputLine
+  if ($OutNull) {
+    & $Executable @ExecutableArgs | Out-Null
+  } elseif ($Silent) {
+    & $Executable @ExecutableArgs *> $null
+  } elseif ($OutFile -and $ErrorFile) {
+    & $Executable @ExecutableArgs > $OutFile 2> $ErrorFile
+  } elseif ($OutFile) {
+    & $Executable @ExecutableArgs > $OutFile
+  } elseif ($ErrorFile) {
+    & $Executable @ExecutableArgs 2> $ErrorFile
   } else {
-    if ($OutNull) {
-      & $Executable @ExecutableArgs | Out-Null
-    } elseif ($Silent) {
-      & $Executable @ExecutableArgs *> $null
-    } elseif ($OutFile -and $ErrorFile) {
-      & $Executable @ExecutableArgs > $OutFile 2> $ErrorFile
-    } elseif ($OutFile) {
-      & $Executable @ExecutableArgs > $OutFile
-    } elseif ($ErrorFile) {
-      & $Executable @ExecutableArgs 2> $ErrorFile
-    } else {
-      & $Executable @ExecutableArgs
+    & $Executable @ExecutableArgs
+  }
+
+  if ($LastExitCode -ne 0) {
+    $ErrorMessage = "Error: $([IO.Path]::GetFileName($Executable)) exited with code $($LastExitCode).`n"
+
+    $ErrorMessage += "Invocation:`n"
+    $ErrorMessage += "  $Executable $ExecutableArgs`n"
+
+    $ErrorMessage += "Call stack:`n"
+    foreach ($Frame in @(Get-PSCallStack)) {
+      $ErrorMessage += "  $Frame`n"
     }
 
-    if ($LastExitCode -ne 0) {
-      $ErrorMessage = "Error: $([IO.Path]::GetFileName($Executable)) exited with code $($LastExitCode).`n"
-
-      $ErrorMessage += "Invocation:`n"
-      $ErrorMessage += "  $Executable $ExecutableArgs`n"
-
-      $ErrorMessage += "Call stack:`n"
-      foreach ($Frame in @(Get-PSCallStack)) {
-        $ErrorMessage += "  $Frame`n"
-      }
-
-      throw $ErrorMessage
-    }
+    throw $ErrorMessage
   }
 }
 
 function Invoke-IsolatingEnvVars([scriptblock]$Block) {
-  if ($ToBatch) {
-    Write-Output "setlocal enableextensions enabledelayedexpansion"
-  }
-
-  $OldVars = @{}
-  foreach ($Var in (Get-ChildItem env:*).GetEnumerator()) {
-    $OldVars.Add($Var.Key, $Var.Value)
+  # Handle -WhatIf manually here instead of allowing it to propegate to the various
+  # built-in commands to suppress a ton of extra output as we remove and add env vars.
+  if ($WhatIfPreference) {
+    Write-Host "What if: Performing the operation `"$($MyInvocation.MyCommand.Name)`" for the following command(s):"
+  } else {
+    $OldVars = @{}
+    foreach ($Var in (Get-ChildItem env:*).GetEnumerator()) {
+      $OldVars.Add($Var.Key, $Var.Value)
+    }
   }
 
   & $Block
 
-  Remove-Item env:*
-  foreach ($Var in $OldVars.GetEnumerator()) {
-    New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
-  }
-
-  if ($ToBatch) {
-    Write-Output "endlocal"
+  if ($WhatIfPreference) {
+    Write-Host "What if: Finished the operation `"$($MyInvocation.MyCommand.Name)`", restoring local environment."
+  } else {
+    Remove-Item env:*
+    foreach ($Var in $OldVars.GetEnumerator()) {
+      New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
+    }
   }
 }
 
-function Invoke-VsDevShell([Hashtable] $Platform) {
-  if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
-    Write-Warning "Invoke-VsDevShell called on non-Windows platform."
-    return
-  }
+function Invoke-VsDevShell {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([Hashtable] $Platform)
 
-  $DevCmdArguments = "-no_logo -host_arch=$($BuildPlatform.Architecture.VSName) -arch=$($Platform.Architecture.VSName)"
-  if ($CustomWinSDKRoot) {
-    $DevCmdArguments += " -winsdk=none"
-  } elseif ($WinSDKVersion) {
-    $DevCmdArguments += " -winsdk=$WinSDKVersion"
-  }
+  if ($PSCmdlet.ShouldProcess($Platform.Architecture.VSName)) {
+    if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
+      Write-Warning "4DevShell called on non-Windows platform."
+      return
+    }
 
-  if ($ToBatch) {
-    Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
-  } else {
+    $DevCmdArguments = "-no_logo -host_arch=$($BuildPlatform.Architecture.VSName) -arch=$($Platform.Architecture.VSName)"
+    if ($CustomWinSDKRoot) {
+      $DevCmdArguments += " -winsdk=none"
+    } elseif ($WinSDKVersion) {
+      $DevCmdArguments += " -winsdk=$WinSDKVersion"
+    }
+
     # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
@@ -853,22 +835,22 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
 }
 
 function Get-Dependencies {
-  Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies ..." -ForegroundColor Cyan
-  $ProgressPreference = "SilentlyContinue"
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
 
+  $ProgressPreference = "SilentlyContinue"
   $WebClient = New-Object Net.WebClient
 
-  function DownloadAndVerify($URL, $Destination, $Hash) {
-    if (Test-Path $Destination) {
-      return
-    }
+  function DownloadAndVerify {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([string] $URL, [string] $Destination, [string] $Hash)
 
-    Write-Output "$Destination not found. Downloading ..."
-    if ($ToBatch) {
-      Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
-      Write-Output "curl.exe -sL $URL -o $Destination"
-      Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
-    } else {
+    if ($PSCmdlet.ShouldProcess("$URL -> $Destination")) {
+      if (Test-Path $Destination) {
+        return
+      }
+
+      Write-Output "$Destination not found. Downloading ..."
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
       $WebClient.DownloadFile($URL, $Destination)
       $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
@@ -879,73 +861,82 @@ function Get-Dependencies {
   }
 
   function Expand-ZipFile {
+    [CmdletBinding(SupportsShouldProcess)]
     param
     (
-        [string]$ZipFileName,
-        [string]$BinaryCache,
-        [string]$ExtractPath,
-        [bool]$CreateExtractPath = $true
+        [string] $ZipFileName,
+        [string] $BinaryCache,
+        [string] $ExtractPath,
+        [bool] $CreateExtractPath = $true
     )
 
-    $source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
-    $destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
+    if ($PSCmdlet.ShouldProcess($ZipFileName)) {
+      $Source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
+      $Destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
 
-    # Check if the extracted directory already exists and is up to date.
-    if (Test-Path $destination) {
-        $zipLastWriteTime = (Get-Item $source).LastWriteTime
-        $extractedLastWriteTime = (Get-Item $destination).LastWriteTime
-        # Compare the last write times
-        if ($zipLastWriteTime -le $extractedLastWriteTime) {
-            Write-Output "'$ZipFileName' is already extracted and up to date."
-            return
-        }
+      # Check if the extracted directory already exists and is up to date.
+      if (Test-Path $Destination) {
+          $ZipLastWriteTime = (Get-Item $Source).LastWriteTime
+          $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
+          if ($ZipLastWriteTime -le $ExtractedLastWriteTime) {
+              Write-Output "'$ZipFileName' is already extracted and up to date."
+              return
+          }
+      }
+
+      $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
+
+      Write-Output "Extracting '$ZipFileName' ..."
+      New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
+      Expand-Archive -Path $Source -DestinationPath $Destination -Force
     }
-
-    $destination = if ($CreateExtractPath) { $destination } else { $BinaryCache }
-
-    Write-Output "Extracting '$ZipFileName' ..."
-    New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
-    Expand-Archive -Path $source -DestinationPath $destination -Force
   }
 
   function Export-Toolchain {
+    [CmdletBinding(SupportsShouldProcess)]
     param
     (
-        [string]$InstallerExeName,
-        [string]$BinaryCache,
-        [string]$ToolchainName
+        [string] $InstallerExeName,
+        [string] $BinaryCache,
+        [string] $ToolchainName
     )
 
-    $source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
-    $destination = Join-Path -Path $BinaryCache -ChildPath toolchains\$ToolchainName
+    if ($PSCmdlet.ShouldProcess($InstallerExeName)) {
+      $Source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
+      $Destination = Join-Path -Path $BinaryCache -ChildPath toolchains\$ToolchainName
 
-    # Check if the extracted directory already exists and is up to date.
-    if (Test-Path $destination) {
-        $installerWriteTime = (Get-Item $source).LastWriteTime
-        $extractedWriteTime = (Get-Item $destination).LastWriteTime
-        if ($installerWriteTime -le $extractedWriteTime) {
-            Write-Output "'$InstallerExeName' is already extracted and up to date."
-            return
-        }
-    }
+      # Check if the extracted directory already exists and is up to date.
+      if (Test-Path $Destination) {
+          $InstallerWriteTime = (Get-Item $Source).LastWriteTime
+          $ExtractedWriteTime = (Get-Item $Destination).LastWriteTime
+          if ($InstallerWriteTime -le $ExtractedWriteTime) {
+              Write-Output "'$InstallerExeName' is already extracted and up to date."
+              return
+          }
+      }
 
-    Write-Output "Extracting '$InstallerExeName' ..."
+      Write-Output "Extracting '$InstallerExeName' ..."
 
-    # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
-    Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
-    Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
-      $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-      $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-      Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+      # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
+      New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
+      Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+      Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+        $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
+        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+      }
+    } else {
+      Write-Host "What if: `"$($WiX.Path)\wix.exe`" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\"
     }
   }
 
   if ($SkipBuild -and $SkipPackaging) { return }
 
-  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-  if ($ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies..."
+  if ($WhatIfPreference) {
+    Write-Host "What if: Performing the operation `"$($MyInvocation.MyCommand.Name)`""
+  } else {
+    Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] `"$MyInvocation.MyCommand.Name`" ..." -ForegroundColor Cyan
+    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
   }
 
   DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
@@ -977,32 +968,40 @@ function Get-Dependencies {
   function Install-Python([string] $ArchName) {
     $Python = Get-KnownPython $ArchName
     DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
-    if (-not $ToBatch) {
-      Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+    Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+  }
+
+  function Install-PIPIfNeeded {
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+
+    if ($PSCmdlet.ShouldProcess($BuildArchName)) {
+      try {
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
+      } catch {
+        Write-Output "Installing pip ..."
+        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
+      } finally {
+        Write-Output "pip installed."
+      }
     }
   }
 
-  function Install-PIPIfNeeded() {
-    try {
-      Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
-    } catch {
-      Write-Output "Installing pip ..."
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
-    } finally {
-      Write-Output "pip installed."
-    }
-  }
+  function Install-PythonWheel {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([string] $ModuleName)
 
-  function Install-PythonWheel([string] $ModuleName) {
-    try {
-      Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
-    } catch {
-      $Wheel = $PythonWheels[$ModuleName]
-      DownloadAndVerify $Wheel.URL "$BinaryCache\python\$($Wheel.File)" $Wheel.SHA256
-      Write-Output "Installing '$($Wheel.File)' ..."
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$($Wheel.File)" --disable-pip-version-check
-    } finally {
-      Write-Output "$ModuleName installed."
+    if ($PSCmdlet.ShouldProcess($ModuleName)) {
+      try {
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
+      } catch {
+        $Wheel = $PythonWheels[$ModuleName]
+        DownloadAndVerify $Wheel.URL "$BinaryCache\python\$($Wheel.File)" $Wheel.SHA256
+        Write-Output "Installing '$($Wheel.File)' ..."
+        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$($Wheel.File)" --disable-pip-version-check
+      } finally {
+        Write-Output "$ModuleName installed."
+      }
     }
   }
 
@@ -1066,12 +1065,11 @@ function Get-Dependencies {
     }
   }
 
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)"
-    Write-Host ""
-  }
-  if ($Summary) {
-    Add-TimingData $BuildPlatform "Get-Dependencies" $Stopwatch.Elapsed
+  if (-not $WhatIfPreference) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)`n"
+    if ($Summary) {
+      Add-TimingData $BuildPlatform "Get-Dependencies" $Stopwatch.Elapsed
+    }
   }
 }
 
@@ -1133,18 +1131,27 @@ function Add-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value) {
   }
 }
 
-function Test-SCCacheAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
-  if ($ToBatch) { return $false }
+function Test-SCCacheAtLeast {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([System.Version] $MinVersion)
 
-  $SCCacheVersionString = @(& sccache.exe --version)[0]
-  if (-not ($SCCacheVersionString -match "sccache (\d+)\.(\d+)(?:\.(\d+))?")) {
-    throw "Unexpected SCCache version string format"
+  if ($PSCmdLet.ShouldProcess($MinVersion)) {
+    $SCCacheVersionString = @(& sccache.exe --version)[0]
+    if (-not ($SCCacheVersionString -match "sccache (.+)")) {
+        throw "Unexpected SCCache version string format"
+    } else {
+      $VersionString = $Matches[1]
+    }
+
+    try {
+        $CurrentVersion = [System.Version]::new($VersionString)
+        return $CurrentVersion -ge $MinimumVersion
+    } catch {
+        throw "Failed to parse SCCache version string: $VersionString"
+    }
+  } else {
+    return $true
   }
-
-  if ([int]$Matches.1 -ne $Major) { return [int]$Matches.1 -gt $Major }
-  if ([int]$Matches.2 -ne $Minor) { return [int]$Matches.2 -gt $Minor }
-  if ($null -eq $Matches.3) { return 0 -gt $Patch }
-  return [int]$Matches.3 -ge $Patch
 }
 
 function Get-PlatformRoot([OS] $OS) {
@@ -1162,7 +1169,7 @@ function Get-SwiftSDK {
 }
 
 function Build-CMakeProject {
-  [CmdletBinding(PositionalBinding = $false)]
+  [CmdletBinding(PositionalBinding = $false, SupportsShouldProcess)]
   param
   (
     [string] $Src,
@@ -1183,15 +1190,6 @@ function Build-CMakeProject {
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
   )
-
-  if ($ToBatch) {
-    Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' ..."
-  } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
-  }
-
-  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   # Enter the developer command shell early so we can resolve cmake.exe
   # for version checks.
@@ -1456,37 +1454,47 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
-    } elseif ($UsePinnedCompilers.Contains("Swift")) {
-      $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
-    }
-
-    if ($ToBatch) {
-      Write-Output ""
-      Write-Output "echo cmake.exe $cmakeGenerateArgs"
-    } else {
-      Write-Host "cmake.exe $cmakeGenerateArgs"
-    }
-    Invoke-Program cmake.exe @cmakeGenerateArgs
-
-    # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program cmake.exe --build $Bin
-      } else {
-        Invoke-Program cmake.exe --build $Bin --target $Target
+    if (-not $WhatIfPreference) {
+      # Don't keep growing $env:Path in WhatIf since we don't clean it up.
+      if ($UseBuiltCompilers.Contains("Swift")) {
+        Write-Host -ForegroundColor Blue "PATH = $env:Path"
+        $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
+      } elseif ($UsePinnedCompilers.Contains("Swift")) {
+        $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
       }
     }
 
-    if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-      Invoke-Program cmake.exe --build $Bin --target install
-    }
-  }
+    if ($PSCmdlet.ShouldProcess($Src)) {
+      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
+      $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
-    Write-Host ""
+      Write-Host "cmake.exe $cmakeGenerateArgs"
+      Invoke-Program cmake.exe @cmakeGenerateArgs
+
+      # Build all requested targets
+      foreach ($Target in $BuildTargets) {
+        if ($Target -eq "default") {
+          Invoke-Program cmake.exe --build $Bin
+        } else {
+          Invoke-Program cmake.exe --build $Bin --target $Target
+        }
+      }
+
+      if ($BuildTargets.Length -eq 0 -and $InstallTo) {
+        Invoke-Program cmake.exe --build $Bin --target install
+      }
+      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)`n"
+    } else {
+      # -WhatIf was specified - show what would be done without executing
+      Write-Host "What if: cmake.exe $cmakeGenerateArgs"
+      if ($BuildTargets.Length -eq 0 -and $InstallTo) {
+        Write-Host "What if: cmake.exe --build $Bin"
+      } else {
+        foreach ($Target in $BuildTargets) {
+          Write-Host "What if: cmake.exe --build $Bin --Target $Target"
+        }
+      }
+    }
   }
 }
 
@@ -1500,7 +1508,7 @@ enum SPMBuildAction {
 }
 
 function Build-SPMProject {
-  [CmdletBinding(PositionalBinding = $false)]
+  [CmdletBinding(PositionalBinding = $false, SupportsShouldProcess)]
   param
   (
     [SPMBuildAction] $Action,
@@ -1518,14 +1526,6 @@ function Build-SPMProject {
     TestParallel { "Testing" }
   }
 
-  if ($ToBatch) {
-    Write-Output ""
-    Write-Output "echo $ActionForOutput '$Src' to '$Bin' ..."
-  } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' ..."
-  }
-
-  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   Invoke-IsolatingEnvVars {
     $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion)
@@ -1566,25 +1566,28 @@ function Build-SPMProject {
       }
     }
 
-    Invoke-Program "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
-  }
+    if ($PSCmdlet.ShouldProcess("$ActionName `"$Src`"")) {
+      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' ..."
+      $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
-    Write-Host ""
+      Invoke-Program "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
+      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)`n"
+    } else {
+      Write-Host "What if: `"$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe`" $ActionName $Arguments $AdditionalArguments"
+    }
   }
 }
 
 function Build-WiXProject() {
-  [CmdletBinding(PositionalBinding = $false)]
+  [CmdletBinding(PositionalBinding = $false, SupportsShouldProcess)]
   param
   (
-    [Parameter(Position = 0, Mandatory = $true)]
-    [string]$FileName,
-    [Parameter(Mandatory = $true)]
-    [hashtable]$Platform,
-    [switch]$Bundle,
-    [hashtable]$Properties = @{}
+    [Parameter(Position = 0, Mandatory)]
+    [string] $FileName,
+    [Parameter(Mandatory)]
+    [hashtable] $Platform,
+    [switch] $Bundle,
+    [hashtable] $Properties = @{}
   )
 
   $ProductVersionArg = $ProductVersion
@@ -1615,7 +1618,9 @@ function Build-WiXProject() {
   $MSBuildArgs += "-binaryLogger:$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
   $MSBuildArgs += "-detailedSummary:False"
 
-  Invoke-Program $msbuild @MSBuildArgs
+  if ($PSCmdlet.ShouldProcess("msbuild.exe $MSBuildArgs")) {
+    Invoke-Program $msbuild @MSBuildArgs
+  }
 }
 
 # TODO(compnerd): replace this with Get-{Build,Host,Target}ProjectBinaryCache
@@ -1675,17 +1680,19 @@ function Build-BuildTools([Hashtable] $Platform) {
 }
 
 function Write-PList {
-  [CmdletBinding(PositionalBinding = $false)]
+  [CmdletBinding(PositionalBinding = $false, SupportsShouldProcess)]
   param
   (
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory)]
     [PSCustomObject] $Settings,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory)]
     [string] $Path
   )
 
-  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps($(($Settings | ConvertTo-JSON -Compress) -replace '"', "'")), encoding='utf-8'))" `
-      -OutFile $Path
+  if ($PSCmdlet.ShouldProcess($Path)) {
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps($(($Settings | ConvertTo-JSON -Compress) -replace '"', "'")), encoding='utf-8'))" `
+        -OutFile $Path
+  }
 }
 
 function Load-LitTestOverrides($Filename) {
@@ -1818,14 +1825,14 @@ function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $Te
 
       # Transitive dependency of _lldb.pyd
       $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-      Copy-Item $RuntimeBinaryCache\bin\swiftCore.dll "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
+      Copy-File $RuntimeBinaryCache\bin\swiftCore.dll "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
 
       # Runtime dependencies of repl_swift.exe
       $SwiftRTSubdir = "lib\swift\windows"
       Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir'"
-      Copy-Item "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
+      Copy-File "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
       Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
-      Copy-Item "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
+      Copy-File "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
 
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";
@@ -1859,83 +1866,81 @@ function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $Te
 
 # Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
 function Build-mimalloc() {
-  [CmdletBinding(PositionalBinding = $false)]
-  param
-  (
-    [Parameter(Position = 0, Mandatory = $true)]
-    [hashtable]$Platform
-  )
+  [CmdletBinding(SupportsShouldProcess)]
+  param([hashtable] $Platform)
 
-  # TODO: migrate to the CMake build
-  $MSBuildArgs = @()
-  $MSBuildArgs += "-noLogo"
-  $MSBuildArgs += "-maxCpuCount"
+  if ($PSCmdlet.ShouldProcess($Platform.Triple)) {
+    # TODO: migrate to the CMake build
+    $MSBuildArgs = @()
+    $MSBuildArgs += "-noLogo"
+    $MSBuildArgs += "-maxCpuCount"
 
-  $Properties = @{}
-  Add-KeyValueIfNew $Properties Configuration Release
-  Add-KeyValueIfNew $Properties OutDir "$BinaryCache\$($Platform.Triple)\mimalloc\bin\"
-  Add-KeyValueIfNew $Properties Platform "$($Platform.Architecture.ShortName)"
+    $Properties = @{}
+    Add-KeyValueIfNew $Properties Configuration Release
+    Add-KeyValueIfNew $Properties OutDir "$BinaryCache\$($Platform.Triple)\mimalloc\bin\"
+    Add-KeyValueIfNew $Properties Platform "$($Platform.Architecture.ShortName)"
 
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $Platform
-    # Avoid hard-coding the VC tools version number
-    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-    if ($VCRedistDir) {
-      Add-KeyValueIfNew $Properties VCRedistDir "$VCRedistDir\"
+    Invoke-IsolatingEnvVars {
+      Invoke-VsDevShell $Platform
+      # Avoid hard-coding the VC tools version number
+      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+      if ($VCRedistDir) {
+        Add-KeyValueIfNew $Properties VCRedistDir "$VCRedistDir\"
+      }
     }
-  }
 
-  foreach ($Property in $Properties.GetEnumerator()) {
-    if ($Property.Value.Contains(" ")) {
-      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
-    } else {
-      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
+    foreach ($Property in $Properties.GetEnumerator()) {
+      if ($Property.Value.Contains(" ")) {
+        $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
+      } else {
+        $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
+      }
     }
-  }
 
-  Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-lib.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc\"
-  Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-override-dll.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc-override-dll\"
+    Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-lib.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc\"
+    Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-override-dll.vcxproj" @MSBuildArgs "-p:IntDir=$BinaryCache\$($Platform.Triple)\mimalloc\mimalloc-override-dll\"
 
-  $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
-  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
+    $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
+    $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
-  foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
-    Copy-Item -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
-  }
+    foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
+      Copy-Item -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
+    }
 
-  # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
-  # https://github.com/microsoft/mimalloc/issues/997
-  if ($IsCrossCompiling) {
-    Copy-Item -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\mimalloc-redirect$HostSuffix.dll" -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\mimalloc-redirect$BuildSuffix.dll"
-  }
+    # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
+    # https://github.com/microsoft/mimalloc/issues/997
+    if ($IsCrossCompiling) {
+      Copy-Item -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\mimalloc-redirect$HostSuffix.dll" -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\mimalloc-redirect$BuildSuffix.dll"
+    }
 
-  # TODO: should we split this out into its own function?
-  $Tools = @(
-    "swift.exe",
-    "swiftc.exe",
-    "swift-driver.exe",
-    "swift-frontend.exe",
-    "clang.exe",
-    "clang++.exe",
-    "clang-cl.exe",
-    "lld.exe",
-    "lld-link.exe",
-    "ld.lld.exe",
-    "ld64.lld.exe"
-  )
-  foreach ($Tool in $Tools) {
-    $Binary = [IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $Tool)
-    # Binary-patch in place
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
-    # Log the import table
-    $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Tool.txt"
-    $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Tool-error.txt"
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
-    # Verify patching
-    $Found = Select-String -Path $LogFile -Pattern "mimalloc"
-    if (-not $Found) {
-      Get-Content $ErrorFile
-      throw "Failed to patch mimalloc for $Tool"
+    # TODO: should we split this out into its own function?
+    $Tools = @(
+      "swift.exe",
+      "swiftc.exe",
+      "swift-driver.exe",
+      "swift-frontend.exe",
+      "clang.exe",
+      "clang++.exe",
+      "clang-cl.exe",
+      "lld.exe",
+      "lld-link.exe",
+      "ld.lld.exe",
+      "ld64.lld.exe"
+    )
+    foreach ($Tool in $Tools) {
+      $Binary = [IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $Tool)
+      # Binary-patch in place
+      Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
+      # Log the import table
+      $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Tool.txt"
+      $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Tool-error.txt"
+      Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
+      # Verify patching
+      $Found = Select-String -Path $LogFile -Pattern "mimalloc"
+      if (-not $Found) {
+        Get-Content $ErrorFile
+        throw "Failed to patch mimalloc for $Tool"
+      }
     }
   }
 }
@@ -1953,14 +1958,19 @@ function Build-LLVM([Hashtable] $Platform) {
 }
 
 function Build-Sanitizers([Hashtable] $Platform) {
-  $LLVMTargetCache = $(Get-ProjectBinaryCache $Platform LLVM)
-  $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
-  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
-    throw "Unexpected version string output from llvm-lit.py"
+  $LLVMTargetCache = ""
+  $InstallTo = ""
+
+  if (-not $WhatIfPreference) {
+    $LLVMTargetCache = $(Get-ProjectBinaryCache $Platform LLVM)
+    $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
+    if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
+      throw "Unexpected version string output from llvm-lit.py"
+    }
+    $LLVMVersionMajor = $Matches.1
+    $InstallTo = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
+    Write-Host "Sanitizers SDK directory: $InstallTo"
   }
-  $LLVMVersionMajor = $Matches.1
-  $InstallTo = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
-  Write-Host "Sanitizers SDK directory: $InstallTo"
 
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
@@ -2418,9 +2428,14 @@ function Test-Foundation {
 }
 
 function Build-FoundationMacros([Hashtable] $Platform) {
-  $SwiftSyntaxDir = (Get-ProjectCMakeModules $Platform Compilers)
-  if (-not (Test-Path $SwiftSyntaxDir)) {
-    throw "The swift-syntax from the compiler build for $($Platform.OS) $($Platform.Architecture.ShortName) isn't available"
+  $Defines = @{}
+
+  if (-not $WhatIfPreference) {
+    $SwiftSyntaxDir = (Get-ProjectCMakeModules $Platform Compilers)
+    if (-not (Test-Path $SwiftSyntaxDir)) {
+      throw "The swift-syntax from the compiler build for $($Platform.OS) $($Platform.Architecture.ShortName) isn't available"
+    }
+    $Defines = @{ SwiftSyntax_DIR = $SwiftSyntaxDir; }
   }
 
   Build-CMakeProject `
@@ -2430,9 +2445,7 @@ function Build-FoundationMacros([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers Swift `
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
-    -Defines @{
-      SwiftSyntax_DIR = $SwiftSyntaxDir;
-    }
+    -Defines $Defines
 }
 
 function Build-XCTest([Hashtable] $Platform) {
@@ -2518,21 +2531,26 @@ function Write-PlatformInfoPlist([Hashtable] $Platform) {
 # Copies files installed by CMake from the arch-specific platform root,
 # where they follow the layout expected by the installer,
 # to the final platform root, following the installer layout.
-function Install-Platform([Hashtable[]] $Platforms, [OS] $OS) {
-  # Copy SDK header files
-  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
-    $ModuleDirectory = "$(Get-SwiftSDK $OS)\usr\lib\swift\$Module"
-    if (Test-Path $ModuleDirectory) {
-      Move-Directory $ModuleDirectory "$(Get-SwiftSDK $OS)\usr\include\"
-    }
-  }
+function Install-Platform {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([Hashtable[]] $Platforms, [OS] $OS)
 
-  # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
-  foreach ($Platform in $Platforms) {
-    $PlatformResources = "$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString().ToLowerInvariant())"
-    Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
-      if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
-        Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
+  if ($PSCmdlet.ShouldProcess("$OS ($Platforms)")) {
+    # Copy SDK header files
+    foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
+      $ModuleDirectory = "$(Get-SwiftSDK $OS)\usr\lib\swift\$Module"
+      if (Test-Path $ModuleDirectory) {
+        Move-Directory $ModuleDirectory "$(Get-SwiftSDK $OS)\usr\include\"
+      }
+    }
+
+    # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
+    foreach ($Platform in $Platforms) {
+      $PlatformResources = "$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString().ToLowerInvariant())"
+      Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
+        if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
+          Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
+        }
       }
     }
   }
@@ -2998,24 +3016,27 @@ function Build-TestingMacros([Hashtable] $Platform) {
     }
 }
 
-function Install-HostToolchain() {
-  if ($ToBatch) { return }
+function Install-HostToolchain {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
 
-  # We've already special-cased $HostPlatform.ToolchainInstallRoot to point to $ToolchainInstallRoot.
-  # There are only a few extra restructuring steps we need to take care of.
+  if ($PSCmdlet.ShouldProcess($HostArchName)) {
+    # We've already special-cased $HostPlatform.ToolchainInstallRoot to point to $ToolchainInstallRoot.
+    # There are only a few extra restructuring steps we need to take care of.
 
-  # Restructure _InternalSwiftScan (keep the original one for the installer)
-  Copy-Item -Force `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\include"
-  Copy-Item -Force `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
-    "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+    # Restructure _InternalSwiftScan (keep the original one for the installer)
+    Copy-Item -Force `
+      "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\_InternalSwiftScan" `
+      "$($HostPlatform.ToolchainInstallRoot)\usr\include"
+    Copy-Item -Force `
+      "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\_InternalSwiftScan.lib" `
+      "$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
-  # Switch to swift-driver
-  $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
-  Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
-  Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+    # Switch to swift-driver
+    $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
+    Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe"
+    Copy-Item -Force $SwiftDriver "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+  }
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -3092,10 +3113,15 @@ function Build-Installer([Hashtable] $Platform) {
 
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $Platform
-    # Avoid hard-coding the VC tools version number
-    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-    if ($VCRedistDir) {
-      $Properties["VCRedistDir"] = "$VCRedistDir\"
+    if ($WhatIfPreference) {
+      # Get-ChildItem doesn't support -WhatIf and fails if it can't find the path, so just print that we would find it.
+      Write-Host "What if: Performing operation `"Find `$VCRedistDir`" on target `"$($HostPlatform.Architecture.ShortName)`"."
+    } else {
+      # Avoid hard-coding the VC tools version number
+      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostPlatform.Architecture.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+      if ($VCRedistDir) {
+        $Properties["VCRedistDir"] = "$VCRedistDir\"
+      }
     }
   }
 
@@ -3118,11 +3144,7 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   }
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
-  if ($ToBatch) {
-    Write-Output "md `"$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)`""
-  } else {
-    New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
-  }
+  New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
   Invoke-Program "$($WiX.Path)\wix.exe" -- burn detach "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
 }
 
@@ -3147,8 +3169,8 @@ if ($Clean) {
 }
 
 if (-not $SkipBuild) {
-  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
-    throw "Minimum required sccache version is 0.7.4"
+  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -MinVersion $SCCacheMinVersion))) {
+    throw "Minimum required sccache version is $SCCacheMinVersion"
   }
 
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
@@ -3225,8 +3247,8 @@ if (-not $SkipBuild) {
       Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
       Invoke-BuildStep Build-Foundation $Platform -Static
 
-      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
-      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-File "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-File "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
     }
     Install-Platform $AndroidSDKPlatforms Android
     Invoke-BuildStep Write-PlatformInfoPlist $Platform
