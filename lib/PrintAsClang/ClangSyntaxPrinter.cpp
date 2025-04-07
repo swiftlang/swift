@@ -207,7 +207,8 @@ void ClangSyntaxPrinter::printNamespace(
 void ClangSyntaxPrinter::printParentNamespaceForNestedTypes(
     const ValueDecl *D, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
     NamespaceTrivia trivia) const {
-  if (!isa_and_nonnull<NominalTypeDecl>(D->getDeclContext()->getAsDecl())) {
+  if (!isa_and_nonnull<NominalTypeDecl>(D->getDeclContext()->getAsDecl()) ||
+      importer::isClangNamespace(D->getDeclContext())) {
     bodyPrinter(os);
     return;
   }

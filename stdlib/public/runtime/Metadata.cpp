@@ -7807,44 +7807,50 @@ checkMetadataDependency(MetadataDependency dependency) {
 void swift::blockOnMetadataDependency(MetadataDependency root,
                                       MetadataDependency firstLink) {
   std::vector<MetadataDependency> links;
-  auto checkNewLink = [&](MetadataDependency newLink) {
-    links.push_back(newLink);
-    for (auto i = links.begin(), e = links.end() - 1; i != e; ++i) {
-      if (i->Value == newLink.Value) {
-        diagnoseMetadataDependencyCycle(
-          llvm::makeArrayRef(&*i, links.end() - i));
-      }
-    }
-  };
-
   links.push_back(root);
 
   // Iteratively add each link, checking for a cycle, until we reach
   // something without a known dependency.
-  checkNewLink(firstLink);
-  while (true) {
+
+  // Start out with firstLink. The initial NewState value won't be
+  // used, so just initialize it to an arbitrary value.
+  MetadataStateWithDependency currentCheckResult{
+      PrivateMetadataState::Allocating, firstLink};
+
+  // If there isn't a known dependency, we can't do any more checking.
+  while (currentCheckResult.Dependency) {
+    // Add this dependency to our links.
+    links.push_back(currentCheckResult.Dependency);
+
     // Try to get a dependency for the metadata in the last link we added.
-    auto checkResult = checkMetadataDependency(links.back());
+    currentCheckResult = checkMetadataDependency(links.back());
 
-    // If there isn't a known dependency, we can't do any more checking.
-    if (!checkResult.Dependency) {
-      // In the special case where it's the first link that doesn't have
-      // a known dependency and its current metadata state now satisfies
-      // the dependency leading to it, we can skip waiting.
-      if (links.size() == 2 && 
-          satisfies(checkResult.NewState, links.back().Requirement))
-        return;
-
-      // Otherwise, just make a blocking request for the first link in
-      // the chain.
-      auto request = MetadataRequest(firstLink.Requirement);
-      swift_checkMetadataState(request, firstLink.Value);
-      return;
+    // Check the last link against the rest of the list.
+    for (auto i = links.begin(), e = links.end() - 1; i != e; ++i) {
+      if (i->Value == links.back().Value) {
+        // If there's a cycle but the new link's current state is now satisfied,
+        // then this is a stale dependency, not a cycle. This can happen when
+        // threads race to build a type in a fulfillable cycle.
+        if (!satisfies(currentCheckResult.NewState, links.back().Requirement))
+          diagnoseMetadataDependencyCycle(
+              llvm::makeArrayRef(&*i, links.end() - i));
+      }
     }
-
-    // Check the new link.
-    checkNewLink(checkResult.Dependency);
   }
+
+  // We didn't find any cycles. Make a blocking request if appropriate.
+
+  // In the special case where it's the first link that doesn't have
+  // a known dependency and its current metadata state now satisfies
+  // the dependency leading to it, we can skip waiting.
+  if (links.size() == 2 &&
+      satisfies(currentCheckResult.NewState, links.back().Requirement))
+    return;
+
+  // Otherwise, just make a blocking request for the first link in
+  // the chain.
+  auto request = MetadataRequest(firstLink.Requirement);
+  swift_checkMetadataState(request, firstLink.Value);
 }
 
 /***************************************************************************/
