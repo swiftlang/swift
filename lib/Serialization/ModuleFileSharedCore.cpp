@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -694,23 +695,19 @@ std::string ModuleFileSharedCore::Dependency::getPrettyPrintedPath() const {
 }
 
 void ModuleFileSharedCore::fatal(llvm::Error error) const {
-  llvm::SmallString<0> errorStr;
-  llvm::raw_svector_ostream out(errorStr);
-
-  out << "*** DESERIALIZATION FAILURE ***\n";
-  out << "*** If any module named here was modified in the SDK, please delete the ***\n";
-  out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
-  outputDiagnosticInfo(out);
-  out << "\n";
-  if (error) {
-    handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
-      ei.log(out);
-      out << "\n";
-    });
-  }
-
-  llvm::PrettyStackTraceString trace(errorStr.c_str());
-  abort();
+  abortWithPrettyStackTraceMessage([&](auto &out) {
+    out << "*** DESERIALIZATION FAILURE ***\n";
+    out << "*** If any module named here was modified in the SDK, please delete the ***\n";
+    out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
+    outputDiagnosticInfo(out);
+    out << "\n";
+    if (error) {
+      handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
+        ei.log(out);
+        out << "\n";
+      });
+    }
+  });
 }
 
 void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
