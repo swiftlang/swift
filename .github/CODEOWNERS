@@ -18,8 +18,8 @@
 # .github
 /.github/                                 @shahmishal
 /.github/CODEOWNERS                       @AnthonyLatsis @shahmishal
-/.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
-/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @shahmishal @xedin
+/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @shahmishal @xedin
 
 /.gitignore           @shahmishal
 # TODO: /.mailmap
@@ -61,7 +61,7 @@
 /docs/ABI/RegisterUsage.md                @al45tair
 /docs/CrossCompilationModel.md            @MaxDesiatov
 /docs/Generics                            @slavapestov
-/docs/HowToGuides/                        @AnthonyLatsis @LucianoPAlmeida @xedin
+/docs/HowToGuides/                        @AnthonyLatsis @xedin
 /docs/Optimizer*                          @eeckstein
 /docs/SIL*                                @jckarter
 /docs/Windows*                            @compnerd
