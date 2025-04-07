@@ -153,6 +153,7 @@ copy_files(public/Platform Overlay/Windows/CRT
 # libraries, and test support libraries.
 
 # Supplemental Libraries
+copy_library_sources("Synchronization" "public" "Supplemental")
 
 # Copy StringProcessing, RegexParser, RegexBuilder
 if(NOT DEFINED StringProcessing_ROOT_DIR)
