@@ -75,6 +75,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
