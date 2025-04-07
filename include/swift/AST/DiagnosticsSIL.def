@@ -143,7 +143,7 @@ ERROR(deserialize_function_type_mismatch,Fatal,
       (StringRef, Type, Type))
 
 ERROR(without_actually_escaping_on_isolated_any,none,
-      "withoutActuallyEscaping is currently unimplemented for @isolated(any) "
+      "withoutActuallyEscaping is currently unimplemented for '@isolated(any)' "
       "function values", ())
 
 // Capture before declaration diagnostics.
@@ -391,9 +391,9 @@ ERROR(embedded_swift_existential_protocol,none,
 ERROR(embedded_swift_existential,none,
       "cannot use a value of protocol type in embedded Swift", ())
 ERROR(perf_diag_existential_type,none,
-      "cannot use a value of protocol type %0 in @_noExistential function", (Type))
+      "cannot use a value of protocol type %0 in '@_noExistential' function", (Type))
 ERROR(perf_diag_existential,none,
-      "cannot use a value of protocol type in @_noExistential function", ())
+      "cannot use a value of protocol type in '@_noExistential' function", ())
 ERROR(embedded_swift_value_deinit,none,
       "cannot de-virtualize deinit of type %0", (Type))
 ERROR(embedded_swift_metatype_type,none,
@@ -824,7 +824,7 @@ NOTE(capturepromotion_variable_defined_here,none,
 
 // noimplicitcopy on generic or existential binding
 ERROR(noimplicitcopy_used_on_generic_or_existential, none,
-      "@_noImplicitCopy can not be used on a generic or existential typed "
+      "'@_noImplicitCopy' can not be used on a generic or existential typed "
       "binding or a nominal type containing such typed things", ())
 
 // discard statement
@@ -879,7 +879,8 @@ ERROR(sil_movechecking_cannot_destructure_imported_nonfrozen, none,
       "cannot partially consume '%0' of non-frozen type %1 imported from %2",
       (StringRef, Type, const ModuleDecl*))
 ERROR(sil_movechecking_cannot_destructure_exported_usableFromInline_alwaysEmitIntoClient, none,
-      "cannot partially consume '%0' of non-frozen usableFromInline type %1 within a function annotated @_alwaysEmitIntoClient",
+      "cannot partially consume '%0' of non-frozen usableFromInline type %1 "
+      "within a function annotated '@_alwaysEmitIntoClient'",
       (StringRef, Type))
 ERROR(sil_movechecking_cannot_destructure, none,
       "cannot partially consume '%0'",
@@ -891,7 +892,8 @@ ERROR(sil_movechecking_cannot_partially_reinit_nonfrozen, none,
       "cannot partially reinitialize '%0' of non-frozen type %1 imported from %2; only full reinitialization is allowed",
       (StringRef, Type, const ModuleDecl*))
 ERROR(sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient, none,
-      "cannot partially reinitialize '%0' of non-frozen usableFromInline type %1 within a function annotated @_alwaysEmitIntoClient",
+      "cannot partially reinitialize '%0' of non-frozen usableFromInline type "
+      "%1 within a function annotated '@_alwaysEmitIntoClient'",
       (StringRef, Type))
 ERROR(sil_movechecking_cannot_partially_reinit, none,
       "cannot partially reinitialize '%0' after it has been consumed; only full reinitialization is allowed",
