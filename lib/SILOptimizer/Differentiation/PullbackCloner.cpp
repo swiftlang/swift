@@ -2507,7 +2507,7 @@ bool PullbackCloner::Implementation::run() {
           continue;
         }
 
-        assert(getTangentValueCategory(bbActiveValue) ==
+        ASSERT(getTangentValueCategory(bbActiveValue) ==
                SILValueCategory::Address);
 
         // getAdjointProjection might call materializeAdjointDirect which
@@ -2524,7 +2524,7 @@ bool PullbackCloner::Implementation::run() {
           // All adjoint buffers are allocated in the pullback entry and
           // deallocated in the pullback exit. So, use IsNotInitialization to
           // emit destroy_addr before zeroing the buffer.
-          assert(bufferMap.contains({bb, bbActiveValue}));
+          ASSERT(bufferMap.contains({bb, bbActiveValue}));
           builder.emitZeroIntoBuffer(pbLoc, getAdjointBuffer(bb, bbActiveValue),
                                      IsNotInitialization);
 
@@ -2577,7 +2577,7 @@ bool PullbackCloner::Implementation::run() {
             break;
           }
 
-          assert(false);
+          ASSERT(false);
         } while (false);
       }
     }
