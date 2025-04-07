@@ -1082,16 +1082,14 @@ namespace {
             // Define the method descriptor.
             SILDeclRef func(entry.getFunction());
 
-            /// Distributed thunks don't need resilience.
-            if (func.isDistributedThunk()) {
-              continue;
+            /// Distributed thunks don't need method descriptors
+            if (!func.isDistributedThunk()) {
+              auto *descriptor =
+                B.getAddrOfCurrentPosition(
+                  IGM.ProtocolRequirementStructTy);
+              IGM.defineMethodDescriptor(func, Proto, descriptor,
+                                         IGM.ProtocolRequirementStructTy);
             }
-
-            auto *descriptor =
-              B.getAddrOfCurrentPosition(
-                IGM.ProtocolRequirementStructTy);
-            IGM.defineMethodDescriptor(func, Proto, descriptor,
-                                       IGM.ProtocolRequirementStructTy);
           }
         }
 
