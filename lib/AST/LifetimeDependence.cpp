@@ -495,7 +495,8 @@ protected:
   }
 
   bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind, Type type,
-                                 ValueOwnership ownership) const {
+                                 ValueOwnership ownership,
+                                 bool isInterfaceFile = false) const {
     if (kind == ParsedLifetimeDependenceKind::Inherit) {
       return true;
     }
@@ -508,6 +509,10 @@ protected:
       ? ownership : getLoweredOwnership(afd);
 
     if (kind == ParsedLifetimeDependenceKind::Borrow) {
+      if (isInterfaceFile) {
+        return loweredOwnership == ValueOwnership::Shared ||
+               loweredOwnership == ValueOwnership::InOut;
+      }
       return loweredOwnership == ValueOwnership::Shared;
     }
     assert(kind == ParsedLifetimeDependenceKind::Inout);
@@ -639,8 +644,8 @@ protected:
     case ParsedLifetimeDependenceKind::Inout: {
     // @lifetime(borrow x) is valid only for borrowing parameters.
     // @lifetime(inout x) is valid only for inout parameters.
-    if (!isCompatibleWithOwnership(parsedLifetimeKind, type,
-                                   loweredOwnership)) {
+    if (!isCompatibleWithOwnership(parsedLifetimeKind, type, loweredOwnership,
+                                   isInterfaceFile())) {
       diagnose(loc,
                diag::lifetime_dependence_cannot_use_parsed_borrow_consuming,
                getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
