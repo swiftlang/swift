@@ -12,6 +12,8 @@ typedef unsigned long size_t;
 
 #endif // __SIZE_T_DEFINED_CUSTOM__
 
+#include <string>
+
 struct ExplicitDefaultConstructor {
   ExplicitDefaultConstructor() : x(42) {}
   int x;
@@ -255,22 +257,22 @@ public:
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:Retain5")))
-__attribute__((swift_attr("release:Release5"))) PrivateOperatorNew { // expected-error {{'operator new' is a private member of 'SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew}}
+__attribute__((swift_attr("release:Release5"))) PrivateOperatorNew {
 public:
   int val = 1;
 
 private:
-  void *operator new(size_t); // expected-note {{declared private here}}
+  void *operator new(size_t);
 };
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:Retain6")))
-__attribute__((swift_attr("release:Release6"))) ProtectedOperatorNew { // expected-error {{'operator new' is a protected member of 'SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew'}}
+__attribute__((swift_attr("release:Release6"))) ProtectedOperatorNew {
 public:
   int val = 1;
 
 protected:
-  void *operator new(size_t); // expected-note {{declared protected here}}
+  void *operator new(size_t);
 };
 
 struct __attribute__((swift_attr("import_reference")))
@@ -365,6 +367,74 @@ public:
   int val = 10;
   NoIdentifierInCtorParam(int) {};
 };
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain19")))
+__attribute__((swift_attr("release:Release19"))) RValRefCtor {
+public:
+  std::string val;
+  RValRefCtor(std::string &&x) { val = x; }
+};
+
+struct cxxValTy {
+public:
+  int val;
+  cxxValTy() {};
+  cxxValTy(int x) { val = x; }
+  ~cxxValTy() {};
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain20")))
+__attribute__((swift_attr("release:Release20"))) RValRefCtor2 {
+public:
+  cxxValTy val;
+  RValRefCtor2(cxxValTy &&x) : val(std::move(x)) {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain21")))
+__attribute__((swift_attr("release:Release21"))) UserDefinedCopyCtor {
+public:
+  int val = 1;
+  UserDefinedCopyCtor(int x) { val = x; };
+
+  // User defined copy ctor
+  UserDefinedCopyCtor(const UserDefinedCopyCtor &other) { val = other.val; }
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain22")))
+__attribute__((swift_attr("release:Release22"))) UserDefinedMoveCtor {
+public:
+  int val = 1;
+  UserDefinedMoveCtor(int x) { val = x; };
+
+  // User defined move constructor
+  UserDefinedMoveCtor(UserDefinedMoveCtor &&other) noexcept {
+    val = other.val;
+    other.val = -1;
+  }
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:Retain23")))
+__attribute__((swift_attr("release:Release23"))) UserDefinedMoveAndCopyCtor {
+public:
+  int val = 1;
+  UserDefinedMoveAndCopyCtor(int x) { val = x; };
+
+  // User defined copy ctor
+  UserDefinedMoveAndCopyCtor(const UserDefinedMoveAndCopyCtor &other) {
+    val = other.val;
+  }
+
+  // User defined move constructor
+  UserDefinedMoveAndCopyCtor(UserDefinedMoveAndCopyCtor &&other) noexcept {
+    val = other.val;
+    other.val = -1;
+  }
+};
 } // namespace SwiftInitSynthesisForCXXRefTypes
 
 void Retain1(SwiftInitSynthesisForCXXRefTypes::CompilerGeneratedDefaultCtor
@@ -435,5 +505,23 @@ void Retain18(
     SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {};
 void Release18(
     SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {};
+void Retain19(SwiftInitSynthesisForCXXRefTypes::RValRefCtor *_Nonnull v) {};
+void Release19(SwiftInitSynthesisForCXXRefTypes::RValRefCtor *_Nonnull v) {};
+void Retain20(SwiftInitSynthesisForCXXRefTypes::RValRefCtor2 *_Nonnull v) {};
+void Release20(SwiftInitSynthesisForCXXRefTypes::RValRefCtor2 *_Nonnull v) {};
+void Retain21(
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedCopyCtor *_Nonnull v) {};
+void Release21(
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedCopyCtor *_Nonnull v) {};
+void Retain22(
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveCtor *_Nonnull v) {};
+void Release22(
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveCtor *_Nonnull v) {};
+void Retain23(
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveAndCopyCtor *_Nonnull v) {
+};
+void Release23(
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveAndCopyCtor *_Nonnull v) {
+};
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H

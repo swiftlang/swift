@@ -2550,15 +2550,11 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         ctorDecl->getAccess() == clang::AS_protected ||
         ctorDecl->isCopyOrMoveConstructor() || ctorDecl->isVariadic())
       continue;
-    bool hasDefaultArg = false;
-    for (const clang::ParmVarDecl *param : ctorDecl->parameters()) {
-      if (param->hasDefaultArg()) {
-        hasDefaultArg = true;
-        break;
-      }
-    }
-    // Todo: Add support for default args in ctors for C++ foreign reference
-    // types
+
+    bool hasDefaultArg = !ctorDecl->parameters().empty() &&
+                         ctorDecl->parameters().back()->hasDefaultArg();
+    // TODO: Add support for default args in ctors for C++ foreign reference
+    // types.
     if (hasDefaultArg)
       continue;
     ctorDeclsForSynth.push_back(ctorDecl);
@@ -2567,17 +2563,22 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   if (ctorDeclsForSynth.empty())
     return {};
 
-  clang::FunctionDecl *operatorNew = nullptr;
-  clang::FunctionDecl *operatorDelete = nullptr;
-  bool passAlignment = false;
-  bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
-      cxxRecordDeclLoc, clang::SourceRange(), clang::Sema::AFS_Both,
-      clang::Sema::AFS_Both, cxxRecordTy, /*IsArray=*/false, passAlignment,
-      clang::MultiExprArg(), operatorNew, operatorDelete, /*Diagnose=*/false);
-  if (findingAllocFuncFailed || !operatorNew || operatorNew->isDeleted() ||
-      operatorNew->getAccess() == clang::AS_private ||
-      operatorNew->getAccess() == clang::AS_protected)
-    return {};
+  {
+    clang::FunctionDecl *operatorNew = nullptr;
+    clang::FunctionDecl *operatorDelete = nullptr;
+    bool passAlignment = false;
+    clang::Sema::SFINAETrap trap(clangSema);
+    bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
+        cxxRecordDeclLoc, clang::SourceRange(), clang::Sema::AFS_Both,
+        clang::Sema::AFS_Both, cxxRecordTy, /*IsArray=*/false, passAlignment,
+        clang::MultiExprArg(), operatorNew, operatorDelete,
+        /*Diagnose=*/false);
+    if (trap.hasErrorOccurred() || findingAllocFuncFailed || !operatorNew ||
+        operatorNew->isDeleted() ||
+        operatorNew->getAccess() == clang::AS_private ||
+        operatorNew->getAccess() == clang::AS_protected)
+      return {};
+  }
 
   clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
   // Adding `_Nonnull` to the return type of synthesized static factory
@@ -2648,7 +2649,12 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
 
     std::string swiftInitStr = "init(";
     for (unsigned i = 0; i < ctorParamCount; ++i) {
-      swiftInitStr += "_:";
+      auto paramType = selectedCtorDecl->getParamDecl(i)->getType();
+      if (paramType->isRValueReferenceType()) {
+        swiftInitStr += "consuming:";
+      } else {
+        swiftInitStr += "_:";
+      }
     }
     swiftInitStr += ")";
     synthCxxMethodDecl->addAttr(
@@ -2673,10 +2679,16 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
       ctorArgs.push_back(argExpr);
     }
     llvm::SmallVector<clang::Expr *, 4> ctorArgsToAdd;
-    if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
-                                          ctorArgs, cxxRecordDeclLoc,
-                                          ctorArgsToAdd))
-      continue;
+
+    {
+      clang::Sema::SFINAETrap trap(clangSema);
+      if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
+                                            ctorArgs, cxxRecordDeclLoc,
+                                            ctorArgsToAdd))
+        continue;
+      if (trap.hasErrorOccurred())
+        continue;
+    }
 
     clang::ExprResult synthCtorExprResult = clangSema.BuildCXXConstructExpr(
         cxxRecordDeclLoc, cxxRecordTy, selectedCtorDecl,

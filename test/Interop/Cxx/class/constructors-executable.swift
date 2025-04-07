@@ -4,6 +4,7 @@
 // REQUIRES: swift_feature_CXXForeignReferenceTypeInitializers
 
 import Constructors
+import CxxStdlib
 import StdlibUnittest
 
 var CxxConstructorTestSuite = TestSuite("CxxConstructors")
@@ -152,6 +153,39 @@ CxxConstructorTestSuite.test("SynthesizeAndImportStaticFactoryAsInitializer") {
 
   let x10 = SwiftInitSynthesisForCXXRefTypes.NoIdentifierInCtorParam(10)
   expectEqual(x10.val, 10)
+
+  let x11 = SwiftInitSynthesisForCXXRefTypes.RValRefCtor(
+    consuming: std.string("Calling from Swift!"))
+  expectEqual(x11.val, "Calling from Swift!")
+
+  let x12 = SwiftInitSynthesisForCXXRefTypes.cxxValTy(5)
+  let y12 = SwiftInitSynthesisForCXXRefTypes.RValRefCtor2(consuming: x12)
+  expectEqual(y12.val.val, 5)
+
+  let x13 = SwiftInitSynthesisForCXXRefTypes.UserDefinedCopyCtor(2)
+  let x14 = x13
+  expectEqual(x13.val, 2)
+  expectEqual(x14.val, 2)
+  x13.val = 3
+  expectEqual(x13.val, 3)
+  expectEqual(x14.val, 3)
+}
+
+CxxConstructorTestSuite.test("SynthesizedStaticFactoriesDoNotEmitDiagnosticsWithoutInitCall") {
+  let _: SwiftInitSynthesisForCXXRefTypes.PrivateOperatorNew
+
+  let _: SwiftInitSynthesisForCXXRefTypes.PrivateOperatorNew
+  let _: SwiftInitSynthesisForCXXRefTypes.ProtectedOperatorNew
+  let _: SwiftInitSynthesisForCXXRefTypes.DeletedOperatorNew
+
+  let _: SwiftInitSynthesisForCXXRefTypes.PrivateCtor
+  let _: SwiftInitSynthesisForCXXRefTypes.ProtectedCtor
+  let _: SwiftInitSynthesisForCXXRefTypes.DeletedCtor
+
+  let _: SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultArg
+  let _: SwiftInitSynthesisForCXXRefTypes.CtorWithDefaultAndNonDefaultArg
+
+  let _: SwiftInitSynthesisForCXXRefTypes.VariadicCtors
 }
 
 runAllTests()
