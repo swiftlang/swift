@@ -493,7 +493,7 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
 ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
+EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
