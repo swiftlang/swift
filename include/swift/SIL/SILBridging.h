@@ -507,6 +507,7 @@ struct BridgedFunction {
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
   BRIDGED_INLINE void setIsSerialized(bool isSerialized) const;
+  BRIDGED_INLINE bool conformanceMatchesActorIsolation(BridgedConformance conformance) const;
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAutodiffVJP() const;
