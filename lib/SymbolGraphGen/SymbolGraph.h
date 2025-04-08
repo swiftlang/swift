@@ -13,15 +13,14 @@
 #ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPH_H
 #define SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPH_H
 
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/VersionTuple.h"
+#include "Edge.h"
+#include "Symbol.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "Edge.h"
-#include "JSON.h"
-#include "Symbol.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -67,12 +66,12 @@ struct SymbolGraph {
   /**
    The symbols in a module: the nodes in the graph.
    */
-  llvm::DenseSet<Symbol> Nodes;
+  llvm::SetVector<Symbol> Nodes;
 
   /**
    The relationships between symbols: the edges in the graph.
    */
-  llvm::DenseSet<Edge> Edges;
+  llvm::SetVector<Edge> Edges;
 
   /**
    True if this graph is for a single symbol, rather than an entire module.
