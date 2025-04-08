@@ -4,6 +4,9 @@
 
 // REQUIRES: concurrency
 
+// https://github.com/swiftlang/swift/issues/80582
+// UNSUPPORTED: OS=windows-msvc
+
 extension Error {
   func printMe() { }
 }
