@@ -71,6 +71,18 @@ public struct NonEscapableSelf : ~Swift.Escapable {
   public mutating func mutatingMethodOneParamBorrow(_: Swift.Int) -> lifetime_depend_infer.NonEscapableSelf
   #endif
 }
+
+public struct NoncopyableInoutMethods : ~Swift.Copyable & ~Swift.Escapable {
+#if $LifetimeDependence
+public mutating func mutatingMethodOneParamFunctionType<E, Result>(_ body: (Swift.Int) throws(E) -> Result) throws(E) -> Result where E : Swift.Error, Result : ~Swift.Copyable
+
+public subscript(position: Swift.Int) -> Swift.Int {
+  unsafeAddress
+  unsafeMutableAddress
+}
+#endif
+}
+
 public struct EscapableTrivialSelf {
   #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
   @lifetime(self)
