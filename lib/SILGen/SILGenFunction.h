@@ -2603,8 +2603,17 @@ public:
 
   enum class ThunkGenFlag {
     None,
-    ConvertingToNonIsolatedCaller,
-    ConvertingFromNonIsolatedCaller,
+
+    /// Set if the thunk has an implicit isolated parameter.
+    ///
+    /// The implication is that we shouldn't forward that parameter into the
+    /// callee as a normal parameter (if the callee has an implicit param, we
+    /// handle it through a different code path).
+    ThunkHasImplicitIsolatedParam = 0x1,
+
+    /// Set if the callee has an implicit isolated parameter that we need to
+    /// find the appropriate value for when we call it from the thunk.
+    CalleeHasImplicitIsolatedParam = 0x2,
   };
   using ThunkGenOptions = OptionSet<ThunkGenFlag>;
 
