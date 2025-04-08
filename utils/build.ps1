@@ -2317,7 +2317,7 @@ function Write-SDKSettingsPlist([OS] $OS) {
       DEFAULT_COMPILER = "${ToolchainIdentifier}"
     }
     SupportedTargets = @{
-      $OS.ToString() = @{
+      $OS.ToString().ToLowerInvariant() = @{
         PlatformFamilyDisplayName = $OS.ToString()
         PlatformFamilyName = $OS.ToString()
       }
@@ -2326,16 +2326,16 @@ function Write-SDKSettingsPlist([OS] $OS) {
   switch ($OS) {
     Windows {
       $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
-      $SDKSettings.SupportedTargets.Windows.LLVMTargetVendor = "unknown"
-      $SDKSettings.SupportedTargets.Windows.LLVMTargetSys = "windows"
-      $SDKSettings.SupportedTargets.Windows.LLVMTargetTripleEnvironment = "msvc"
-      $SDKSettings.SupportedTargets.Windows.Archs = $WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      $SDKSettings.SupportedTargets.windows.LLVMTargetVendor = "unknown"
+      $SDKSettings.SupportedTargets.windows.LLVMTargetSys = "windows"
+      $SDKSettings.SupportedTargets.windows.LLVMTargetTripleEnvironment = "msvc"
+      $SDKSettings.SupportedTargets.windows.Archs = $WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
     Android {
-      $SDKSettings.SupportedTargets.Android.LLVMTargetVendor = "unknown"
-      $SDKSettings.SupportedTargets.Android.LLVMTargetSys = "linux"
-      $SDKSettings.SupportedTargets.Android.LLVMTargetTripleEnvironment = "android${AndroidAPILevel}"
-      $SDKSettings.SupportedTargets.Android.Archs = $AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      $SDKSettings.SupportedTargets.android.LLVMTargetVendor = "unknown"
+      $SDKSettings.SupportedTargets.android.LLVMTargetSys = "linux"
+      $SDKSettings.SupportedTargets.android.LLVMTargetTripleEnvironment = "android${AndroidAPILevel}"
+      $SDKSettings.SupportedTargets.android.Archs = $AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
   }
   $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS)\SDKSettings.json"
