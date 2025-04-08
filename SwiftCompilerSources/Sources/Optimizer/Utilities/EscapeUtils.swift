@@ -641,11 +641,13 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 
     // Indirect arguments cannot escape the function, but loaded values from such can.
     if !followLoads(at: path) {
-      guard let beginApply = apply as? BeginApplyInst else {
-        return .continueWalk
-      }
-      // Except for begin_apply: it can yield an address value.
-      if !indirectResultEscapes(of: beginApply, path: path) {
+      if let beginApply = apply as? BeginApplyInst {
+        // begin_apply can yield an address value.
+        if !indirectResultEscapes(of: beginApply, path: path) {
+          return .continueWalk
+        }
+      } else if !apply.isAddressable(operand: argOp) {
+        // The result does not depend on the argument's address.
         return .continueWalk
       }
     }
