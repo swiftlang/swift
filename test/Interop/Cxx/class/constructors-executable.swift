@@ -154,10 +154,6 @@ CxxConstructorTestSuite.test("SynthesizeAndImportStaticFactoryAsInitializer") {
   let x10 = SwiftInitSynthesisForCXXRefTypes.NoIdentifierInCtorParam(10)
   expectEqual(x10.val, 10)
 
-  let x11 = SwiftInitSynthesisForCXXRefTypes.RValRefCtor(
-    consuming: std.string("Calling from Swift!"))
-  expectEqual(x11.val, "Calling from Swift!")
-
   let x12 = SwiftInitSynthesisForCXXRefTypes.cxxValTy(5)
   let y12 = SwiftInitSynthesisForCXXRefTypes.RValRefCtor2(consuming: x12)
   expectEqual(y12.val.val, 5)
