@@ -6001,9 +6001,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::CDecl_DECL_ATTR: {
         bool isImplicit;
-        bool isUnderscored = false;
+        bool isUnderscored;
         serialization::decls_block::CDeclDeclAttrLayout::readRecord(
-            scratch, isImplicit); // TODO isUnderscored
+            scratch, isImplicit, isUnderscored);
         Attr = new (ctx) CDeclAttr(blobData, isImplicit, isUnderscored);
         break;
       }
