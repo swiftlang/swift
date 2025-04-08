@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -138,10 +139,9 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
   return decl;
 }
 
-void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
-                                                 AccessorDecl *getter,
-                                                 AccessorDecl *setter) {
-  assert(getter);
+void importer::makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                            AccessorDecl *setter) {
+  assert(getter && "computed property must have non-null getter");
   // The synthesized computed property can either use a `get` or an
   // `unsafeAddress` accessor.
   auto isAddress = getter->getAccessorKind() == AccessorKind::Address;
@@ -189,6 +189,25 @@ bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
                     swiftAttr->getAttribute() == "release:immortal";
            return false;
          });
+}
+
+void importer::recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+  if (!isIUO)
+    return;
+
+#if !defined(NDEBUG)
+  Type ty;
+  if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+    ty = FD->getResultInterfaceType();
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    ty = CD->getResultInterfaceType();
+  } else {
+    ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
+  }
+  assert(ty->getOptionalObjectType());
+#endif
+
+  decl->setImplicitlyUnwrappedOptional(true);
 }
 
 #ifndef NDEBUG
@@ -658,7 +677,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setIsTransparent(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
-  importer.makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
+  importer::makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
 
   getterDecl->setImplicit();
   getterDecl->setAccess(AccessLevel::Public);
@@ -1626,11 +1645,11 @@ namespace {
         options -= MakeStructRawValuedFlags::IsLet;
         options -= MakeStructRawValuedFlags::IsImplicit;
 
-        synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                        {KnownProtocolKind::RawRepresentable,
-                                         KnownProtocolKind::Equatable,
-                                         KnownProtocolKind::Hashable},
-                                        options, /*setterAccess=*/access);
+        Impl.makeStructRawValued(structDecl, underlyingType,
+                                 {KnownProtocolKind::RawRepresentable,
+                                  KnownProtocolKind::Equatable,
+                                  KnownProtocolKind::Hashable},
+                                 options, /*setterAccess=*/access);
 
         result = structDecl;
         break;
@@ -1722,10 +1741,10 @@ namespace {
           // Create the _nsError initializer.
           //   public init(_nsError error: NSError)
           VarDecl *members[1] = {nsErrorProp};
-          auto nsErrorInit =
-              synthesizer.createValueConstructor(errorWrapper, members,
-                                                 /*wantCtorParamNames=*/true,
-                                                 /*wantBody=*/true);
+          auto nsErrorInit = SwiftDeclSynthesizer::createValueConstructor(
+              errorWrapper, members,
+              /*wantCtorParamNames=*/true,
+              /*wantBody=*/true);
           errorWrapper->addMember(nsErrorInit);
 
           // Add the domain error member.
@@ -1778,7 +1797,7 @@ namespace {
         // C enum without additional knowledge that the type has no
         // undeclared values, and won't ever add cases.
         auto rawValueConstructor =
-            synthesizer.makeEnumRawValueConstructor(enumDecl);
+            SwiftDeclSynthesizer::makeEnumRawValueConstructor(enumDecl);
 
         auto varName = C.Id_rawValue;
         auto rawValue = new (C) VarDecl(/*IsStatic*/false,
@@ -1797,7 +1816,7 @@ namespace {
             C, StaticSpellingKind::None, varPattern, /*InitExpr*/ nullptr,
             enumDecl);
 
-        synthesizer.makeEnumRawValueGetter(enumDecl, rawValue);
+        SwiftDeclSynthesizer::makeEnumRawValueGetter(enumDecl, rawValue);
 
         enumDecl->addMember(rawValueConstructor);
         enumDecl->addMember(rawValue);
@@ -2417,7 +2436,7 @@ namespace {
             hasUnreferenceableStorage = true;
             isBitField = true;
 
-            synthesizer.makeBitFieldAccessors(
+            SwiftDeclSynthesizer::makeBitFieldAccessors(
                 const_cast<clang::RecordDecl *>(decl), result,
                 const_cast<clang::FieldDecl *>(field), member);
           }
@@ -2426,23 +2445,24 @@ namespace {
         if (auto ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
           // Indirect fields are created as computed property accessible the
           // fields on the anonymous field from which they are injected.
-          synthesizer.makeIndirectFieldAccessors(ind, members, result, member);
+          SwiftDeclSynthesizer::makeIndirectFieldAccessors(ind, members, result,
+                                                           member);
         } else if (decl->isUnion() && !isBitField) {
           // Union fields should only be available indirectly via a computed
           // property. Since the union is made of all of the fields at once,
           // this is a trivial accessor that casts self to the correct
           // field type.
-          synthesizer.makeUnionFieldAccessors(result, member);
+          SwiftDeclSynthesizer::makeUnionFieldAccessors(result, member);
 
           // Union accessors are always unsafe.
           member->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
 
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
-          auto valueCtor =
-              synthesizer.createValueConstructor(result, member,
-                                                 /*want param names*/ true,
-                                                 /*wantBody=*/true);
+          auto valueCtor = SwiftDeclSynthesizer::createValueConstructor(
+              result, member,
+              /*want param names*/ true,
+              /*wantBody=*/true);
 
           if (isNonEscapable)
             markReturnsUnsafeNonescapable(valueCtor);
@@ -2486,7 +2506,7 @@ namespace {
         //    interop and might rely on the fact that C structs have a default
         //    constructor available in Swift.
         ConstructorDecl *defaultCtor =
-            synthesizer.createDefaultConstructor(result);
+            SwiftDeclSynthesizer::createDefaultConstructor(result);
         if (cxxRecordDecl) {
           auto attr = AvailableAttr::createUniversallyDeprecated(
               defaultCtor->getASTContext(),
@@ -2519,7 +2539,7 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        auto valueCtor = synthesizer.createValueConstructor(
+        auto valueCtor = SwiftDeclSynthesizer::createValueConstructor(
             result, members,
             /*want param names*/ true,
             /*want body*/ hasUnreferenceableStorage);
@@ -2558,9 +2578,9 @@ namespace {
                              });
                 });
             if (!hasUserProvidedStaticFactory) {
-              if (auto generatedCxxMethodDecl =
-                      synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                          cxxRecordDecl)) {
+              if (auto generatedCxxMethodDecl = SwiftDeclSynthesizer::
+                      synthesizeStaticFactoryForCXXForeignRef(
+                          Impl.getClangSema(), cxxRecordDecl)) {
                 if (Decl *importedInitDecl =
                         Impl.SwiftContext.getClangModuleLoader()
                             ->importDeclDirectly(generatedCxxMethodDecl))
@@ -2628,8 +2648,8 @@ namespace {
                   cxxMethodBridging.importNameAsCamelCaseName()))
             continue;
 
-          auto p =
-              synthesizer.makeComputedPropertyFromCXXMethods(getter, setter);
+          auto p = SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(
+              getter, setter);
           // Add computed properties directly because they won't be found from
           // the clang decl during lazy member lookup.
           result->addMember(p);
@@ -2641,8 +2661,8 @@ namespace {
             continue;
 
           auto getterAndSetter = subscriptInfo.second;
-          auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
-                                                     getterAndSetter.second);
+          auto subscript = SwiftDeclSynthesizer::makeSubscript(
+              getterAndSetter.first, getterAndSetter.second);
           // Also add subscripts directly because they won't be found from the
           // clang decl.
           result->addMember(subscript);
@@ -2660,7 +2680,7 @@ namespace {
           auto getterAndSetter = getterAndSetterIt->second;
 
           VarDecl *pointeeProperty =
-              synthesizer.makeDereferencedPointeeProperty(
+              SwiftDeclSynthesizer::makeDereferencedPointeeProperty(
                   getterAndSetter.first, getterAndSetter.second);
 
           // Import the attributes from clang decl of dereference operator to
@@ -3374,7 +3394,7 @@ namespace {
 
         // Create the global constant.
         bool isStatic = dc->isTypeContext();
-        auto result = synthesizer.createConstant(
+        auto result = Impl.createConstant(
             name, dc, type, clang::APValue(decl->getInitVal()),
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
                                           : ConstantConvertKind::None,
@@ -3452,8 +3472,8 @@ namespace {
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
@@ -3735,7 +3755,8 @@ namespace {
         if (func->getParameters()->size() == 0 && !isa<ClassDecl>(typeDecl)) {
           // This is a pre-increment operator. We synthesize a
           // non-mutating function called `successor() -> Self`.
-          FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(func);
+          FuncDecl *successorFunc =
+              SwiftDeclSynthesizer::makeSuccessorFunc(func);
 
           // Import the clang decl attributes to synthesized successor function.
           Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(func, successorFunc);
@@ -3754,7 +3775,8 @@ namespace {
       // call / subscript / dereference / increment. Those
       // operators do not need static versions.
       if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call) {
-        auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
+        auto opFuncDecl =
+            SwiftDeclSynthesizer::makeOperator(func, cxxOperatorKind);
         Impl.addAlternateDecl(func, opFuncDecl);
 
         Impl.markUnavailable(
@@ -4128,8 +4150,8 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       if (dc->getSelfClassDecl())
         // FIXME: only if the class itself is not marked final
@@ -4366,7 +4388,18 @@ namespace {
       if (decl->getOverloadedOperator() ==
               clang::OverloadedOperatorKind::OO_Call &&
           decl->isStatic()) {
-        auto result = synthesizer.makeInstanceToStaticOperatorCallMethod(decl);
+        auto *clangDC = decl->getParent();
+        auto newMethod = SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+            Impl.SwiftContext, clangDC, clangDC, decl,
+            ForwardingMethodKind::Base,
+            ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+            /*forceConstQualifier*/ true);
+
+        newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
+            decl->getASTContext(), "callAsFunction"));
+
+        auto *result = dyn_cast_or_null<FuncDecl>(
+            Impl.importDecl(newMethod, Impl.CurrentVersion));
         if (result)
           return result;
       }
@@ -4405,13 +4438,26 @@ namespace {
             // Create a thunk that will perform dynamic dispatch.
             // TODO: we don't have to import the actual `method` in this case,
             // we can just synthesize a thunk and import that instead.
-            auto result = synthesizer.makeVirtualMethod(decl);
-            if (result) {
+            assert(!decl->isStatic() &&
+                   "C++ virtual functions cannot be static");
+            auto clangDC = decl->getParent();
+
+            auto newMethod =
+                SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+                    Impl.SwiftContext, clangDC, clangDC, decl,
+                    ForwardingMethodKind::Virtual,
+                    ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                        KeepReference,
+                    /*forceConstQualifier*/ false);
+
+            auto *result = dyn_cast_or_null<FuncDecl>(
+                Impl.importDecl(newMethod, Impl.CurrentVersion));
+
+            if (result)
               return result;
-            } else {
-              Impl.markUnavailable(
-                  funcDecl, "virtual function is not available in Swift");
-            }
+
+            Impl.markUnavailable(funcDecl,
+                                 "virtual function is not available in Swift");
           }
         }
       }
@@ -4504,8 +4550,8 @@ namespace {
       result->setIsObjC(false);
       result->setIsDynamic(false);
       result->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -4936,8 +4982,8 @@ namespace {
           /*IsStatic*/decl->isClassMethod(), VarDecl::Introducer::Var,
                         Impl.importSourceLoc(decl->getLocation()), ident, dc);
       propDecl->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(propDecl,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          propDecl, importedType.isImplicitlyUnwrapped());
 
       ////
       // Build the getter
@@ -4965,7 +5011,7 @@ namespace {
 
       // FIXME: Fake locations for '{' and '}'?
       propDecl->setIsSetterMutating(false);
-      Impl.makeComputed(propDecl, getter, /*setter=*/nullptr);
+      importer::makeComputed(propDecl, getter, /*setter=*/nullptr);
       addObjCAttribute(propDecl, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(propDecl, inferredObjCPropertyAttrs);
 
@@ -5217,7 +5263,7 @@ namespace {
       if (forceClassMethod)
         result->setImplicit();
 
-      Impl.recordImplicitUnwrapForDecl(result, isIUO);
+      importer::recordImplicitUnwrapForDecl(result, isIUO);
 
       // Mark this method @objc.
       addObjCAttribute(result, selector);
@@ -6093,8 +6139,8 @@ namespace {
           /*IsStatic*/decl->isClassProperty(), VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
       result->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
+      importer::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
 
       // Recover from a missing getter in no-asserts builds. We're still not
       // sure under what circumstances this occurs, but we shouldn't crash.
@@ -6120,7 +6166,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->setIsSetterMutating(false);
-      Impl.makeComputed(result, getter, setter);
+      importer::makeComputed(result, getter, setter);
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
@@ -6625,12 +6671,12 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (unlabeledCtor)
       options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
 
-    synthesizer.makeStructRawValued(structDecl, storedUnderlyingType,
-                                    synthesizedProtocols, options);
+    Impl.makeStructRawValued(structDecl, storedUnderlyingType,
+                             synthesizedProtocols, options);
   } else {
     // We need to make a stored rawValue or storage type, and a
     // computed one of bridged type.
-    synthesizer.makeStructRawValuedWithBridge(
+    Impl.makeStructRawValuedWithBridge(
         structDecl, storedUnderlyingType, computedPropertyUnderlyingType,
         synthesizedProtocols,
         /*makeUnlabeledValueInit=*/unlabeledCtor);
@@ -6718,7 +6764,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
   auto convertKind = ConstantConvertKind::Construction;
   if (isa<EnumDecl>(theStruct))
     convertKind = ConstantConvertKind::ConstructionWithUnwrap;
-  Decl *CD = synthesizer.createConstant(
+  Decl *CD = Impl.createConstant(
       name, theStruct, theStruct->getDeclaredInterfaceType(),
       clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl,
       importer::convertClangAccess(clangEnum->getAccess()));
@@ -6785,7 +6831,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
     result->setType(original->getInterfaceType());
   }
 
-  Decl *CD = synthesizer.createConstant(
+  Decl *CD = Impl.createConstant(
       name, importIntoDC, importedEnumTy, result, ConstantConvertKind::None,
       /*isStatic*/ true, alias,
       importer::convertClangAccess(clangEnum->getAccess()));
@@ -6814,8 +6860,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   if (!underlyingType)
     return nullptr;
 
-  synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                  {KnownProtocolKind::OptionSet});
+  Impl.makeStructRawValued(structDecl, underlyingType,
+                           {KnownProtocolKind::OptionSet});
   auto selfType = structDecl->getDeclaredInterfaceType();
   Impl.addSynthesizedTypealias(structDecl, ctx.Id_Element, selfType);
   Impl.addSynthesizedTypealias(structDecl, ctx.Id_ArrayLiteralElement,
@@ -6910,8 +6956,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                                 std::move(initKind));
   result->setImportAsStaticMember();
 
-  Impl.recordImplicitUnwrapForDecl(result,
-                                   importedType.isImplicitlyUnwrapped());
+  importer::recordImplicitUnwrapForDecl(result,
+                                        importedType.isImplicitlyUnwrapped());
   result->setOverriddenDecls({ });
   result->setIsObjC(false);
   result->setIsDynamic(false);
@@ -7101,8 +7147,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   property->setIsObjC(false);
   property->setIsDynamic(false);
 
-  Impl.recordImplicitUnwrapForDecl(property,
-                                   importedType.isImplicitlyUnwrapped());
+  importer::recordImplicitUnwrapForDecl(property,
+                                        importedType.isImplicitlyUnwrapped());
 
   // Note that we've formed this property.
   Impl.FunctionsAsProperties[getter] = property;
@@ -7146,7 +7192,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (swiftSetter) property->setIsSetterMutating(swiftSetter->isMutating());
 
   // Make this a computed property.
-  Impl.makeComputed(property, swiftGetter, swiftSetter);
+  importer::makeComputed(property, swiftGetter, swiftSetter);
 
   // Make the property the alternate declaration for the getter.
   Impl.addAlternateDecl(swiftGetter, property);
@@ -7436,8 +7482,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   addObjCAttribute(result, selector);
   recordMemberInContext(dc, result);
 
-  Impl.recordImplicitUnwrapForDecl(result,
-                                   importedType.isImplicitlyUnwrapped());
+  importer::recordImplicitUnwrapForDecl(result,
+                                        importedType.isImplicitlyUnwrapped());
 
   if (implicit)
     result->setImplicit();
@@ -7831,7 +7877,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       if (existingSubscript->hasClangNode() &&
           !existingSubscript->supportsMutation()) {
         // Create the setter thunk.
-        auto setterThunk = synthesizer.buildSubscriptSetterDecl(
+        auto setterThunk = SwiftDeclSynthesizer::buildSubscriptSetterDecl(
             existingSubscript, setter, elementTy, setter->getDeclContext(),
             setterIndex);
 
@@ -7881,12 +7927,12 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   subscript->setSetterAccess(access);
 
   // Build the thunks.
-  AccessorDecl *getterThunk = synthesizer.buildSubscriptGetterDecl(
+  AccessorDecl *getterThunk = SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       subscript, getter, elementTy, dc, getterIndex);
 
   AccessorDecl *setterThunk = nullptr;
   if (setter)
-    setterThunk = synthesizer.buildSubscriptSetterDecl(
+    setterThunk = SwiftDeclSynthesizer::buildSubscriptSetterDecl(
         subscript, setter, elementTy, dc, setterIndex);
 
   // Record the subscript as an alternative declaration.
@@ -7898,9 +7944,9 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     Impl.importAttributes(setterObjCMethod, setterThunk);
 
   subscript->setIsSetterMutating(false);
-  Impl.makeComputed(subscript, getterThunk, setterThunk);
+  importer::makeComputed(subscript, getterThunk, setterThunk);
 
-  Impl.recordImplicitUnwrapForDecl(subscript, isIUO);
+  importer::recordImplicitUnwrapForDecl(subscript, isIUO);
 
   addObjCAttribute(subscript, std::nullopt);
 

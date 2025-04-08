@@ -2714,7 +2714,8 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                              : (isBorrowing ? ParamSpecifier::Borrowing
                                             : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
-  impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+  importer::recordImplicitUnwrapForDecl(paramInfo,
+                                        isParamTypeImplicitlyUnwrapped);
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.
@@ -2725,9 +2726,15 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
       impl->isDefaultArgSafeToImport(param) &&
       !param->isTemplated()) {
-    SwiftDeclSynthesizer synthesizer(*impl);
-    if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
-            param, swiftParamTy, paramInfo->getParameterNameLoc())) {
+    FuncDecl *defaultArgFunc;
+    CallExpr *defaultArgExpr;
+    std::tie(defaultArgFunc, defaultArgExpr) =
+        SwiftDeclSynthesizer::makeDefaultArgument(
+            param, swiftParamTy, paramInfo->getParameterNameLoc(),
+            impl->ImportedHeaderUnit);
+    if (defaultArgFunc) {
+      assert(defaultArgExpr && "defaultArgExpr should be non-null iff defaultArgFunc is");
+      impl->defaultArgGenerators[param] = defaultArgFunc;
       paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
       paramInfo->setTypeCheckedDefaultExpr(defaultArgExpr);
       paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");

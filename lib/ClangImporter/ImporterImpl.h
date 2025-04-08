@@ -360,6 +360,26 @@ private:
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
 
+enum class MakeStructRawValuedFlags {
+  /// whether to also create an unlabeled init
+  MakeUnlabeledValueInit = 0x01,
+
+  /// whether the raw value should be a let
+  IsLet = 0x02,
+
+  /// whether to mark the rawValue as implicit
+  IsImplicit = 0x04,
+};
+using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
+
+inline MakeStructRawValuedOptions getDefaultMakeStructRawValuedOptions() {
+  MakeStructRawValuedOptions opts;
+  opts -= MakeStructRawValuedFlags::MakeUnlabeledValueInit; // default off
+  opts |= MakeStructRawValuedFlags::IsLet;                  // default on
+  opts |= MakeStructRawValuedFlags::IsImplicit;             // default on
+  return opts;
+}
+
 /// The result of importing a clang type. It holds both the Swift Type
 /// as well as a bool in which 'true' indicates either:
 ///   This is an Optional type.
@@ -611,10 +631,6 @@ public:
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
-
-  /// Writes the mangled name of \p clangDecl to \p os.
-  void getMangledName(clang::MangleContext *mangler,
-                      const clang::NamedDecl *clangDecl, raw_ostream &os);
 
   /// Whether the C++ interoperability compatibility version is at least
   /// 'major'.
@@ -876,25 +892,6 @@ public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
                          ImportPath::Module path);
-
-  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
-    if (!isIUO)
-      return;
-
-#if !defined(NDEBUG)
-    Type ty;
-    if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-      ty = FD->getResultInterfaceType();
-    } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      ty = CD->getResultInterfaceType();
-    } else {
-      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
-    }
-    assert(ty->getOptionalObjectType());
-#endif
-
-    decl->setImplicitlyUnwrappedOptional(true);
-  }
 
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
@@ -1217,9 +1214,6 @@ public:
       NominalTypeDecl *nominal,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
       bool isUnchecked = false);
-
-  void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
-                    AccessorDecl *setter);
 
   /// Retrieve the standard library module.
   ModuleDecl *getStdlibModule();
@@ -1877,6 +1871,88 @@ public:
       return *SinglePCHImport;
     return StringRef();
   }
+
+  /// Create a new named constant with the given value.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param value The value of the named constant.
+  /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                            const clang::APValue &value,
+                            ConstantConvertKind convertKind, bool isStatic,
+                            ClangNode ClangN, AccessLevel access);
+
+  /// Create a new named constant with the given value.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param value The value of the named constant.
+  /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                            StringRef value, ConstantConvertKind convertKind,
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
+
+  /// Create a new named constant using the given expression.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param valueExpr An expression to use as the value of the constant.
+  /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                            Expr *valueExpr, ConstantConvertKind convertKind,
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
+
+private:
+  Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
+
+public:
+  /// Make a struct declaration into a raw-value-backed struct, with
+  /// bridged computed rawValue property which differs from stored backing
+  ///
+  /// \param structDecl the struct to make a raw value for
+  /// \param storedUnderlyingType the type of the stored raw value
+  /// \param bridgedType the type of the 'rawValue' computed property bridge
+  /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+  ///
+  /// This will perform most of the work involved in making a new Swift struct
+  /// be backed by a stored raw value and computed raw value of bridged type.
+  /// This will populated derived protocols and synthesized protocols, add the
+  /// new variable and pattern bindings, and create the inits parameterized
+  /// over a bridged type that will cast to the stored type, as appropriate.
+  void makeStructRawValuedWithBridge(
+      StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
+      ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+      bool makeUnlabeledValueInit = false);
+
+  /// Make a struct declaration into a raw-value-backed struct
+  ///
+  /// \param structDecl the struct to make a raw value for
+  /// \param underlyingType the type of the raw value
+  /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+  /// \param setterAccess the access level of the raw value's setter
+  ///
+  /// This will perform most of the work involved in making a new Swift struct
+  /// be backed by a raw value. This will populated derived protocols and
+  /// synthesized protocols, add the new variable and pattern bindings, and
+  /// create the inits parameterized over a raw value
+  ///
+  void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
+                           ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+                           MakeStructRawValuedOptions options =
+                               getDefaultMakeStructRawValuedOptions(),
+                           AccessLevel setterAccess = AccessLevel::Private);
 };
 
 class ImportDiagnosticAdder {
@@ -1896,6 +1972,15 @@ public:
 };
 
 namespace importer {
+/// Writes the mangled name of \p clangDecl to \p os.
+void getMangledName(clang::MangleContext *mangler,
+                    const clang::NamedDecl *clangDecl, raw_ostream &os);
+
+/// Make \a storage a computed property with the given \a getter and \a setter.
+///
+/// \a getter must be non-null.
+void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                  AccessorDecl *setter);
 
 /// Returns true if the given C/C++ record should be imported as a reference
 /// type into Swift.
@@ -1905,6 +1990,9 @@ bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
 bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+/// Set \a decl as an implicitly unwrapped optional if \a isUIO.
+void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO);
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
@@ -2082,7 +2170,6 @@ bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
-
 } // end namespace importer
 } // end namespace swift
 

@@ -4643,12 +4643,12 @@ void ClangImporter::getMangledName(raw_ostream &os,
   if (!Impl.Mangler)
     Impl.Mangler.reset(getClangASTContext().createMangleContext());
 
-  return Impl.getMangledName(Impl.Mangler.get(), clangDecl, os);
+  return importer::getMangledName(Impl.Mangler.get(), clangDecl, os);
 }
 
-void ClangImporter::Implementation::getMangledName(
-    clang::MangleContext *mangler, const clang::NamedDecl *clangDecl,
-    raw_ostream &os) {
+void importer::getMangledName(clang::MangleContext *mangler,
+                              const clang::NamedDecl *clangDecl,
+                              raw_ostream &os) {
   if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
     auto ctorGlobalDecl =
         clang::GlobalDecl(ctor, clang::CXXCtorType::Ctor_Complete);
@@ -5563,18 +5563,17 @@ const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
 
 // Construct a Swift method that represents the synthesized C++ method
 // that invokes the base C++ method.
-FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl, ASTContext &ctx,
-                                         NominalTypeDecl *derivedStruct,
-                                         NominalTypeDecl *baseStruct,
-                                         FuncDecl *baseMember) {
+static FuncDecl *synthesizeBaseFunctionDeclCall(ASTContext &ctx,
+                                                NominalTypeDecl *derivedStruct,
+                                                NominalTypeDecl *baseStruct,
+                                                FuncDecl *baseMember) {
   auto *cxxMethod = getCalledBaseCxxMethod(baseMember);
   if (!cxxMethod)
     return nullptr;
-  auto *newClangMethod =
-      SwiftDeclSynthesizer(&impl).synthesizeCXXForwardingMethod(
-          cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
-          cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), cxxMethod,
-          ForwardingMethodKind::Base);
+  auto *newClangMethod = SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+      ctx, cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
+      cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), cxxMethod,
+      ForwardingMethodKind::Base);
   if (!newClangMethod)
     return nullptr;
   return cast_or_null<FuncDecl>(
@@ -5597,9 +5596,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto baseStruct =
       cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
 
-  auto forwardedFunc = synthesizeBaseFunctionDeclCall(
-      *static_cast<ClangImporter *>(ctx.getClangModuleLoader()), ctx,
-      derivedStruct, baseStruct, baseMember);
+  auto forwardedFunc = synthesizeBaseFunctionDeclCall(ctx, derivedStruct,
+                                                      baseStruct, baseMember);
   if (!forwardedFunc) {
     ctx.Diags.diagnose(SourceLoc(), diag::failed_base_method_call_synthesis,
                          funcDecl, baseStruct);
@@ -5833,22 +5831,19 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   if (auto *md = dyn_cast_or_null<clang::CXXMethodDecl>(baseClangDecl)) {
     // Subscript operator, or `.pointee` wrapper is represented through a
     // generated C++ method call that calls the base operator.
-    baseGetterCxxMethod =
-        SwiftDeclSynthesizer(
-            static_cast<ClangImporter *>(ctx.getClangModuleLoader()))
-            .synthesizeCXXForwardingMethod(
-                cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
-                cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), md,
-                ForwardingMethodKind::Base,
-                getterDecl->getResultInterfaceType()->isForeignReferenceType()
-                    ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                          RemoveReferenceIfPointer
-                    : (kind != AccessorKind::Get
-                           ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                                 KeepReference
-                           : ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                                 RemoveReference),
-                /*forceConstQualifier=*/kind != AccessorKind::MutableAddress);
+    baseGetterCxxMethod = SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
+        ctx, cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
+        cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), md,
+        ForwardingMethodKind::Base,
+        getterDecl->getResultInterfaceType()->isForeignReferenceType()
+            ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                  RemoveReferenceIfPointer
+            : (kind != AccessorKind::Get
+                   ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                         KeepReference
+                   : ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                         RemoveReference),
+        /*forceConstQualifier=*/kind != AccessorKind::MutableAddress);
   } else if (auto *fd = dyn_cast_or_null<clang::FieldDecl>(baseClangDecl)) {
     ValueDecl *retainOperationFn = nullptr;
     // Check if this field getter is returning a retainable FRT.
