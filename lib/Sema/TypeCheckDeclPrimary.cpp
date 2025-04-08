@@ -3236,8 +3236,6 @@ public:
     diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
 
-    TypeChecker::checkPatternBindingCaptures(ED);
-
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
@@ -3306,8 +3304,6 @@ public:
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
     }
-
-    TypeChecker::checkPatternBindingCaptures(SD);
 
     checkInheritanceClause(SD);
     diagnoseMissingExplicitSendable(SD);
@@ -3489,8 +3485,6 @@ public:
 
     for (Decl *Member : CD->getABIMembers())
       visit(Member);
-
-    TypeChecker::checkPatternBindingCaptures(CD);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -4073,8 +4067,6 @@ public:
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
-
-    TypeChecker::checkPatternBindingCaptures(ED);
 
     TypeChecker::checkConformancesInContext(ED);
 
