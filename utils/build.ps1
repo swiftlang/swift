@@ -664,7 +664,7 @@ function Get-TargetInfo([Hashtable] $Platform) {
   # Cache the result of "swiftc -print-target-info" as $Platform.Cache.TargetInfo
   $CacheKey = "TargetInfo"
   if (-not $Platform.Cache.ContainsKey($CacheKey)) {
-    Invoke-IsolatingEnvVars {
+    [void](Invoke-IsolatingEnvVars {
       $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
       $TargetInfo = & swiftc -target $Platform.Triple -print-target-info
       if ($LastExitCode -ne 0) {
@@ -672,7 +672,7 @@ function Get-TargetInfo([Hashtable] $Platform) {
       }
       $TargetInfo = $TargetInfo | ConvertFrom-JSON
       $Platform.Cache[$CacheKey] = $TargetInfo.target
-    }
+    })
   }
   return $Platform.Cache[$CacheKey]
 }
@@ -1353,7 +1353,7 @@ function Build-CMakeProject {
       }
       if ($UseBuiltCompilers.Contains("Swift")) {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
-        $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
+        $RuntimeBinaryCache = Get-ProjectBinaryCache $Platform Runtime
         $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
         switch ($Platform.OS) {
@@ -1958,8 +1958,8 @@ function Build-LLVM([Hashtable] $Platform) {
 function Build-Sanitizers([Hashtable] $Platform) {
   $LLVMTargetCache = $(Get-ProjectBinaryCache $Platform LLVM)
   $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
-  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
-    throw "Unexpected version string output from llvm-lit.py"
+  if (-not $ToBatch -and -not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
+    throw "Unexpected version string '$LITVersionStr' output from llvm-lit.py"
   }
   $LLVMVersionMajor = $Matches.1
   $InstallTo = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
