@@ -1543,6 +1543,9 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
   if (importer::isCxxConstReferenceType(clangTy))
     return true;
 
+  if (clangTy->isRValueReferenceType())
+    return true;
+
   return false;
 }
 
