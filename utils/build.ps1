@@ -476,6 +476,11 @@ function Add-TimingData {
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
+  if ($EnableCaching) {
+    Write-Host "SCCache:" -ForegroundColor Green
+    & sccache.exe --show-stats
+  }
+
   $TotalTime = [TimeSpan]::Zero
   foreach ($Entry in $TimingData) {
     $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
@@ -3197,8 +3202,11 @@ if ($Clean) {
 }
 
 if (-not $SkipBuild) {
-  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
-    throw "Minimum required sccache version is 0.7.4"
+  if ($EnableCaching) {
+    if (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4)) {
+      throw "Minimum required sccache version is 0.7.4"
+    }
+    & sccache.exe --zero-stats
   }
 
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
