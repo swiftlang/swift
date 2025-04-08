@@ -179,8 +179,7 @@ namespace swift {
     void readWitnessTableEntries(
            llvm::BitstreamEntry &entry,
            std::vector<SILWitnessTable::Entry> &witnessEntries,
-           std::vector<SILWitnessTable::ConditionalConformance>
-             &conditionalConformances);
+           std::vector<ProtocolConformanceRef> &conditionalConformances);
     SILProperty *readProperty(serialization::DeclID);
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
