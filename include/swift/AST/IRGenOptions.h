@@ -649,7 +649,7 @@ public:
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        UseCoroCCX8664(false), UseCoroCCArm64(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(true),
         MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
