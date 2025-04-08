@@ -12,8 +12,6 @@ typedef unsigned long size_t;
 
 #endif // __SIZE_T_DEFINED_CUSTOM__
 
-#include <string>
-
 struct ExplicitDefaultConstructor {
   ExplicitDefaultConstructor() : x(42) {}
   int x;
@@ -346,7 +344,7 @@ __attribute__((swift_attr("release:Release16"))) ParameterizedCtor2 {
 public:
   int val1 = 1;
   int val2 = 1;
-  ParameterizedCtor2() {};
+  ParameterizedCtor2() {}
   ParameterizedCtor2(int x) : val1(x) {}
   ParameterizedCtor2(int x, int y) : val1(x), val2(y) {}
 };
@@ -357,7 +355,7 @@ __attribute__((swift_attr("release:Release17"))) VariadicCtors {
 public:
   int val1 = 1;
   int val2 = 2;
-  VariadicCtors(...) {};
+  VariadicCtors(...) {}
 };
 
 struct __attribute__((swift_attr("import_reference")))
@@ -365,23 +363,15 @@ __attribute__((swift_attr("retain:Retain18")))
 __attribute__((swift_attr("release:Release18"))) NoIdentifierInCtorParam {
 public:
   int val = 10;
-  NoIdentifierInCtorParam(int) {};
-};
-
-struct __attribute__((swift_attr("import_reference")))
-__attribute__((swift_attr("retain:Retain19")))
-__attribute__((swift_attr("release:Release19"))) RValRefCtor {
-public:
-  std::string val;
-  RValRefCtor(std::string &&x) { val = x; }
+  NoIdentifierInCtorParam(int) {}
 };
 
 struct cxxValTy {
 public:
   int val;
-  cxxValTy() {};
+  cxxValTy() {}
   cxxValTy(int x) { val = x; }
-  ~cxxValTy() {};
+  ~cxxValTy() {}
 };
 
 struct __attribute__((swift_attr("import_reference")))
@@ -389,7 +379,7 @@ __attribute__((swift_attr("retain:Retain20")))
 __attribute__((swift_attr("release:Release20"))) RValRefCtor2 {
 public:
   cxxValTy val;
-  RValRefCtor2(cxxValTy &&x) : val(std::move(x)) {}
+  RValRefCtor2(cxxValTy &&x) { val = x; }
 };
 
 struct __attribute__((swift_attr("import_reference")))
@@ -438,49 +428,49 @@ public:
 } // namespace SwiftInitSynthesisForCXXRefTypes
 
 void Retain1(SwiftInitSynthesisForCXXRefTypes::CompilerGeneratedDefaultCtor
-                  *_Nonnull v) {};
+                 *_Nonnull v) {}
 void Release1(SwiftInitSynthesisForCXXRefTypes::CompilerGeneratedDefaultCtor
-                  *_Nonnull v) {};
+                  *_Nonnull v) {}
 void Retain2(
-    SwiftInitSynthesisForCXXRefTypes::UserProvidedDefaultCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedDefaultCtor *_Nonnull v) {}
 void Release2(
-    SwiftInitSynthesisForCXXRefTypes::UserProvidedDefaultCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedDefaultCtor *_Nonnull v) {}
 void Retain3(
     SwiftInitSynthesisForCXXRefTypes::ExplicitCompilerGeneratedDefaultCtor
-        *_Nonnull v) {};
+        *_Nonnull v) {}
 void Release3(
     SwiftInitSynthesisForCXXRefTypes::ExplicitCompilerGeneratedDefaultCtor
-        *_Nonnull v) {};
+        *_Nonnull v) {}
 void Retain4(
-    SwiftInitSynthesisForCXXRefTypes::PlacementOperatorNew *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::PlacementOperatorNew *_Nonnull v) {}
 void Release4(
-    SwiftInitSynthesisForCXXRefTypes::PlacementOperatorNew *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::PlacementOperatorNew *_Nonnull v) {}
 void Retain5(SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew *_Nonnull v) {
 };
 void Release5(
-    SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::PrivateOperatorNew *_Nonnull v) {}
 void Retain6(
-    SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew *_Nonnull v) {}
 void Release6(
-    SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::ProtectedOperatorNew *_Nonnull v) {}
 void Retain7(SwiftInitSynthesisForCXXRefTypes::DeletedOperatorNew *_Nonnull v) {
 };
 void Release7(
-    SwiftInitSynthesisForCXXRefTypes::DeletedOperatorNew *_Nonnull v) {};
-void Retain8(SwiftInitSynthesisForCXXRefTypes::PrivateCtor *_Nonnull v) {};
-void Release8(SwiftInitSynthesisForCXXRefTypes::PrivateCtor *_Nonnull v) {};
-void Retain9(SwiftInitSynthesisForCXXRefTypes::ProtectedCtor *_Nonnull v) {};
-void Release9(SwiftInitSynthesisForCXXRefTypes::ProtectedCtor *_Nonnull v) {};
-void Retain10(SwiftInitSynthesisForCXXRefTypes::DeletedCtor *_Nonnull v) {};
-void Release10(SwiftInitSynthesisForCXXRefTypes::DeletedCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::DeletedOperatorNew *_Nonnull v) {}
+void Retain8(SwiftInitSynthesisForCXXRefTypes::PrivateCtor *_Nonnull v) {}
+void Release8(SwiftInitSynthesisForCXXRefTypes::PrivateCtor *_Nonnull v) {}
+void Retain9(SwiftInitSynthesisForCXXRefTypes::ProtectedCtor *_Nonnull v) {}
+void Release9(SwiftInitSynthesisForCXXRefTypes::ProtectedCtor *_Nonnull v) {}
+void Retain10(SwiftInitSynthesisForCXXRefTypes::DeletedCtor *_Nonnull v) {}
+void Release10(SwiftInitSynthesisForCXXRefTypes::DeletedCtor *_Nonnull v) {}
 void Retain11(
-    SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultArg *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultArg *_Nonnull v) {}
 void Release11(
-    SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultArg *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultArg *_Nonnull v) {}
 void Retain12(SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultAndNonDefaultArg
-                  *_Nonnull v) {};
+                  *_Nonnull v) {}
 void Release12(SwiftInitSynthesisForCXXRefTypes::CtorWithDefaultAndNonDefaultArg
-                    *_Nonnull v) {};
+                   *_Nonnull v) {}
 void Retain13(
     SwiftInitSynthesisForCXXRefTypes::DefaulltAndNonDefaultCtors *_Nonnull v) {
 };
@@ -490,33 +480,31 @@ void Release13(
 void Retain14(SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor *_Nonnull v) {
 };
 void Release14(
-    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor *_Nonnull v) {}
 void Retain15(
-    SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {}
 void Release15(
-    SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserProvidedStaticFactory *_Nonnull v) {}
 void Retain16(
-    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {}
 void Release16(
-    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {};
-void Retain17(SwiftInitSynthesisForCXXRefTypes::VariadicCtors *_Nonnull v) {};
-void Release17(SwiftInitSynthesisForCXXRefTypes::VariadicCtors *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::ParameterizedCtor2 *_Nonnull v) {}
+void Retain17(SwiftInitSynthesisForCXXRefTypes::VariadicCtors *_Nonnull v) {}
+void Release17(SwiftInitSynthesisForCXXRefTypes::VariadicCtors *_Nonnull v) {}
 void Retain18(
-    SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {}
 void Release18(
-    SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {};
-void Retain19(SwiftInitSynthesisForCXXRefTypes::RValRefCtor *_Nonnull v) {};
-void Release19(SwiftInitSynthesisForCXXRefTypes::RValRefCtor *_Nonnull v) {};
-void Retain20(SwiftInitSynthesisForCXXRefTypes::RValRefCtor2 *_Nonnull v) {};
-void Release20(SwiftInitSynthesisForCXXRefTypes::RValRefCtor2 *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::NoIdentifierInCtorParam *_Nonnull v) {}
+void Retain20(SwiftInitSynthesisForCXXRefTypes::RValRefCtor2 *_Nonnull v) {}
+void Release20(SwiftInitSynthesisForCXXRefTypes::RValRefCtor2 *_Nonnull v) {}
 void Retain21(
-    SwiftInitSynthesisForCXXRefTypes::UserDefinedCopyCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedCopyCtor *_Nonnull v) {}
 void Release21(
-    SwiftInitSynthesisForCXXRefTypes::UserDefinedCopyCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedCopyCtor *_Nonnull v) {}
 void Retain22(
-    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveCtor *_Nonnull v) {}
 void Release22(
-    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveCtor *_Nonnull v) {};
+    SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveCtor *_Nonnull v) {}
 void Retain23(
     SwiftInitSynthesisForCXXRefTypes::UserDefinedMoveAndCopyCtor *_Nonnull v) {
 };

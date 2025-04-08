@@ -2563,22 +2563,20 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   if (ctorDeclsForSynth.empty())
     return {};
 
-  {
-    clang::FunctionDecl *operatorNew = nullptr;
-    clang::FunctionDecl *operatorDelete = nullptr;
-    bool passAlignment = false;
-    clang::Sema::SFINAETrap trap(clangSema);
-    bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
-        cxxRecordDeclLoc, clang::SourceRange(), clang::Sema::AFS_Both,
-        clang::Sema::AFS_Both, cxxRecordTy, /*IsArray=*/false, passAlignment,
-        clang::MultiExprArg(), operatorNew, operatorDelete,
-        /*Diagnose=*/false);
-    if (trap.hasErrorOccurred() || findingAllocFuncFailed || !operatorNew ||
-        operatorNew->isDeleted() ||
-        operatorNew->getAccess() == clang::AS_private ||
-        operatorNew->getAccess() == clang::AS_protected)
-      return {};
-  }
+  clang::FunctionDecl *operatorNew = nullptr;
+  clang::FunctionDecl *operatorDelete = nullptr;
+  bool passAlignment = false;
+  clang::Sema::SFINAETrap trap(clangSema);
+  bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
+      cxxRecordDeclLoc, clang::SourceRange(), clang::Sema::AFS_Both,
+      clang::Sema::AFS_Both, cxxRecordTy, /*IsArray=*/false, passAlignment,
+      clang::MultiExprArg(), operatorNew, operatorDelete,
+      /*Diagnose=*/false);
+  if (trap.hasErrorOccurred() || findingAllocFuncFailed || !operatorNew ||
+      operatorNew->isDeleted() ||
+      operatorNew->getAccess() == clang::AS_private ||
+      operatorNew->getAccess() == clang::AS_protected)
+    return {};
 
   clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
   // Adding `_Nonnull` to the return type of synthesized static factory
@@ -2680,15 +2678,10 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     }
     llvm::SmallVector<clang::Expr *, 4> ctorArgsToAdd;
 
-    {
-      clang::Sema::SFINAETrap trap(clangSema);
-      if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
-                                            ctorArgs, cxxRecordDeclLoc,
-                                            ctorArgsToAdd))
-        continue;
-      if (trap.hasErrorOccurred())
-        continue;
-    }
+    if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
+                                          ctorArgs, cxxRecordDeclLoc,
+                                          ctorArgsToAdd))
+      continue;
 
     clang::ExprResult synthCtorExprResult = clangSema.BuildCXXConstructExpr(
         cxxRecordDeclLoc, cxxRecordTy, selectedCtorDecl,
