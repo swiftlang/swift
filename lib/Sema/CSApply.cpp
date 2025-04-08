@@ -5577,6 +5577,18 @@ namespace {
       E->setMacroRef(macroRef);
       E->setType(expandedType);
 
+      auto fnType =
+          simplifyType(overload.adjustedOpenedType)->castTo<FunctionType>();
+
+      auto newArgs = coerceCallArguments(
+          E->getArgs(), fnType, macroRef, /*applyExpr=*/nullptr,
+          cs.getConstraintLocator(E, ConstraintLocator::ApplyArgument),
+          solution.getAppliedPropertyWrappers(E));
+      if (!newArgs)
+        return nullptr;
+
+      E->setArgs(newArgs);
+
       // FIXME: Expansion should be lazy.
       // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
       // 'getRewritten()', and performed on-demand. Unfortunately that requires
