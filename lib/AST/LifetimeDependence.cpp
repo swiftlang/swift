@@ -1069,6 +1069,13 @@ protected:
       return;
     }
     if (afd->getParameters()->size() > 0) {
+      if (useLazyInference()) {
+        // Assume that a mutating method does not depend on its parameters.
+        // This is unsafe but needed because some MutableSpan APIs snuck into
+        // the standard library interface without specifying dependencies.
+        pushDeps(createDeps(selfIndex).add(selfIndex,
+                                           LifetimeDependenceKind::Inherit));
+      }
       return;
     }
     pushDeps(createDeps(selfIndex).add(selfIndex,
@@ -1115,6 +1122,17 @@ protected:
                    .add(newValIdx, *kind));
       break;
     }
+    case AccessorKind::MutableAddress:
+      if (useLazyInference()) {
+        // Assume that a mutating method does not depend on its parameters.
+        // Currently only for backward interface compatibility. Even though this
+        // is the only useful dependence (a borrow of self is possible but not
+        // useful), explicit annotation is required for now to confirm that the
+        // mutated self cannot depend on anything stored at this address.
+        pushDeps(createDeps(selfIndex).add(selfIndex,
+                                           LifetimeDependenceKind::Inherit));
+      }
+      break;
     default:
       // Unknown mutating accessor.
       break;
