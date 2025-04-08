@@ -688,7 +688,7 @@ public:
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(true), MergeableTraps(false),
         EnableSwiftDirectRetainRelease(SWIFT_ENABLE_DIRECT_RETAIN_RELEASE),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
