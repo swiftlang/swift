@@ -2539,8 +2539,8 @@ namespace {
           result->addMember(ctor);
         }
       } else {
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::CXXForeignReferenceTypeInitializers)) {
+        if (!Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::SuppressCXXForeignReferenceTypeInitializers)) {
           assert(
               isa<ClassDecl>(result) &&
               "Expected result to be a ClassDecl as it cannot be a StructDecl");
