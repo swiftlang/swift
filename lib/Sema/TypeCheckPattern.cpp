@@ -90,7 +90,21 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     ValueDecl *e = result.getValueDecl();
     assert(e);
 
-    // Skip if the enum element was referenced as an instance member
+    // We only care about enum members, and must either have an EnumElementDecl,
+    // or a VarDecl which could be wrapping an underlying enum element.
+    // FIXME: We check this up-front to avoid kicking InterfaceTypeRequest
+    // below to help workaround https://github.com/swiftlang/swift/issues/80657
+    // for non-enum cases. The proper fix is to move this filtering logic
+    // into the constraint system.
+    if (!e->getDeclContext()->getSelfEnumDecl())
+      continue;
+
+    auto *EED = dyn_cast<EnumElementDecl>(e);
+    auto *VD = dyn_cast<VarDecl>(e);
+    if (!EED && !VD)
+      continue;
+
+    // Skip if referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
           !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
@@ -98,17 +112,17 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
       }
     }
 
-    if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
+    if (EED) {
       // Note that there could be multiple elements with the same
       // name, such results in a re-declaration error, so let's
       // just always pick the last element, just like in `foundConstant`
       // case.
-      foundElement = oe;
+      foundElement = EED;
       continue;
     }
 
-    if (auto *var = dyn_cast<VarDecl>(e)) {
-      foundConstant = var;
+    if (VD) {
+      foundConstant = VD;
       continue;
     }
   }
