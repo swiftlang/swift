@@ -5866,11 +5866,11 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 }
 
 const CustomAvailabilityDomain *
-CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
-                              const ASTContext &ctx) {
+CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
+                              Decl *decl, const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
-  CustomAvailabilityDomain::Profile(id, identifier, mod, kind);
+  CustomAvailabilityDomain::Profile(id, identifier, mod);
 
   auto &foldingSet = ctx.getImpl().CustomAvailabilityDomains;
   void *insertPos;
@@ -5880,7 +5880,8 @@ CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
 
   void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
                            alignof(CustomAvailabilityDomain));
-  auto *newNode = ::new (mem) CustomAvailabilityDomain(identifier, mod, kind);
+  auto *newNode =
+      ::new (mem) CustomAvailabilityDomain(identifier, kind, mod, decl);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
