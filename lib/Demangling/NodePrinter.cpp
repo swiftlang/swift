@@ -1265,6 +1265,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
     case FunctionSigSpecializationParamKind::ConstantPropGlobal: {
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1280,6 +1282,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     }
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1287,6 +1291,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropString:
+      if (Idx + 3 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1297,6 +1303,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      if (Idx + 4 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1308,6 +1316,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << ">]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
