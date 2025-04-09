@@ -52,7 +52,7 @@ add_library(swift_Synchronization
   Mutex/Mutex.swift
   $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
   $<$<PLATFORM_ID:Linux>:Mutex/LinuxImpl.swift>
-  $<$<PLATFORM_ID:WASM>:Mutex/SpinLoopHint.swift> #ToDo is this right?
+  $<$<PLATFORM_ID:WASI>:Mutex/SpinLoopHint.swift>
   $<$<PLATFORM_ID:WINDOWS>:Mutex/WindowsImpl.swift>)
 
 set_target_properties(swift_Synchronization PROPERTIES
