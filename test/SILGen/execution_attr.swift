@@ -1,8 +1,7 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature ExecutionAttribute | %FileCheck -check-prefix CHECK -check-prefix DISABLED %s
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution | %FileCheck -check-prefix CHECK -check-prefix ENABLED %s
+// RUN: %target-swift-emit-silgen %s  | %FileCheck -check-prefix CHECK -check-prefix DISABLED %s
+// RUN: %target-swift-emit-silgen %s -enable-experimental-feature AsyncCallerExecution | %FileCheck -check-prefix CHECK -check-prefix ENABLED %s
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_AsyncCallerExecution
 
 // Validate that both with and without the experimental flag we properly codegen
