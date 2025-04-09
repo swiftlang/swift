@@ -688,6 +688,10 @@ public:
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
 
+  /// Returns true if this type satisfies a conformance to Escapable in the
+  /// given generic signature.
+  bool isEscapable(GenericSignature sig);
+
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
 
@@ -3566,6 +3570,16 @@ protected:
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
+    
+    if (Info) {
+      unsigned maxLifetimeTarget = NumParams + 1;
+      if (auto outputFn = Output->getAs<AnyFunctionType>()) {
+        maxLifetimeTarget += outputFn->getNumParams();
+      }
+      for (auto &dep : Info->getLifetimeDependencies()) {
+        assert(dep.getTargetIndex() < maxLifetimeTarget);
+      }
+    }
   }
 
 public:
@@ -5008,11 +5022,13 @@ enum class SILCoroutineKind : uint8_t {
 
 class SILFunctionConventions;
 
+Type substOpaqueTypesWithUnderlyingTypes(Type type,
+                                         TypeExpansionContext context);
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
 ProtocolConformanceRef
-substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref,
                                     TypeExpansionContext context);
 namespace Lowering {
   class TypeConverter;
@@ -5170,6 +5186,16 @@ public:
       const ASTContext &ctx,
       ProtocolConformanceRef witnessMethodConformance =
           ProtocolConformanceRef());
+          
+  /// Given an existing ExtInfo, and a set of interface parameters and results
+  /// destined for a new SILFunctionType, return a new ExtInfo with only the
+  /// lifetime dependencies relevant after substitution.
+  static ExtInfo
+  getSubstLifetimeDependencies(GenericSignature genericSig,
+                               ExtInfo origExtInfo,
+                               ArrayRef<SILParameterInfo> params,
+                               ArrayRef<SILYieldInfo> yields,
+                               ArrayRef<SILResultInfo> results);
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.
@@ -5622,6 +5648,13 @@ public:
   std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
     return getLifetimeDependenceFor(getNumParameters());
   }
+
+  /// Return true of the specified parameter is addressable based on its type
+  /// lowering in 'caller's context. This includes @_addressableForDependencies
+  /// parameter types.
+  ///
+  /// Defined in SILType.cpp.
+  bool isAddressable(unsigned paramIdx, SILFunction *caller);
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
@@ -7884,10 +7917,27 @@ class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef Value;
+  // Integers may not be canonical, but don't have any structural type
+  // components from which to get the ASTContext, so we need to store a
+  // reference to it ourselves.
+  const ASTContext &Context;
+
+  static const ASTContext *
+  getCanonicalIntegerLiteralContext(StringRef value, const ASTContext &ctx) {
+    for (char c : value) {
+      // A canonical integer literal consists only of ASCII decimal digits.
+      if (c < '0' || c > '9') {
+        return nullptr;
+      }
+    }
+    return &ctx;
+  }
 
   IntegerType(StringRef value, bool isNegative, const ASTContext &ctx) :
-      TypeBase(TypeKind::Integer, &ctx, RecursiveTypeProperties()),
-      Value(value) {
+      TypeBase(TypeKind::Integer, getCanonicalIntegerLiteralContext(value, ctx),
+               RecursiveTypeProperties()),
+      Value(value),
+      Context(ctx) {
     Bits.IntegerType.IsNegative = isNegative;
   }
 
@@ -7917,6 +7967,8 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Integer;
   }
+  
+  const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 

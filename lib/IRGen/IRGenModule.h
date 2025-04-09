@@ -92,7 +92,6 @@ namespace clang {
 namespace swift {
   class GenericSignature;
   class AssociatedConformance;
-  class AssociatedType;
   class ASTContext;
   class BaseConformance;
   class BraceStmt;
@@ -861,6 +860,11 @@ public:
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
 
+  llvm::StructType *
+  createTransientStructType(StringRef name,
+                            std::initializer_list<llvm::Type *> types,
+                            bool packed = false);
+
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
   unsigned TailElemTypeID = 0;
@@ -1118,6 +1122,7 @@ public:
   clang::CodeGen::CodeGenModule &getClangCGM() const;
   
   CanType getRuntimeReifiedType(CanType type);
+  Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
   SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
   std::pair<CanType, ProtocolConformanceRef>
@@ -1532,7 +1537,7 @@ public:
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   llvm::Constant *
-  getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer();
+  getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;

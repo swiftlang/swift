@@ -2970,7 +2970,7 @@ namespace {
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
 
         ConcreteDeclRef witness =
-            conformance.getWitnessByName(type->getRValueType(), constrName);
+            conformance.getWitnessByName(constrName);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         return witness;
@@ -3108,8 +3108,7 @@ namespace {
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
 
-      ConcreteDeclRef witness = conformance.getWitnessByName(
-          conformingType->getRValueType(), constrName);
+      ConcreteDeclRef witness = conformance.getWitnessByName(constrName);
 
       auto selectedOverload = solution.getOverloadChoiceIfAvailable(
           cs.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
@@ -3412,9 +3411,8 @@ namespace {
       auto &DE = ctx.Diags;
       DE.diagnose(UDE->getLoc(),
                   diag::warn_deprecated_conditional_conformance_outer_access,
-                  UDE->getName(),
-                  choice->getDescriptiveKind(), choiceParentDecl,
-                  innerChoice->getDescriptiveKind(), innerParentDecl);
+                  UDE->getName(), choice, choiceParentDecl, innerChoice,
+                  innerParentDecl);
 
       auto name = choiceParentDecl->getName().getBaseIdentifier();
       SmallString<32> namePlusDot = name.str();
@@ -3422,7 +3420,7 @@ namespace {
 
       DE.diagnose(UDE->getLoc(),
                   diag::fix_deprecated_conditional_conformance_outer_access,
-                  namePlusDot, choice->getDescriptiveKind())
+                  namePlusDot, choice)
           .fixItInsert(UDE->getStartLoc(), namePlusDot);
     }
 
@@ -3822,7 +3820,7 @@ namespace {
         DeclName name(ctx, DeclBaseName::createConstructor(),
                       {ctx.Id_arrayLiteral});
         ConcreteDeclRef witness =
-            conformance.getWitnessByName(arrayTy->getRValueType(), name);
+            conformance.getWitnessByName(name);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         expr->setInitializer(witness);
@@ -3868,7 +3866,7 @@ namespace {
       DeclName name(ctx, DeclBaseName::createConstructor(),
                     {ctx.Id_dictionaryLiteral});
       ConcreteDeclRef witness =
-          conformance.getWitnessByName(dictionaryTy->getRValueType(), name);
+          conformance.getWitnessByName(name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -5053,8 +5051,7 @@ namespace {
 
         de.diagnose(E->getLoc(), diag::expr_selector_not_objc, foundDecl)
             .highlight(subExpr->getSourceRange());
-        de.diagnose(foundDecl, diag::make_decl_objc,
-                    foundDecl->getDescriptiveKind())
+        de.diagnose(foundDecl, diag::make_decl_objc, foundDecl)
             .fixItInsert(foundDecl->getAttributeInsertionLoc(false), "@objc ");
         return E;
       }
@@ -5579,6 +5576,18 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
       E->setType(expandedType);
+
+      auto fnType =
+          simplifyType(overload.adjustedOpenedType)->castTo<FunctionType>();
+
+      auto newArgs = coerceCallArguments(
+          E->getArgs(), fnType, macroRef, /*applyExpr=*/nullptr,
+          cs.getConstraintLocator(E, ConstraintLocator::ApplyArgument),
+          solution.getAppliedPropertyWrappers(E));
+      if (!newArgs)
+        return nullptr;
+
+      E->setArgs(newArgs);
 
       // FIXME: Expansion should be lazy.
       // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
@@ -8081,7 +8090,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
       auto witness = builtinConformance.getWitnessByName(
-          type->getRValueType(), builtinLiteralFuncName);
+          builtinLiteralFuncName);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
 
@@ -8106,7 +8115,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
   if (!literalType.empty()) {
     // Extract the literal type.
     Type builtinLiteralType =
-        conformance.getTypeWitnessByName(type, literalType);
+        conformance.getTypeWitnessByName(literalType);
     if (builtinLiteralType->hasError())
       return nullptr;
 
@@ -8120,7 +8129,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
 
   // Find the witness that we'll use to initialize the literal value.
   auto witness =
-      conformance.getWitnessByName(type->getRValueType(), literalFuncName);
+      conformance.getWitnessByName(literalFuncName);
   if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
     return nullptr;
 
@@ -8222,9 +8231,8 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance = checkConformance(argumentType, dictLitProto);
-    auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
-    auto valueType =
-        conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
+    auto keyType = conformance.getTypeWitnessByName(ctx.Id_Key);
+    auto valueType = conformance.getTypeWitnessByName(ctx.Id_Value);
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (auto arg : *args) {

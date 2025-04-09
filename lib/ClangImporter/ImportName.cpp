@@ -62,19 +62,26 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
-static const char *getOperatorName(clang::OverloadedOperatorKind Operator) {
-  switch (Operator) {
+Identifier importer::getOperatorName(ASTContext &ctx,
+                                     clang::OverloadedOperatorKind op) {
+  switch (op) {
   case clang::OO_None:
   case clang::NUM_OVERLOADED_OPERATORS:
-    return nullptr;
-
+    return Identifier{};
 #define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
   case clang::OO_##Name:                                                       \
-    return #Name;
+    return ctx.getIdentifier("__operator" #Name);
 #include "clang/Basic/OperatorKinds.def"
   }
+}
 
-  llvm_unreachable("Invalid OverloadedOperatorKind!");
+Identifier importer::getOperatorName(ASTContext &ctx, Identifier op) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (op.str() == Spelling)                                                    \
+    return ctx.getIdentifier("__operator" #Name);
+#include "clang/Basic/OperatorKinds.def"
+
+  return Identifier{};
 }
 
 /// Determine whether the given Clang selector matches the given
@@ -1960,10 +1967,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe: {
-      auto operatorName = isa<clang::CXXMethodDecl>(functionDecl)
-                              ? "__operator" + std::string{getOperatorName(op)}
-                              : clang::getOperatorSpelling(op);
-      baseName = swiftCtx.getIdentifier(operatorName).str();
+      auto operatorName =
+          isa<clang::CXXMethodDecl>(functionDecl)
+              ? getOperatorName(swiftCtx, op)
+              : swiftCtx.getIdentifier(clang::getOperatorSpelling(op));
+      baseName = operatorName.str();
       isFunction = true;
       addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {

@@ -507,6 +507,7 @@ struct BridgedFunction {
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
   BRIDGED_INLINE void setIsSerialized(bool isSerialized) const;
+  BRIDGED_INLINE bool conformanceMatchesActorIsolation(BridgedConformance conformance) const;
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAutodiffVJP() const;
@@ -772,12 +773,14 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool AllocStackInst_hasDynamicLifetime() const;
   BRIDGED_INLINE bool AllocStackInst_isFromVarDecl() const;
   BRIDGED_INLINE bool AllocStackInst_usesMoveableValueDebugInfo() const;
+  BRIDGED_INLINE bool AllocStackInst_isLexical() const;
   BRIDGED_INLINE bool AllocRefInstBase_isObjc() const;
   BRIDGED_INLINE bool AllocRefInstBase_canAllocOnStack() const;
   BRIDGED_INLINE SwiftInt AllocRefInstBase_getNumTailTypes() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSILTypeArray AllocRefInstBase_getTailAllocatedTypes() const;
   BRIDGED_INLINE bool AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const;
   BRIDGED_INLINE SwiftInt BeginApplyInst_numArguments() const;
+  BRIDGED_INLINE bool BeginApplyInst_isCalleeAllocated() const;
   BRIDGED_INLINE SwiftInt TryApplyInst_numArguments() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock BranchInst_getTargetBlock() const;
   BRIDGED_INLINE SwiftInt SwitchEnumInst_getNumCases() const;
@@ -1059,7 +1062,6 @@ struct BridgedWitnessTableEntry {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getAssociatedTypeRequirement() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getAssociatedTypeWitness() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getAssociatedConformanceRequirement() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getAssociatedConformanceSubstType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getAssociatedConformanceWitness() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getBaseProtocolRequirement() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getBaseProtocolWitness() const;
@@ -1074,7 +1076,6 @@ struct BridgedWitnessTableEntry {
                                                        BridgedCanType witness);
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedWitnessTableEntry createAssociatedConformance(BridgedCanType requirement,
-                                                              BridgedCanType substType,
                                                               BridgedConformance witness);
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedWitnessTableEntry createBaseProtocol(BridgedDeclObj requirement,

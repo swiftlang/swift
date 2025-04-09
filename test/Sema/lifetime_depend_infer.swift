@@ -137,7 +137,7 @@ struct EscapableNonTrivialSelf {
   @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
   mutating func mutatingMethodNoParamCopy() -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutatingMethodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
   func methodOneParam(_: Int) -> NEImmortal { NEImmortal() } // expected-error{{a method with a ~Escapable result requires '@lifetime(...)'}}
@@ -159,7 +159,7 @@ struct EscapableNonTrivialSelf {
   @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
   mutating func mutatingMethodOneParamCopy(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 }
 
@@ -224,7 +224,7 @@ func oneParamLifetime(c: C) -> NEImmortal { NEImmortal() }
 
 func oneParamConsume(c: consuming C) -> NEImmortal { NEImmortal() } // expected-error{{cannot borrow the lifetime of 'c', which has consuming ownership on a function}}
 
-@lifetime(c) // expected-error{{invalid use of borrow dependence with consuming ownership}}
+@lifetime(c) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
 func oneParamConsumeLifetime(c: consuming C) -> NEImmortal { NEImmortal() }
 
 func oneParamBorrow(c: borrowing C) -> NEImmortal { NEImmortal() } // OK
@@ -424,7 +424,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       yield ne
     }
 
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify {
       yield &ne
     }
@@ -484,7 +484,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       ne
     }
 
-    @lifetime(borrow self)
+    @lifetime(&self)
     set {
       ne = newValue
     }
@@ -496,7 +496,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       yield ne
     }
 
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify {
       yield &ne
     }

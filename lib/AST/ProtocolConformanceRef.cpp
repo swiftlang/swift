@@ -67,24 +67,22 @@ ProtocolDecl *ProtocolConformanceRef::getProtocol() const {
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType,
-                              SubstitutionMap subMap,
+ProtocolConformanceRef::subst(SubstitutionMap subMap,
                               SubstOptions options) const {
   InFlightSubstitutionViaSubMap IFS(subMap, options);
-  return subst(origType, IFS);
+  return subst(IFS);
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType,
-                              TypeSubstitutionFn subs,
+ProtocolConformanceRef::subst(TypeSubstitutionFn subs,
                               LookupConformanceFn conformances,
                               SubstOptions options) const {
   InFlightSubstitution IFS(subs, conformances, options);
-  return subst(origType, IFS);
+  return subst(IFS);
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
+ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
   if (isInvalid())
     return *this;
 
@@ -93,36 +91,28 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   if (isPack())
     return getPack()->subst(IFS);
 
-  ASSERT(isAbstract());
-  auto *proto = getProtocol();
+  auto *abstract = getAbstract();
+  auto origType = abstract->getType();
+  auto *proto = abstract->getProtocol();
 
   // If the type is an opaque archetype, the conformance will remain abstract,
   // unless we're specifically substituting opaque types.
-  if (origType->getAs<OpaqueTypeArchetypeType>()) {
-    if (!IFS.shouldSubstituteOpaqueArchetypes()) {
-      return forAbstract(origType.subst(IFS), proto);
-    }
+  if (origType->is<OpaqueTypeArchetypeType>() &&
+      !IFS.shouldSubstituteOpaqueArchetypes()) {
+    return forAbstract(origType.subst(IFS), proto);
   }
 
-  // FIXME: Handle local archetypes as above!
-
-  // Otherwise, compute the substituted type.
-  auto substType = origType.subst(IFS);
-
-  // If the type is an existential, it must be self-conforming.
-  // FIXME: This feels like it's in the wrong place.
-  if (substType->isExistentialType()) {
-    auto optConformance =
-        lookupConformance(substType, proto, /*allowMissing=*/true);
-    if (optConformance)
-      return optConformance;
-
-    return ProtocolConformanceRef::forInvalid();
+  // If the type is a local archetype, the conformance will remain abstract,
+  // unless we're specifically substituting local types.
+  if (origType->is<LocalArchetypeType>() &&
+      !IFS.shouldSubstituteLocalArchetypes()) {
+    return forAbstract(origType.subst(IFS), proto);
   }
 
   // Local conformance lookup into the substitution map.
   // FIXME: Pack element level?
-  return IFS.lookupConformance(origType->getCanonicalType(), substType, proto,
+  return IFS.lookupConformance(origType->getCanonicalType(),
+                               origType.subst(IFS), proto,
                                /*level=*/0);
 }
 
@@ -149,7 +139,7 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
 }
 
 Type
-ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
+ProtocolConformanceRef::getTypeWitnessByName(Identifier name) const {
   assert(!isInvalid());
 
   // Find the named requirement.
@@ -160,11 +150,11 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   if (!assocType)
     return ErrorType::get(proto->getASTContext());
 
-  return getTypeWitness(type, assocType);
+  return getTypeWitness(assocType);
 }
 
 ConcreteDeclRef
-ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
+ProtocolConformanceRef::getWitnessByName(DeclName name) const {
   // Find the named requirement.
   auto *proto = getProtocol();
   auto *requirement = proto->getSingleRequirement(name);
@@ -174,7 +164,7 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
   if (!isConcrete()) {
-    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, type, *this);
+    auto subs = SubstitutionMap::getProtocolSubstitutions(*this);
     return ConcreteDeclRef(requirement, subs);
   }
 
@@ -190,78 +180,56 @@ ProtocolConformanceRef::getConditionalRequirements() const {
     return {};
 }
 
-Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
-                                            AssociatedTypeDecl *assocType,
+Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
                                             SubstOptions options) const {
+  if (isInvalid())
+    return ErrorType::get(assocType->getASTContext());
+
   if (isPack()) {
     auto *pack = getPack();
-    ASSERT(conformingType->isEqual(pack->getType()));
-    return pack->getTypeWitness(assocType);
+    return pack->getTypeWitness(assocType, options);
   }
 
-  auto failed = [&]() {
-    return DependentMemberType::get(ErrorType::get(conformingType),
-                                    assocType);
-  };
-
-  if (isInvalid())
-    return failed();
-
-  auto proto = getProtocol();
-  ASSERT(assocType->getProtocol() == proto);
-
   if (isConcrete()) {
-    auto witnessType = getConcrete()->getTypeWitness(assocType, options);
-    if (!witnessType || witnessType->is<ErrorType>())
-      return failed();
+    auto *concrete = getConcrete();
+    ASSERT(concrete->getProtocol() == assocType->getProtocol());
+
+    auto witnessType = concrete->getTypeWitness(assocType, options);
+    if (!witnessType)
+      return ErrorType::get(assocType->getASTContext());
     return witnessType;
   }
 
-  ASSERT(isAbstract());
+  auto *abstract = getAbstract();
+  auto conformingType = abstract->getType();
+  ASSERT(abstract->getProtocol() == assocType->getProtocol());
 
-  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>())
     return archetypeType->getNestedType(assocType);
-  }
-
-  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
-                     conformingType->isTypeVariableOrMember() ||
-                     conformingType->is<UnresolvedType>() ||
-                     conformingType->is<PlaceholderType>());
 
   return DependentMemberType::get(conformingType, assocType);
 }
 
-Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
-                                               Type assocType) const {
-  if (isInvalid())
-    return ErrorType::get(assocType->getASTContext());
-
-  auto proto = getProtocol();
-
-  auto substMap =
-    SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
-  return assocType.subst(substMap);
-}
-
 ProtocolConformanceRef
-ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
-                                                 Type assocType,
+ProtocolConformanceRef::getAssociatedConformance(Type assocType,
                                                  ProtocolDecl *protocol) const {
+  if (isInvalid())
+    return *this;
+
   // If this is a pack conformance, project the associated conformances from
   // each pack element.
   if (isPack()) {
     auto *pack = getPack();
-    assert(conformingType->isEqual(pack->getType()));
     return ProtocolConformanceRef(
         pack->getAssociatedConformance(assocType, protocol));
   }
 
   // If this is a concrete conformance, project the associated conformance.
   if (isConcrete()) {
-    auto conformance = getConcrete();
-    assert(conformance->getType()->isEqual(conformingType));
-    return conformance->getAssociatedConformance(assocType, protocol);
+    return getConcrete()->getAssociatedConformance(assocType, protocol);
   }
+
+  auto conformingType = getType();
 
   auto computeSubjectType = [&](Type conformingType) -> Type {
     return assocType.transformRec(

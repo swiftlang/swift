@@ -912,14 +912,17 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (opts.ImplicitObjCPCHPath.empty())
+  if (!opts.ModuleHasBridgingHeader)
+    return std::string();
+
+  if (!opts.ImplicitObjCHeaderPath.empty())
     return opts.ImplicitObjCHeaderPath;
 
   auto clangImporter =
       static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
 
   // No clang importer created. Report error?
-  if (!clangImporter)
+  if (!clangImporter || opts.ImplicitObjCPCHPath.empty())
     return std::string();
 
   return clangImporter->getOriginalSourceFile(opts.ImplicitObjCPCHPath);
@@ -1406,7 +1409,8 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::get(name, mainModule, kind, ctx);
+    auto *domain =
+        CustomAvailabilityDomain::get(name, kind, mainModule, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };
@@ -1469,8 +1473,6 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
-    if (Invocation.getLangOptions().hasFeature(Feature::ExtensibleEnums))
-      MainModule->setSupportsExtensibleEnums(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

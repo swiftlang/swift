@@ -3,7 +3,7 @@
 @escaping var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attribute can only be applied to types, not declarations}}
 
-func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
+func wrongParamType(a: @escaping Int) {} // expected-error {{'@escaping' only applies to function types}}
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{unknown attribute 'noescape'}}
 
@@ -75,8 +75,8 @@ let foo: @escaping (Int) -> Int // expected-error{{@escaping attribute may only 
 
 struct GenericStruct<T> {}
 
-func misuseEscaping(_ a: @escaping Int) {} // expected-error{{@escaping attribute only applies to function types}} {{26-36=}}
-func misuseEscaping(_ a: (@escaping Int)?) {} // expected-error{{@escaping attribute only applies to function types}} {{27-36=}}
+func misuseEscaping(_ a: @escaping Int) {} // expected-error{{'@escaping' only applies to function types}} {{26-36=}}
+func misuseEscaping(_ a: (@escaping Int)?) {} // expected-error{{'@escaping' only applies to function types}} {{27-36=}}
 func misuseEscaping(opt a: @escaping ((Int) -> Int)?) {} // expected-error{{closure is already escaping in optional type argument}} {{28-38=}}
 
 func misuseEscaping(_ a: (@escaping (Int) -> Int)?) {} // expected-error{{closure is already escaping in optional type argument}} {{27-36=}}
@@ -231,7 +231,7 @@ extension P_52188 {
 
 // https://github.com/apple/swift/issues/51669
 
-func f_51669<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}
+func f_51669<T>(_ x: @escaping T) {} // expected-error 1{{'@escaping' only applies to function types}}
 
 // https://github.com/apple/swift/issues/57070
 

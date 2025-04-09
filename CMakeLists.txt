@@ -575,6 +575,17 @@ set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "/usr/lib/swift" CACHE STRING
     "The directory of the install_name for standard library dylibs")
 
+#
+# User-configurable OpenBSD-specific options.
+#
+
+option(SWIFT_OPENBSD_BTCFI
+  "Emit branch target identification instructions and sign return addresses when available"
+  FALSE)
+if(SWIFT_OPENBSD_BTCFI)
+  add_definitions("-DSWIFT_OPENBSD_BTCFI")
+endif()
+
 # We don't want to use the same install_name_dir as the standard library which
 # will be installed in /usr/lib/swift. These private libraries should continue
 # to use @rpath for now.

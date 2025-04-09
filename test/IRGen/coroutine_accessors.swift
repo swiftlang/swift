@@ -230,7 +230,7 @@ public mutating func increment_irm() {
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call swiftcc void @swift_task_dealloc_through(ptr [[FRAME]])
+// CHECK:         call swiftcc void @{{(_)?}}swift_task_dealloc_through(ptr [[FRAME]])
 // CHECK:       }
 @_silgen_name("increment_irm_async")
 public mutating func increment_irm_async() async {

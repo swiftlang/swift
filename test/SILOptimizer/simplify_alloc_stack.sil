@@ -41,7 +41,7 @@ sil [ossa] @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
 sil [ossa] @use_c2 : $@convention(thin) (@in_guaranteed C2) -> ()
 
 // CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum1 :
-// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK:        [[A:%[0-9]+]] = alloc_stack [lexical] $S
 // CHECK:      bb1:
 // CHECK-NEXT:   store %0 to [trivial] [[A]]
 // CHECK:      bb2:
@@ -51,7 +51,7 @@ sil [ossa] @use_c2 : $@convention(thin) (@in_guaranteed C2) -> ()
 // CHECK:      } // end sil function 'expand_alloc_stack_of_enum1'
 sil [ossa] @expand_alloc_stack_of_enum1 : $@convention(method) (S) -> () {
 bb0(%0 : $S):
-  %1 = alloc_stack $MP
+  %1 = alloc_stack [lexical] $MP
   cond_br undef, bb1, bb2
 
 bb1:
@@ -215,7 +215,7 @@ bb0(%0 : $S):
 }
 
 // CHECK-LABEL: sil [ossa] @replace_archetype :
-// CHECK:         [[S:%.*]] = alloc_stack $T
+// CHECK:         [[S:%.*]] = alloc_stack [lexical] $T
 // CHECK:         debug_value [[S]]
 // CHECK:         unchecked_addr_cast [[S]]
 // CHECK:         destroy_addr [[S]]
@@ -225,7 +225,7 @@ bb0(%0 : @owned $T):
   %1 = metatype $@thick T.Type
   %2 = init_existential_metatype %1, $@thick P.Type
   %3 = open_existential_metatype %2 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
-  %4 = alloc_stack $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self
+  %4 = alloc_stack [lexical] $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self
   debug_value %4, var, name "x"
   %5 = unchecked_addr_cast %4 to $*T
   store %0 to [init] %5
@@ -364,4 +364,20 @@ bb0(%0 : @owned $C2):
   destroy_addr %1
   dealloc_stack %1
   return %5
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_existential_with_escaping_addr :
+// CHECK:         alloc_stack $any P
+// CHECK:       } // end sil function 'dont_replace_existential_with_escaping_addr'
+sil [ossa] @dont_replace_existential_with_escaping_addr : $@convention(thin) <V> (@thick V.Type, @owned C2) -> @out V {
+bb0(%0 : $*V, %1 : $@thick V.Type, %2 : @owned $C2):
+  %114 = alloc_stack $any P
+  %117 = init_existential_addr %114, $C2
+  store %2 to [init] %117
+  %129 = unchecked_addr_cast %114 to $*V
+  copy_addr %129 to [init] %0
+  destroy_addr %114
+  dealloc_stack %114
+  %137 = tuple ()
+  return %137
 }

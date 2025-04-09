@@ -41,7 +41,8 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
   - Normal: "cannot call 'super.init' outside of an initializer"
   - Better: "'super.init' cannot be called outside of an initializer"
 
-- When referring to attributes by name, use *either* "the 'foo' attribute" or "'@foo'", rather than "the '@foo' attribute".
+- When referring to attributes by name, use *either* `attribute 'foo'` or 
+  `'@foo'`, rather than `attribute '@foo'`.
 
 - Match the tone and phrasing of other diagnostics. Some common phrases:
 
@@ -130,7 +131,10 @@ If you run into any issues or have questions while following the steps above, fe
 
 - `%%` - Emits a literal percent sign.
 
-There are several format specifiers that are specific to `Decl` parameters:
+The following subsections describe format specifiers that are specific to 
+diagnostic arguments of a given type.
+
+#### `Decl`
 
 - `%kind0` - Prefixes the declaration's name with its descriptive decl kind (e.g. `instance method 'foo(x:)'`).
 
@@ -139,6 +143,11 @@ There are several format specifiers that are specific to `Decl` parameters:
 - `%base0` - Inserts only the base name, removing any argument labels (e.g. `'foo'`).
 
 - `%kindbase0` - Combines `kind` and `base` (e.g. `instance method 'foo'`).
+
+#### `TypeAttribute`
+
+- `%kind0` - Replaced with `attribute 'foo'`, whereas `%0` is replaced with
+  `'@foo'`.
 
 Note: If your diagnostic could apply to accessors, be careful how you format the declaration's name; accessors have an empty name, so you need to display their accessor kind and the name of their storage decl instead. Inserting the name with a `Decl *` parameter will handle these complications automatically; if you want to use `DeclName` or `Identifier` instead, you'll probably need a separate version of the diagnostic for accessors. 
 

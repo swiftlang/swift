@@ -416,6 +416,9 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
+/// Enable inout lifetime dependence - @lifetime(&arg)
+EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
+
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
@@ -490,12 +493,7 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
 ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
-
-/// Allow public enumerations to be extensible by default
-/// regardless of whether the module they are declared in
-/// is resilient or not.
-EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
+EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)

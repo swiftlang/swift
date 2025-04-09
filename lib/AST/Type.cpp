@@ -1878,6 +1878,18 @@ CanType TypeBase::computeCanonicalType() {
     Result = ErrorUnionType::get(ctx, newTerms).getPointer();
     break;
   }
+  case TypeKind::Integer: {
+    auto intTy = cast<IntegerType>(this);
+    APInt value = intTy->getValue();
+    if (intTy->isNegative()) {
+      value = -value;
+    }
+    SmallString<20> canonicalText;
+    value.toStringUnsigned(canonicalText);
+    Result = IntegerType::get(canonicalText, intTy->isNegative(),
+                              intTy->getASTContext());
+    break;
+  }
   }
 
   // Cache the canonical type for future queries.
@@ -4569,7 +4581,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
   auto conformance = swift::lookupConformance(this, differentiableProtocol);
-  auto assocTy = conformance.getTypeWitness(this, assocDecl);
+  auto assocTy = conformance.getTypeWitness(assocDecl);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 

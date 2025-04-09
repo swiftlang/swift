@@ -456,6 +456,22 @@ public:
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
 
+  /// Checks whether this expression is always hoisted above a binary operator
+  /// when it appears on the left-hand side, e.g 'try x + y' becomes
+  /// 'try (x + y)'. If so, returns the sub-expression, \c nullptr otherwise.
+  ///
+  /// Note that such expressions may not appear on the right-hand side of a
+  /// binary operator, except for assignment and ternaries.
+  Expr *getAlwaysLeftFoldedSubExpr() const;
+
+  /// Checks whether this expression is always hoisted above a binary operator
+  /// when it appears on the left-hand side, e.g 'try x + y' becomes
+  /// 'try (x + y)'.
+  ///
+  /// Note that such expressions may not appear on the right-hand side of a
+  /// binary operator, except for assignment and ternaries.
+  bool isAlwaysLeftFolded() const { return bool(getAlwaysLeftFoldedSubExpr()); }
+
   /// Find the original expression value, looking through various
   /// implicit conversions.
   const Expr *findOriginalValue() const;

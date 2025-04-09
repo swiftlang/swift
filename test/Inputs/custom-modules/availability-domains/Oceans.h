@@ -1,4 +1,4 @@
-#import <Rivers.h>
+#include <Rivers.h>
 #include <feature-availability.h>
 
 int arctic_pred(void);

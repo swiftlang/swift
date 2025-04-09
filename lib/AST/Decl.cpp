@@ -176,7 +176,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(InfixOperator);
   TRIVIAL_KIND(PrefixOperator);
   TRIVIAL_KIND(PostfixOperator);
-  TRIVIAL_KIND(TypeAlias);
   TRIVIAL_KIND(GenericTypeParam);
   TRIVIAL_KIND(AssociatedType);
   TRIVIAL_KIND(Protocol);
@@ -189,6 +188,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
+
+  case DeclKind::TypeAlias:
+    return cast<TypeAliasDecl>(this)->getGenericParams()
+             ? DescriptiveDeclKind::GenericTypeAlias
+             : DescriptiveDeclKind::TypeAlias;
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -350,6 +354,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(PrefixOperator, "prefix operator");
   ENTRY(PostfixOperator, "postfix operator");
   ENTRY(TypeAlias, "type alias");
+  ENTRY(GenericTypeAlias, "generic type alias");
   ENTRY(GenericTypeParam, "generic parameter");
   ENTRY(AssociatedType, "associated type");
   ENTRY(Type, "type");
@@ -364,7 +369,6 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericClass, "generic class");
   ENTRY(GenericActor, "generic actor");
   ENTRY(GenericDistributedActor, "generic distributed actor");
-  ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(StaticSubscript, "static subscript");
   ENTRY(ClassSubscript, "class subscript");
@@ -2285,6 +2289,13 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
                                 /*Init*/ nullptr, /*InitContext*/ nullptr);
   }
   return PBD;
+}
+
+CaptureInfo PatternBindingDecl::getCaptureInfo(unsigned i) const {
+  auto *mutableThis = const_cast<PatternBindingDecl *>(this);
+  PatternBindingCaptureInfoRequest req(mutableThis, i);
+  return evaluateOrDefault(getASTContext().evaluator, req,
+                           CaptureInfo::empty());
 }
 
 PatternBindingInitializer *
@@ -6854,14 +6865,11 @@ bool EnumDecl::treatAsExhaustiveForDiags(const DeclContext *useDC) const {
     if (enumModule->inSamePackage(useDC->getParentModule()))
       return true;
 
-    // If the module where enum is declared supports extensible enumerations
-    // and this enum is not explicitly marked as "@frozen", cross-module
-    // access cannot be exhaustive and requires `@unknown default:`.
-    if (enumModule->supportsExtensibleEnums() &&
-        !getAttrs().hasAttribute<FrozenAttr>()) {
-      if (useDC != enumModule->getDeclContext())
-        return false;
-    }
+    // When the enum is marked as `@extensible` cross-module access
+    // cannot be exhaustive and requires `@unknown default:`.
+    if (getAttrs().hasAttribute<ExtensibleAttr>() &&
+        enumModule != useDC->getParentModule())
+      return false;
   }
 
   return isFormallyExhaustive(useDC);

@@ -1,8 +1,8 @@
-//===--- DerivedConformances.cpp - Derived conformance utilities ----------===//
+//===--- DerivedConformance.cpp ---------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,21 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
+#include "DerivedConformance.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "DerivedConformances.h"
 
 using namespace swift;
 
@@ -274,9 +274,9 @@ void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
 
   if (shouldDiagnose) {
     auto &ctx = nominal->getASTContext();
-    ctx.Diags.diagnose(
-        nominal->getLoc(), diag::automatic_protocol_synthesis_unsupported,
-        protocol->getName().str(), nominal->getDescriptiveKind());
+    ctx.Diags.diagnose(nominal->getLoc(),
+                       diag::automatic_protocol_synthesis_unsupported, protocol,
+                       nominal);
   }
 }
 

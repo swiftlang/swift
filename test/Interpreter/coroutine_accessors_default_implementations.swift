@@ -35,12 +35,16 @@
 // RUN:     %target-rpath(%t) \
 // RUN:     -o %t/main
 
-// RUN: %target-codesign %t/%target-library-name(Library)
-// RUN: %target-codesign %t/main
+// RUN: %target-codesign %t/main %t/%target-library-name(Library)
 // RUN: %target-run %t/main %t/%target-library-name(Library) | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: executable_test
+
+// This test verifies the backwards compatibility of binaries built against old
+// SDKs running on newer OSes (where CoroutineAccessors has been enabled).
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 //--- Library.swift
 public protocol P {

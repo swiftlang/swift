@@ -185,11 +185,11 @@ public:
   ProtocolDecl *getProtocol() const;
   
   /// Apply a substitution to the conforming type.
-  ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,
+  ProtocolConformanceRef subst(SubstitutionMap subMap,
                                SubstOptions options = std::nullopt) const;
 
   /// Apply a substitution to the conforming type.
-  ProtocolConformanceRef subst(Type origType, TypeSubstitutionFn subs,
+  ProtocolConformanceRef subst(TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
                                SubstOptions options = std::nullopt) const;
 
@@ -197,26 +197,24 @@ public:
   ///
   /// This function should generally not be used outside of the substitution
   /// subsystem.
-  ProtocolConformanceRef subst(Type origType,
-                               InFlightSubstitution &IFS) const;
+  ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
 
   /// Map contextual types to interface types in the conformance.
   ProtocolConformanceRef mapConformanceOutOfContext() const;
 
   /// Look up the type witness for an associated type declaration in this
   /// conformance.
-  Type getTypeWitness(Type origType, AssociatedTypeDecl *assocType,
+  Type getTypeWitness(AssociatedTypeDecl *assocType,
                       SubstOptions options = std::nullopt) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
-  Type getAssociatedType(Type origType, Type dependentType) const;
+  Type getAssociatedType(Type dependentType) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol) and conformance, follow it from the conforming type.
   ProtocolConformanceRef
-  getAssociatedConformance(Type origType, Type dependentType,
-                           ProtocolDecl *requirement) const;
+  getAssociatedConformance(Type dependentType, ProtocolDecl *requirement) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0,
@@ -235,7 +233,7 @@ public:
     return llvm::hash_value(conformance.Union.getOpaqueValue());
   }
 
-  Type getTypeWitnessByName(Type type, Identifier name) const;
+  Type getTypeWitnessByName(Identifier name) const;
 
   /// Find a particular named function witness for a type that conforms to
   /// the given protocol.
@@ -243,7 +241,7 @@ public:
   /// \param type The conforming type.
   ///
   /// \param name The name of the requirement.
-  ConcreteDeclRef getWitnessByName(Type type, DeclName name) const;
+  ConcreteDeclRef getWitnessByName(DeclName name) const;
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;

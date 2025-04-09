@@ -76,8 +76,7 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(CanType target) {
   auto bridgedProto =
       target->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto conf = lookupConformance(target, bridgedProto);
-  return SubstitutionMap::getProtocolSubstitutions(conf.getProtocol(),
-                                                   target, conf);
+  return SubstitutionMap::getProtocolSubstitutions(conf);
 }
 
 /// Given that our insertion point is at the cast that we are trying to
@@ -1480,6 +1479,9 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // valid conformance will be returned.
     auto Conformance = checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
+      return false;
+
+    if (!matchesActorIsolation(Conformance, Inst->getFunction()))
       return false;
 
     auto layout = TargetType->getExistentialLayout();

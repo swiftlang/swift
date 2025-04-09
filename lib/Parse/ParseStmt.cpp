@@ -2720,7 +2720,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       assert(peekToken().is(tok::identifier) && "isAtStartOfSwitchCase() lied");
 
       consumeToken(tok::at_sign);
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      diagnose(Tok, diag::unknown_attr_name, Tok.getText());
       consumeToken(tok::identifier);
 
       if (Tok.is(tok::l_paren))

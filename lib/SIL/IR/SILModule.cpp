@@ -804,7 +804,8 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
     }
     ++idx;
   }
-  llvm_unreachable("enum element not found in enum decl");
+  ASSERT(false && "enum element not found in enum decl, broken AST?");
+  return 0;
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {

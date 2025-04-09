@@ -189,6 +189,10 @@ public:
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
+  getProtocolSubstitutions(ProtocolConformanceRef conformance);
+
+  /// Create a substitution map for a protocol conformance.
+  static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,
                            Type selfType,
                            ProtocolConformanceRef conformance);

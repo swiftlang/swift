@@ -1500,21 +1500,28 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
 @usableFromInline
 @preconcurrency
 internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
-  Task.detached {
+  let taskFlags = taskCreateFlags(
+    priority: nil, isChildTask: false, copyTaskLocals: false,
+    inheritContext: false, enqueueJob: false,
+    addPendingGroupTaskUnconditionally: false,
+    isDiscardingTask: false, isSynchronousStart: false)
+
+  let (theTask, _) = Builtin.createAsyncTask(taskFlags) {
     do {
-#if !os(Windows)
-#if compiler(>=5.5) && $BuiltinHopToActor
-      Builtin.hopToActor(MainActor.shared)
-#else
-      fatalError("Swift compiler is incompatible with this SDK version")
-#endif
-#endif
       try await asyncFun()
       exit(0)
     } catch {
       _errorInMain(error)
     }
   }
+
+  let job = Builtin.convertTaskToJob(theTask)
+  if #available(SwiftStdlib 6.2, *) {
+    MainActor.executor.enqueue(ExecutorJob(context: job))
+  } else {
+    Builtin.unreachable()
+  }
+
   _asyncMainDrainQueue()
 }
 #endif

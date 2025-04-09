@@ -174,7 +174,7 @@ public func increment(_ int: inout Int) {
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call swiftcc void @swift_task_dealloc_through(ptr [[FRAME]])
+// CHECK:         call swiftcc void @{{(_)?}}swift_task_dealloc_through(ptr [[FRAME]])
 // CHECK:       }
 @_silgen_name("increment_i_async")
 public func increment_i_async() async {

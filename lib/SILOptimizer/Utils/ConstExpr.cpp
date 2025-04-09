@@ -1874,7 +1874,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     CanType targetType = substituteGenericParamsAndSimplify(
         checkedCastInst->getTargetFormalType());
     DynamicCastFeasibility castResult = classifyDynamicCast(
-        inst->getModule().getSwiftModule(), sourceType, targetType);
+        inst->getFunction(), sourceType, targetType);
     if (castResult == DynamicCastFeasibility::MaySucceed) {
       return {std::nullopt, getUnknown(evaluator, inst->asSILNode(),
                                        UnknownReason::UnknownCastResult)};

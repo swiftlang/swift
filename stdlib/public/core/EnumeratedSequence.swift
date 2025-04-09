@@ -98,9 +98,9 @@ extension EnumeratedSequence: Sequence {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension EnumeratedSequence: Collection where Base: Collection {
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @frozen
   public struct Index {
     /// The position in the underlying collection.
@@ -111,7 +111,7 @@ extension EnumeratedSequence: Collection where Base: Collection {
     @usableFromInline
     let _offset: Int
 
-    @available(SwiftStdlib 6.1, *)
+    @available(SwiftStdlib 6.2, *)
     @_alwaysEmitIntoClient
     init(base: Base.Index, offset: Int) {
       self.base = base
@@ -119,25 +119,25 @@ extension EnumeratedSequence: Collection where Base: Collection {
     }
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var startIndex: Index {
     Index(base: _base.startIndex, offset: 0)
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var endIndex: Index {
     Index(base: _base.endIndex, offset: 0)
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var count: Int {
     _base.count
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var isEmpty: Bool {
     _base.isEmpty
@@ -147,13 +147,13 @@ extension EnumeratedSequence: Collection where Base: Collection {
   ///
   /// - Complexity: O(*n*) if `index == endIndex` and `Base` does not conform to
   ///   `RandomAccessCollection`, O(1) otherwise.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   func _offset(of index: Index) -> Int {
     index.base == _base.endIndex ? _base.count : index._offset
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public func distance(from start: Index, to end: Index) -> Int {
     if start.base == _base.endIndex || end.base == _base.endIndex {
@@ -163,13 +163,13 @@ extension EnumeratedSequence: Collection where Base: Collection {
     }
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public func index(after index: Index) -> Index {
     Index(base: _base.index(after: index.base), offset: index._offset + 1)
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     let index = _base.index(i.base, offsetBy: distance)
@@ -177,7 +177,7 @@ extension EnumeratedSequence: Collection where Base: Collection {
     return Index(base: index, offset: offset + distance)
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public func index(
     _ i: Index,
@@ -196,7 +196,7 @@ extension EnumeratedSequence: Collection where Base: Collection {
     return Index(base: index, offset: offset + distance)
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     _precondition(
@@ -208,29 +208,29 @@ extension EnumeratedSequence: Collection where Base: Collection {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension EnumeratedSequence.Index: Comparable {
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.base == rhs.base
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public static func <(lhs: Self, rhs: Self) -> Bool {
     lhs.base < rhs.base
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension EnumeratedSequence: BidirectionalCollection where Base: BidirectionalCollection & RandomAccessCollection {
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public func index(before index: Index) -> Index {
     Index(base: _base.index(before: index.base), offset: _offset(of: index) - 1)
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension EnumeratedSequence: RandomAccessCollection where Base: RandomAccessCollection {}

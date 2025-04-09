@@ -1,8 +1,8 @@
-//===--- DerivedConformanceDifferentiable.cpp - Derived Differentiable ----===//
+//===--- DerivedConformanceDifferentiable.cpp -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2019 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,9 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "TypeChecker.h"
+#include "DerivedConformance.h"
 #include "TypeCheckType.h"
-#include "llvm/ADT/SmallPtrSet.h"
+#include "TypeChecker.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -32,7 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "DerivedConformances.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 
@@ -50,10 +50,9 @@ static bool canInvokeMoveByOnProperty(
     return true;
   // When the property is a `let`, the only case that would be supported is when
   // it has a `move(by:)` protocol requirement witness that is non-mutating.
-  auto interfaceType = vd->getInterfaceType();
   auto &C = vd->getASTContext();
   auto witness = diffableConformance.getWitnessByName(
-      interfaceType, DeclName(C, C.Id_move, {C.Id_by}));
+      DeclName(C, C.Id_move, {C.Id_by}));
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());
@@ -121,7 +120,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   assert(conf && "Contextual type must conform to `Differentiable`");
   if (!conf)
     return nullptr;
-  auto tanType = conf.getTypeWitnessByName(contextualType, C.Id_TangentVector);
+  auto tanType = conf.getTypeWitnessByName(C.Id_TangentVector);
   return tanType->hasArchetype() ? tanType->mapTypeOutOfContext() : tanType;
 }
 
@@ -150,7 +149,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
     auto conf = checkConformance(fieldType, diffableProto);
     if (!conf)
       return false;
-    auto tangentType = conf.getTypeWitnessByName(fieldType, C.Id_TangentVector);
+    auto tangentType = conf.getTypeWitnessByName(C.Id_TangentVector);
     if (!fieldType->isEqual(tangentType))
       return false;
   }

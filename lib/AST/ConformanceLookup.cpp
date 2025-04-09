@@ -916,3 +916,11 @@ bool TypeBase::isEscapable() {
   auto canType = preprocessTypeForInvertibleQuery(this);
   return conformsToInvertible(canType, InvertibleProtocolKind::Escapable);
 }
+
+bool TypeBase::isEscapable(GenericSignature sig) {
+  Type contextTy = this;
+  if (sig) {
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+  }
+  return contextTy->isEscapable();
+}

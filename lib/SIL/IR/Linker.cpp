@@ -342,8 +342,10 @@ void SILLinkerVisitor::visitProtocolConformance(
     // reading in most conformances until we need them for devirtualization.
     // However, we *must* pull in shared clang-importer-derived conformances
     // we potentially use, since we may not otherwise have a local definition.
-    if (mustDeserializeProtocolConformance(Mod, c))
+    if ((isEmbedded && referencedFromInitExistential) ||
+        mustDeserializeProtocolConformance(Mod, c)) {
       visitProtocolConformance(c, referencedFromInitExistential);
+    }
   };
   
   // For each entry in the witness table...
@@ -424,6 +426,24 @@ void SILLinkerVisitor::visitInitExistentialRefInst(
   // visiting the protocol_method before the init_existential_inst.
   for (ProtocolConformanceRef C : IERI->getConformances()) {
     visitProtocolConformance(C, true);
+  }
+}
+
+void SILLinkerVisitor::visitBuiltinInst(BuiltinInst *bi) {
+  switch (bi->getBuiltinInfo().ID) {
+    case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
+    case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
+      if (Mod.getOptions().EmbeddedSwift) {
+        // Those builtins act like init_existential_ref instructions and therefore
+        // it's important to have the Executor witness tables available in embedded
+        // mode.
+        auto executorConf = bi->getSubstitutions().getConformances()[0];
+        visitProtocolConformance(executorConf, true);
+      }
+      break;
+    default:
+      break;
   }
 }
 
