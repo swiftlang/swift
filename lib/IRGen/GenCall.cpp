@@ -264,7 +264,7 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(
     auto *fnTy = projectFn->getFunctionType();
     llvm::Value *callerContext = nullptr;
     if (projectFn == getOrCreateResumePrjFn()) {
-      callerContext = popAysncContext(calleeContext);
+      callerContext = popAsyncContext(calleeContext);
     } else {
       callerContext =
         Builder.CreateCallWithoutDbgLoc(fnTy, projectFn, {calleeContext});
