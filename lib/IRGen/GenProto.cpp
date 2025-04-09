@@ -3390,16 +3390,15 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     assert(entry.isOutOfLineBase());
     auto inheritedProtocol = entry.getBase();
 
-    sourceKey.Kind =
-      LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
     if (sourceKey.Kind.isConcreteProtocolConformance()) {
       auto inheritedConformance =
         sourceKey.Kind.getConcreteProtocolConformance()
           ->getInheritedConformance(inheritedProtocol);
-      if (inheritedConformance) {
-        sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
-                                                          inheritedConformance);
-      }
+      sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
+                                                        inheritedConformance);
+    } else {
+      sourceKey.Kind =
+        LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
     }
 
     if (!source) return MetadataResponse();
