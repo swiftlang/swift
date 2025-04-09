@@ -5649,6 +5649,13 @@ public:
     return getLifetimeDependenceFor(getNumParameters());
   }
 
+  /// Return true of the specified parameter is addressable based on its type
+  /// lowering in 'caller's context. This includes @_addressableForDependencies
+  /// parameter types.
+  ///
+  /// Defined in SILType.cpp.
+  bool isAddressable(unsigned paramIdx, SILFunction *caller);
+
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
   /// the function type is not @convention(c) or @convention(block).
