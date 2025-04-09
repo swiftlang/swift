@@ -12,6 +12,8 @@ project(SwiftSynchronization
   LANGUAGES Swift
   VERSION 6.1.0${BUILD_NUMBER})
 
+include(GNUInstallDirs)
+
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Synchronization must build as a standalone project")
 endif()
@@ -60,3 +62,14 @@ set_target_properties(swift_Synchronization PROPERTIES
 target_link_libraries(swift_Synchronization
   PRIVATE
     swiftCore)
+
+set(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ${Supplemental_INSTALL_NESTED_SUBDIR} CACHE BOOL "")
+set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}/${Supplemental_ARCH_SUBDIR}>" CACHE STRING "")
+set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}>" CACHE STRING "")
+
+install(TARGETS swift_Synchronization
+  EXPORT SwiftSupplementalTargets
+  COMPONENT SwiftCore_runtime
+  ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
