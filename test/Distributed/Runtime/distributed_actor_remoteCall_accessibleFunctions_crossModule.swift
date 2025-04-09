@@ -12,7 +12,7 @@
 // RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
 // RUN:     -o %t/%target-library-name(FakeDistributedActorSystems)
 
-/// Build the Lib
+/// Build the ResilientAPILib
 // RUN: %target-build-swift                                                    \
 // RUN:     -target %target-swift-6.0-abi-triple                               \
 // RUN:     -parse-as-library -emit-library                                    \
@@ -27,7 +27,7 @@
 // RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
 // RUN:     -o %t/%target-library-name(ResilientAPILib)
 
-/// Build the ActorLib
+/// Build the ResilientImplLib
 // RUN: %target-build-swift                                                    \
 // RUN:     -target %target-swift-6.0-abi-triple                               \
 // RUN:     -parse-as-library -emit-library                                    \
@@ -35,6 +35,7 @@
 // RUN:     -module-name ResilientImplLib                                      \
 // RUN:     -I %t                                                              \
 // RUN:     -L %t                                                              \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
 // RUN:     %t/src/ResilientImplLib.swift                                      \
 // RUN:     -lFakeDistributedActorSystems                                      \
 // RUN:     -lResilientAPILib                                                  \
@@ -52,6 +53,7 @@
 // RUN:     -module-name main                                                  \
 // RUN:     -I %t                                                              \
 // RUN:     -L %t                                                              \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
 // RUN:     %s                                                                 \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
@@ -85,12 +87,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: remote_run || device_run
-
-
-// FIXME: Also reproduces the following issue rdar://128284016
-//<unknown>:0: error: symbol '$s15ResilientAPILib30ServiceProtocolP8getArray2a12a2SayAA8ResponseVGSaySiG_SSSgtYaKFTj' (dispatch thunk of ResilientAPILib.ServiceProtocol.getArray(a1: Swift.Array<Swift.Int>, a2: Swift.Optional<Swift.String>) async throws -> Swift.Array<ResilientAPILib.Response>) is in generated IR file, but not in TBD file
-
-//<unknown>:0: error: symbol '$s15ResilientAPILib30ServiceProtocolP8getArray2a12a2SayAA8ResponseVGSaySiG_SSSgtYaKFTjTu' (async function pointer to dispatch thunk of ResilientAPILib.ServiceProtocol.getArray(a1: Swift.Array<Swift.Int>, a2: Swift.Optional<Swift.String>) async throws -> Swift.Array<ResilientAPILib.Response>) is in generated IR file, but not in TBD file
 
 //--- ResilientAPILib.swift
 
