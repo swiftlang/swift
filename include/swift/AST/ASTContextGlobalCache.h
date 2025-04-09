@@ -55,6 +55,7 @@ struct WitnessIsolationError {
 /// Describes an isolation error involving an associated conformance.
 struct AssociatedConformanceIsolationError {
   ProtocolConformance *isolatedConformance;
+  DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
 
   /// Diagnose this associated conformance isolation error.
   void diagnose(const NormalProtocolConformance *conformance) const;

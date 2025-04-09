@@ -7995,7 +7995,8 @@ namespace {
           firstConformance->getIsolation(),
           firstConformance->getType(),
           firstConformance->getProtocol()->getName(),
-          getContextIsolation());
+          getContextIsolation())
+        .warnUntilSwiftVersion(6);
       return true;
     }
   };

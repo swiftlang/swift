@@ -4963,6 +4963,9 @@ static void diagnoseConformanceIsolationErrors(
       hasIsolatedConformances = true;
     }
 
+    // Take the least-restrictive behavior.
+    behavior = behavior.merge(assocConformanceError.behavior);
+
     anyNonDistributedIssues = true;
   }
 
@@ -5419,9 +5422,19 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
             // If the isolation doesn't match, record an error.
             if (!outerIsolation.isGlobalActor() ||
                 outerIsolation != innerIsolation) {
+              DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
+              // If we're working with requirements imported from Clang, or with
+              // global actor isolation in general, use the default diagnostic
+              // behavior based on the conformance context.
+              if (proto->hasClangNode() ||
+                  outerIsolation.isGlobalActor() ||
+                  innerIsolation.isGlobalActor())
+                behavior = SendableCheckContext(dc).defaultDiagnosticBehavior();
+
               ctx.getGlobalCache().conformanceIsolationErrors[conformance]
                 .push_back(
-                  AssociatedConformanceIsolationError{isolatedConformance});
+                  AssociatedConformanceIsolationError{
+                    isolatedConformance, behavior});
               return true;
             }
 
