@@ -187,28 +187,20 @@ extension TokenSyntax {
   }
 }
 
-extension CodeBlockItemSyntax {
-  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> [CodeBlockItemSyntax] {
-    if let converter = context.converter {
-      let range = sourceRange(converter: converter)
-      let annotation: CodeBlockItemSyntax = """
-        #sourceLocation(file: \(context.file), line: \(raw: range.start.line))
-      """
-      
-      
-      return [annotation, self]
-    } else {
-      return [self]
-    }
-  }
-}
-
 extension CodeBlockSyntax {
   func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> CodeBlockSyntax {
+    guard let converter = context.converter, let firstStatement = statements.first else {
+      return self
+    }
+    let range = firstStatement.sourceRange(converter: converter)
     return CodeBlockSyntax(
       leadingTrivia: leadingTrivia,
       leftBrace: leftBrace,
-      statements: CodeBlockItemListSyntax(statements.flatMap { $0.locationAnnotated(in: context) }),
+      statements: CodeBlockItemListSyntax {
+        "#sourceLocation(file: \(context.file), line: \(raw: range.start.line))"
+        statements
+        "#sourceLocation()"
+      },
       rightBrace: rightBrace,
       trailingTrivia: trailingTrivia
     )
