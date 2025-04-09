@@ -1627,11 +1627,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         set(stdlib_cache_file_flag -C ${SWIFT_SDK_${sdk}_${arch}_CACHE})
       endif()
 
-      set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
-      if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
-        string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
-        set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
-      endif()
+      set(stdlib_target_triple ${SWIFT_SDK_${sdk}_${arch}_TRIPLE})
 
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
