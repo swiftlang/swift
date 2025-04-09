@@ -28,28 +28,72 @@ func _getCurrentTaskShim() -> UInt
 func add(_ a: UInt, _ b: UInt) async -> UInt {
   if b == 0 {
     reflect(asyncTask: _getCurrentTaskShim())
-    // CHECK: Reflecting an async task.
-    // CHECK: Async task {{0x[0-9a-fA-F]*}}
-
-    // The actual number of chunks we'll get depends on internal implementation
-    // details that we don't want this test to depend on. We'll just make sure
-    // we get at least two, and ignore the details.
-    // CHECK:   Slab pointer {{0x[0-9a-fA-F]*}}
-    // CHECK:     Slab size {{[0-9]{2,}()}}
-    // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9][0-9]*}} kind {{[0-9]*}}
-    // CHECK:   Slab pointer {{0x[0-9a-fA-F]*}}
-    // CHECK:     Slab size {{[0-9]{2,}()}}
-    // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9[[0-9]*}} kind {{[0-9]*}}
     return a
   } else {
     return await add(a, b - 1) + 1
   }
 }
 
+func sleepForever() async -> Int {
+  if #available(SwiftStdlib 5.7, *) {
+    try? await Task.sleep(for: .seconds(1_000_000_000))
+    return 42
+  } else {
+    fatalError("This test shouldn't be running against old stdlibs.")
+  }
+}
+
+func testNestedCallsTask() async {
+  reflectionLog(str: "testNestedCallsTask")
+  // CHECK: testNestedCallsTask
+
+  let n = await add(100, 100)
+  reflect(any: n)
+  // CHECK: Reflecting an async task.
+  // CHECK: Async task {{0x[0-9a-fA-F]*}}
+
+  // The actual number of chunks we'll get depends on internal implementation
+  // details that we don't want this test to depend on. We'll just make sure
+  // we get at least two, and ignore the details.
+  // CHECK:   Slab pointer {{0x[0-9a-fA-F]*}}
+  // CHECK:     Slab size {{[0-9]{2,}()}}
+  // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9][0-9]*}} kind {{[0-9]*}}
+  // CHECK:   Slab pointer {{0x[0-9a-fA-F]*}}
+  // CHECK:     Slab size {{[0-9]{2,}()}}
+  // CHECK:     Chunk at {{0x[0-9a-fA-F]*}} length {{[1-9[[0-9]*}} kind {{[0-9]*}}
+}
+
+func testOneAsyncLet() async {
+  reflectionLog(str: "testOneAsyncLet")
+  // CHECK: testOneAsyncLet
+
+  async let alet = sleepForever()
+  reflect(asyncTask: _getCurrentTaskShim())
+  // CHECK: Async task {{0x[0-9a-fA-F]*}}
+  // CHECK: children = {
+  // CHECK:   Async task {{0x[0-9a-fA-F]*}}
+  // CHECK: }
+}
+
+func testMultipleAsyncLet() async {
+  reflectionLog(str: "testMultipleAsyncLet")
+  // CHECK: testMultipleAsyncLet
+
+  async let alet1 = sleepForever()
+  async let alet2 = sleepForever()
+  reflect(asyncTask: _getCurrentTaskShim())
+  // CHECK: Async task {{0x[0-9a-fA-F]*}}
+  // CHECK: children = {
+  // CHECK:   Async task {{0x[0-9a-fA-F]*}}
+  // CHECK:   Async task {{0x[0-9a-fA-F]*}}
+  // CHECK: }
+}
+
 @main struct Main {
   static func main() async {
-    let n = await add(100, 100)
-    reflect(any: n)
+    await testNestedCallsTask()
+    await testOneAsyncLet()
+    await testMultipleAsyncLet()
 
     doneReflecting()
   }
