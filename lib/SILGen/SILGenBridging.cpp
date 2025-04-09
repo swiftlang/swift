@@ -1373,11 +1373,16 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   auto inputs = objcFnTy->getParameters();
   auto nativeInputs = swiftFnTy->getParameters();
   auto fnConv = SGF.silConv.getFunctionConventions(swiftFnTy);
-  assert(nativeInputs.size() == bridgedFormalTypes.size());
-  assert(nativeInputs.size() == nativeFormalTypes.size());
+  bool nativeInputsHasImplicitIsolatedParam = false;
+  if (auto param = swiftFnTy->maybeGetIsolatedParameter())
+    nativeInputsHasImplicitIsolatedParam = param->hasOption(SILParameterInfo::ImplicitLeading);
+  assert(nativeInputs.size() - unsigned(nativeInputsHasImplicitIsolatedParam) == bridgedFormalTypes.size());
+  assert(nativeInputs.size() - unsigned(nativeInputsHasImplicitIsolatedParam) == nativeFormalTypes.size());
   assert(inputs.size() ==
            nativeInputs.size() + unsigned(foreignError.has_value())
-                               + unsigned(foreignAsync.has_value()));
+                               + unsigned(foreignAsync.has_value()) -
+         unsigned(nativeInputsHasImplicitIsolatedParam));
+
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = SGF.getSILType(inputs[i], objcFnTy);
     SILValue arg = SGF.F.begin()->createFunctionArgument(argTy);
@@ -1423,13 +1428,13 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
            + unsigned(foreignAsync.has_value())
         == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
-  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() &&
+  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() - bool(nativeInputsHasImplicitIsolatedParam) &&
          "swift inputs don't match number of arguments?!");
   assert((foreignErrorSlot || !foreignError) &&
          "didn't find foreign error slot");
 
   // Bridge the input types.
-  assert(bridgedArgs.size() == nativeInputs.size());
+  assert(bridgedArgs.size() == nativeInputs.size() - bool(nativeInputsHasImplicitIsolatedParam));
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     // Consider the bridged values to be "call results" since they're coming
     // from potentially nil-unsound ObjC callers.
@@ -1655,6 +1660,31 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // have an indirect result, it must be outside of this scope, otherwise
   // we will deallocate it too early.
   Scope argScope(Cleanups, CleanupLocation(loc));
+
+  // See if our native function has an implicitly isolated parameter. In such a
+  // case, we need to pass in the isolation.
+  if (auto isolatedParameter = substTy->maybeGetIsolatedParameter();
+      isolatedParameter && isolatedParameter->hasOption(SILParameterInfo::ImplicitLeading)) {
+    assert(F.isAsync() && "Can only be async");
+    assert(isolation && "No isolation?!");
+    switch (isolation->getKind()) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
+      args.push_back(emitNonIsolatedIsolation(loc).getValue());
+      break;
+    case ActorIsolation::ActorInstance:
+      llvm::report_fatal_error("Should never see this");
+      break;
+    case ActorIsolation::GlobalActor:
+      args.push_back(emitLoadGlobalActorExecutor(isolation->getGlobalActor()));
+      break;
+    case ActorIsolation::Erased:
+      llvm::report_fatal_error("Should never see this");
+      break;
+    }
+  }
 
   // Bridge the arguments.
   SILValue foreignErrorSlot;
