@@ -2712,16 +2712,16 @@ namespace {
             return;
 
           switch (toIsolation.getKind()) {
-          // Converting to `@execution(caller)` function type
+          // Converting to `nonisolated(nonsending)` function type
           case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::NonIsolated: {
-              // nonisolated -> @execution(caller) doesn't cross
+              // nonisolated -> nonisolated(nonsending) doesn't cross
               // an isolation boundary.
               if (!fromFnType->isAsync())
                 break;
 
-              // @execution(concurrent) -> @execution(caller)
+              // @concurrent -> nonisolated(nonsending)
               // crosses an isolation boundary.
               LLVM_FALLTHROUGH;
             }
@@ -2744,9 +2744,9 @@ namespace {
             break;
           }
 
-          // Converting to nonisolated synchronous or @execution(concurrent)
-          // asynchronous function type could require crossing an isolation
-          // boundary.
+          // Converting to nonisolated synchronous or @concurrent
+          // asynchronous function type could require crossing an
+          // isolation boundary.
           case FunctionTypeIsolation::Kind::NonIsolated: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::Parameter:
@@ -2762,7 +2762,7 @@ namespace {
             }
 
             case FunctionTypeIsolation::Kind::NonIsolated: {
-              // nonisolated synchronous <-> @execution(concurrent)
+              // nonisolated synchronous <-> @concurrent
               if (fromFnType->isAsync() != toFnType->isAsync()) {
                 diagnoseNonSendableParametersAndResult(
                     toFnType, /*downgradeToWarning=*/true);
@@ -2784,10 +2784,10 @@ namespace {
               break;
 
             case FunctionTypeIsolation::Kind::NonIsolated: {
-              // Since @execution(concurrent) as an asynchronous
-              // function it would mean that without Sendable
-              // check it would be possible for non-Sendable state
-              // to escape from actor isolation.
+              // Since @concurrent as an asynchronous function it
+              // would mean that without Sendable check it would
+              // be possible for non-Sendable state to escape from
+              // actor isolation.
               if (fromFnType->isAsync()) {
                 diagnoseNonSendableParametersAndResult(
                   toFnType, /*downgradeToWarning=*/true);
