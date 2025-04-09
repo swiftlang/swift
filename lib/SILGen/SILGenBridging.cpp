@@ -2117,7 +2117,25 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     indirectResult = F.begin()->createFunctionArgument(
         nativeConv.getSingleSILResultType(F.getTypeExpansionContext()));
   }
-  
+
+  // Before we do anything, see if our function type is async and has an
+  // implicit isolated parameter. In such a case, we need to implicitly insert
+  // it here before we insert other parameters.
+  //
+  // NOTE: We do not jump to it or do anything further since as mentioned above,
+  // we might switch to the callee's actor as part of making the call... but we
+  // don't need to do anything further than that because we're going to
+  // immediately return.
+  bool hasImplicitIsolatedParameter = false;
+  if (auto isolatedParameter = nativeFnTy->maybeGetIsolatedParameter();
+      isolatedParameter && nativeFnTy->isAsync() &&
+      isolatedParameter->hasOption(SILParameterInfo::ImplicitLeading)) {
+    auto loweredTy = getLoweredTypeForFunctionArgument(
+        isolatedParameter->getArgumentType(&F));
+    F.begin()->createFunctionArgument(loweredTy);
+    hasImplicitIsolatedParameter = true;
+  }
+
   // Forward the arguments.
   SmallVector<SILValue, 8> params;
 
@@ -2182,9 +2200,12 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         getParameterTypes(nativeCI.LoweredType.getParams(), hasSelfParam);
 
       for (unsigned nativeParamIndex : indices(params)) {
+        // Adjust the parameter if we inserted an implicit isolated parameter.
+        unsigned nativeFnTyParamIndex = nativeParamIndex + hasImplicitIsolatedParameter;
+
         // Bring the parameter to +1.
         auto paramValue = params[nativeParamIndex];
-        auto thunkParam = nativeFnTy->getParameters()[nativeParamIndex];
+        auto thunkParam = nativeFnTy->getParameters()[nativeFnTyParamIndex];
         // TODO: Could avoid a retain if the bridged parameter is also +0 and
         // doesn't require a bridging conversion.
         ManagedValue param;
