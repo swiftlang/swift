@@ -36,7 +36,7 @@ add_compile_options(
 gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
 gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)
 
-add_library(swift_Synchronization
+add_library(swiftSynchronization
   Atomics/Atomic.swift
   Atomics/AtomicBool.swift
   Atomics/AtomicFloats.swift
@@ -55,11 +55,11 @@ add_library(swift_Synchronization
   $<$<PLATFORM_ID:WASI>:Mutex/SpinLoopHint.swift>
   $<$<PLATFORM_ID:WINDOWS>:Mutex/WindowsImpl.swift>)
 
-set_target_properties(swift_Synchronization PROPERTIES
+set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME _Synchronization
   Swift_COMPILATION_MODE wholemodule)
 
-target_link_libraries(swift_Synchronization
+target_link_libraries(swiftSynchronization
   PRIVATE
     swiftCore)
 
@@ -67,7 +67,7 @@ set(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform an
 set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}/${Supplemental_ARCH_SUBDIR}>" CACHE STRING "")
 set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}>" CACHE STRING "")
 
-install(TARGETS swift_Synchronization
+install(TARGETS swiftSynchronization
   EXPORT SwiftSupplementalTargets
   COMPONENT SwiftCore_runtime
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
