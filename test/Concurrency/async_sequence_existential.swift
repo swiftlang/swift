@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
 
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -dump-ast 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -dump-ast -o %t.ast.txt
+// RUN: %FileCheck %s < %t.ast.txt
 
 // REQUIRES: concurrency
 
