@@ -8431,11 +8431,10 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // Because typechecking for the debugger has more lax rules, check the access
   // level of the getter to decide whether to use a dispatch thunk for the
   // debugger.
-  bool shouldUseDispatchThunkIfInDebugger =
-      !classDecl->getASTContext().LangOpts.DebuggerSupport ||
-      methodAccess >= AccessLevel::Public;
+  bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
+  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
   if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      shouldUseDispatchThunkIfInDebugger) {
+      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This
