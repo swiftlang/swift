@@ -37,14 +37,19 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
     _invariantCheck()
   }
 
+  /// Creates a UTF8Span, bypassing safety and security checks. The caller
+  /// must guarantee that `codeUnits` contains validly-encoded UTF-8, or else
+  /// undefined behavior may result upon use. If `isKnownASCII: true is
+  /// passed`, the contents must be ASCII, or else undefined behavior may
+  /// result upon use.
   @unsafe
-  @lifetime(copy uncheckedCodeUnits) // TODO: borrow or copy?
+  @lifetime(copy codeUnits) // TODO: borrow or copy?
   public init(
-    unsafeAssumingValidUTF8 uncheckedCodeUnits: Span<UInt8>,
+    unchecked codeUnits: Span<UInt8>,
     isKnownASCII: Bool = false
   ) {
     self.init(
-      _uncheckedAssumingValidUTF8: uncheckedCodeUnits,
+      _uncheckedAssumingValidUTF8: codeUnits,
       isKnownASCII: isKnownASCII,
       isKnownNFC: false
     )
@@ -193,7 +198,7 @@ extension String {
       let utf8 = self.utf8
       let span = utf8.span
       let result = unsafe UTF8Span(
-        unsafeAssumingValidUTF8: span,
+        unchecked: span,
         isKnownASCII: isKnownASCII)
       return unsafe _overrideLifetime(result, borrowing: self)
     }
@@ -209,7 +214,7 @@ extension Substring {
       let utf8 = self.utf8
       let span = utf8.span
       let result = unsafe UTF8Span(
-        unsafeAssumingValidUTF8: span,
+        unchecked: span,
         isKnownASCII: isKnownASCII)
       return unsafe _overrideLifetime(result, borrowing: self)
     }

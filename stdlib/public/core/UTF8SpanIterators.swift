@@ -148,7 +148,7 @@ extension UTF8Span {
       self.currentCodeUnitOffset = codeUnits._scalarAlignForwards(i)
     }
 
-    /// Reset this iterator to code unit offset `i`, skipping _all_ safety
+    /// Reset this iterator to `codeUnitOffset`, skipping _all_ safety
     /// checks (including bounds checks).
     ///
     /// Note: This is only for very specific, low-level use cases. If
@@ -161,10 +161,11 @@ extension UTF8Span {
     /// For example, this could be used by a regex engine to backtrack to a
     /// known-valid previous position.
     ///
+    @unsafe
     @lifetime(self: copy self)
-    public mutating func reset(uncheckedAssumingAlignedTo i: Int) {
-      _internalInvariant(codeUnits._isScalarAligned(unchecked: i))
-      self.currentCodeUnitOffset = i
+    public mutating func reset(toUnchecked codeUnitOffset: Int) {
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: codeUnitOffset))
+      self.currentCodeUnitOffset = codeUnitOffset
     }
 
     /// Returns the UTF8Span containing all the content up to the iterator's
@@ -343,7 +344,7 @@ extension UTF8Span {
       self.currentCodeUnitOffset = codeUnits._scalarAlignForwards(i)
     }
 
-    /// Reset this iterator to code unit offset `i`, skipping _all_ safety
+    /// Reset this iterator to `codeUnitOffset`, skipping _all_ safety
     /// checks.
     ///
     /// Note: This is only for very specific, low-level use cases. If
@@ -356,10 +357,11 @@ extension UTF8Span {
     /// For example, this could be used by a regex engine to backtrack to a
     /// known-valid previous position.
     ///
+    @unsafe
     @lifetime(self: copy self)
-    public mutating func reset(uncheckedAssumingAlignedTo i: Int) {
-      _internalInvariant(codeUnits._isScalarAligned(unchecked: i))
-      self.currentCodeUnitOffset = i
+    public mutating func reset(toUnchecked codeUnitOffset: Int) {
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: codeUnitOffset))
+      self.currentCodeUnitOffset = codeUnitOffset
     }
 
     /// Returns the UTF8Span containing all the content up to the iterator's
