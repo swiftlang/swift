@@ -1175,6 +1175,12 @@ def enable_arm64_corocc : Flag<["-"], "enable-arm64-corocc">,
 def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
   HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
 
+def enable_callee_allocated_coro_abi : Flag<["-"], "enable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and use yield_once_2.">;
+
+def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and don't use yield_once_2.">;
+
 def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
   HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
 

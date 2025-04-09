@@ -2481,8 +2481,10 @@ static CanSILFunctionType getSILFunctionType(
   
   if (auto accessor = getAsCoroutineAccessor(constant)) {
     auto origAccessor = cast<AccessorDecl>(origConstant->getDecl());
+    auto &ctx = origAccessor->getASTContext();
     coroutineKind =
-        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())
+        (requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+         ctx.SILOpts.CoroutineAccessorsUseYieldOnce2)
             ? SILCoroutineKind::YieldOnce2
             : SILCoroutineKind::YieldOnce;
 

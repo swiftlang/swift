@@ -597,6 +597,16 @@ struct SILOptOptions {
       "enable-address-dependencies",
       llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
 
+  llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "enable-callee-allocated-coro-abi",
+      llvm::cl::desc("Override per-platform settings and use yield_once_2."),
+      llvm::cl::init(false));
+  llvm::cl::opt<bool> DisableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "disable-callee-allocated-coro-abi",
+      llvm::cl::desc(
+          "Override per-platform settings and don't use yield_once_2."),
+      llvm::cl::init(false));
+
   llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
       "mergeable-traps",
       llvm::cl::desc("Enable cond_fail merging."));
@@ -918,6 +928,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.EnablePackMetadataStackPromotion;
 
   SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.EnableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
+  if (options.DisableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = false;
   SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
