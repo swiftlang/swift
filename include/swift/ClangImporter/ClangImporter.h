@@ -428,6 +428,16 @@ public:
                             bool trackParsedSymbols = false,
                             bool implicitImport = false);
 
+  /// Bind the bridging header content to the module.
+  ///
+  /// \param adapter The module that depends on the contents of this header.
+  /// \param diagLoc A location to attach any diagnostics to if import fails.
+  ///
+  /// \returns true if there was an error importing the header.
+  ///
+  /// \sa importBridgingHeader
+  bool bindBridgingHeader(ModuleDecl *adapter, SourceLoc diagLoc);
+
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
   ///
