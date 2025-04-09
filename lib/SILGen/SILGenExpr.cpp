@@ -489,11 +489,11 @@ namespace {
                                        SGFContext C);
 
     /// Helper method for handling function conversion expr to
-    /// @execution(caller). Returns an empty RValue on failure.
+    /// nonisolated(nonsending). Returns an empty RValue on failure.
     RValue emitFunctionCvtToExecutionCaller(FunctionConversionExpr *E,
                                             SGFContext C);
     /// Helper method for handling function conversion expr to a global actor
-    /// from an @execution(caller) function.
+    /// from an nonisolated(nonsending) function.
     RValue
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
@@ -1968,17 +1968,17 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   //
   // Swift 6:
   //
-  // (fn_cvt_expr type="@execution(caller) () async -> ()"
-  //   (fn_cvt_expr type="@execution(caller) @Sendable () async -> ()"
+  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
+  //   (fn_cvt_expr type="nonisolated(nonsending) @Sendable () async -> ()"
   //      (declref_expr type="() async -> ()"
   //
   // Swift 5:
   //
-  // (fn_cvt_expr type="@execution(caller) () async -> ()"
+  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
   //   (declref_expr type="() async -> ()"
   //
   // The @Sendable in Swift 6 mode is due to us not representing
-  // @execution(caller) or @Sendable in the constraint evaluator.
+  // nonisolated(nonsending) or @Sendable in the constraint evaluator.
   //
   // The reason why we need to evaluate this especially is that otherwise we
   // generate multiple
@@ -2038,7 +2038,7 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   // We are pattern matching a conversion sequence like the following:
   //
   // (fn_cvt_expr implicit type="@GlobalActor @Sendable () async -> ()
-  //    (fn_cvt_expr implicit type="@execution(caller) @Sendable () async -> ()"
+  //    (fn_cvt_expr implicit type="nonisolated(nonsending) @Sendable () async -> ()"
   //       (declref_expr type="() async -> ()"
   //
   // Where the declref referred to by the declref_expr has execution(caller)
@@ -2047,9 +2047,9 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   // fix it up later.
   //
   // What we want to emit first a direct reference to the caller as an
-  // @execution(caller) function, then we convert it to @execution(caller)
-  // @Sendable. Finally, we thunk @execution(caller) to @GlobalActor. The
-  // thunking is important so that we can ensure that @execution(caller) runs on
+  // nonisolated(nonsending) function, then we convert it to nonisolated(nonsending)
+  // @Sendable. Finally, we thunk nonisolated(nonsending) to @GlobalActor. The
+  // thunking is important so that we can ensure that nonisolated(nonsending) runs on
   // that specific @GlobalActor.
 
   CanAnyFunctionType destType =
@@ -2201,13 +2201,13 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     }
   }
 
-  // Check if we are converting a function to an @execution(caller) from a
-  // declref that is also @execution(caller). In such a case, this was a case
+  // Check if we are converting a function to an nonisolated(nonsending) from a
+  // declref that is also nonisolated(nonsending). In such a case, this was a case
   // that was put in by Sema. We do not need a thunk, but just need to recognize
   // this case and elide the conversion. The reason why we need to do this is
-  // that otherwise, we put in extra thunks that convert @execution(caller) to
-  // @execution(concurrent) back to @execution(caller). This is done b/c we do
-  // not represent @execution(caller) in interface types, so the actual decl ref
+  // that otherwise, we put in extra thunks that convert nonisolated(nonsending) to
+  // @concurrent back to nonisolated(nonsending). This is done b/c we do
+  // not represent nonisolated(nonsending) in interface types, so the actual decl ref
   // will be viewed as @async () -> ().
   if (destType->getIsolation().isNonIsolatedCaller()) {
     if (RValue rv = emitFunctionCvtToExecutionCaller(e, C))
