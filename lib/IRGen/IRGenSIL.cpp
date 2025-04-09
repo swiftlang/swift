@@ -8433,7 +8433,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // debugger.
   bool shouldUseDispatchThunkIfInDebugger =
       !classDecl->getASTContext().LangOpts.DebuggerSupport ||
-      methodAccess == AccessLevel::Public;
+      methodAccess >= AccessLevel::Public;
   if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
       shouldUseDispatchThunkIfInDebugger) {
     shouldUseDispatchThunk = true;
