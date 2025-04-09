@@ -87,7 +87,12 @@ filterEscapableLifetimeDependencies(GenericSignature sig,
   for (auto &depInfo : inputs) {
     auto targetIndex = depInfo.getTargetIndex();
     Type substTy = getSubstTargetType(targetIndex);
-    
+
+    // If the type still contains type variables we don't know whether we
+    // can drop the dependency.
+    if (substTy->hasTypeVariable())
+      continue;
+
     // Drop the dependency if the target type is Escapable.
     if (sig || !substTy->hasTypeParameter()) {
       if (substTy->isEscapable(sig)) {
