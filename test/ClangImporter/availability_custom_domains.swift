@@ -1,6 +1,18 @@
+// RUN: %empty-directory(%t)
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
 // RUN:   -import-objc-header %S/Inputs/availability_domains_bridging_header.h \
-// RUN:   -I %S/Inputs/custom-modules/availability-domains \
+// RUN:   -I %S/../Inputs/custom-modules/availability-domains \
+// RUN:   -enable-experimental-feature CustomAvailability \
+// RUN:   %s %S/Inputs/availability_custom_domains_other.swift
+
+// Re-test with the bridging header precompiled into a .pch.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-pch \
+// RUN:   -o %t/bridging-header.pch %S/Inputs/availability_domains_bridging_header.h
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
+// RUN:   -import-objc-header %t/bridging-header.pch \
+// RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   %s %S/Inputs/availability_custom_domains_other.swift
 

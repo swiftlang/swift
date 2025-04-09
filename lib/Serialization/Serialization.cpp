@@ -3125,7 +3125,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
              !theAttr->getParsedAttr()->hasCachedRenamedDecl());
       auto domain = theAttr->getDomain();
 
-      // FIXME: [availability] Serialize domain and kind directly.
+      auto getDomainKind = [](AvailabilityDomain domain) -> AvailabilityDomainKind {
+        switch (domain.getKind()) {
+          case AvailabilityDomain::Kind::Universal:
+            return AvailabilityDomainKind::Universal;
+          case AvailabilityDomain::Kind::SwiftLanguage:
+            return AvailabilityDomainKind::SwiftLanguage;
+          case AvailabilityDomain::Kind::PackageDescription:
+            return AvailabilityDomainKind::PackageDescription;
+          case AvailabilityDomain::Kind::Embedded:
+            return AvailabilityDomainKind::Embedded;
+          case AvailabilityDomain::Kind::Platform:
+            return AvailabilityDomainKind::Platform;
+          case AvailabilityDomain::Kind::Custom:
+            return AvailabilityDomainKind::Custom;
+        }
+      };
+
+      auto domainKind = getDomainKind(domain);
+      const Decl *domainDecl = domain.getDecl();
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
       blob.append(theAttr->getRename());
@@ -3136,13 +3155,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          domain.isPackageDescription(),
           theAttr->isSPI(),
-          domain.isEmbedded(),
+          static_cast<uint8_t>(domainKind),
+          static_cast<unsigned>(domain.getPlatformKind()),
+          S.addDeclRef(domainDecl),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(domain.getPlatformKind()),
           theAttr->getMessage().size(),
           theAttr->getRename().size(),
           blob);
