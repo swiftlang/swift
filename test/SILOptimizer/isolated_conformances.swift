@@ -9,6 +9,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
 // REQUIRES: swift_feature_IsolatedConformances
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
