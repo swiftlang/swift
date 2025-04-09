@@ -120,8 +120,27 @@ extension MyClass {
         let _ = privEnumOpen.variantPrivEnumOpen
     }
 
-    func fcutd(_ _: publTypedef) { }
-    private func fcitd(_ _: privTypedef) { }
+    // Make sure these types are usable in type signatures too
+    func publTypedefFunc(_ _: publTypedef) { }
+    private func privTypedefFunc(_ _: privTypedef) { }
+
+    func publStructFunc(_ _: publStruct) { }
+    private func privStructFunc(_ _: privStruct) { }
+
+    func publEnumFunc(_ _: publEnum) { }
+    private func privEnumFunc(_ _: privEnum) { }
+
+    func publEnumClassFunc(_ _: publEnumClass) { }
+    private func privEnumClassFunc(_ _: privEnumClass) { }
+
+    func publEnumClosedFunc(_ _: publEnumClosed) { }
+    private func privEnumClosedFunc(_ _: privEnumClosed) { }
+
+    func publEnumOpenFunc(_ _: publEnumOpen) { }
+    private func privEnumOpenFunc(_ _: privEnumOpen) { }
+
+    func publEnumFlagFunc(_ _: publEnumFlag) { }
+    private func privEnumFlagFunc(_ _: privEnumFlag) { }
 }
 
 func notExt(_ c: inout MyClass) {
