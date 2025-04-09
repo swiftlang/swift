@@ -102,7 +102,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow elements)
+  @lifetime(&elements)
   public init<Element: BitwiseCopyable>(
     _elements elements: inout MutableSpan<Element>
   ) {

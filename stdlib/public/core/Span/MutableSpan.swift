@@ -247,7 +247,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   /// - Returns: a MutableRawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
   public var mutableBytes: MutableRawSpan {
-    @lifetime(borrow self)
+    @lifetime(&self)
     mutating get {
       MutableRawSpan(_elements: &self)
     }
