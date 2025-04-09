@@ -37,12 +37,11 @@ struct Allocation<T>: ~Copyable {
     _ body: (/* mutating */ inout OutputSpan<T>) throws(E) -> Void
   ) throws(E) {
     if count != nil { fatalError() }
-    var outputBuffer = OutputSpan<T>(
-      _initializing: .init(start: allocation, count: capacity)
-    )
+    let buffer = UnsafeBufferPointer(start: allocation, count: capacity)
+    var outputBuffer = OutputSpan<T>(_initializing: buffer)
     do {
       try body(&outputBuffer)
-      let initialized = outputBuffer.relinquishBorrowedMemory()
+      let initialized = outputBuffer.finalize(for: buffer)
       assert(initialized.baseAddress == allocation)
       count = initialized.count
     }
