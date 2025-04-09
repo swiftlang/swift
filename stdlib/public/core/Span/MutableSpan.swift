@@ -65,8 +65,7 @@ extension MutableSpan where Element: ~Copyable {
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer.baseAddress._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
@@ -112,8 +111,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer.baseAddress._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
     let (byteCount, stride) = (buffer.count, MemoryLayout<Element>.stride)

@@ -90,8 +90,7 @@ extension OutputSpan where Element: ~Copyable  {
     initialized: Int = 0
   ) {
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer.baseAddress._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
     unsafe self.init(_unchecked: buffer, initialized: initialized)
