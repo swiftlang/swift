@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-experimental-feature IsolatedConformances -enable-experimental-feature InferIsolatedConformances %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-upcoming-feature InferIsolatedConformances %s
 
-// REQUIRES: swift_feature_IsolatedConformances
-// REQUIRES: swift_feature_InferIsolatedConformances
 // REQUIRES: concurrency
 
 protocol P {
