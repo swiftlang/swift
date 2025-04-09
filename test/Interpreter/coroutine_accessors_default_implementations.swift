@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend \
 // RUN:     %t/Library.swift   \
 // RUN:     %t/LibImpl.underscored.swift   \
+// RUN:     -enable-callee-allocated-coro-abi \
 // RUN:     -emit-module       \
 // RUN:     -module-name Library \
 // RUN:     -parse-as-library  \
@@ -13,6 +14,7 @@
 
 // RUN: %target-swift-frontend \
 // RUN:     %t/Executable.swift \
+// RUN:     -enable-callee-allocated-coro-abi \
 // RUN:     -c \
 // RUN:     -parse-as-library \
 // RUN:     -module-name Executable \
@@ -22,6 +24,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Library)) \
 // RUN:     %t/Library.swift \
 // RUN:     %t/LibImpl.nonunderscored.swift   \
+// RUN:     -Xfrontend -enable-callee-allocated-coro-abi \
 // RUN:     -emit-module \
 // RUN:     -enable-library-evolution \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
