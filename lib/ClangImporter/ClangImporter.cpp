@@ -4090,35 +4090,29 @@ void ClangModuleUnit::lookupObjCMethods(
 
 void ClangModuleUnit::lookupAvailabilityDomains(
     Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
-  auto lookupTable = owner.findLookupTable(clangModule);
-  if (!lookupTable)
+  auto domainName = identifier.str();
+  auto &ctx = getASTContext();
+  auto &clangASTContext = getClangASTContext();
+
+  auto domainInfo = clangASTContext.getFeatureAvailInfo(domainName);
+  if (domainInfo.Kind == clang::FeatureAvailKind::None)
     return;
 
-  auto varDecl = lookupTable->lookupAvailabilityDomainDecl(identifier.str());
+  auto *varDecl = dyn_cast_or_null<clang::VarDecl>(domainInfo.Decl);
   if (!varDecl)
     return;
 
-  auto featureInfo = getClangASTContext().getFeatureAvailInfo(varDecl);
-  if (featureInfo.first.empty())
+  // The decl that was found may belong to a different Clang module.
+  if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  auto getDomainKind = [](clang::FeatureAvailKind featureAvailKind) {
-    switch (featureAvailKind) {
-    case clang::FeatureAvailKind::None:
-      llvm_unreachable("unexpected kind");
-    case clang::FeatureAvailKind::Available:
-      return CustomAvailabilityDomain::Kind::Enabled;
-    case clang::FeatureAvailKind::Unavailable:
-      return CustomAvailabilityDomain::Kind::Disabled;
-    case clang::FeatureAvailKind::Dynamic:
-      return CustomAvailabilityDomain::Kind::Dynamic;
-    }
-  };
+  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  if (!imported)
+    return;
 
-  auto domain = AvailabilityDomain::forCustom(CustomAvailabilityDomain::get(
-      featureInfo.first, getParentModule(),
-      getDomainKind(featureInfo.second.Kind), getASTContext()));
-  results.push_back(domain);
+  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  ASSERT(customDomain);
+  results.push_back(*customDomain);
 }
 
 void ClangModuleUnit::collectLinkLibraries(

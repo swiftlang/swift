@@ -490,8 +490,10 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 }
 
 static bool usesFeatureCustomAvailability(Decl *decl) {
-  // FIXME: [availability] Check whether @available attributes for custom
-  // domains are attached to the decl.
+  for (auto attr : decl->getSemanticAvailableAttrs()) {
+    if (attr.getDomain().isCustom())
+      return true;
+  }
   return false;
 }
 

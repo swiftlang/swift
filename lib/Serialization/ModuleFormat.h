@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 937; // Simplify SILWitnessTable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 938; // custom AvailabilityDomains
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -759,6 +759,18 @@ using GenericParamKindField = BCFixed<2>;
       X##_HasSubminor = Y.getSubminor().has_value();\
     }
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class AvailabilityDomainKind : uint8_t {
+  Universal = 0,
+  SwiftLanguage,
+  PackageDescription,
+  Embedded,
+  Platform,
+  Custom,
+};
+using AvailabilityDomainKindField = BCFixed<3>;
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -1227,6 +1239,8 @@ namespace decls_block {
 /// that if you forget \c DESERIALIZE_TYPE(...) you will come up
 /// with a linker error.
 #define TYPE_LAYOUT(LAYOUT, ...) TYPE_LAYOUT_IMPL(LAYOUT, __VA_ARGS__)
+
+  // clang-format off
 
   using ClangTypeLayout = BCRecordLayout<
     CLANG_TYPE,
@@ -2385,22 +2399,21 @@ namespace decls_block {
     DeclIDField // ABI decl
   >;
 
-  using AvailableDeclAttrLayout = BCRecordLayout<
-    Available_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCFixed<1>, // is unconditionally unavailable?
-    BCFixed<1>, // is unconditionally deprecated?
-    BCFixed<1>, // is unavailable from async?
-    BCFixed<1>, // is this PackageDescription version-specific kind?
-    BCFixed<1>, // is SPI?
-    BCFixed<1>, // is for Embedded
-    BC_AVAIL_TUPLE, // Introduced
-    BC_AVAIL_TUPLE, // Deprecated
-    BC_AVAIL_TUPLE, // Obsoleted
-    BCVBR<5>,    // platform
-    BCVBR<5>,    // number of bytes in message string
-    BCVBR<5>,    // number of bytes in rename string
-    BCBlob       // message, followed by rename
+  using AvailableDeclAttrLayout = BCRecordLayout<Available_DECL_ATTR,
+    BCFixed<1>,                   // implicit flag
+    BCFixed<1>,                   // is unconditionally unavailable?
+    BCFixed<1>,                   // is unconditionally deprecated?
+    BCFixed<1>,                   // is unavailable from async?
+    BCFixed<1>,                   // is SPI?
+    AvailabilityDomainKindField,  // kind of availability domain
+    BCVBR<5>,                     // platform kind of domain
+    DeclIDField,                  // the decl representing a custom domain
+    BC_AVAIL_TUPLE,               // introduced version
+    BC_AVAIL_TUPLE,               // deprecated version
+    BC_AVAIL_TUPLE,               // obsoleted version
+    BCVBR<5>,                     // number of bytes in message string
+    BCVBR<5>,                     // number of bytes in rename string
+    BCBlob                        // message, followed by rename
   >;
 
   using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
@@ -2565,6 +2578,8 @@ namespace decls_block {
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
+
+  // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
 #undef TYPE_LAYOUT

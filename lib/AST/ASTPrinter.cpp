@@ -3303,14 +3303,6 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
 }
 
 static void
-suppressingFeatureCustomAvailability(PrintOptions &options,
-                                     llvm::function_ref<void()> action) {
-  // FIXME: [availability] Save and restore a bit controlling whether
-  // @available attributes for custom domains are printed.
-  action();
-}
-
-static void
 suppressingFeatureExecutionAttribute(PrintOptions &options,
                                     llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope1(options.SuppressExecutionAttribute, true);
