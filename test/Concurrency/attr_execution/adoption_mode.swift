@@ -14,7 +14,7 @@ struct G<T> {
 do {
   func syncF() {}
   @concurrent func executionConcurrentAsyncF() async {}
-  @execution(caller) func executionCallerAsyncF() async {}
+  nonisolated(nonsending) func executionCallerAsyncF() async {}
   @MainActor func mainActorAsyncF() async {}
   func isolatedParamAsyncF(
     isolation: isolated (any Actor)? = #isolation

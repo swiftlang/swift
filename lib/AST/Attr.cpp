@@ -304,23 +304,6 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
-void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
-                                  const PrintOptions &options) const {
-  if (options.SuppressExecutionAttribute)
-    return;
-
-  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  printer.printAttrName("@execution");
-  printer << "(";
-  switch (getBehavior()) {
-  case ExecutionKind::Caller:
-    printer << "caller";
-    break;
-  }
-  printer << ")";
-  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-}
-
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -1726,16 +1709,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Execution: {
-    auto *attr = cast<ExecutionAttr>(this);
-    switch (attr->getBehavior()) {
-    case ExecutionKind::Caller:
-      Printer << "@execution(caller)";
-      break;
-    }
-    break;
-  }
-
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1960,13 +1933,6 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DeclAttrKind::Lifetime:
     return "lifetime";
-  case DeclAttrKind::Execution: {
-    switch (cast<ExecutionAttr>(this)->getBehavior()) {
-    case ExecutionKind::Caller:
-      return "execution(caller)";
-    }
-    llvm_unreachable("Invalid execution kind");
-  }
   }
   llvm_unreachable("bad DeclAttrKind");
 }

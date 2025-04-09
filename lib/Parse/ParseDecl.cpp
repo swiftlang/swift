@@ -3947,20 +3947,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(Attr.get());
     break;
   }
-
-  case DeclAttrKind::Execution: {
-    auto behavior = parseSingleAttrOption<ExecutionKind>(
-        *this, Loc, AttrRange, AttrName, DK,
-         {{Context.Id_caller, ExecutionKind::Caller}});
-    if (!behavior)
-      return makeParserSuccess();
-
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) ExecutionAttr(AtLoc, AttrRange, *behavior,
-                                                 /*Implicit*/ false));
-
-    break;
-  }
   }
 
   if (DuplicateAttribute) {
@@ -4744,53 +4730,6 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
       result = new (Context) IsolatedTypeAttr(AtLoc, attrLoc,
                                               {lpLoc, rpLoc},
                                               {*kind, kindLoc});
-    }
-    return makeParserSuccess();
-  }
-
-  case TypeAttrKind::Execution: {
-    if (!Context.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
-      diagnose(Tok, diag::requires_experimental_feature, "@execution", false,
-               Feature::ExecutionAttribute.getName());
-      return makeParserError();
-    }
-
-    SourceLoc lpLoc = Tok.getLoc(), behaviorLoc, rpLoc;
-    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (!justChecking) {
-        diagnose(Tok, diag::attr_execution_expected_lparen);
-        // TODO: should we suggest removing the `@`?
-      }
-      return makeParserError();
-    }
-
-    bool invalid = false;
-    std::optional<ExecutionKind> behavior;
-    if (isIdentifier(Tok, "caller")) {
-      behaviorLoc = consumeToken(tok::identifier);
-      behavior = ExecutionKind::Caller;
-    } else {
-      if (!justChecking) {
-        diagnose(Tok, diag::attr_execution_expected_kind);
-      }
-      invalid = true;
-      consumeIf(tok::identifier);
-    }
-
-    if (justChecking && !Tok.is(tok::r_paren))
-      return makeParserError();
-    if (parseMatchingToken(tok::r_paren, rpLoc,
-                           diag::attr_execution_expected_rparen,
-                           lpLoc))
-      return makeParserError();
-
-    if (invalid)
-      return makeParserError();
-    assert(behavior);
-
-    if (!justChecking) {
-      result = new (Context) ExecutionTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
-                                               {*behavior, behaviorLoc});
     }
     return makeParserSuccess();
   }

@@ -618,12 +618,6 @@ static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
     return "double_apply";
   }
 }
-static StringRef getDumpString(ExecutionKind kind) {
-  switch (kind) {
-  case ExecutionKind::Caller:
-    return "caller";
-  }
-}
 static StringRef getDumpString(ExplicitSafety safety) {
   switch (safety) {
   case ExplicitSafety::Unspecified:
@@ -4936,11 +4930,6 @@ public:
 
 #undef TRIVIAL_ATTR_PRINTER
 
-  void visitExecutionAttr(ExecutionAttr *Attr, Label label) {
-    printCommon(Attr, "execution_attr", label);
-    printField(Attr->getBehavior(), Label::always("behavior"));
-    printFoot();
-  }
   void visitABIAttr(ABIAttr *Attr, Label label) {
     printCommon(Attr, "abi_attr", label);
     printRec(Attr->abiDecl, Label::always("decl"));
@@ -6349,7 +6338,7 @@ namespace {
           printFlag("@isolated(any)");
           break;
         case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-          printFlag("@execution(caller)");
+          printFlag("nonisolated(nonsending)");
           break;
         }
       }

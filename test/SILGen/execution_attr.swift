@@ -11,7 +11,7 @@
 // CHECK-LABEL: // executionCaller()
 // CHECK-NEXT: // Isolation: caller_isolation_inheriting
 // CHECK-NEXT: sil hidden [ossa] @$s14execution_attr0A6CalleryyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-@execution(caller)
+nonisolated(nonsending)
 func executionCaller() async {}
 
 // CHECK-LABEL: // executionConcurrent()
@@ -23,7 +23,7 @@ func executionConcurrent() async {}
 // DISABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
 // ENABLED: sil hidden [ossa] @$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> () {
 // CHECK: } // end sil function '$s14execution_attr0A15CallerParameteryyyyYaYCXEYaF'
-func executionCallerParameter(_ x: @execution(caller) () async -> ()) async {
+func executionCallerParameter(_ x: nonisolated(nonsending) () async -> ()) async {
   await x()
 }
 
@@ -34,7 +34,7 @@ func executionConcurrentParameter(_ x: @concurrent () async -> ()) async {
 }
 
 struct S {
-  let field: @execution(caller) () async -> ()
+  let field: nonisolated(nonsending) () async -> ()
 }
 
 // DISABLED: sil hidden [ossa] @$s14execution_attr0A11CallerFieldyyAA1SVYaF : $@convention(thin) @async (@guaranteed S) -> () {
@@ -61,5 +61,5 @@ extension S {
   // CHECK-LABEL: // S.executionCallerFieldMethod(_:)
   // CHECK: // Isolation: unspecified
   // CHECK: sil hidden [ossa] @$s14execution_attr1SV0A17CallerFieldMethodyyyyYaYCXEF : $@convention(method) (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> (), @guaranteed S) -> () {
-  func executionCallerFieldMethod(_ x: @execution(caller) () async -> ()) {}
+  func executionCallerFieldMethod(_ x: nonisolated(nonsending) () async -> ()) {}
 }

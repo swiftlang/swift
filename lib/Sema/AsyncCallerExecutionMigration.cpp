@@ -122,8 +122,7 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
     }
 
     if (attrs) {
-      if (attrs->hasAttribute<ExecutionAttr>() ||
-          attrs->hasAttribute<ConcurrentAttr>())
+      if (attrs->hasAttribute<ConcurrentAttr>())
         return;
 
       if (auto *nonisolated = attrs->getAttribute<NonisolatedAttr>()) {

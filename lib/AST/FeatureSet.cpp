@@ -503,17 +503,15 @@ static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureExecutionAttribute(Decl *decl) {
-  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution, decl)) {
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent,
+                                               decl)) {
     return false;
   }
-
-  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
-    return true;
 
   if (decl->getAttrs().hasAttribute<ConcurrentAttr>())
     return true;
 
-  auto hasExecutionAttr = [](TypeRepr *R) {
+  auto hasConcurrentAttr = [](TypeRepr *R) {
     if (!R)
       return false;
 
@@ -521,7 +519,7 @@ static bool usesFeatureExecutionAttribute(Decl *decl) {
       if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
         return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
           if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
-            return isa<ExecutionTypeAttr>(TA);
+            return isa<ConcurrentTypeAttr>(TA);
           }
           return false;
         });
@@ -535,12 +533,12 @@ static bool usesFeatureExecutionAttribute(Decl *decl) {
   // Check if any parameters that have `@execution` attribute.
   if (auto *PL = VD->getParameterList()) {
     for (auto *P : *PL) {
-      if (hasExecutionAttr(P->getTypeRepr()))
+      if (hasConcurrentAttr(P->getTypeRepr()))
         return true;
     }
   }
 
-  if (hasExecutionAttr(VD->getResultTypeRepr()))
+  if (hasConcurrentAttr(VD->getResultTypeRepr()))
     return true;
 
   return false;

@@ -34,7 +34,7 @@ struct CustomActor {
   }
 }
 
-@execution(caller)
+nonisolated(nonsending)
 func executionCallerIsolation() async {
   checkIfOnMainQueue()
 }

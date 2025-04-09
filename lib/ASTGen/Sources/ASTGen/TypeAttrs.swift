@@ -76,9 +76,6 @@ extension ASTGenVisitor {
       case .differentiable:
         return (self.generateDifferentiableTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .execution:
-        return (self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute)
-          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .opaqueReturnTypeOf:
         return (self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
@@ -238,33 +235,6 @@ extension ASTGenVisitor {
       parensRange: self.generateAttrParensRange(attribute: node),
       kind: differentiability,
       kindLoc: differentiabilityLoc
-    )
-  }
-
-  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
-    let behaviorLoc = self.generateSourceLoc(node.arguments)
-    let behavior: BridgedExecutionTypeAttrExecutionKind? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "caller": return .caller
-        default:
-          // TODO: Diagnose.
-          return nil
-        }
-      }
-    )
-    guard let behavior else {
-      return nil
-    }
-      
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      behavior: behavior,
-      behaviorLoc: behaviorLoc
     )
   }
   

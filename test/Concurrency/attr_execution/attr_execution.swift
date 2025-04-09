@@ -13,5 +13,5 @@ func concurrentTest() async {}
 // CHECK-LABEL: // callerTest()
 // CHECK: // Isolation: caller_isolation_inheriting
 // CHECK: sil hidden [ossa] @$s14attr_execution10callerTestyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
-@execution(caller)
+nonisolated(nonsending)
 func callerTest() async {}

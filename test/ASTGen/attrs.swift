@@ -199,7 +199,7 @@ struct StorageRestrctionTest {
 }
 
 do {
-  @execution(caller) func testLocal() async {} // Ok
+  nonisolated(nonsending) func testLocal() async {} // Ok
 
   struct Test {
     @concurrent func testMember() async {} // Ok
