@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name execution_attr -enable-experimental-feature ExecutionAttribute
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name execution_attr
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name execution_attr
 
 // RUN: %FileCheck %s --input-file %t.swiftinterface
 
-// REQUIRES: swift_feature_ExecutionAttribute
+// REQUIRES: concurrency
 
 public struct Test {
   // CHECK:  nonisolated(nonsending) public init() async

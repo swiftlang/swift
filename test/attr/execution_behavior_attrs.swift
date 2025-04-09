@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_ExecutionAttribute
 
 // FIXME: Bad parser diagnostic on C++ side
 nonisolated(something) func invalidAttr() async {} // expected-error {{cannot find 'nonisolated' in scope}}

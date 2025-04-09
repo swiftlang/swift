@@ -1,12 +1,11 @@
-// RUN: %target-swift-emit-silgen %s -module-name attr_execution_silgen -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute -DSWIFT_FIVE | %FileCheck -check-prefix CHECK -check-prefix FIVE %s
-// RUN: %target-swift-emit-silgen %s -swift-version 6 -module-name attr_execution_silgen -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute | %FileCheck -check-prefix CHECK -check-prefix SIX %s
+// RUN: %target-swift-emit-silgen %s -module-name attr_execution_silgen -target %target-swift-5.1-abi-triple -DSWIFT_FIVE | %FileCheck -check-prefix CHECK -check-prefix FIVE %s
+// RUN: %target-swift-emit-silgen %s -swift-version 6 -module-name attr_execution_silgen -target %target-swift-5.1-abi-triple | %FileCheck -check-prefix CHECK -check-prefix SIX %s
 
 // We codegen slightly differently for swift 5 vs swift 6, so we need to check
 // both.
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_ExecutionAttribute
 
 ////////////////////////
 // MARK: Declarations //

@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ExecutionAttribute
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_ExecutionAttribute
 
 typealias F = @concurrent () async -> Void
 
