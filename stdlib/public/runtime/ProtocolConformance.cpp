@@ -444,8 +444,15 @@ static bool _checkWitnessTableIsolation(
   llvm::ArrayRef<const void *> conditionalArgs,
   ConformanceExecutionContext &context
 ) {
-  // If there's no protocol conformance descriptor, do nothing.
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+  auto description = lookThroughOptionalConditionalWitnessTable(
+                         reinterpret_cast<const RelativeWitnessTable *>(wtable))
+                         ->getDescription();
+#else
   auto description = wtable->getDescription();
+#endif
+
+  // If there's no protocol conformance descriptor, do nothing.
   if (!description)
     return false;
 
