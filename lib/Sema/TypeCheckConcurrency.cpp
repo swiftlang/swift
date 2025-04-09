@@ -3020,10 +3020,9 @@ namespace {
       // FIXME: When passing to a sending parameter, should this be handled
       // by region isolation? Or should it always be handled by region
       // isolation?
-      if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-          (mayExecuteConcurrentlyWith(
+      if (mayExecuteConcurrentlyWith(
               localFunc.getAsDeclContext(), getDeclContext()) ||
-           (explicitClosure && explicitClosure->isPassedToSendingParameter()))) {
+          (explicitClosure && explicitClosure->isPassedToSendingParameter())) {
         GenericSignature genericSig;
         if (auto afd = localFunc.getAbstractFunctionDecl())
           genericSig = afd->getGenericSignature();
@@ -7917,8 +7916,6 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   auto dc = rootNormal->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::IsolatedConformances))
-    return ActorIsolation::forNonisolated(false);
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.

@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -enable-experimental-feature IsolatedConformances %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s
 
-// REQUIRES: swift_feature_IsolatedConformances
 // REQUIRES: concurrency
 
 protocol P {

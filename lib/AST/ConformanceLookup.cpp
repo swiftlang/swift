@@ -386,33 +386,30 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   // All metatypes are Copyable, Escapable, and BitwiseCopyable.
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
-    case KnownProtocolKind::Sendable:
+    case KnownProtocolKind::Sendable: {
       // Metatypes are generally Sendable, but with isolated conformances we
       // cannot assume that metatypes based on type parameters are Sendable.
       // Therefore, check for conformance to SendableMetatype.
-      if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances)) {
-        auto sendableMetatypeProto = 
-            ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-        if (sendableMetatypeProto) {
-          Type instanceType = metatypeType->getInstanceType();
+      auto sendableMetatypeProto =
+          ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+      if (sendableMetatypeProto) {
+        Type instanceType = metatypeType->getInstanceType();
 
-          // If the instance type is a type parameter, it is not necessarily
-          // Sendable. There will need to be a Sendable requirement.
-          if (instanceType->isTypeParameter())
-            break;
+        // If the instance type is a type parameter, it is not necessarily
+        // Sendable. There will need to be a Sendable requirement.
+        if (instanceType->isTypeParameter())
+          break;
 
-          // If the instance type conforms to SendableMetatype, then its
-          // metatype is Sendable.
-          auto instanceConformance = lookupConformance(
-              instanceType, sendableMetatypeProto);
-          if (instanceConformance.isInvalid() ||
-              instanceConformance.hasMissingConformance())
-            break;
-        }
-
-        // Every other metatype is Sendable.
+        // If the instance type conforms to SendableMetatype, then its
+        // metatype is Sendable.
+        auto instanceConformance = lookupConformance(
+            instanceType, sendableMetatypeProto);
+        if (instanceConformance.isInvalid() ||
+            instanceConformance.hasMissingConformance())
+          break;
       }
       LLVM_FALLTHROUGH;
+    }
 
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:

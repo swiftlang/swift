@@ -8526,10 +8526,6 @@ ERROR(attr_abi_failable_mismatch,none,
 //===----------------------------------------------------------------------===//
 // MARK: Isolated conformances
 //===----------------------------------------------------------------------===//
-GROUPED_ERROR(isolated_conformance_experimental_feature,IsolatedConformances,
-      none,
-      "isolated conformances require experimental feature "
-      " 'IsolatedConformances'", ())
 NOTE(note_isolate_conformance_to_global_actor,none,
      "isolate this conformance to the %select{global actor %0|main actor}1 "
      "with '@%2'", (Type, bool, StringRef))

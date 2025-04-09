@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature IsolatedConformances -emit-sil -o /dev/null
+// RUN: %target-typecheck-verify-swift -swift-version 6 -emit-sil -o /dev/null
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_IsolatedConformances
 
 
 protocol Q {
