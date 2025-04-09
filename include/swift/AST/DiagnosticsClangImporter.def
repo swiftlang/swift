@@ -377,5 +377,9 @@ NOTE(ptr_to_nonescapable,none,
      "pointer to non-escapable type %0 cannot be imported",
      (const clang::Type*))
 
+NOTE(nonescapable_field_of_escapable, none,
+     "escapable record %0 cannot have non-escapable field '%1'",
+     (const clang::NamedDecl *, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
