@@ -542,18 +542,18 @@ function Get-PythonScriptsPath {
 
 function Get-InstallDir([Hashtable] $Platform) {
   if ($Platform -eq $HostPlatform) {
-    $ProgramFilesName = "Program Files"
-  } elseif ($Platform -eq $KnownPlatforms["WindowsX86"]) {
-    $ProgramFilesName = "Program Files (x86)"
-  } elseif (($HostPlatform -eq $KnownPlatforms["WindowsARM64"]) -and ($Platform -eq $KnownPlatforms["WindowsX64"])) {
-    # x64 programs actually install under "Program Files" on arm64,
-    # but this would conflict with the native installation.
-    $ProgramFilesName = "Program Files (Amd64)"
-  } else {
-    # arm64 cannot be installed on x64
-    return $null
+    return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift")
   }
-  return "$ImageRoot\$ProgramFilesName\Swift"
+  if ($Platform -eq $KnownPlatforms["WindowsARM64"]) {
+    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Arm64)", "Swift")
+  }
+  if ($Platform -eq $KnownPlatforms["WindowsX64"]) {
+    return [IO.Path]::Combine("$ImageRoot\", "Program Files (Amd64)", "Swift")
+  }
+  if ($Platform -eq $KnownPlatforms["WindowsX86"]) {
+    return [IO.Path]::Combine("$ImageRoot\", "Program Files (x86)", "Swift")
+  }
+  throw "Unknown Platform"
 }
 
 # For dev productivity, install the host toolchain directly using CMake.
@@ -1607,10 +1607,7 @@ function Build-WiXProject() {
   Add-KeyValueIfNew $Properties ProductArchitecture $Platform.Architecture.VSName
   Add-KeyValueIfNew $Properties ProductVersion $ProductVersionArg
 
-  $MSBuildArgs = @("$SourceCache\swift-installer-scripts\platforms\Windows\$FileName")
-  $MSBuildArgs += "-noLogo"
-  $MSBuildArgs += "-restore"
-  $MSBuildArgs += "-maxCpuCount"
+  $MSBuildArgs = @( "-noLogo", "-maxCpuCount", "-restore", "$SourceCache\swift-installer-scripts\platforms\Windows\$FileName" )
   foreach ($Property in $Properties.GetEnumerator()) {
     if ($Property.Value.Contains(" ")) {
       $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
@@ -2190,8 +2187,12 @@ function Build-Runtime([Hashtable] $Platform) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
-      # Clang[<18] doesn't provide the _Builtin_float module.
-      SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT = "YES";
+    }
+
+    if ((Get-AndroidNDK).ClangVersion -lt 18) {
+      $PlatformDefines += @{
+        SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT = "YES";
+      }
     }
   }
 
@@ -3133,14 +3134,14 @@ function Test-PackageManager() {
 function Build-Installer([Hashtable] $Platform) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
-  $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
+  $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "False" } else { "True" }
 
   $Properties = @{
     BundleFlavor = "offline";
-    TOOLCHAIN_ROOT = "$($Platform.ToolchainInstallRoot)\";
+    ImageRoot = "$(Get-InstallDir $Platform)\";
     # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
     # https://github.com/microsoft/mimalloc/issues/997
-    WORKAROUND_MIMALLOC_ISSUE_997 = if ($IsCrossCompiling) { "true" } else { "false" };
+    WORKAROUND_MIMALLOC_ISSUE_997 = if ($IsCrossCompiling) { "True" } else { "False" };
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
@@ -3155,10 +3156,11 @@ function Build-Installer([Hashtable] $Platform) {
     }
   }
 
+  $Properties["Platforms"] = "`"windows$(if ($Android) { ";android" })`"";
+  $Properties["AndroidArchitectures"] = "`"$(($AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
+  $Properties["WindowsArchitectures"] = "`"$(($WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
   foreach ($SDKPlatform in $WindowsSDKPlatforms) {
-    $Properties["INCLUDE_WINDOWS_$($SDKPlatform.Architecture.VSName.ToUpperInvariant())_SDK"] = "true"
-    $Properties["PLATFORM_ROOT_$($SDKPlatform.Architecture.VSName.ToUpperInvariant())"] = "$(Get-PlatformRoot Windows)\";
-    $Properties["SDK_ROOT_$($SDKPlatform.Architecture.VSName.ToUpperInvariant())"] = "$(Get-SwiftSDK Windows)\"
+    $Properties["WindowsRuntime$($SDKPlatform.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $SDKPlatform), "Runtimes", "$ProductVersion");
   }
 
   Build-WiXProject bundle\installer.wixproj -Platform $Platform -Bundle -Properties $Properties
@@ -3167,11 +3169,7 @@ function Build-Installer([Hashtable] $Platform) {
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
-  foreach ($SDKPlatform in $WindowsSDKPlatforms) {
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\sdk.windows.$($SDKPlatform.Architecture.VSName).cab" $Stage
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\sdk.windows.$($SDKPlatform.Architecture.VSName).msi" $Stage
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\rtl.$($SDKPlatform.Architecture.VSName).msm" $Stage
-  }
+  Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msm" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
   if ($ToBatch) {
@@ -3237,10 +3235,9 @@ if (-not $SkipBuild) {
       Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
     }
 
-    if ($Platform -eq $HostPlatform) {
-      Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion))\usr"
-    }
+    Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
   }
+
   Install-Platform $WindowsSDKPlatforms Windows
   Write-PlatformInfoPlist Windows
   Write-SDKSettingsPlist Windows
