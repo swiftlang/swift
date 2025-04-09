@@ -2401,7 +2401,23 @@ namespace {
           continue;
         }
 
-        members.push_back(cast<VarDecl>(member));
+        auto *vd = cast<VarDecl>(member);
+        if (!isNonEscapable) {
+          if (const auto *fd = dyn_cast<clang::FieldDecl>(nd))
+            if (evaluateOrDefault(
+                    Impl.SwiftContext.evaluator,
+                    ClangTypeEscapability({fd->getType().getTypePtr(), &Impl}),
+                    CxxEscapability::Unknown) ==
+                CxxEscapability::NonEscapable) {
+              Impl.addImportDiagnostic(
+                  decl,
+                  Diagnostic(diag::nonescapable_field_of_escapable, decl,
+                             nd->getName()),
+                  decl->getLocation());
+              return nullptr;
+            }
+        }
+        members.push_back(vd);
       }
 
       bool hasReferenceableFields = !members.empty();
