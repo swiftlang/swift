@@ -1,19 +1,12 @@
 // RUN: %target-swift-frontend -emit-sil -verify -O %s | %FileCheck %s
 // REQUIRES: swift_in_compiler
-// UNSUPPORTED: OS=windows-msvc
 
 import _Differentiation
-#if canImport(Glibc)
-import Glibc
-#else
-import Foundation
-#endif
 
 // Simulation parameters
 let trials = 100
 let timesteps = 20
 let dTime: Float = 0.1
-let printGradToCompare = false
 
 // Definitions
 let π = Float.pi
@@ -219,14 +212,6 @@ func dontLetTheCompilerOptimizeThisAway<T>(_ x: T) {
     blackHole = x
 }
 
-func measure<T>(_ block: () throws -> T) throws -> (time: Double, result: T) {
-    let t0 = DispatchTime.now()
-    let result = try block()
-    let t1 = DispatchTime.now()
-    let elapsed = Double(t1.uptimeNanoseconds - t0.uptimeNanoseconds) / 1E9
-    return (elapsed, result)
-}
-
 @differentiable(reverse)
 func fullPipe(simParams: SimParams) -> Float {
     let pred = simulate(simParams: simParams)
@@ -234,32 +219,10 @@ func fullPipe(simParams: SimParams) -> Float {
     return loss
 }
 
-var totalPureForwardTime: Double = 0
-var totalGradientTime: Double = 0
-
 for _ in 0 ..< trials {
-    let (forwardOnly, _) = try measure {
-        return fullPipe(simParams: simParams)
-    }
+    let forwardOnly = fullPipe(simParams: simParams)
     dontLetTheCompilerOptimizeThisAway(forwardOnly)
 
-    let (gradientTime, grad) = try measure {
-        return gradient(at: simParams, of: fullPipe)
-    }
+    let grad = gradient(at: simParams, of: fullPipe)
     dontLetTheCompilerOptimizeThisAway(grad)
-
-    if printGradToCompare {
-        print(grad)
-    }
-
-    totalPureForwardTime += forwardOnly
-    totalGradientTime += gradientTime
 }
-
-let averagePureForward = totalPureForwardTime / Double(trials)
-let averageGradient = totalGradientTime / Double(trials)
-
-print("trials: \(trials)")
-print("timesteps: \(timesteps)")
-print("average forward only time: \(averagePureForward) seconds")
-print("average forward and back (gradient) time: \(averageGradient) seconds")
