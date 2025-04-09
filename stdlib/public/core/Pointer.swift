@@ -524,3 +524,22 @@ func _convertConstStringToUTF8PointerArgument<
   return _convertConstArrayToPointerArgument(utf8)
 }
 #endif
+
+extension _Pointer {
+
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (Int(bitPattern: self) & MemoryLayout<Pointee>.alignment &- 1) == 0
+  }
+}
+
+extension Optional where Wrapped: _Pointer {
+
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    guard let pointer = self else { return true }
+    return pointer._isWellAligned()
+  }
+}
