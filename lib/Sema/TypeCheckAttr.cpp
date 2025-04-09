@@ -243,20 +243,8 @@ public:
     }
   }
 
-  void visitExecutionAttr(ExecutionAttr *attr) {
-    checkExecutionBehaviorAttribute(attr);
-
-    if (auto *concurrentAttr = D->getAttrs().getAttribute<ConcurrentAttr>())
-    diagnoseAndRemoveAttr(attr, diag::actor_isolation_multiple_attr_2, D,
-                          attr, concurrentAttr);
-  }
-
   void visitConcurrentAttr(ConcurrentAttr *attr) {
     checkExecutionBehaviorAttribute(attr);
-
-    if (auto *executionAttr = D->getAttrs().getAttribute<ExecutionAttr>())
-      diagnoseAndRemoveAttr(attr, diag::actor_isolation_multiple_attr_2, D,
-                            attr, executionAttr);
 
     if (auto *nonisolated = D->getAttrs().getAttribute<NonisolatedAttr>()) {
       if (nonisolated->isNonSending())
@@ -4338,7 +4326,6 @@ static void checkGlobalActorAttr(
     std::pair<CustomAttr *, NominalTypeDecl *> &globalActorAttr) {
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
-  auto executionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
   auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
   llvm::SmallVector<const DeclAttribute *, 2> attributes;
@@ -4350,9 +4337,6 @@ static void checkGlobalActorAttr(
   }
   if (nonisolatedAttr) {
     attributes.push_back(nonisolatedAttr);
-  }
-  if (executionAttr) {
-    attributes.push_back(executionAttr);
   }
   if (concurrentAttr) {
     attributes.push_back(concurrentAttr);
@@ -8191,11 +8175,6 @@ public:
   }
 
   void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
-    if (!ctx.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
-      visitDeclAttribute(attr);
-      return;
-    }
-
     // execution behavior attribute implies `async`.
     if (closure->hasExplicitResultType() &&
         closure->getAsyncLoc().isInvalid()) {
@@ -8227,10 +8206,6 @@ public:
         attr->setInvalid();
       }
     }
-  }
-
-  void visitExecutionAttr(ExecutionAttr *attr) {
-    checkExecutionBehaviorAttribute(attr);
   }
 
   void visitConcurrentAttr(ConcurrentAttr *attr) {

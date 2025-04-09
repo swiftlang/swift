@@ -2943,15 +2943,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 #include "swift/AST/DeclAttr.def"
 
-    case DeclAttrKind::Execution: {
-      auto *theAttr = cast<ExecutionAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[ExecutionDeclAttrLayout::Code];
-      ExecutionDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode,
-          static_cast<uint8_t>(theAttr->getBehavior()));
-      return;
-    }
-
     case DeclAttrKind::ABI: {
       auto *theAttr = cast<ABIAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ABIDeclAttrLayout::Code];

@@ -91,6 +91,6 @@ public struct MutatingTest {
 public func testExecutionConcurrent() async {}
 // CHECK: @concurrent public func testExecutionConcurrent() async
 
-@execution(caller)
+nonisolated(nonsending)
 public func testExecutionCaller() async {}
-// CHECK: @execution(caller) public func testExecutionCaller() async
+// CHECK: nonisolated(nonsending) public func testExecutionCaller() async

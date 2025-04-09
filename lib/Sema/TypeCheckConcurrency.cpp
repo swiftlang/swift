@@ -4902,7 +4902,6 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
-  auto concurrentExecutionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
   auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
   // Remove implicit attributes if we only care about explicit ones.
@@ -4913,36 +4912,18 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       isolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
       globalActorAttr = std::nullopt;
-    if (concurrentExecutionAttr && concurrentExecutionAttr->isImplicit())
-      concurrentExecutionAttr = nullptr;
     if (concurrentAttr && concurrentAttr->isImplicit())
       concurrentAttr = nullptr;
   }
 
   unsigned numIsolationAttrs =
       (isolatedAttr ? 1 : 0) + (nonisolatedAttr ? 1 : 0) +
-      (globalActorAttr ? 1 : 0) + (concurrentExecutionAttr ? 1 : 0) +
-      (concurrentAttr ? 1 : 0);
+      (globalActorAttr ? 1 : 0) + (concurrentAttr ? 1 : 0);
   if (numIsolationAttrs == 0) {
     if (isa<DestructorDecl>(decl) && !decl->isImplicit()) {
       return ActorIsolation::forNonisolated(false);
     }
     return std::nullopt;
-  }
-
-  // If the declaration is explicitly marked with 'execution', return the
-  // appropriate isolation.
-  //
-  // NOTE: This needs to occur before we handle an explicit nonisolated attr,
-  // since if @execution and nonisolated are used together, we want to ensure
-  // that @execution takes priority. This ensures that if we import code from a
-  // module that was compiled with a different value for AsyncCallerExecution,
-  // we get the semantics of the source module.
-  if (concurrentExecutionAttr) {
-    switch (concurrentExecutionAttr->getBehavior()) {
-    case ExecutionKind::Caller:
-      return ActorIsolation::forCallerIsolationInheriting();
-    }
   }
 
   if (concurrentAttr)
@@ -5719,8 +5700,9 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   ASTContext &ctx = value->getASTContext();
   switch (isolation) {
   case ActorIsolation::CallerIsolationInheriting:
-    value->getAttrs().add(new (ctx) ExecutionAttr(ExecutionKind::Caller,
-                                                  /*implicit=*/true));
+    value->getAttrs().add(new (ctx) NonisolatedAttr(
+        /*atLoc=*/{}, /*range=*/{}, NonIsolatedModifier::NonSending,
+        /*implicit=*/true));
     break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
@@ -5913,10 +5895,12 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // as nonisolated but since AsyncCallerExecution is enabled, we return
   // CallerIsolationInheriting.
   if (isolationFromAttr && isolationFromAttr->getKind() ==
-          ActorIsolation::CallerIsolationInheriting &&
-      !value->getAttrs().hasAttribute<ExecutionAttr>()) {
-    value->getAttrs().add(new (ctx) ExecutionAttr(ExecutionKind::Caller,
-                                                  /*implicit=*/true));
+          ActorIsolation::CallerIsolationInheriting) {
+    auto nonisolated = value->getAttrs().getAttribute<NonisolatedAttr>();
+    if (!nonisolated || !nonisolated->isNonSending())
+      value->getAttrs().add(new (ctx) NonisolatedAttr(
+          /*atLoc*/ {}, /*range=*/{}, NonIsolatedModifier::NonSending,
+          /*implicit=*/true));
   }
 
   if (auto *fd = dyn_cast<FuncDecl>(value)) {

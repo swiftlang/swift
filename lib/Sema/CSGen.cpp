@@ -2584,14 +2584,6 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
-        if (auto *execution =
-                closure->getAttrs().getAttribute<ExecutionAttr>()) {
-          switch (execution->getBehavior()) {
-          case ExecutionKind::Caller:
-            return FunctionTypeIsolation::forNonIsolatedCaller();
-          }
-        }
-
         if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
           return FunctionTypeIsolation::forNonIsolated();
         }

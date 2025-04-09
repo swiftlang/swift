@@ -236,10 +236,6 @@ protected:
 
       NumFeatures : 31
     );
-
-    SWIFT_INLINE_BITFIELD(ExecutionAttr, DeclAttribute, NumExecutionKindBits,
-      Behavior : NumExecutionKindBits
-    );
   } Bits;
   // clang-format on
 
@@ -3284,34 +3280,6 @@ public:
   }
 };
 
-class ExecutionAttr : public DeclAttribute {
-public:
-  ExecutionAttr(SourceLoc AtLoc, SourceRange Range,
-                ExecutionKind behavior,
-                bool Implicit)
-      : DeclAttribute(DeclAttrKind::Execution, AtLoc, Range, Implicit) {
-    Bits.ExecutionAttr.Behavior = static_cast<uint8_t>(behavior);
-  }
-
-  ExecutionAttr(ExecutionKind behavior, bool Implicit)
-      : ExecutionAttr(/*AtLoc=*/SourceLoc(), /*Range=*/SourceRange(), behavior,
-                      Implicit) {}
-
-  ExecutionKind getBehavior() const {
-    return static_cast<ExecutionKind>(Bits.ExecutionAttr.Behavior);
-  }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Execution;
-  }
-
-  UNIMPLEMENTED_CLONE(ExecutionAttr)
-
-  bool isEquivalent(const ExecutionAttr *other, Decl *attachedTo) const {
-    return getBehavior() == other->getBehavior();
-  }
-};
-
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -3771,10 +3739,6 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
       Kind : 8
     );
-
-    SWIFT_INLINE_BITFIELD_FULL(ExecutionTypeAttr, TypeAttribute, 8,
-      Behavior : 8
-    );
   } Bits;
   // clang-format on
 
@@ -4038,28 +4002,6 @@ public:
     return getIsolationKindName(getIsolationKind());
   }
   static const char *getIsolationKindName(IsolationKind kind);
-
-  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
-};
-
-/// The @execution function type attribute.
-class ExecutionTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Execution> {
-  SourceLoc BehaviorLoc;
-
-public:
-  ExecutionTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
-                    Located<ExecutionKind> behavior)
-      : SimpleTypeAttr(atLoc, kwLoc, parensRange), BehaviorLoc(behavior.Loc) {
-    Bits.ExecutionTypeAttr.Behavior = uint8_t(behavior.Item);
-  }
-
-  ExecutionKind getBehavior() const {
-    return ExecutionKind(Bits.ExecutionTypeAttr.Behavior);
-  }
-
-  SourceLoc getBehaviorLoc() const {
-    return BehaviorLoc;
-  }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

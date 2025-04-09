@@ -12,7 +12,7 @@
 // MARK: Declarations //
 ////////////////////////
 
-@execution(caller)
+nonisolated(nonsending)
 func globalCallerFunc() async -> () {}
 
 @concurrent
@@ -25,13 +25,13 @@ class SendableKlass : @unchecked Sendable {
   init() {}
 }
 
-@execution(caller)
+nonisolated(nonsending)
 func globalCallerFuncSendableKlass(_ x: SendableKlass) async -> () {}
 
 @concurrent
 func globalConcurrentFuncSendableKlass(_ x: SendableKlass) async -> () {}
 
-@execution(caller)
+nonisolated(nonsending)
 func globalCallerFuncSendableKlass(_ x: SendableKlass) async -> SendableKlass { fatalError() }
 
 @concurrent
@@ -48,7 +48,7 @@ func globalConcurrentFuncSendableKlass(_ x: SendableKlass) async -> SendableKlas
 // CHECK:   [[THUNK:%.*]] = function_ref @$sScA_pSgIegHg_IegH_TR : $@convention(thin) @async (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> ()
 // CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen33testCallerToConcurrentNonIsolatedyyyyYaYCcYaF'
-public func testCallerToConcurrentNonIsolated(_ x: @escaping @execution(caller) () async -> ()) async {
+public func testCallerToConcurrentNonIsolated(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
   let y: @concurrent () async -> () = x
   await y()
 }
@@ -69,7 +69,7 @@ public func testCallerToConcurrentNonIsolated(_ x: @escaping @execution(caller) 
 // CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen31testCallerToConcurrentMainActoryyyyYaYCcYaF'
 @MainActor
-public func testCallerToConcurrentMainActor(_ x: @escaping @execution(caller) () async -> ()) async {
+public func testCallerToConcurrentMainActor(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
   let y: @concurrent () async -> () = x
   await y()
 }
@@ -81,7 +81,7 @@ public func testCallerToConcurrentMainActor(_ x: @escaping @execution(caller) ()
 // CHECK:   partial_apply [callee_guaranteed] [[THUNK]]([[FUNC_COPY]])
 // CHECK: } // end sil function '$s21attr_execution_silgen33testConcurrentToCallerNonIsolatedyyyyYacYaF'
 public func testConcurrentToCallerNonIsolated(_ x: @escaping @concurrent () async -> ()) async {
-  let y: @execution(caller) () async -> () = x
+  let y: nonisolated(nonsending) () async -> () = x
   await y()
 }
 
@@ -101,7 +101,7 @@ public func testConcurrentToCallerNonIsolated(_ x: @escaping @concurrent () asyn
 // CHECK: } // end sil function '$s21attr_execution_silgen42testConcurrentToCallerNonIsolatedMainActoryyyyYacYaF'
 @MainActor
 public func testConcurrentToCallerNonIsolatedMainActor(_ x: @escaping @concurrent () async -> ()) async {
-  let y: @execution(caller) () async -> () = x
+  let y: nonisolated(nonsending) () async -> () = x
   await y()
 }
 
@@ -142,10 +142,10 @@ public func testConcurrentToConcurrent(_ x: @escaping @concurrent () async -> ()
 // CHECK: } // end sil function '$s21attr_execution_silgen012testCallerToE0yyyyYaYCcYaF'
 //
 // z has a round trip issue.
-public func testCallerToCaller(_ x: @escaping @execution(caller) () async -> ()) async {
-  let y: @execution(caller) () async -> () = x
+public func testCallerToCaller(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
+  let y: nonisolated(nonsending) () async -> () = x
   await y()
-  let z: @execution(caller) () async -> () = globalCallerFunc
+  let z: nonisolated(nonsending) () async -> () = globalCallerFunc
   await z()
 }
 
@@ -162,9 +162,9 @@ public func testCallerToCaller(_ x: @escaping @execution(caller) () async -> ())
 // CHECK:   [[Y2_B_C_B:%.*]] = begin_borrow [[Y2_B_C]]
 // CHECK:   apply [[Y2_B_C_B]]([[ACTOR]])
 // CHECK: } // end sil function '$s21attr_execution_silgen24testCallerLocalVariablesyyyyYaYCcYaF'
-public func testCallerLocalVariables(_ x: @escaping @execution(caller) () async -> ()) async {
-  let y: @execution(caller) () async -> () = x
-  let y2: @execution(caller) () async -> () = y
+public func testCallerLocalVariables(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
+  let y: nonisolated(nonsending) () async -> () = x
+  let y2: nonisolated(nonsending) () async -> () = y
   await y2()
 }
 
@@ -196,9 +196,9 @@ public func testConcurrentLocalVariables(_ x: @escaping @concurrent () async -> 
 // CHECK:   [[THUNK_2:%.*]] = function_ref @$sIegH_ScA_pSgIegHg_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @async @callee_guaranteed () -> ()) -> ()
 // CHECK:   [[PA_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK_2]]([[Y_B_C]])
 // CHECK: } // end sil function '$s21attr_execution_silgen34testCallerConcurrentLocalVariablesyyyyYaYCcYaF'
-public func testCallerConcurrentLocalVariables(_ x: @escaping @execution(caller) () async -> ()) async {
+public func testCallerConcurrentLocalVariables(_ x: nonisolated(nonsending) @escaping () async -> ()) async {
   let y: @concurrent () async -> () = x
-  let y2: @execution(caller) () async -> () = y
+  let y2: nonisolated(nonsending) () async -> () = y
   await y2()
 }
 
@@ -214,7 +214,7 @@ public func testCallerConcurrentLocalVariables(_ x: @escaping @execution(caller)
 // CHECK:   [[PA_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK_2]]([[Y_B_C]])
 // CHECK: } // end sil function '$s21attr_execution_silgen34testConcurrentCallerLocalVariablesyyyyYacYaF'
 public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () async -> ()) async {
-  let y: @execution(caller) () async -> () = x
+  let y: nonisolated(nonsending) () async -> () = x
   let y2: @concurrent () async -> () = y
   await y2()
 }
@@ -262,7 +262,7 @@ public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () asy
 
 // CHECK: } // end sil function '$s21attr_execution_silgen22globalActorConversionsyyyyYac_yyYaYCctYaF'
 func globalActorConversions(_ x: @escaping @concurrent () async -> (),
-                            _ y: @escaping @execution(caller) () async -> ()) async {
+                            _ y: nonisolated(nonsending) @escaping () async -> ()) async {
   let v1: @MainActor () async -> Void = globalCallerFunc
   await v1()
   let v2: @MainActor () async -> Void = globalConcurrentFunc
@@ -321,7 +321,7 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 
 // CHECK: } // end sil function '$s21attr_execution_silgen23globalActorConversions2yyyAA13SendableKlassCYac_yADYaYCctYaF'
 func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async -> (),
-                             _ y: @escaping @execution(caller) (SendableKlass) async -> ()) async {
+                             _ y: nonisolated(nonsending) @escaping (SendableKlass) async -> ()) async {
   let v1: @MainActor (SendableKlass) async -> Void = globalCallerFuncSendableKlass
   await v1(SendableKlass())
   let v2: @MainActor (SendableKlass) async -> Void = globalConcurrentFuncSendableKlass
@@ -382,7 +382,7 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 // CHECK:  [[V5:%.*]] = move_value [lexical] [var_decl] [[PA]]
 // CHECK: } // end sil function '$s21attr_execution_silgen23globalActorConversions3yyAA13SendableKlassCADYac_A2DYaYCctYaF'
 func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async -> SendableKlass,
-                             _ y: @escaping @execution(caller) (SendableKlass) async -> SendableKlass) async {
+                             _ y: nonisolated(nonsending) @escaping (SendableKlass) async -> SendableKlass) async {
   let v1: @MainActor (SendableKlass) async -> SendableKlass = globalCallerFuncSendableKlass
   _ = await v1(SendableKlass())
   let v2: @MainActor (SendableKlass) async -> SendableKlass = globalConcurrentFuncSendableKlass
@@ -421,8 +421,8 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
 func conversionsFromSyncToAsync(_ x: @escaping @Sendable (NonSendableKlass) -> Void,
                                 _ y: @escaping @MainActor @Sendable (SendableKlass) -> Void,
                                 _ z: @escaping @MainActor @Sendable (NonSendableKlass) -> Void) async {
-  let _: @execution(caller) (NonSendableKlass) async -> Void = x
-  let _: @execution(caller) (SendableKlass) async -> Void = y
+  let _: nonisolated(nonsending) (NonSendableKlass) async -> Void = x
+  let _: nonisolated(nonsending) (SendableKlass) async -> Void = y
   let _: @concurrent (SendableKlass) async -> Void = y
   let _: @concurrent (NonSendableKlass) async -> Void = z
 }

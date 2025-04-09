@@ -4245,17 +4245,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   };
 
-  if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
-    checkExecutionBehaviorAttribute(executionAttr);
-
-    if (!repr->isInvalid()) {
-      switch (executionAttr->getBehavior()) {
-      case ExecutionKind::Caller:
-        isolation = FunctionTypeIsolation::forNonIsolatedCaller();
-        break;
-      }
-    }
-  } else if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+  if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
     checkExecutionBehaviorAttribute(concurrentAttr);
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();

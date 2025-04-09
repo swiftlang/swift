@@ -1414,10 +1414,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
-  // `@execution(...)` and `@concurrent` attributes are only
-  // valid on asynchronous function types.
-  if (expr->getAttrs().hasAttribute<ExecutionAttr>() ||
-      expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
+  // `@concurrent` attribute is only valid on asynchronous function types.
+  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
     async = true;
   }
 

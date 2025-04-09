@@ -2629,14 +2629,6 @@ static CanSILFunctionType getSILFunctionType(
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
         actorIsolation = ActorIsolation::forNonisolated(false);
       } else if (auto *decl = constant->getAbstractFunctionDecl()) {
-        if (auto behavior = decl->getExecutionBehavior()) {
-          switch (behavior.value()) {
-          case ExecutionKind::Caller:
-            actorIsolation = ActorIsolation::forCallerIsolationInheriting();
-            break;
-          }
-        }
-
         if (auto *nonisolatedAttr =
                 decl->getAttrs().getAttribute<NonisolatedAttr>()) {
           if (nonisolatedAttr->isNonSending())

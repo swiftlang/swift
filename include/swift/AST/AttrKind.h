@@ -130,14 +130,6 @@ enum class ExternKind: uint8_t {
 enum : unsigned { NumExternKindBits =
   countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
 
-enum class ExecutionKind : uint8_t {
-  Caller = 0,
-  Last_ExecutionKind = Caller
-};
-
-enum : unsigned { NumExecutionKindBits =
-  countBitsUsed(static_cast<unsigned>(ExecutionKind::Last_ExecutionKind)) };
-
 enum class NonIsolatedModifier : uint8_t {
   None = 0,
   Unsafe,
