@@ -1,8 +1,8 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -print-diagnostic-groups -I %S/Inputs/custom-modules
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -print-diagnostic-groups -parse-as-library -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
 
 import ObjcAsync
 
@@ -286,7 +286,7 @@ func asyncContext(t: HandlerTest) async {
   // expected-warning@+1{{consider using asynchronous alternative function}}
   defaultedParamsEnd4(arg: 1) { }
   // expected-warning@+2{{consider using asynchronous alternative function}}
-  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated [DeprecatedDeclaration]}}
+  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated}}{{documentation-file=deprecated-declaration}}
   manyAttrs() { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
   macOSOnly() { }

@@ -558,6 +558,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DropDeinitInst:
@@ -1019,7 +1020,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::WitnessMethod: {
       auto conformance =
           as.getOrigCalleeType()->getWitnessMethodConformanceOrInvalid();
-      if (conformance.getRequirement()->requiresClass()) {
+      if (conformance.getProtocol()->requiresClass()) {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
       } else {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;

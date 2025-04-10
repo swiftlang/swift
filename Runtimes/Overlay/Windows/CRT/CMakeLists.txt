@@ -13,6 +13,9 @@ target_compile_definitions(swiftCRT PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
 target_compile_options(swiftCRT PRIVATE
   "SHELL:-Xcc -D_USE_MATH_DEFINES")
+target_link_libraries(swiftCRT PRIVATE
+  ClangModules
+  swiftCore)
 
 install(TARGETS swiftCRT
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"

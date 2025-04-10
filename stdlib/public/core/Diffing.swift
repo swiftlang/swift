@@ -355,7 +355,7 @@ private func _myers<C,D>(
   ) rethrows -> R {
     if let result = try values.withContiguousStorageIfAvailable(body) { return result }
     let array = ContiguousArray(values)
-    return try array.withUnsafeBufferPointer(body)
+    return try unsafe array.withUnsafeBufferPointer(body)
   }
 
   return unsafe _withContiguousStorage(for: old) { a in

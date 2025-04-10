@@ -2105,6 +2105,12 @@ FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC, AlwaysAvailable,
          NO_ATTRS,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
+FUNCTION(coroFrameAllocStub, Swift, swift_coroFrameAllocStub, C_CC,
+         AlwaysAvailable, RETURNS(Int8PtrTy),
+         ARGS(SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
 
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, BlocksRuntime, _Block_copy, C_CC, AlwaysAvailable,
@@ -3006,36 +3012,6 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
          ARGS(PtrTy, SizeTy, Int32Ty, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::NoEffect),
-         UNKNOWN_MEMEFFECTS)
-
-// void *swift_coro_alloc(CoroAllocator *, size_t size);
-FUNCTION(CoroAlloc,
-         _Concurrency, swift_coro_alloc, SwiftCC,
-         CoroutineAccessorsAvailability,
-         RETURNS(Int8PtrTy),
-         ARGS(CoroAllocatorPtrTy, SizeTy),
-         NO_ATTRS,
-         EFFECT(RuntimeEffect::Allocating, RuntimeEffect::Concurrency),
-         UNKNOWN_MEMEFFECTS)
-
-// void swift_coro_dealloc(CoroAllocator *, void *ptr);
-FUNCTION(CoroDealloc,
-         _Concurrency, swift_coro_dealloc, SwiftCC,
-         CoroutineAccessorsAvailability,
-         RETURNS(VoidTy),
-         ARGS(CoroAllocatorPtrTy, Int8PtrTy),
-         NO_ATTRS,
-         EFFECT(RuntimeEffect::Deallocating, RuntimeEffect::Concurrency),
-         UNKNOWN_MEMEFFECTS)
-
-// const CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
-FUNCTION(CoroGetGlobalAllocator, 
-         _Concurrency, swift_coro_getGlobalAllocator, SwiftCC, 
-         CoroutineAccessorsAvailability, 
-         RETURNS(CoroAllocatorPtrTy), 
-         ARGS(CoroAllocatorFlagsTy), 
-         ATTRS(NoUnwind, WillReturn), 
-         EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
 
 #undef RETURNS

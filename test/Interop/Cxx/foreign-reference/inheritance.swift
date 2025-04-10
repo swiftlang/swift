@@ -15,34 +15,41 @@ func cast(_ s: SubT) -> BaseT {
   return cxxCast(s)
 }
 
-var TemplatingTestSuite = TestSuite("Foreign references work with templates")
+var InheritanceTestSuite = TestSuite("Inheritance of foreign reference types")
 
-TemplatingTestSuite.test("SubT") {
+InheritanceTestSuite.test("Templated cast to base") {
   let s: SubT = SubT.getSubT()
   expectFalse(s.isBase)
   let sc: BaseT = cast(s)
   expectFalse(sc.isBase)
   let sx: BaseT = cxxCast(s)  // should instantiate I to SubT and O to BaseT
-  expectFalse(sc.isBase)
+  expectFalse(sx.isBase)
+  let sy: BaseT = Foo.cxxCast(s)  // should instantiate I to SubT and O to BaseT
+  expectFalse(sy.isBase)
 }
 
-TemplatingTestSuite.test("BaseT") {
+InheritanceTestSuite.test("Templated cast to itself") {
   let b: BaseT = BaseT.getBaseT()
   expectTrue(b.isBase)
   let bc: BaseT = cxxCast(b)  // should instantiate I and O both to BaseT
   expectTrue(bc.isBase)
 }
 
-TemplatingTestSuite.test("DerivedOutOfOrder") {
+InheritanceTestSuite.test("DerivedOutOfOrder") {
   let d = DerivedOutOfOrder.getInstance()
   expectEqual(123, d.baseField)
   expectEqual(456, d.derivedField)
   expectEqual(789, d.leafField)
 }
 
-var FrtInheritanceTestSuite = TestSuite("Foreign references in C++ inheritance")
+InheritanceTestSuite.test("DerivedUsesBaseTailPadding") {
+  let d = DerivedUsesBaseTailPadding.getInstance()
+  expectEqual(123, d.field8)
+  expectEqual(456, d.field4)
+  expectEqual(789, d.field2)
+}
 
-FrtInheritanceTestSuite.test("ParentChild") {
+InheritanceTestSuite.test("ParentChild") {
   let immortalRefType = ImmortalRefereceExample.returnImmortalRefType()
   expectTrue(
     type(of: immortalRefType) is AnyObject.Type,

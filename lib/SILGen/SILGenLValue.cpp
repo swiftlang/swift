@@ -245,8 +245,9 @@ static LValueTypeData getPhysicalStorageTypeData(TypeExpansionContext context,
 }
 
 static bool shouldUseUnsafeEnforcement(VarDecl *var) {
-  if (var->isDebuggerVar())
+  if (var->isDebuggerVar()) {
     return true;
+  }
 
   return false;
 }
@@ -277,6 +278,22 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   } else if (hasExclusivityAttr(var, ExclusivityAttr::Checked)) {
     return SILAccessEnforcement::Dynamic;
   }
+
+  // Access markers are especially load-bearing for the move-only checker,
+  // so we also emit `begin_access` markers for cases where storage
+  // is move-only.
+  // TODO: It seems useful to do this for all unchecked declarations, since
+  // access scopes are useful semantic information.
+  if (var->getTypeInContext()->isNoncopyable()) {
+    return SILAccessEnforcement::Unsafe;
+  }
+  if (auto param = dyn_cast<ParamDecl>(var)) {
+    if (param->getSpecifier() == ParamSpecifier::Borrowing
+        || param->getSpecifier() == ParamSpecifier::Consuming) {
+      return SILAccessEnforcement::Unsafe;
+    }
+  }
+  
   return std::nullopt;
 }
 
@@ -855,7 +872,7 @@ namespace {
                                                                 checkKind);
       }
 
-      return ManagedValue::forLValue(result);
+      return ManagedValue::forFormalAccessedAddress(result, getAccessKind());
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
@@ -884,7 +901,7 @@ namespace {
       auto Res = SGF.B.createTupleElementAddr(loc, base.getValue(),
                                               ElementIndex,
                                               getTypeOfRValue().getAddressType());
-      return ManagedValue::forLValue(Res);
+      return ManagedValue::forFormalAccessedAddress(Res, getAccessKind());
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
@@ -913,9 +930,11 @@ namespace {
 
       // If we have a moveonlywrapped type, unwrap it. The reason why is that
       // any fields that we access we want to be treated as copyable.
-      if (base.getType().isMoveOnlyWrapped())
-        base = ManagedValue::forLValue(
-            SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, base.getValue()));
+      if (base.getType().isMoveOnlyWrapped()) {
+        base = ManagedValue::forFormalAccessedAddress(
+            SGF.B.createMoveOnlyWrapperToCopyableAddr(loc, base.getValue()),
+            getAccessKind());
+      }
 
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
@@ -923,12 +942,14 @@ namespace {
 
       if (!Field->getPointerAuthQualifier().isPresent() ||
           !SGF.getOptions().EnableImportPtrauthFieldFunctionPointers) {
-        return ManagedValue::forLValue(Res);
+        return ManagedValue::forFormalAccessedAddress(Res,
+                                                      getAccessKind());
       }
       auto beginAccess =
           enterAccessScope(SGF, loc, base, Res, getTypeData(), getAccessKind(),
                            SILAccessEnforcement::Signed, takeActorIsolation());
-      return ManagedValue::forLValue(beginAccess);
+      return ManagedValue::forFormalAccessedAddress(beginAccess,
+                                                    getAccessKind());
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
@@ -1028,7 +1049,7 @@ namespace {
         llvm_unreachable("Bad existential representation for address-only type");
       }
 
-      return ManagedValue::forLValue(addr);
+      return ManagedValue::forFormalAccessedAddress(addr, getAccessKind());
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
@@ -1180,7 +1201,7 @@ namespace {
                         NoConsumeOrAssign
                   : MarkUnresolvedNonCopyableValueInst::CheckKind::
                         AssignableButNotConsumable);
-          return ManagedValue::forLValue(addr);
+          return ManagedValue::forFormalAccessedAddress(addr, getAccessKind());
         }
       }
 

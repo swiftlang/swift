@@ -1723,3 +1723,44 @@ class InferIsolationViaOverride: SuperWithIsolatedMethod {
     // expected-error@-1 {{call to main actor-isolated instance method 'isolatedMethod()' in a synchronous nonisolated context}}
   }
 }
+
+struct ReferenceSelfDotMethods {
+  @MainActor
+  func mainActorAffinedFunction() {}
+
+  nonisolated
+  private func testCurry() -> (Self) -> (@MainActor () -> Void) {
+    let functionRef = Self.mainActorAffinedFunction
+    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
+    return functionRef // expected-warning {{converting non-sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+  }
+
+  @MainActor
+  private func callOnMainActorOk() {
+    let mainActorAffinedClosure = testCurry()(self)
+    mainActorAffinedClosure()
+  }
+
+  nonisolated
+  private func nonisolatedCallErrors() {
+    let mainActorAffinedClosure = testCurry()(self)
+    // expected-note@-1 {{calls to let 'mainActorAffinedClosure' from outside of its actor context are implicitly asynchronous}}
+    mainActorAffinedClosure()
+    // expected-error@-1 {{call to main actor-isolated let 'mainActorAffinedClosure' in a synchronous nonisolated context}}
+  }
+}
+
+actor UserDefinedActorSelfDotMethod {
+  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+
+  // Unfortunately we can't express the desired isolation of this returned closure statically to
+  // be able to call it on the desired actor. This may be possible with the acceptance of
+  // https://forums.swift.org/t/closure-isolation-control/70378 but I think we need more expressivity
+  // in the type system to express this sort of curry.
+  nonisolated
+  private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
+    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
+    // error message changes with InferSendabaleFromCaptures - see actor_isolation_swift6.swift
+    return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
+  }
+}

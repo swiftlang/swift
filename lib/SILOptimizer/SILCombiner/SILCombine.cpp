@@ -707,6 +707,8 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   }
 }
 
+// cond_fail removal based on cond_fail message and containing function name.
+//
 // The standard library uses _precondition calls which have a message argument.
 //
 // Allow disabling the generated cond_fail by these message arguments.
@@ -728,6 +730,10 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
 //
 // The optimizer will remove these cond_fails if the swift frontend is invoked
 // with -Xllvm -cond-fail-config-file=/path/to/disable_cond_fails.
+//
+// Additionally, also interpret the lines as function names and check whether
+// the current cond_fail is contained in a listed function when considering
+// whether to remove it.
 static llvm::cl::opt<std::string> CondFailConfigFile(
     "cond-fail-config-file", llvm::cl::init(""),
     llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
@@ -750,6 +756,13 @@ bool SILCombiner::shouldRemoveCondFail(CondFailInst &CFI) {
     }
     fs.close();
   }
+  // Check whether the cond_fail's containing function was listed in the config
+  // file.
+  if (CondFailsToRemove.find(CFI.getFunction()->getName().str()) !=
+      CondFailsToRemove.end())
+    return true;
+
+  // Check whether the cond_fail's message was listed in the config file.
   auto message = CFI.getMessage();
   return CondFailsToRemove.find(message.str()) != CondFailsToRemove.end();
 }

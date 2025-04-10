@@ -34,20 +34,20 @@
 // CHECK-NOT: error:
 
 // CHECK-SWIFT-5-NOT: warning:
-// CHECK-SWIFT-5: warning: '-disable-experimental-feature' argument 'DynamicActorIsolation:adoption' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: '-disable-experimental-feature' argument 'DynamicActorIsolation:invalid8' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: '-disable-experimental-feature' argument 'DynamicActorIsolation:invalid7' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:adoption' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:invalid6' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:invalid5' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid4' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid3' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
-// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid2' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
+// CHECK-SWIFT-5: warning: '-disable-experimental-feature' argument 'DynamicActorIsolation:adoption' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: '-disable-experimental-feature' argument 'DynamicActorIsolation:invalid8' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: '-disable-experimental-feature' argument 'DynamicActorIsolation:invalid7' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:adoption' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:invalid6' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:invalid5' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid4' is not a recognized mode for feature 'DynamicActorIsolation' [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid3' is not a recognized mode for feature 'DynamicActorIsolation' [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid2' is not a recognized mode for feature 'DynamicActorIsolation' [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'DynamicActorIsolation' [#StrictLanguageFeatures]{{$}}
 // CHECK-SWIFT-5-NOT: warning:
 
 // CHECK-SWIFT-6-NOT: warning:

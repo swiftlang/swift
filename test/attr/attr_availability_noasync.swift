@@ -54,6 +54,17 @@ func asyncFunc() async {
 func unavailableAsyncFunc() async {
 }
 
+do {
+  struct S {
+    @available(*, noasync)
+    subscript(_: Int) -> Int {
+      get async {}
+      // expected-error@+1 {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
+      set {}
+    }
+  }
+}
+
 @available(SwiftStdlib 5.5, *)
 protocol BadSyncable {
     // expected-error@+2{{asynchronous property 'isSyncd' must be available from asynchronous contexts}}

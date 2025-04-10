@@ -74,7 +74,12 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void * _Nonnull addr);
-  
+
+SWIFT_RUNTIME_STDLIB_API
+const void * _Nullable
+_swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t * _Nonnull bytes,
+                                                _swift_shims_CFIndex len);
+
 #endif // __OBJC2__
 
 #ifdef __cplusplus

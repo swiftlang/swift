@@ -1008,14 +1008,14 @@ Generate a backtrace for the parent process.
           let formatter = backtraceFormatter()
           switch thread.backtrace {
             case let .raw(backtrace):
-              if let frame = backtrace.frames.unsafeFirst {
+              if let frame = backtrace.frames.consumingFirst {
                 let formatted = formatter.format(frame: frame)
                 writeln("\(formatted)")
               }
             case let .symbolicated(backtrace):
               if let frame = backtrace.frames.drop(while: {
                 $0.isSwiftRuntimeFailure
-              }).unsafeFirst {
+              }).consumingFirst {
                 let formatted = formatter.format(frame: frame)
                 writeln("\(formatted)")
               }
@@ -1087,7 +1087,7 @@ Generate a backtrace for the parent process.
 
             switch thread.backtrace {
               case let .raw(backtrace):
-                if let frame = backtrace.frames.unsafeFirst {
+                if let frame = backtrace.frames.consumingFirst {
                   rows += formatter.formatRows(
                     frame: frame
                   ).map{ row in
@@ -1103,7 +1103,7 @@ Generate a backtrace for the parent process.
               case let .symbolicated(backtrace):
                 if let frame = backtrace.frames.drop(while: {
                   $0.isSwiftRuntimeFailure
-                }).unsafeFirst {
+                }).consumingFirst {
                   rows += formatter.formatRows(
                     frame: frame
                   ).map{ row in

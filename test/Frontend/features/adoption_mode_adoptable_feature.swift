@@ -25,10 +25,10 @@
 // CHECK-NOT: error:
 
 // CHECK-SWIFT-5-NOT: warning:
-// CHECK-SWIFT-5: warning: '-disable-experimental-feature' argument 'ExistentialAny:adoption' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'ExistentialAny:adoption' cannot specify a mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid2' is not a recognized mode for feature 'ExistentialAny'; did you mean 'adoption'?{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'ExistentialAny'; did you mean 'adoption'?{{$}}
+// CHECK-SWIFT-5: warning: '-disable-experimental-feature' argument 'ExistentialAny:adoption' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'ExistentialAny:adoption' cannot specify a mode [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid2' is not a recognized mode for feature 'ExistentialAny'; did you mean 'adoption'? [#StrictLanguageFeatures]{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'ExistentialAny'; did you mean 'adoption'? [#StrictLanguageFeatures]{{$}}
 // CHECK-SWIFT-5-NOT: warning:
 
 // CHECK-SWIFT-7-NOT: warning:

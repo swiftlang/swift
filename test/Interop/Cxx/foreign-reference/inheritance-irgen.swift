@@ -13,6 +13,11 @@ blackHole(x.baseField)
 blackHole(x.derivedField)
 blackHole(x.leafField)
 
+let y = DerivedUsesBaseTailPadding.getInstance()
+
+blackHole(y.field2)
+blackHole(y.field4)
+
 // CHECK: call ptr @{{.*}}returnValueType{{.*}}
 // CHECK-NOT: call void @{{.*}}RCRetain@{{.*}}ValueType(ptr @{{.*}})
 var x1 = BasicInheritanceExample.returnValueType()

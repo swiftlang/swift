@@ -654,6 +654,54 @@ using TargetRelativeProtocolRequirementPointer =
 using RelativeProtocolRequirementPointer =
   TargetRelativeProtocolRequirementPointer<InProcess>;
 
+/// An entry in the default override table, consisting of one of our methods
+/// `replacement` together with (1) another of our methods `original` which
+/// might have been overridden by a subclass and (2) an implementation of
+/// `replacement` to be used by such a subclass if it does not provide its own
+/// implementation.
+template <typename Runtime>
+struct TargetMethodDefaultOverrideDescriptor {
+  /// The method which replaced the original at call-sites.
+  TargetRelativeMethodDescriptorPointer<Runtime> Replacement;
+
+  /// The method originally called at such call sites.
+  TargetRelativeMethodDescriptorPointer<Runtime> Original;
+
+  union {
+    TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> CoroImpl;
+  };
+
+  bool isData() const {
+    auto *replacement = Replacement.get();
+    assert(replacement && "no replacement");
+    return replacement->Flags.isData();
+  }
+
+  void *getImpl() const {
+    auto *replacement = Replacement.get();
+    assert(replacement && "no replacement");
+    if (replacement->Flags.isAsync()) {
+      return AsyncImpl.get();
+    } else if (replacement->Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
+    } else {
+      return Impl.get();
+    }
+  }
+};
+
+/// Header for a table of default override descriptors.  Such a table is a
+/// variable-sized structure whose length is stored in this header which is
+/// followed by that many TargetMethodDefaultOverrideDescriptors.
+template <typename Runtime>
+struct TargetMethodDefaultOverrideTableHeader {
+  /// The number of TargetMethodDefaultOverrideDescriptor records following this
+  /// header in the class's nominal type descriptor.
+  uint32_t NumEntries;
+};
+
 /// An entry in the method override table, referencing a method from one of our
 /// ancestor classes, together with an implementation.
 template <typename Runtime>
@@ -4205,9 +4253,11 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
                               TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
                               InvertibleProtocolSet,
-                              TargetSingletonMetadataPointer<Runtime>> {
+                              TargetSingletonMetadataPointer<Runtime>,
+                              TargetMethodDefaultOverrideTableHeader<Runtime>,
+                              TargetMethodDefaultOverrideDescriptor<Runtime>> {
 private:
-  using TrailingGenericContextObjects =
+  using TrailingGenericContextObjects = 
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                          TargetTypeGenericContextDescriptorHeader,
                                          TargetResilientSuperclass<Runtime>,
@@ -4223,7 +4273,9 @@ private:
                                          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
                                          InvertibleProtocolSet,
-                                         TargetSingletonMetadataPointer<Runtime>>;
+                                         TargetSingletonMetadataPointer<Runtime>,
+                                         TargetMethodDefaultOverrideTableHeader<Runtime>,
+                                         TargetMethodDefaultOverrideDescriptor<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4254,6 +4306,10 @@ public:
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
   using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
+  using DefaultOverrideTableHeader =
+      TargetMethodDefaultOverrideTableHeader<Runtime>;
+  using DefaultOverrideDescriptor =
+      TargetMethodDefaultOverrideDescriptor<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -4399,6 +4455,16 @@ private:
     return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
+  size_t numTrailingObjects(OverloadToken<DefaultOverrideTableHeader>) const {
+    return hasDefaultOverrideTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DefaultOverrideDescriptor>) const {
+    if (!hasDefaultOverrideTable())
+      return 0;
+    return getDefaultOverrideTable()->NumEntries;
+  }
+
 public:
   const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
   getResilientSuperclass() const {
@@ -4428,6 +4494,10 @@ public:
     }
 
     return FieldOffsetVectorOffset;
+  }
+
+  bool hasDefaultOverrideTable() const {
+    return getTypeContextDescriptorFlags().class_hasDefaultOverrideTable();
   }
 
   bool isActor() const {
@@ -4474,6 +4544,20 @@ public:
       return {};
     return {this->template getTrailingObjects<MethodOverrideDescriptor>(),
             numTrailingObjects(OverloadToken<MethodOverrideDescriptor>{})};
+  }
+
+  const DefaultOverrideTableHeader *getDefaultOverrideTable() const {
+    if (!hasDefaultOverrideTable())
+      return nullptr;
+    return this->template getTrailingObjects<DefaultOverrideTableHeader>();
+  }
+
+  llvm::ArrayRef<DefaultOverrideDescriptor> getDefaultOverrideDescriptors()
+      const {
+    if (!hasDefaultOverrideTable())
+      return {};
+    return {this->template getTrailingObjects<DefaultOverrideDescriptor>(),
+            numTrailingObjects(OverloadToken<DefaultOverrideDescriptor>{})};
   }
 
   /// Return the bounds of this class's metadata.

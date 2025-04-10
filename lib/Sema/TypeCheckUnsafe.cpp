@@ -33,8 +33,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
   switch (use.getKind()) {
   case UnsafeUse::Override: {
     auto override = use.getDecl();
-    override->diagnose(
-        diag::override_safe_with_unsafe, override->getDescriptiveKind());
+    override->diagnose(diag::override_safe_with_unsafe, override);
     if (auto overridingClass = override->getDeclContext()->getSelfClassDecl()) {
       overridingClass->diagnose(
           diag::make_subclass_unsafe, overridingClass->getName()
@@ -47,9 +46,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 
   case UnsafeUse::Witness: {
     auto witness = cast<ValueDecl>(use.getDecl());
-    witness->diagnose(diag::note_witness_unsafe,
-                      witness->getDescriptiveKind(),
-                      witness->getName());
+    witness->diagnose(diag::note_witness_unsafe, witness);
     return;
   }
 
@@ -69,12 +66,12 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 
   case UnsafeUse::UnsafeConformance: {
     auto conformance = use.getConformance();
-    ASTContext &ctx = conformance.getRequirement()->getASTContext();
+    ASTContext &ctx = conformance.getProtocol()->getASTContext();
     ctx.Diags.diagnose(
         use.getLocation(),
         diag::note_use_of_unsafe_conformance_is_unsafe,
         use.getType(),
-        conformance.getRequirement());
+        conformance.getProtocol());
     return;
   }
 
@@ -208,8 +205,12 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
   auto subs = declRef.getSubstitutions();
   {
     auto type = decl->getInterfaceType();
-    if (subs)
-      type = type.subst(subs);
+    if (subs) {
+      if (auto *genericFnType = type->getAs<GenericFunctionType>())
+        type = genericFnType->substGenericArgs(subs);
+      else
+        type = type.subst(subs);
+    }
 
     bool shouldReturnTrue = false;
     diagnoseUnsafeType(ctx, loc, type, [&](Type unsafeType) {
@@ -302,7 +303,7 @@ bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
     if (conformance.isInvalid())
       continue;
 
-    ASTContext &ctx = conformance.getRequirement()->getASTContext();
+    ASTContext &ctx = conformance.getProtocol()->getASTContext();
     if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
       return false;
 

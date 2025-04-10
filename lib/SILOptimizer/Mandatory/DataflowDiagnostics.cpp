@@ -69,10 +69,9 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
           Context.Diags.diagnose(expr->getStartLoc(),
                                  diag::missing_return_closure, ResTy);
         } else {
-          auto *DC = FLoc.getAsDeclContext();
-          assert(DC && DC->getAsDecl() && "not a declaration?");
+          auto *FD = FLoc.castToASTNode<AbstractFunctionDecl>();
           Context.Diags.diagnose(expr->getStartLoc(), diag::missing_return_decl,
-                                 ResTy, DC->getAsDecl()->getDescriptiveKind());
+                                 ResTy, FD);
         }
         Context.Diags
             .diagnose(expr->getStartLoc(), diag::missing_return_last_expr_note)
@@ -89,12 +88,10 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
                                : diag::missing_return_closure;
     diagnose(Context, L.getEndSourceLoc(), diagID, ResTy);
   } else {
-    auto *DC = FLoc.getAsDeclContext();
-    assert(DC && DC->getAsDecl() && "not a declaration?");
+    auto *FD = FLoc.castToASTNode<AbstractFunctionDecl>();
     auto diagID = isNoReturnFn ? diag::missing_never_call_decl
                                : diag::missing_return_decl;
-    diagnose(Context, L.getEndSourceLoc(), diagID, ResTy,
-             DC->getAsDecl()->getDescriptiveKind());
+    diagnose(Context, L.getEndSourceLoc(), diagID, ResTy, FD);
   }
 }
 

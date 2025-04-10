@@ -36,6 +36,29 @@ private func log(_ message: @autoclosure () -> String) {
 // Local variables are accessed in one of these ways.
 //
 // Note: @in is only immutable up to when it is destroyed, so still requires a local live range.
+//
+// A .dependenceSource access creates a new dependent value that keeps this local alive.
+//
+//     %local = alloc_stack // this local
+//     %md = mark_dependence %val on %local
+//     mark_dependence_addr %adr on %local
+//
+// The effect of .dependenceSource on reachability is like a load of this local. The dependent value depends on any
+// value in this local that reaches this point.
+//
+// A .dependenceDest access is the point where another value becomes dependent on this local:
+//
+//     %local = alloc_stack // this local
+//     %md = mark_dependence %local on %val
+//     mark_dependence_addr %local on %val
+//
+// The effect of .dependenceDest on reachability is like a store of this local. All uses of this local reachable from
+// this point are uses of the dependence base.
+//
+// Note that the same mark_dependence_addr often involves two locals:
+//
+//     mark_dependence_addr %localDest on %localSource
+//
 struct LocalVariableAccess: CustomStringConvertible {
   enum Kind {
     case incomingArgument // @in, @inout, @inout_aliasable
@@ -43,7 +66,8 @@ struct LocalVariableAccess: CustomStringConvertible {
     case inoutYield       // indirect yield from this accessor
     case beginAccess // Reading or reassigning a 'var'
     case load        // Reading a 'let'. Returning 'var' from an initializer.
-    case dependence  // A mark_dependence after an apply with an indirect result. No effect.
+    case dependenceSource // A value/address depends on this local here (like a load)
+    case dependenceDest  // This local depends on another value/address here (like a store)
     case store       // 'var' initialization and destruction
     case apply       // indirect arguments
     case escape      // alloc_box captures
@@ -77,7 +101,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       case .`init`, .modify:
         return true
       }
-    case .load, .dependence:
+    case .load, .dependenceSource, .dependenceDest:
       return false
     case .incomingArgument, .outgoingArgument, .store, .inoutYield:
       return true
@@ -116,8 +140,10 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "beginAccess"
     case .load:
       str += "load"
-    case .dependence:
-      str += "dependence"
+    case .dependenceSource:
+      str += "dependenceSource"
+    case .dependenceDest:
+      str += "dependenceDest"
     case .store:
       str += "store"
     case .apply:
@@ -152,7 +178,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       case .`init`, .modify:
         break // lazily compute full assignment
       }
-    case .load, .dependence:
+      case .load, .dependenceSource, .dependenceDest:
       self._isFullyAssigned = false
     case .store:
       if let store = localAccess.instruction as? StoringInstruction {
@@ -365,7 +391,7 @@ extension LocalVariableAccessWalker : ForwardingDefUseWalker {
       break
     case let markDep as MarkDependenceInst:
       assert(markDep.baseOperand == operand)
-      visit(LocalVariableAccess(.dependence, operand))
+      visit(LocalVariableAccess(.dependenceSource, operand))
     default:
       visit(LocalVariableAccess(.escape, operand))
     }
@@ -381,10 +407,6 @@ extension LocalVariableAccessWalker : ForwardingDefUseWalker {
 extension LocalVariableAccessWalker: AddressUseVisitor {
   private mutating func walkDownAddressUses(address: Value) -> WalkResult {
     for operand in address.uses.ignoreTypeDependence {
-      if let md = operand.instruction as? MarkDependenceInst, operand == md.valueOperand {
-        // Record the forwarding mark_dependence as a fake access before continuing to walk down.
-        visit(LocalVariableAccess(.dependence, operand))
-      }
       if classifyAddress(operand: operand) == .abortWalk {
         return .abortWalk
       }
@@ -399,6 +421,13 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   // temporaries do not have access scopes, so we need to walk down any projection that may be used to initialize the
   // temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+    // Intercept mark_dependence destination to record an access point which can be used like a store when finding all
+    // uses that affect the base after the point that the dependence was marked.
+    if let md = value as? MarkDependenceInst {
+      assert(operand == md.valueOperand)
+      visit(LocalVariableAccess(.dependenceDest, operand))
+      // walk down the forwarded address as usual...
+    }
     return walkDownAddressUses(address: value)
   }
 
@@ -432,6 +461,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
          is PackElementSetInst:
       // Handle instructions that initialize both temporaries and local variables.
       visit(LocalVariableAccess(.store, operand))
+    case let md as MarkDependenceAddrInst:
+      assert(operand == md.addressOperand)
+      visit(LocalVariableAccess(.dependenceDest, operand))
     case is DeallocStackInst:
       break
     default:
@@ -452,7 +484,7 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
     // Find all uses of partial_apply [on_stack].
     if let pai = value as? PartialApplyInst, !pai.mayEscape {
       var walker = NonEscapingClosureDefUseWalker(context)
@@ -468,12 +500,17 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+    // No other dependent uses can access to memory at this address.
+    return .continueWalk
+  }
+
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value) -> WalkResult {
     visit(LocalVariableAccess(.load, operand))
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand) -> WalkResult {
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
     visit(LocalVariableAccess(.load, operand))
     return .continueWalk
   }

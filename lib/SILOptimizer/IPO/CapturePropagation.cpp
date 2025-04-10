@@ -496,7 +496,7 @@ static SILFunction *getSpecializedWithDeadParams(
         FuncBuilder.getModule().getSwiftModule(),
         FuncBuilder.getModule().isWholeModule(), ApplySite(), Specialized,
         PAI->getSubstitutionMap(), Specialized->getSerializedKind(),
-        /* ConvertIndirectToDirect */ false, /*dropMetatypeArgs=*/false);
+        /* ConvertIndirectToDirect */ false, /*dropUnusedArguments=*/false);
     GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                            Specialized,
                                            ReInfo.getClonerParamSubstitutionMap(),

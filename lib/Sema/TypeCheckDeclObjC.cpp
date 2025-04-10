@@ -401,19 +401,20 @@ static bool checkObjCWithGenericParams(const ValueDecl *VD, ObjCReason Reason) {
   assert(GC);
   if (GC->getGenericParams()) {
     softenIfAccessNote(VD, Reason.getAttr(),
-      VD->diagnose(diag::objc_invalid_with_generic_params,
-                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
-          .limitBehavior(behavior));
+                       VD->diagnose(diag::objc_invalid_with_generic_params, VD,
+                                    getObjCDiagnosticAttrKind(Reason))
+                           .limitBehavior(behavior));
     Reason.describe(VD);
 
     return true;
   }
 
   if (GC->getTrailingWhereClause()) {
-    softenIfAccessNote(VD, Reason.getAttr(),
-      VD->diagnose(diag::objc_invalid_with_generic_requirements,
-                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
-          .limitBehavior(behavior));
+    softenIfAccessNote(
+        VD, Reason.getAttr(),
+        VD->diagnose(diag::objc_invalid_with_generic_requirements, VD,
+                     getObjCDiagnosticAttrKind(Reason))
+            .limitBehavior(behavior));
     Reason.describe(VD);
 
     return true;
@@ -448,9 +449,8 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
     break;
 
   case ClassDecl::ForeignKind::RuntimeOnly:
-    VD->diagnose(diag::objc_in_objc_runtime_visible,
-                 VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                 clazz->getName())
+    VD->diagnose(diag::objc_in_objc_runtime_visible, VD,
+                 getObjCDiagnosticAttrKind(Reason), clazz)
         .limitBehavior(behavior);
     Reason.describe(VD);
     break;
@@ -586,8 +586,7 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           softenIfAccessNote(value, reason.getAttr(),
                              value
                                  ->diagnose(diag::objc_in_resilient_extension,
-                                            value->getDescriptiveKind(),
-                                            ancestor->getName(),
+                                            value, ancestor,
                                             ctx.getTargetAvailabilityDomain(),
                                             stubAvailability)
                                  .limitBehavior(behavior));
@@ -650,6 +649,11 @@ bool swift::isRepresentableInObjC(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention) {
+  auto abiRole = ABIRoleInfo(AFD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason,
+                                 asyncConvention, errorConvention);
+
   // Clear out the async and error conventions. They will be added later if
   // needed.
   asyncConvention = std::nullopt;
@@ -693,8 +697,7 @@ bool swift::isRepresentableInObjC(
       // willSet/didSet implementations are never exposed to objc, they are
       // always directly dispatched from the synthesized setter.
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
-                            diag::objc_observing_accessor,
-                            accessor->getDescriptiveKind())
+                            diag::objc_observing_accessor, accessor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;
@@ -802,9 +805,9 @@ bool swift::isRepresentableInObjC(
     auto FD = dyn_cast<FuncDecl>(AFD);
     if (!FD) {
       softenIfAccessNote(AFD, Reason.getAttr(),
-        AFD->diagnose(diag::not_objc_function_async, AFD->getDescriptiveKind())
-          .highlight(AFD->getAsyncLoc())
-          .limitBehavior(behavior));
+                         AFD->diagnose(diag::not_objc_function_async, AFD)
+                             .highlight(AFD->getAsyncLoc())
+                             .limitBehavior(behavior));
       Reason.describe(AFD);
 
       return false;
@@ -1104,6 +1107,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (VD->isInvalid())
     return false;
 
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
@@ -1132,9 +1139,8 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // to mark them as @objc
   if (VD->getEffectfulGetAccessor()) {
     softenIfAccessNote(VD, Reason.getAttr(),
-      VD->diagnose(diag::effectful_not_representable_objc,
-                   VD->getDescriptiveKind())
-          .limitBehavior(behavior));
+                       VD->diagnose(diag::effectful_not_representable_objc, VD)
+                           .limitBehavior(behavior));
     Reason.describe(VD);
     return false;
   }
@@ -1160,6 +1166,10 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
 bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
+  auto abiRole = ABIRoleInfo(SD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
+
   ASTContext &ctx = SD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
@@ -1175,19 +1185,18 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // to mark them as @objc
   if (SD->getEffectfulGetAccessor()) {
     softenIfAccessNote(SD, Reason.getAttr(),
-      SD->diagnose(diag::effectful_not_representable_objc,
-                   SD->getDescriptiveKind())
-          .limitBehavior(behavior));
+                       SD->diagnose(diag::effectful_not_representable_objc, SD)
+                           .limitBehavior(behavior));
     Reason.describe(SD);
     return false;
   }
 
   // ObjC doesn't support class subscripts.
   if (!SD->isInstanceMember()) {
-    softenIfAccessNote(SD, Reason.getAttr(),
-      SD->diagnose(diag::objc_invalid_on_static_subscript,
-                   SD->getDescriptiveKind(), Reason)
-          .limitBehavior(behavior));
+    softenIfAccessNote(
+        SD, Reason.getAttr(),
+        SD->diagnose(diag::objc_invalid_on_static_subscript, SD, Reason)
+            .limitBehavior(behavior));
     Reason.describe(SD);
     Reason.setAttrInvalid();
     return true;
@@ -1616,18 +1625,18 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
                    suggestFinal ? "final " : "@nonobjc ");
 
-    VD->diagnose(diag::make_decl_objc, VD->getDescriptiveKind())
-      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+    VD->diagnose(diag::make_decl_objc, VD)
+        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
   } else {
     ASSERT(currentlyObjC.has_value());
 
     VD->diagnose(diag::objc_implementation_will_become_nonobjc, VD)
       .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
 
-    VD->diagnose(diag::fixit_add_nonobjc_or_final_for_objc_implementation,
-                 VD->getDescriptiveKind(), suggestFinal)
-      .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
-                   suggestFinal ? "final " : "@nonobjc ");
+    VD->diagnose(diag::fixit_add_nonobjc_or_final_for_objc_implementation, VD,
+                 suggestFinal)
+        .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
+                     suggestFinal ? "final " : "@nonobjc ");
   }
 
   implAttr->setHasInvalidImplicitLangAttrs();
@@ -1640,8 +1649,7 @@ static void diagnoseInvalidObjCName(ValueDecl *VD, ObjCAttr *attr) {
   if (attr && !attr->getNameLocs().empty()) {
     // Locate the diagnostic on the name itself if it was explicitly provided.
     VD->getDiags().diagnose(attr->getNameLocs().front(),
-                            diag::objc_name_not_valid_identifier,
-                            VD->getDescriptiveKind());
+                            diag::objc_name_not_valid_identifier, VD);
   } else {
     switch (VD->getDescriptiveKind()) {
     case DescriptiveDeclKind::Getter:
@@ -1652,8 +1660,7 @@ static void diagnoseInvalidObjCName(ValueDecl *VD, ObjCAttr *attr) {
       // diagnostics for the getter/setter.
       break;
     default:
-      VD->diagnose(diag::objc_cannot_infer_name_raw_identifier,
-                   VD->getDescriptiveKind());
+      VD->diagnose(diag::objc_cannot_infer_name_raw_identifier, VD);
     }
   }
 }
@@ -1770,6 +1777,11 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
 
+  // ABI-only decls inherit objc-ness from their API.
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isObjC();
+
   // Access notes may add attributes that affect this calculus.
   TypeChecker::applyAccessNote(VD);
 
@@ -1821,9 +1833,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredInterfaceType(),
                           inherited->getDeclaredInterfaceType());
-          inherited->diagnose(diag::kind_declname_declared_here,
-                              DescriptiveDeclKind::Protocol,
-                              inherited->getName());
+          inherited->diagnose(diag::decl_declared_here_with_kind, inherited);
           isObjC = std::nullopt;
         }
       }
@@ -3307,19 +3317,6 @@ public:
   }
 
 private:
-  static bool hasAsync(ValueDecl *member) {
-    if (!member)
-      return false;
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member))
-      return func->hasAsync();
-
-    if (auto storage = dyn_cast<AbstractStorageDecl>(member))
-      return hasAsync(storage->getEffectfulGetAccessor());
-
-    return false;
-  }
-
   static ValueDecl *getAsyncAlternative(ValueDecl *req) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(req)) {
       auto asyncFunc = func->getAsyncAlternative();
@@ -3394,7 +3391,7 @@ private:
 
     // Skip async versions of members. We'll match against the completion
     // handler versions, hopping over to `getAsyncAlternative()` if needed.
-    if (hasAsync(VD))
+    if (VD->isAsync())
       return;
 
     auto inserted = unmatchedRequirements.insert(VD);
@@ -3859,7 +3856,7 @@ private:
                        ObjCSelector explicitObjCName) const {
     // If the candidate we're considering is async, see if the requirement has
     // an async alternate and try to match against that instead.
-    if (hasAsync(cand))
+    if (cand->isAsync())
       if (auto asyncAltReq = getAsyncAlternative(req))
         return matchesImpl(asyncAltReq, cand, explicitObjCName);
 
@@ -3933,9 +3930,9 @@ private:
     }
 
     case MatchOutcome::WrongStaticness: {
-      auto diag = diagnose(cand,
-                           diag::objc_implementation_class_or_instance_mismatch,
-                           cand, req->getDescriptiveKind());
+      auto diag =
+          diagnose(cand, diag::objc_implementation_class_or_instance_mismatch,
+                   cand, req);
       fixDeclarationStaticSpelling(diag, cand, getStaticSpelling(req));
       return;
     }
@@ -3948,8 +3945,7 @@ private:
       return;
 
     case MatchOutcome::WrongDeclKind:
-      diagnose(cand, diag::objc_implementation_wrong_decl_kind,
-               cand, req->getDescriptiveKind());
+      diagnose(cand, diag::objc_implementation_wrong_decl_kind, cand, req);
       return;
 
     case MatchOutcome::WrongType:
@@ -3958,17 +3954,16 @@ private:
       return;
 
     case MatchOutcome::WrongWritability:
-      diagnose(cand, diag::objc_implementation_must_be_settable,
-               cand, req->getDescriptiveKind());
+      diagnose(cand, diag::objc_implementation_must_be_settable, cand, req);
       return;
 
     case MatchOutcome::WrongRequiredAttr: {
       bool shouldBeRequired = cast<ConstructorDecl>(req)->isRequired();
 
       auto diag =
-        diagnose(cand, diag::objc_implementation_required_attr_mismatch,
-                 cand, req->getDescriptiveKind(),  shouldBeRequired);
-      
+          diagnose(cand, diag::objc_implementation_required_attr_mismatch, cand,
+                   req, shouldBeRequired);
+
       if (shouldBeRequired)
         diag.fixItInsert(cand->getAttributeInsertionLoc(/*forModifier=*/true),
                          "required ");
@@ -4075,9 +4070,8 @@ public:
                cand, cand->getDeclContext()->getSelfClassDecl());
 
       if (canBeRepresentedInObjC(cand)) {
-        auto diagnostic =
-            diagnose(cand, diag::fixit_add_private_for_objc_implementation,
-                     cand->getDescriptiveKind());
+        auto diagnostic = diagnose(
+            cand, diag::fixit_add_private_for_objc_implementation, cand);
         if (auto modifier = cand->getAttrs().getAttribute<AccessControlAttr>())
           diagnostic.fixItReplace(modifier->getRange(), "private");
         else
@@ -4088,7 +4082,7 @@ public:
       // Initializers can't be 'final', but they can be '@nonobjc'
       bool suggestFinal = !isa<ConstructorDecl>(cand);
       diagnose(cand, diag::fixit_add_nonobjc_or_final_for_objc_implementation,
-               cand->getDescriptiveKind(), suggestFinal)
+               cand, suggestFinal)
           .fixItInsert(cand->getAttributeInsertionLoc(suggestFinal),
                        suggestFinal ? "final " : "@nonobjc ");
     }
@@ -4128,6 +4122,9 @@ public:
 
 evaluator::SideEffect TypeCheckObjCImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *D) const {
+  if (!ABIRoleInfo(D).providesAPI())
+    return evaluator::SideEffect();
+
   PrettyStackTraceDecl trace("checking member implementations of", D);
 
   // FIXME: Because we check extension-by-extension, candidates and requirements

@@ -20,7 +20,7 @@ struct Lock: ~Copyable {
     // CHECK-NEXT: sil{{.*}} @[[INIT:\$.*4LockV.*fC]] :
     init() {
         // CHECK-NOT: destroy_addr
-        // CHECK: builtin "zeroInitializer"<Lock>
+        // CHECK: builtin "zeroInitializer"({{%.*}} : $*Lock)
         // CHECK-NOT: destroy_addr
         // CHECK: [[F:%.*]] = function_ref @init_lock
         // CHECK: apply [[F]](

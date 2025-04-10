@@ -647,9 +647,9 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
-  auto isolation = SILFunctionTypeIsolation::Unknown;
+  auto isolation = SILFunctionTypeIsolation::forUnknown();
   if (flags.hasErasedIsolation())
-    isolation = SILFunctionTypeIsolation::Erased;
+    isolation = SILFunctionTypeIsolation::forErased();
 
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.
@@ -1052,6 +1052,10 @@ Type ASTBuilder::createOptionalType(Type base) {
 
 Type ASTBuilder::createArrayType(Type base) {
   return ArraySliceType::get(base);
+}
+
+Type ASTBuilder::createInlineArrayType(Type count, Type element) {
+  return InlineArrayType::get(count, element);
 }
 
 Type ASTBuilder::createDictionaryType(Type key, Type value) {

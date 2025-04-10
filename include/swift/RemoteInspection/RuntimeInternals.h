@@ -64,7 +64,7 @@ template <typename Runtime> struct ConformanceCacheEntry {
 
 template <typename Runtime>
 struct HeapObject {
-  typename Runtime::StoredPointer Metadata;
+  typename Runtime::StoredSignedPointer Metadata;
   typename Runtime::StoredSize RefCounts;
 };
 
@@ -131,10 +131,7 @@ struct AsyncTask: Job<Runtime> {
   // On 64-bit, there's a Reserved64 after ResumeContext.
   typename Runtime::StoredPointer ResumeContextAndReserved[
     sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
-  union {
-    AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
-    typename Runtime::StoredPointer PrivateStorageRaw[14];
-  };
+  AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
 };
 
 template <typename Runtime>
@@ -159,14 +156,16 @@ struct FutureAsyncContextPrefix {
 };
 
 template <typename Runtime>
-struct ActiveActorStatusWithEscalation {
+struct alignas(2 * sizeof(typename Runtime::StoredPointer))
+    ActiveActorStatusWithEscalation {
   uint32_t Flags[1];
   uint32_t DrainLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
   typename Runtime::StoredPointer FirstJob;
 };
 
 template <typename Runtime>
-struct ActiveActorStatusWithoutEscalation {
+struct alignas(2 * sizeof(typename Runtime::StoredPointer))
+    ActiveActorStatusWithoutEscalation {
   uint32_t Flags[sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
   typename Runtime::StoredPointer FirstJob;
 };
@@ -174,9 +173,8 @@ struct ActiveActorStatusWithoutEscalation {
 template <typename Runtime, typename ActiveActorStatus>
 struct DefaultActorImpl {
   HeapObject<Runtime> HeapObject;
-  Job<Runtime> JobStorage;
-  ActiveActorStatus Status;
   bool IsDistributedRemote;
+  ActiveActorStatus Status;
 };
 
 template <typename Runtime>

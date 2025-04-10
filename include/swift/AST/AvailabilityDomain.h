@@ -32,6 +32,7 @@
 namespace swift {
 class ASTContext;
 class CustomAvailabilityDomain;
+class Decl;
 class DeclContext;
 class ModuleDecl;
 
@@ -148,6 +149,11 @@ public:
     return AvailabilityDomain(Kind::Embedded);
   }
 
+  /// If `decl` represents an availability domain, returns the corresponding
+  /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
+  static std::optional<AvailabilityDomain> forCustom(Decl *decl,
+                                                     const ASTContext &ctx);
+
   static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
   }
@@ -217,6 +223,10 @@ public:
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
 
+  /// Returns true if this domain is a platform domain and is considered active
+  /// in the current compilation context.
+  bool isActivePlatform(const ASTContext &ctx) const;
+
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
   /// this version is specified with the `-target` option. For the Swift
@@ -231,6 +241,10 @@ public:
 
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
+
+  /// Returns the decl that represents the domain, or `nullptr` if the domain
+  /// does not have a decl.
+  Decl *getDecl() const;
 
   /// Returns the module that the domain belongs to, if it is a custom domain.
   ModuleDecl *getModule() const;
@@ -303,24 +317,26 @@ private:
   Identifier name;
   Kind kind;
   ModuleDecl *mod;
+  Decl *decl;
 
-  CustomAvailabilityDomain(Identifier name, ModuleDecl *mod, Kind kind);
+  CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
+                           Decl *decl);
 
 public:
-  static const CustomAvailabilityDomain *get(StringRef name, ModuleDecl *mod,
-                                             Kind kind, const ASTContext &ctx);
+  static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
+                                             ModuleDecl *mod, Decl *decl,
+                                             const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
+  Decl *getDecl() const { return decl; }
 
   /// Uniquing for `ASTContext`.
   static void Profile(llvm::FoldingSetNodeID &ID, Identifier name,
-                      ModuleDecl *mod, Kind kind);
+                      ModuleDecl *mod);
 
-  void Profile(llvm::FoldingSetNodeID &ID) const {
-    Profile(ID, name, mod, kind);
-  }
+  void Profile(llvm::FoldingSetNodeID &ID) const { Profile(ID, name, mod); }
 };
 
 /// Represents either a resolved availability domain or an identifier written

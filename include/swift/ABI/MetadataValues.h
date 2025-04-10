@@ -62,9 +62,6 @@ enum {
   /// in a non-default distributed actor.
   NumWords_NonDefaultDistributedActor = 12,
 
-  /// The number of words in a task.
-  NumWords_AsyncTask = 24,
-
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
 
@@ -313,6 +310,11 @@ enum class DynamicCastFlags : size_t {
   /// True if the cast should destroy the source value on failure;
   /// false if the value should be left in place.
   DestroyOnFailure = 0x4,
+
+  /// True if the cast should prohibit the use of any isolated conformances,
+  /// for example because there is a Sendable constraint on the existential
+  /// type we're casting to.
+  ProhibitIsolatedConformances = 0x8,
 };
 inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
   return (size_t(a) & size_t(b)) != 0;
@@ -372,8 +374,6 @@ public:
     Setter,
     ModifyCoroutine,
     ReadCoroutine,
-    Read2Coroutine,
-    Modify2Coroutine,
   };
 
 private:
@@ -436,21 +436,25 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isAsync() const { return Value & IsAsyncMask; }
+  bool _hasAsyncBitSet() const { return Value & IsAsyncMask; }
 
-  bool isCalleeAllocatedCoroutine() const {
+  bool isAsync() const { return !isCoroutine() && _hasAsyncBitSet(); }
+
+  bool isCoroutine() const {
     switch (getKind()) {
     case Kind::Method:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
+      return false;
     case Kind::ModifyCoroutine:
     case Kind::ReadCoroutine:
-      return false;
-    case Kind::Read2Coroutine:
-    case Kind::Modify2Coroutine:
       return true;
     }
+  }
+
+  bool isCalleeAllocatedCoroutine() const {
+    return isCoroutine() && _hasAsyncBitSet();
   }
 
   bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
@@ -613,8 +617,6 @@ public:
     ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
-    Read2Coroutine,
-    Modify2Coroutine,
   };
 
 private:
@@ -664,24 +666,28 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isAsync() const { return Value & IsAsyncMask; }
+  bool _hasAsyncBitSet() const { return Value & IsAsyncMask; }
 
-  bool isCalleeAllocatedCoroutine() const {
+  bool isAsync() const { return !isCoroutine() && _hasAsyncBitSet(); }
+
+  bool isCoroutine() const {
     switch (getKind()) {
     case Kind::BaseProtocol:
     case Kind::Method:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
-    case Kind::ReadCoroutine:
-    case Kind::ModifyCoroutine:
     case Kind::AssociatedTypeAccessFunction:
     case Kind::AssociatedConformanceAccessFunction:
       return false;
-    case Kind::Read2Coroutine:
-    case Kind::Modify2Coroutine:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
       return true;
     }
+  }
+
+  bool isCalleeAllocatedCoroutine() const {
+    return isCoroutine() && _hasAsyncBitSet();
   }
 
   bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
@@ -1955,7 +1961,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
 
+    /// WARNING: 5 is the last bit!
+
     // Type-specific flags:
+
+    Class_HasDefaultOverrideTable = 6,
 
     /// Set if the class is an actor.
     ///
@@ -2062,6 +2072,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsActor,
                                 class_isActor,
                                 class_setIsActor)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasDefaultOverrideTable,
+                                class_hasDefaultOverrideTable,
+                                class_setHasDefaultOverrideTable)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,

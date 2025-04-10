@@ -150,6 +150,7 @@ extension _UnsafeBitset: @unsafe Sequence {
     return unsafe Iterator(self)
   }
 
+  @unsafe
   @usableFromInline
   @frozen
   internal struct Iterator: IteratorProtocol {

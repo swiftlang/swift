@@ -596,7 +596,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
     appendOperator("Ty");
   else
     appendOperator("TR");
-  
+
   if (GlobalActorBound) {
     appendType(GlobalActorBound, GenSig);
     appendOperator("TU");
@@ -828,14 +828,12 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
 // Since we don't have a distinct mangling for sugared generic
 // parameter types, we must desugar them here.
 static Type getTypeForDWARFMangling(Type t) {
-  return t.subst(
-    [](SubstitutableType *t) -> Type {
-      if (t->isRootParameterPack()) {
-        return PackType::getSingletonPackExpansion(t->getCanonicalType());
-      }
-      return t->getCanonicalType();
-    },
-    MakeAbstractConformanceForGenericType());
+  return t.transformRec(
+    [](TypeBase *t) -> std::optional<Type> {
+      if (isa<GenericTypeParamType>(t))
+        return t->getCanonicalType();
+      return std::nullopt;
+    });
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
@@ -1139,7 +1137,7 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
   if (isa<AbstractClosureExpr>(DC)) {
     ParamList = cast<AbstractClosureExpr>(DC)->getParameters();
   } else {
-    ParamList = getParameterList(cast<ValueDecl>(DC->getAsDecl()));
+    ParamList = cast<ValueDecl>(DC->getAsDecl())->getParameterList();
   }
 
   unsigned UnnamedIndex = 0;
@@ -1193,17 +1191,16 @@ getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
     return std::nullopt;
 
   // If there is an 'objc' attribute with a name, use that name.
-  if (auto objc = proto->getAttrs().getAttribute<ObjCAttr>()) {
-    if (auto name = objc->getName()) {
-      llvm::SmallString<4> buffer;
-      return std::string(name->getString(buffer));
-    }
+  if (auto objcName = proto->getExplicitObjCName()) {
+    llvm::SmallString<4> buffer;
+    return std::string(objcName->getString(buffer));
   }
 
   return std::nullopt;
 }
 
-void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
+void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name,
+                                bool skipLocalDiscriminator) {
   ASSERT(!getABIDecl(decl) && "caller should make sure we get ABI decls");
   if (name.empty())
     name = decl->getBaseName();
@@ -1244,6 +1241,11 @@ void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
+    // If we don't need a local discriminator (attached macros receive a
+    // separate discriminator), we're done.
+    if (skipLocalDiscriminator)
+      return;
+
     if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
       if (!decl->hasName()) {
         // Mangle unnamed params with their ordering.
@@ -1573,6 +1575,18 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendType(cast<ArraySliceType>(tybase)->getBaseType(), sig, forDecl);
       appendOperator("XSa");
       return;
+
+    case TypeKind::InlineArray: {
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      auto *T = cast<InlineArrayType>(tybase);
+      appendType(T->getCountType(), sig, forDecl);
+      appendType(T->getElementType(), sig, forDecl);
+      // Note we don't have a known-type mangling for InlineArray, we can
+      // use 'A' since it's incredibly unlikely
+      // AutoreleasingUnsafeMutablePointer will ever receive type sugar.
+      appendOperator("XSA");
+      return;
+    }
 
     case TypeKind::VariadicSequence:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
@@ -2158,7 +2172,7 @@ void ASTMangler::appendRetroactiveConformances(SubstitutionMap subMap,
     if (conformance.isInvalid())
       continue;
 
-    if (conformance.getRequirement()->isMarkerProtocol())
+    if (conformance.getProtocol()->isMarkerProtocol())
       continue;
 
     SWIFT_DEFER {
@@ -2277,7 +2291,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   if (!fn->isNoEscape())
     OpArgs.push_back('e');
 
-  switch (fn->getIsolation()) {
+  switch (fn->getIsolation().getKind()) {
   case SILFunctionTypeIsolation::Unknown:
     break;
   case SILFunctionTypeIsolation::Erased:
@@ -2769,7 +2783,7 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
-    if (useModuleName.empty()) {
+    if (useModuleName.empty() || useModuleName == STDLIB_NAME) {
       appendOperator("s");
     } else if (!RespectOriginallyDefinedIn) {
       appendOperator("s");
@@ -3367,8 +3381,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   }
 }
 
-static ParamSpecifier
-getDefaultOwnership(const ValueDecl *forDecl) {
+ParamSpecifier swift::getDefaultParamSpecifier(const ValueDecl *forDecl) {
   // `consuming` is the default ownership for initializers and setters.
   // Everything else defaults to borrowing.
   if (!forDecl) {
@@ -3439,7 +3452,7 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
 void ASTMangler::appendFunctionInputType(
     AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Param> params,
     GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
-  auto defaultSpecifier = getDefaultOwnership(forDecl);
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
   
   switch (params.size()) {
   case 0:
@@ -3555,6 +3568,8 @@ void ASTMangler::appendParameterTypeListElement(
     appendOperator("Yu");
   if (flags.isCompileTimeLiteral())
     appendOperator("Yt");
+  if (flags.isConstValue())
+    appendOperator("Yg");
 
   if (!name.empty())
     appendIdentifier(name.str());
@@ -4516,7 +4531,7 @@ void ASTMangler::appendAnyProtocolConformance(
   // If we have a conformance to a marker protocol but we aren't allowed to
   // emit marker protocols, skip it.
   if (!AllowMarkerProtocols &&
-      conformance.getRequirement()->isMarkerProtocol())
+      conformance.getProtocol()->isMarkerProtocol())
     return;
 
   // While all invertible protocols are marker protocols, do not mangle them
@@ -4525,15 +4540,17 @@ void ASTMangler::appendAnyProtocolConformance(
   // but we *might* have let that slip by for the other cases below, so the
   // early-exits are highly conservative.
   const bool forInvertible =
-      conformance.getRequirement()->getInvertibleProtocolKind().has_value();
+      conformance.getProtocol()->getInvertibleProtocolKind().has_value();
 
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
     if (forInvertible)
       return;
 
+    // FIXME: conformingType parameter should no longer be needed, because
+    // its in conformance.
     auto path = genericSig->getConformancePath(conformingType,
-                                               conformance.getAbstract());
+                                               conformance.getProtocol());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     if (forInvertible)
@@ -4544,7 +4561,7 @@ void ASTMangler::appendAnyProtocolConformance(
     ConformancePath conformancePath =
         opaqueSignature->getConformancePath(
           opaqueType->getInterfaceType(),
-          conformance.getAbstract());
+          conformance.getProtocol());
 
     // Append the conformance path with the signature of the opaque type.
     appendDependentProtocolConformance(conformancePath, opaqueSignature);
@@ -5147,13 +5164,15 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
     // If we needed a local discriminator, stuff that into the name itself.
     // This is hack, but these names aren't stable anyway.
+    bool skipLocalDiscriminator = false;
     if (auto discriminator = precheckedMangleContext.second) {
+      skipLocalDiscriminator = true;
       name = encodeLocalPrecheckedDiscriminator(
           decl->getASTContext(), name, *discriminator);
     }
 
     if (auto valueDecl = dyn_cast<ValueDecl>(decl))
-      appendDeclName(valueDecl, name);
+      appendDeclName(valueDecl, name, skipLocalDiscriminator);
     else if (!name.empty())
       appendIdentifier(name.str());
     else

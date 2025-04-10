@@ -38,6 +38,11 @@ using namespace swift;
 static llvm::cl::opt<bool> PrintCondFailMessages(
   "print-cond-fail-messages", llvm::cl::init(false),
   llvm::cl::desc("print cond_fail messages"));
+static llvm::cl::opt<bool> IncludeCondFailMessagesFunction(
+  "print-cond-fail-messages-include-function-name", llvm::cl::init(false),
+  llvm::cl::desc("when printing cond_fail messages include"
+                 "the current SIL function name"));
+
 static llvm::DenseSet<StringRef> CondFailMessages;
 
 static bool cleanFunction(SILFunction &fn) {
@@ -64,7 +69,11 @@ static bool cleanFunction(SILFunction &fn) {
       //   ```
       if (PrintCondFailMessages) {
         if (auto CFI = dyn_cast<CondFailInst>(inst)) {
-          auto msg = CFI->getMessage();
+          auto msg = CFI->getMessage().str();
+          if (IncludeCondFailMessagesFunction) {
+            msg.append(" in ");
+            msg.append(fn.getName().str());
+          }
           if (CondFailMessages.insert(msg).second)
             llvm::dbgs() << "cond_fail message encountered: " << msg << "\n";
         }

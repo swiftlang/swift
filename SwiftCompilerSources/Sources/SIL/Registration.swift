@@ -195,6 +195,7 @@ public func registerSILClasses() {
   register(ObjCMetatypeToObjectInst.self)
   register(ValueToBridgeObjectInst.self)
   register(MarkDependenceInst.self)
+  register(MarkDependenceAddrInst.self)
   register(RefToBridgeObjectInst.self)
   register(BridgeObjectToRefInst.self)
   register(BridgeObjectToWordInst.self)

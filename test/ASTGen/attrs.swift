@@ -94,7 +94,7 @@ struct S4 {}
 @implementation extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 @implementation(Category) extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 
-@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of low-level parameters}}
+@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of parameters}}
 func fn(_: Int) {}
 
 @_alignment(8) struct AnyAlignment {}

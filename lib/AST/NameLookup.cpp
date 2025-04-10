@@ -1546,7 +1546,7 @@ void MemberLookupTable::addMember(Decl *member) {
     A->getMemberName().addToLookupTable(Lookup, vd);
 
   auto abiRole = ABIRoleInfo(vd);
-  if (!abiRole.providesABI())
+  if (!abiRole.providesABI() && abiRole.getCounterpart())
     addMember(abiRole.getCounterpart());
 }
 
@@ -2388,6 +2388,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
                                      ValueDecl *decl,
                                      bool onlyCompleteObjectInits,
                                      bool requireImport) {
+  auto &ctx = dc->getASTContext();
+
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -2405,19 +2407,43 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl) &&
-      !dc->getASTContext().isAccessControlDisabled()) {
+  if (!(options & NL_IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
     bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
   }
 
-  // Check that there is some import in the originating context that makes this
-  // decl visible.
-  if (requireImport && !(options & NL_IgnoreMissingImports))
-    if (!dc->isDeclImported(decl))
-      return false;
+  if (requireImport) {
+    // Check that there is some import in the originating context that makes
+    // this decl visible.
+    if (!(options & NL_IgnoreMissingImports)) {
+      if (!dc->isDeclImported(decl))
+        return false;
+    }
+
+    // Unlike in Swift, Obj-C allows method overrides to be declared in
+    // extensions (categories), even outside of the module that defines the
+    // type that is being extended. When MemberImportVisibility is enabled,
+    // if these overrides are not filtered out they can hijack name
+    // lookup and cause the compiler to insist that the module that defines
+    // the extension be imported, contrary to developer expectations.
+    //
+    // Filter results belonging to these extensions out, even when ignoring
+    // missing imports, if we're in a context that requires imports to access
+    // member declarations.
+    if (decl->getOverriddenDecl()) {
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+        if (auto *nominal = extension->getExtendedNominal()) {
+          auto extensionMod = extension->getModuleContext();
+          auto nominalMod = nominal->getModuleContext();
+          if (!extensionMod->isSameModuleLookingThroughOverlays(nominalMod) &&
+              !dc->isDeclImported(extension))
+            return false;
+        }
+      }
+    }
+  }
 
   // Check that it has the appropriate ABI role.
   if (!ABIRoleInfo(decl).matchesOptions(options))
@@ -3167,6 +3193,10 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     result.first.push_back(ctx.getArrayDecl());
     return result;
 
+  case TypeReprKind::InlineArray:
+    result.first.push_back(ctx.getInlineArrayDecl());
+    return result;
+
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
@@ -3253,6 +3283,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
   case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
@@ -3710,13 +3741,14 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     return { };
 
   // Functions, initializers, and subscripts can contain opaque parameters.
-  ParameterList *params = nullptr;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    params = func->getParameters();
-  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
-    params = subscript->getIndices();
-  else
+  // FIXME: What's wrong with allowing them in macro decls?
+  if (isa<MacroDecl>(value)) {
     return { };
+  }
+  auto *params = value->getParameterList();
+  if (!params) {
+    return {};
+  }
 
   // Look for parameters that have "some" types in them.
   unsigned index = parsedGenericParams ? parsedGenericParams->size() : 0;
@@ -3947,9 +3979,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                 .diagnose(loc, diag::warn_property_wrapper_module_scope, name,
                           moduleName)
                 .fixItInsert(loc, moduleName.str().str() + ".");
-            ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                               assocType->getDescriptiveKind(),
-                               assocType->getName());
+            ctx.Diags.diagnose(assocType, diag::decl_declared_here_with_kind,
+                               assocType);
 
             auto *baseTR = UnqualifiedIdentTypeRepr::create(
                 ctx, nameLoc, DeclNameRef(moduleName));

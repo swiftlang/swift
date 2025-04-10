@@ -2601,11 +2601,28 @@ public:
                               SILType loweredResultTy,
                               SGFContext ctx = SGFContext());
 
+  enum class ThunkGenFlag {
+    None,
+
+    /// Set if the thunk has an implicit isolated parameter.
+    ///
+    /// The implication is that we shouldn't forward that parameter into the
+    /// callee as a normal parameter (if the callee has an implicit param, we
+    /// handle it through a different code path).
+    ThunkHasImplicitIsolatedParam = 0x1,
+
+    /// Set if the callee has an implicit isolated parameter that we need to
+    /// find the appropriate value for when we call it from the thunk.
+    CalleeHasImplicitIsolatedParam = 0x2,
+  };
+  using ThunkGenOptions = OptionSet<ThunkGenFlag>;
+
   /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
+      ThunkGenOptions options = {});
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

@@ -270,6 +270,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 }
 #else
 @inlinable // trivial-implementation
+@safe
 public func ===<T: AnyObject, U: AnyObject>(lhs: T?, rhs: U?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):

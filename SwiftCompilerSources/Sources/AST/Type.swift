@@ -40,7 +40,7 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     self.bridged = bridgedOrNil
   }
 
-  init(bridged: BridgedASTType) {
+  public init(bridged: BridgedASTType) {
     self.bridged = bridged
   }
 
@@ -160,6 +160,20 @@ extension TypeProperties {
       return true
     }
     return false
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                Properties of lowered `SILFunctionType`s
+  //===--------------------------------------------------------------------===//
+
+  public var isLoweredFunction: Bool { rawType.bridged.isLoweredFunction() }
+  public var isNoEscapeFunction: Bool { rawType.bridged.isNoEscapeFunction() }
+  public var isCalleeConsumedFunction: Bool { rawType.bridged.isCalleeConsumedFunction() }
+  public var isThickFunction: Bool { rawType.bridged.isThickFunction() }
+  public var isAsyncFunction: Bool { rawType.bridged.isAsyncFunction() }
+
+  public var invocationGenericSignatureOfFunction: GenericSignature {
+    GenericSignature(bridged: rawType.bridged.getInvocationGenericSignatureOfFunctionType())
   }
 
   //===--------------------------------------------------------------------===//

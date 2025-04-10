@@ -480,6 +480,12 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     D = accessor->getStorage();
   }
 
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    // ABI-only decls can't have @available attributes of their own.
+    D = abiRole.getCounterpart();
+  }
+
   return D->getAbstractSyntaxDeclForAttributes();
 }
 
@@ -645,13 +651,13 @@ static void fixAvailabilityForDecl(
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  const Decl *ConcDecl = D->getConcreteSyntaxDeclForAttributes();
+  const Decl *ConcDecl = relatedDeclForAvailabilityFixit(D);
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
-  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
-  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
-    KindForDiagnostic = D->getDescriptiveKind();
+  const auto *DeclForDiagnostic = ConcDecl;
+  if (isa<PatternBindingDecl>(DeclForDiagnostic)) {
+    DeclForDiagnostic = D;
   }
 
   SourceLoc InsertLoc =
@@ -662,7 +668,7 @@ static void fixAvailabilityForDecl(
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
 
-  D->diagnose(diag::availability_add_attribute, KindForDiagnostic)
+  D->diagnose(diag::availability_add_attribute, DeclForDiagnostic)
       .fixItInsert(InsertLoc, diag::insert_available_attr,
                    Domain.getNameForAttributePrinting(),
                    RequiredAvailability.getVersionString(), OriginalIndent);
@@ -3145,7 +3151,26 @@ public:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
+  bool checkInlineArrayTypeRepr(InlineArrayTypeRepr *T) {
+    // Has the same availability as InlineArray.
+    auto &ctx = where.getDeclContext()->getASTContext();
+    auto *D = ctx.getInlineArrayDecl();
+    if (!D) {
+      // If we have a broken stdlib we will have already diagnosed.
+      return false;
+    }
+    return diagnoseDeclAvailability(D, T->getSourceRange(), /*call*/ nullptr,
+                                    where, flags);
+  }
+
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    if (auto *IAT = dyn_cast<InlineArrayTypeRepr>(T)) {
+      if (checkInlineArrayTypeRepr(IAT)) {
+        foundAnyIssues = true;
+      }
+      return Action::Continue();
+    }
+
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR)
       return Action::Continue();
@@ -3431,6 +3456,12 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (!ctx.supportsVersionedAvailability())
     return false;
 
+  // Don't enforce explicit availability requirements in .swiftinterface files.
+  // These diagnostics are only designed to be emitted when building from
+  // source.
+  if (decl->getDeclContext()->isInSwiftinterface())
+    return false;
+
   // Skip non-public decls.
   if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
     AccessScope scope =
@@ -3480,6 +3511,11 @@ void swift::checkExplicitAvailability(Decl *decl) {
       !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
   if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+    // Skip extensions that extend non-public types.
+    auto extended = extension->getExtendedNominal();
+    if (!extended || !extended->getFormalAccessScope().isPublic())
+      return;
+
     // Skip extensions when none of their members need availability.
     auto members = extension->getMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
@@ -3490,7 +3526,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    if (!hasMembers && !isExported(extension))
+    if (!hasMembers && !hasConformancesToPublicProtocols(extension))
       return;
   } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
     // Check the first var instead.

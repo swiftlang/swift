@@ -575,7 +575,7 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
   auto instantiatedPatternTy =
       context.environment->mapContextualPackTypeIntoElementContext(patternTy);
   auto instantiatedConformance =
-      lookupConformance(instantiatedPatternTy, conformance.getRequirement());
+      lookupConformance(instantiatedPatternTy, conformance.getProtocol());
 
   // Emit the element witness table.
   auto *wtable = emitWitnessTableRef(IGF, instantiatedPatternTy,
@@ -1124,7 +1124,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
     assert(conformances.size() == wtables.size());
     for (unsigned i : indices(wtables)) {
       auto reqt = GenericRequirement::forWitnessTable(
-          archetype, conformances[i].getRequirement());
+          archetype, conformances[i].getProtocol());
       bindGenericRequirement(IGF, reqt, wtables[i], MetadataState::Complete,
                              SubstitutionMap());
     }

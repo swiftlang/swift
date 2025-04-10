@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend                              \
 // RUN:     %t/Library.swift                                \
 // RUN:     -emit-module                                    \
-// RUN:     -target %target-future-triple                   \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -module-name Library                            \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
@@ -13,7 +12,6 @@
 // RUN: %target-build-swift                                 \
 // RUN:     %t/Downstream.swift                             \
 // RUN:     -c                                              \
-// RUN:     -target %target-future-triple                   \
 // RUN:     -Onone                                          \
 // RUN:     -parse-as-library                               \
 // RUN:     -module-name main                               \
@@ -25,7 +23,53 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Library)) \
 // RUN:     %t/Library.swift                                        \
 // RUN:     -emit-module                                            \
-// RUN:     -target %target-future-triple                   \
+// RUN:     -enable-library-evolution                               \
+// RUN:     -enable-experimental-feature CoroutineAccessors         \
+// RUN:     -emit-module-path %t/Library.swiftmodule                \
+// RUN:     -module-name Library
+
+// RUN: %target-build-swift   \
+// RUN:     %t/Executable.o   \
+// RUN:     -lLibrary         \
+// RUN:     -L %t             \
+// RUN:     %target-rpath(%t) \
+// RUN:     -o %t/main
+
+// RUN: %target-codesign %t/%target-library-name(Library)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(Library) | %FileCheck %s
+
+// Now do it all again, but without using the runtime
+// swift_task_dealloc_through function.
+
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+
+// RUN: %target-swift-frontend                                \
+// RUN:     -Xllvm -enable-runtime-task-dealloc-through=false \
+// RUN:     %t/Library.swift                                  \
+// RUN:     -emit-module                                      \
+// RUN:     -enable-library-evolution                         \
+// RUN:     -module-name Library                              \
+// RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -emit-module-path %t/Library.swiftmodule
+
+// RUN: %target-build-swift                                   \
+// RUN:     -Xllvm -enable-runtime-task-dealloc-through=false \
+// RUN:     %t/Downstream.swift                               \
+// RUN:     -c                                                \
+// RUN:     -Onone                                            \
+// RUN:     -parse-as-library                                 \
+// RUN:     -module-name main                                 \
+// RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -lLibrary                                         \
+// RUN:     -I %t                                             \
+// RUN:     -o %t/Executable.o
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Library)) \
+// RUN:     -Xllvm -enable-runtime-task-dealloc-through=false       \
+// RUN:     %t/Library.swift                                        \
+// RUN:     -emit-module                                            \
 // RUN:     -enable-library-evolution                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors         \
 // RUN:     -emit-module-path %t/Library.swiftmodule                \

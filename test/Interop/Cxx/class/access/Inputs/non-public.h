@@ -21,20 +21,31 @@ public:
   void publMethod(void) const {}
   void publMutatingMethod(void) {}
   int publVar;
-  static void publStaticFunc(void);
-  static int publStaticVar;
+  static void publStaticFunc(void) {};
+  static inline int publStaticVar = 0;
 
   typedef int publTypedef;
-  struct publStruct {};
+  publTypedef publTypedefMake(void) const { return 42; }
+  void publTypedefTake(publTypedef x) const { }
 
-  enum publEnum { publEnumValue1 };
-  enum class publEnumClass { publEnumClassValue1 };
+  struct publStruct { int x; };
+  publStruct publStructMake(void) const { return publStruct{}; }
+  void publStructTake(publStruct x) const { }
+
+  enum publEnum { variantPublEnum };
+  publEnum publEnumMake(void) const { return variantPublEnum; }
+  void publEnumTake(publEnum x) const { }
+
+  enum class publEnumClass { variantPublEnumClass };
+  publEnumClass publEnumClassMake(void) const { return publEnumClass::variantPublEnumClass; }
+  void publEnumClassTake(publEnumClass x) const { }
+
   enum { publEnumAnonValue1 };
   enum publEnumClosed {
-    publEnumClosedValue1
+    variantPublEnumClosed
   } __attribute__((enum_extensibility(closed)));
   enum publEnumOpen {
-    publEnumOpenValue1
+    variantPublEnumOpen
   } __attribute__((enum_extensibility(open)));
   enum publEnumFlag {} __attribute__((flag_enum));
 
@@ -42,20 +53,31 @@ TEST_PRIVATE:
   void privMethod(void) const {}
   void privMutatingMethod(void) {}
   int privVar;
-  static void privStaticFunc(void);
-  static int privStaticVar;
+  static void privStaticFunc(void) {};
+  static inline int privStaticVar = 0;
 
   typedef int privTypedef;
-  struct privStruct {};
+  privTypedef privTypedefMake(void) const { return 42; }
+  void privTypedefTake(privTypedef x) const { }
 
-  enum privEnum { privEnumValue1 };
-  enum class privEnumClass { privEnumClassValue1 };
+  struct privStruct { int x; };
+  privStruct privStructMake(void) const { return privStruct{}; }
+  void privStructTake(privStruct x) const { }
+
+  enum privEnum { variantPrivEnum };
+  privEnum privEnumMake(void) const { return variantPrivEnum; }
+  void privEnumTake(privEnum x) const { }
+
+  enum class privEnumClass { variantPrivEnumClass };
+  privEnumClass privEnumClassMake(void) const { return privEnumClass::variantPrivEnumClass; }
+  void privEnumClassTake(privEnumClass x) const { }
+
   enum { privEnumAnonValue1 };
   enum privEnumClosed {
-    privEnumClosedValue1
+    variantPrivEnumClosed
   } __attribute__((enum_extensibility(closed)));
   enum privEnumOpen {
-    privEnumOpenValue1
+    variantPrivEnumOpen
   } __attribute__((enum_extensibility(open)));
   enum privEnumFlag {} __attribute__((flag_enum));
 };

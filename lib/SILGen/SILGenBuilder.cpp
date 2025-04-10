@@ -625,29 +625,33 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
-    SILLocation loc, ManagedValue op,
-    SILType destLoweredTy, CanType destFormalTy) {
+    SILLocation loc, CastingIsolatedConformances isolatedConformances,
+    ManagedValue op, SILType destLoweredTy, CanType destFormalTy) {
   SILValue result =
-      createUnconditionalCheckedCast(loc, op.forward(SGF),
+      createUnconditionalCheckedCast(loc, isolatedConformances,
+                                     op.forward(SGF),
                                      destLoweredTy, destFormalTy);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
-void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
-                                            ManagedValue op,
-                                            CanType sourceFormalTy,
-                                            SILType destLoweredTy,
-                                            CanType destFormalTy,
-                                            SILBasicBlock *trueBlock,
-                                            SILBasicBlock *falseBlock,
-                                            ProfileCounter Target1Count,
-                                            ProfileCounter Target2Count) {
+void SILGenBuilder::createCheckedCastBranch(
+    SILLocation loc, bool isExact,
+    CastingIsolatedConformances isolatedConformances,
+    ManagedValue op,
+    CanType sourceFormalTy,
+    SILType destLoweredTy,
+    CanType destFormalTy,
+    SILBasicBlock *trueBlock,
+    SILBasicBlock *falseBlock,
+    ProfileCounter Target1Count,
+    ProfileCounter Target2Count) {
   // Casting a guaranteed value requires ownership preservation.
   if (!doesCastPreserveOwnershipForTypes(SGF.SGM.M, op.getType().getASTType(),
                                          destFormalTy)) {
     op = op.ensurePlusOne(SGF, loc);
   }
-  createCheckedCastBranch(loc, isExact, op.forward(SGF), sourceFormalTy,
+  createCheckedCastBranch(loc, isExact, isolatedConformances,
+                          op.forward(SGF), sourceFormalTy,
                           destLoweredTy, destFormalTy, trueBlock, falseBlock,
                           Target1Count, Target2Count);
 }

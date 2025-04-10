@@ -34,14 +34,14 @@ func b() {
 // CHECK-WARNINGS-AS-ERRORS: unexpected error produced: initialization of immutable value 'c' was never used
 
 typealias Crap = () -> ()
-extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{educational-notes=foo-bar-baz}}
-// CHECK: error: expected educational note(s) not seen; actual educational note(s): {{[{][{]}}educational-notes=nominal-types{{[}][}]}}
+extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{documentation-file=foo-bar-baz}}
+// CHECK: error: expected documentation file not seen; actual documentation file: {{[{][{]}}documentation-file=nominal-types{{[}][}]}}
 
-extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{educational-notes=nominal-types}} {{educational-notes=nominal-types}}
-// CHECK: error: each verified diagnostic may only have one {{[{][{]}}educational-notes=<#notes#>{{[}][}]}} declaration
+extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{documentation-file=nominal-types}} {{documentation-file=nominal-types}}
+// CHECK: error: each verified diagnostic may only have one {{[{][{]}}documentation-file=<#notes#>{{[}][}]}} declaration
 
-extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{educational-notes=nominal-types,foo-bar-baz}}
-// CHECK: error: expected educational note(s) not seen; actual educational note(s): {{[{][{]}}educational-notes=nominal-types{{[}][}]}}
+extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') cannot be extended}} {{documentation-file=nominal-types,foo-bar-baz}}
+// CHECK: error: expected documentation file not seen; actual documentation file: {{[{][{]}}documentation-file=nominal-types{{[}][}]}}
 
 // Verify the serialized diags have the right magic at the top.
 // CHECK-SERIALIZED: DIA

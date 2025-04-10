@@ -106,3 +106,17 @@ func nontrivial() -> InlineArray<2, String> {
 func noncopyable() -> InlineArray<2, Atomic<Int>> {
   [Atomic(0), Atomic(1)]
 }
+
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal7closures11InlineArrayVy$0_S2icGyF : $@convention(thin) () -> @owned InlineArray<1, (Int) -> Int> {
+// CHECK:         [[IA_ALLOC:%.*]] = alloc_stack $InlineArray<1, (Int) -> Int>
+// CHECK-NEXT:    [[ADDR_CAST:%.*]] = unchecked_addr_cast [[IA_ALLOC]] to $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
+// CHECK:         [[FN_REF:%.*]] = function_ref
+// CHECK-NEXT:    [[THIN_TO_THICK_FN:%.*]] = thin_to_thick_function [[FN_REF]] to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, Int>
+// CHECK-NEXT:    store [[THIN_TO_THICK_FN]] to [init] [[ADDR_CAST]]
+// CHECK-NEXT:    [[IA:%.*]] = load [take] [[IA_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[IA_ALLOC]]
+// CHECK-NEXT:    return [[IA]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal7closures11InlineArrayVy$0_S2icGyF'
+func closure() -> InlineArray<1, (Int) -> Int> {
+  [{$0 * 2}]
+}

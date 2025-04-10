@@ -25,4 +25,8 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
   public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
+
+  public var genericParameters: TypeArray {
+    TypeArray(bridged: bridged.getGenericParams())
+  }
 }

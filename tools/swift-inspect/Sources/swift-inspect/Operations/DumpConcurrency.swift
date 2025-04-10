@@ -353,7 +353,7 @@ fileprivate class ConcurrencyDumper {
 
       let flags = decodeTaskFlags(task)
 
-      output("Task \(hex: task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
+      output("Task \(task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
       if let thread = taskToThread[swift_addr_t(task.address)] {
         output("current task on thread \(hex: thread)")
       }
@@ -414,7 +414,7 @@ fileprivate class ConcurrencyDumper {
 
       func jobStr(_ job: swift_reflection_ptr_t) -> String {
         if let task = tasks[job] {
-          return "Task \(hex: task.id) \(symbolicateBacktracePointer(ptr: task.runJob))"
+          return "Task \(task.id) \(symbolicateBacktracePointer(ptr: task.runJob))"
         }
         return "<internal job \(hex: job)>"
       }
@@ -452,7 +452,7 @@ fileprivate class ConcurrencyDumper {
     for (thread, task) in threadCurrentTasks {
       let taskStr: String
       if let info = tasks[swift_reflection_ptr_t(task)] {
-        taskStr = "\(hex: info.id)"
+        taskStr = "\(info.id)"
       } else {
         taskStr = "<unknown task \(hex: task)>"
       }

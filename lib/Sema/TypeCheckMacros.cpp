@@ -607,8 +607,7 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
       isa<ExtensionDecl>(decl)) {
-    decl->diagnose(diag::invalid_decl_in_macro_expansion,
-                   decl->getDescriptiveKind());
+    decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
@@ -957,8 +956,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
 
   case MacroRole::Extension: {
+    // Extensions are expanded at the top-level.
+    auto *NTD = cast<NominalTypeDecl>(target.get<Decl *>());
+    auto *topLevelDecl = NTD->getTopmostDeclarationDeclContext();
+
     SourceLoc afterDeclLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+        Lexer::getLocForEndOfToken(sourceMgr, topLevelDecl->getEndLoc());
     return CharSourceRange(afterDeclLoc, 0);
   }
 
@@ -984,6 +987,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
                                  closure->getEndLoc()));
     }
 
+    // If the function has a body, that's what's being replaced.
+    auto *AFD = cast<AbstractFunctionDecl>(target.get<Decl *>());
+    if (auto range = AFD->getBodySourceRange())
+      return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, range);
+
+    // Otherwise we have no body, just use the end of the decl.
     SourceLoc afterDeclLoc =
         Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
     return CharSourceRange(afterDeclLoc, 0);
@@ -1833,9 +1842,8 @@ std::optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
   // property into a computed one without telling us pre-expansion. Produce
   // an error to prevent this.
   if (expectObservers && foundNonObservingAccessorInMacro) {
-    storage->diagnose(
-        diag::macro_nonobserver_unexpected_in_expansion, macro->getName(),
-        foundNonObservingAccessorInMacro->getDescriptiveKind());
+    storage->diagnose(diag::macro_nonobserver_unexpected_in_expansion, macro,
+                      foundNonObservingAccessorInMacro);
   }
 
   // We expected to get a non-observing accessor, but there isn't one (from
@@ -1903,10 +1911,10 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
         if (bufferID)
           return;
 
-        // '@StartTask' is gated behind the 'ConcurrencySyntaxSugar'
+        // '@Task' is gated behind the 'ConcurrencySyntaxSugar'
         // experimental feature.
         if (macro->getParentModule()->getName().is("_Concurrency") &&
-            macro->getBaseIdentifier().is("StartTask") &&
+            macro->getBaseIdentifier().is("Task") &&
             !ctx.LangOpts.hasFeature(Feature::ConcurrencySyntaxSugar)) {
           ctx.Diags.diagnose(
               customAttr->getLocation(),
@@ -2089,7 +2097,7 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
                                                 MacroDecl *macro,
                                                 MacroRole role,
                                                 NominalTypeDecl *nominal) {
-  if (nominal->getDeclContext()->isLocalContext()) {
+  if (nominal->getLocalContext()) {
     nominal->diagnose(diag::local_extension_macro);
     return std::nullopt;
   }

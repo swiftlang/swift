@@ -3362,6 +3362,10 @@ public:
   /// Undo the above change.
   void removePotentialThrowSite(CatchNode catchNode);
 
+  /// Retrieve the explicit caught error type for the given catch node, without
+  /// attempting any inference.
+  Type getExplicitCaughtErrorType(CatchNode catchNode);
+
   /// Determine the caught error type for the given catch node.
   Type getCaughtErrorType(CatchNode node);
 

@@ -42,8 +42,11 @@ using namespace swift;
 using namespace irgen;
 
 /// Compute the flags to pass to swift_dynamicCast.
-static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
-                                            CheckedCastMode mode) {
+static DynamicCastFlags getDynamicCastFlags(
+    CastConsumptionKind consumptionKind,
+    CheckedCastMode mode,
+    CastingIsolatedConformances isolatedConformances
+) {
   DynamicCastFlags flags = DynamicCastFlags::Default;
 
   if (mode == CheckedCastMode::Unconditional)
@@ -52,6 +55,14 @@ static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
     flags |= DynamicCastFlags::DestroyOnFailure;
   if (shouldTakeOnSuccess(consumptionKind))
     flags |= DynamicCastFlags::TakeOnSuccess;
+
+  switch (isolatedConformances) {
+  case CastingIsolatedConformances::Allow:
+    break;
+  case CastingIsolatedConformances::Prohibit:
+    flags |= DynamicCastFlags::ProhibitIsolatedConformances;
+    break;
+  }
 
   return flags;
 }
@@ -63,10 +74,12 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
                                     Address dest,
                                     CanType targetType,
                                     CastConsumptionKind consumptionKind,
-                                    CheckedCastMode mode) {
+                                    CheckedCastMode mode,
+                            CastingIsolatedConformances isolatedConformances) {
   // TODO: attempt to specialize this based on the known types.
 
-  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode);
+  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode,
+                                               isolatedConformances);
 
   // Cast both addresses to opaque pointer type.
   dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.OpaqueTy);
@@ -847,6 +860,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                   SILType targetLoweredType,
                                   CanType targetFormalType,
                                   CheckedCastMode mode,
+                              CastingIsolatedConformances isolatedConformances,
                                   Explosion &out) {
   assert(sourceLoweredType.isObject());
   assert(targetLoweredType.isObject());
@@ -976,7 +990,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                                src, sourceFormalType,
                                                dest, targetFormalType,
                                                CastConsumptionKind::TakeAlways,
-                                               mode);
+                                               mode, isolatedConformances);
         llvm::Value *successResult = IGF.Builder.CreateLoad(dest);
         llvm::Value *failureResult = llvm::ConstantPointerNull::get(destPtrType);
         llvm::Value *result = IGF.Builder.CreateSelect(success, successResult, failureResult);

@@ -233,6 +233,10 @@ public:
 
   bool isDistributedActor() const;
 
+  bool isCallerIsolationInheriting() const {
+    return getKind() == CallerIsolationInheriting;
+  }
+
   Type getGlobalActor() const {
     assert(isGlobalActor());
 

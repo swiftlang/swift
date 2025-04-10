@@ -2207,8 +2207,7 @@ public:
       return nullptr;
 
     // Dig out the Objective-C type.
-    Type objcType = conformance.getTypeWitnessByName(
-        declaredType, ctx.Id_ObjectiveCType);
+    Type objcType = conformance.getTypeWitnessByName(ctx.Id_ObjectiveCType);
 
     // Dig out the Objective-C class.
     return objcType->getClassOrBoundGenericClass();

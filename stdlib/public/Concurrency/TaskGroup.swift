@@ -331,8 +331,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     self._group = group
   }
 
-  /// Wait for the next child task to complete,
-  /// and return the value it returned.
+  /// Waits for the next child task to complete,
+  /// and returns the value it returned.
   ///
   /// The values returned by successive calls to this method
   /// appear in the order that the tasks *completed*,

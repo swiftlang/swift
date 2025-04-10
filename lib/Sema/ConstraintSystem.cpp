@@ -511,7 +511,7 @@ void ConstraintSystem::recordPotentialThrowSite(
   recordPotentialThrowSite(catchNode, site);
 }
 
-Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
+Type ConstraintSystem::getExplicitCaughtErrorType(CatchNode catchNode) {
   ASTContext &ctx = getASTContext();
 
   // If there is an explicit caught type for this node, use it.
@@ -521,6 +521,16 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
 
     return explicitCaughtType;
   }
+
+  return Type();
+}
+
+Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
+  ASTContext &ctx = getASTContext();
+
+  // If we have an explicit caught error type for this node, use it.
+  if (auto explicitCaughtType = getExplicitCaughtErrorType(catchNode))
+    return explicitCaughtType;
 
   // Retrieve the thrown error type of a closure.
   // FIXME: This will need to change when we do inference of thrown error
@@ -1699,7 +1709,7 @@ struct TypeSimplifier {
           return memberTy;
         }
 
-        auto result = conformance.getTypeWitness(lookupBaseType, assocType);
+        auto result = conformance.getTypeWitness(assocType);
         if (result && !result->hasError())
           return result;
       }
@@ -3876,7 +3886,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
+  return conformance.getTypeWitnessByName(cs.getASTContext().Id_RawValue);
 }
 
 void ConstraintSystem::generateOverloadConstraints(
@@ -4974,14 +4984,12 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
 
   // Have we bound an overload for the argument already?
   if (argExpr) {
-    auto locator = getConstraintLocator(argExpr);
-    auto knownOverloadBinding = ResolvedOverloads.find(locator);
-    if (knownOverloadBinding != ResolvedOverloads.end()) {
+    if (auto selectedOverload = findSelectedOverloadFor(argExpr)) {
       // If the overload choice is a generic function, then we have a generic
       // function reference.
-      auto choice = knownOverloadBinding->second;
-      if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
-              choice.choice.getDeclOrNull())) {
+      auto choice = selectedOverload->choice;
+      if (auto func =
+              dyn_cast_or_null<AbstractFunctionDecl>(choice.getDeclOrNull())) {
         if (func->isGeneric())
           return true;
       }

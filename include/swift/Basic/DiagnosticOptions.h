@@ -69,10 +69,6 @@ public:
   PrintDiagnosticNamesMode PrintDiagnosticNames =
       PrintDiagnosticNamesMode::None;
 
-  /// If set to true, include educational notes in printed output if available.
-  /// Educational notes are documentation which supplement diagnostics.
-  bool PrintEducationalNotes = false;
-
   /// Whether to emit diagnostics in the terse LLVM style or in a more
   /// descriptive style that's specific to Swift.
   FormattingStyle PrintedFormattingStyle = FormattingStyle::Swift;

@@ -431,7 +431,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
       llvm::raw_svector_ostream OS(Info.USR);
-      SwiftLangSupport::printUSR(VD, OS);
+      SwiftLangSupport::printUSR(VD, OS, /*distinguishSynthesizedDecls*/ true);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);
@@ -451,11 +451,8 @@ static bool initDocEntityInfo(const Decl *D,
   Info.IsUnavailable = D->isUnavailable();
   Info.IsDeprecated = D->isDeprecated();
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    Info.IsAsync = AFD->hasAsync();
-  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
-    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
-      Info.IsAsync = Getter->hasAsync();
+  if (auto *valueDecl = dyn_cast<ValueDecl>(D)) {
+    Info.IsAsync = valueDecl->isAsync();
   }
 
   if (!IsRef) {

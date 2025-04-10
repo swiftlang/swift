@@ -402,6 +402,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
       DeclAttrKind::AllowFeatureSuppression,
+      DeclAttrKind::Extensible,
   };
 
   return result;
@@ -1284,6 +1285,15 @@ void PrintAST::printAttributes(const Decl *D) {
   // for each decl They cannot be shared across different decls.
   assert(Options.ExcludeCustomAttrList.empty());
 
+  // If there is an `@abi` attr, we need to print it first so that it isn't
+  // affected by subsequent mutation of `Options.ExcludeAttrList`.
+  if (auto abiAttr = attrs.getAttribute<ABIAttr>()) {
+    if (Options.PrintImplicitAttrs && !Options.excludeAttr(abiAttr)) {
+      abiAttr->print(Printer, Options, D);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ABI);
+    }
+  }
+
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
@@ -1323,8 +1333,8 @@ void PrintAST::printAttributes(const Decl *D) {
 
       if (!Options.PrintForSIL) {
         // Don't print @_hasStorage if the value is simply stored, or the
-        // decl is resilient.
-        if (vd->isResilient() ||
+        // decl is resilient or in an `@objc @implementation` extension.
+        if (vd->isResilient() || isInObjCImpl(vd) ||
             (vd->getImplInfo().isSimpleStored() &&
              !hasLessAccessibleSetter(vd)))
           Options.ExcludeAttrList.push_back(DeclAttrKind::HasStorage);
@@ -1334,7 +1344,8 @@ void PrintAST::printAttributes(const Decl *D) {
     // Add SPIs to both private and package interfaces
     if (!Options.printPublicInterface() &&
         DeclAttribute::canAttributeAppearOnDeclKind(
-            DeclAttrKind::SPIAccessControl, D->getKind())) {
+            DeclAttrKind::SPIAccessControl, D->getKind()) &&
+        !Options.excludeAttrKind(DeclAttrKind::SPIAccessControl)) {
       interleave(D->getSPIGroups(),
              [&](Identifier spiName) {
                Printer.printAttrName("_spi", true);
@@ -1358,7 +1369,7 @@ void PrintAST::printAttributes(const Decl *D) {
     // If the declaration is implicitly @objc, print the attribute now.
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isObjC() && !isa<EnumElementDecl>(VD) &&
-          !attrs.hasAttribute<ObjCAttr>()) {
+          !attrs.hasAttribute<ObjCAttr>() && ABIRoleInfo(D).providesAPI()) {
         Printer.printAttrName("@objc");
         Printer << " ";
       }
@@ -3292,14 +3303,6 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
 }
 
 static void
-suppressingFeatureCustomAvailability(PrintOptions &options,
-                                     llvm::function_ref<void()> action) {
-  // FIXME: [availability] Save and restore a bit controlling whether
-  // @available attributes for custom domains are printed.
-  action();
-}
-
-static void
 suppressingFeatureExecutionAttribute(PrintOptions &options,
                                     llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope1(options.SuppressExecutionAttribute, true);
@@ -3341,7 +3344,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
-    printer << "$" << getFeatureName(feature);
+    printer << "$" << Feature(feature).getName();
   }
 
 #ifndef NDEBUG
@@ -3911,6 +3914,9 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
+  
+  if (flags.isConstValue())
+    printer.printKeyword("@const", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -4506,6 +4512,13 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
                       decl->getElementInterfaceType());
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+
+    if (!Options.SuppressSendingArgsAndResults) {
+      if (decl->getElementTypeRepr()) {
+        if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
+          Printer << "sending ";
+      }
+    }
 
     PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
@@ -5986,7 +5999,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
         Name = Mod->getASTContext()
           .getIdentifier(const_cast<OriginallyDefinedInAttr*>(attr)
-                         ->OriginalModuleName);
+                         ->ManglingModuleName);
         break;
       }
     }
@@ -6634,7 +6647,7 @@ public:
       case SILFunctionType::Representation::WitnessMethod:
         Printer << "witness_method: ";
         printTypeDeclName(
-            witnessMethodConformance.getRequirement()->getDeclaredType()
+            witnessMethodConformance.getProtocol()->getDeclaredType()
                 ->castTo<ProtocolType>());
         break;
       case SILFunctionType::Representation::Closure:
@@ -7062,6 +7075,18 @@ public:
     } else {
       Printer << "[";
       visit(T->getBaseType());
+      Printer << "]";
+    }
+  }
+
+  void visitInlineArrayType(InlineArrayType *T) {
+    if (Options.AlwaysDesugarInlineArrayTypes) {
+      visit(T->getDesugaredType());
+    } else {
+      Printer << "[";
+      visit(T->getCountType());
+      Printer << " x ";
+      visit(T->getElementType());
       Printer << "]";
     }
   }
@@ -7713,6 +7738,11 @@ void SILParameterInfo::print(
     options -= SILParameterInfo::Isolated;
     Printer << "@sil_isolated ";
   }
+      
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    Printer << "@const ";
+  }
 
   if (lifetimeDependence) {
     Printer.printLifetimeDependence(*lifetimeDependence);
@@ -7811,7 +7841,7 @@ std::string TypeBase::getStringAsComponent(const PrintOptions &PO) const {
   return OS.str();
 }
 
-void TypeBase::dumpPrint() const {
+void TypeBase::print() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }

@@ -356,7 +356,7 @@ public func _forEachFieldWithKeyPath<Root>(
       return KeyPath<Root, Leaf>.self
     }
     let resultSize = MemoryLayout<Int32>.size + MemoryLayout<Int>.size
-    let partialKeyPath = _openExistential(childType, do: keyPathType)
+    let partialKeyPath = unsafe _openExistential(childType, do: keyPathType)
        ._create(capacityInBytes: resultSize) {
       var destBuilder = unsafe KeyPathBuffer.Builder($0)
       unsafe destBuilder.pushHeader(KeyPathBuffer.Header(

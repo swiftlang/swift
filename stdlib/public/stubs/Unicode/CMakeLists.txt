@@ -21,7 +21,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       set(extra_c_compile_flags -ffreestanding)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding)
+      set(extra_c_compile_flags -ffreestanding)
     endif()
     list(APPEND extra_c_compile_flags -nostdinc++)
 

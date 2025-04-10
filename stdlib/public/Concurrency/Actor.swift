@@ -99,10 +99,26 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 @freestanding(expression)
 public macro isolation<T>() -> T = Builtin.IsolationMacro
 
+/// Wrap the function body in a new top-level task on behalf of the
+/// given actor.
 @available(SwiftStdlib 5.1, *)
 @attached(body)
-public macro StartTask() =
-  #externalMacro(module: "SwiftMacros", type: "StartTaskMacro")
+public macro Task(
+  on actor: any GlobalActor,
+  name: String? = nil,
+  priority: TaskPriority? = nil
+) =
+  #externalMacro(module: "SwiftMacros", type: "TaskMacro")
+
+/// Wrap the function body in a new top-level task on behalf of the
+/// current actor.
+@available(SwiftStdlib 5.1, *)
+@attached(body)
+public macro Task(
+  name: String? = nil,
+  priority: TaskPriority? = nil
+) =
+  #externalMacro(module: "SwiftMacros", type: "TaskMacro")
 
 // NOTE: We put SwiftSetting under $Macro since #SwiftSettings() is a macro.
 @available(SwiftStdlib 9999, *)

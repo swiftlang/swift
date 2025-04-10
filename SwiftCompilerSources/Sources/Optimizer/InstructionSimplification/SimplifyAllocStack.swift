@@ -213,12 +213,14 @@ private extension AllocStackInst {
         builder.createCheckedCastAddrBranch(
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: cab.destination, targetFormalType: cab.targetFormalType,
+          isolatedConformances: cab.isolatedConformances,
           consumptionKind: cab.consumptionKind,
           successBlock: cab.successBlock, failureBlock: cab.failureBlock)
         context.erase(instruction: cab)
       case let ucca as UnconditionalCheckedCastAddrInst:
         let builder = Builder(before: ucca, context)
         builder.createUnconditionalCheckedCastAddr(
+          isolatedConformances: ucca.isolatedConformances,
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: ucca.destination, targetFormalType: ucca.targetFormalType)
         context.erase(instruction: ucca)
@@ -255,9 +257,13 @@ private extension AllocStackInst {
       case is CheckedCastAddrBranchInst, is UnconditionalCheckedCastAddrInst:
         // To construct a new cast instruction we need a formal type.
         requiresLegalFormalType = true
-        fallthrough
-      case is UncheckedAddrCastInst:
         if use != use.instruction.operands[0] {
+          return nil
+        }
+      case is UncheckedAddrCastInst:
+        if self.type.isExistential {
+          // Bail if the address of the original existential escapes.
+          // This is not a problem if the alloc_stack already contains the opened existential.
           return nil
         }
       default:
@@ -272,10 +278,10 @@ private extension AllocStackInst {
         //         `alloc_stack $any P` -> `alloc_stack $ConcreteType`
         concreteType = cft
       } else {
-        // The instruction which defines the existential archetype must dominate the alloc_stack, because
-        // after the transformation the alloc_stack will use the existential archetype.
-        for openArchetypeOp in initExistential.typeDependentOperands {
-          if !openArchetypeOp.value.definingInstruction!.dominatesInSameBlock(self) {
+        // The instruction or argument which defines the archetype must dominate the alloc_stack
+        // because after the transformation, the alloc_stack will use the archetype.
+        for typeDependentOp in initExistential.typeDependentOperands {
+          if !typeDependentOp.value.triviallyDominates(self) {
             return nil
           }
         }

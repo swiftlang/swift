@@ -36,6 +36,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     hasher.combine(ObjectIdentifier(self))
   }
 
+  public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
@@ -59,6 +61,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
   public var loweredFunctionType: CanonicalType {
     CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
+  }
+
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
+  }
+
+  public var forwardingSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getForwardingSubstitutionMap())
+  }
+
+  public func mapTypeIntoContext(_ type: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: bridged.mapTypeIntoContext(type.bridged))
   }
 
   /// Returns true if the function is a definition and not only an external declaration.
@@ -320,10 +334,15 @@ extension Function {
 
   public var hasSelfArgument: Bool { argumentConventions.selfIndex != nil }
 
-  public var selfArgumentIndex: Int { argumentConventions.selfIndex! }
+  public var selfArgumentIndex: Int? { argumentConventions.selfIndex }
 
-  public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
-  
+  public var selfArgument: FunctionArgument? {
+    if let selfArgIdx = selfArgumentIndex {
+      return arguments[selfArgIdx]
+    }
+    return nil
+  }
+
   public var dynamicSelfMetadata: FunctionArgument? {
     if bridged.hasDynamicSelfMetadata() {
       return arguments.last!

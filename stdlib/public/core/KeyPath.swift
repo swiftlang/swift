@@ -77,7 +77,7 @@ public class AnyKeyPath: _AppendKeyPath {
     }
 
 #if _pointerBitWidth(_64)
-    _kvcKeyPathStringPtr = unsafe UnsafePointer<CChar>(bitPattern: -offset - 1)
+    unsafe _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: -offset - 1)
 #elseif _pointerBitWidth(_32)
     if offset <= maximumOffsetOn32BitArchitecture {
       _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: (offset + 1))
@@ -96,7 +96,7 @@ public class AnyKeyPath: _AppendKeyPath {
     }
 
 #if _pointerBitWidth(_64)
-    let offset = (0 &- Int(bitPattern: _kvcKeyPathStringPtr)) &- 1
+    let offset = unsafe (0 &- Int(bitPattern: _kvcKeyPathStringPtr)) &- 1
     guard _fastPath(offset >= 0) else {
       // This happens to be an actual _kvcKeyPathStringPtr, not an offset, if
       // we get here.
@@ -126,7 +126,7 @@ public class AnyKeyPath: _AppendKeyPath {
       guard self.getOffsetFromStorage() == nil else {
         return nil
       }
-      guard let ptr = _kvcKeyPathStringPtr else { return nil }
+      guard let ptr = unsafe _kvcKeyPathStringPtr else { return nil }
 
       return unsafe String(validatingCString: ptr)
     }
@@ -155,7 +155,7 @@ public class AnyKeyPath: _AppendKeyPath {
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
-    result._kvcKeyPathStringPtr = nil
+    unsafe result._kvcKeyPathStringPtr = nil
     let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))
     unsafe body(UnsafeMutableRawBufferPointer(start: base, count: bytes))
@@ -173,7 +173,7 @@ public class AnyKeyPath: _AppendKeyPath {
   @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
   internal var _storedInlineOffset: Int? {
     #if !$Embedded
-    return withBuffer {
+    return unsafe withBuffer {
       var buffer = unsafe $0
 
       // The identity key path is effectively a stored keypath of type Self
@@ -219,7 +219,7 @@ extension AnyKeyPath: Hashable {
   @_effects(releasenone)
   final public func hash(into hasher: inout Hasher) {
     ObjectIdentifier(type(of: self)).hash(into: &hasher)
-    return withBuffer {
+    return unsafe withBuffer {
       var buffer = unsafe $0
       if unsafe buffer.data.isEmpty { return }
       while true {
@@ -243,9 +243,9 @@ extension AnyKeyPath: Hashable {
     if type(of: a) != type(of: b) {
       return false
     }
-    return a.withBuffer {
+    return unsafe a.withBuffer {
       var aBuffer = unsafe $0
-      return b.withBuffer {
+      return unsafe b.withBuffer {
         var bBuffer = unsafe $0
         
         // Two equivalent key paths should have the same reference prefix
@@ -344,7 +344,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
       }
     }
 
-    return withBuffer {
+    return unsafe withBuffer {
       var buffer = unsafe $0
 
       if unsafe _slowPath(buffer.data.isEmpty) {
@@ -441,7 +441,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   
   deinit {
     #if !$Embedded
-    withBuffer { unsafe $0.destroy() }
+    unsafe withBuffer { unsafe $0.destroy() }
     #else
     fatalError() // unreachable, keypaths in embedded Swift are compile-time
     #endif
@@ -475,7 +475,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
     var type: Any.Type = Root.self
     var keepAlive: AnyObject?
     
-    return withBuffer {
+    return unsafe withBuffer {
       var buffer = unsafe $0
       
       unsafe _internalInvariant(!buffer.hasReferencePrefix,
@@ -531,7 +531,7 @@ public class ReferenceWritableKeyPath<
   internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
-    let address: UnsafeMutablePointer<Value> = withBuffer {
+    let address: UnsafeMutablePointer<Value> = unsafe withBuffer {
       var buffer = unsafe $0
 
       // Project out the reference prefix.
@@ -2619,9 +2619,9 @@ internal func _appendingKeyPaths<
   leaf: KeyPath<Value, AppendedValue>
 ) -> Result {
   let resultTy = type(of: root).appendedType(with: type(of: leaf))
-  var returnValue: AnyKeyPath = root.withBuffer {
+  var returnValue: AnyKeyPath = unsafe root.withBuffer {
     var rootBuffer = unsafe $0
-    return leaf.withBuffer {
+    return unsafe leaf.withBuffer {
       var leafBuffer = unsafe $0
 
       // If either operand is the identity key path, then we should return
@@ -2638,8 +2638,8 @@ internal func _appendingKeyPaths<
       let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
 
       if root.getOffsetFromStorage() == nil, leaf.getOffsetFromStorage() == nil,
-        let rootPtr = root._kvcKeyPathStringPtr,
-        let leafPtr = leaf._kvcKeyPathStringPtr {
+        let rootPtr = unsafe root._kvcKeyPathStringPtr,
+        let leafPtr = unsafe leaf._kvcKeyPathStringPtr {
         rootKVCLength = unsafe Int(_swift_stdlib_strlen(rootPtr))
         leafKVCLength = unsafe Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
@@ -2673,7 +2673,7 @@ internal func _appendingKeyPaths<
 
       var kvcStringBuffer: UnsafeMutableRawPointer? = nil
 
-      let result = resultTy._create(capacityInBytes: totalResultSize) {
+      let result = unsafe resultTy._create(capacityInBytes: totalResultSize) {
         var destBuffer = unsafe $0
 
         // Remember where the tail-allocated KVC string buffer begins.
@@ -2771,7 +2771,7 @@ internal func _appendingKeyPaths<
             dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
             src: leafPtr,
             size: UInt(leafKVCLength))
-          result._kvcKeyPathStringPtr =
+          unsafe result._kvcKeyPathStringPtr =
             unsafe UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))
           unsafe kvcStringBuffer.advanced(by: rootKVCLength + leafKVCLength + 1)
             .storeBytes(of: 0 /* '\0' */, as: CChar.self)
@@ -2874,7 +2874,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   var pureStructOffset: UInt32? = nil
 
   // Allocate the instance.
-  let instance = keyPathClass._create(
+  let instance = unsafe keyPathClass._create(
     capacityInBytes: sizeWithMaxSize
   ) { instanceData in
     // Instantiate the pattern into the instance.
@@ -2893,11 +2893,11 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
 
   if kvcStringOffset == 0 {
     // Null pointer.
-    instance._kvcKeyPathStringPtr = nil
+    unsafe instance._kvcKeyPathStringPtr = nil
   } else {
     let kvcStringPtr = unsafe _resolveRelativeAddress(kvcStringBase, kvcStringOffset)
-    instance._kvcKeyPathStringPtr =
-      unsafe kvcStringPtr.assumingMemoryBound(to: CChar.self)
+    unsafe instance._kvcKeyPathStringPtr =
+      kvcStringPtr.assumingMemoryBound(to: CChar.self)
   }
   if unsafe instance._kvcKeyPathStringPtr == nil, let offset = pureStructOffset {
     instance.assignOffsetToStorage(offset: Int(offset))
@@ -4222,7 +4222,7 @@ public func _createOffsetBasedKeyPath(
   // The buffer header is 32 bits, but components must start on a word
   // boundary.
   let kpBufferSize = MemoryLayout<Int>.size + MemoryLayout<Int32>.size
-  let kp = kpTy._create(capacityInBytes: kpBufferSize) {
+  let kp = unsafe kpTy._create(capacityInBytes: kpBufferSize) {
     var builder = unsafe KeyPathBuffer.Builder($0)
     let header = unsafe KeyPathBuffer.Header(
       size: kpBufferSize - MemoryLayout<Int>.size,
@@ -4265,7 +4265,7 @@ public func _rerootKeyPath<NewRoot>(
     hasReferencePrefix,
     isSingleComponent,
     componentSize
-  ) = existingKp.withBuffer {
+  ) = unsafe existingKp.withBuffer {
     unsafe ($0.trivial, $0.hasReferencePrefix, $0.isSingleComponent, $0.data.count)
   }
 
@@ -4297,7 +4297,7 @@ public func _rerootKeyPath<NewRoot>(
   capacity = MemoryLayout<Int>._roundingUpToAlignment(capacity)
   capacity += MemoryLayout<Int>.size
 
-  return newKpTy._create(
+  return unsafe newKpTy._create(
     capacityInBytes: capacity
   ) {
     var builder = unsafe KeyPathBuffer.Builder($0)
@@ -4310,7 +4310,7 @@ public func _rerootKeyPath<NewRoot>(
 
     unsafe builder.pushHeader(header)
 
-    existingKp.withBuffer {
+    unsafe existingKp.withBuffer {
       var existingBuffer = unsafe $0
 
       while true {
@@ -4382,7 +4382,7 @@ extension AnyKeyPath: CustomDebugStringConvertible {
   @available(SwiftStdlib 5.8, *)
   public var debugDescription: String {
     var description = "\\\(String(describing: Self.rootType))"
-    return withBuffer {
+    return unsafe withBuffer {
       var buffer = unsafe $0
       if unsafe buffer.data.isEmpty {
         description.append(".self")

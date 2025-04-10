@@ -236,7 +236,7 @@ final internal class _SetStorage<Element: Hashable>
   }
 
   internal var asNative: _NativeSet<Element> {
-    return _NativeSet(self)
+    return unsafe _NativeSet(self)
   }
 
 #if _runtime(_ObjC)

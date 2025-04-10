@@ -189,11 +189,6 @@ public:
     assert(value->getType().isAddress() && "Expected value to be an address");
     // We check for value->getFunction() here since we /could/ be passed
     // SILUndef here.
-    if (auto *f = value->getFunction()) {
-      if (value->getType().isTrivial(f)) {
-        return forTrivialAddressRValue(value);
-      }
-    }
     assert(value->getOwnershipKind() == OwnershipKind::None &&
            "Addresses always have trivial ownership");
     return ManagedValue(value, false, CleanupHandle::invalid());
@@ -256,7 +251,7 @@ public:
   
   /// Creates a managed value for an address that is undergoing a formal
   /// access. This will be `forLValue` if the `accessKind` is a mutating
-  /// (exclusive) access or `forBorrowedRValueAddress` if the
+  /// (exclusive) access or `forBorrowedAddressRValue` if the
   /// `accessKind` is borrowing (shared).
   static ManagedValue forFormalAccessedAddress(SILValue address,
                                                SGFAccessKind accessKind);

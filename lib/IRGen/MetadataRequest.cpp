@@ -526,7 +526,7 @@ CanType IRGenModule::getRuntimeReifiedType(CanType type) {
   }));
 }
 
-CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
+Type IRGenModule::substOpaqueTypesWithUnderlyingTypes(Type type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
@@ -535,6 +535,11 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   }
 
   return type;
+}
+
+CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
+  return substOpaqueTypesWithUnderlyingTypes(static_cast<Type>(type))
+      ->getCanonicalType();
 }
 
 SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
@@ -560,7 +565,7 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
     auto context = getMaximalTypeExpansionContext();
     return std::make_pair(
        swift::substOpaqueTypesWithUnderlyingTypes(type, context),
-       swift::substOpaqueTypesWithUnderlyingTypes(conformance, type, context));
+       swift::substOpaqueTypesWithUnderlyingTypes(conformance, context));
   }
 
   return std::make_pair(type, conformance);
@@ -899,7 +904,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
   // If we have to instantiate resilient or dependent witness tables, we
   // cannot prespecialize.
   for (auto conformance : substitutions.getConformances()) {
-    auto protocol = conformance.getRequirement();
+    auto protocol = conformance.getProtocol();
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
       continue;
 

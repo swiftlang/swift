@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckProtocol.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
 #include "TypeAccessScopeChecker.h"
@@ -512,8 +512,7 @@ checkEffects(AbstractStorageDecl *witness, AbstractStorageDecl *req) {
 /// to be used by `matchWitness`.
 static std::optional<RequirementMatch>
 matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
-                          bool &decomposeFunctionType, bool &ignoreReturnType,
-                          Type &reqThrownError, Type &witnessThrownError) {
+                          bool &decomposeFunctionType, bool &ignoreReturnType) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -658,23 +657,6 @@ matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
-
-    // Dig out the thrown error types from the getter so we can compare them
-    // later.
-    auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
-      if (auto getter = asd->getEffectfulGetAccessor()) {
-        if (Type thrownErrorType = getter->getThrownInterfaceType()) {
-          return thrownErrorType;
-        } else if (getter->hasThrows()) {
-          return asd->getASTContext().getAnyExistentialType();
-        }
-      }
-
-      return asd->getASTContext().getNeverType();
-    };
-
-    reqThrownError = getThrownErrorType(reqASD);
-    witnessThrownError = getThrownErrorType(witnessASD);
   } else if (isa<ConstructorDecl>(witness)) {
     decomposeFunctionType = true;
     ignoreReturnType = true;
@@ -713,39 +695,33 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
                                                  const ValueDecl *witness) {
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
-  Type reqThrownError;
-  Type witnessThrownError;
   return matchWitnessStructureImpl(req, const_cast<ValueDecl *>(witness),
-                                   decomposeFunctionType, ignoreReturnType,
-                                   reqThrownError,
-                                   witnessThrownError) == std::nullopt;
+                                   decomposeFunctionType, ignoreReturnType)
+      == std::nullopt;
 }
 
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
+        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
         setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
         finalize) {
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
-  Type reqThrownError;
-  Type witnessThrownError;
 
   if (auto StructuralMismatch = matchWitnessStructureImpl(
-          req, witness, decomposeFunctionType, ignoreReturnType, reqThrownError,
-          witnessThrownError)) {
+          req, witness, decomposeFunctionType, ignoreReturnType)) {
     return *StructuralMismatch;
   }
 
   // Set up the match, determining the requirement and witness types
   // in the process.
-  Type reqType, witnessType;
+  Type reqType, witnessType, reqThrownError, witnessThrownError;
   {
     std::optional<RequirementMatch> result;
-    std::tie(result, reqType, witnessType) = setup();
+    std::tie(result, reqType, witnessType, reqThrownError, witnessThrownError) = setup();
     if (result) {
       return std::move(result.value());
     }
@@ -805,10 +781,10 @@ RequirementMatch swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, 
                               witnessType);
 
-    ParameterList *witnessParamList = getParameterList(witness);
+    ParameterList *witnessParamList = witness->getParameterList();
     assert(witnessParamList->size() == witnessParams.size());
 
-    ParameterList *reqParamList = getParameterList(req);
+    ParameterList *reqParamList = req->getParameterList();
     assert(reqParamList->size() == reqParams.size());
 
     // Match each of the parameters.
@@ -936,7 +912,8 @@ RequirementMatch swift::matchWitness(
 
     case ThrownErrorSubtyping::Subtype:
       // If there were no type parameters, we're done.
-      if (!reqThrownError->hasTypeParameter())
+      if (!reqThrownError->hasTypeVariable() &&
+          !reqThrownError->hasTypeParameter())
         break;
 
       LLVM_FALLTHROUGH;
@@ -1186,7 +1163,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   // Set up the constraint system for matching.
   auto setup =
-      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type> {
+      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
@@ -1199,10 +1176,12 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (syntheticEnv)
       selfTy = syntheticEnv->mapTypeIntoContext(selfTy);
 
+
     // Open up the type of the requirement.
+    SmallVector<OpenedType, 4> reqReplacements;
+
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    SmallVector<OpenedType, 4> reqReplacements;
     reqType =
         cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isDynamicResult=*/false,
@@ -1235,14 +1214,17 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
 
     // Open up the witness type.
+    SmallVector<OpenedType, 4> witnessReplacements;
+
     witnessType = witness->getInterfaceType();
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       openWitnessType =
-          cs->getTypeOfMemberReference(
-                selfTy, witness, dc, /*isDynamicResult=*/false,
-                FunctionRefInfo::doubleBaseNameApply(), witnessLocator)
+          cs->getTypeOfMemberReference(selfTy, witness, dc,
+                                       /*isDynamicResult=*/false,
+                                       FunctionRefInfo::doubleBaseNameApply(),
+                                       witnessLocator, &witnessReplacements)
               .adjustedReferenceType;
     } else {
       openWitnessType =
@@ -1253,7 +1235,37 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
     openWitnessType = openWitnessType->getRValueType();
 
-    return std::make_tuple(std::nullopt, reqType, openWitnessType);
+    Type reqThrownError;
+    Type witnessThrownError;
+
+    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
+      auto *reqASD = cast<AbstractStorageDecl>(req);
+
+      // Dig out the thrown error types from the getter so we can compare them
+      // later.
+      auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
+        if (auto getter = asd->getEffectfulGetAccessor()) {
+          if (Type thrownErrorType = getter->getThrownInterfaceType()) {
+            return thrownErrorType;
+          } else if (getter->hasThrows()) {
+            return asd->getASTContext().getErrorExistentialType();
+          }
+        }
+
+        return asd->getASTContext().getNeverType();
+      };
+
+      reqThrownError = getThrownErrorType(reqASD);
+      reqThrownError = cs->openType(reqThrownError, reqReplacements,
+                                    reqLocator);
+
+      witnessThrownError = getThrownErrorType(witnessASD);
+      witnessThrownError = cs->openType(witnessThrownError, witnessReplacements,
+                                        witnessLocator);
+    }
+
+    return std::make_tuple(std::nullopt, reqType, openWitnessType,
+                           reqThrownError, witnessThrownError);
   };
 
   // Match a type in the requirement to a type in the witness.
@@ -2851,10 +2863,8 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
   }
 
   // For parameter adjustments, dig out the pattern.
-  ParameterList *params = nullptr;
-  if (isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) {
-    params = getParameterList(witness);
-  } else {
+  auto *params = witness->getParameterList();
+  if (!params) {
     return SourceLoc();
   }
 
@@ -3344,9 +3354,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   // Determine the isolation of the requirement itself.
   auto requirementIsolation = getActorIsolation(requirement);
   if (requirementIsolation.requiresSubstitution()) {
-    auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
     auto subs = SubstitutionMap::getProtocolSubstitutions(
-        Proto, substitutingType, ProtocolConformanceRef(Conformance));
+        ProtocolConformanceRef(Conformance));
     requirementIsolation = requirementIsolation.subst(subs);
   }
 
@@ -3379,7 +3388,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // Witnessing `async` requirement with an isolated synchronous
     // declaration is done via async witness thunk which requires
     // a hop to the expected concurrency domain.
-    if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+    if (requirement->isAsync() && !witness->isAsync())
       return refResult.isolation;
 
     // Otherwise, we're done.
@@ -3426,8 +3435,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   // FIXME: feels like ActorReferenceResult should be reporting this back to
   // us somehow.
   // To enter the actor, we always need the requirement to be `async`.
-  if (!sameConcurrencyDomain &&
-      !isAsyncDecl(requirement) &&
+  if (!sameConcurrencyDomain && !requirement->isAsync() &&
       !isAccessibleAcrossActors(witness, refResult.isolation, DC))
     missingOptions |= MissingFlags::RequirementAsync;
 
@@ -3518,7 +3526,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       return std::nullopt;
 
     if (refResult.isolation.isActorIsolated()) {
-      if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+      if (requirement->isAsync() && !witness->isAsync())
         return refResult.isolation;
 
       // Always treat `@preconcurrency` witnesses as isolated.
@@ -3664,12 +3672,11 @@ static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
   // move it to another extension where the required level is possible;
   // otherwise, we simply mark decl as the required level.
   if (shouldMoveToAnotherExtension) {
-    diags.diagnose(decl, diag::witness_move_to_another_extension,
-                   decl->getDescriptiveKind(), requiredAccess);
+    diags.diagnose(decl, diag::witness_move_to_another_extension, decl,
+                   requiredAccess);
   } else {
-    auto fixItDiag = diags.diagnose(decl, diag::witness_fix_access,
-                                    decl->getDescriptiveKind(),
-                                    requiredAccess);
+    auto fixItDiag =
+        diags.diagnose(decl, diag::witness_fix_access, decl, requiredAccess);
     fixItAccess(fixItDiag, decl, requiredAccess, isForSetter,
                 shouldUseDefaultAccess);
   }
@@ -3843,8 +3850,7 @@ filterProtocolRequirements(
   const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
     auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
     auto Conformance = lookupConformance(Adoptee, PD);
-    return SubstitutionMap::getProtocolSubstitutions(
-        PD, Adoptee, Conformance);
+    return SubstitutionMap::getProtocolSubstitutions(Conformance);
   };
 
   llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
@@ -3859,15 +3865,22 @@ filterProtocolRequirements(
 
     auto OverloadTy = Req->getOverloadSignatureType();
     if (OverloadTy) {
-      OverloadTy =
-          OverloadTy.subst(getProtocolSubstitutionMap(Req))->getCanonicalType();
+      auto Subs = getProtocolSubstitutionMap(Req);
+      // FIXME: This is wrong if the overload has its own generic parameters
+      if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OverloadTy))
+        OverloadTy = GenericFnTy.substGenericArgs(Subs);
+      else
+        OverloadTy = OverloadTy.subst(Subs)->getCanonicalType();
     }
     if (llvm::any_of(DeclsByName[Req->getName()], [&](ValueDecl *OtherReq) {
           auto OtherOverloadTy = OtherReq->getOverloadSignatureType();
           if (OtherOverloadTy) {
-            OtherOverloadTy =
-                OtherOverloadTy.subst(getProtocolSubstitutionMap(OtherReq))
-                    ->getCanonicalType();
+            auto Subs = getProtocolSubstitutionMap(OtherReq);
+            // FIXME: This is wrong if the overload has its own generic parameters
+            if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OtherOverloadTy))
+              OtherOverloadTy = GenericFnTy.substGenericArgs(Subs);
+            else
+              OtherOverloadTy = OtherOverloadTy.subst(Subs)->getCanonicalType();
           }
           return conflicting(Req->getASTContext(), Req->getOverloadSignature(),
                              OverloadTy, OtherReq->getOverloadSignature(),
@@ -4320,9 +4333,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
         });
     }
     if (best.Kind == MatchKind::RequiresNonSendable) {
@@ -4471,9 +4483,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
       });
       break;
     }
@@ -4503,9 +4514,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                          conformance->getProtocol(), EncodedMessage.Message);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
         });
       break;
 
@@ -4522,9 +4532,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            witness, conformance->getProtocol()->getName(),
                            EncodedMessage.Message);
             emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-            diags.diagnose(requirement, diag::kind_declname_declared_here,
-                           DescriptiveDeclKind::Requirement,
-                           requirement->getName());
+            diags.diagnose(requirement, diag::requirement_declared_here,
+                           requirement);
           });
         break;
     }
@@ -5179,9 +5188,8 @@ static bool diagnoseTypeWitnessAvailability(
               .warnUntilSwiftVersion(warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
-          ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                             DescriptiveDeclKind::Requirement,
-                             assocType->getName());
+          ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
+                             assocType);
         });
   }
 
@@ -5221,8 +5229,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
     typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
     conformanceInContext =
-      conformanceInContext.subst(conformance->getType(),
-                                 genericEnv->getForwardingSubstitutionMap());
+      conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, typeInContext, conformanceInContext);
@@ -5379,7 +5386,11 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
 
       auto outerIsolation = conformance->getIsolation();
       ProtocolConformanceRef(assocConf).forEachIsolatedConformance(
-          [&](ProtocolConformance *isolatedConformance) {
+          [&](ProtocolConformanceRef isolatedConformanceRef) {
+            if (!isolatedConformanceRef.isConcrete())
+              return false;
+
+            auto isolatedConformance = isolatedConformanceRef.getConcrete();
             auto innerIsolation = isolatedConformance->getIsolation();
 
             // If the isolation doesn't match, record an error.
@@ -5515,8 +5526,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5535,8 +5546,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5555,8 +5566,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             fixItDiag->fixItInsert(witness->getAttributeInsertionLoc(false),
                                    "@objc ");
@@ -5570,9 +5581,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                              "@nonobjc ");
           }
 
-          requirement->diagnose(diag::kind_declname_declared_here,
-                                DescriptiveDeclKind::Requirement,
-                                requirement->getName());
+          requirement->diagnose(diag::requirement_declared_here, requirement);
 
           Conformance->setInvalid();
           return;
@@ -6131,14 +6140,11 @@ static bool isGeneric(ValueDecl *decl) {
 
 /// Determine whether this is an unlabeled initializer or subscript.
 static bool isUnlabeledInitializerOrSubscript(ValueDecl *value) {
-  ParameterList *paramList = nullptr;
-  if (isa<ConstructorDecl>(value) || isa<SubscriptDecl>(value)) {
-    paramList = getParameterList(value);
-  } else {
+  if (!(isa<ConstructorDecl>(value) || isa<SubscriptDecl>(value))) {
     return false;
   }
 
-  for (auto param : *paramList) {
+  for (auto param : *value->getParameterList()) {
     if (!param->getArgumentName().empty()) return false;
   }
 
@@ -6261,8 +6267,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
         .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
   }
 
-  req->diagnose(diag::kind_declname_declared_here,
-                DescriptiveDeclKind::Requirement, req->getName());
+  req->diagnose(diag::requirement_declared_here, req);
 }
 
 /// Whether the given protocol is "NSCoding".
@@ -6281,11 +6286,7 @@ static bool hasExplicitObjCName(ClassDecl *classDecl) {
   if (classDecl->getAttrs().hasAttribute<ObjCRuntimeNameAttr>())
     return true;
 
-  auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
-  if (!objcAttr)
-    return false;
-
-  return objcAttr->hasName() && !objcAttr->isNameImplicit();
+  return classDecl->getExplicitObjCName().has_value();
 }
 
 /// Check if the name of a class might be unstable, and if so, emit a
@@ -7403,7 +7404,10 @@ bool swift::forEachConformance(
     if (forEachConformance(subs, body, visitedConformances))
       return true;
 
-    type = type.subst(subs);
+    if (auto *genericFnType = type->getAs<GenericFunctionType>())
+      type = genericFnType->substGenericArgs(subs);
+    else
+      type = type.subst(subs);
   }
 
   if (forEachConformance(type, body, visitedConformances))

@@ -252,7 +252,7 @@ extension AsyncStream {
     func next() async -> Element? {
       await withTaskCancellationHandler {
         unsafe await withUnsafeContinuation {
-          next($0)
+          unsafe next($0)
         }
       } onCancel: { [cancel] in
         cancel()
@@ -512,7 +512,7 @@ extension AsyncThrowingStream {
     func next() async throws -> Element? {
       try await withTaskCancellationHandler {
         try unsafe await withUnsafeThrowingContinuation {
-          next($0)
+          unsafe next($0)
         }
       } onCancel: { [cancel] in
         cancel()

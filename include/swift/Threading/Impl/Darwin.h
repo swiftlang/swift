@@ -129,6 +129,42 @@ inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ::os_unfair_lock_unlock(&handle);
 }
 
+// .. Recursive mutex support .................................................
+
+// The os_unfair_recursive_lock interface is stable, but not in the SDK. Bring
+// our own definitions for what we need.
+
+#define OS_UNFAIR_RECURSIVE_LOCK_INIT                                          \
+  (os_unfair_recursive_lock{OS_UNFAIR_LOCK_INIT, 0})
+
+typedef struct os_unfair_recursive_lock_s {
+  os_unfair_lock ourl_lock;
+  uint32_t ourl_count;
+} os_unfair_recursive_lock, *os_unfair_recursive_lock_t;
+
+using recursive_mutex_handle = os_unfair_recursive_lock;
+
+extern "C" void
+os_unfair_recursive_lock_lock_with_options(os_unfair_recursive_lock_t lock,
+                                           uint32_t options);
+
+extern "C" void
+os_unfair_recursive_lock_unlock(os_unfair_recursive_lock_t lock);
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {
+  handle = OS_UNFAIR_RECURSIVE_LOCK_INIT;
+}
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {}
+
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
+  os_unfair_recursive_lock_lock_with_options(&handle, 0);
+}
+
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
+  os_unfair_recursive_lock_unlock(&handle);
+}
+
 // .. ConditionVariable support ..............................................
 
 struct cond_handle {

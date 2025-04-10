@@ -714,10 +714,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                         /*unboundTyOpener*/ nullptr,
                                         /*placeholderHandler*/ nullptr,
                                         /*packElementOpener*/ nullptr);
-      auto params = func ? func->getParameters()
-                      : subscr ? subscr->getIndices()
-                      : macro->parameterList;
-      for (auto param : *params) {
+
+      for (auto param : *VD->getParameterList()) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
             continue;
@@ -929,18 +927,21 @@ void TypeChecker::diagnoseRequirementFailure(
     if (reqFailureInfo.IsolatedConformanceProto) {
       ASTContext &ctx =
           reqFailureInfo.IsolatedConformanceProto->getASTContext();
-      auto isolatedConformance = reqFailureInfo.IsolatedConformances.front();
-      ctx.Diags.diagnose(
-          errorLoc, diag::isolated_conformance_with_sendable,
-          isolatedConformance->getType(),
-          isolatedConformance->getProtocol()->getName(),
-          reqFailureInfo
-            .IsolatedConformanceProto->isSpecificProtocol(
-              KnownProtocolKind::SendableMetatype),
-          req.getFirstType(),
-          isolatedConformance->getIsolation());
-      diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-      break;
+      auto isolatedConformanceRef = reqFailureInfo.IsolatedConformances.front();
+      if (isolatedConformanceRef.isConcrete()) {
+        auto isolatedConformance = isolatedConformanceRef.getConcrete();
+        ctx.Diags.diagnose(
+            errorLoc, diag::isolated_conformance_with_sendable,
+            isolatedConformance->getType(),
+            isolatedConformance->getProtocol()->getName(),
+            reqFailureInfo
+              .IsolatedConformanceProto->isSpecificProtocol(
+                KnownProtocolKind::SendableMetatype),
+            req.getFirstType(),
+            isolatedConformance->getIsolation());
+        diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+        break;
+      }
     }
 
     diagnoseConformanceFailure(substReq.getFirstType(),
@@ -1028,7 +1029,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    SmallVector<ProtocolConformance *, 2> isolatedConformances;
+    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
     switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
                                       &isolatedConformances)) {
     case CheckRequirementResult::Success:
@@ -1072,7 +1073,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
                                                         signature)) {
           return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
             req, substReq,
-            TinyPtrVector<ProtocolConformance *>(isolatedConformances),
+            TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
             *failedProtocol);
       }
     }

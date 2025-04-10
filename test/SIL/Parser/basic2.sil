@@ -313,6 +313,22 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_addr : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+// CHECK: mark_dependence_addr %1 : $*Builtin.NativeObject on %0 : $*Builtin.NativeObject
+// CHECK: mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %0 : $*Builtin.NativeObject
+// CHECK: mark_dependence_addr [unresolved] %1 : $*Builtin.NativeObject on %0 : $*Builtin.NativeObject
+// CHECK: } // end sil function 'test_mark_dependence_addr'
+sil [ossa] @test_mark_dependence_addr : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  mark_dependence_addr %1 : $*Builtin.NativeObject on %0 : $*Builtin.NativeObject
+  mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %0 : $*Builtin.NativeObject
+  mark_dependence_addr [unresolved] %1 : $*Builtin.NativeObject on %0 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: mark_unresolved_non_copyable_value [consumable_and_assignable] %{{[0-9]+}} : $*MoveOnlyPair
 // CHECK: } // end sil function 'testMarkUnresolvedNonCopyableValueInst'

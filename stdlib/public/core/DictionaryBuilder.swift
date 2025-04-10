@@ -84,7 +84,7 @@ extension Dictionary {
       _ values: UnsafeMutableBufferPointer<Value>
     ) -> Int
   ) {
-    self.init(_native: _NativeDictionary(
+    self.init(_native: unsafe _NativeDictionary(
         _unsafeUninitializedCapacity: capacity,
         allowingDuplicates: allowingDuplicates,
         initializingWith: initializer))
@@ -151,7 +151,7 @@ extension _NativeDictionary {
           unsafe _internalInvariant(b != bucket)
           _precondition(allowingDuplicates, "Duplicate keys found")
           // Discard duplicate entry.
-          uncheckedDestroy(at: bucket)
+          unsafe uncheckedDestroy(at: bucket)
           unsafe _storage._count -= 1
           unsafe bucket.offset -= 1
           continue
@@ -166,7 +166,7 @@ extension _NativeDictionary {
       if unsafe target > bucket {
         // The target is outside the unprocessed region.  We can simply move the
         // entry, leaving behind an uninitialized bucket.
-        moveEntry(from: bucket, to: target)
+        unsafe moveEntry(from: bucket, to: target)
         // Restore invariants by lowering the region boundary.
         unsafe bucket.offset -= 1
       } else if unsafe target == bucket {
@@ -176,7 +176,7 @@ extension _NativeDictionary {
         // The target bucket is also in the unprocessed region. Swap the current
         // item into place, then try again with the swapped-in value, so that we
         // don't lose it.
-        swapEntry(target, with: bucket)
+        unsafe swapEntry(target, with: bucket)
       }
     }
     // When there are no more unprocessed entries, we're left with a valid

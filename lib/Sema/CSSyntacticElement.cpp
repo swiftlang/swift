@@ -969,7 +969,7 @@ private:
     auto throwLoc = throwStmt->getThrowLoc();
     Type errorType;
     if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc))
-      errorType = catchNode.getExplicitCaughtType(cs.getASTContext());
+      errorType = cs.getExplicitCaughtErrorType(catchNode);
 
     if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {

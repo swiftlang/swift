@@ -51,7 +51,7 @@ struct inspectableWithStruct {
   @GKInspectable var GKInspectableInStruct: Int // expected-error {{only class instance properties can be declared @GKInspectable}} {{3-18=}}
 }
 
-func foo(x: @convention(block) Int) {} // expected-error {{@convention attribute only applies to function types}}
+func foo(x: @convention(block) Int) {} // expected-error {{'@convention' only applies to function types}}
 func foo(x: @convention(block) (Int) -> Int) {}
 
 @_transparent
@@ -307,6 +307,9 @@ class ExclusivityAttrClass {
 
 class HasStorage {
   @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
+}
+extension HasStorage {
+  @_hasStorage var y : Int { 24 } // expected-error {{'@_hasStorage' attribute cannot be applied to declaration in extension}}
 }
 
 @_show_in_interface protocol _underscored {}

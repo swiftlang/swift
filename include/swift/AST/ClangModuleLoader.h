@@ -33,6 +33,7 @@ class SourceLocation;
 namespace swift {
 
 class ClangInheritanceInfo;
+class ClangNode;
 class ConcreteDeclRef;
 class Decl;
 class FuncDecl;
@@ -321,6 +322,10 @@ public:
   getTypeDefForCXXCFOptionsDefinition(const clang::Decl *candidateDecl) = 0;
 
   virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
+
+  /// Just like Decl::getClangNode() except we look through to the 'Code'
+  /// enum of an error wrapper struct.
+  virtual ClangNode getEffectiveClangNode(const Decl *decl) const = 0;
 };
 
 /// Describes a C++ template instantiation error.

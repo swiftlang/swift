@@ -88,15 +88,18 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
 getAllMovedPlatformVersions(Decl *D) {
+  StringRef Name = D->getDeclContext()->getParentModule()->getName().str();
+
   std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.has_value()) {
+      if (Active.has_value() && Active->LinkerModuleName != Name) {
         Results.push_back(*Active);
       }
     }
   }
+
   return Results;
 }
 
@@ -324,16 +327,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     if (*IntroVer >= Ver.Version)
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
-    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
+    auto It = previousInstallNameMap->find(Ver.LinkerModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;

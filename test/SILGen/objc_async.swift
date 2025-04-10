@@ -330,3 +330,33 @@ extension OptionalMemberLookups {
 func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {
     return try await v.pileOfHotdogsToEat(withLimit: timeLimit)
 }
+
+/// Issue 65199: pass zero-initialized completion handler arguments for the
+/// normal result on the error path of an ObjC async thunk.
+extension SlowServer: @retroactive FailableFloatLoader {
+  public func loadFloatOrThrow() async throws -> Float {
+    return 0
+  }
+}
+// CHECK-LABEL: sil [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF : $@convention(method) @async (@guaranteed SlowServer) -> (Float, @error any Error)
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFTo : $@convention(objc_method) (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> () {
+// CHECK:         function_ref @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To
+
+// CHECK-LABEL: sil shared [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> ()
+// CHECK:         [[BLOCK:%.*]] = copy_block
+// CHECK:         [[METHOD:%.*]] = function_ref @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF :
+// CHECK:         try_apply [[METHOD]]({{%.*}}) : {{.*}}, normal bb1, error bb2
+// CHECK:       bb1([[NORMAL_RESULT:%.*]] : $Float):
+// CHECK-NEXT:    [[BORROWED_BLOCK:%.*]] = begin_borrow [[BLOCK]] :
+// CHECK-NEXT:    [[NIL_NSERROR:%.*]] = enum $Optional<NSError>, #Optional.none
+// CHECK-NEXT:    apply [[BORROWED_BLOCK]]([[NORMAL_RESULT]], [[NIL_NSERROR]])
+// CHECK:       bb2([[ERROR_RESULT:%.*]] : @owned $any Error):
+// CHECK-NEXT:    [[BORROWED_BLOCK:%.*]] = begin_borrow [[BLOCK]] :
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[CONVERT_FN:%.*]] = function_ref
+// CHECK-NEXT:    [[NSERROR:%.*]] = apply [[CONVERT_FN]]([[ERROR_RESULT]])
+// CHECK-NEXT:    [[SOME_NSERROR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt, [[NSERROR]] : $NSError
+// CHECK-NEXT:    [[ZERO_FLOAT:%.*]] = builtin "zeroInitializer"() : $Float
+// CHECK-NEXT:    [[BORROWED_SOME_NSERROR:%.*]] = begin_borrow [[SOME_NSERROR]] :
+// CHECK-NEXT:    apply [[BORROWED_BLOCK]]([[ZERO_FLOAT]], [[BORROWED_SOME_NSERROR]])

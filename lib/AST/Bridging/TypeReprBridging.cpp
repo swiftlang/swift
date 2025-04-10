@@ -100,6 +100,14 @@ BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
   return ErrorTypeRepr::create(cContext.unbridged(), cRange.unbridged());
 }
 
+BridgedInlineArrayTypeRepr BridgedInlineArrayTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr cCountType,
+    BridgedTypeRepr cElementType, BridgedSourceRange cBracketsRange) {
+  return InlineArrayTypeRepr::create(
+      cContext.unbridged(), cCountType.unbridged(), cElementType.unbridged(),
+      cBracketsRange.unbridged());
+}
+
 BridgedInverseTypeRepr
 BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cTildeLoc,

@@ -1181,6 +1181,11 @@ void ConstraintSystem::shrink(Expr *expr) {
         if (boundGeneric->hasUnresolvedType())
           return boundGeneric;
 
+        // Avoid handling InlineArray, building a tuple would be wrong, and
+        // we want to eliminate shrink.
+        if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
+          return Type();
+
         llvm::SmallVector<TupleTypeElt, 2> params;
         for (auto &type : boundGeneric->getGenericArgs()) {
           // One of the generic arguments in invalid or unresolved.

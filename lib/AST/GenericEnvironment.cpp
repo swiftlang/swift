@@ -752,28 +752,6 @@ SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
                               MakeAbstractConformanceForGenericType());
 }
 
-std::pair<Type, ProtocolConformanceRef>
-GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
-                                           Type conformingType,
-                                           ProtocolConformanceRef conformance) {
-  if (!genericEnv)
-    return {conformingType, conformance};
-  
-  return genericEnv->mapConformanceRefIntoContext(conformingType, conformance);
-}
-
-std::pair<Type, ProtocolConformanceRef>
-GenericEnvironment::mapConformanceRefIntoContext(
-                                     Type conformingInterfaceType,
-                                     ProtocolConformanceRef conformance) const {
-  auto contextConformance = conformance.subst(conformingInterfaceType,
-    QueryInterfaceTypeSubstitutions(this),
-    LookUpConformanceInModule());
-  
-  auto contextType = mapTypeIntoContext(conformingInterfaceType);
-  return {contextType, contextConformance};
-}
-
 OpenedElementContext
 OpenedElementContext::createForContextualExpansion(ASTContext &ctx,
                                        CanPackExpansionType expansionType) {

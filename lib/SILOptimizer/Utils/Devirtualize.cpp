@@ -809,6 +809,24 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
     return false;
   }
 
+  // A narrow fix for https://github.com/swiftlang/swift/issues/79318
+  // to make sure that uses of distributed requirement witnesses are
+  // not devirtualized because that results in a loss of the ad-hoc
+  // requirement infomation in the re-created substitution map.
+  //
+  // We have a similar check in `canSpecializeFunction` which presents
+  // specialization for exactly the same reason.
+  //
+  // TODO: A better way to fix this would be to record the ad-hoc conformance
+  // requirement in `RequirementEnvironment` and adjust IRGen to handle it.
+  if (f->hasLocation()) {
+    if (auto *funcDecl =
+            dyn_cast_or_null<FuncDecl>(f->getLocation().getAsDeclContext())) {
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+        return false;
+    }
+  }
+
   return true;
 }
 

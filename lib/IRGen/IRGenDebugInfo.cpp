@@ -1243,14 +1243,12 @@ private:
       auto *member = createMemberType(Member.DIType, Member.Name,
                                          OffsetInBits, Member.AlignInBits,
                                       Scope, File, Flags);
-      member->dump();
       Members.push_back(member);
     }
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
         DBuilder.getOrCreateArray(Members), RuntimeLang, nullptr, UniqueID);
-      DITy->dump();
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
@@ -2291,6 +2289,7 @@ private:
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
+    case TypeKind::InlineArray:
     case TypeKind::Optional:
     case TypeKind::VariadicSequence: {
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
@@ -2542,10 +2541,10 @@ private:
       if (auto Attribute =
               ND->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
         auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
-            Attribute->OriginalModuleName);
+            Attribute->ManglingModuleName);
         void *Key = (void *)Identifier.get();
         Scope =
-            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
+            getOrCreateModule(Key, TheCU, Attribute->ManglingModuleName, {});
       } else {
         Context = ND->getParent();
       }
@@ -2578,8 +2577,13 @@ private:
 
     // Scope outermost fileprivate decls in an inline private discriminator
     // namespace.
+    //
+    // We need to don't do this for decls imported from Clang modules because
+    // the scopes of C/C++ symbols are not restricted to a particular file unit.
     if (auto *Decl = DbgTy.getDecl())
-      if (Decl->isOutermostPrivateOrFilePrivateScope())
+      if (Decl->isOutermostPrivateOrFilePrivateScope() &&
+          !isa<ClangModuleUnit>(
+              Decl->getDeclContext()->getModuleScopeContext()))
         Scope = getFilePrivateScope(Scope, Decl);
 
     return Scope;

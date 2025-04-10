@@ -11,7 +11,6 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny:adoption \
 //        To verify that the message is not followed by
 //        "; this will be an error ...".
-// RUN:   -print-diagnostic-groups \
 // RUN:   -verify-additional-prefix default-swift-mode- \
 // RUN:   -verify-additional-prefix explicit-any-adopt-
 
@@ -32,10 +31,10 @@ protocol Bar {
 class Bistro {
   convenience init(_: Bar){ self.init()}
   // expected-explicit-any-warning@-1 {{use of protocol 'Bar' as a type must be written 'any Bar'; this will be an error in a future Swift language mode}}{{23-26=any Bar}}
-  // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Bar' as a type must be written 'any Bar' [ExistentialAny]}}{{23-26=any Bar}}
+  // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Bar' as a type must be written 'any Bar'}}{{documentation-file=existential-any}}{{23-26=any Bar}}
   class func returnBar() -> Bar {}
   // expected-explicit-any-warning@-1 {{use of protocol 'Bar' as a type must be written 'any Bar'; this will be an error in a future Swift language mode}}{{29-32=any Bar}}
-  // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Bar' as a type must be written 'any Bar' [ExistentialAny]}}{{29-32=any Bar}}
+  // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Bar' as a type must be written 'any Bar'}}{{documentation-file=existential-any}}{{29-32=any Bar}}
 }
 
 func useBarAsType(_ x: any Bar) {}
@@ -235,7 +234,7 @@ enum E1: RawRepresentable {
 
   var rawValue: P1 {
     // expected-explicit-any-warning@-1 {{use of protocol 'P1' as a type must be written 'any P1'; this will be an error in a future Swift language mode}}{{17-19=any P1}}
-    // expected-explicit-any-adopt-warning@-2 {{use of protocol 'P1' as a type must be written 'any P1' [ExistentialAny]}}{{17-19=any P1}}
+    // expected-explicit-any-adopt-warning@-2 {{use of protocol 'P1' as a type must be written 'any P1'}}{{documentation-file=existential-any}}{{17-19=any P1}}
     return ConcreteComposition()
   }
 }
@@ -333,10 +332,10 @@ enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not
 
 // Protocols from a serialized module (the standard library).
 do {
-  // expected-explicit-any-adopt-warning@+2 {{use of protocol 'Decodable' as a type must be written 'any Decodable' [ExistentialAny]}}
+  // expected-explicit-any-adopt-warning@+2 {{use of protocol 'Decodable' as a type must be written 'any Decodable'}}{{documentation-file=existential-any}}
   // expected-explicit-any-warning@+1 {{use of protocol 'Decodable' as a type must be written 'any Decodable'; this will be an error in a future Swift language mode}}
   let _: Decodable
-  // expected-explicit-any-adopt-warning@+2 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable') [ExistentialAny]}}
+  // expected-explicit-any-adopt-warning@+2 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable')}}{{documentation-file=existential-any}}
   // expected-explicit-any-warning@+1 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable'); this will be an error in a future Swift language mode}}
   let _: Codable
 }
@@ -566,7 +565,7 @@ func testEnumAssociatedValue() {
     case c1((any HasAssoc) -> Void)
     // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
     case c2((HasAssoc) -> Void)
-    // expected-explicit-any-adopt-warning@+2 {{use of protocol 'P' as a type must be written 'any P' [ExistentialAny]}}
+    // expected-explicit-any-adopt-warning@+2 {{use of protocol 'P' as a type must be written 'any P'}}{{documentation-file=existential-any}}
     // expected-explicit-any-warning@+1 {{use of protocol 'P' as a type must be written 'any P'; this will be an error in a future Swift language mode}}
     case c3((P) -> Void)
   }
@@ -594,7 +593,7 @@ func f(_ x: Objectlike) {}
 typealias Copy = Copyable
 func h(_ z1: Copy,
        // expected-explicit-any-warning@-1 {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable'); this will be an error in a future Swift language mode}}
-       // expected-explicit-any-adopt-warning@-2 {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable') [ExistentialAny]}}
+       // expected-explicit-any-adopt-warning@-2 {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable')}}{{documentation-file=existential-any}}
        _ z2: Copyable) {}
        // expected-explicit-any-warning@-1 {{use of protocol 'Copyable' as a type must be written 'any Copyable'; this will be an error in a future Swift language mode}}
-       // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Copyable' as a type must be written 'any Copyable' [ExistentialAny]}}
+       // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Copyable' as a type must be written 'any Copyable'}}{{documentation-file=existential-any}}

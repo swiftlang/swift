@@ -30,7 +30,7 @@ import SwiftShims
 import Builtin
 import CModule
 
-extension ObjClass {
+@objc @implementation extension ObjClass {
   @objc @_hasStorage dynamic var o: NSObject { get set }
 }
 

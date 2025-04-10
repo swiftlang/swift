@@ -664,18 +664,25 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
   return OperandOwnership::UnownedInstantaneousUse;
 }
 
+template<SILInstructionKind Opc, typename Derived>
+static OperandOwnership
+visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, Derived> *mdi) {
+}
+
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
-  if (getOperandIndex() == MarkDependenceInst::Value) {
+  if (getOperandIndex() == MarkDependenceInst::Dependent) {
     return getOwnershipKind().getForwardingOperandOwnership(
       /*allowUnowned*/true);
   }
   if (mdi->isNonEscaping()) {
-    if (!mdi->getType().isAddress()) {
-      // This creates a "dependent value", just like on-stack partial_apply,
-      // which we treat like a borrow.
-      return OperandOwnership::Borrow;
+    if (auto *svi = dyn_cast<SingleValueInstruction>(mdi)) {
+      if (!svi->getType().isAddress()) {
+        // This creates a "dependent value", just like on-stack partial_apply,
+        // which we treat like a borrow.
+        return OperandOwnership::Borrow;
+      }
     }
     return OperandOwnership::AnyInteriorPointer;
   }
@@ -684,9 +691,15 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     // lifetime.
     return OperandOwnership::UnownedInstantaneousUse;
   }
-  // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
-  // a borrow of the base (mark_dependence %base -> end_dependence is analogous
-  // to a borrow scope).
+  return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership OperandOwnershipClassifier::
+visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
+  // If we are analyzing "the value", this is a trivial use
+  if (getOperandIndex() == MarkDependenceInst::Dependent) {
+    return OperandOwnership::TrivialUse;
+  }
   return OperandOwnership::PointerEscape;
 }
 

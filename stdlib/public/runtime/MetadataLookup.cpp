@@ -2444,6 +2444,12 @@ public:
     return BuiltType();
   }
 
+  TypeLookupErrorOr<BuiltType> createInlineArrayType(BuiltType count,
+                                                     BuiltType element) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDictionaryType(BuiltType key,
                                                     BuiltType value) {
     // Mangled types for building metadata don't contain sugared types
@@ -3276,12 +3282,14 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   return OldGetClassHook(typeName, outClass);
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor))
 static void installGetClassHook() {
   if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_getClass)) {
     SWIFT_RUNTIME_WEAK_USE(objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook));
   }
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 #endif
 

@@ -92,20 +92,16 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }
 
+  /// True if a value of this type can have its address taken by a lifetime-dependent value.
+  public func isAddressableForDeps(in function: Function) -> Bool {
+    bridged.isAddressableForDeps(function.bridged)
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//
 
-  public var isLoweredFunction: Bool { bridged.isFunction() }
-  public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
-  public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }
   public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
-  public var isThickFunction: Bool { bridged.isThickFunction() }
-  public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
-
-  public var invocationGenericSignatureOfFunction: GenericSignature {
-    GenericSignature(bridged: bridged.getInvocationGenericSignatureOfFunctionType())
-  }
 
   // Returns a new SILFunctionType with changed "escapeness".
   public func getFunctionType(withNoEscape: Bool) -> Type {

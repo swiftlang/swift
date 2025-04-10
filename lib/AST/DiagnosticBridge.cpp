@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -62,18 +63,21 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
       highlightRanges.push_back(range);
   }
 
-  StringRef documentationPath;
-  if (info.EducationalNotePaths.size() > 0)
-    documentationPath = info.EducationalNotePaths[0];
+  StringRef documentationPath = info.CategoryDocumentationURL;
 
-  // FIXME: Translate Fix-Its.
-  swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, perFrontendState,
-                                   text.str(),
-                                   severity, info.Loc,
-                                   info.Category,
-                                   documentationPath,
-                                   highlightRanges.data(),
-                                   highlightRanges.size());
+  SmallVector<BridgedFixIt, 2> fixIts;
+  for (const auto &fixIt : info.FixIts) {
+    fixIts.push_back(BridgedFixIt{ fixIt.getRange(), fixIt.getText() });
+  }
+
+  swift_ASTGen_addQueuedDiagnostic(
+      queuedDiagnostics, perFrontendState,
+      text.str(),
+      severity, info.Loc,
+      info.Category,
+      documentationPath,
+      highlightRanges.data(), highlightRanges.size(),
+      llvm::ArrayRef<BridgedFixIt>(fixIts));
 
   // TODO: A better way to do this would be to pass the notes as an
   // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires

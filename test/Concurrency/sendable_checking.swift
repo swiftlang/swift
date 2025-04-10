@@ -507,3 +507,23 @@ func checkOpaqueType() -> some Sendable {
 class MainActorSub: MainActorSuper<MainActorSub.Nested> {
   struct Nested {}  // no cycle
 }
+
+@available(SwiftStdlib 5.9, *)
+struct SendablePack<each Element: Sendable>: Sendable {
+  let elements: (repeat each Element)
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+func sendablePacks<each Element: Sendable>(
+    _ element: repeat each Element
+) async {
+  { @Sendable in
+    repeat _ = each element
+  }()
+
+  await sendPack(repeat each element)
+}
+
+@available(SwiftStdlib 5.1, *)
+func sendPack<each Element>(_: repeat each Element) async {}

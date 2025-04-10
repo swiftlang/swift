@@ -1,15 +1,20 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
 
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -dump-ast 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -primary-file %s -dump-ast -o %t.ast.txt
+// RUN: %FileCheck %s < %t.ast.txt
 
 // REQUIRES: concurrency
+
+// https://github.com/swiftlang/swift/issues/80582
+// UNSUPPORTED: OS=windows-msvc
 
 extension Error {
   func printMe() { }
 }
 
 func test(seq: any AsyncSequence) async {
-  // CHECK: "error" interface_type="any Error"
+  // CHECK-LABEL: (catch_stmts
+  // CHECK:         (var_decl {{.*}} "error" interface_type="any Error"
   do {
     for try await _ in seq { }
   } catch {

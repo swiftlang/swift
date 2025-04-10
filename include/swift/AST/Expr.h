@@ -368,10 +368,9 @@ protected:
     IsObjC : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32+1,
+  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
     : NumPadBits,
-    NumElements : 32,
-    IsFolded: 1
+    NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
@@ -456,6 +455,22 @@ public:
   const Expr *getValueProvidingExpr() const {
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
+
+  /// Checks whether this expression is always hoisted above a binary operator
+  /// when it appears on the left-hand side, e.g 'try x + y' becomes
+  /// 'try (x + y)'. If so, returns the sub-expression, \c nullptr otherwise.
+  ///
+  /// Note that such expressions may not appear on the right-hand side of a
+  /// binary operator, except for assignment and ternaries.
+  Expr *getAlwaysLeftFoldedSubExpr() const;
+
+  /// Checks whether this expression is always hoisted above a binary operator
+  /// when it appears on the left-hand side, e.g 'try x + y' becomes
+  /// 'try (x + y)'.
+  ///
+  /// Note that such expressions may not appear on the right-hand side of a
+  /// binary operator, except for assignment and ternaries.
+  bool isAlwaysLeftFolded() const { return bool(getAlwaysLeftFoldedSubExpr()); }
 
   /// Find the original expression value, looking through various
   /// implicit conversions.
@@ -3970,6 +3985,9 @@ class SequenceExpr final : public Expr,
     private llvm::TrailingObjects<SequenceExpr, Expr *> {
   friend TrailingObjects;
 
+  /// The cached folded expression.
+  Expr *FoldedExpr = nullptr;
+
   SequenceExpr(ArrayRef<Expr*> elements)
     : Expr(ExprKind::Sequence, /*Implicit=*/false) {
     Bits.SequenceExpr.NumElements = elements.size();
@@ -4005,11 +4023,14 @@ public:
     getElements()[i] = e;
   }
 
-  bool isFolded() const {
-    return static_cast<bool>(Bits.SequenceExpr.IsFolded);
+  /// Retrieve the folded expression, or \c nullptr if the SequencExpr has
+  /// not yet been folded.
+  Expr *getFoldedExpr() const {
+    return FoldedExpr;
   }
-  void setFolded(bool folded) {
-    Bits.SequenceExpr.IsFolded = static_cast<unsigned>(folded);
+
+  void setFoldedExpr(Expr *foldedExpr) {
+    FoldedExpr = foldedExpr;
   }
 
   // Implement isa/cast/dyncast/etc.

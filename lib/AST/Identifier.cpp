@@ -98,6 +98,11 @@ int Identifier::compare(Identifier other) const {
 }
 
 int DeclName::compare(DeclName other) const {
+  // Fast equality comparsion.
+  if (getOpaqueValue() == other.getOpaqueValue())
+    return 0;
+
+
   // Compare base names.
   if (int result = getBaseName().compare(other.getBaseName()))
     return result;
@@ -111,10 +116,13 @@ int DeclName::compare(DeclName other) const {
       return result;
   }
 
-  if (argNames.size() == otherArgNames.size())
-    return 0;
+  if (argNames.size() != otherArgNames.size())
+    return argNames.size() < otherArgNames.size() ? -1 : 1;
 
-  return argNames.size() < otherArgNames.size() ? -1 : 1;
+  // Order based on if it is compound name or not.
+  assert(isSimpleName() != other.isSimpleName() &&
+         "equality should be covered by opaque value comparsion");
+  return isSimpleName() ? -1 : 1;
 }
 
 static bool equals(ArrayRef<Identifier> idents, ArrayRef<StringRef> strings) {

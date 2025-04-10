@@ -3017,6 +3017,17 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
 
+Expr *Expr::getAlwaysLeftFoldedSubExpr() const {
+  if (auto *ATE = dyn_cast<AnyTryExpr>(this))
+    return ATE->getSubExpr();
+  if (auto *AE = dyn_cast<AwaitExpr>(this))
+    return AE->getSubExpr();
+  if (auto *UE = dyn_cast<UnsafeExpr>(this))
+    return UE->getSubExpr();
+
+  return nullptr;
+}
+
 const Expr *Expr::findOriginalValue() const {
   auto *expr = this;
   do {

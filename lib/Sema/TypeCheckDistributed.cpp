@@ -565,8 +565,7 @@ bool CheckDistributedFunctionRequest::evaluate(
         if (checkConformance(paramTy, req).isInvalid()) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
-              param->getArgumentName().str(), param->getInterfaceType(),
-              func->getDescriptiveKind(),
+              param->getArgumentName(), param->getInterfaceType(), func,
               serializationRequirementIsCodable ? "Codable"
                                                 : req->getNameStr());
 

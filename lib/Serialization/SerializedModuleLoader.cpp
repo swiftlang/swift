@@ -1100,8 +1100,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
-    if (loadedModuleFile->supportsExtensibleEnums())
-      M.setSupportsExtensibleEnums();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     M.setSwiftInterfaceCompilerVersion(
         loadedModuleFile->getSwiftInterfaceCompilerVersion());
@@ -1788,10 +1786,11 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     Ctx.removeLoadedModule(moduleID.Item);
     return nullptr;
   }
-  // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
-  // from .swift_ast sections are never produced from textual interfaces. By
-  // disabling resilience the debugger can directly access private members.
-  if (BypassResilience)
+  // The MemoryBuffer loader is used by LLDB during debugging. Modules
+  // imported from .swift_ast sections are not typically produced from
+  // textual interfaces. By disabling resilience, the debugger can
+  // directly access private members.
+  if (BypassResilience && !M->isBuiltFromInterface())
     M->setBypassResilience();
 
   return M;

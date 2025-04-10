@@ -23,6 +23,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/NestedNameSpecifier.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 
 using namespace swift;
@@ -127,8 +128,8 @@ void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
   }
 }
 
-bool ClangSyntaxPrinter::printNestedTypeNamespaceQualifiers(
-    const ValueDecl *D) const {
+bool ClangSyntaxPrinter::printNestedTypeNamespaceQualifiers(const ValueDecl *D,
+                                                            bool forC) const {
   bool first = true;
   while (auto parent = dyn_cast_or_null<NominalTypeDecl>(
              D->getDeclContext()->getAsDecl())) {
@@ -137,9 +138,10 @@ bool ClangSyntaxPrinter::printNestedTypeNamespaceQualifiers(
         isa<clang::NamespaceDecl>(parent->getClangNode().getAsDecl()))
       break;
     if (!first)
-      os << "::";
+      os << (forC ? "_" : "::");
     first = false;
-    os << "__";
+    if (!forC)
+      os << "__";
     printBaseName(parent);
     os << "Nested";
     D = parent;
@@ -205,7 +207,8 @@ void ClangSyntaxPrinter::printNamespace(
 void ClangSyntaxPrinter::printParentNamespaceForNestedTypes(
     const ValueDecl *D, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
     NamespaceTrivia trivia) const {
-  if (!isa_and_nonnull<NominalTypeDecl>(D->getDeclContext()->getAsDecl())) {
+  if (!isa_and_nonnull<NominalTypeDecl>(D->getDeclContext()->getAsDecl()) ||
+      importer::isClangNamespace(D->getDeclContext())) {
     bodyPrinter(os);
     return;
   }
@@ -472,7 +475,7 @@ void ClangSyntaxPrinter::printSymbolUSRAttribute(const ValueDecl *D) const {
     return;
   }
   auto result = evaluateOrDefault(D->getASTContext().evaluator,
-                                  USRGenerationRequest{D}, std::string());
+                                  USRGenerationRequest{D, {}}, std::string());
   if (result.empty())
     return;
   os << " SWIFT_SYMBOL(\"" << result << "\")";

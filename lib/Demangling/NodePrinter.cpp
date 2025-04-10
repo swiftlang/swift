@@ -328,6 +328,7 @@ private:
     case Node::Kind::TypeSymbolicReference:
     case Node::Kind::SugaredOptional:
     case Node::Kind::SugaredArray:
+    case Node::Kind::SugaredInlineArray:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
     case Node::Kind::Integer:
@@ -452,6 +453,7 @@ private:
     case Node::Kind::Isolated:
     case Node::Kind::Sending:
     case Node::Kind::CompileTimeLiteral:
+    case Node::Kind::ConstValue:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -659,6 +661,7 @@ private:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
     case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::CoroFunctionPointer:
+    case Node::Kind::DefaultOverride:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1262,6 +1265,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
     case FunctionSigSpecializationParamKind::ConstantPropGlobal: {
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1277,6 +1282,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     }
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1284,6 +1291,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropString:
+      if (Idx + 3 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1294,6 +1303,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      if (Idx + 4 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1305,6 +1316,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << ">]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1832,6 +1845,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::CompileTimeLiteral:
     Printer << "_const ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ConstValue:
+    Printer << "@const ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::Shared:
@@ -3289,6 +3306,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     Printer << "]";
     return nullptr;
+  case Node::Kind::SugaredInlineArray: {
+    Printer << "[";
+    print(Node->getChild(0), depth + 1);
+    Printer << " x ";
+    print(Node->getChild(1), depth + 1);
+    Printer << "]";
+    return nullptr;
+  }
   case Node::Kind::SugaredDictionary:
     Printer << "[";
     print(Node->getChild(0), depth + 1);
@@ -3484,6 +3509,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::CoroFunctionPointer:
     Printer << "coro function pointer to ";
+    return nullptr;
+  case Node::Kind::DefaultOverride:
+    Printer << "default override of ";
     return nullptr;
   }
 

@@ -29,6 +29,7 @@ extern llvm::cl::opt<bool> EnableSILInliningOfGenerics;
 
 namespace swift {
 class BasicCalleeAnalysis;
+class IsSelfRecursiveAnalysis;
 
 // Controls the decision to inline functions with @_semantics, @effect and
 // global_init attributes.
@@ -40,7 +41,8 @@ enum class InlineSelection {
 
 /// Check if this ApplySite is eligible for inlining. If so, return the callee.
 SILFunction *getEligibleFunction(FullApplySite AI,
-                                 InlineSelection WhatToInline);
+                                 InlineSelection WhatToInline,
+                                 IsSelfRecursiveAnalysis *SRA);
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.

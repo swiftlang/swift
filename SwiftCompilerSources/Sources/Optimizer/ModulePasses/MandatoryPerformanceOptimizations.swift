@@ -35,8 +35,7 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   if moduleContext.options.enableEmbeddedSwift {
     worklist.addAllNonGenericFunctions(of: moduleContext)
   } else {
-    worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
-    worklist.addAllAnnotatedGlobalInitOnceFunctions(of: moduleContext)
+    worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
@@ -483,10 +482,29 @@ fileprivate struct FunctionWorklist {
     }
     return nil
   }
-
-  mutating func addAllPerformanceAnnotatedFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.performanceConstraints != .none {
-      pushIfNotVisited(f)
+  
+  mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions {
+      // Performance annotated functions
+      if f.performanceConstraints != .none {
+        pushIfNotVisited(f)
+      }
+      
+      // Annotated global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
+      
+      // @const global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
     }
   }
 
@@ -495,15 +513,6 @@ fileprivate struct FunctionWorklist {
       pushIfNotVisited(f)
     }
     return
-  }
-
-  mutating func addAllAnnotatedGlobalInitOnceFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.isGlobalInitOnceFunction {
-      if let global = f.getInitializedGlobal(),
-         global.mustBeInitializedStatically {
-        pushIfNotVisited(f)
-      }
-    }
   }
 
   mutating func addCallees(of function: Function) {

@@ -706,6 +706,29 @@ bool SILFunctionType::isNoReturnFunction(SILModule &M,
   return false;
 }
 
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
+  SILParameterInfo paramInfo = getParameters()[paramIdx];
+  for (auto &depInfo : getLifetimeDependencies()) {
+    auto *addressableIndices = depInfo.getAddressableIndices();
+    if (addressableIndices && addressableIndices->contains(paramIdx)) {
+      return true;
+    }
+    auto *condAddressableIndices = depInfo.getConditionallyAddressableIndices();
+    if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
+      CanType argType = paramInfo.getArgumentType(
+        caller->getModule(), this, caller->getTypeExpansionContext());
+      CanType contextType =
+        argType->hasTypeParameter()
+        ? caller->mapTypeIntoContext(argType)->getCanonicalType()
+        : argType;
+      auto &tl = caller->getTypeLowering(contextType);
+      if (tl.getRecursiveProperties().isAddressableForDependencies())
+        return true;
+    }
+  }
+  return false;
+}
+
 #ifndef NDEBUG
 static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   assert(type1->isLegalSILType());
@@ -1146,6 +1169,13 @@ bool SILType::isMarkedAsImmortal() const {
     }
   }
   return false;
+}
+
+bool SILType::isAddressableForDeps(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto &tl = function.getTypeLowering(contextType);
+  return tl.getRecursiveProperties().isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {

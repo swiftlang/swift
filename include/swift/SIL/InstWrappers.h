@@ -293,7 +293,7 @@ public:
     case SILInstructionKind::DifferentiableFunctionInst:
       return nullptr;
     case SILInstructionKind::MarkDependenceInst:
-      return &forwardingInst->getOperandRef(MarkDependenceInst::Value);
+      return &forwardingInst->getOperandRef(MarkDependenceInst::Dependent);
     case SILInstructionKind::RefToBridgeObjectInst:
       return
         &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);

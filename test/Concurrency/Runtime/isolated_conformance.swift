@@ -20,6 +20,10 @@ protocol Q {
   func g()
 }
 
+protocol R: Sendable {
+  func h()
+}
+
 nonisolated class MyClass: @MainActor P {
   func f() {
     print("MyClass.f()")
@@ -45,6 +49,12 @@ extension MyClass: @SomeGlobalActor Q {
   }
 }
 
+extension MyClass: nonisolated R {
+  nonisolated func h() {
+    print("MyClass.h()")
+  }
+}
+
 struct Wrapper<T> {
   var wrapped: T
 }
@@ -60,6 +70,13 @@ extension Wrapper: Q where T: Q {
   func g() {
     print("Wrapper for ", terminator: "")
     wrapped.g()
+  }
+}
+
+extension Wrapper: R where T: R {
+  func h() {
+    print("Wrapper for ", terminator: "")
+    wrapped.h()
   }
 }
 
@@ -82,18 +99,37 @@ extension WrapMany: Q where repeat each T: Q {
   }
 }
 
-extension Int: P, Q {
-  func f() { }
-  func g() { }
+@available(SwiftStdlib 5.9, *)
+extension WrapMany: R where repeat each T: R {
+  func h() {
+    print("Wrapper for many")
+  }
 }
 
-extension String: P, Q {
+extension Int: P, Q, R {
   func f() { }
   func g() { }
+  func h() { }
+}
+
+extension String: P, Q, R {
+  func f() { }
+  func g() { }
+  func h() { }
 }
 
 func tryCastToP(_ value: any Sendable) -> Bool {
   if let p = value as? any P {
+    p.f()
+    return true
+  }
+
+  print("Conformance did not match")
+  return false
+}
+
+func tryCastToPAndR(_ value: any Sendable) -> Bool {
+  if let p = value as? any P & R {
     p.f()
     return true
   }
@@ -134,6 +170,11 @@ await Task.detached { @MainActor in
   precondition(tryCastToP(mc))
   precondition(tryCastToP(wrappedMC))
 
+  // Cannot cast to P & R because the conformance to P is isolated, but R
+  // is Sendable.
+  precondition(!tryCastToPAndR(mc))
+  precondition(!tryCastToPAndR(wrappedMC))
+
   if #available(SwiftStdlib 5.9, *) {
     let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
     precondition(tryCastToP(wrappedMany))
@@ -148,6 +189,11 @@ print("Testing a separate task on a different global actor")
 await Task.detached { @SomeGlobalActor in
   precondition(tryCastToQ(mc))
   precondition(tryCastToQ(wrappedMC))
+
+  // Cannot cast to P & R because the conformance to P is isolated, but R
+  // is Sendable.
+  precondition(!tryCastToPAndR(mc))
+  precondition(!tryCastToPAndR(wrappedMC))
 
   if #available(SwiftStdlib 5.9, *) {
     let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
@@ -175,6 +221,7 @@ await Task.detached {
     print("Cast succeeds, but shouldn't")
   }
 }.value
+
 
 // Ensure that we access mc later
 print(mc)

@@ -18,7 +18,6 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/AsyncLet.h"
-#include "swift/ABI/Coro.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 
@@ -45,17 +44,6 @@
 #else
 #define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
 #endif
-
-// Does the runtime provide priority escalation support?
-#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
-    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
-    (defined(__arm64__) || defined(__x86_64__))
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
-#else
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
-#endif
-#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
 
 namespace swift {
 class DefaultActor;
@@ -128,26 +116,28 @@ void swift_task_dealloc(void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void swift_task_dealloc_through(void *ptr);
 
-// TODO: CoroutineAccessors: Eliminate this entry point and replace its uses
-//                           with direct references the globals.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
+/// Deallocate memory in a task.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_dealloc(void *ptr);
 
-// TODO: CoroutineAccessors: Mark the underlying struct const.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-CoroAllocator *const _swift_coro_task_allocator;
+/// Allocate memory in a job.
+///
+/// All allocations will be rounded to a multiple of MAX_ALIGNMENT;
+/// if the job does not support allocation, this will return NULL.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_job_allocate(Job *job, size_t size);
 
-// TODO: CoroutineAccessors: Move these declarations back to swiftCore {{
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void *swift_coro_alloc(CoroAllocator *allocator, size_t size);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void swift_coro_dealloc(CoroAllocator *allocator, void *ptr);
-
-// TODO: CoroutineAccessors: Mark the underlying struct const.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-CoroAllocator *const _swift_coro_malloc_allocator;
-// }} TODO: CoroutineAccessors
+/// Deallocate memory in a job.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_deallocate(Job *job, void *ptr);
 
 /// Cancel a task and all of its child tasks.
 ///

@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
@@ -577,16 +578,6 @@ void ShortestPathAnalysis::Weight::updateBenefit(int &Benefit,
     Benefit = newBenefit;
 }
 
-// Return true if the callee has self-recursive calls.
-static bool calleeIsSelfRecursive(SILFunction *Callee) {
-  for (auto &BB : *Callee)
-    for (auto &I : BB)
-      if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getReferencedFunctionOrNull() == Callee)
-          return true;
-  return false;
-}
-
 SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   // Currently, we only consider "array" semantic calls to be "optimizable
   // semantic functions" (non-transient) because we only have semantic passes
@@ -752,7 +743,8 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
-                                        InlineSelection WhatToInline) {
+                                        InlineSelection WhatToInline,
+                                        IsSelfRecursiveAnalysis *SRA) {
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
   if (!Callee) {
@@ -864,10 +856,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 
   // Inlining self-recursive functions into other functions can result
   // in excessive code duplication since we run the inliner multiple
-  // times in our pipeline
-  //
-  // FIXME: This should be cached!
-  if (calleeIsSelfRecursive(Callee)) {
+  // times in our pipeline.
+  if (SRA->get(Callee)->get()) {
     return nullptr;
   }
 

@@ -91,6 +91,11 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
+llvm::StructType *IRGenModule::createTransientStructType(
+    StringRef name, std::initializer_list<llvm::Type *> types, bool packed) {
+  return createStructType(*this, name, types, packed);
+}
+
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                       llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -187,9 +192,8 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
   auto &schema = IGM.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions;
   if (!schema.isEnabled()) return;
 
-  auto decl = dyn_cast_or_null<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
-  assert(decl && "decl not found");
-  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, AssociatedType(decl));
+  auto decl = cast<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, decl);
   assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
 }
 
@@ -502,6 +506,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       RelativeAddressTy
     });
 
+  MethodDefaultOverrideDescriptorStructTy = createStructType(
+      *this, "swift.method_default_override_descriptor",
+      {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy});
+
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy
@@ -625,7 +633,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   if (isCoroCCSupported) {
     SwiftCoroCC = llvm::CallingConv::SwiftCoro;
   } else {
-    SwiftCoroCC = llvm::CallingConv::Swift;
+    SwiftCoroCC = SwiftCC;
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
@@ -701,7 +709,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
-    IntPtrTy              // Task.Status
   });
 
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
@@ -828,8 +835,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
                                      {
                                          Int32Ty, // CoroAllocator.Flags
-                                         CoroAllocateFnTy,
-                                         CoroDeallocateFnTy,
+                                         CoroAllocateFnTy->getPointerTo(),
+                                         CoroDeallocateFnTy->getPointerTo(),
                                      });
   CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }
@@ -1226,9 +1233,9 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
 }
 
 llvm::Constant *IRGenModule::
-    getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer() {
+    getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
-             LinkEntity::forKnownAsyncFunctionPointer(
+             LinkEntity::forKnownCoroFunctionPointer(
                  "swift_deletedCalleeAllocatedCoroutineMethodError"))
       .getValue();
 }

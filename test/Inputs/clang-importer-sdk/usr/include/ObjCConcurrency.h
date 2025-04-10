@@ -364,4 +364,8 @@ MAIN_ACTOR
 - (void)loadFloatWithCompletionHandler:(void (^)(float))completionHandler;
 @end
 
+@protocol FailableFloatLoader
+- (void)loadFloatOrThrowWithCompletionHandler:(void (^)(float, NSError* __nullable)) completionHandler;
+@end
+
 #pragma clang assume_nonnull end

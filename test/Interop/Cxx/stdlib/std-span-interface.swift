@@ -34,6 +34,29 @@ import CxxStdlib
 // CHECK-NEXT:   @_alwaysEmitIntoClient public mutating func foo(_ s: Span<CInt>)
 // CHECK-NEXT:   mutating func foo(_ s: std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>)
 // CHECK-NEXT: }
+
+// CHECK: @lifetime(s: copy s)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func FuncWithMutableSafeWrapper(_ s: inout MutableSpan<CInt>)
+// CHECK-NEXT: @lifetime(copy s)
+// CHECK-NEXT: @lifetime(s: copy s)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func FuncWithMutableSafeWrapper2(_ s: inout MutableSpan<CInt>) -> MutableSpan<CInt>
+// CHECK-NEXT: @lifetime(borrow v)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper3(_ v: inout VecOfInt) -> MutableSpan<CInt>
+// CHECK-NEXT: @lifetime(copy p)
+// CHECK-NEXT: @lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper1(_ p: inout MutableSpan<Int32>) -> MutableSpan<CInt>
+// CHECK-NEXT: @lifetime(borrow v)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper2(_ v: inout VecOfInt, _ len: Int32) -> MutableSpan<Int32>
+// CHECK-NEXT: @lifetime(s: copy s)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper3(_ s: inout MutableSpan<CInt>, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @lifetime(s: copy s)
+// CHECK-NEXT: @lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper4(_ s: inout MutableSpan<CInt>, _ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper5(_ s: SpanOfInt, _ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper6(_ s: SpanOfInt, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper7(_ p: UnsafeMutableBufferPointer<Int32>) -> SpanOfInt
+
 // CHECK: @_alwaysEmitIntoClient public func funcWithSafeWrapper(_ s: Span<CInt>)
 // CHECK-NEXT: @lifetime(copy s)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper2(_ s: Span<CInt>) -> Span<CInt>

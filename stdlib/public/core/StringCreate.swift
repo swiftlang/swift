@@ -383,7 +383,7 @@ extension String {
     }
 
     let storage = unsafe buffer.baseAddress.map {
-      __SharedStringStorage(
+      unsafe __SharedStringStorage(
         _mortal: $0,
         countAndFlags: _StringObject.CountAndFlags(
           count: buffer.startIndex.distance(to: written),

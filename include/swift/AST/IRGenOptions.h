@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
@@ -540,6 +541,9 @@ public:
   // variants.
   unsigned UseCoroCCArm64 : 1;
 
+  // Whether to emit mergeable or non-mergeable traps.
+  unsigned MergeableTraps : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -643,19 +647,16 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
+        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false),
+        MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {
-#ifndef NDEBUG
-    DisableRoundTripDebugTypes = false;
-#else
-    DisableRoundTripDebugTypes = true;
-#endif
+    DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 
   /// Appends to \p os an arbitrary string representing all options which

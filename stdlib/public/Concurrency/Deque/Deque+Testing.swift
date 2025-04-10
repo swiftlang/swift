@@ -62,7 +62,7 @@ extension _Deque {
     }
     let storage = unsafe _Deque<Element>._Storage(unsafeDowncast(buffer, to: _DequeBuffer.self))
     if contents.count > 0 {
-      contents.withUnsafeBufferPointer { source in
+      unsafe contents.withUnsafeBufferPointer { source in
         unsafe storage.update { target in
           let segments = unsafe target.mutableSegments()
           let c = unsafe segments.first.count

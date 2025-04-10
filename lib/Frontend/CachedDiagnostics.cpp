@@ -469,6 +469,9 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
     return Serialized;
   };
 
+  std::vector<std::string> educationalNotes;
+  if (!Info.CategoryDocumentationURL.empty())
+    educationalNotes.push_back(Info.CategoryDocumentationURL);
   return {(uint32_t)Info.ID,
           convertSourceLoc(SM, Info.Loc),
           (uint8_t)Info.Kind,
@@ -476,8 +479,7 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
           Info.Category.str(),
           convertSourceLoc(SM, Info.BufferIndirectlyCausingDiagnostic),
           convertDiagnosticInfoArray(Info.ChildDiagnosticInfo),
-          std::vector<std::string>(Info.EducationalNotePaths.begin(),
-                                   Info.EducationalNotePaths.end()),
+          educationalNotes,
           convertSourceRangeArray(Info.Ranges),
           convertFixItArray(Info.FixIts),
           Info.IsChildNote};
@@ -623,7 +625,8 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
                                   Ranges,
                                   FixIts,
                                   Info.IsChildNote};
-  DeserializedInfo.EducationalNotePaths = Info.EducationalNotePaths;
+  if (Info.EducationalNotePaths.size() == 1)
+    DeserializedInfo.CategoryDocumentationURL = Info.EducationalNotePaths[0];
   return callback(DeserializedInfo);
 }
 

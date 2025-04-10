@@ -115,12 +115,31 @@ extension Span {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension MutableSpan {
+  @_alwaysEmitIntoClient
+  @unsafe
+  @_unsafeNonescapableResult
+  @lifetime(borrow span)
+  public init<T: CxxMutableSpan<Element>>(
+    _unsafeCxxSpan span: borrowing T,
+  ) {
+    let buffer = unsafe UnsafeMutableBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let newSpan = unsafe MutableSpan(_unsafeElements: buffer)
+    // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
+    self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
+  }
+}
+
 public protocol CxxMutableSpan<Element> {
   associatedtype Element
   associatedtype Size: BinaryInteger
 
   init()
   init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+
+  func size() -> Size
+  func __dataUnsafe() -> UnsafeMutablePointer<Element>
 }
 
 extension CxxMutableSpan {

@@ -739,15 +739,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
       // Raw memory is not directly decomposable, but we still want to mark
       // it as initialized. Use a zero initializer.
-      auto &C = ctor->getASTContext();
-      auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
-      B.createBuiltin(ctor, zeroInit->getBaseIdentifier(),
-                      SILType::getEmptyTupleType(C),
-                      SubstitutionMap::get(zeroInit->getInnermostDeclContext()
-                                               ->getGenericSignatureOfContext(),
-                                           {selfDecl->getTypeInContext()},
-                                           LookUpConformanceInModule()),
-                      selfLV.getLValueAddress());
+      B.createZeroInitAddr(ctor, selfLV.getLValueAddress());
     } else if (isa<StructDecl>(nominal)
                && lowering.getLoweredType().isMoveOnly()
                && nominal->getStoredProperties().empty()) {

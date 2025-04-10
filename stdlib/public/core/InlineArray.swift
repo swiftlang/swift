@@ -43,6 +43,7 @@
 @available(SwiftStdlib 6.2, *)
 @frozen
 @safe
+@_addressableForDependencies
 public struct InlineArray<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal let _storage: Builtin.FixedArray<count, Element>
@@ -146,7 +147,7 @@ extension InlineArray where Element: ~Copyable {
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Self._initializationBuffer(start: rawPtr)
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       for i in 0 ..< count {
         do throws(E) {
@@ -203,7 +204,7 @@ extension InlineArray where Element: ~Copyable {
     var o: Element? = first
 
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Self._initializationBuffer(start: rawPtr)
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       guard Self.count > 0 else {
         return
@@ -246,7 +247,7 @@ extension InlineArray where Element: Copyable {
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
     self = Builtin.emplace {
-      let buffer = Self._initializationBuffer(start: $0)
+      let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
@@ -452,6 +453,36 @@ extension InlineArray where Element: ~Copyable {
     let jthElement = unsafe _mutableBuffer.moveElement(from: j)
     unsafe _mutableBuffer.initializeElement(at: i, to: jthElement)
     unsafe _mutableBuffer.initializeElement(at: j, to: ithElement)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Span
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: ~Copyable {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let pointer = unsafe _address
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(&self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      let pointer = unsafe _mutableAddress
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
   }
 }
 

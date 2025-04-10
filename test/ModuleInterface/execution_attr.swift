@@ -32,32 +32,32 @@ public struct Test {
   public func other(_: @execution(caller) () async -> Void) {}
 
   // CHECK: #if compiler(>=5.3) && $ExecutionAttribute
-  // CHECK-NEXT: public var test: Swift.Int {
-  // CHECK-NEXT:   @execution(caller) get async
+  // CHECK-NEXT: @execution(caller) public var testOnVar: Swift.Int {
+  // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public var test: Swift.Int {
+  // CHECK-NEXT: public var testOnVar: Swift.Int {
   // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #endif
-  public var test: Int {
-    @execution(caller)
+  @execution(caller)
+  public var testOnVar: Int {
     get async {
       42
     }
   }
 
   // CHECK: #if compiler(>=5.3) && $ExecutionAttribute
-  // CHECK-NEXT: public subscript(x: Swift.Int) -> Swift.Bool {
-  // CHECK-NEXT:   @execution(caller) get async
+  // CHECK-NEXT: @execution(caller) public subscript(onSubscript _: Swift.Int) -> Swift.Bool {
+  // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public subscript(x: Swift.Int) -> Swift.Bool {
+  // CHECK-NEXT: public subscript(onSubscript _: Swift.Int) -> Swift.Bool {
   // CHECK-NEXT:   get async
   // CHECK-NEXT: }
   // CHECK-NEXT: #endif
-  public subscript(x: Int) -> Bool {
-    @execution(caller)
+  @execution(caller)
+  public subscript(onSubscript _: Int) -> Bool {
     get async {
       false
     }

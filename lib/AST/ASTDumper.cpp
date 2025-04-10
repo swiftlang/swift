@@ -4544,6 +4544,13 @@ public:
     printFoot();
   }
 
+  void visitInlineArrayTypeRepr(InlineArrayTypeRepr *T, Label label) {
+    printCommon("type_inline_array", label);
+    printRec(T->getCount(), Label::always("count"));
+    printRec(T->getElement(), Label::always("element"));
+    printFoot();
+  }
+
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T, Label label) {
     printCommon("type_dictionary", label);
     printRec(T->getKey(), Label::optional("key"));
@@ -4641,6 +4648,12 @@ public:
 
   void visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T, Label label) {
     printCommon("_const", label);
+    printRec(T->getBase(), Label::optional("base"));
+    printFoot();
+  }
+                        
+  void visitConstValueTypeRepr(ConstValueTypeRepr *T, Label label) {
+    printCommon("@const", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
   }
@@ -4812,6 +4825,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
   TRIVIAL_ATTR_PRINTER(CompileTimeLiteral, compile_time_literal)
   TRIVIAL_ATTR_PRINTER(ConstVal, compile_time_value)
+  TRIVIAL_ATTR_PRINTER(ConstInitialized, const_initialized)
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
@@ -4911,6 +4925,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
+  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5207,7 +5222,8 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->OriginalModuleName, Label::always("original_module"));
+    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
+    printField(Attr->LinkerModuleName, Label::always("linker_module"));
     printField(Attr->Platform, Label::always("platform"));
     printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
                   Label::always("moved_version"));
@@ -5512,7 +5528,13 @@ public:
       assert(conformance.isAbstract());
 
       printHead("abstract_conformance", ASTNodeColor, label);
-      printReferencedDeclField(conformance.getAbstract(),
+
+      PrintOptions PO;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::StableReference;
+
+      printTypeField(conformance.getType(), Label::always("type"), PO);
+      printReferencedDeclField(conformance.getProtocol(),
                                Label::always("protocol"));
       printFoot();
     }
@@ -5853,6 +5875,7 @@ namespace {
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
+      printFlag(paramFlags.isConstValue(), "constValue");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6305,6 +6328,22 @@ namespace {
             break;
           }
         }
+        auto isolation = T->getIsolation();
+        switch (isolation.getKind()) {
+        case FunctionTypeIsolation::Kind::NonIsolated:
+        case FunctionTypeIsolation::Kind::Parameter:
+          break;
+        case FunctionTypeIsolation::Kind::GlobalActor:
+          printRec(isolation.getGlobalActorType(),
+                   Label::always("global_actor"));
+          break;
+        case FunctionTypeIsolation::Kind::Erased:
+          printFlag("@isolated(any)");
+          break;
+        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+          printFlag("@execution(caller)");
+          break;
+        }
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
@@ -6385,6 +6424,13 @@ namespace {
     void visitArraySliceType(ArraySliceType *T, Label label) {
       printCommon("array_slice_type", label);
       printRec(T->getBaseType(), Label::optional("base_type"));
+      printFoot();
+    }
+
+    void visitInlineArrayType(InlineArrayType *T, Label label) {
+      printCommon("inline_array_type", label);
+      printRec(T->getCountType(), Label::always("count"));
+      printRec(T->getElementType(), Label::always("element"));
       printFoot();
     }
 
@@ -6487,6 +6533,7 @@ namespace {
       printCommon("integer_type", label);
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
+      printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
       printFoot();
     }
 
