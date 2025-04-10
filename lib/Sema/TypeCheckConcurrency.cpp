@@ -3024,9 +3024,13 @@ namespace {
       if (mayExecuteConcurrentlyWith(
               localFunc.getAsDeclContext(), getDeclContext()) ||
           (explicitClosure && explicitClosure->isPassedToSendingParameter())) {
-        GenericSignature genericSig;
-        if (auto afd = localFunc.getAbstractFunctionDecl())
-          genericSig = afd->getGenericSignature();
+        auto innermostGenericDC = localFunc.getAsDeclContext();
+        while (innermostGenericDC && !innermostGenericDC->isGenericContext())
+          innermostGenericDC = innermostGenericDC->getParent();
+
+        GenericSignature genericSig = innermostGenericDC
+            ? innermostGenericDC->getGenericSignatureOfContext()
+            : GenericSignature();
 
         for (const auto &capturedType :
                  localFunc.getCaptureInfo().getCapturedTypes()) {
@@ -3037,8 +3041,6 @@ namespace {
                 ->getDepth();
           } else if (type->isTypeParameter()) {
             genericDepth = type->getRootGenericParam()->getDepth();
-
-            type = localFunc.getAsDeclContext()->mapTypeIntoContext(type);
           } else {
             continue;
           }
@@ -3048,6 +3050,9 @@ namespace {
           if (genericSig.getNextDepth() > 0 &&
               genericDepth < genericSig.getNextDepth() - 1)
             continue;
+
+          if (type->isTypeParameter() && innermostGenericDC)
+            type = innermostGenericDC->mapTypeIntoContext(type);
 
           // Check that the metatype is sendable.
           SendableCheckContext sendableContext(getDeclContext(), preconcurrency);
