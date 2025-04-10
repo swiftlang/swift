@@ -24,23 +24,6 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline
   internal var _count: Int = 0
 
-  @_alwaysEmitIntoClient
-  internal func _start() -> UnsafeMutableRawPointer {
-    unsafe _pointer._unsafelyUnwrappedUnchecked
-  }
-
-  @_alwaysEmitIntoClient
-  public var freeCapacity: Int { capacity &- _count }
-
-  @_alwaysEmitIntoClient
-  public var count: Int { _count }
-
-  @_alwaysEmitIntoClient
-  public var isEmpty: Bool { _count == 0 }
-
-  @_alwaysEmitIntoClient
-  public var isFull: Bool { _count == capacity }
-
   deinit {
     if _count > 0 {
       unsafe _start().withMemoryRebound(
@@ -68,6 +51,25 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan: @unchecked Sendable where Element: Sendable & ~Copyable {}
+
+extension OutputSpan where Element: ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _start() -> UnsafeMutableRawPointer {
+    unsafe _pointer._unsafelyUnwrappedUnchecked
+  }
+
+  @_alwaysEmitIntoClient
+  public var freeCapacity: Int { capacity &- _count }
+
+  @_alwaysEmitIntoClient
+  public var count: Int { _count }
+
+  @_alwaysEmitIntoClient
+  public var isEmpty: Bool { _count == 0 }
+
+  @_alwaysEmitIntoClient
+  public var isFull: Bool { _count == capacity }
+}
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: ~Copyable  {
