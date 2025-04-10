@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-irgen                                            \
 // RUN:     %s                                                              \
+// RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -module-name backdep                                            \
 // RUN:     -target %target-swift-5.7-abi-triple                            \
 // RUN:     -Onone                                                          \

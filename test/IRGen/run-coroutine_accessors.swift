@@ -94,8 +94,6 @@
 // UNSUPPORTED: wasm
 // UNSUPPORTED: OS=wasi
 // UNSUPPORTED: CPU=wasm32
-// TODO: CoroutineAccessors: Enable on Windows.
-// UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
