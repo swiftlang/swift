@@ -1932,6 +1932,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // Load plugin libraries for macro expression as default arguments
   genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
       searchPathOpts.PluginSearchOpts;
+  genericSubInvocation.getSearchPathOptions().ResolvedPluginVerification =
+      searchPathOpts.ResolvedPluginVerification;
 
   // Get module loading behavior options.
   genericSubInvocation.getSearchPathOptions().ScannerModuleValidation = searchPathOpts.ScannerModuleValidation;
