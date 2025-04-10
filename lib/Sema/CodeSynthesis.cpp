@@ -1743,8 +1743,7 @@ bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,
     return false;
 
   ASTContext &ctx = nominal->getASTContext();
-  value->getAttrs().add(
-      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  value->getAttrs().add(NonisolatedAttr::createImplicit(ctx));
   return true;
 }
 
