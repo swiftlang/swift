@@ -67,7 +67,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension OutputSpan: Sendable where Element: Sendable & ~Copyable {}
+extension OutputSpan: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: ~Copyable  {
@@ -95,6 +95,10 @@ extension OutputSpan where Element: ~Copyable  {
       ((Int(bitPattern: buffer.baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
+    )
+    _precondition(
+      buffer.baseAddress?.advanced(by: buffer.count) >= buffer.baseAddress,
+      "buffer must not overflow"
     )
     _precondition(
       initializedCount >= 0 && initializedCount <= buffer.count,
@@ -314,7 +318,7 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func moveAppend(
-    fromContentsOf source: consuming Self
+    fromContentsOf source: inout Self
   ) {
     guard !source.isEmpty else { return }
     _precondition(
@@ -328,6 +332,7 @@ extension OutputSpan where Element: ~Copyable {
       as: Element.self, from: buffer.baseAddress!, count: buffer.count
     )
     _count &+= buffer.count
+    source = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
   }
 
   @_alwaysEmitIntoClient
@@ -335,10 +340,10 @@ extension OutputSpan where Element: ~Copyable {
   public mutating func moveAppend(
     fromContentsOf source: UnsafeMutableBufferPointer<Element>
   ) {
-    let source = unsafe OutputSpan(
+    var source = unsafe OutputSpan(
       buffer: source, initializedCount: source.count
     )
-    moveAppend(fromContentsOf: source)
+    moveAppend(fromContentsOf: &source)
   }
 }
 
@@ -386,6 +391,39 @@ extension OutputSpan where Element: ~Copyable {
       let span = unsafe MutableSpan(_unsafeElements: buffer)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension OutputSpan where Element: ~Copyable {
+
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
+    _ body: (UnsafeMutableBufferPointer<Element>, _ initializedCount: inout Int) throws(E) -> R
+  ) throws(E) -> R {
+    guard let pointer = unsafe _pointer, capacity > 0 else {
+      let buffer = UnsafeMutableBufferPointer<Element>(start: nil, count: 0)
+      var count = 0
+      defer { precondition(count == 0, "invalid attempt to grow buffer") }
+      return try unsafe body(buffer, &count)
+    }
+    // bind memory by hand to sidestep alignment concerns
+    let binding = Builtin.bindMemory(
+      pointer._rawValue, capacity._builtinWordValue, Element.self
+    )
+    defer { Builtin.rebindMemory(pointer._rawValue, binding) }
+    let buffer = UnsafeMutableBufferPointer<Element>(
+      start: .init(pointer._rawValue), count: capacity
+    )
+    var initializedCount = _count
+    defer {
+      _precondition(
+        initializedCount <= capacity, "invalid attempt to grow buffer"
+      )
+      _count = initializedCount
+    }
+    return try unsafe body(buffer, &initializedCount)
   }
 }
 
