@@ -307,24 +307,24 @@ func useAfterTransferLetSquelchedIndirectAddressOnly<T : ProvidesStaticValue>(_ 
 
   await transferToMainIndirect(ns)
   // expected-tns-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-tns-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'T' into main actor-isolated context may introduce data races}}
-  print(ns) // expected-tns-note {{access can happen concurrently}}
+  print(ns)
 
   await transferToMainIndirect(ns2)
   print(ns2)
 
   await transferToMainIndirect(ns3)
   // expected-tns-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-tns-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-tns-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'T' into main actor-isolated context may introduce data races}}
-  print(ns3) // expected-tns-note {{access can happen concurrently}}
+  print(ns3)
 
   await transferToMainIndirect(ns4)
   // expected-tns-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-tns-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-tns-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'T' into main actor-isolated context may introduce data races}}
-  print(ns4) // expected-tns-note {{access can happen concurrently}}
+  print(ns4)
 }
 
 ////////////////////////

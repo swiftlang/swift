@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-upcoming-feature InferIsolatedConformances %s
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_InferIsolatedConformances
 
 protocol P {
   func f()
