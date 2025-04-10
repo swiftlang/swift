@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence -enable-experimental-feature Span -enable-experimental-feature AddressableTypes)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_LifetimeDependence
