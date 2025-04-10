@@ -310,6 +310,8 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
     return true;
   case SILInstructionKind::MoveValueInst:
     // Look through if it isn't from a var decl.
@@ -334,9 +336,6 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedValueCastInst:
-  case SILInstructionKind::StructElementAddrInst:
-  case SILInstructionKind::TupleElementAddrInst:
-  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::ConvertEscapeToNoEscapeInst:
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::RefToRawPointerInst:
@@ -735,6 +734,7 @@ TrackableValueLookupResult RegionAnalysisValueMap::getTrackableValue(
 
   auto trackedValue =
       getTrackableValueHelper(value, isAddressCapturedByPartialApply);
+
   std::optional<TrackableValue> trackedBase;
   if (base)
     trackedBase =
@@ -1128,6 +1128,17 @@ void TrackableValueLookupResult::print(llvm::raw_ostream &os) const {
     os << "Base:\n";
     base->print(os);
   }
+}
+
+//===----------------------------------------------------------------------===//
+//                      MARK: UnderlyingTrackedValueInfo
+//===----------------------------------------------------------------------===//
+
+void RegionAnalysisValueMap::UnderlyingTrackedValueInfo::print(
+    llvm::raw_ostream &os) const {
+  os << "RegionAnalysisValueMap.\nValue: " << value;
+  if (base)
+    os << "Base: " << base;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3205,9 +3216,15 @@ void PartitionOpBuilder::addRequire(TrackableValueLookupResult value) {
           return;
 
         options |= PartitionOp::Flag::RequireOfMutableBaseOfSendableValue;
+      } else if (auto *asi = dyn_cast<AllocStackInst>(rep)) {
+        if (asi->isLet())
+          return;
+
+        options |= PartitionOp::Flag::RequireOfMutableBaseOfSendableValue;
       }
+
+      addRequire(value.base, options);
     }
-    addRequire(value.base, options);
   }
 }
 
@@ -3355,6 +3372,9 @@ CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
 CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
+CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
+CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 
 //===---
 // Store
@@ -3604,9 +3624,6 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTrivialBitCastInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedBitwiseCastInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedValueCastInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(TupleElementAddrInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(StructElementAddrInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertEscapeToNoEscapeInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertFunctionInst)
 
@@ -3701,20 +3718,42 @@ PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   return TranslationSemantics::LookThrough;
 }
 
-/// LoadInst is technically a statically look through instruction, but we want
-/// to handle it especially in the infrastructure, so we cannot mark it as
-/// such. This makes marking it as a normal lookthrough instruction impossible
-/// since the routine checks that invariant.
-TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *limvi) {
+/// LoadInst has two different semantics:
+///
+/// 1. If the load produces a non-Sendable value, we want to treat it as a
+/// statically look through instruction, but we want to handle it especially in
+/// the infrastructure, so we cannot mark it as such. This makes marking it as a
+/// normal lookthrough instruction impossible since the routine checks that
+/// invariant.
+///
+/// 2. If the load produces a Sendable value, we want to perform a require on
+/// the address so that if we have a load from a non-Sendable base, we properly
+/// require the base.
+TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *li) {
+  if (SILIsolationInfo::isSendableType(li->getOperand())) {
+    translateSILRequire(li->getOperand());
+  }
+
   return TranslationSemantics::Special;
 }
 
-/// LoadBorrowInst is technically a statically look through instruction, but we
-/// want to handle it especially in the infrastructure, so we cannot mark it as
-/// such. This makes marking it as a normal lookthrough instruction impossible
-/// since the routine checks that invariant.
+/// LoadBorrowInst has two different semantics:
+///
+/// 1. If the load produces a non-Sendable value, we want to treat it as a
+/// statically look through instruction, but we want to handle it especially in
+/// the infrastructure, so we cannot mark it as such. This makes marking it as a
+/// normal lookthrough instruction impossible since the routine checks that
+/// invariant.
+///
+/// 2. If the load produces a Sendable value, we want to perform a require on
+/// the address so that if we have a load from a non-Sendable base, we properly
+/// require the base.
 TranslationSemantics
 PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  if (SILIsolationInfo::isSendableType(lbi->getOperand())) {
+    translateSILRequire(lbi->getOperand());
+  }
+
   return TranslationSemantics::Special;
 }
 

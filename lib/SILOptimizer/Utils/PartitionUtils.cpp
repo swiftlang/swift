@@ -142,6 +142,9 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   }
   case PartitionOpKind::Require: {
     os << "require ";
+    if (getOptions().containsOnly(
+            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue))
+      os << "[mutable_base_of_sendable_val] ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << getOpArg1();

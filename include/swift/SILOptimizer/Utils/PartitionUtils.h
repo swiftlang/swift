@@ -1461,13 +1461,6 @@ public:
           return;
       }
 
-      // If this is a require of a mutable base of a Sendable value and we were
-      // not closure captured, we can bail.
-      if (op.getOptions().containsOnly(PartitionOp::Flag::RequireOfMutableBaseOfSendableValue) &&
-          regionHasClosureCapturedElt) {
-        return;
-      }
-
       // Mark op.getOpArg1() as sent.
       SendingOperandState &state = operandToStateMap.get(op.getSourceOp());
       state.isClosureCaptured |= regionHasClosureCapturedElt;
