@@ -12,6 +12,7 @@ add_library(swift_Concurrency
   EmbeddedSupport.cpp
   Error.cpp
   ExecutorBridge.cpp
+  ExecutorImpl.cpp
   ExecutorChecks.cpp
   GlobalExecutor.cpp
   Setup.cpp
