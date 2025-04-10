@@ -109,6 +109,15 @@ public struct ObservableMacro {
       trailingTrivia: .space
     )
   }
+
+  static var trackedAttribute: AttributeSyntax {
+    AttributeSyntax(
+      leadingTrivia: .space,
+      atSign: .atSignToken(),
+      attributeName: IdentifierTypeSyntax(name: .identifier(trackedMacroName)),
+      trailingTrivia: .space
+    )
+  }
 }
 
 struct ObservationDiagnostic: DiagnosticMessage {
