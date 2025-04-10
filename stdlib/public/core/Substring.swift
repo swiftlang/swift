@@ -779,7 +779,7 @@ extension Substring.UTF8View {
     borrowing get {
 #if _runtime(_ObjC)
       // handle non-UTF8 Objective-C bridging cases here
-      if !_wholeGuts.isFastUTF8 && _wholeGuts._object.hasObjCBridgeableObject {
+      if !_wholeGuts.isFastUTF8, _wholeGuts._object.hasObjCBridgeableObject {
         let base: String.UTF8View = self._base
         let first = base._foreignDistance(from: base.startIndex, to: startIndex)
         let count = base._foreignDistance(from: startIndex, to: endIndex)
@@ -796,7 +796,8 @@ extension Substring.UTF8View {
         let span = unsafe Span(_unsafeStart: start, count: end &- first)
         return unsafe _overrideLifetime(span, borrowing: self)
       }
-      _precondition(_wholeGuts.isFastUTF8)
+      let isFastUTF8 = _wholeGuts.isFastUTF8
+      _precondition(isFastUTF8, "Substring must be contiguous UTF8")
       var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
       span = span._extracting(first..<end)
       return unsafe _overrideLifetime(span, borrowing: self)
