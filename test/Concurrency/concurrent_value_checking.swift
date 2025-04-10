@@ -305,7 +305,7 @@ var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-wa
 // ----------------------------------------------------------------------
 func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 
-func concurrentClosures<T>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{26-26=: Sendable}}
+func concurrentClosures<T: SendableMetatype>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{44-44= & Sendable}}
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
     acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a '@Sendable' closure}}
