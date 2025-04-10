@@ -5452,6 +5452,10 @@ public:
     return getParameters().back();
   }
 
+  unsigned getSelfParameterIndex() const {
+    return NumParameters - 1;
+  }
+
   /// Return SILParameterInfo for the isolated parameter in this SILFunctionType
   /// if one exists. Returns None otherwise.
   std::optional<SILParameterInfo> maybeGetIsolatedParameter() const {
@@ -5655,6 +5659,17 @@ public:
   ///
   /// Defined in SILType.cpp.
   bool isAddressable(unsigned paramIdx, SILFunction *caller);
+
+  /// Return true of the specified parameter is addressable based on its type
+  /// lowering. This includes @_addressableForDependencies parameter types.
+  ///
+  /// 'genericEnv' may be null.
+  ///
+  /// Defined in SILType.cpp.
+  bool isAddressable(unsigned paramIdx, SILModule &module,
+                     GenericEnvironment *genericEnv,
+                     Lowering::TypeConverter &typeConverter,
+                     TypeExpansionContext expansion);
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
