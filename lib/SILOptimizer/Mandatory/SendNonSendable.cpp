@@ -2701,24 +2701,6 @@ struct DiagnosticEvaluator final
 
   void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
     const auto &partitionOp = *error.op;
-
-    auto &operandState = operandToStateMap.get(error.sendingOp);
-
-    // Ignore this if we have a gep like instruction that is returning a
-    // sendable type and sendingOp was not set with closure
-    // capture.
-    if (auto *svi =
-            dyn_cast<SingleValueInstruction>(partitionOp.getSourceInst())) {
-      if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
-          !SILIsolationInfo::isNonSendableType(svi->getType(),
-                                               svi->getFunction())) {
-        bool isCapture = operandState.isClosureCaptured;
-        if (!isCapture) {
-          return;
-        }
-      }
-    }
-
     REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
     sendingOpToRequireInstMultiMap.insert(
         error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
