@@ -2158,6 +2158,7 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
 
 extension FixedWidthInteger {
   @inlinable
+  @_transparent
   public var bitWidth: Int { return Self.bitWidth }
 
   @inlinable
@@ -2770,7 +2771,7 @@ extension FixedWidthInteger {
   }
 
   @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
       self = Self(_truncatingBits: source._lowWord)
@@ -3015,7 +3016,7 @@ extension UnsignedInteger {
   /// This property is always `false` for unsigned integer types.
   @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
-    @inline(__always)
+    @_transparent
     get { return false }
   }
 }
@@ -3230,7 +3231,7 @@ extension SignedInteger {
   /// This property is always `true` for signed integer types.
   @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
-    @inline(__always)
+    @_transparent
     get { return true }
   }
 }
