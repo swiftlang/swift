@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: not %target-swift-frontend -typecheck -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs  %t/test.swift  -enable-experimental-cxx-interop -disable-availability-checking
 
 //--- Inputs/module.modulemap
 module Test {
@@ -21,5 +21,4 @@ HasCtor {
 
 import Test
 
-// CHECK: error: 'HasCtor' cannot be constructed because it has no accessible initializers
 let x = HasCtor(42)
