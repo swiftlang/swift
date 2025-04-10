@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/TargetInfo.h"
-#include "swift/Basic/Version.h"
+#include <vector>
+
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/TargetInfo.h"
+#include "swift/Basic/Version.h"
 #include "swift/Frontend/Frontend.h"
 
 #include "clang/Basic/TargetInfo.h"
@@ -51,6 +54,43 @@ static void printCompatibilityLibrary(
   out << "\n      }";
 
   printedAny = true;
+}
+
+static void printSupportedFeatures(llvm::raw_ostream &out) {
+  std::vector<swift::Feature> upcoming{{
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version) Feature::FeatureName,
+#include "swift/Basic/Features.def"
+  }};
+
+  std::vector<swift::Feature> experimental{{
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#define EXPERIMENTAL_FEATURE(FeatureName, SENumber) Feature::FeatureName,
+#include "swift/Basic/Features.def"
+  }};
+
+  auto printFeature = [&out](const Feature &feature) {
+    out << "      ";
+    out << "{ \"name\": \"" << feature.getName() << "\"";
+    if (feature.isAdoptable()) {
+      out << ", \"adoptable\": true";
+    }
+    if (auto version = feature.getLanguageVersion()) {
+      out << ", \"introduced_in\": " << *version;
+    }
+    out << " }";
+  };
+
+  out << "  \"feature_flags\": {\n";
+  out << "    \"upcoming\": [\n";
+  llvm::interleave(upcoming, printFeature, [&out] { out << ",\n"; });
+  out << "\n    ],\n";
+
+  out << "    \"experimental\": [\n";
+  llvm::interleave(experimental, printFeature, [&out] { out << ",\n"; });
+  out << "\n    ]\n";
+
+  out << "  }\n";
 }
 
 namespace swift {
@@ -109,7 +149,9 @@ void printTargetInfo(const CompilerInvocation &invocation,
   writeEscaped(searchOpts.RuntimeResourcePath, out);
   out << "\"\n";
 
-  out << "  }\n";
+  out << "  },\n";
+
+  printSupportedFeatures(out);
 
   out << "}\n";
 }
