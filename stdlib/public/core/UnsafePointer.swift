@@ -469,6 +469,12 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
+extension UnsafePointer where Pointee: ~Copyable {
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (UInt(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+  }
+}
 
 /// A pointer for accessing and manipulating data of a
 /// specific type.
@@ -1380,5 +1386,12 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     return unsafe UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
+  }
+}
+
+extension UnsafeMutablePointer where Pointee: ~Copyable {
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (UInt(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }
 }

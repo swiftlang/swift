@@ -105,10 +105,7 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    _precondition(
-      buffer.baseAddress._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
+    _precondition(buffer._isWellAligned(), "Misaligned Span")
     let span = unsafe Span(_unchecked: buffer.baseAddress, count: buffer.count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
@@ -229,10 +226,12 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
   ) {
+    guard let start = buffer.baseAddress else {
+      self.init()
+      return
+    }
     _precondition(
-      buffer.baseAddress._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
+      start == start.alignedDown(for: Element.self), "Misaligned Span")
     let (byteCount, stride) = (buffer.count, MemoryLayout<Element>.stride)
     let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
     _precondition(
