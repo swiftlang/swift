@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=default -enable-experimental-feature CXXForeignReferenceTypeInitializers -disable-availability-checking -verify-additional-file %S/Inputs/constructors.h -Xcc -Wno-nullability-completeness
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=default -disable-availability-checking -verify-additional-file %S/Inputs/constructors.h -Xcc -Wno-nullability-completeness
 
-// This test uses -verify-additional-file, which do not work well on Windows:
+// This test uses -verify-additional-file, which do not work well on Windows.
 // UNSUPPORTED: OS=windows-msvc
-// REQUIRES: swift_feature_CXXForeignReferenceTypeInitializers
 
 import Constructors
 

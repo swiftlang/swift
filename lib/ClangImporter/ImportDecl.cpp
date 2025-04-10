@@ -2555,8 +2555,8 @@ namespace {
           result->addMember(ctor);
         }
       } else {
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::CXXForeignReferenceTypeInitializers)) {
+        if (!Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::SuppressCXXForeignReferenceTypeInitializers)) {
           assert(
               isa<ClassDecl>(result) &&
               "Expected result to be a ClassDecl as it cannot be a StructDecl");
@@ -3625,7 +3625,18 @@ namespace {
           isa<clang::FunctionDecl>(decl)
               ? cast<clang::FunctionDecl>(decl)->getReturnType()
               : cast<clang::ObjCMethodDecl>(decl)->getReturnType();
-      if (isForeignReferenceTypeWithoutImmortalAttrs(retType)) {
+      clang::QualType pointeeType = retType;
+      if (retType->isPointerType() || retType->isReferenceType()) {
+        pointeeType = retType->getPointeeType();
+      }
+
+      clang::RecordDecl *recordDecl = nullptr;
+      if (const auto *recordType = pointeeType->getAs<clang::RecordType>()) {
+        recordDecl = recordType->getDecl();
+      }
+
+      if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
+          !hasImmortalAttrs(recordDecl)) {
         if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
