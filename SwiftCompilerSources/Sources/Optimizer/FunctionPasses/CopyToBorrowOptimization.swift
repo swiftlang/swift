@@ -360,6 +360,13 @@ private extension Value {
   }
 
   var lookThroughForwardingInstructions: Value {
+    if let bfi = definingInstruction as? BorrowedFromInst,
+       !bfi.borrowedPhi.isReborrow,
+       bfi.enclosingValues.count == 1
+    {
+      // Return the single forwarded enclosingValue
+      return bfi.enclosingValues[0]
+    }
     if let fi = definingInstruction as? ForwardingInstruction,
        let forwardedOp = fi.singleForwardedOperand
     {
