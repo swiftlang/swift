@@ -119,6 +119,7 @@ struct NonCopyable {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK: class MyImmortal {
+// CHECK-NEXT:     init
 // CHECK-NEXT:   func foo()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct NonCopyable {

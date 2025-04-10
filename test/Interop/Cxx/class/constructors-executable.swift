@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature CXXForeignReferenceTypeInitializers -Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking)
 //
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_CXXForeignReferenceTypeInitializers
 
 import Constructors
 import CxxStdlib
