@@ -1,4 +1,10 @@
-// RUN: %target-sil-opt %s -dump-addr-escape-info -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-addr-escape-info -o /dev/null \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
 
 // REQUIRES: swift_in_compiler
 
@@ -37,6 +43,13 @@ protocol P {}
 
 extension Int : P {}
 
+@_addressableForDependencies
+struct Addressable {
+  @_hasStorage var a: Int
+}
+
+struct NE : ~Escapable {}
+
 sil @no_arguments : $@convention(thin) () -> ()
 sil @indirect_argument : $@convention(thin) (@in Int) -> ()
 sil @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
@@ -68,6 +81,14 @@ sil @initX : $@convention(method) (@owned X) -> @owned X {
 sil @modifyStr : $@convention(method) (@inout Str) -> ()
 sil @guaranteed_yield_coroutine : $@yield_once @convention(thin) (@inout X) -> @yields @inout X
 sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
+
+sil @addressable_independent_arg : $@convention(thin) (@in_guaranteed Addressable) -> Builtin.RawPointer
+
+sil @addressable_dependent_arg : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+sil @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE {
+[%0: noescape]
+}
 
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -862,3 +883,76 @@ bb0(%0 :  @guaranteed $X):
   return %3 : $()
 }
 
+// CHECK-LABEL: Address escape information for noescape_via_independent_addressable:
+// CHECK: pair 0 - 1
+// CHECK-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed Addressable) -> Builtin.RawPointer
+// CHECK-NEXT: alloc_stack $Addressable
+// CHECK-NEXT: no alias
+// CHECK-LABEL: End function noescape_via_independent_addressable
+sil [ossa] @noescape_via_independent_addressable : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to [trivial] %2
+
+  %f = function_ref @addressable_independent_arg : $@convention(thin) (@in_guaranteed Addressable) -> Builtin.RawPointer
+  %a = apply %f(%1) : $@convention(thin) (@in_guaranteed Addressable) -> Builtin.RawPointer
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_addr %1
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Address escape information for escape_via_dependent_addressable:
+// CHECK: pair 0 - 1
+// CHECK-NEXT:   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   %{{.*}} = alloc_stack $Addressable
+// CHECK-NEXT: may alias
+// CHECK-LABEL: End function escape_via_dependent_addressable
+sil [ossa] @escape_via_dependent_addressable : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to [trivial] %2
+
+  %f = function_ref @addressable_dependent_arg : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_value %a
+  destroy_addr %1
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Address escape information for escape_via_noescape_addressable:
+// CHECK: pair 0 - 1
+// CHECK-NEXT:   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   %{{.*}} = alloc_stack $Addressable
+// CHECK-NEXT: no alias
+// CHECK-LABEL: End function escape_via_noescape_addressable
+sil [ossa] @escape_via_noescape_addressable : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to [trivial] %2
+
+  %f = function_ref @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_value %a
+  destroy_addr %1
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
