@@ -368,6 +368,12 @@ private:
     }
 
     operator bool() const { return value; }
+
+    void print(llvm::raw_ostream &os) const;
+    SWIFT_DEBUG_DUMP {
+      print(llvm::dbgs());
+      llvm::dbgs() << '\n';
+    }
   };
 
   /// A map from a SILValue to its equivalence class representative.

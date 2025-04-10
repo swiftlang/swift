@@ -2702,6 +2702,14 @@ struct DiagnosticEvaluator final
   void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
     const auto &partitionOp = *error.op;
     REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
+    // Ignore this if we are erroring on a mutable base of a Sendable value and
+    // if when we sent the value's region was not closure captured.
+    if (error.op->getOptions().containsOnly(
+            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue) &&
+        !operandToStateMap.get(error.sendingOp).isClosureCaptured)
+      return;
+
     sendingOpToRequireInstMultiMap.insert(
         error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
   }
