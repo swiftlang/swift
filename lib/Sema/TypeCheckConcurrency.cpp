@@ -7942,7 +7942,7 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
     return ActorIsolation::forNonisolated(false);
 
   // If we are inferring isolated conformances and the conforming type is
-  // isolated to a global actor,
+  // isolated to a global actor, use the conforming type's isolation.
   auto nominal = dc->getSelfNominalTypeDecl();
   if (ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances) &&
       nominal) {

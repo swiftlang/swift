@@ -1058,8 +1058,11 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   auto globalActorType = globalActorTypeOrError.get();
 
   TypeExpr *globalActorTypeExpr = nullptr;
-  if (globalActorType)
+  if (globalActorType) {
     globalActorTypeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+    rawOptions |=
+        static_cast<unsigned>(ProtocolConformanceFlags::GlobalActorIsolated);
+  }
 
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
