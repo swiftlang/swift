@@ -6,3 +6,5 @@
 // REQUIRES: OS=macosx
 
 // RUN: %{python} %utils/python_lint.py
+
+// REQUIRES: rdar59281423
