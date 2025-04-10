@@ -50,3 +50,31 @@ do {
     }
   }
 }
+
+func use(_ closure: @autoclosure () -> Any) {
+}
+
+do {
+  class C {
+    @preconcurrency static func f(_: @escaping @Sendable () -> Void) {}
+  }
+
+  class SelfCapture { // expected-note 5 {{class 'SelfCapture' does not conform to the 'Sendable' protocol}}
+    func fooDirect() {
+      C.f {
+        use(self)
+        // expected-warning@-1 {{capture of 'self' with non-sendable type 'SelfCapture' in a '@Sendable' closure}}
+        // expected-warning@-2 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
+      }
+    }
+
+    func fooThroughClosure() {
+      C.f {
+        { use(self) }()
+        // expected-warning@-1 {{capture of 'self' with non-sendable type 'SelfCapture' in a '@Sendable' closure}}
+        // expected-warning@-2 {{capture of 'self' with non-sendable type 'SelfCapture' in an isolated closure}}
+        // expected-warning@-3 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
+      }
+    }
+  }
+}
