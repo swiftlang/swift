@@ -24,6 +24,8 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline
   internal var _count: Int = 0
 
+  @_alwaysEmitIntoClient
+  @inlinable
   deinit {
     if _count > 0 {
       unsafe _start().withMemoryRebound(
