@@ -154,8 +154,6 @@ extension DiagnosticsError {
 
 struct LocalMacroExpansionContext<Context: MacroExpansionContext> {
   var context: Context
-  var file: ExprSyntax?
-  var converter: SourceLocationConverter?
 }
 
 extension DeclModifierListSyntax {
@@ -198,15 +196,15 @@ extension TokenSyntax {
 
 extension CodeBlockSyntax {
   func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> CodeBlockSyntax {
-    guard let converter = context.converter, let firstStatement = statements.first else {
+    guard let firstStatement = statements.first, let loc = context.context.location(of: firstStatement) else {
       return self
     }
-    let range = firstStatement.sourceRange(converter: converter)
+    
     return CodeBlockSyntax(
       leadingTrivia: leadingTrivia,
       leftBrace: leftBrace,
       statements: CodeBlockItemListSyntax {
-        "#sourceLocation(file: \(context.file), line: \(raw: range.start.line))"
+        "#sourceLocation(file: \(loc.file), line: \(loc.line))"
         statements
         "#sourceLocation()"
       },
@@ -215,6 +213,7 @@ extension CodeBlockSyntax {
     )
   }
 }
+
 
 extension AccessorDeclSyntax {
   func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorDeclSyntax {
@@ -491,16 +490,8 @@ extension ObservationTrackedMacro: PeerMacro {
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
     }
-    let file = context.location(of: property)?.file
-    let filePath = file?.as(StringLiteralExprSyntax.self)?.segments.compactMap { (item) -> String? in
-      switch item {
-      case .stringSegment(let seg): seg.content.text
-      default: nil
-      }
-    }.first
-    let converter = filePath.map { SourceLocationConverter(fileName: $0, tree: property) }
-    let localContext = LocalMacroExpansionContext(context: context, file: file, converter: converter)
     
+    let localContext = LocalMacroExpansionContext(context: context)
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.trackedAttribute, in: localContext))
     return [storage]
   }
