@@ -1602,17 +1602,27 @@ struct PartitionOpBuilder {
   void addAssignFresh(TrackableValue value) {
     if (value.isSendable())
       return;
-    std::array<Element, 1> values = {
-        lookupValueID(value.getRepresentative().getValue())};
+    auto id = lookupValueID(value.getRepresentative().getValue());
     currentInstPartitionOps.emplace_back(
-        PartitionOp::AssignFresh(values, currentInst));
+        PartitionOp::AssignFresh(id, currentInst));
   }
 
   void addAssignFresh(ArrayRef<SILValue> values) {
-    auto transformedCollection = makeTransformRange(
-        values, [&](SILValue value) { return lookupValueID(value); });
+    if (values.empty())
+      return;
+
+    auto first = lookupValueID(values.front());
     currentInstPartitionOps.emplace_back(
-        PartitionOp::AssignFresh(transformedCollection, currentInst));
+        PartitionOp::AssignFresh(first, currentInst));
+
+    auto transformedCollection =
+        makeTransformRange(values.drop_front(), [&](SILValue value) {
+          return lookupValueID(value);
+        });
+    for (auto id : transformedCollection) {
+      currentInstPartitionOps.emplace_back(
+          PartitionOp::AssignFreshAssign(id, first, currentInst));
+    }
   }
 
   void addAssign(SILValue destValue, Operand *srcOperand) {
@@ -1686,12 +1696,13 @@ struct PartitionOpBuilder {
   void addRequire(TrackableValueLookupResult value);
 
 private:
-  void addRequire(TrackableValue value);
+  void addRequire(TrackableValue value, PartitionOp::Options options = {});
 
-  void addRequire(std::optional<TrackableValue> value) {
+  void addRequire(std::optional<TrackableValue> value,
+                  PartitionOp::Options options = {}) {
     if (!value)
       return;
-    addRequire(*value);
+    addRequire(*value, options);
   }
 
 public:
@@ -3144,10 +3155,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   SWIFT_DEFER { opsToPrint.clear(); };
   for (const PartitionOp &op : ops) {
     // Now dump our the root value we map.
-    for (unsigned opArg : op.getOpArgs()) {
-      // If we didn't insert, skip this. We only emit this once.
-      opsToPrint.push_back(Element(opArg));
-    }
+    op.getOpArgs(opsToPrint);
   }
   sortUnique(opsToPrint);
   for (Element opArg : opsToPrint) {
@@ -3165,7 +3173,8 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 #endif
 }
 
-void PartitionOpBuilder::addRequire(TrackableValue value) {
+void PartitionOpBuilder::addRequire(TrackableValue value,
+                                    PartitionOp::Options options) {
   if (value.isSendable())
     return;
   auto silValue = value.getRepresentative().getValue();
@@ -3175,13 +3184,31 @@ void PartitionOpBuilder::addRequire(TrackableValue value) {
   // Check if this value
 
   currentInstPartitionOps.emplace_back(
-      PartitionOp::Require(lookupValueID(silValue), currentInst));
+      PartitionOp::Require(lookupValueID(silValue), currentInst, options));
 }
 
 void PartitionOpBuilder::addRequire(TrackableValueLookupResult value) {
   // Call addRequire which will short curcuit if we have a sendable value.
   addRequire(value.value);
-  addRequire(value.base);
+
+  if (value.value.isSendable()) {
+    auto options = PartitionOp::Options();
+    if (value.base && value.base->isNonSendable()) {
+      // Check if our base was captured by a closure. In such a case, we need to
+      // treat this as a use of the base.
+      auto rep = value.base->getRepresentative().getValue();
+      if (auto boxType = rep->getType().getAs<SILBoxType>()) {
+        // If we are not mutable, we are always safe to access the Sendable
+        // value. The reason why is that we will have copied the non-Sendable
+        // segment by value at +1 when we send it implying that we will
+        if (!boxType->getLayout()->isMutable())
+          return;
+
+        options |= PartitionOp::Flag::RequireOfMutableBaseOfSendableValue;
+      }
+    }
+    addRequire(value.base, options);
+  }
 }
 
 //===----------------------------------------------------------------------===//
