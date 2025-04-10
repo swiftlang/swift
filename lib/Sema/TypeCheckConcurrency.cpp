@@ -5691,8 +5691,10 @@ static void addAttributesForActorIsolation(ValueDecl *value,
     break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    value->getAttrs().add(new (ctx) NonisolatedAttr(
-        isolation == ActorIsolation::NonisolatedUnsafe, /*implicit=*/true));
+    value->getAttrs().add(NonisolatedAttr::createImplicit(
+        ctx, isolation == ActorIsolation::NonisolatedUnsafe
+                 ? NonIsolatedModifier::Unsafe
+                 : NonIsolatedModifier::None));
     break;
   }
   case ActorIsolation::GlobalActor: {

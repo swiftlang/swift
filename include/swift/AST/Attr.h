@@ -2978,13 +2978,8 @@ public:
                   NonIsolatedModifier modifier, bool implicit)
       : DeclAttribute(DeclAttrKind::Nonisolated, atLoc, range, implicit) {
     Bits.NonisolatedAttr.Modifier = static_cast<unsigned>(modifier);
+    assert((getModifier() == modifier) && "not enough bits for modifier");
   }
-
-  NonisolatedAttr(bool unsafe, bool implicit)
-      : NonisolatedAttr({}, {},
-                        unsafe ? NonIsolatedModifier::Unsafe
-                               : NonIsolatedModifier::None,
-                        implicit) {}
 
   NonIsolatedModifier getModifier() const {
     return static_cast<NonIsolatedModifier>(Bits.NonisolatedAttr.Modifier);
@@ -2993,6 +2988,13 @@ public:
   bool isUnsafe() const { return getModifier() == NonIsolatedModifier::Unsafe; }
   bool isNonSending() const {
     return getModifier() == NonIsolatedModifier::NonSending;
+  }
+
+  static NonisolatedAttr *
+  createImplicit(ASTContext &ctx,
+                 NonIsolatedModifier modifier = NonIsolatedModifier::None) {
+    return new (ctx) NonisolatedAttr(/*atLoc*/ {}, /*range*/ {}, modifier,
+                                     /*implicit=*/true);
   }
 
   static bool classof(const DeclAttribute *DA) {

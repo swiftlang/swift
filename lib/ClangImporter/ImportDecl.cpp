@@ -8837,8 +8837,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       // Hard-code @actorIndependent, until Objective-C clients start
       // using nonisolated.
       if (swiftAttr->getAttribute() == "@actorIndependent") {
-        auto attr = new (SwiftContext)
-            NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true);
+        auto attr = NonisolatedAttr::createImplicit(SwiftContext);
         MappedDecl->getAttrs().add(attr);
         continue;
       }
@@ -8971,8 +8970,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       auto *mappedVar = cast<VarDecl>(MappedDecl);
       if (mappedVar->isStatic() && mappedVar->isLet() &&
           isNSNotificationName(cast<clang::ValueDecl>(ClangDecl)->getType())) {
-        MappedDecl->getAttrs().add(new (SwiftContext) NonisolatedAttr(
-            /*unsafe=*/false, /*implicit=*/true));
+        MappedDecl->getAttrs().add(
+            NonisolatedAttr::createImplicit(SwiftContext));
       }
     }
   }
