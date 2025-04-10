@@ -4999,6 +4999,7 @@ class CallEmission {
   FormalEvaluationScope initialWritebackScope;
   std::optional<ActorIsolation> implicitActorHopTarget;
   bool implicitlyThrows;
+  bool canUnwind;
 
 public:
   /// Create an emission for a call of the given callee.
@@ -5006,7 +5007,8 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitActorHopTarget(std::nullopt), implicitlyThrows(false) {}
+        implicitActorHopTarget(std::nullopt), implicitlyThrows(false),
+        canUnwind(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -5056,6 +5058,8 @@ public:
   /// which actually is throwing, regardless whether or not the actual target
   /// function can throw or not.
   void setImplicitlyThrows(bool flag) { implicitlyThrows = flag; }
+
+  void setCanUnwind(bool flag) { canUnwind = flag; }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
@@ -5114,9 +5118,11 @@ namespace {
 /// Cleanup to end a coroutine application.
 class EndCoroutineApply : public Cleanup {
   SILValue ApplyToken;
+  bool CanUnwind;
   std::vector<BeginBorrowInst *> BorrowedMoveOnlyValues;
 public:
-  EndCoroutineApply(SILValue applyToken) : ApplyToken(applyToken) {}
+  EndCoroutineApply(SILValue applyToken, bool CanUnwind)
+      : ApplyToken(applyToken), CanUnwind(CanUnwind) {}
 
   void setBorrowedMoveOnlyValues(ArrayRef<BeginBorrowInst *> values) {
     BorrowedMoveOnlyValues.insert(BorrowedMoveOnlyValues.end(),
@@ -5129,14 +5135,7 @@ public:
       SGF.B.createEndBorrow(l, *i);
       SGF.B.createDestroyValue(l, (*i)->getOperand());
     }
-    auto *beginApply =
-        cast<BeginApplyInst>(ApplyToken->getDefiningInstruction());
-    auto isCalleeAllocated = beginApply->isCalleeAllocated();
-    auto unwindOnCallerError =
-        !isCalleeAllocated ||
-        SGF.SGM.getASTContext().LangOpts.hasFeature(
-            Feature::CoroutineAccessorsUnwindOnCallerError);
-    if (forUnwind && unwindOnCallerError) {
+    if (forUnwind && CanUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
       SGF.B.createEndApply(l, ApplyToken,
@@ -5179,18 +5178,15 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
 
   auto fnValue = callee.getFnValue(SGF, borrowedSelf);
 
-  return SGF.emitBeginApply(uncurriedLoc.value(), fnValue,
+  return SGF.emitBeginApply(uncurriedLoc.value(), fnValue, canUnwind,
                             callee.getSubstitutions(), uncurriedArgs,
                             calleeTypeInfo.substFnType, options, yields);
 }
 
-CleanupHandle
-SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
-                               SubstitutionMap subs,
-                               ArrayRef<ManagedValue> args,
-                               CanSILFunctionType substFnType,
-                               ApplyOptions options,
-                               SmallVectorImpl<ManagedValue> &yields) {
+CleanupHandle SILGenFunction::emitBeginApply(
+    SILLocation loc, ManagedValue fn, bool canUnwind, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, CanSILFunctionType substFnType,
+    ApplyOptions options, SmallVectorImpl<ManagedValue> &yields) {
   // Emit the call.
   SmallVector<SILValue, 4> rawResults;
   emitRawApply(*this, loc, fn, subs, args, substFnType, options,
@@ -5206,7 +5202,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
 
   // Push a cleanup to end the application.
   // TODO: destroy all the arguments at exactly this point?
-  Cleanups.pushCleanup<EndCoroutineApply>(token);
+  Cleanups.pushCleanup<EndCoroutineApply>(token, canUnwind);
   auto endApplyHandle = getTopCleanup();
 
   // Manage all the yielded values.
@@ -6183,7 +6179,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
 std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
            CleanupHandle>
 SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
-                                          SILType substFnType,
+                                          SILType substFnType, bool canUnwind,
                                           SubstitutionMap subs,
                                           ArrayRef<SILValue> args,
                                           SmallVectorImpl<SILValue> &yields) {
@@ -6208,7 +6204,7 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
     deallocCleanup = enterDeallocStackCleanup(allocation);
   }
 
-  Cleanups.pushCleanup<EndCoroutineApply>(token);
+  Cleanups.pushCleanup<EndCoroutineApply>(token, canUnwind);
   auto abortCleanup = Cleanups.getTopCleanup();
 
   return {token, abortCleanup, allocation, deallocCleanup};
@@ -7561,6 +7557,21 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   return ManagedValue::forLValue(address);
 }
 
+bool SILGenFunction::canUnwindAccessorDeclRef(SILDeclRef accessorRef) {
+  auto *accessor =
+      dyn_cast_or_null<AccessorDecl>(accessorRef.getAbstractFunctionDecl());
+  ASSERT(accessor && "only accessors can unwind");
+  auto kind = accessor->getAccessorKind();
+  ASSERT(isYieldingAccessor(kind) && "only yielding accessors can unwind");
+  if (!requiresFeatureCoroutineAccessors(kind)) {
+    // _read and _modify can unwind
+    return true;
+  }
+  // Coroutine accessors can only unwind with the experimental feature.
+  return getASTContext().LangOpts.hasFeature(
+      Feature::CoroutineAccessorsUnwindOnCallerError);
+}
+
 CleanupHandle
 SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
                                       SubstitutionMap substitutions,
@@ -7595,6 +7606,8 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
     subscriptIndices.emplace({});
 
   emission.addCallSite(loc, std::move(subscriptIndices));
+
+  emission.setCanUnwind(canUnwindAccessorDeclRef(accessor));
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 

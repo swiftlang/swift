@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-irgen                                            \
 // RUN:     %s                                                              \
 // RUN:     -Onone                                                          \
+// RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors                 \
 // RUN:     -enable-arm64-corocc                                            \
 // RUN:     -enable-x86_64-corocc                                           \

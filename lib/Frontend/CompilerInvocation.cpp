@@ -3130,6 +3130,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableAddressDependencies = Args.hasFlag(
       OPT_enable_address_dependencies, OPT_disable_address_dependencies,
       Opts.EnableAddressDependencies);
+
+  if (LangOpts.Target.isOSDarwin() || LangOpts.Target.isOSLinux()) {
+    // On Darwin and Linux, use yield_once_2 by default.
+    Opts.CoroutineAccessorsUseYieldOnce2 = true;
+  }
+  Opts.CoroutineAccessorsUseYieldOnce2 =
+      Args.hasFlag(OPT_enable_callee_allocated_coro_abi,
+                   OPT_disable_callee_allocated_coro_abi,
+                   Opts.CoroutineAccessorsUseYieldOnce2);
+
   Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   return false;
