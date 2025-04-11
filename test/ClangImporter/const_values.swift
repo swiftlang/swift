@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/src/main.swift \
 // RUN:   -import-bridging-header %t/src/test.h \
-// RUN:   -module-name main -I %t -emit-sil | %FileCheck %s
+// RUN:   -module-name main -I %t -emit-sil -serialize-diagnostics -serialize-diagnostics-path %t/test.diag | %FileCheck %s
+
+// RUN: c-index-test -read-diagnostics %t/test.diag 2>&1 | %FileCheck --check-prefix CHECK-DIAG %t/src/test.h
 
 //--- test.h
 #include <stdbool.h>
@@ -16,6 +18,8 @@ static const int static_const_int = 42;
 
 static const bool static_const_bool = true;
 static const char static_const_char = 42;
+static const char static_const_char_with_long_literal = 42ull;
+static const char static_const_char_with_overflow_literal = 777ull; // CHECK-DIAG: [[@LINE]]:{{.*}}: warning: implicit conversion from 'unsigned long long' to 'char' changes value from 777 to 9
 static const long static_const_long = 42;
 static const float static_const_float = 42.0;
 static const double static_const_double = 42.0;
@@ -23,10 +27,18 @@ static const double static_const_double = 42.0;
 static const char static_const_char_array[4] = {1, 2, 3, 4};
 static const char *static_const_pointer = 0;
 
+static const char static_const_char_referencing_other_const = 1 + static_const_char;
+
 typedef enum MyEnum: char {
   MyEnumCase0 = 0, MyEnumCase1, MyEnumCase2
 } MyEnum;
 static const MyEnum static_const_enum = MyEnumCase1;
+
+struct MyStruct {
+  int field;
+};
+__attribute__((swift_name("MyStruct.static_const_int_as_a_member")))
+static const int static_const_int_as_a_member = 42;
 
 //--- main.swift
 func foo() {
@@ -38,6 +50,8 @@ func foo() {
 
   print(static_const_bool)
   print(static_const_char)
+  print(static_const_char_with_long_literal)
+  print(static_const_char_with_overflow_literal)
   print(static_const_long)
   print(static_const_float)
   print(static_const_double)
@@ -45,7 +59,11 @@ func foo() {
   print(static_const_char_array)
   print(static_const_pointer)
 
+  print(static_const_char_referencing_other_const)
+
   print(static_const_enum)
+
+  print(MyStruct.static_const_int_as_a_member)
 }
 
 // Globals that don't get their value imported stay as public_external:
@@ -88,6 +106,20 @@ func foo() {
 // CHECK-NEXT:   return %1
 // CHECK-NEXT: }
 
+// CHECK:      sil shared [transparent] @$sSo35static_const_char_with_long_literals4Int8Vvg : $@convention(thin) () -> Int8 {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 42
+// CHECK-NEXT:   %1 = struct $Int8 (%0)
+// CHECK-NEXT:   return %1
+// CHECK-NEXT: }
+
+// CHECK:      sil shared [transparent] @$sSo39static_const_char_with_overflow_literals4Int8Vvg : $@convention(thin) () -> Int8 {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 9
+// CHECK-NEXT:   %1 = struct $Int8 (%0)
+// CHECK-NEXT:   return %1
+// CHECK-NEXT: }
+
 // CHECK:      sil shared [transparent] @$sSo17static_const_longSivg : $@convention(thin) () -> Int {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 42
@@ -109,10 +141,26 @@ func foo() {
 // CHECK-NEXT:   return %1
 // CHECK-NEXT: }
 
+// CHECK:      sil shared [transparent] @$sSo036static_const_char_referencing_other_B0s4Int8Vvg : $@convention(thin) () -> Int8 {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 43
+// CHECK-NEXT:   %1 = struct $Int8 (%0)
+// CHECK-NEXT:   return %1
+// CHECK-NEXT: }
+
 // CHECK:      sil shared [transparent] @$sSo17static_const_enumSo6MyEnumVvg : $@convention(thin) () -> MyEnum {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 1
 // CHECK-NEXT:   %1 = struct $Int8 (%0)
 // CHECK-NEXT:   %2 = struct $MyEnum (%1)
 // CHECK-NEXT:   return %2
+// CHECK-NEXT: }
+
+// CHECK:      sil shared [transparent] @$sSo8MyStructV28static_const_int_as_a_members5Int32VvgZ : $@convention(method) (@thin MyStruct.Type) -> Int32 {
+// CHECK-NEXT: // %0 "self"
+// CHECK-NEXT: bb0(%0 : $@thin MyStruct.Type):
+// CHECK-NEXT:   debug_value %0, let, name "self", argno 1
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int32, 42
+// CHECK-NEXT:   %3 = struct $Int32 (%2)
+// CHECK-NEXT:   return %3
 // CHECK-NEXT: }
