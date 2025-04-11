@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-irgen                                            \
 // RUN:     %s                                                              \
+// RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors                 \
 // RUN: | %IRGenFileCheck %s
 
