@@ -121,11 +121,6 @@ extension UTF8Span {
   public var count: Int {
     Int(truncatingIfNeeded: _countAndFlags & Self._countMask)
   }
-
-//  @_alwaysEmitIntoClient @inline(__always)
-//  internal var _end: UnsafeRawPointer {
-//    unsafeBaseAddress.advanced(by: _byteCount)
-//  }
 }
 
 

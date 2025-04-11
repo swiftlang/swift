@@ -194,8 +194,8 @@ extension String {
   @available(SwiftStdlib 6.2, *)
   public init(copying codeUnits: UTF8Span) {
     let isASCII = codeUnits.isKnownASCII
-    self = codeUnits._withUnsafeBufferPointer { bufPtr in
-     String._uncheckedFromUTF8(bufPtr, isASCII: isASCII)
+    self = unsafe codeUnits._withUnsafeBufferPointer { bufPtr in
+      unsafe String._uncheckedFromUTF8(bufPtr, isASCII: isASCII)
     }
   }
 

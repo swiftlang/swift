@@ -106,24 +106,6 @@ extension UnsafeRawPointer {
     unsafe String(decoding: _urbp(range) , as: UTF8.self)
   }
 
-  // // @usableFromInline
-  // internal func _isCharacterAligned(
-  //   _ i: Int,
-  //   limitedBy end: Int
-  // ) -> Bool {
-  //   print(i)
-  //   print(end)
-  //   _internalInvariant(i >= 0 && i <= end)
-  //   if i == 0 || i == end {
-  //     return true
-  //   }
-
-  //   // TODO: call internals instead
-  //   let str = _str(0..<end)
-  //   let idx = str.utf8.index(str.utf8.startIndex, offsetBy: i)
-  //   return idx == str.index(after: str.index(before: idx))
-  // }
-
   // @usableFromInline
   internal func _nextCharacterStart(
     _ i: Int, limitedBy end: Int
