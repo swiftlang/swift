@@ -27,9 +27,9 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    debugLog(prefix: prefix, message())
   }
 }
 
@@ -226,7 +226,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 
   var description: String {
-    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)), "
+    return "assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)), "
       + "\(access)"
   }
 
@@ -329,7 +329,7 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
   subscript(instruction: Instruction) -> LocalVariableAccessInfo? { accessMap[instruction] }
 
   var description: String {
-    "Access map:\n" + map({String(describing: $0)}).joined(separator: "\n")
+    "Access map for: \(allocation)\n" + map({String(describing: $0)}).joined(separator: "\n")
   }
 }
 
@@ -699,6 +699,7 @@ extension LocalVariableReachableAccess {
       case .escape:
         break
       }
+      break
     }
     return currentEffect
   }
@@ -808,8 +809,8 @@ extension LocalVariableReachableAccess {
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
                              accessStack: &accessStack)
     }
-    log("\(accessMap)")
-    log("Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
+    log("\n\(accessMap)")
+    log(prefix: false, "Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
     return true
   }
 
@@ -873,7 +874,7 @@ extension LocalVariableReachableAccess {
   private func findAllEscapesPriorToAccess() {
     var visitedBlocks = BasicBlockSet(context)
     var escapedBlocks = BasicBlockSet(context)
-    var blockList = BasicBlockWorklist(context)
+    var blockList = Stack<BasicBlock>(context)
     defer {
       visitedBlocks.deinitialize()
       escapedBlocks.deinitialize()
@@ -886,19 +887,19 @@ extension LocalVariableReachableAccess {
       for successor in from.successors {
         if hasEscaped {
           if escapedBlocks.insert(successor) {
-            blockList.pushIfNotVisited(successor)
+            blockList.push(successor)
           }
         } else if visitedBlocks.insert(successor) {
-          blockList.pushIfNotVisited(successor)
+          blockList.push(successor)
         }
       }
     }
     var hasEscaped = propagateEscapeInBlock(after: accessMap.allocation.nextInstruction, hasEscaped: false)
     forwardPropagate(accessMap.allocation.parentBlock, hasEscaped)
     while let block = blockList.pop() {
-      hasEscaped = escapedBlocks.insert(block)
+      hasEscaped = escapedBlocks.contains(block)
       hasEscaped = propagateEscapeInBlock(after: block.instructions.first!, hasEscaped: hasEscaped)
-      forwardPropagate(accessMap.allocation.parentBlock, hasEscaped)
+      forwardPropagate(block, hasEscaped)
     }
   }
 
@@ -916,4 +917,50 @@ extension LocalVariableReachableAccess {
     }
     return hasEscaped
   }
+}
+
+let localVariableReachingAssignmentsTest = FunctionTest("local_variable_reaching_assignments") {
+  function, arguments, context in
+  let allocation = arguments.takeValue()
+  let instruction = arguments.takeInstruction()
+  print("### Allocation: \(allocation)")
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard let localReachability = localReachabilityCache.reachability(for: allocation, context) else {
+    print("No reachability")
+    return
+  }
+  print("### Access map:")
+  print(localReachability.accessMap)
+  print("### Instruction: \(instruction)")
+  var reachingAssignments = Stack<LocalVariableAccess>(context)
+  defer { reachingAssignments.deinitialize() }
+  guard localReachability.gatherReachingAssignments(for: instruction, in: &reachingAssignments) else {
+    print("!!! Reaching escape")
+    return
+  }
+  print("### Reachable assignments:")
+  print(reachingAssignments.map({ String(describing: $0)}).joined(separator: "\n"))
+}
+
+let localVariableReachableUsesTest = FunctionTest("local_variable_reachable_uses") {
+  function, arguments, context in
+  let allocation = arguments.takeValue()
+  let modify = arguments.takeInstruction()
+  print("### Allocation: \(allocation)")
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard let localReachability = localReachabilityCache.reachability(for: allocation, context) else {
+    print("No reachability")
+    return
+  }
+  print("### Access map:")
+  print(localReachability.accessMap)
+  print("### Modify: \(modify)")
+  var reachableUses = Stack<LocalVariableAccess>(context)
+  defer { reachableUses.deinitialize() }
+  guard localReachability.gatherAllReachableUses(of: modify, in: &reachableUses) else {
+    print("!!! Reachable escape")
+    return
+  }
+  print("### Reachable access:")
+  print(reachableUses.map({ String(describing: $0)}).joined(separator: "\n"))
 }
