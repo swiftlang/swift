@@ -208,6 +208,13 @@ add_library(swiftCore
   UnsafeRawPointer.swift
   UTFEncoding.swift
   UTF8.swift
+  UTF8EncodingError.swift
+  UTF8Span.swift
+  UTF8SpanBits.swift
+  UTF8SpanComparisons.swift
+  UTF8SpanFundamentals.swift
+  UTF8SpanInternalHelpers.swift
+  UTF8SpanIterators.swift
   UTF16.swift
   UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
