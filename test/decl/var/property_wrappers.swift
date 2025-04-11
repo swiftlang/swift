@@ -92,7 +92,7 @@ struct NonVisibleInitWrapper<Value> {
 struct InitialValueTypeMismatch<Value> {
   var wrappedValue: Value // expected-note{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}} {{documentation-file=property-wrapper-requirements}}
+  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an '@autoclosure' thereof}} {{documentation-file=property-wrapper-requirements}}
     self.wrappedValue = initialValue!
   }
 }
@@ -101,10 +101,10 @@ struct InitialValueTypeMismatch<Value> {
 struct MultipleInitialValues<Value> {
   var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an '@autoclosure' thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an '@autoclosure' thereof}}
   }
 }
 

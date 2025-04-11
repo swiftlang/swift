@@ -118,7 +118,7 @@ func testError() {
 
 #if ERRORS
 class ObjCTest {
-  @objc func foo() -> TestError {} // expected-error {{method cannot be marked @objc because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
+  @objc func foo() -> TestError {} // expected-error {{method cannot be marked '@objc' because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
   @objc func bar() -> TestError.Code {} // okay
 }
 #endif

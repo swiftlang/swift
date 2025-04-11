@@ -18,7 +18,7 @@ func testNotAutomaticallySendable() {
 }
 
 @_rawLayout(size: 4, alignment: 4)
-struct UnuncheckedSendable: ~Copyable, Sendable {} // expected-warning{{@_rawLayout does not conform to the 'Sendable' protocol}}
+struct UnuncheckedSendable: ~Copyable, Sendable {} // expected-warning{{'@_rawLayout' does not conform to the 'Sendable' protocol}}
 
 func testUnuncheckedSendable() {
     let s = UnuncheckedSendable()

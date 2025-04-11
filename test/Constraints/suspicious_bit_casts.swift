@@ -6,7 +6,7 @@ func escapeByBitCast(f: () -> ()) -> () -> () {
 }
 
 func changeFnRep(f: @escaping () -> ()) -> @convention(block) () -> () {
-  // expected-warning@+1{{'unsafeBitCast' from function type '() -> ()' to '@convention(block) () -> ()' changes @convention and is undefined; use an implicit conversion to change conventions}}
+  // expected-warning@+1{{'unsafeBitCast' from function type '() -> ()' to '@convention(block) () -> ()' changes '@convention' and is undefined; use an implicit conversion to change conventions}}
   return unsafeBitCast(f, to: (@convention(block) () -> ()).self)
 }
 

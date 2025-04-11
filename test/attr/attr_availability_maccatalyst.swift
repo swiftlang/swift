@@ -52,7 +52,7 @@ func introducedLaterOnMacCatalyst() {
 func introducedLaterOnIOS() {
 }
 
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func testPoundAvailable() {
 
   if #available(macCatalyst 55.0, *) {

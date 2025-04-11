@@ -28,8 +28,8 @@ public class WrapperObjcClass: NSObject {
 
 class GenericClassCase {
     @objc
-    func foo(@WrapperGenericClass _ ref: Int) throws {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-    // expected-note@-1 {{classes not annotated with @objc cannot be represented in Objective-C}}
+    func foo(@WrapperGenericClass _ ref: Int) throws {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+    // expected-note@-1 {{classes not annotated with '@objc' cannot be represented in Objective-C}}
 }
 
 @propertyWrapper
@@ -51,7 +51,7 @@ public class WrapperGenericClass<Element> {
 
 class StructCase {
     @objc
-    func foo(@WrapperStruct _ ref: Int) throws {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+    func foo(@WrapperStruct _ ref: Int) throws {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
 }
 
@@ -74,7 +74,7 @@ public struct WrapperStruct {
 
 class EnumCase {
     @objc
-    func foo(@WrapperEnum _ ref: Int) throws {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+    func foo(@WrapperEnum _ ref: Int) throws {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-1 {{non-'@objc' enums cannot be represented in Objective-C}}
 }
 

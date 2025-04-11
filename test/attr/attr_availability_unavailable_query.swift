@@ -9,7 +9,7 @@ func foo() -> Int { return 0 }
 func bar() -> Int { return 0 }
 
 // Verify that #unavailable is the opposite of #available.
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func testUnavailable() {
   if #unavailable(macOS 998.0) {
     foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
@@ -32,7 +32,7 @@ func testUnavailable() {
 }
 
 // Verify that #unavailable doesn't complain about useless specs.
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func testUnavailableDoesntWarnUselessSpecs() {
   if #unavailable(macOS 998.0), #unavailable(macOS 999.0) {
     foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
@@ -46,7 +46,7 @@ func testUnavailableDoesntWarnUselessSpecs() {
 }
 
 // Verify that #unavailable refines the availability of all "else" paths.
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func testUnavailableExpandAllElsePaths() {
   if #unavailable(macOS 998.0) {
     foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}

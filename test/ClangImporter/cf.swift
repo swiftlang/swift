@@ -161,11 +161,11 @@ func testNonConstVoid() {
 
 class NuclearFridge: CCRefrigerator {} // expected-error {{cannot inherit from Core Foundation type 'CCRefrigerator'}}
 extension CCRefrigerator {
-  @objc func foo() {} // expected-error {{method cannot be marked @objc because Core Foundation types are not classes in Objective-C}}
+  @objc func foo() {} // expected-error {{method cannot be marked '@objc' because Core Foundation types are not classes in Objective-C}}
   func bar() {} // okay, implicitly non-objc
 }
 
 protocol SwiftProto {}
 @objc protocol ObjCProto {}
-extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to @objc protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
+extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to '@objc' protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
 extension CCRefrigerator: SwiftProto {}

@@ -1461,7 +1461,7 @@ func testClosures() {
 
 func acceptAutoclosure(f: @autoclosure () -> Int) { }
 func produceInt() -> Int { }
-acceptAutoclosure(f: produceInt) // expected-error{{add () to forward @autoclosure parameter}} {{32-32=()}}
+acceptAutoclosure(f: produceInt) // expected-error{{add () to forward '@autoclosure' parameter}} {{32-32=()}}
 
 // -------------------------------------------
 // Trailing closures

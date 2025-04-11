@@ -15,7 +15,7 @@ extension Runnable where Self : OtherThing {
     }
 }
 
-@main //expected-error{{'EntryPoint' is annotated with @main and must provide a main static function}}
+@main //expected-error{{'EntryPoint' is annotated with '@main' and must provide a main static function}}
 struct EntryPoint : Runnable {
   func run() {
   }

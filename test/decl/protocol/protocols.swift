@@ -412,7 +412,7 @@ class DoesntConformToObjCProtocol : ObjCProtocol {
 
 @objc protocol ObjCProtocolRefinement : ObjCProtocol { }
 
-@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{@objc protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-@objc protocol 'NonObjCProtocol'}}
+@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{'@objc' protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-'@objc' protocol 'NonObjCProtocol'}}
 
 
 // <rdar://problem/16079878>

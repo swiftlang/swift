@@ -60,10 +60,10 @@ Constructor UInt8.init(exactly:) has mangled name changing from 'Swift.UInt8.ini
 Constructor UInt8.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
 Constructor _ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral:) has mangled name changing from 'Swift._ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral: Builtin.FPIEEE80) -> A' to 'Swift._ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral: Builtin.FPIEEE64) -> A'
 Constructor _ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral:) has parameter 0 type change from Builtin.FPIEEE80 to Builtin.FPIEEE64
-Func __VaListBuilder.allocStorage(wordCount:) is a new API without @available attribute
-Func __VaListBuilder.appendWords(_:) is a new API without @available attribute
-Func __VaListBuilder.deallocStorage(wordCount:storage:) is a new API without @available attribute
-Func __VaListBuilder.rawSizeAndAlignment(_:) is a new API without @available attribute
+Func __VaListBuilder.allocStorage(wordCount:) is a new API without '@available'
+Func __VaListBuilder.appendWords(_:) is a new API without '@available'
+Func __VaListBuilder.deallocStorage(wordCount:storage:) is a new API without '@available'
+Func __VaListBuilder.rawSizeAndAlignment(_:) is a new API without '@available'
 Func _cos(_:) has been removed
 Func _exp(_:) has been removed
 Func _exp2(_:) has been removed
@@ -75,14 +75,14 @@ Func _rint(_:) has been removed
 Func _sin(_:) has been removed
 Struct Float80 has been removed
 Struct __VaListBuilder.Header has been removed
-Var __VaListBuilder.allocated is a new API without @available attribute
+Var __VaListBuilder.allocated is a new API without '@available'
 Var __VaListBuilder.allocated is added to a non-resilient type
-Var __VaListBuilder.count is a new API without @available attribute
+Var __VaListBuilder.count is a new API without '@available'
 Var __VaListBuilder.count is added to a non-resilient type
 Var __VaListBuilder.fpRegistersUsed has been removed
 Var __VaListBuilder.gpRegistersUsed has been removed
 Var __VaListBuilder.header has been removed
-Var __VaListBuilder.requiredAlignmentInBytes is a new API without @available attribute
+Var __VaListBuilder.requiredAlignmentInBytes is a new API without '@available'
 Var __VaListBuilder.requiredAlignmentInBytes is added to a non-resilient type
 Var __VaListBuilder.storage has declared type change from Swift.ContiguousArray<Swift.Int> to Swift.UnsafeMutablePointer<Swift.Int>?
 Var __VaListBuilder.storage has mangled name changing from 'Swift.__VaListBuilder.storage : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'

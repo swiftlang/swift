@@ -33,7 +33,7 @@ func passingConcurrentOrNot(
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay
-  acceptsConcurrent(ncfn) // expected-warning{{passing non-sendable parameter 'ncfn' to function expecting a @Sendable closure}}
+  acceptsConcurrent(ncfn) // expected-warning{{passing non-sendable parameter 'ncfn' to function expecting a '@Sendable' closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 

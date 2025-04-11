@@ -12,7 +12,7 @@
 
 // RUN: echo "ABI breakage: func foo() has been removed" > %t/incomplete-allowlist.txt
 // RUN: echo "ABI breakage: func foo() has been removed" > %t/complete-allowlist.txt
-// RUN: echo "ABI breakage: func bar() is a new API without @available attribute" >> %t/complete-allowlist.txt
+// RUN: echo "ABI breakage: func bar() is a new API without '@available'" >> %t/complete-allowlist.txt
 
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module -o %t.mod1/Foo.swiftmodule  %t.mod1/Foo.swift -parse-as-library -enable-library-evolution -emit-module-source-info -emit-module-source-info-path %t.mod1/Foo.swiftsourceinfo -emit-module-interface-path %t.mod1/Foo.swiftinterface -module-name Foo -swift-version 5
 

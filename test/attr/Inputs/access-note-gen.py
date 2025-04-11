@@ -81,8 +81,8 @@ expected_error_re = re.compile(r'expected-error' + offset_re_fragment +
                                r'([^}\\]*(?:(?:\}?\\.|\}[^}])[^}\\]*)*)' +
                                r'\}\}')
 
-"""Matches the string 'marked @objc'."""
-marked_objc_re = re.compile(r'marked @objc')
+"""Matches the string "marked '@objc'"."""
+marked_objc_re = re.compile(r"marked '@objc'")
 
 """Matches any non-none fix-it expectation."""
 fixit_re = re.compile(r'{{\d+-\d+=[^}]*}}')
@@ -103,7 +103,7 @@ def adjust_comments(offset, inserted_attr, comment_str):
                                                m.group(2) + prefix + m.group(3) +
                                                suffix,
                                      adjusted)
-    adjusted = marked_objc_re.sub(u"marked @objc by an access note", adjusted)
+    adjusted = marked_objc_re.sub(u"marked '@objc' by an access note", adjusted)
     adjusted = fixit_re.sub(u"{{none}}", adjusted)
 
     return u"// [expectations adjusted] " + adjusted

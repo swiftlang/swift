@@ -252,7 +252,7 @@ extension SomeClass { // expected-warning {{public declarations should have an a
 public struct StructWithImplicitMembers { }
 
 extension StructWithImplicitMembers: Hashable { }
-// expected-note @-1 {{add @available attribute to enclosing extension}}
+// expected-note @-1 {{add '@available' attribute to enclosing extension}}
 // expected-warning @-2 {{public declarations should have an availability attribute with an introduction version}}
 // expected-error @-3 {{'StructWithImplicitMembers' is only available in macOS 10.15 or newer}}
 

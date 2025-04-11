@@ -195,8 +195,8 @@ extension TestStruct {
   }
 }
 
-extension TestStruct { // expected-note{{add @available attribute to enclosing extension}}
-  func availableFuncMacOS() { // expected-note{{add @available attribute to enclosing instance method}}
+extension TestStruct { // expected-note{{add '@available' attribute to enclosing extension}}
+  func availableFuncMacOS() { // expected-note{{add '@available' attribute to enclosing instance method}}
     introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 50 or newer}}
     // expected-note@-1{{add 'if #available' version check}}
   }

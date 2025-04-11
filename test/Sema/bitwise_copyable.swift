@@ -97,7 +97,7 @@ struct S_Explicit_With_Metatype_Optional_AnyObject : BitwiseCopyable {
 }
 
 @sensitive
-struct S_Explicit_Sensitive : BitwiseCopyable { // expected-error {{a @sensitive type cannot conform to 'BitwiseCopyable'}}
+struct S_Explicit_Sensitive : BitwiseCopyable { // expected-error {{a '@sensitive' type cannot conform to 'BitwiseCopyable'}}
 }
 
 @sensitive

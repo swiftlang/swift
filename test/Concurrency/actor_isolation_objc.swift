@@ -36,10 +36,10 @@ actor A {
   var x: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
 
   @objc var y: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
-  // expected-error@-1{{actor-isolated property 'y' cannot be @objc}}
+  // expected-error@-1{{actor-isolated property 'y' cannot be '@objc'}}
 
   // expected-note@+1 {{add '@objc' to expose this property to Objective-C}}
-  @objc var computed : Int { // expected-error{{actor-isolated property 'computed' cannot be @objc}}
+  @objc var computed : Int { // expected-error{{actor-isolated property 'computed' cannot be '@objc'}}
     get { 120 }
   }
 
@@ -50,7 +50,7 @@ actor A {
 
 actor Dril: NSObject {
   // expected-note@+2 {{add 'async' to function 'postSynchronouslyTo(twitter:)' to make it asynchronous}}
-  // expected-error@+1 {{actor-isolated instance method 'postSynchronouslyTo(twitter:)' cannot be @objc}}
+  // expected-error@+1 {{actor-isolated instance method 'postSynchronouslyTo(twitter:)' cannot be '@objc'}}
   @objc func postSynchronouslyTo(twitter msg: String) -> Bool {
     return true
   }

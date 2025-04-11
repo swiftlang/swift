@@ -59,7 +59,7 @@ func osx_extension() -> OSXAppExtensionsUnavailable {
 
 // MARK: Global functions
 
-func available_func( // expected-note * {{add @available attribute to enclosing global function}}
+func available_func( // expected-note * {{add '@available' attribute to enclosing global function}}
   _: AlwaysAvailable,
   _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   _: OSXFutureAvailable, // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
@@ -113,7 +113,7 @@ func osx_func(
 }
 
 @available(OSXApplicationExtension, unavailable)
-func osx_extension_func( // expected-note 2 {{add @available attribute to enclosing global function}}
+func osx_extension_func( // expected-note 2 {{add '@available' attribute to enclosing global function}}
   _: AlwaysAvailable,
   _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   _: OSXFutureAvailable, // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
@@ -132,7 +132,7 @@ func osx_extension_func( // expected-note 2 {{add @available attribute to enclos
 
 // MARK: Global vars
 
-var always_var: ( // expected-note 2 {{add @available attribute to enclosing var}}
+var always_var: ( // expected-note 2 {{add '@available' attribute to enclosing var}}
   AlwaysAvailable,
   NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   OSXFutureAvailable, // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
@@ -183,7 +183,7 @@ var osx_var: (
 )
 
 @available(OSXApplicationExtension, unavailable)
-var osx_extension_var: ( // expected-note 2 {{add @available attribute to enclosing var}}
+var osx_extension_var: ( // expected-note 2 {{add '@available' attribute to enclosing var}}
   AlwaysAvailable,
   NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   OSXFutureAvailable, // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
@@ -201,7 +201,7 @@ var osx_extension_var: ( // expected-note 2 {{add @available attribute to enclos
 
 // MARK: Properties
 
-struct AlwaysAvailableContainer { // expected-note 2 {{add @available attribute to enclosing struct}}
+struct AlwaysAvailableContainer { // expected-note 2 {{add '@available' attribute to enclosing struct}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
@@ -235,7 +235,7 @@ struct OSXUnavailableContainer { // expected-note 2 {{'OSXUnavailableContainer' 
 }
 
 @available(OSXApplicationExtension, unavailable)
-struct OSXAppExtensionsUnavailableContainer { // expected-note 2 {{add @available attribute to enclosing struct}}
+struct OSXAppExtensionsUnavailableContainer { // expected-note 2 {{add '@available' attribute to enclosing struct}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
@@ -291,7 +291,7 @@ extension ExtendMe {
   @available(OSX 99, *)
   func never_available_extension_osx_future_method() {} // expected-note {{has been explicitly marked unavailable here}}
 
-  func never_available_extension_available_method( // expected-note * {{add @available attribute to enclosing instance method}}
+  func never_available_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: OSXFutureAvailable,
@@ -345,7 +345,7 @@ extension ExtendMe {
   }
 
   @available(OSXApplicationExtension, unavailable)
-  func never_available_extension_osx_app_extension_method( // expected-note {{add @available attribute to enclosing instance method}}
+  func never_available_extension_osx_app_extension_method( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: OSXFutureAvailable,
@@ -370,7 +370,7 @@ extension ExtendMe {
   @available(OSX 99, *)
   func osx_extension_osx_future_method() {} // expected-note {{has been explicitly marked unavailable here}}
 
-  func osx_extension_available_method( // expected-note * {{add @available attribute to enclosing instance method}}
+  func osx_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: OSXFutureAvailable,
@@ -424,7 +424,7 @@ extension ExtendMe {
   }
 
   @available(OSXApplicationExtension, unavailable)
-  func osx_extension_osx_app_extension_method( // expected-note {{add @available attribute to enclosing instance method}}
+  func osx_extension_osx_app_extension_method( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: OSXFutureAvailable,
@@ -443,13 +443,13 @@ extension ExtendMe {
 }
 
 @available(OSXApplicationExtension, unavailable)
-extension ExtendMe { // expected-note * {{add @available attribute to enclosing extension}}
+extension ExtendMe { // expected-note * {{add '@available' attribute to enclosing extension}}
   func osx_app_extension_extension_available_method() {}
 
   @available(OSX 99, *)
   func osx_app_extension_extension_osx_future_method() {}
 
-  func osx_app_extension_extension_available_method( // expected-note * {{add @available attribute to enclosing instance method}}
+  func osx_app_extension_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
     _: OSXFutureAvailable, // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
@@ -503,7 +503,7 @@ extension ExtendMe { // expected-note * {{add @available attribute to enclosing 
   }
 
   @available(OSXApplicationExtension, unavailable)
-  func osx_app_extension_extension_osx_app_extension_method( // expected-note 2 {{add @available attribute to enclosing instance method}}
+  func osx_app_extension_extension_osx_app_extension_method( // expected-note 2 {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
     _: OSXFutureAvailable, // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
@@ -521,7 +521,7 @@ extension ExtendMe { // expected-note * {{add @available attribute to enclosing 
   }
 }
 
-func available_func_call_extension_methods(_ e: ExtendMe) { // expected-note {{add @available attribute to enclosing global function}}
+func available_func_call_extension_methods(_ e: ExtendMe) { // expected-note {{add '@available' attribute to enclosing global function}}
   e.never_available_extension_available_method() // expected-error {{'never_available_extension_available_method()' is unavailable}}
   e.osx_extension_available_method() // expected-error {{'osx_extension_available_method()' is unavailable in macOS}}
   e.osx_app_extension_extension_available_method()

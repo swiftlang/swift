@@ -128,5 +128,5 @@ func testFunctionIsolationExprTuple(
 func nonSendableIsolatedAny(
   _ fn: @escaping @isolated(any) () -> Void // expected-note {{parameter 'fn' is implicitly non-sendable}}
 ) {
-  let _: @Sendable () -> Void = fn  // expected-warning {{using non-sendable parameter 'fn' in a context expecting a @Sendable closure}}
+  let _: @Sendable () -> Void = fn  // expected-warning {{using non-sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
 }

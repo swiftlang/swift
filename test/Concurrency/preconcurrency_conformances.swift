@@ -10,7 +10,7 @@ do {
   class K {}
 
   struct A : @preconcurrency Q {} // Ok
-  // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Q' has no effect}}
+  // expected-warning@-1 {{'@preconcurrency' on conformance to 'Q' has no effect}}
 
   struct B : @preconcurrency K {
     // expected-error@-1 {{'@preconcurrency' cannot apply to non-protocol type 'K'}}
@@ -31,7 +31,7 @@ protocol InvalidUseOfPreconcurrencyAttr : @preconcurrency Q {
 
 struct TestPreconcurrencyAttr {}
 extension TestPreconcurrencyAttr : @preconcurrency Q { // Ok
-  // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Q' has no effect}}
+  // expected-warning@-1 {{'@preconcurrency' on conformance to 'Q' has no effect}}
 }
 
 class NonSendable {}
@@ -99,7 +99,7 @@ protocol Initializable {
 }
 
 final class K : @preconcurrency Initializable {
-  // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Initializable' has no effect}}
+  // expected-warning@-1 {{'@preconcurrency' on conformance to 'Initializable' has no effect}}
   init() {} // Ok
 }
 
@@ -138,7 +138,7 @@ do {
   // expected-warning@+2{{conformance of 'TestExplicitGlobalActorAttrs' to protocol 'WithIndividuallyIsolatedRequirements' involves isolation mismatches and can cause data races}}
   @MainActor
   struct TestExplicitGlobalActorAttrs : @preconcurrency WithIndividuallyIsolatedRequirements {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithIndividuallyIsolatedRequirements' has no effect}}
+    // expected-warning@-1 {{'@preconcurrency' on conformance to 'WithIndividuallyIsolatedRequirements' has no effect}}
 
     var a: Int = 42
 
@@ -163,7 +163,7 @@ protocol WithNonIsolated {
 do {
   // expected-warning@+1{{conformance of 'TestExplicitOtherIsolation' to protocol 'WithNonIsolated' involves isolation mismatches and can cause data races}}
   class TestExplicitOtherIsolation : @preconcurrency WithNonIsolated {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{38-54=}}
+    // expected-warning@-1 {{'@preconcurrency' on conformance to 'WithNonIsolated' has no effect}}{{38-54=}}
 
     @GlobalActor var prop: Int = 42
     // expected-note@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot satisfy main actor-isolated requirement}}
@@ -175,7 +175,7 @@ do {
 
 do {
   class InferredGlobalActorAttrs : @preconcurrency WithNonIsolated {
-    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{36-52=}}
+    // expected-warning@-1 {{'@preconcurrency' on conformance to 'WithNonIsolated' has no effect}}{{36-52=}}
     var prop: Int = 42
     func test() {}
   }
@@ -202,7 +202,7 @@ do {
   protocol P2 {}
   protocol P3: P1, P2 {}
 
-  // expected-warning@+1 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
+  // expected-warning@+1 {{'@preconcurrency' on conformance to 'P3' has no effect}}
   @MainActor struct S: @preconcurrency P3 {}
 }
 
@@ -233,7 +233,7 @@ do {
   // preconcurrency has no effect here.
   // expected-warning@+1{{conformance of 'S4' to protocol 'P2' crosses into main actor-isolated code and can cause data races}}
   @MainActor struct S4: @preconcurrency P3, P2 {
-    // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
+    // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P3' has no effect}}
     // expected-note@-2:45 {{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
     func foo() {}
@@ -241,13 +241,13 @@ do {
   }
   // expected-warning@+1{{conformance of 'S5' to protocol 'P2' crosses into main actor-isolated code and can cause data races; this is an error in the Swift 6 language mode}}
   @MainActor struct S5: P2, @preconcurrency P3 {
-    // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
+    // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P3' has no effect}}
     // expected-note@-2:25 {{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }
-  // expected-warning@+1 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
+  // expected-warning@+1 {{'@preconcurrency' on conformance to 'P3' has no effect}}
   @MainActor struct S6: @preconcurrency P2, @preconcurrency P3 {
     func foo() {}
   }
@@ -271,7 +271,7 @@ do {
 
   // Preconcurrency effectful for 'P3' only.
   @MainActor struct S3: @preconcurrency P3 & P4 {
-  // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P4' has no effect}}
+  // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P4' has no effect}}
     func foo() {}
   }
 }
@@ -301,7 +301,7 @@ do {
 
   // expected-warning@+1{{conformance of 'S4' to protocol 'P2' crosses into main actor-isolated code and can cause data races}}
   @MainActor struct S4: P6, @preconcurrency P5 {
-    // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P5' has no effect}}
+    // expected-warning@-1:21 {{'@preconcurrency' on conformance to 'P5' has no effect}}
     // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
     func foo() {}
