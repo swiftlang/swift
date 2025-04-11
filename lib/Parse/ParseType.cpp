@@ -1749,17 +1749,19 @@ bool Parser::canParseNonisolatedAsTypeModifier() {
   if (Tok.isAtStartOfLine())
     return false;
 
-  // Always requires `(<<argument>>)`
-  if (!Tok.is(tok::l_paren))
+  // Always requires `(nonsending)`, together
+  // we don't want eagerly interpret something
+  // like `nonisolated(0)` as a modifier.
+
+  if (!consumeIf(tok::l_paren))
     return false;
 
-  // Consume argument list
-  skipSingle();
+  if (!Tok.isContextualKeyword("nonsending"))
+    return false;
 
-  // if consumed '(...)' ended up being followed
-  // by `[async, throws, ...] -> ...` this means
-  // the `nonisolated` is invalid as a modifier.
-  return !isAtFunctionTypeArrow();
+  consumeToken();
+
+  return consumeIf(tok::r_paren);
 }
 
 bool Parser::canParseTypeScalar() {

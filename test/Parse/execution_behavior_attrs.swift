@@ -77,3 +77,10 @@ do {
 
   _ = [nonisolated()]
 }
+
+do {
+  func nonisolated(_: Int) -> Int { 42 }
+
+  nonisolated(0) // expected-warning {{result of call to 'nonisolated' is unused}}
+  print("hello")
+}
