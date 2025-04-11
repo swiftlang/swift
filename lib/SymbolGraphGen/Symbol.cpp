@@ -704,13 +704,13 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
         Graph->Walker.Options.AvailabilityPlatforms.value();
     if (Graph->Walker.Options.AvailabilityIsBlockList) {
       for (const auto Availability : Availabilities.keys()) {
-        if (AvailabilityPlatforms.contains(Availability)) {
+        if (Availability != "*" && AvailabilityPlatforms.contains(Availability)) {
           Availabilities.erase(Availability);
         }
       }
     } else {
       for (const auto Availability : Availabilities.keys()) {
-        if (!AvailabilityPlatforms.contains(Availability)) {
+        if (Availability != "*" && !AvailabilityPlatforms.contains(Availability)) {
           Availabilities.erase(Availability);
         }
       }

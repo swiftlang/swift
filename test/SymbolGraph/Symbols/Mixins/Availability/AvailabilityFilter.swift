@@ -37,18 +37,27 @@
 @available(macOS 11.0, iOS 15.0, watchOS 15.0, *)
 public struct S {}
 
+/// Ensure that regardless of platforms being removed, that universal availability info,
+/// like unconditional deprecation, still lands in the symbol graph.
+@available(*, deprecated)
+public class C {}
+
 // DEFAULT-DAG: macOS
 // DEFAULT-DAG: iOS
 // DEFAULT-DAG: watchOS
+// DEFAULT-DAG: "isUnconditionallyDeprecated":{{ ?}}true
 
 // ALLOWLIST-NOT: watchOS
 // ALLOWLIST-DAG: macOS
 // ALLOWLIST-DAG: iOS
+// ALLOWLIST-DAG: "isUnconditionallyDeprecated":{{ ?}}true
 
 // BLOCKLIST-NOT: macOS
 // BLOCKLIST-NOT: iOS
 // BLOCKLIST-DAG: watchOS
+// BLOCKLIST-DAG: "isUnconditionallyDeprecated":{{ ?}}true
 
 // EMPTY-NOT: macOS
 // EMPTY-NOT: iOS
 // EMPTY-NOT: watchOS
+// EMPTY-DAG: "isUnconditionallyDeprecated":{{ ?}}true
