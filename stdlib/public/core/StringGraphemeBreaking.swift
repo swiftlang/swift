@@ -649,7 +649,7 @@ internal func _nextGraphemeClusterBoundary(
   nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
 ) -> Int {
 
-  // Note: If `index` in't already on a boundary, then starting with an empty
+  // Note: If `index` isn't already on a boundary, then starting with an empty
   // state here sometimes leads to this method returning results that diverge
   // from the true breaks in the string.
   var state = _GraphemeBreakingState()
