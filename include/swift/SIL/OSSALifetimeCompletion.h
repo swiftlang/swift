@@ -57,12 +57,20 @@ private:
   /// Extend trivial variables for lifetime diagnostics (only in SILGenCleanup).
   HandleTrivialVariable_t handleTrivialVariable;
 
+  /// Whether verification of the computed liveness should be run even when the
+  /// global setting is off.
+  /// TODO: Remove this option.
+  bool ForceLivenessVerification;
+
 public:
-  OSSALifetimeCompletion(SILFunction *function, const DominanceInfo *domInfo,
-                         DeadEndBlocks &deadEndBlocks,
-                         HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable)
+  OSSALifetimeCompletion(
+      SILFunction *function, const DominanceInfo *domInfo,
+      DeadEndBlocks &deadEndBlocks,
+      HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable,
+      bool forceLivenessVerification = false)
       : domInfo(domInfo), deadEndBlocks(deadEndBlocks),
-        completedValues(function), handleTrivialVariable(handleTrivialVariable) {}
+        completedValues(function), handleTrivialVariable(handleTrivialVariable),
+        ForceLivenessVerification(forceLivenessVerification) {}
 
   /// The kind of boundary at which to complete the lifetime.
   ///
