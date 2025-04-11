@@ -439,3 +439,9 @@ func testCallMethodOnAddressOnlyInOutCopy<T : P>(_ x: inout T) {
   _ = (copy x).computedK
   _ = (copy x).consumingComputedK
 }
+
+struct Trivial: BitwiseCopyable { var x: Int }
+
+func copyTrivial(x: inout Trivial) -> Trivial {
+    return copy x
+}

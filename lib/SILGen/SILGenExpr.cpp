@@ -7178,6 +7178,14 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
 
     if (subType.isLoadable(SGF.F)) {
+      // Trivial types don't undergo any lifetime analysis, so simply load
+      // the value.
+      if (subType.isTrivial(SGF.F)
+          && !address.getType().isMoveOnlyWrapped()) {
+        return RValue(SGF, {SGF.B.createLoadCopy(E, address)},
+                      subType.getASTType());
+      }
+
       // Use a formal access load borrow so this closes in the writeback scope
       // above.
       ManagedValue value = SGF.B.createFormalAccessLoadBorrow(E, address);
