@@ -606,7 +606,7 @@ public:
 
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
+        Verify(true), VerifyEach(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false), SanitizerUseStableABI(false),
