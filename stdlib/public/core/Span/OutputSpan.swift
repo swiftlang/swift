@@ -84,6 +84,18 @@ extension OutputSpan where Element: ~Copyable  {
     _count = initializedCount
   }
 
+  /// Unsafely create an OutputSpan over partly-initialized memory.
+  ///
+  /// The memory in `buffer` must remain valid throughout the lifetime
+  /// of the newly-created `OutputSpan`. Its prefix must contain
+  /// `initializedCount` initialized instances, followed by uninitialized
+  /// memory. The default value of `initializedCount` is 0, representing
+  /// the common case of a completely uninitialized `buffer`.
+  ///
+  /// - Parameters:
+  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - initializedCount: the number of initialized elements
+  ///                       at the beginning of `buffer`.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -96,29 +108,18 @@ extension OutputSpan where Element: ~Copyable  {
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
-    _precondition(
-      buffer.baseAddress?.advanced(by: buffer.count) >= buffer.baseAddress,
-      "buffer must not overflow"
-    )
+    if let baseAddress = buffer.baseAddress {
+      _precondition(
+        unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
+        "buffer must not overflow"
+      )
+    }
     _precondition(
       initializedCount >= 0 && initializedCount <= buffer.count,
       "OutputSpan must have a valid count."
     )
     unsafe self.init(_unchecked: buffer, initializedCount: initializedCount)
   }
-
-//  @_alwaysEmitIntoClient
-//  @lifetime(borrow pointer)
-//  public init(
-//    _initializing pointer: UnsafeMutablePointer<Element>,
-//    capacity: Int,
-//    initialized: Int = 0
-//  ) {
-//    _precondition(capacity >= 0, "Capacity must be 0 or greater")
-//    let buf = unsafe UnsafeMutableBufferPointer(start: pointer, count: capacity)
-//    let os = OutputSpan(_initializing: buf, initialized: initialized)
-//    self = unsafe _overrideLifetime(os, borrowing: pointer)
-//  }
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -127,12 +128,14 @@ extension OutputSpan {
 //  @_alwaysEmitIntoClient
 //  @lifetime(borrow buffer)
 //  public init(
-//    _initializing buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
-//    initialized: Int = 0
+//    buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
+//    initializedCount: Int = 0
 //  ) {
-//    let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
-//    let os = OutputSpan(_initializing: rebased, initialized: 0)
-//    self = unsafe _overrideLifetime(os, borrowing: buffer)
+//    let buffer = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
+//    let span = unsafe Self(
+//      _unchecked: buffer, initializedCount: initializedCount
+//    )
+//    self = unsafe _overrideLifetime(span, borrowing: buffer)
 //  }
 }
 
@@ -325,14 +328,14 @@ extension OutputSpan where Element: ~Copyable {
       source.count <= freeCapacity,
       "buffer cannot contain every element from source."
     )
-    let buffer = unsafe source.relinquish()
-    // we must now deinitialize the returned UMBP
     let tail = unsafe _start().advanced(by: _count&*MemoryLayout<Element>.stride)
-    unsafe tail.moveInitializeMemory(
-      as: Element.self, from: buffer.baseAddress!, count: buffer.count
-    )
-    _count &+= buffer.count
-    source = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+    unsafe source.withUnsafeMutableBufferPointer {
+      unsafe tail.moveInitializeMemory(
+        as: Element.self, from: $0.baseAddress!, count: $1
+      )
+      _count &+= $1
+      $1 = 0
+    }
   }
 
   @_alwaysEmitIntoClient
@@ -403,7 +406,7 @@ extension OutputSpan where Element: ~Copyable {
     _ body: (UnsafeMutableBufferPointer<Element>, _ initializedCount: inout Int) throws(E) -> R
   ) throws(E) -> R {
     guard let pointer = unsafe _pointer, capacity > 0 else {
-      let buffer = UnsafeMutableBufferPointer<Element>(start: nil, count: 0)
+      let buffer = unsafe UnsafeMutableBufferPointer<Element>(start: nil, count: 0)
       var count = 0
       defer { precondition(count == 0, "invalid attempt to grow buffer") }
       return try unsafe body(buffer, &count)
@@ -413,7 +416,7 @@ extension OutputSpan where Element: ~Copyable {
       pointer._rawValue, capacity._builtinWordValue, Element.self
     )
     defer { Builtin.rebindMemory(pointer._rawValue, binding) }
-    let buffer = UnsafeMutableBufferPointer<Element>(
+    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
       start: .init(pointer._rawValue), count: capacity
     )
     var initializedCount = _count
