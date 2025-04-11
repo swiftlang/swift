@@ -815,6 +815,7 @@ Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
 // SE-0464 UTF8Span
+Added: _$sSS7copyingSSs8UTF8SpanV_tcfC
 Added: _$sSS8utf8Spans04UTF8B0Vvg
 Added: _$sSS8utf8Spans04UTF8B0VvpMV
 Added: _$sSs8utf8Spans04UTF8B0Vvg

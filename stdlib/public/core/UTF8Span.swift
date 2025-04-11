@@ -190,6 +190,15 @@ extension UTF8Span {
 
 // TODO(toolchain): decide if we rebase on top of Guillaume's work
 extension String {
+
+  @available(SwiftStdlib 6.2, *)
+  public init(copying codeUnits: UTF8Span) {
+    let isASCII = codeUnits.isKnownASCII
+    self = codeUnits._withUnsafeBufferPointer { bufPtr in
+     String._uncheckedFromUTF8(bufPtr, isASCII: isASCII)
+    }
+  }
+
   @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
     @lifetime(borrow self)
