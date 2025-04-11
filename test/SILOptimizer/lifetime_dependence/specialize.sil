@@ -11,6 +11,8 @@
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_AddressableTypes
 
+// REQUIRES: PTRSIZE=64
+
 // Test the SIL representation for lifetime dependence scope fixup.
 
 sil_stage raw
