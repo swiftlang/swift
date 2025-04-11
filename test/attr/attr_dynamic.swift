@@ -11,7 +11,7 @@ dynamic prefix operator +!+  // expected-error{{unexpected attribute 'dynamic' i
 
 class Foo {
   @objc dynamic init() {}
-  @objc dynamic init(x: NotObjCAble) {} // expected-error{{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @objc dynamic init(x: NotObjCAble) {} // expected-error{{initializer cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
   
   @objc dynamic var x: Int
   
