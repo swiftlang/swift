@@ -457,7 +457,7 @@ EXPERIMENTAL_FEATURE(TrailingComma, false)
 
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
-EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
+EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
