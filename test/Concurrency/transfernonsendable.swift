@@ -1968,3 +1968,32 @@ extension NonIsolatedFinalKlass {
     // expected-tns-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   }
 }
+
+func mutableLocalCaptureDataRace() async {
+  var x = 0
+  x = 0
+  _ = x
+
+  Task.detached { x = 1 } // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
+}
+
+func mutableLocalCaptureDataRace2() async {
+  var x = 0
+  x = 0
+
+  Task.detached { x = 1 } // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+
+  print(x) // expected-tns-note {{access can happen concurrently}}
+}
+
+func localCaptureDataRace3() async {
+  let x = 0
+
+  Task.detached { print(x) }
+
+  print(x)
+}

@@ -113,55 +113,64 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     os << "assign ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0] << " = %%" << opArgs[1];
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2();
     break;
   }
   case PartitionOpKind::AssignFresh:
-    os << "assign_fresh %%" << opArgs[0];
+    os << "assign_fresh %%" << getOpArg1();
     break;
   case PartitionOpKind::Send: {
     os << "send ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   }
   case PartitionOpKind::UndoSend: {
     os << "undo_send ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   }
   case PartitionOpKind::Merge: {
     os << "merge ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0] << " with %%" << opArgs[1];
+    os << "%%" << getOpArg1() << " with %%" << getOpArg2();
     break;
   }
   case PartitionOpKind::Require: {
     os << "require ";
+    if (getOptions().containsOnly(
+            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue))
+      os << "[mutable_base_of_sendable_val] ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   }
   case PartitionOpKind::UnknownPatternError:
     os << "unknown pattern error ";
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   case PartitionOpKind::InOutSendingAtFunctionExit:
     os << "inout_sending_at_function_exit ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   case PartitionOpKind::NonSendableIsolationCrossingResult:
     os << "nonsendable_isolationcrossing_result ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
+    break;
+  case PartitionOpKind::AssignFreshAssign:
+    os << "assign_fresh_assign ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2();
     break;
   }
   os << ": " << *getSourceInst();
