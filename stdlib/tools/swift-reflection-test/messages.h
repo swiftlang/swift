@@ -29,6 +29,5 @@ typedef enum InstanceKind {
   Closure,
   Enum,
   EnumValue,
-  AsyncTask,
-  LogString,
+  AsyncTask
 } InstanceKind;
