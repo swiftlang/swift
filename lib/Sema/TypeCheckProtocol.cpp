@@ -3704,8 +3704,12 @@ static Type getTupleConformanceTypeWitness(DeclContext *dc,
 
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
-  if (isa<ConstructorDecl>(Requirement)) {
+                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS,
+                     bool withExplicitObjCAttr) {
+  // We sometimes use this for @implementation extensions too.
+  bool forProtocol = isa<ProtocolDecl>(Requirement->getDeclContext());
+
+  if (isa<ConstructorDecl>(Requirement) && forProtocol) {
     if (auto CD = Adopter->getSelfClassDecl()) {
       if (!CD->isSemanticallyFinal() && isa<ExtensionDecl>(Adopter)) {
         // In this case, user should mark class as 'final' or define
@@ -3731,15 +3735,35 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
 
+  PrintOptions Options = PrintOptions::printForDiagnostics(
+      AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
+  Options.PrintDocumentationComments = false;
+  Options.PrintAccess = false;
+  Options.SkipAttributes = true;
+  Options.FunctionDefinitions = true;
+  Options.PrintAccessorBodiesInProtocols = true;
+  Options.PrintExplicitAccessorParameters = false;
+  Options.FullyQualifiedTypesIfAmbiguous = true;
+
+  if (withExplicitObjCAttr) {
+    if (auto runtimeName = Requirement->getObjCRuntimeName()) {
+      llvm::SmallString<32> scratch;
+      Printer.printAttrName("@objc");
+      Printer << "(" << runtimeName->getString(scratch) << ")";
+      Printer.printNewline();
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
+    }
+  }
+
   AccessLevel Access =
     std::min(
       /* Access of the context */
       Adopter->getSelfNominalTypeDecl()->getFormalAccess(),
       /* Access of the protocol */
-      Requirement->getDeclContext()->getSelfProtocolDecl()->
-        getFormalAccess());
-  if (Access == AccessLevel::Public)
-    Printer << "public ";
+      Requirement->getDeclContext()->getSelfNominalTypeDecl()
+                      ->getFormalAccess());
+  if (Access > AccessLevel::Internal)
+    Printer.printKeyword(getAccessLevelSpelling(Access), Options, " ");
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
     Printer << "typealias " << MissingTypeWitness->getName() << " = ";
@@ -3753,7 +3777,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     Printer << "\n";
   } else {
-    if (isa<ConstructorDecl>(Requirement)) {
+    if (isa<ConstructorDecl>(Requirement) && forProtocol) {
       if (auto CD = Adopter->getSelfClassDecl()) {
         if (!CD->isFinal()) {
           Printer << "required ";
@@ -3762,15 +3786,6 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
         }
       }
     }
-
-    PrintOptions Options = PrintOptions::printForDiagnostics(
-        AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
-    Options.PrintDocumentationComments = false;
-    Options.PrintAccess = false;
-    Options.SkipAttributes = true;
-    Options.FunctionDefinitions = true;
-    Options.PrintAccessorBodiesInProtocols = true;
-    Options.FullyQualifiedTypesIfAmbiguous = true;
 
     bool AdopterIsClass = Adopter->getSelfClassDecl() != nullptr;
     // Skip 'mutating' only inside classes: mutating methods usually
@@ -3797,9 +3812,12 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
-    if (isa<NominalTypeDecl>(Adopter)) {
-      // Create a variable declaration instead of a computed property in
-      // nominal types...
+
+    // Can the conforming declaration declare a stored property?
+    auto ImplementedAdopter = Adopter->getImplementedObjCContext();
+    if (isa<NominalTypeDecl>(ImplementedAdopter) &&
+          (!isa<EnumDecl>(ImplementedAdopter) || Requirement->isStatic())) {
+      // Create a variable declaration instead of a computed property...
       Options.PrintPropertyAccessors = false;
 
       // ...but a non-mutating setter requirement will force us into a
@@ -3810,6 +3828,11 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
           if (const auto Set = VD->getOpaqueAccessor(AccessorKind::Set))
             if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
               Options.PrintPropertyAccessors = true;
+
+      // If we're not printing the accessors, make them affect the introducer
+      // instead.
+      Options.InferPropertyIntroducerFromAccessors =
+          !Options.PrintPropertyAccessors;
     }
     Requirement->print(Printer, Options);
     Printer << "\n";

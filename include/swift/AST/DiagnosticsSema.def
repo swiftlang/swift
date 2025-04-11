@@ -1265,6 +1265,10 @@ REMARK(macro_loaded,none,
        "compiler plugin server '%2' with shared library '%3'}1",
        (Identifier, unsigned, StringRef, StringRef))
 
+ERROR(resolved_macro_changed,none,
+      "resolved macro library '%0' failed verification: %1",
+      (StringRef, StringRef))
+
 REMARK(transitive_dependency_behavior,none,
        "%1 has %select{a required|an optional|an ignored}2 "
        "transitive dependency on '%0'",
@@ -1980,10 +1984,19 @@ ERROR(objc_implementation_wrong_swift_name,none,
       "you mean %1?",
       (ObjCSelector, const ValueDecl *))
 
-ERROR(objc_implementation_missing_impl,none,
-      "extension for %select{main class interface|category %0}0 should "
-      "provide implementation for %kind1",
-      (Identifier, ValueDecl *))
+ERROR(objc_implementation_missing_impls,none,
+      "extension for %select{main class interface|category %0}0 does not "
+      "provide all required implementations",
+      (Identifier))
+NOTE(objc_implementation_missing_impls_fixit,none,
+     "add stub%s0 for missing '@implementation' requirement%s0",
+     (unsigned))
+NOTE(objc_implementation_missing_impl,none,
+     "missing %kind0",
+     (ValueDecl *))
+NOTE(objc_implementation_missing_impl_either,none,
+     "missing %kind0 or %1",
+     (ValueDecl *, ValueDecl *))
 
 ERROR(objc_implementation_class_or_instance_mismatch,none,
       "%kind0 does not match %kindonly1 declared in header",
