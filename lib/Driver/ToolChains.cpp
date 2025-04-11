@@ -379,10 +379,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(globalRemapping));
   }
 
-  if (inputArgs.hasArg(options::OPT_executor_factory)) {
-    inputArgs.AddLastArg(arguments, options::OPT_executor_factory);
-  }
-
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
