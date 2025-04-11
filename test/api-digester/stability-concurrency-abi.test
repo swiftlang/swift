@@ -88,10 +88,6 @@ Func withCheckedThrowingContinuation(function:_:) has mangled name changing from
 Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
 Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> () to Swift.String
 
-// #isolation adoption for cancellation handlers; old APIs are kept ABI compatible
-Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func withTaskCancellationHandler(operation:onCancel:isolation:)
-Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
-
 // #isolated was adopted and the old methods kept: $ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF
 Func withCheckedContinuation(function:_:) has been renamed to Func withCheckedContinuation(isolation:function:_:)
 Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency.withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
@@ -134,6 +130,12 @@ Var AsyncStream.Continuation.storage is a new API without '@available'
 Var AsyncThrowingStream.Continuation.storage is a new API without '@available'
 Class AsyncStream._Storage is a new API without '@available'
 Class AsyncThrowingStream._Storage is a new API without '@available'
+
+// withTaskCancellationHandler now uses caller execution
+// Old methods are kept for ABI compatibility but this test does not understand that
+Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: @execution(caller) () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A'
+Func withTaskCancellationHandler(operation:onCancel:) is now with @execution
+
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
