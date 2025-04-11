@@ -10,6 +10,10 @@ struct NonTrivial {
   int *p;
 };
 
+struct Trivial {
+  int i;
+};
+
 void cfunc(void (^ _Nonnull block)(NonTrivial)) noexcept {
   block(NonTrivial());
 }
@@ -44,5 +48,14 @@ void cfuncARCWeak(ARCWeak) noexcept;
 
 void (* _Nonnull getFnPtr() noexcept)(NonTrivial) noexcept;
 void (* _Nonnull getFnPtr2() noexcept)(ARCWeak) noexcept;
+
+void cfuncConstRefNonTrivial(void (*_Nonnull)(const NonTrivial &));
+void cfuncConstRefTrivial(void (*_Nonnull)(const Trivial &));
+void blockConstRefNonTrivial(void (^_Nonnull)(const NonTrivial &));
+void blockConstRefTrivial(void (^_Nonnull)(const Trivial &));
+#if __OBJC__
+void cfuncConstRefStrong(void (*_Nonnull)(const ARCStrong &));
+void blockConstRefStrong(void (^_Nonnull)(const ARCStrong &));
+#endif
 
 #endif // __CLOSURE__
