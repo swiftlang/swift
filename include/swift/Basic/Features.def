@@ -255,6 +255,7 @@ LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)"
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(IsolatedConformances, 470, "Global-actor isolated conformances")
+LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
