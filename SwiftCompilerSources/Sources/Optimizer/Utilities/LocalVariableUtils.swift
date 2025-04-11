@@ -699,6 +699,7 @@ extension LocalVariableReachableAccess {
       case .escape:
         break
       }
+      break
     }
     return currentEffect
   }
@@ -873,7 +874,7 @@ extension LocalVariableReachableAccess {
   private func findAllEscapesPriorToAccess() {
     var visitedBlocks = BasicBlockSet(context)
     var escapedBlocks = BasicBlockSet(context)
-    var blockList = BasicBlockWorklist(context)
+    var blockList = Stack<BasicBlock>(context)
     defer {
       visitedBlocks.deinitialize()
       escapedBlocks.deinitialize()
@@ -886,19 +887,19 @@ extension LocalVariableReachableAccess {
       for successor in from.successors {
         if hasEscaped {
           if escapedBlocks.insert(successor) {
-            blockList.pushIfNotVisited(successor)
+            blockList.push(successor)
           }
         } else if visitedBlocks.insert(successor) {
-          blockList.pushIfNotVisited(successor)
+          blockList.push(successor)
         }
       }
     }
     var hasEscaped = propagateEscapeInBlock(after: accessMap.allocation.nextInstruction, hasEscaped: false)
     forwardPropagate(accessMap.allocation.parentBlock, hasEscaped)
     while let block = blockList.pop() {
-      hasEscaped = escapedBlocks.insert(block)
+      hasEscaped = escapedBlocks.contains(block)
       hasEscaped = propagateEscapeInBlock(after: block.instructions.first!, hasEscaped: hasEscaped)
-      forwardPropagate(accessMap.allocation.parentBlock, hasEscaped)
+      forwardPropagate(block, hasEscaped)
     }
   }
 
