@@ -43,7 +43,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   /// passed`, the contents must be ASCII, or else undefined behavior may
   /// result upon use.
   @unsafe
-  @lifetime(copy codeUnits) // TODO: borrow or copy?
+  @lifetime(copy codeUnits)
   public init(
     unchecked codeUnits: Span<UInt8>,
     isKnownASCII: Bool = false
