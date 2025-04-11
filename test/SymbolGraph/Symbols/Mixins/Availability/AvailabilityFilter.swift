@@ -23,6 +23,15 @@
 // RUN: %target-swift-symbolgraph-extract -module-name AvailabilityFilter -I %t -pretty-print -output-dir %t -block-availability-platforms macOS,iOS
 // RUN: %FileCheck %s --input-file %t/AvailabilityFilter.symbols.json --check-prefix BLOCKLIST
 
+// Now test to ensure an empty allow list filters out all availability...
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -module-name AvailabilityFilter -emit-module -emit-module-path %t/AvailabilityFilter.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/ -symbol-graph-availability-platforms ""
+// RUN: %FileCheck %s --input-file %t/AvailabilityFilter.symbols.json --check-prefix EMPTY
+
+// RUN: %target-swift-symbolgraph-extract -module-name AvailabilityFilter -I %t -pretty-print -output-dir %t -availability-platforms ""
+// RUN: %FileCheck %s --input-file %t/AvailabilityFilter.symbols.json --check-prefix EMPTY
+
 // REQUIRES: OS=macosx
 
 @available(macOS 11.0, iOS 15.0, watchOS 15.0, *)
@@ -39,3 +48,7 @@ public struct S {}
 // BLOCKLIST-NOT: macOS
 // BLOCKLIST-NOT: iOS
 // BLOCKLIST-DAG: watchOS
+
+// EMPTY-NOT: macOS
+// EMPTY-NOT: iOS
+// EMPTY-NOT: watchOS
