@@ -28,7 +28,6 @@ typedef enum MyEnum: char {
 } MyEnum;
 static const MyEnum static_const_enum = MyEnumCase1;
 
-
 //--- main.swift
 func foo() {
   print(MACRO_INT)
@@ -110,4 +109,10 @@ func foo() {
 // CHECK-NEXT:   return %1
 // CHECK-NEXT: }
 
-// TODO: Add static_const_enum
+// CHECK:      sil shared [transparent] @$sSo17static_const_enumSo6MyEnumVvg : $@convention(thin) () -> MyEnum {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 1
+// CHECK-NEXT:   %1 = struct $Int8 (%0)
+// CHECK-NEXT:   %2 = struct $MyEnum (%1)
+// CHECK-NEXT:   return %2
+// CHECK-NEXT: }
