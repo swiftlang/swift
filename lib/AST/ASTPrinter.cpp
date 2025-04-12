@@ -3302,14 +3302,6 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
   action();
 }
 
-static void
-suppressingFeatureExecutionAttribute(PrintOptions &options,
-                                    llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope1(options.SuppressExecutionAttribute, true);
-  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Execution);
-  action();
-}
-
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -6509,8 +6501,7 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      if (!Options.SuppressExecutionAttribute)
-        Printer << "@execution(caller) ";
+      Printer << "nonisolated(nonsending) ";
       break;
     }
 

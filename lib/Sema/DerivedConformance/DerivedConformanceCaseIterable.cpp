@@ -105,8 +105,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
       SynthesizedIntroducer::Var, Context.Id_allCases, returnTy,
       /*isStatic=*/true, /*isFinal=*/true);
 
-  propDecl->getAttrs().add(
-              new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   // Define the getter.
   auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl);

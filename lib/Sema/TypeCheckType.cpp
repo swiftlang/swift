@@ -2324,6 +2324,8 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
                                          TypeResolutionOptions options);
+    NeverNullType resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
+                                                TypeResolutionOptions options);
     NeverNullType
     resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr,
                                       TypeResolutionOptions options);
@@ -2730,7 +2732,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       !isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<DeclRefTypeRepr>(repr) && !isa<PackExpansionTypeRepr>(repr) &&
-      !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
+      !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr) &&
+      !isa<CallerIsolatedTypeRepr>(repr)) {
     options.setContext(std::nullopt);
   }
 
@@ -2753,6 +2756,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::Sending:
     return resolveSendingTypeRepr(cast<SendingTypeRepr>(repr), options);
+  case TypeReprKind::CallerIsolated:
+    return resolveCallerIsolatedTypeRepr(cast<CallerIsolatedTypeRepr>(repr),
+                                         options);
   case TypeReprKind::CompileTimeLiteral:
       return resolveCompileTimeLiteralTypeRepr(cast<CompileTimeLiteralTypeRepr>(repr),
                                                options);
@@ -4195,10 +4201,11 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
+  auto checkExecutionBehaviorAttribute = [&](TypeAttribute *attr) {
     if (!repr->isAsync()) {
-      diagnoseInvalid(repr, executionAttr->getAtLoc(),
-                      diag::attr_execution_type_attr_only_on_async);
+      diagnoseInvalid(repr, attr->getAttrLoc(),
+                      diag::execution_behavior_type_attr_only_on_async,
+                      attr->getAttrName());
     }
 
     switch (isolation.getKind()) {
@@ -4207,38 +4214,36 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
     case FunctionTypeIsolation::Kind::GlobalActor:
       diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
-          diag::attr_execution_type_attr_incompatible_with_global_isolation,
-          isolation.getGlobalActorType());
+          repr, attr->getAttrLoc(),
+          diag::execution_behavior_type_attr_incompatible_with_global_isolation,
+          attr->getAttrName(), isolation.getGlobalActorType());
       break;
 
     case FunctionTypeIsolation::Kind::Parameter:
       diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
-          diag::attr_execution_type_attr_incompatible_with_isolated_param);
+          repr, attr->getAttrLoc(),
+          diag::execution_behavior_type_attr_incompatible_with_isolated_param,
+          attr->getAttrName());
       break;
 
     case FunctionTypeIsolation::Kind::Erased:
       diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
-          diag::attr_execution_type_attr_incompatible_with_isolated_any);
+          repr, attr->getAttrLoc(),
+          diag::execution_behavior_type_attr_incompatible_with_isolated_any,
+          attr->getAttrName());
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      llvm_unreachable("cannot happen because multiple @execution attributes "
-                       "aren't allowed.");
+      llvm_unreachable(
+          "cannot happen because multiple execution behavior attributes "
+          "aren't allowed.");
     }
+  };
 
-    if (!repr->isInvalid()) {
-      switch (executionAttr->getBehavior()) {
-      case ExecutionKind::Concurrent:
-        isolation = FunctionTypeIsolation::forNonIsolated();
-        break;
-      case ExecutionKind::Caller:
-        isolation = FunctionTypeIsolation::forNonIsolatedCaller();
-        break;
-      }
-    }
+  if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+    checkExecutionBehaviorAttribute(concurrentAttr);
+    if (!repr->isInvalid())
+      isolation = FunctionTypeIsolation::forNonIsolated();
   } else {
     if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
             .isEnabledForAdoption()) {
@@ -5265,6 +5270,69 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 
   // Return the type.
   return resolveType(repr->getBase(), options);
+}
+
+NeverNullType
+TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
+                                            TypeResolutionOptions options) {
+  Type type = resolveType(repr->getBase(), options);
+  if (type->hasError())
+    return ErrorType::get(getASTContext());
+
+  auto *fnType = dyn_cast<AnyFunctionType>(type.getPointer());
+  if (!fnType) {
+    diagnoseInvalid(repr, repr->getStartLoc(),
+                    diag::nonisolated_nonsending_only_on_function_types, repr);
+    return ErrorType::get(getASTContext());
+  }
+
+  if (!fnType->isAsync()) {
+    diagnoseInvalid(repr, repr->getStartLoc(),
+                    diag::nonisolated_nonsending_only_on_async, repr);
+  }
+
+  if (auto *ATR = dyn_cast<AttributedTypeRepr>(repr->getBase())) {
+    if (ATR->get(TypeAttrKind::Concurrent)) {
+      diagnoseInvalid(
+          repr, repr->getStartLoc(),
+          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
+          repr);
+    }
+  }
+
+  switch (fnType->getIsolation().getKind()) {
+  case FunctionTypeIsolation::Kind::NonIsolated:
+    break;
+
+  case FunctionTypeIsolation::Kind::GlobalActor:
+    diagnoseInvalid(
+        repr, repr->getStartLoc(),
+        diag::nonisolated_nonsending_incompatible_with_global_isolation, repr,
+        fnType->getIsolation().getGlobalActorType());
+    break;
+
+  case FunctionTypeIsolation::Kind::Parameter:
+    diagnoseInvalid(
+        repr, repr->getStartLoc(),
+        diag::nonisolated_nonsending_incompatible_with_isolated_param, repr);
+    break;
+
+  case FunctionTypeIsolation::Kind::Erased:
+    diagnoseInvalid(repr, repr->getStartLoc(),
+                    diag::nonisolated_nonsending_incompatible_with_isolated_any,
+                    repr);
+    break;
+
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    llvm_unreachable(
+        "cannot happen because multiple nonisolated(nonsending) attributes "
+        "aren't allowed.");
+  }
+
+  if (repr->isInvalid())
+    return ErrorType::get(getASTContext());
+
+  return fnType->withIsolation(FunctionTypeIsolation::forNonIsolatedCaller());
 }
 
 NeverNullType
@@ -6387,6 +6455,7 @@ private:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
     case TypeReprKind::Integer:
+    case TypeReprKind::CallerIsolated:
       return false;
     }
   }

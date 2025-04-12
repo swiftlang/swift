@@ -183,6 +183,7 @@ actor MyGenericGlobalActor<T> {
 // ON_GLOBALVAR-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_GLOBALVAR-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
 // ON_GLOBALVAR-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
+// ON_GLOBALVAR-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -220,6 +221,7 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_PROPERTY-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
 // ON_PROPERTY-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
+// ON_PROPERTY-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -251,6 +253,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // ON_METHOD-DAG: Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
 // ON_METHOD-DAG: Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// ON_METHOD-DAG: Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -326,6 +329,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // ON_MEMBER_LAST-DAG: Keyword/None:                       extensible[#Declaration Attribute#]; name=extensible
+// ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -399,6 +403,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
 // KEYWORD_LAST-DAG: Keyword/None:                       extensible[#Declaration Attribute#]; name=extensible
+// KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper

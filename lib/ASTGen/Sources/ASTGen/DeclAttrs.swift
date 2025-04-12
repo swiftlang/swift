@@ -117,8 +117,6 @@ extension ASTGenVisitor {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
       switch attrKind {
-      case .execution:
-        return handle(self.generateExecutionAttr(attribute: node)?.asDeclAttribute)
       case .ABI:
         return handle(self.generateABIAttr(attribute: node)?.asDeclAttribute)
       case .alignment:
@@ -197,6 +195,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atReasync))
       case .rethrows:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atRethrows))
+      case .concurrent:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .concurrent))
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -357,33 +357,6 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
-  }
-
-  /// E.g.:
-  ///   ```
-  ///   @execution(concurrent)
-  ///   @execution(caller)
-  ///   ```
-  func generateExecutionAttr(attribute node: AttributeSyntax) -> BridgedExecutionAttr? {
-    let behavior: BridgedExecutionKind? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "concurrent": return .concurrent
-        case "caller": return .caller
-        default: return nil
-        }
-      }
-    )
-    guard let behavior else {
-      return nil
-    }
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
-      behavior: behavior
-    )
   }
 
   /// E.g.:
@@ -1415,27 +1388,25 @@ extension ASTGenVisitor {
 
   // FIXME: This is a decl modifier
   func generateNonisolatedAttr(attribute node: AttributeSyntax) -> BridgedNonisolatedAttr? {
-    let isUnsafe = self.generateSingleAttrOption(
+    let modifier: BridgedNonIsolatedModifier? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {
-        case "unsafe":
-          return true
-        default:
-          // FIXME: Diagnose.
-          return nil
+        case "unsafe": return .unsafe
+        case "nonsending": return .nonSending
+        default: return nil
         }
       },
-      valueIfOmitted: false
+      valueIfOmitted: BridgedNonIsolatedModifier.none
     )
-    guard let isUnsafe else {
+    guard let modifier else {
       return nil
     }
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      isUnsafe: isUnsafe
+      modifier: modifier
     )
   }
 
@@ -2409,12 +2380,14 @@ extension ASTGenVisitor {
   }
 
   func generateNonisolatedAttr(declModifier node: DeclModifierSyntax) -> BridgedNonisolatedAttr? {
-    let isUnsafe: Bool
+    let modifier: BridgedNonIsolatedModifier
     switch node.detail?.detail.rawText {
     case "unsafe":
-      isUnsafe = true
+      modifier = .unsafe
+    case "nonsending":
+      modifier = .nonSending
     case nil:
-      isUnsafe = false
+      modifier = .none
     case let text?:
       // TODO: Diagnose
       _ = text
@@ -2425,7 +2398,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: nil,
       range: self.generateSourceRange(node),
-      isUnsafe: isUnsafe
+      modifier: modifier
     )
   }
 

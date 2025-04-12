@@ -923,6 +923,11 @@ ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
   return ParamDecl::getValueOwnershipForSpecifier(getSpecifier());
 }
 
+void CallerIsolatedTypeRepr::printImpl(ASTPrinter &Printer,
+                                       const PrintOptions &Opts) const {
+  Printer.printKeyword("nonisolated(nonsending)", Opts);
+}
+
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,
                                     const PrintOptions &Opts) const {
   Printer.printText("_");

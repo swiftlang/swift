@@ -254,6 +254,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
+LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -483,10 +484,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
 /// Allow the @abi attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
-
-/// Allow the @execution attribute. This is also connected to
-/// AsyncCallerExecution feature.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
 
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.

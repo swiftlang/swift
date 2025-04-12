@@ -362,6 +362,7 @@ extension ASTGenVisitor {
     var constLoc: BridgedSourceLoc = nil
     var sendingLoc: BridgedSourceLoc = nil
     var lifetimeEntry: BridgedLifetimeEntry? = nil
+    var nonisolatedLoc: BridgedSourceLoc = nil
 
     // TODO: Diagnostics for duplicated specifiers, and ordering.
     for node in node.specifiers {
@@ -398,6 +399,8 @@ extension ASTGenVisitor {
           ),
           sources: node.arguments.lazy.compactMap(self.generateLifetimeDescriptor(lifetimeSpecifierArgument:)).bridgedArray(in: self)
         )
+      case .nonisolatedTypeSpecifier(_):
+        nonisolatedLoc = loc
       }
     }
 
@@ -451,6 +454,14 @@ extension ASTGenVisitor {
         self.ctx,
         base: type,
         entry: lifetimeEntry
+      ).asTypeRepr
+    }
+
+    if nonisolatedLoc.isValid {
+      type = BridgedCallerIsolatedTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: nonisolatedLoc
       ).asTypeRepr
     }
 
