@@ -766,8 +766,10 @@ struct AsyncTask::PrivateStorage {
   alignas(ActiveTaskStatus) char StatusStorage[sizeof(ActiveTaskStatus)];
 
   /// The allocator for the task stack.
-  /// Currently 2 words + 8 bytes.
+  /// Currently 2 words + 4 bytes.
   TaskAllocator Allocator;
+
+  // Four bytes of padding here (on 64-bit)
 
   /// Storage for task-local values.
   /// Currently one word.
@@ -775,6 +777,8 @@ struct AsyncTask::PrivateStorage {
 
   /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.
   uint32_t Id;
+
+  // Another four bytes of padding here too (on 64-bit)
 
   /// Base priority of Task - set only at creation time of task.
   /// Current max priority of task is ActiveTaskStatus.
