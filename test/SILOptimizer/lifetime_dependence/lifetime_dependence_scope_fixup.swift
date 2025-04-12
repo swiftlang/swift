@@ -40,27 +40,40 @@ struct View : ~Escapable {
   }
 }
 
-struct MutableView : ~Copyable, ~Escapable {
-  let ptr: UnsafeRawBufferPointer
+struct NCMutableContainer : ~Copyable {
+  let ptr: UnsafeMutableRawBufferPointer
   let c: Int
-  @lifetime(borrow ptr)
-  init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
+  init(_ ptr: UnsafeMutableRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
-  @lifetime(copy otherBV)
-  init(_ otherBV: borrowing View) {
-    self.ptr = otherBV.ptr
-    self.c = otherBV.c
+}
+
+struct MutableView : ~Copyable, ~Escapable {
+  let ptr: UnsafeMutableRawBufferPointer
+  @lifetime(borrow ptr)
+  init(_ ptr: UnsafeMutableRawBufferPointer) {
+    self.ptr = ptr
   }
-  init(_ k: borrowing NCContainer) {
+  @lifetime(copy otherBV)
+  init(_ otherBV: borrowing MutableView) {
+    self.ptr = otherBV.ptr
+  }
+  init(_ k: borrowing NCMutableContainer) {
     self.ptr = k.ptr
-    self.c = k.c
+  }
+}
+
+extension MutableView {
+  @lifetime(&self)
+  mutating public func update() -> Self {
+    return unsafe MutableView(ptr)
   }
 }
 
 func use(_ o : borrowing View) {}
 func mutate(_ x: inout NCContainer) { }
+func mutate(_ x: inout NCMutableContainer) { }
 func mutate(_ x: inout View) { }
 func consume(_ o : consuming View) {}
 func use(_ o : borrowing MutableView) {}
@@ -125,9 +138,9 @@ func test3(_ a: Array<Int>) {
   }
 }
 
-func test4(_ a: Array<Int>) {
-  a.withUnsafeBytes {
-    var x = NCContainer($0, a.count)
+func test4(_ a: inout Array<Int>) {
+  a.withUnsafeMutableBytes {
+    var x = NCMutableContainer($0, $0.count)
     mutate(&x)
     let view = MutableView(x)
     use(view)
@@ -180,11 +193,11 @@ func test7(_ a: UnsafeRawBufferPointer) {
   mutate(&x)
 }
 
-func test8(_ a: Array<Int>) {
-  a.withUnsafeBytes {
-    var x = View($0, a.count)
+func test8(_ a: inout Array<Int>) {
+  a.withUnsafeMutableBytes {
+    var x = View(UnsafeRawBufferPointer(start: $0.baseAddress!, count: $0.count), $0.count)
     mutate(&x)
-    let view = MutableView(x)
+    let view = MutableView($0)
     use(view)
     consume(view)
   }
@@ -244,4 +257,30 @@ func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
   var ptr = p
   _ = ptr.pointee
   _ = ptr
+}
+
+// CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup16testReassignment1bySw_tF : $@convention(thin) (UnsafeMutableRawBufferPointer) -> () {
+// CHECK: bb0(%0 : $UnsafeMutableRawBufferPointer):
+// CHECK:   [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $MutableView, var, name "span", type $MutableView
+// CHECK:   apply %{{.*}}(%0, %{{.*}}) : $@convention(method) (UnsafeMutableRawBufferPointer, @thin MutableView.Type) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   [[ACCESS1:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableView) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   [[LD1:%.*]] = load %{{.*}} : $*MutableView
+// CHECK:   apply %{{.*}}([[LD1]]) : $@convention(thin) (@guaranteed MutableView) -> ()
+// CHECK:   end_access [[ACCESS1]] : $*MutableView
+// CHECK:   [[ACCESS2:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableView) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   [[LD2:%.*]] = load %{{.*}} : $*MutableView
+// CHECK:   apply %{{.*}}([[LD2]]) : $@convention(thin) (@guaranteed MutableView) -> ()
+// CHECK:   end_access [[ACCESS2]] : $*MutableView
+// CHECK:   destroy_addr [[VAR]] : $*MutableView
+// CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup16testReassignment1bySw_tF'
+func testReassignment(b: UnsafeMutableRawBufferPointer) {
+  var span = MutableView(b)
+
+  var sub = span.update()
+  use(sub)
+
+  sub = span.update()
+  use(sub)
 }

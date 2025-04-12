@@ -630,13 +630,17 @@ struct LocalVariableReachableAccess {
 
 // Find reaching assignments...
 extension LocalVariableReachableAccess {
-  // Gather all fully assigned accesses that reach `instruction`.
+  // Gather all fully assigned accesses that reach 'instruction'. If 'instruction' is itself a modify access, it is
+  // ignored and the nearest assignments above 'instruction' are still gathered.
   func gatherReachingAssignments(for instruction: Instruction, in accessStack: inout Stack<LocalVariableAccess>)
     -> Bool {
     var blockList = BasicBlockWorklist(context)
     defer { blockList.deinitialize() }
 
-    let initialEffect = backwardScanAccesses(before: instruction, accessStack: &accessStack)
+    var initialEffect: BlockEffect? = nil
+    if let prev = instruction.previous {
+      initialEffect = backwardScanAccesses(before: prev, accessStack: &accessStack)
+    }
     if !backwardPropagateEffect(in: instruction.parentBlock, effect: initialEffect, blockList: &blockList,
                                 accessStack: &accessStack) {
       return false
@@ -647,7 +651,7 @@ extension LocalVariableReachableAccess {
       // lattice: none -> read -> modify -> escape -> assign
       //
       // `blockInfo.effect` is the same as `currentEffect` returned by backwardScanAccesses, except when an early escape
-      // happens after an assign.
+      // happens below an assign, in which case we report the escape here.
       switch currentEffect {
       case .none, .read, .modify, .escape:
         break
@@ -695,7 +699,6 @@ extension LocalVariableReachableAccess {
         continue
       case .assign:
         accessStack.push(accessInfo.access)
-        break
       case .escape:
         break
       }
@@ -709,24 +712,30 @@ extension LocalVariableReachableAccess {
 extension LocalVariableReachableAccess {
   /// This performs a forward CFG walk to find known reachable uses from `assignment`. This ignores aliasing and
   /// escapes.
-  func gatherKnownReachableUses(from assignment: LocalVariableAccess,
+  ///
+  /// The known live range is the range in which the assigned value is valid and may be used by dependent values. It
+  /// includes the destroy or reassignment of the local.
+  func gatherKnownLifetimeUses(from assignment: LocalVariableAccess,
                                 in accessStack: inout Stack<LocalVariableAccess>) {
     if let modifyInst = assignment.instruction {
-      _ = gatherReachableUses(after: modifyInst, in: &accessStack, allowEscape: true)
+      _ = gatherReachableUses(after: modifyInst, in: &accessStack, lifetime: true)
+      return
     }
-    gatherKnownReachableUsesFromEntry(in: &accessStack)
+    gatherKnownLifetimeUsesFromEntry(in: &accessStack)
   }
 
   /// This performs a forward CFG walk to find known reachable uses from the function entry. This ignores aliasing and
   /// escapes.
-  private func gatherKnownReachableUsesFromEntry(in accessStack: inout Stack<LocalVariableAccess>) {
+  private func gatherKnownLifetimeUsesFromEntry(in accessStack: inout Stack<LocalVariableAccess>) {
     assert(accessMap.liveInAccess!.kind == .incomingArgument, "only an argument access is live in to the function")
     let firstInst = accessMap.function.entryBlock.instructions.first!
-    _ = gatherReachableUses(onOrAfter: firstInst, in: &accessStack, allowEscape: true)
+    _ = gatherReachableUses(onOrAfter: firstInst, in: &accessStack, lifetime: true)
   }
 
   /// This performs a forward CFG walk to find all reachable uses of `modifyInst`. `modifyInst` may be a `begin_access
   /// [modify]` or instruction that initializes the local variable.
+  ///
+  /// This does not include the destroy or reassignment of the value set by `modifyInst`.
   ///
   /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` are
   /// reachable from `modifyInst`.
@@ -749,37 +758,40 @@ extension LocalVariableReachableAccess {
     if accessInfo.hasEscaped! {
       return false
     }
-    return gatherReachableUses(after: modifyInst, in: &accessStack, allowEscape: false)
+    return gatherReachableUses(after: modifyInst, in: &accessStack, lifetime: false)
   }
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after `begin`.
   ///
-  /// If `allowEscape` is true, then this returns false if the walk ended early because of a reachable escape.
+  /// If `lifetime` is true, then this gathers the full known lifetime, includeing destroys and reassignments ignoring
+  /// escapes.
+  ///
+  /// If `lifetime` is false, then this returns `false` if the walk ended early because of a reachable escape.
   private func gatherReachableUses(after begin: Instruction, in accessStack: inout Stack<LocalVariableAccess>,
-                                   allowEscape: Bool) -> Bool {
+                                   lifetime: Bool) -> Bool {
     if let term = begin as? TermInst {
       for succ in term.successors {
-        if !gatherReachableUses(onOrAfter: succ.instructions.first!, in: &accessStack, allowEscape: allowEscape) {
+        if !gatherReachableUses(onOrAfter: succ.instructions.first!, in: &accessStack, lifetime: lifetime) {
           return false
         }
       }
       return true
     } else {
-      return gatherReachableUses(onOrAfter: begin.next!, in: &accessStack, allowEscape: allowEscape)
+      return gatherReachableUses(onOrAfter: begin.next!, in: &accessStack, lifetime: lifetime)
     }
   }
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after and including `begin`.
   ///
-  /// If `allowEscape` is true, then this returns false if the walk ended early because of a reachable escape.
+  /// If `lifetime` is true, then this returns false if the walk ended early because of a reachable escape.
   private func gatherReachableUses(onOrAfter begin: Instruction, in accessStack: inout Stack<LocalVariableAccess>,
-                                   allowEscape: Bool) -> Bool {
+                                   lifetime: Bool) -> Bool {
     var blockList = BasicBlockWorklist(context)
     defer { blockList.deinitialize() }
 
     let initialBlock = begin.parentBlock
-    let initialEffect = forwardScanAccesses(after: begin, accessStack: &accessStack, allowEscape: allowEscape)
-    if !allowEscape, initialEffect == .escape {
+    let initialEffect = forwardScanAccesses(after: begin, accessStack: &accessStack, lifetime: lifetime)
+    if !lifetime, initialEffect == .escape {
       return false
     }
     forwardPropagateEffect(in: initialBlock, blockInfo: blockMap[initialBlock], effect: initialEffect,
@@ -795,15 +807,15 @@ extension LocalVariableReachableAccess {
       case .none:
         break
       case .escape:
-        if !allowEscape {
+        if !lifetime {
           break
         }
         fallthrough
       case .read, .modify, .assign:
         let firstInst = block.instructions.first!
-        currentEffect = forwardScanAccesses(after: firstInst, accessStack: &accessStack, allowEscape: allowEscape)
+        currentEffect = forwardScanAccesses(after: firstInst, accessStack: &accessStack, lifetime: lifetime)
       }
-      if !allowEscape, currentEffect == .escape {
+      if !lifetime, currentEffect == .escape {
         return false
       }
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
@@ -836,9 +848,9 @@ extension LocalVariableReachableAccess {
   }
 
   // Check all instructions in this block after and including `begin`. Return a BlockEffect indicating the combined
-  // effects seen before stopping the scan. An .assign stops the scan. A .escape stops the scan if allowEscape is false.
+  // effects seen before stopping the scan. An .assign stops the scan. A .escape stops the scan if lifetime is false.
   private func forwardScanAccesses(after first: Instruction, accessStack: inout Stack<LocalVariableAccess>,
-                                   allowEscape: Bool)
+                                   lifetime: Bool)
     -> BlockEffect? {
     var currentEffect: BlockEffect?
     for inst in InstructionList(first: first) {
@@ -848,9 +860,12 @@ extension LocalVariableReachableAccess {
       currentEffect = BlockEffect(for: accessInfo, accessMap.context).meet(currentEffect)
       switch currentEffect! {
       case .assign:
+        if lifetime {
+          accessStack.push(accessInfo.access)
+        }
         return currentEffect
       case .escape:
-        if !allowEscape {
+        if !lifetime {
           log("Local variable: \(accessMap.allocation)\n    escapes at \(inst)")
           return currentEffect
         }
