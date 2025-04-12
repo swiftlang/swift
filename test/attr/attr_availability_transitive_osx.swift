@@ -87,8 +87,7 @@ func never_available_func(
 ) {
   always()
   never() // expected-error {{'never()' is unavailable}}
-  osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-  // expected-note@-1 {{add 'if #available' version check}}
+  osx_future()
   osx()
   osx_ios()
   osx_extension()
@@ -105,8 +104,7 @@ func osx_func(
 ) {
   always()
   never() // expected-error {{'never()' is unavailable}}
-  osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-  // expected-note@-1 {{add 'if #available' version check}}
+  osx_future()
   osx()
   osx_ios()
   osx_extension()
@@ -159,7 +157,7 @@ var never_var: (
 ) = (
   always(),
   never(), // expected-error {{'never()' is unavailable}}
-  osx_future(), // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
+  osx_future(),
   osx(),
   osx_ios(),
   osx_extension()
@@ -176,7 +174,7 @@ var osx_var: (
 ) = (
   always(),
   never(), // expected-error {{'never()' is unavailable}}
-  osx_future(), // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
+  osx_future(),
   osx(),
   osx_ios(),
   osx_extension()
@@ -218,7 +216,7 @@ struct AlwaysAvailableContainer { // expected-note 2 {{add @available attribute 
 struct NeverAvailableContainer { // expected-note 2 {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  let osx_future_var: OSXFutureAvailable = osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
+  let osx_future_var: OSXFutureAvailable = osx_future()
   let osx_var: OSXUnavailable = osx()
   let osx_ios_var: MultiPlatformUnavailable = osx_ios()
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
@@ -228,7 +226,7 @@ struct NeverAvailableContainer { // expected-note 2 {{'NeverAvailableContainer' 
 struct OSXUnavailableContainer { // expected-note 2 {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  let osx_future_var: OSXFutureAvailable = osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
+  let osx_future_var: OSXFutureAvailable = osx_future()
   let osx_var: OSXUnavailable = osx()
   let osx_ios_var: MultiPlatformUnavailable = osx_ios()
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
@@ -301,8 +299,7 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -319,8 +316,7 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -337,15 +333,14 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
   }
 
   @available(OSXApplicationExtension, unavailable)
-  func never_available_extension_osx_app_extension_method( // expected-note {{add @available attribute to enclosing instance method}}
+  func never_available_extension_osx_app_extension_method(
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: OSXFutureAvailable,
@@ -355,8 +350,7 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -380,8 +374,7 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -398,8 +391,7 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -416,15 +408,14 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
   }
 
   @available(OSXApplicationExtension, unavailable)
-  func osx_extension_osx_app_extension_method( // expected-note {{add @available attribute to enclosing instance method}}
+  func osx_extension_osx_app_extension_method(
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: OSXFutureAvailable,
@@ -434,8 +425,7 @@ extension ExtendMe {
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -477,8 +467,7 @@ extension ExtendMe { // expected-note * {{add @available attribute to enclosing 
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -495,8 +484,7 @@ extension ExtendMe { // expected-note * {{add @available attribute to enclosing 
   ) {
     always()
     never() // expected-error {{'never()' is unavailable}}
-    osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-    // expected-note@-1 {{add 'if #available' version check}}
+    osx_future()
     osx()
     osx_ios()
     osx_extension()
@@ -534,7 +522,7 @@ func available_func_call_extension_methods(_ e: ExtendMe) { // expected-note {{a
 }
 
 @available(OSX, obsoleted: 10.9)
-struct OSXObsoleted {} // expected-note 2 {{'OSXObsoleted' was obsoleted in macOS 10.9}}
+struct OSXObsoleted {} // expected-note 4 {{'OSXObsoleted' was obsoleted in macOS 10.9}}
 
 @available(OSX, unavailable)
 @available(OSX, introduced: 99)
@@ -561,17 +549,46 @@ func osx_unavailable_func(
   OSXUnavailableAndIntroducedInFutureSameAttribute,
   OSXIntroducedInFutureAndUnavailable
 ) {
-  // FIXME: [availability] Stop diagnosing potential unavailability or obsoletion in an unavailable context.
-  _ = OSXFutureAvailable() // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
-  // expected-note@-1 {{add 'if #available' version check}}
+  // FIXME: [availability] Stop diagnosing obsoletion in an unavailable context.
+  _ = OSXFutureAvailable()
   _ = OSXObsoleted() // expected-error {{'OSXObsoleted' is unavailable in macOS}}
   _ = OSXUnavailableAndIntroducedInFuture()
   _ = OSXUnavailableAndIntroducedInFutureSameAttribute()
   _ = OSXIntroducedInFutureAndUnavailable()
 
   func takesType<T>(_ t: T.Type) {}
-  takesType(OSXFutureAvailable.self) // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
-  // expected-note@-1 {{add 'if #available' version check}}
+  takesType(OSXFutureAvailable.self)
+  takesType(OSXObsoleted.self) // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  takesType(OSXUnavailableAndIntroducedInFuture.self)
+  takesType(OSXUnavailableAndIntroducedInFutureSameAttribute.self)
+  takesType(OSXIntroducedInFutureAndUnavailable.self)
+
+  return (s1, s2, s3, s4, s5)
+}
+
+@available(OSX, unavailable, introduced: 99)
+func osx_unavailable_and_introduced_func(
+  _ s1: OSXFutureAvailable,
+  _ s2: OSXObsoleted,
+  _ s3: OSXUnavailableAndIntroducedInFuture,
+  _ s4: OSXUnavailableAndIntroducedInFutureSameAttribute,
+  _ s5: OSXIntroducedInFutureAndUnavailable,
+) -> (
+  OSXFutureAvailable,
+  OSXObsoleted,
+  OSXUnavailableAndIntroducedInFuture,
+  OSXUnavailableAndIntroducedInFutureSameAttribute,
+  OSXIntroducedInFutureAndUnavailable
+) {
+  // FIXME: [availability] Stop diagnosing obsoletion in an unavailable context.
+  _ = OSXFutureAvailable()
+  _ = OSXObsoleted() // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  _ = OSXUnavailableAndIntroducedInFuture()
+  _ = OSXUnavailableAndIntroducedInFutureSameAttribute()
+  _ = OSXIntroducedInFutureAndUnavailable()
+
+  func takesType<T>(_ t: T.Type) {}
+  takesType(OSXFutureAvailable.self)
   takesType(OSXObsoleted.self) // expected-error {{'OSXObsoleted' is unavailable in macOS}}
   takesType(OSXUnavailableAndIntroducedInFuture.self)
   takesType(OSXUnavailableAndIntroducedInFutureSameAttribute.self)

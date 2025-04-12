@@ -5,6 +5,33 @@
 
 ## Swift 6.2
 
+* The Swift compiler no longer diagnoses references to declarations that are
+  potentially unavailable because the platform version might not be new enough
+  when those references occur inside of contexts that are also unavailable to
+  that platform. This addresses a long-standing nuisance for multi-platform
+  code. However, there is also a chance that existing source code may become
+  ambiguous as a result:
+
+  ```swift
+  struct A {}
+  struct B {}
+
+  func potentiallyAmbiguous(_: A) {}
+
+  @available(macOS 99, *)
+  func potentiallyAmbiguous(_: B) {}
+
+  @available(macOS, unavailable)
+  func unavailableOnMacOS() {
+    potentiallyAmbiguous(.init()) // error: ambiguous use of 'init()'
+  }
+  ```
+
+  Code that is now ambiguous as a result should likely be restructured since
+  disambiguation based on platform introduction alone has never been a reliable
+  strategy, given that the code would eventually become ambiguous anyways when
+  the deployment target is raised.
+
 * [SE-0419][]:
   Introduced the new `Runtime` module, which contains a public API that can
   generate backtraces, presently supported on macOS and Linux.  Capturing a
