@@ -1,6 +1,9 @@
 #ifndef TEST_INTEROP_CXX_CLASS_INPUTS_MEMBER_VARIABLES_H
 #define TEST_INTEROP_CXX_CLASS_INPUTS_MEMBER_VARIABLES_H
 
+#include <cstddef>
+#include <optional>
+
 class MyClass {
 public:
   const int const_member = 23;
@@ -23,6 +26,26 @@ struct HasZeroSizedField {
   short get_c() const { return c; }
   void set_c(short c) { this->c = c; }
 };
+
+struct ReuseFieldPadding {
+  [[no_unique_address]] std::optional<int> a = {2};
+  char c;
+  char get_c() const { return c; }
+  void set_c(char c) { this->c = c; }
+  int offset() const { return offsetof(ReuseFieldPadding, c); }
+  std::optional<int> getOptional() { return a; }
+};
+
+using OptInt = std::optional<int>;
+
+struct ReuseFieldPaddingWithTypedef {
+  [[no_unique_address]] OptInt a;
+  char c;
+  char get_c() const { return c; }
+  void set_c(char c) { this->c = c; }
+  int offset() const { return offsetof(ReuseFieldPadding, c); }
+};
+
 
 inline int takesZeroSizedInCpp(HasZeroSizedField x) {
   return x.a;
