@@ -707,6 +707,17 @@ bool SILFunctionType::isNoReturnFunction(SILModule &M,
 }
 
 bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
+  return isAddressable(paramIdx, caller->getModule(),
+                       caller->getGenericEnvironment(),
+                       caller->getModule().Types,
+                       caller->getTypeExpansionContext());
+}
+
+// 'genericEnv' may be null.
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
+                                    GenericEnvironment *genericEnv,
+                                    Lowering::TypeConverter &typeConverter,
+                                    TypeExpansionContext expansion) {
   SILParameterInfo paramInfo = getParameters()[paramIdx];
   for (auto &depInfo : getLifetimeDependencies()) {
     auto *addressableIndices = depInfo.getAddressableIndices();
@@ -715,13 +726,12 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
     }
     auto *condAddressableIndices = depInfo.getConditionallyAddressableIndices();
     if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
-      CanType argType = paramInfo.getArgumentType(
-        caller->getModule(), this, caller->getTypeExpansionContext());
-      CanType contextType =
-        argType->hasTypeParameter()
-        ? caller->mapTypeIntoContext(argType)->getCanonicalType()
+      CanType argType = paramInfo.getArgumentType(module, this, expansion);
+      CanType contextType = genericEnv
+        ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
         : argType;
-      auto &tl = caller->getTypeLowering(contextType);
+      assert(!contextType->hasTypeParameter());
+      auto &tl = typeConverter.getTypeLowering(contextType, expansion);
       if (tl.getRecursiveProperties().isAddressableForDependencies())
         return true;
     }
