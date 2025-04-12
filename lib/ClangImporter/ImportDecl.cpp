@@ -61,6 +61,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -4479,6 +4480,28 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+      if (decl->hasAttr<clang::NoUniqueAddressAttr>()) {
+        if (const auto *rd = decl->getType()->getAsRecordDecl()) {
+          // Clang can store the next field in the padding of this one. Swift
+          // does not support this yet so let's not import the field and
+          // represent it with an opaque blob in codegen.
+          const auto &fieldLayout =
+              decl->getASTContext().getASTRecordLayout(rd);
+          auto &clangCtx = decl->getASTContext();
+          if (!decl->isZeroSize(clangCtx) &&
+              fieldLayout.getDataSize() != fieldLayout.getSize()) {
+            const auto *parent = decl->getParent();
+            auto currIdx = decl->getFieldIndex();
+            auto nextIdx = currIdx + 1;
+            const auto &parentLayout = clangCtx.getASTRecordLayout(parent);
+            if (parentLayout.getFieldCount() > nextIdx &&
+                parentLayout.getFieldOffset(nextIdx) <
+                    (parentLayout.getFieldOffset(currIdx) +
+                     clangCtx.toBits(fieldLayout.getSize())))
+              return nullptr;
+          }
+        }
+      }
       // Fields are imported as variables.
       std::optional<ImportedName> correctSwiftName;
       ImportedName importedName;
