@@ -618,14 +618,6 @@ static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
     return "double_apply";
   }
 }
-static StringRef getDumpString(ExecutionKind kind) {
-  switch (kind) {
-  case ExecutionKind::Concurrent:
-    return "concurrent";
-  case ExecutionKind::Caller:
-    return "caller";
-  }
-}
 static StringRef getDumpString(ExplicitSafety safety) {
   switch (safety) {
   case ExplicitSafety::Unspecified:
@@ -2391,6 +2383,8 @@ namespace {
               VD->getAttrs().getAttribute<NonisolatedAttr>()) {
         if (nonisolatedAttr->isUnsafe()) {
           printFlag(true, "nonisolated(unsafe)", DeclModifierColor);
+        } else if (nonisolatedAttr->isNonSending()) {
+          printFlag(true, "nonisolated(nonsending)", DeclModifierColor);
         } else {
           printFlag(true, "nonisolated", DeclModifierColor);
         }
@@ -4646,6 +4640,12 @@ public:
     printFoot();
   }
 
+  void visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T, Label label) {
+    printCommon("caller_isolated", label);
+    printRec(T->getBase(), Label::optional("base"));
+    printFoot();
+  }
+
   void visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T, Label label) {
     printCommon("_const", label);
     printRec(T->getBase(), Label::optional("base"));
@@ -4926,14 +4926,10 @@ public:
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
   TRIVIAL_ATTR_PRINTER(Extensible, extensible)
+  TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
 
 #undef TRIVIAL_ATTR_PRINTER
 
-  void visitExecutionAttr(ExecutionAttr *Attr, Label label) {
-    printCommon(Attr, "execution_attr", label);
-    printField(Attr->getBehavior(), Label::always("behavior"));
-    printFoot();
-  }
   void visitABIAttr(ABIAttr *Attr, Label label) {
     printCommon(Attr, "abi_attr", label);
     printRec(Attr->abiDecl, Label::always("decl"));
@@ -5184,6 +5180,7 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *Attr, Label label) {
     printCommon(Attr, "nonisolated_attr", label);
     printFlag(Attr->isUnsafe(), "unsafe");
+    printFlag(Attr->isNonSending(), "nonsending");
     printFoot();
   }
   void visitObjCAttr(ObjCAttr *Attr, Label label) {
@@ -6341,7 +6338,7 @@ namespace {
           printFlag("@isolated(any)");
           break;
         case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-          printFlag("@execution(caller)");
+          printFlag("nonisolated(nonsending)");
           break;
         }
       }

@@ -8756,14 +8756,6 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-std::optional<ExecutionKind>
-AbstractFunctionDecl::getExecutionBehavior() const {
-  auto *attr = getAttrs().getAttribute<ExecutionAttr>();
-  if (!attr)
-    return {};
-  return attr->getBehavior();
-}
-
 clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
   if (auto *clangDecl = getClangDecl()) {
     if (auto *valueDecl = dyn_cast<clang::ValueDecl>(clangDecl)) {

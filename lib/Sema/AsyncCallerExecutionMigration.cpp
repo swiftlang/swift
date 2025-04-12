@@ -50,8 +50,8 @@ public:
       : ctx(ctx), node(repr), isolation(isolation) {}
 
   /// Warns that the behavior of nonisolated async functions will change under
-  /// `AsyncCallerExecution` and suggests `@execution(concurrent)` to preserve
-  /// the current behavior.
+  /// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+  /// behavior.
   void diagnose() const;
 };
 } // end anonymous namespace
@@ -74,7 +74,7 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
 
     // If the attribute cannot appear on this kind of declaration, we can't
     // diagnose it.
-    if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution,
+    if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent,
                                                  decl)) {
       return;
     }
@@ -121,8 +121,14 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
       attrs = &closure->getAttrs();
     }
 
-    if (attrs && attrs->hasAttribute<ExecutionAttr>()) {
-      return;
+    if (attrs) {
+      if (attrs->hasAttribute<ConcurrentAttr>())
+        return;
+
+      if (auto *nonisolated = attrs->getAttribute<NonisolatedAttr>()) {
+        if (nonisolated->isNonSending())
+          return;
+      }
     }
   }
 
@@ -142,7 +148,7 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
     }
   }
 
-  const ExecutionAttr attr(ExecutionKind::Concurrent, /*implicit=*/true);
+  const ConcurrentAttr attr(/*implicit=*/true);
 
   const auto featureName = feature.getName();
   if (decl) {

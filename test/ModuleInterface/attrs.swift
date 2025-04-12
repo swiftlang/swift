@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name attrs \
 // RUN:  -emit-private-module-interface-path %t.private.swiftinterface \
-// RUN:  -enable-experimental-feature ABIAttribute \
-// RUN:  -enable-experimental-feature ExecutionAttribute
+// RUN:  -enable-experimental-feature ABIAttribute
 
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name attrs
 // RUN: %target-swift-typecheck-module-from-interface(%t.private.swiftinterface) -module-name attrs
@@ -10,7 +9,6 @@
 // RUN: %FileCheck %s --check-prefixes CHECK,PRIVATE-CHECK --input-file %t.private.swiftinterface
 
 // REQUIRES: swift_feature_ABIAttribute
-// REQUIRES: swift_feature_ExecutionAttribute
 
 // CHECK: @_transparent public func glass() -> Swift.Int { return 0 }{{$}}
 @_transparent public func glass() -> Int { return 0 }
@@ -87,13 +85,13 @@ public struct MutatingTest {
 @abi(func abiSpiFunc())
 @_spi(spiGroup) public func abiSpiFunc() {}
 
-@execution(concurrent)
+@concurrent
 public func testExecutionConcurrent() async {}
-// CHECK: @execution(concurrent) public func testExecutionConcurrent() async
+// CHECK: @concurrent public func testExecutionConcurrent() async
 
-@execution(caller)
+nonisolated(nonsending)
 public func testExecutionCaller() async {}
-// CHECK: @execution(caller) public func testExecutionCaller() async
+// CHECK: nonisolated(nonsending) public func testExecutionCaller() async
 
 // CHECK-NOT: @extensible
 // CHECK: public enum TestExtensible

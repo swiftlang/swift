@@ -3209,6 +3209,12 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                        isolated->getBase(), dc, options);
   }
 
+  case TypeReprKind::CallerIsolated: {
+    auto callerIsolated = cast<CallerIsolatedTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       callerIsolated->getBase(), dc, options);
+  }
+
   case TypeReprKind::Composition: {
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {

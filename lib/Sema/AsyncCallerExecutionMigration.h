@@ -29,21 +29,21 @@ class ValueDecl;
 class AbstractClosureExpr;
 
 /// Warns that the behavior of nonisolated async functions will change under
-/// `AsyncCallerExecution` and suggests `@execution(concurrent)` to preserve
-/// the current behavior.
+/// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+/// behavior.
 void warnAboutNewNonisolatedAsyncExecutionBehavior(
     ASTContext &ctx, FunctionTypeRepr *node, FunctionTypeIsolation isolation);
 
 /// Warns that the behavior of nonisolated async functions will change under
-/// `AsyncCallerExecution` and suggests `@execution(concurrent)` to preserve
-/// the current behavior.
+/// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+/// behavior.
 void warnAboutNewNonisolatedAsyncExecutionBehavior(ASTContext &ctx,
                                                    ValueDecl *node,
                                                    ActorIsolation isolation);
 
 /// Warns that the behavior of nonisolated async functions will change under
-/// `AsyncCallerExecution` and suggests `@execution(concurrent)` to preserve
-/// the current behavior.
+/// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+/// behavior.
 void warnAboutNewNonisolatedAsyncExecutionBehavior(ASTContext &ctx,
                                                    AbstractClosureExpr *node,
                                                    ActorIsolation isolation);

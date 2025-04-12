@@ -304,26 +304,6 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
-void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
-                                  const PrintOptions &options) const {
-  if (options.SuppressExecutionAttribute)
-    return;
-
-  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  printer.printAttrName("@execution");
-  printer << "(";
-  switch (getBehavior()) {
-  case ExecutionKind::Concurrent:
-    printer << "concurrent";
-    break;
-  case ExecutionKind::Caller:
-    printer << "caller";
-    break;
-  }
-  printer << ")";
-  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-}
-
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -1538,8 +1518,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Nonisolated: {
     Printer.printAttrName("nonisolated");
-    if (cast<NonisolatedAttr>(this)->isUnsafe()) {
+    switch (cast<NonisolatedAttr>(this)->getModifier()) {
+    case NonIsolatedModifier::None:
+      break;
+    case NonIsolatedModifier::Unsafe:
       Printer << "(unsafe)";
+      break;
+    case NonIsolatedModifier::NonSending:
+      Printer << "(nonsending)";
+      break;
     }
     break;
   }
@@ -1719,19 +1706,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     Printer << ")";
 
-    break;
-  }
-
-  case DeclAttrKind::Execution: {
-    auto *attr = cast<ExecutionAttr>(this);
-    switch (attr->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      Printer << "@execution(concurrent)";
-      break;
-    case ExecutionKind::Caller:
-      Printer << "@execution(caller)";
-      break;
-    }
     break;
   }
 
@@ -1931,10 +1905,13 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Documentation:
     return "_documentation";
   case DeclAttrKind::Nonisolated:
-    if (cast<NonisolatedAttr>(this)->isUnsafe()) {
-        return "nonisolated(unsafe)";
-    } else {
-        return "nonisolated";
+    switch (cast<NonisolatedAttr>(this)->getModifier()) {
+    case NonIsolatedModifier::None:
+      return "nonisolated";
+    case NonIsolatedModifier::Unsafe:
+      return "nonisolated(unsafe)";
+    case NonIsolatedModifier::NonSending:
+      return "nonisolated(nonsending)";
     }
   case DeclAttrKind::MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
@@ -1956,15 +1933,6 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DeclAttrKind::Lifetime:
     return "lifetime";
-  case DeclAttrKind::Execution: {
-    switch (cast<ExecutionAttr>(this)->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      return "execution(concurrent)";
-    case ExecutionKind::Caller:
-      return "execution(caller)";
-    }
-    llvm_unreachable("Invalid execution kind");
-  }
   }
   llvm_unreachable("bad DeclAttrKind");
 }

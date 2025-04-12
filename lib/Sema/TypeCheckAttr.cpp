@@ -198,7 +198,7 @@ public:
     TypeChecker::checkDeclABIAttribute(D, attr);
   }
 
-  void visitExecutionAttr(ExecutionAttr *attr) {
+  void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
     auto *const decl = cast<ValueDecl>(D);
 
     auto *const storage = dyn_cast<AbstractStorageDecl>(decl);
@@ -208,7 +208,8 @@ public:
     }
 
     if (!decl->isAsync()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_execution_only_on_async, decl);
+      diagnoseAndRemoveAttr(attr, diag::execution_behavior_only_on_async, attr,
+                            decl);
       return;
     }
 
@@ -224,8 +225,8 @@ public:
       // isolated parameters affect isolation of the function itself
       if (isa<IsolatedTypeRepr>(repr)) {
         diagnoseAndRemoveAttr(
-            attr, diag::attr_execution_incompatible_isolated_parameter, decl,
-            P);
+            attr, diag::execution_behavior_incompatible_isolated_parameter,
+            attr, decl, P);
         return;
       }
 
@@ -233,8 +234,9 @@ public:
         if (attrType->has(TypeAttrKind::Isolated)) {
           diagnoseAndRemoveAttr(
               attr,
-              diag::attr_execution_incompatible_dynamically_isolated_parameter,
-              decl, P);
+              diag::
+                  execution_behavior_incompatible_dynamically_isolated_parameter,
+              attr, decl, P);
           return;
         }
       }
@@ -253,6 +255,16 @@ public:
       diagnoseAndRemoveAttr(attr, diag::extensible_attr_on_internal_type,
                             E->getName(), E->getFormalAccess());
       return;
+    }
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    checkExecutionBehaviorAttribute(attr);
+
+    if (auto *nonisolated = D->getAttrs().getAttribute<NonisolatedAttr>()) {
+      if (nonisolated->isNonSending())
+        diagnoseAndRemoveAttr(attr, diag::actor_isolation_multiple_attr_2, D,
+                              attr, nonisolated);
     }
   }
 
@@ -4313,7 +4325,7 @@ static void checkGlobalActorAttr(
     std::pair<CustomAttr *, NominalTypeDecl *> &globalActorAttr) {
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
-  auto executionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
+  auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
   llvm::SmallVector<const DeclAttribute *, 2> attributes;
 
@@ -4325,10 +4337,9 @@ static void checkGlobalActorAttr(
   if (nonisolatedAttr) {
     attributes.push_back(nonisolatedAttr);
   }
-  if (executionAttr) {
-    attributes.push_back(executionAttr);
+  if (concurrentAttr) {
+    attributes.push_back(concurrentAttr);
   }
-
   if (attributes.size() == 1)
     return;
 
@@ -7529,6 +7540,19 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // that do not have storage.
   auto dc = D->getDeclContext();
 
+  if (attr->isNonSending()) {
+    // Just like `@concurrent` this form of `nonisolated` is only
+    // applicable to certain declarations.
+    if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent, D)) {
+      diagnoseAndRemoveAttr(
+          attr, diag::cannot_specify_execution_behavior_for_decl, attr);
+      return;
+    }
+
+    checkExecutionBehaviorAttribute(attr);
+    return;
+  }
+
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     auto type = var->getTypeInContext();
@@ -8143,18 +8167,13 @@ public:
     // Nothing else to check.
   }
 
-  void visitExecutionAttr(ExecutionAttr *attr) {
-    if (!ctx.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
-      visitDeclAttribute(attr);
-      return;
-    }
-
-    // `@execution(...)` implies `async`.
+  void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
+    // execution behavior attribute implies `async`.
     if (closure->hasExplicitResultType() &&
         closure->getAsyncLoc().isInvalid()) {
       ctx.Diags
           .diagnose(attr->getLocation(),
-                    diag::attr_execution_only_on_async_closure)
+                    diag::execution_behavior_only_on_async_closure, attr)
           .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
     }
@@ -8163,8 +8182,8 @@ public:
       ctx.Diags
           .diagnose(
               attr->getLocation(),
-              diag::attr_execution_type_attr_incompatible_with_global_isolation,
-              actorType)
+              diag::execution_behavior_attr_incompatible_with_global_isolation,
+              attr, actorType)
           .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
     }
@@ -8174,11 +8193,16 @@ public:
         ctx.Diags
             .diagnose(
                 attr->getLocation(),
-                diag::attr_execution_type_attr_incompatible_with_isolated_param)
+                diag::execution_behavior_attr_incompatible_with_isolated_param,
+                attr)
             .fixItRemove(attr->getRangeWithAt());
         attr->setInvalid();
       }
     }
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    checkExecutionBehaviorAttribute(attr);
   }
 
   void visitNonisolatedAttr(NonisolatedAttr *attr) {

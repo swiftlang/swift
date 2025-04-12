@@ -147,8 +147,7 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
                                                    SourceLoc(), SourceRange(),
                                                    /*implicit*/ true));
-  property->getAttrs().add(
-      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  property->getAttrs().add(NonisolatedAttr::createImplicit(ctx));
 
   // Make the property implicitly final.
   property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
