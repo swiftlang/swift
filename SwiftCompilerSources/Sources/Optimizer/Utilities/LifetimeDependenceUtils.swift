@@ -930,8 +930,8 @@ extension LifetimeDependenceDefUseWalker {
       // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
       return .continueWalk
     case .store:
-      let si = localAccess.operand!.instruction as! StoringInstruction
-      assert(si.sourceOperand == initialValue, "the only reachable store should be the current assignment")
+      // A store does not use the previous in-memory value.
+      return .continueWalk
     case .apply:
       return visitAppliedUse(of: localAccess.operand!, by: localAccess.instruction as! FullApplySite)
     case .escape:
@@ -946,7 +946,6 @@ extension LifetimeDependenceDefUseWalker {
     case .incomingArgument:
       fatalError("Incoming arguments are never reachable")
     }
-    return .continueWalk
   }
 
   private mutating func visitAppliedUse(of operand: Operand, by apply: FullApplySite) -> WalkResult {
