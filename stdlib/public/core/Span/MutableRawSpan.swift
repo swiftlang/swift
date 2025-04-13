@@ -109,16 +109,17 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(copy elements)
+  @lifetime(&elements)
   public init<Element: BitwiseCopyable>(
-    _elements elements: consuming MutableSpan<Element>
+    _elements elements: inout MutableSpan<Element>
   ) {
-    let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: elements._pointer,
-      count: elements.count &* MemoryLayout<Element>.stride
+    let (start, count) = unsafe (elements._pointer, elements._count)
+    let span = unsafe MutableRawSpan(
+      _unchecked: start,
+      byteCount: count == 1 ? MemoryLayout<Element>.size
+                 : count &* MemoryLayout<Element>.stride
     )
-    let span = unsafe MutableRawSpan(_unsafeBytes: bytes)
-    self = unsafe _overrideLifetime(span, copying: elements)
+    self = unsafe _overrideLifetime(span, mutating: &elements)
   }
 }
 
