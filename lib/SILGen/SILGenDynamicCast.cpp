@@ -18,6 +18,7 @@
 #include "ExitableFullExpr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -302,6 +303,15 @@ namespace {
       return CastStrategy::Address;
     }
 
+    static bool containsNonMarkerProtocols(ArrayRef<ProtocolDecl *> protocols) {
+      for (auto proto : protocols) {
+        if (!proto->isMarkerProtocol())
+          return true;
+      }
+
+      return false;
+    }
+
     CastingIsolatedConformances computedIsolatedConformances() const {
       // Non-existential types don't carry conformances, so we always allow
       // isolated conformances.
@@ -309,7 +319,7 @@ namespace {
         return CastingIsolatedConformances::Allow;
 
       // If there is a conformance to SendableMetatype, then this existential
-      // can leave the current isolation domain. Prohibit isolated conformances.
+      // can leave the current isolation domain.
       ASTContext &ctx = TargetType->getASTContext();
       Type checkType;
       if (auto existentialMetatype = TargetType->getAs<ExistentialMetatypeType>())
@@ -317,6 +327,14 @@ namespace {
       else
         checkType = TargetType;
 
+      // If there are no non-marker protocols in the existential, there's no
+      // need to prohibit isolated conformances.
+      auto layout = checkType->getExistentialLayout();
+      if (!containsNonMarkerProtocols(layout.getProtocols()))
+        return CastingIsolatedConformances::Allow;
+
+      // If the type conforms to SendableMetatype, prohibit isolated
+      // conformances.
       auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
       if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
         return CastingIsolatedConformances::Prohibit;

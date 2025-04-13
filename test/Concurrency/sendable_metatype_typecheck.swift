@@ -9,12 +9,28 @@ protocol Q {
   static func g()
 }
 
+
+// Sendability of existential metatypes
+fileprivate nonisolated let anyObjectArray: [AnyClass] = []
+
+func testSendableExistential() {
+  _ = anyObjectArray
+}
+
+
 nonisolated func acceptMeta<T>(_: T.Type) { }
 
 nonisolated func staticCallThroughMetaVal<T: Q>(_: T.Type) {
   let x = T.self // expected-error{{capture of non-sendable type 'T.Type' in an isolated closure}}
   Task.detached {
     x.g() // expected-error{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  }
+}
+
+nonisolated func captureThroughMetaValMoReqs<T>(_: T.Type) {
+  let x = T.self
+  Task.detached {
+    _ = x
   }
 }
 
