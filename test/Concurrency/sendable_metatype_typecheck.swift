@@ -87,3 +87,15 @@ nonisolated func passMetaWithMetaSendableVal<T: SendableMetatype & Q>(_: T.Type)
     x.g() // okay, because T is Sendable implies T.Type: Sendable
   }
 }
+
+struct GenericThingy<Element> {
+  func searchMe(_: (Element, Element) -> Bool) { }
+
+  func test() where Element: Comparable {
+    // Ensure that this we infer a non-@Sendable function type for Comparable.<
+    searchMe(<)
+
+    let _: (Element, Element) -> Bool = (>)
+    let _: @Sendable (Element, Element) -> Bool = (>) // expected-error{{converting non-sendable function value to '@Sendable (Element, Element) -> Bool' may introduce data races}}
+  }
+}
