@@ -30,9 +30,9 @@
 
 #include <cstddef>
 
+#include "swift/Basic/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
-#include "swift/Runtime/STLCompatibility.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
@@ -99,11 +99,11 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
   if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
     func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
 #elif defined(_WIN32)
-  func = std::bit_cast<dispatchEnqueueFuncType>(
+  func = function_cast<dispatchEnqueueFuncType>(
       GetProcAddress(LoadLibraryW(L"dispatch.dll"),
       "dispatch_async_swift_job"));
 #else
-  func = std::bit_cast<dispatchEnqueueFuncType>(
+  func = function_cast<dispatchEnqueueFuncType>(
       dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
 #endif
 #endif

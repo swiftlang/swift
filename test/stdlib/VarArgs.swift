@@ -174,7 +174,7 @@ test_varArgs6()
 
 func test_varArgs7() {
 #if canImport(Darwin) && arch(arm64)
-  let canTest = if #available(SwiftStdlib 6.2, *) { false } else { true }
+  let canTest = if #available(SwiftStdlib 6.2, *) { true } else { false }
 #else
   // va_list is more complicated on other targets so that behavior is not the
   // same, skip the test by doing a fake print of the expected output. Also

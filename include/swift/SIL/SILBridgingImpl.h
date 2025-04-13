@@ -28,6 +28,7 @@
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
@@ -823,6 +824,10 @@ void BridgedFunction::setIsSerialized(bool isSerialized) const {
   getFunction()->setSerializedKind(isSerialized ? swift::IsSerialized : swift::IsNotSerialized);
 }
 
+bool BridgedFunction::conformanceMatchesActorIsolation(BridgedConformance conformance) const {
+  return swift::matchesActorIsolation(conformance.unbridged(), getFunction());
+}
+
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
   return decl.getAs<swift::NominalTypeDecl>()->isResilient(getFunction()->getModule().getSwiftModule(),
                                                            getFunction()->getResilienceExpansion());
@@ -1331,6 +1336,10 @@ bool BridgedInstruction::AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEqui
 
 SwiftInt BridgedInstruction::BeginApplyInst_numArguments() const {
   return getAs<swift::BeginApplyInst>()->getNumArguments();
+}
+
+bool BridgedInstruction::BeginApplyInst_isCalleeAllocated() const {
+  return getAs<swift::BeginApplyInst>()->isCalleeAllocated();
 }
 
 SwiftInt BridgedInstruction::TryApplyInst_numArguments() const {
@@ -1913,10 +1922,6 @@ BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceRequirement() c
   return unbridged().getAssociatedConformanceWitness().Requirement;
 }
 
-BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceSubstType() const {
-  return {unbridged().getAssociatedConformanceWitness().SubstType};
-}
-
 BridgedConformance BridgedWitnessTableEntry::getAssociatedConformanceWitness() const {
   return {unbridged().getAssociatedConformanceWitness().Witness};
 }
@@ -1948,11 +1953,9 @@ BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedType(BridgedD
 }
 
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedConformance(BridgedCanType requirement,
-                                                                               BridgedCanType substType,
                                                                                BridgedConformance witness) {
   return bridge(swift::SILWitnessTable::Entry(
     swift::SILWitnessTable::AssociatedConformanceWitness{requirement.unbridged(),
-                                                         substType.unbridged(),
                                                          witness.unbridged()}));
 }
 

@@ -143,6 +143,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Use \c let for a read-only computed property.
+  bool InferPropertyIntroducerFromAccessors = false;
+
   /// Whether to print *any* accessors on subscript.
   bool PrintSubscriptAccessors = true;
 
@@ -171,6 +174,10 @@ struct PrintOptions {
 
   /// Whether to print the bodies of accessors in protocol context.
   bool PrintAccessorBodiesInProtocols = false;
+
+  /// Whether to print the parameter list of accessors like \c set . (Even when
+  /// \c true , parameters marked implicit still won't be printed.)
+  bool PrintExplicitAccessorParameters = true;
 
   /// Whether to print type definitions.
   bool TypeDefinitions = false;
@@ -396,9 +403,6 @@ struct PrintOptions {
 
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
-
-  /// Suppress the @execution attribute
-  bool SuppressExecutionAttribute = false;
 
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {

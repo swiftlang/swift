@@ -1267,9 +1267,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           inheritedType->getDeclContext()->getSelfNominalTypeDecl();
       ctx.Diags.diagnose(assocTypeDecl,
                          diag::associated_type_override_typealias,
-                         assocTypeDecl->getName(),
-                         inheritedOwningDecl->getDescriptiveKind(),
-                         inheritedOwningDecl->getDeclaredInterfaceType());
+                         assocTypeDecl->getName(), inheritedOwningDecl);
 
       recordInheritedTypeRequirement(assocTypeDecl, inheritedType);
     }

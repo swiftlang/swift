@@ -1855,5 +1855,8 @@ bool SILDeclRef::isCalleeAllocatedCoroutine() const {
   if (!accessor)
     return false;
 
-  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
+  if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+    return false;
+
+  return getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2;
 }

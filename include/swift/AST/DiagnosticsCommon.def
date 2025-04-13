@@ -23,6 +23,11 @@
 ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
+NOTE(kind_declname_declared_here,none,
+     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
+NOTE(decl_declared_here_with_kind,none,
+     "%kind0 declared here", (const Decl *))
+
 ERROR(not_implemented,none,
       "INTERNAL ERROR: feature not implemented: %0", (StringRef))
 
@@ -176,9 +181,6 @@ ERROR(circular_enum_inheritance,none,
 ERROR(circular_protocol_def,none,
       "protocol %0 refines itself", (Identifier))
 
-NOTE(kind_declname_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
-
 WARNING(warn_property_wrapper_module_scope,none,
         "ignoring associated type %0 in favor of module-scoped property "
         "wrapper %0; please qualify the reference with %1",
@@ -251,8 +253,10 @@ REMARK(remark_scanner_invalidate_missing_cas, none,
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(unknown_attribute,none,
+ERROR(unknown_attr_name,none,
       "unknown attribute '%0'", (StringRef))
+ERROR(unknown_type_attr,none,
+      "unknown %kind0", (const TypeAttribute *))
 
 //------------------------------------------------------------------------------
 // MARK: macro diagnostics

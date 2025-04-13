@@ -1199,7 +1199,8 @@ getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
   return std::nullopt;
 }
 
-void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
+void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name,
+                                bool skipLocalDiscriminator) {
   ASSERT(!getABIDecl(decl) && "caller should make sure we get ABI decls");
   if (name.empty())
     name = decl->getBaseName();
@@ -1240,6 +1241,11 @@ void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
+    // If we don't need a local discriminator (attached macros receive a
+    // separate discriminator), we're done.
+    if (skipLocalDiscriminator)
+      return;
+
     if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
       if (!decl->hasName()) {
         // Mangle unnamed params with their ordering.
@@ -5158,13 +5164,15 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
     // If we needed a local discriminator, stuff that into the name itself.
     // This is hack, but these names aren't stable anyway.
+    bool skipLocalDiscriminator = false;
     if (auto discriminator = precheckedMangleContext.second) {
+      skipLocalDiscriminator = true;
       name = encodeLocalPrecheckedDiscriminator(
           decl->getASTContext(), name, *discriminator);
     }
 
     if (auto valueDecl = dyn_cast<ValueDecl>(decl))
-      appendDeclName(valueDecl, name);
+      appendDeclName(valueDecl, name, skipLocalDiscriminator);
     else if (!name.empty())
       appendIdentifier(name.str());
     else

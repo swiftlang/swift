@@ -3302,22 +3302,6 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
   action();
 }
 
-static void
-suppressingFeatureCustomAvailability(PrintOptions &options,
-                                     llvm::function_ref<void()> action) {
-  // FIXME: [availability] Save and restore a bit controlling whether
-  // @available attributes for custom domains are printed.
-  action();
-}
-
-static void
-suppressingFeatureExecutionAttribute(PrintOptions &options,
-                                    llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope1(options.SuppressExecutionAttribute, true);
-  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Execution);
-  action();
-}
-
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -3352,7 +3336,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
-    printer << "$" << getFeatureName(feature);
+    printer << "$" << Feature(feature).getName();
   }
 
 #ifndef NDEBUG
@@ -3940,11 +3924,18 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->isStatic() && Options.PrintStaticKeyword)
     printStaticKeyword(decl->getCorrectStaticSpelling());
   if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
+    // If InferPropertyIntroducerFromAccessors is set, turn all read-only
+    // properties to `let`.
+    auto introducer = decl->getIntroducer();
+    if (Options.InferPropertyIntroducerFromAccessors &&
+          !cast<VarDecl>(decl)->isSettable(nullptr))
+      introducer = VarDecl::Introducer::Let;
+
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
     
     Printer.printIntroducerKeyword(
-      decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
+      introducer == VarDecl::Introducer::Let ? "let" : "var",
       Options, " ");
   }
   printContextIfNeeded(decl);
@@ -4229,7 +4220,8 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
         Printer << getAccessorLabel(decl->getAccessorKind());
 
         auto params = decl->getParameters();
-        if (params->size() != 0 && !params->get(0)->isImplicit()) {
+        if (params->size() != 0 && !params->get(0)->isImplicit()
+              && Options.PrintExplicitAccessorParameters) {
           auto Name = params->get(0)->getName();
           if (!Name.empty()) {
             Printer << "(";
@@ -6509,8 +6501,7 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      if (!Options.SuppressExecutionAttribute)
-        Printer << "@execution(caller) ";
+      Printer << "nonisolated(nonsending) ";
       break;
     }
 

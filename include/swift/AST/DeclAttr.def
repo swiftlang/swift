@@ -862,11 +862,7 @@ DECL_ATTR(abi, ABI,
   165)
 DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 
-DECL_ATTR(execution, Execution,
-  OnFunc | OnConstructor | OnSubscript | OnVar,
-  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
-  166)
-DECL_ATTR_FEATURE_REQUIREMENT(Execution, ExecutionAttribute)
+// Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
 
 SIMPLE_DECL_ATTR(const, ConstVal,
   OnParam | OnVar | OnFunc,
@@ -884,7 +880,12 @@ SIMPLE_DECL_ATTR(extensible, Extensible,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   169)
 
-LAST_DECL_ATTR(Extensible)
+SIMPLE_DECL_ATTR(concurrent, Concurrent,
+  OnFunc | OnConstructor | OnSubscript | OnVar,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  170)
+
+LAST_DECL_ATTR(Concurrent)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

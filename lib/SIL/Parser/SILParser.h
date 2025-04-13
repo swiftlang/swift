@@ -411,7 +411,7 @@ public:
     if (allowed)
       setEnum(existing, value, name, loc);
     else
-      P.diagnose(loc, diag::unknown_attribute, name);
+      P.diagnose(loc, diag::unknown_attr_name, name);
   }
 };
 

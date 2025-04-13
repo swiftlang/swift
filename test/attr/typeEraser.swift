@@ -50,7 +50,7 @@ protocol InvalidTypeEraser {}
 @_typeEraser(InvalidTypeEraser) // expected-error {{type eraser must be a class, struct, or enum}}
 protocol B3 {}
 
-class Generic<Param>: B5 { // expected-note {{generic type 'Generic' declared here}}
+class Generic<Param>: B5 { // expected-note {{generic class 'Generic' declared here}}
   init<T: B5>(erasing t: T) {}
 }
 @_typeEraser(Generic) // expected-error {{reference to generic type 'Generic' requires arguments in <...>}}

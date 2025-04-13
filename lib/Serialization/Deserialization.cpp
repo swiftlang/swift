@@ -181,6 +181,8 @@ const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
 const char ConformanceXRefError::ID = '\0';
 void ConformanceXRefError::anchor() {}
+const char InavalidAvailabilityDomainError::ID = '\0';
+void InavalidAvailabilityDomainError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -2824,6 +2826,12 @@ giveUpFastPath:
   if (M)
     return diagnoseFatal();
 
+  if (values.size() > 1) {
+    // Apply shadowing filtering after other local filters so we don't rule out
+    // valid candidates shadowed by invalid ones.
+    removeShadowedDecls(values, baseModule);
+  }
+
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
     return llvm::make_error<XRefError>("result is ambiguous", pathTrace,
@@ -3455,17 +3463,10 @@ public:
     if (IsInvalid) {
       decl->setInvalidBit();
 
-      DeclName name;
-      if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-        name = VD->getName();
-      }
-
       auto diagId = MF.allowCompilerErrors()
                         ? diag::serialization_allowing_invalid_decl
                         : diag::serialization_invalid_decl;
-      ctx.Diags.diagnose(SourceLoc(), diagId, name,
-                         decl->getDescriptiveKind(),
-                         MF.getAssociatedModule()->getNameStr());
+      ctx.Diags.diagnose(SourceLoc(), diagId, decl, MF.getAssociatedModule());
     }
 
     if (DAttrs)
@@ -5727,6 +5728,46 @@ ModuleFile::getDeclChecked(
   return declOrOffset;
 }
 
+static std::optional<AvailabilityDomainKind>
+decodeDomainKind(uint8_t kind) {
+  switch (kind) {
+    case static_cast<uint8_t>(AvailabilityDomainKind::Universal):
+      return AvailabilityDomainKind::Universal;
+    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftLanguage):
+      return AvailabilityDomainKind::SwiftLanguage;
+    case static_cast<uint8_t>(AvailabilityDomainKind::PackageDescription):
+      return AvailabilityDomainKind::PackageDescription;
+    case static_cast<uint8_t>(AvailabilityDomainKind::Embedded):
+      return AvailabilityDomainKind::Embedded;
+    case static_cast<uint8_t>(AvailabilityDomainKind::Platform):
+      return AvailabilityDomainKind::Platform;
+    case static_cast<uint8_t>(AvailabilityDomainKind::Custom):
+      return AvailabilityDomainKind::Custom;
+    default:
+      return std::nullopt;
+  }
+}
+
+static std::optional<AvailabilityDomain>
+decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
+                         PlatformKind platformKind, Decl *decl,
+                         const ASTContext &ctx) {
+  switch (domainKind) {
+  case AvailabilityDomainKind::Universal:
+    return AvailabilityDomain::forUniversal();
+  case AvailabilityDomainKind::SwiftLanguage:
+    return AvailabilityDomain::forSwiftLanguage();
+  case AvailabilityDomainKind::PackageDescription:
+    return AvailabilityDomain::forPackageDescription();
+  case AvailabilityDomainKind::Embedded:
+    return AvailabilityDomain::forEmbedded();
+  case AvailabilityDomainKind::Platform:
+    return AvailabilityDomain::forPlatform(platformKind);
+  case AvailabilityDomainKind::Custom:
+    return AvailabilityDomain::forCustom(decl, ctx);
+  }
+}
+
 Expected<AvailableAttr *>
 DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
                                           StringRef blobData) {
@@ -5734,28 +5775,32 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isUnavailable;
   bool isDeprecated;
   bool isNoAsync;
-  bool isPackageDescriptionVersionSpecific;
   bool isSPI;
-  bool isForEmbedded;
+  uint8_t rawDomainKind;
+  unsigned rawPlatform;
+  DeclID domainDeclID;
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
-  unsigned rawPlatform, messageSize, renameSize;
+  unsigned messageSize, renameSize;
 
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
-      scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
-      isPackageDescriptionVersionSpecific, isSPI, isForEmbedded,
+      scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync, isSPI,
+      rawDomainKind, rawPlatform, domainDeclID,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
-      LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, messageSize,
-      renameSize);
+      LIST_VER_TUPLE_PIECES(Obsoleted), messageSize, renameSize);
+
+  auto maybeDomainKind = decodeDomainKind(rawDomainKind);
+  if (!maybeDomainKind)
+    return llvm::make_error<InvalidEnumValueError>(rawDomainKind, "AvailabilityDomainKind");
 
   auto maybePlatform = platformFromUnsigned(rawPlatform);
   if (!maybePlatform.has_value())
     return llvm::make_error<InvalidEnumValueError>(rawPlatform, "PlatformKind");
 
-  PlatformKind platform = maybePlatform.value();
-
+  AvailabilityDomainKind domainKind = *maybeDomainKind;
+  PlatformKind platform = *maybePlatform;
   StringRef message = blobData.substr(0, messageSize);
   blobData = blobData.substr(messageSize);
   StringRef rename = blobData.substr(0, renameSize);
@@ -5774,23 +5819,19 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   else
     kind = AvailableAttr::Kind::Default;
 
-  AvailabilityDomain domain;
-  if (platform != PlatformKind::none) {
-    domain = AvailabilityDomain::forPlatform(platform);
-  } else if (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()) {
-    domain = isPackageDescriptionVersionSpecific
-                 ? AvailabilityDomain::forPackageDescription()
-                 : AvailabilityDomain::forSwiftLanguage();
-  } else if (isForEmbedded) {
-    domain = AvailabilityDomain::forEmbedded();
-  } else {
-    domain = AvailabilityDomain::forUniversal();
+  Decl *domainDecl = nullptr;
+  if (domainDeclID) {
+    SET_OR_RETURN_ERROR(domainDecl, MF.getDeclChecked(domainDeclID));
   }
 
+  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl, ctx);
+  if (!domain)
+    return llvm::make_error<InavalidAvailabilityDomainError>();
+
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind, message, rename,
-                    Introduced, SourceRange(), Deprecated, SourceRange(),
-                    Obsoleted, SourceRange(), isImplicit, isSPI);
+      AvailableAttr(SourceLoc(), SourceRange(), *domain, SourceLoc(), kind,
+                    message, rename, Introduced, SourceRange(), Deprecated,
+                    SourceRange(), Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
 }
 
@@ -5881,14 +5922,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
-      case decls_block::Execution_DECL_ATTR: {
-        unsigned behavior;
-        serialization::decls_block::ExecutionDeclAttrLayout::readRecord(
-            scratch, behavior);
-        Attr = new (ctx) ExecutionAttr(static_cast<ExecutionKind>(behavior),
-                                       /*Implicit=*/false);
-        break;
-      }
       case decls_block::ABI_DECL_ATTR: {
         bool isImplicit;
         DeclID abiDeclID;
@@ -6472,11 +6505,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Nonisolated_DECL_ATTR: {
-        bool isUnsafe{};
+        unsigned modifier;
         bool isImplicit{};
         serialization::decls_block::NonisolatedDeclAttrLayout::readRecord(
-            scratch, isUnsafe, isImplicit);
-        Attr = new (ctx) NonisolatedAttr(isUnsafe, isImplicit);
+            scratch, modifier, isImplicit);
+        Attr = new (ctx) NonisolatedAttr(
+            {}, {}, static_cast<NonIsolatedModifier>(modifier), isImplicit);
         break;
       }
 

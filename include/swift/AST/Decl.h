@@ -169,6 +169,7 @@ enum class DescriptiveDeclKind : uint8_t {
   PostfixOperator,
   PrecedenceGroup,
   TypeAlias,
+  GenericTypeAlias,
   GenericTypeParam,
   AssociatedType,
   Type,
@@ -183,7 +184,6 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericClass,
   GenericActor,
   GenericDistributedActor,
-  GenericType,
   Subscript,
   StaticSubscript,
   ClassSubscript,
@@ -2284,6 +2284,7 @@ private:
   // Flags::Checked.
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   bool isFullyValidated() const {
     return InitContextAndFlags.getInt().contains(
@@ -2432,8 +2433,20 @@ private:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  /// Retrieve the computed capture info, or \c nullopt if it hasn't been
+  /// computed yet.
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    ASSERT(!Captures.hasBeenComputed());
+    ASSERT(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2457,6 +2470,7 @@ class PatternBindingDecl final : public Decl,
   friend class Decl;
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
@@ -2636,13 +2650,9 @@ public:
     getMutablePatternList()[i].setInitContext(init);
   }
 
-  CaptureInfo getCaptureInfo(unsigned i) const {
-    return getPatternList()[i].getCaptureInfo();
-  }
-
-  void setCaptureInfo(unsigned i, CaptureInfo captures) {
-    getMutablePatternList()[i].setCaptureInfo(captures);
-  }
+  /// Retrieve the capture info for the initializer at the given index,
+  /// computing if needed.
+  CaptureInfo getCaptureInfo(unsigned i) const;
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -8135,8 +8145,6 @@ public:
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
-
-  std::optional<ExecutionKind> getExecutionBehavior() const;
 
   /// Whether the declaration is later overridden in the module
   ///

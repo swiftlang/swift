@@ -1920,26 +1920,26 @@ class StoredPropertiesWithAvailabilityInClosures {
 
 struct PropertyObservers {
   var hasPotentiallyUnavailableObservers: Int {
-    @available(macOS 51, *) // expected-error {{willSet observer for property cannot be marked potentially unavailable with '@available'}}
+    @available(macOS 51, *) // expected-error {{willSet observer cannot be marked potentially unavailable with '@available'}}
     willSet { }
 
-    @available(macOS 51, *) // expected-error {{didSet observer for property cannot be marked potentially unavailable with '@available'}}
+    @available(macOS 51, *) // expected-error {{didSet observer cannot be marked potentially unavailable with '@available'}}
     didSet { }
   }
 
   var hasObsoletedObservers: Int {
-    @available(macOS, obsoleted: 10.9) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    @available(macOS, obsoleted: 10.9) // expected-error {{willSet observer cannot be marked unavailable with '@available'}}
     willSet { }
 
-    @available(macOS, obsoleted: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    @available(macOS, obsoleted: 10.9) // expected-error {{didSet observer cannot be marked unavailable with '@available'}}
     didSet { }
   }
 
   var hasSPIAvailableObservers: Int {
-    @_spi_available(macOS, introduced: 10.9) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    @_spi_available(macOS, introduced: 10.9) // expected-error {{willSet observer cannot be marked unavailable with '@available'}}
     willSet { }
 
-    @_spi_available(macOS, introduced: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    @_spi_available(macOS, introduced: 10.9) // expected-error {{didSet observer cannot be marked unavailable with '@available'}}
     didSet { }
   }
 

@@ -73,8 +73,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     nominal->diagnose(diag::property_wrapper_ambiguous_value_property,
                       nominal->getDeclaredType(), name);
     for (auto var : vars) {
-      var->diagnose(diag::kind_declname_declared_here,
-                    var->getDescriptiveKind(), var->getName());
+      var->diagnose(diag::decl_declared_here_with_kind, var);
     }
     return nullptr;
   }
@@ -109,7 +108,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property may not have any effects right now.
   if (auto getter = var->getEffectfulGetAccessor()) {
-    getter->diagnose(diag::property_wrapper_effectful, getter->getDescriptiveKind());
+    getter->diagnose(diag::property_wrapper_effectful, getter);
     return nullptr;
   }
 
@@ -310,9 +309,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
     nominal->diagnose(diag::property_wrapper_ambiguous_enclosing_self_subscript,
                       nominal->getDeclaredType(), subscriptName);
     for (auto subscript : subscripts) {
-      subscript->diagnose(diag::kind_declname_declared_here,
-                          subscript->getDescriptiveKind(),
-                          subscript->getName());
+      subscript->diagnose(diag::decl_declared_here_with_kind, subscript);
     }
     return nullptr;
 

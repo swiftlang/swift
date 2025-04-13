@@ -1234,8 +1234,8 @@ public:
     if (!fn) {
       // Then we're not in some type's member function; emit diagnostics.
       if (auto decl = outerDC->getAsDecl()) {
-        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
-                           decl->getDescriptiveKind());
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_wrong_context_decl, decl);
       } else if (isa<AbstractClosureExpr>(outerDC)) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_closure);
@@ -1252,8 +1252,8 @@ public:
 
       if (fn->isStatic() || isa<DestructorDecl>(fn)
           || isa<ConstructorDecl>(fn)) {
-        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
-                           fn->getDescriptiveKind());
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_wrong_context_decl, fn);
         diagnosed = true;
       }
     }
@@ -1267,8 +1267,7 @@ public:
       // must be noncopyable
       if (!nominalType->isNoncopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
-                           diag::discard_wrong_context_copyable,
-                           fn->getDescriptiveKind());
+                           diag::discard_wrong_context_copyable);
         diagnosed = true;
 
       // has to have a deinit or else it's pointless.
@@ -1343,7 +1342,7 @@ public:
         case SelfAccessKind::Mutating:
           ctx.Diags.diagnose(DS->getDiscardLoc(),
                              diag::discard_wrong_context_nonconsuming,
-                             fn->getDescriptiveKind());
+                             funcDecl);
           diagnosed = true;
           break;
         }

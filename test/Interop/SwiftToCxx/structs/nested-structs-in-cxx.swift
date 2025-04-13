@@ -68,3 +68,11 @@ public class TestObject {
         case invalid
     }
 }
+
+extension RecordConfig.File {
+    public func getFileExtension() -> String { ".wav" }
+}
+
+public func getFiles() -> [RecordConfig.File] {
+    []
+}

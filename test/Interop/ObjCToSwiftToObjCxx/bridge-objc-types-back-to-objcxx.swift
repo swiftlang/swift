@@ -94,7 +94,7 @@ public func retObjCClassArray() -> [ObjCKlass] {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ObjCKlass*> {
 // CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return _impl::$sSo9ObjCKlassCMa(0)._0;
+// CHECK-NEXT:     return UseObjCTy::_impl::$sSo9ObjCKlassCMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 

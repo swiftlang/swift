@@ -61,7 +61,7 @@ SILWitnessTable *SILWitnessTable::create(
     SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
     ProtocolConformance *Conformance,
     ArrayRef<SILWitnessTable::Entry> entries,
-    ArrayRef<ConditionalConformance> conditionalConformances) {
+    ArrayRef<ProtocolConformanceRef> conditionalConformances) {
   assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
@@ -106,7 +106,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 SILWitnessTable::SILWitnessTable(
     SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind, StringRef N,
     ProtocolConformance *Conformance, ArrayRef<Entry> entries,
-    ArrayRef<ConditionalConformance> conditionalConformances)
+    ArrayRef<ProtocolConformanceRef> conditionalConformances)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
       ConditionalConformances(), IsDeclaration(true),
       SerializedKind(SerializedKind) {
@@ -142,7 +142,7 @@ SILWitnessTable::~SILWitnessTable() {
 
 void SILWitnessTable::convertToDefinition(
     ArrayRef<Entry> entries,
-    ArrayRef<ConditionalConformance> conditionalConformances,
+    ArrayRef<ProtocolConformanceRef> conditionalConformances,
     SerializedKind_t serializedKind) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;

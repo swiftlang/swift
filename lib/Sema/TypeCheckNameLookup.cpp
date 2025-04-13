@@ -851,8 +851,7 @@ static void diagnoseMissingImportForMember(const ValueDecl *decl,
                                            SourceFile *sf, SourceLoc loc) {
   auto &ctx = sf->getASTContext();
   auto definingModule = decl->getModuleContextForNameLookup();
-  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
-                     decl->getDescriptiveKind(), decl->getName(),
+  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import, decl,
                      definingModule);
 }
 

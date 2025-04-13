@@ -1522,8 +1522,7 @@ public:
       SpecializedBaseConformances;
 
     ArrayRef<SILWitnessTable::Entry> SILEntries;
-    ArrayRef<SILWitnessTable::ConditionalConformance>
-        SILConditionalConformances;
+    ArrayRef<ProtocolConformanceRef> SILConditionalConformances;
 
     const ProtocolInfo &PI;
 
@@ -1678,7 +1677,7 @@ public:
               IGM.FunctionPtrTy);
         } else if (isCalleeAllocatedCoroutineRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer(),
+              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer(),
               IGM.CoroFunctionPointerPtrTy);
         } else {
           witness = llvm::ConstantExpr::getBitCast(
@@ -2107,10 +2106,10 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
     const auto &condConformance = SILConditionalConformances[idx];
     CanType reqTypeInContext =
       Conformance.getDeclContext()
-        ->mapTypeIntoContext(condConformance.Requirement)
+        ->mapTypeIntoContext(condConformance.getType())
         ->getCanonicalType();
     if (auto archetype = dyn_cast<ArchetypeType>(reqTypeInContext)) {
-      auto condProto = condConformance.Conformance.getProtocol();
+      auto condProto = condConformance.getProtocol();
       IGF.setUnscopedLocalTypeData(
              archetype,
              LocalTypeDataKind::forAbstractProtocolWitnessTable(condProto),
@@ -3391,16 +3390,15 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     assert(entry.isOutOfLineBase());
     auto inheritedProtocol = entry.getBase();
 
-    sourceKey.Kind =
-      LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
     if (sourceKey.Kind.isConcreteProtocolConformance()) {
       auto inheritedConformance =
         sourceKey.Kind.getConcreteProtocolConformance()
           ->getInheritedConformance(inheritedProtocol);
-      if (inheritedConformance) {
-        sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
-                                                          inheritedConformance);
-      }
+      sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
+                                                        inheritedConformance);
+    } else {
+      sourceKey.Kind =
+        LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
     }
 
     if (!source) return MetadataResponse();

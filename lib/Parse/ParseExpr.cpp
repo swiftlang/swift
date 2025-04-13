@@ -542,8 +542,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse '@' sign, 'inout' or 'nonisolated' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      Tok.isContextualKeyword("nonisolated")) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);
@@ -1972,7 +1973,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(TokenLoc),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =

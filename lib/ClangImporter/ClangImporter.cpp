@@ -821,38 +821,14 @@ importer::addCommonInvocationArguments(
     switch (triple.getArch()) {
     case llvm::Triple::x86:
     case llvm::Triple::x86_64:
-      // `-mcpu` is deprecated and an alias for `-mtune`. We need to pass
-      // `-march` and `-mtune` to behave identically to the `apple-a\d+` cases
-      // below.
+      // For x86, `-mcpu` is deprecated and an alias of `-mtune`. We need to
+      // pass `-march` and `-mtune` to behave like `-mcpu` on other targets.
       invocationArgStrs.push_back("-march=" + importerOpts.TargetCPU);
       invocationArgStrs.push_back("-mtune=" + importerOpts.TargetCPU);
       break;
     default:
       invocationArgStrs.push_back("-mcpu=" + importerOpts.TargetCPU);
       break;
-    }
-  } else if (triple.isOSDarwin()) {
-    // Special case CPU based on known deployments:
-    //   - arm64 deploys to apple-a7
-    //   - arm64 on macOS
-    //   - arm64 for iOS/tvOS/watchOS simulators
-    //   - arm64e deploys to apple-a12
-    // and arm64e (everywhere) and arm64e macOS defaults to the "apple-a12" CPU
-    // for Darwin, but Clang only detects this if we use -arch.
-    if (triple.getArchName() == "arm64e")
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.isAArch64() && triple.isMacOSX())
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
-             (triple.isiOS() || triple.isWatchOS()))
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
-             triple.isXROS())
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.getArch() == llvm::Triple::aarch64 ||
-             triple.getArch() == llvm::Triple::aarch64_32 ||
-             triple.getArch() == llvm::Triple::aarch64_be) {
-      invocationArgStrs.push_back("-mcpu=apple-a7");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {
     invocationArgStrs.push_back("-march=z13");
@@ -1869,12 +1845,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
   if (isPCHFilenameExtension(header)) {
-    Impl.ImportedHeaderOwners.push_back(adapter);
-    // We already imported this with -include-pch above, so we should have
-    // collected a bunch of PCH-encoded module imports that we just need to
-    // replay in handleDeferredImports.
-    Impl.handleDeferredImports(diagLoc);
-    return false;
+    return bindBridgingHeader(adapter, diagLoc);
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -1899,6 +1870,15 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   };
   return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
                            std::move(sourceBuffer), implicitImport);
+}
+
+bool ClangImporter::bindBridgingHeader(ModuleDecl *adapter, SourceLoc diagLoc) {
+  Impl.ImportedHeaderOwners.push_back(adapter);
+  // We already imported this with -include-pch above, so we should have
+  // collected a bunch of PCH-encoded module imports that we just need to
+  // replay in handleDeferredImports.
+  Impl.handleDeferredImports(diagLoc);
+  return false;
 }
 
 static llvm::Expected<llvm::cas::ObjectRef>
@@ -4114,35 +4094,29 @@ void ClangModuleUnit::lookupObjCMethods(
 
 void ClangModuleUnit::lookupAvailabilityDomains(
     Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
-  auto lookupTable = owner.findLookupTable(clangModule);
-  if (!lookupTable)
+  auto domainName = identifier.str();
+  auto &ctx = getASTContext();
+  auto &clangASTContext = getClangASTContext();
+
+  auto domainInfo = clangASTContext.getFeatureAvailInfo(domainName);
+  if (domainInfo.Kind == clang::FeatureAvailKind::None)
     return;
 
-  auto varDecl = lookupTable->lookupAvailabilityDomainDecl(identifier.str());
+  auto *varDecl = dyn_cast_or_null<clang::VarDecl>(domainInfo.Decl);
   if (!varDecl)
     return;
 
-  auto featureInfo = getClangASTContext().getFeatureAvailInfo(varDecl);
-  if (featureInfo.first.empty())
+  // The decl that was found may belong to a different Clang module.
+  if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  auto getDomainKind = [](clang::FeatureAvailKind featureAvailKind) {
-    switch (featureAvailKind) {
-    case clang::FeatureAvailKind::None:
-      llvm_unreachable("unexpected kind");
-    case clang::FeatureAvailKind::Available:
-      return CustomAvailabilityDomain::Kind::Enabled;
-    case clang::FeatureAvailKind::Unavailable:
-      return CustomAvailabilityDomain::Kind::Disabled;
-    case clang::FeatureAvailKind::Dynamic:
-      return CustomAvailabilityDomain::Kind::Dynamic;
-    }
-  };
+  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  if (!imported)
+    return;
 
-  auto domain = AvailabilityDomain::forCustom(CustomAvailabilityDomain::get(
-      featureInfo.first, getParentModule(),
-      getDomainKind(featureInfo.second.Kind), getASTContext()));
-  results.push_back(domain);
+  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  ASSERT(customDomain);
+  results.push_back(*customDomain);
 }
 
 void ClangModuleUnit::collectLinkLibraries(
@@ -8791,5 +8765,12 @@ bool importer::declIsCxxOnly(const Decl *decl) {
         // TODO: enumerate those kinds in a more precise and robust way
         .Default([](auto) { return false; });
   }
+  return false;
+}
+
+bool importer::isClangNamespace(const DeclContext *dc) {
+  if (const auto *ed = dc->getSelfEnumDecl())
+    return isa_and_nonnull<clang::NamespaceDecl>(ed->getClangDecl());
+
   return false;
 }

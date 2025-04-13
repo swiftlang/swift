@@ -540,7 +540,7 @@ public:
   SILGenModule &SGM;
   NormalProtocolConformance *Conformance;
   std::vector<SILWitnessTable::Entry> Entries;
-  std::vector<SILWitnessTable::ConditionalConformance> ConditionalConformances;
+  std::vector<ProtocolConformanceRef> ConditionalConformances;
   SILLinkage Linkage;
   SerializedKind_t SerializedKind;
 
@@ -692,12 +692,8 @@ public:
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
     SGM.useConformance(assocConformance);
-
-    auto substType = (assocConformance
-                      ? assocConformance.getType()
-                      : ErrorType::get(SGM.getASTContext()))->getCanonicalType();
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
-        req.getAssociation(), substType, assocConformance});
+        req.getAssociation(), assocConformance});
   }
 
   void addConditionalRequirements() {
@@ -708,8 +704,7 @@ public:
           assert(conformance &&
                  "unable to find conformance that should be known");
 
-          ConditionalConformances.push_back(
-              SILWitnessTable::ConditionalConformance{type, conformance});
+          ConditionalConformances.push_back(conformance);
 
           return /*finished?*/ false;
         });
@@ -1126,7 +1121,7 @@ public:
       return addMissingDefault();
 
     auto entry = SILWitnessTable::AssociatedConformanceWitness{
-        req.getAssociation(), req.getAssociation(), witness};
+        req.getAssociation(), witness};
     DefaultWitnesses.push_back(entry);
   }
 };

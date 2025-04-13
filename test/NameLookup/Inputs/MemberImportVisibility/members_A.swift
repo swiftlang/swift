@@ -35,8 +35,8 @@ public enum EnumInA {
 }
 
 open class BaseClassInA {
-  public init() {}
   open func methodInA() {}
+  open func overriddenMethod() {}
 }
 
 public protocol ProtocolInA {
