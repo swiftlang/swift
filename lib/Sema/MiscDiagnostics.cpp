@@ -5673,16 +5673,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
                     (bool)kind)
           .highlight(arg->getSourceRange());
 
-      // Suggest 'String(describing: <expr>)'.
-      auto argStart = arg->getStartLoc();
-      Ctx.Diags
-          .diagnose(
-              arg->getLoc(),
-              diag::silence_debug_description_in_interpolation_segment_call)
-          .highlight(arg->getSourceRange())
-          .fixItInsert(argStart, "String(describing: ")
-          .fixItInsertAfter(arg->getEndLoc(), ")");
-
       if (kind == UnintendedInterpolationKind::Optional) {
         // Suggest using a default interpolation value parameter.
         Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_parameter)
@@ -5694,6 +5684,16 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
           .highlight(arg->getSourceRange())
           .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
       }
+
+      // Suggest 'String(describing: <expr>)'.
+      auto argStart = arg->getStartLoc();
+      Ctx.Diags
+          .diagnose(
+              arg->getLoc(),
+              diag::silence_debug_description_in_interpolation_segment_call)
+          .highlight(arg->getSourceRange())
+          .fixItInsert(argStart, "String(describing: ")
+          .fixItInsertAfter(arg->getEndLoc(), ")");
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
