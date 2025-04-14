@@ -420,6 +420,7 @@ EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
 /// Enable inout lifetime dependence - @lifetime(&arg)
 EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
+EXPERIMENTAL_FEATURE(LifetimeDependenceMutableAccessors, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
