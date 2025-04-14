@@ -125,3 +125,25 @@ case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conf
 struct S: Sendable {
   var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-sendable type '([any Q.Type], Int)'}}
 }
+
+extension Q {
+  static func h() -> Self { }
+}
+
+extension Array: Q where Element: Q {
+  static func g() { }
+}
+
+struct GenericS<T> { }
+
+extension GenericS: Q where T: Q {
+  static func g() { }
+}
+
+extension GenericS: Sendable where T: Sendable { }
+
+final class TestStaticMembers<T> {
+  init(_: T) {
+    let _: @Sendable () -> GenericS<Int> = GenericS.h // Ok
+  }
+}
