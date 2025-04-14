@@ -239,7 +239,7 @@ extension OutputRawSpan {
 
   @_alwaysEmitIntoClient
   public var mutableBytes: MutableRawSpan {
-    @lifetime(borrow self)
+    @lifetime(&self)
     mutating get {
       let buffer = unsafe UnsafeMutableRawBufferPointer(
         start: _pointer, count: _count

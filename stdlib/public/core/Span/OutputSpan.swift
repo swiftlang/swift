@@ -338,7 +338,7 @@ extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(borrow self)
+    @lifetime(&self)
     mutating get {
       let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = unsafe UnsafeMutableBufferPointer(
