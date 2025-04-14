@@ -2290,6 +2290,14 @@ private:
     return false;
   }
 
+  std::optional<PrimitiveTypeMapping::ClangTypeInfo>
+  getKnownType(const TypeDecl *typeDecl) {
+    if (outputLang == OutputLanguageMode::C)
+      return owningPrinter.typeMapping.getKnownCTypeInfo(typeDecl);
+
+    return owningPrinter.typeMapping.getKnownObjCTypeInfo(typeDecl);
+  }
+
   /// If \p typeDecl is one of the standard library types used to map in Clang
   /// primitives and basic types, print out the appropriate spelling and
   /// return true.
@@ -2298,8 +2306,7 @@ private:
   /// for interfacing with C and Objective-C.
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               std::optional<OptionalTypeKind> optionalKind) {
-    auto knownTypeInfo =
-        owningPrinter.typeMapping.getKnownObjCTypeInfo(typeDecl);
+    auto knownTypeInfo = getKnownType(typeDecl);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
