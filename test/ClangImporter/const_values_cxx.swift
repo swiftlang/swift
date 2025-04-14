@@ -33,6 +33,12 @@ class OtherClass {
   static constexpr int class_static_constexpr_int = 42;
 };
 
+template <int N, int M>
+inline const int template_gcd = template_gcd<M, N % M>;
+
+template <int N>
+inline const int template_gcd<N, 0> = N;
+
 
 //--- main.swift
 func foo() {
@@ -49,6 +55,9 @@ func foo() {
 
   print(MyClass().class_const_int)
   print(MyClass.class_static_const_int)
+
+  // TODO: This seems to be incorrectly imported, this test here is just to check that the compiler doesn't crash.
+  print(template_gcd)
 }
 
 // Only imported as external declarations:

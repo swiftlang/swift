@@ -4593,10 +4593,23 @@ namespace {
 
       ValueDecl *result = nullptr;
 
+      bool initIsEvaluatable = false;
+      if (auto init = decl->getInit()) {
+        // Don't import values for partial specializations. TODO: Should we stop
+        // importing partially specialized variables completely?
+        bool partial = isa<clang::VarTemplatePartialSpecializationDecl>(decl);
+
+        // Don't import values when type-dependent or value-dependent.
+        bool typeDependent = decl->getType()->isDependentType();
+        bool valueDependent = init->isValueDependent();
+
+        initIsEvaluatable = !partial && !typeDependent && !valueDependent;
+      }
+
       // If the variable is const (we're importing it as a let), and has an
       // initializer, then ask Clang for its constant value and synthesize a
       // getter with that value.
-      if (introducer == VarDecl::Introducer::Let && decl->hasInit()) {
+      if (introducer == VarDecl::Introducer::Let && initIsEvaluatable) {
         auto val = decl->evaluateValue();
         // For now, only import integer and float constants. If in the future
         // SwiftDeclSynthesizer::createConstant becomes able to import more
