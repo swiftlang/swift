@@ -521,17 +521,17 @@ extension AsyncThrowingStream: @unchecked Sendable where Element: Sendable { }
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream.Continuation.YieldResult: Sendable where Element: Sendable { }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.2, *)
 extension AsyncThrowingStream.Continuation: Hashable {
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.2, *)
   public func hash(into hasher: inout Hasher) {
     return hasher.combine(ObjectIdentifier(storage))
   }
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.2, *)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.2, *)
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.storage === rhs.storage
   }
