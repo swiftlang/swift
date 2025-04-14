@@ -203,7 +203,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Default(AccessLevel::Public);
   }
 
-  if (auto *A = ParsedArgs.getLastArg(OPT_availability_platforms)) {
+  if (auto *A = ParsedArgs.getLastArg(OPT_allow_availability_platforms)) {
     llvm::SmallVector<StringRef> AvailabilityPlatforms;
     StringRef(A->getValue())
         .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,

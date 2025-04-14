@@ -1774,7 +1774,7 @@ def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-acc
   HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
   MetaVarName<"<level>">;
 
-def symbol_graph_availability_platforms: Separate<["-"], "symbol-graph-availability-platforms">,
+def symbol_graph_allow_availability_platforms: Separate<["-"], "symbol-graph-allow-availability-platforms">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,swift'">,
   MetaVarName<"<platforms>">;
@@ -1798,7 +1798,7 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
-def availability_platforms: Separate<["-"], "availability-platforms">,
+def allow_availability_platforms: Separate<["-"], "allow-availability-platforms">,
   Flags<[SwiftSymbolGraphExtractOption]>,
   HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,swift'">,
   MetaVarName<"<platforms>">;

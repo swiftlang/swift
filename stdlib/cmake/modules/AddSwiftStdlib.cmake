@@ -939,7 +939,7 @@ function(add_swift_target_library_single target name)
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
          "-Xfrontend;-emit-symbol-graph-dir;-Xfrontend;${out_lib_dir}/symbol-graph/${VARIANT_NAME}")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-         "-Xfrontend;-symbol-graph-availability-platforms;-Xfrontend;Swift")
+         "-Xfrontend;-symbol-graph-allow-availability-platforms;-Xfrontend;Swift")
   endif()
 
   if(MODULE)

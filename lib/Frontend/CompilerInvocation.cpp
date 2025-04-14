@@ -2221,7 +2221,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
     Opts.MinimumAccessLevel = AccessLevel::Public;
   }
 
-  if (auto *A = Args.getLastArg(OPT_symbol_graph_availability_platforms)) {
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_allow_availability_platforms)) {
     llvm::SmallVector<StringRef> AvailabilityPlatforms;
     StringRef(A->getValue())
         .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
