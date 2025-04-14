@@ -1723,15 +1723,6 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto declRefRepr = cast<DeclRefTypeRepr>(E->getRepr());
-      auto resolvedTy = resolveTypeReferenceInExpression(declRefRepr,
-                                                         TypeResolverContext::InExpression,
-                                                         CS.getConstraintLocator(E));
-
-      if (!resolvedTy || resolvedTy->hasError())
-        return Type();
-
-      E->setParamType(resolvedTy);
       return E->getParamDecl()->getValueType();
     }
 

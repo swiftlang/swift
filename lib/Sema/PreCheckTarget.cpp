@@ -2340,7 +2340,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 
       // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
       // it may have been folded at the same time; recursively simplify it.
-      if (auto ArgsTypeExpr =  simplifyTypeExpr(E))
+      if (auto ArgsTypeExpr = simplifyTypeExpr(E))
         return ArgsTypeExpr->getTypeRepr();
       return nullptr;
     };
