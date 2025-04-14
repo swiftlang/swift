@@ -32,6 +32,34 @@
   strategy, given that the code would eventually become ambiguous anyways when
   the deployment target is raised.
 
+* [SE-0470][]:
+  A protocol conformance can be isolated to a specific global actor, meaning that the conformance can only be used by code running on that actor. Isolated conformances are expressed by specifying the global actor on the conformance itself:
+
+  ```swift
+  protocol P {
+    func f()
+  }
+
+  @MainActor
+  class MyType: @MainActor P {
+    /*@MainActor*/ func f() {
+      // must be called on the main actor
+    }
+  }
+  ```
+
+  Swift will produce diagnostics if the conformance is directly accessed in code that isn't guaranteed to execute in the same global actor. For example:
+
+  ```swift
+  func acceptP<T: P>(_ value: T) { }
+
+  /*nonisolated*/ func useIsolatedConformance(myType: MyType) {
+    acceptP(myType) // error: main actor-isolated conformance of 'MyType' to 'P' cannot be used in nonisolated context
+  }
+  ```
+
+  To address such issues, only use an isolated conformance from code that executes on the same global actor.
+
 * [SE-0419][]:
   Introduced the new `Runtime` module, which contains a public API that can
   generate backtraces, presently supported on macOS and Linux.  Capturing a
@@ -10759,6 +10787,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+[SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

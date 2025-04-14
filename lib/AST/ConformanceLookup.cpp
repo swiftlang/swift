@@ -66,6 +66,15 @@ swift::collectExistentialConformances(CanType fromType,
   return fromType->getASTContext().AllocateCopy(conformances);
 }
 
+static bool containsNonMarkerProtocols(ArrayRef<ProtocolDecl *> protocols) {
+  for (auto proto : protocols) {
+    if (!proto->isMarkerProtocol())
+      return true;
+  }
+
+  return false;
+}
+
 ProtocolConformanceRef
 swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
@@ -145,6 +154,12 @@ swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // concretely.
   if (auto conformance = lookupSuperclassConformance(layout.getSuperclass()))
     return conformance;
+
+  // If the protocol is SendableMetatype, and there are no non-marker protocol
+  // requirements, allow it via self-conformance.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::SendableMetatype) &&
+      !layout.containsNonMarkerProtocols())
+    return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
   // We didn't find our protocol in the existential's list; it doesn't
   // conform.
@@ -377,6 +392,48 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+/// Given the instance type of a metatype, determine whether the metatype is
+/// Sendable.
+///
+// Metatypes are generally Sendable, but with isolated conformances we
+// cannot assume that metatypes based on type parameters are Sendable.
+// Therefore, check for conformance to SendableMetatype.
+static bool metatypeWithInstanceTypeIsSendable(Type instanceType) {
+  ASTContext &ctx = instanceType->getASTContext();
+
+  // If we don't have the SendableMetatype protocol at all, just assume all
+  // metatypes are Sendable.
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (!sendableMetatypeProto)
+    return true;
+
+  // If the instance type is a type parameter, it is not necessarily
+  // SendableMetatype. There will need to be a SendableMetatype requirement,
+  // but we do not have the generic environment to check that.
+  if (instanceType->isTypeParameter())
+    return false;
+
+  // If the instance type conforms to SendableMetatype, then its
+  // metatype is Sendable.
+  auto instanceConformance = lookupConformance(
+      instanceType, sendableMetatypeProto);
+  if (!instanceConformance.isInvalid() &&
+      !instanceConformance.hasMissingConformance())
+    return true;
+
+  // If this is an archetype that is non-SendableMetatype, but there are no
+  // non-marker protocol requirements that could carry conformances, treat
+  // the metatype as Sendable.
+  if (auto archetype = instanceType->getAs<ArchetypeType>()) {
+    if (!containsNonMarkerProtocols(archetype->getConformsTo()))
+      return true;
+  }
+
+  // The instance type is non-Sendable.
+  return false;
+}
+
 /// Synthesize a builtin metatype type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
@@ -387,31 +444,9 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
     case KnownProtocolKind::Sendable:
-      // Metatypes are generally Sendable, but with isolated conformances we
-      // cannot assume that metatypes based on type parameters are Sendable.
-      // Therefore, check for conformance to SendableMetatype.
-      if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances)) {
-        auto sendableMetatypeProto = 
-            ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-        if (sendableMetatypeProto) {
-          Type instanceType = metatypeType->getInstanceType();
+      if (!metatypeWithInstanceTypeIsSendable(metatypeType->getInstanceType()))
+        break;
 
-          // If the instance type is a type parameter, it is not necessarily
-          // Sendable. There will need to be a Sendable requirement.
-          if (instanceType->isTypeParameter())
-            break;
-
-          // If the instance type conforms to SendableMetatype, then its
-          // metatype is Sendable.
-          auto instanceConformance = lookupConformance(
-              instanceType, sendableMetatypeProto);
-          if (instanceConformance.isInvalid() ||
-              instanceConformance.hasMissingConformance())
-            break;
-        }
-
-        // Every other metatype is Sendable.
-      }
       LLVM_FALLTHROUGH;
 
     case KnownProtocolKind::Copyable:

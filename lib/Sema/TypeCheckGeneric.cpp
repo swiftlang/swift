@@ -1064,17 +1064,19 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       break;
     }
 
-    if (!isolatedConformances.empty()) {
+    if (!isolatedConformances.empty() && signature) {
       // Dig out the original type parameter for the requirement.
       // FIXME: req might not be the right pre-substituted requirement,
       // if this came from a conditional requirement.
-      if (auto failedProtocol =
-              typeParameterProhibitsIsolatedConformance(req.getFirstType(),
-                                                        signature)) {
-          return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-            req, substReq,
-            TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-            *failedProtocol);
+      for (const auto &isolatedConformance : isolatedConformances) {
+        (void)isolatedConformance;
+        if (auto failed =
+                signature->prohibitsIsolatedConformance(req.getFirstType())) {
+            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
+              req, substReq,
+              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
+              failed->second);
+        }
       }
     }
   }
@@ -1180,29 +1182,4 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   return TypeAliasType::get(typeAlias, parent, genericArgs, result);
-}
-
-std::optional<ProtocolDecl *> swift::typeParameterProhibitsIsolatedConformance(
-    Type type, GenericSignature signature) {
-  if (!type->isTypeParameter())
-    return std::nullopt;
-
-  // An isolated conformance cannot be used in a context where the type
-  // parameter can escape the isolation domain in which the conformance
-  // was formed. To establish this, we look for Sendable or SendableMetatype
-  // requirements on the type parameter itself.
-  ASTContext &ctx = type->getASTContext();
-  auto sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
-  auto sendableMetatypeProto =
-      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-
-  if (sendableProto &&
-      signature->requiresProtocol(type, sendableProto))
-    return sendableProto;
-
-  if (sendableMetatypeProto &&
-          signature->requiresProtocol(type, sendableMetatypeProto))
-    return sendableMetatypeProto;
-
-  return std::nullopt;
 }
