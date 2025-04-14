@@ -6731,8 +6731,7 @@ static bool checkSendableInstanceStorage(
           elementType, context,
           /*inDerivedConformance*/Type(), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            auto preconcurrency =
-                context.preconcurrencyBehavior(type->getAnyNominal());
+            auto preconcurrency = context.preconcurrencyBehavior(type);
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
