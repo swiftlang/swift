@@ -781,6 +781,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
 void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
+  assert(group->isCancelled() && "Expected task group to be cancelled when cancelling all child tasks.");
   // Because only the owning task of the task group can modify the
   // child list of a task group status record, and it can only do so
   // while holding the owning task's status record lock, we do not need
@@ -825,7 +826,12 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // under the synchronous control of the task that owns the group.
   case TaskStatusRecordKind::TaskGroup: {
     auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
-    _swift_taskGroup_cancelAllChildren(groupRecord->getGroup());
+    auto group = groupRecord->getGroup();
+    auto wasAlreadyCancelled = group->statusCancel();
+    if (wasAlreadyCancelled) {
+      return;
+    }
+    _swift_taskGroup_cancelAllChildren(group);
     return;
   }
 

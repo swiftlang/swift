@@ -1166,6 +1166,10 @@ bool TaskGroup::isCancelled() {
   return asBaseImpl(this)->isCancelled();
 }
 
+bool TaskGroup::statusCancel() {
+  return asBaseImpl(this)->statusCancel();
+}
+
 // =============================================================================
 // ==== offer ------------------------------------------------------------------
 
