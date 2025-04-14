@@ -1949,7 +1949,7 @@ namespace {
             solution.setExprTypes(base);
             auto capture = new (ctx) VarDecl(/*static*/ false,
                                              VarDecl::Introducer::Let,
-                                             SourceLoc(),
+                                             base->getEndLoc(),
                                              ctx.getIdentifier("$base$"),
                                              dc);
             capture->setImplicit();

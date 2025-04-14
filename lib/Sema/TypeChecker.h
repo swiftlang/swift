@@ -1535,14 +1535,6 @@ bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
 
-/// Determine whether the type parameter has requirements that would prohibit
-/// it from using any isolated conformances.
-///
-/// Returns the protocol to which the type conforms that causes the conflict,
-/// which can be either Sendable or SendableMetatype.
-std::optional<ProtocolDecl *> typeParameterProhibitsIsolatedConformance(
-    Type type, GenericSignature signature);
-
 } // end namespace swift
 
 #endif

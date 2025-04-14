@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 6 -enable-library-evolution -module-name isolated_conformance -enable-experimental-feature IsolatedConformances -emit-module-interface-path - %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -swift-version 6 -enable-library-evolution -module-name isolated_conformance -emit-module-interface-path - %s | %FileCheck %s
 
-// REQUIRES: swift_feature_IsolatedConformances
 // REQUIRES: concurrency
 
 public protocol MyProtocol {

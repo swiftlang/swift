@@ -1,6 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation -enable-experimental-feature IsolatedConformances | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
 
-// REQUIRES: swift_feature_IsolatedConformances
 // REQUIRES: concurrency
 
 sil_stage canonical

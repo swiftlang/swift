@@ -849,19 +849,27 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
       } else if (numApplies < decl->getNumCurryLevels() &&
                  decl->hasCurriedSelf() ) {
         auto shouldMarkMemberTypeSendable = [&]() {
-          // Static member types are @Sendable on both levels because
-          // they only capture a metatype "base" that is always Sendable.
-          // For example, `(S.Type) -> () -> Void`.
-          if (!decl->isInstanceMember())
-            return true;
+          Type capturedBaseType = baseType;
 
-          // For instance members we need to check whether instance type
-          // is Sendable because @Sendable function values cannot capture
-          // non-Sendable values (base instance type in this case).
-          // For example, `(C) -> () -> Void` where `C` should be Sendable
-          // for the inner function type to be Sendable as well.
-          return baseType &&
-                 baseType->getMetatypeInstanceType()->isSendableType();
+          if (!decl->isInstanceMember()) {
+            // Static member types are Sendable when the metatype of their
+            // base type is Sendable, because they capture that metatype.
+            // For example, `(S.Type) -> () -> Void`.
+            if (!capturedBaseType)
+              capturedBaseType = decl->getDeclContext()->getSelfTypeInContext();
+
+            if (!capturedBaseType->is<AnyMetatypeType>())
+              capturedBaseType = MetatypeType::get(capturedBaseType);
+          } else if (capturedBaseType) {
+            // For instance members we need to check whether instance type
+            // is Sendable because @Sendable function values cannot capture
+            // non-Sendable values (base instance type in this case).
+            // For example, `(C) -> () -> Void` where `C` should be Sendable
+            // for the inner function type to be Sendable as well.
+            capturedBaseType = capturedBaseType->getMetatypeInstanceType();
+          }
+
+          return capturedBaseType && capturedBaseType->isSendableType();
         };
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
@@ -1230,8 +1238,8 @@ void ConstraintSystem::openGenericRequirement(
 
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
-    if (typeParameterProhibitsIsolatedConformance(req.getFirstType(),
-                                                  signature))
+    if (signature &&
+        signature->prohibitsIsolatedConformance(req.getFirstType()))
       prohibitIsolatedConformance = true;
 
     openedReq = Requirement(kind, openedFirst, req.getSecondType());

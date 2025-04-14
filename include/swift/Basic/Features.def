@@ -255,6 +255,7 @@ LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)"
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
+LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -277,6 +278,7 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 
 // Optional language features / modes
 
@@ -491,12 +493,6 @@ ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
-
-/// Allow isolated conformances.
-EXPERIMENTAL_FEATURE(IsolatedConformances, true)
-
-/// Infer conformance isolation on global-actor-conforming types.
-EXPERIMENTAL_FEATURE(InferIsolatedConformances, true)
 
 /// Allow SwiftSettings
 EXPERIMENTAL_FEATURE(SwiftSettings, false)
