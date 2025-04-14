@@ -46,6 +46,7 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/SupportedFeatures.h"
 #include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
@@ -2060,6 +2061,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions().PrintTargetInfo) {
     swift::targetinfo::printTargetInfo(Invocation, llvm::outs());
+    return finishDiagProcessing(0, /*verifierEnabled*/ false);
+  }
+
+  if (Invocation.getFrontendOptions().PrintSupportedFeatures) {
+    swift::features::printSupportedFeatures(llvm::outs());
     return finishDiagProcessing(0, /*verifierEnabled*/ false);
   }
 
