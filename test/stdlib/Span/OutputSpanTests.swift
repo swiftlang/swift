@@ -21,35 +21,30 @@ defer { runAllTests() }
 
 @available(SwiftStdlib 6.2, *)
 struct Allocation<T>: ~Copyable {
-  let allocation: UnsafeMutablePointer<T>
-  let capacity: Int
+  let allocation: UnsafeMutableBufferPointer<T>
   var count: Int? = nil
 
   init(of count: Int = 1, _ t: T.Type) {
     precondition(count >= 0)
-    capacity = count
-    allocation = UnsafeMutablePointer<T>.allocate(capacity: capacity)
+    allocation = .allocate(capacity: count)
   }
 
   var isEmpty: Bool { (count ?? 0) == 0 }
 
   mutating func initialize<E>(
-    _ body: (/* mutating */ inout OutputSpan<T>) throws(E) -> Void
+    _ body: (inout OutputSpan<T>) throws(E) -> Void
   ) throws(E) {
     if count != nil { fatalError() }
-    let buffer = UnsafeBufferPointer(start: allocation, count: capacity)
-    var outputBuffer = OutputSpan<T>(_initializing: buffer)
+    var outputBuffer = OutputSpan<T>(buffer: allocation)
     do {
       try body(&outputBuffer)
-      let initialized = outputBuffer.finalize(for: buffer)
-      assert(initialized.baseAddress == allocation)
-      count = initialized.count
+      let initialized = outputBuffer.finalize(for: allocation)
+      count = initialized
     }
     catch {
       outputBuffer.removeAll()
-      let empty = outputBuffer.relinquishBorrowedMemory()
-      assert(empty.baseAddress == allocation)
-      assert(empty.count == 0)
+      let initialized = outputBuffer.finalize(for: allocation)
+      assert(initialized == 0)
       throw error
     }
   }
@@ -57,12 +52,12 @@ struct Allocation<T>: ~Copyable {
   borrowing func withSpan<E, R: ~Copyable>(
     _ body: (borrowing Span<T>) throws(E) -> R
   ) throws(E) -> R {
-    try body(Span(_unsafeStart: allocation, count: count ?? 0))
+    try body(Span(_unsafeElements: allocation[0..<count!]))
   }
 
   deinit {
     if let count {
-      allocation.deinitialize(count: count)
+      allocation.prefix(count).deinitialize()
     }
     allocation.deallocate()
   }
@@ -71,49 +66,35 @@ struct Allocation<T>: ~Copyable {
 enum MyTestError: Error { case error }
 
 suite.test("Create Output Buffer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let c = 48
-  let allocation = UnsafeMutablePointer<UInt8>.allocate(capacity: c)
-  defer { allocation.deallocate() }
-
-  let ob = OutputSpan(_initializing: .init(start: allocation, count: c))
-  // OutputSpan(_initializing: allocation, capacity: c)
-  let initialized = ob.relinquishBorrowedMemory()
-  expectNotNil(initialized.baseAddress)
-  expectEqual(initialized.count, 0)
-}
-
-suite.test("deinit without relinquishing memory")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let c = 48
   let allocation = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: c)
   defer { allocation.deallocate() }
 
-  var ob = OutputSpan(_initializing: allocation)
-  // OutputSpan(_initializing: Slice(base: allocation, bounds: 0..<c))
+  let ob = unsafe OutputSpan(buffer: allocation)
+  let initialized = ob.finalize(for: allocation)
+  expectEqual(initialized, 0)
+}
+
+suite.test("deinit without relinquishing memory")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let c = 48
+  let allocation = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: c)
+  defer { allocation.deallocate() }
+
+  var ob = unsafe OutputSpan(buffer: allocation)
+  // OutputSpan(buffer: Slice(base: allocation, bounds: 0..<c))
   ob.append(repeating: 65, count: 12)
   expectEqual(ob.count, 12)
   _ = ob
 }
 
 suite.test("append single elements")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -125,6 +106,8 @@ suite.test("append single elements")
     let oops = $0.removeLast()
     expectEqual(oops, c)
   }
+  expectNotNil(a.count)
+  expectEqual(a.count, c)
   a.withSpan {
     expectEqual($0.count, c)
     for i in $0.indices {
@@ -133,36 +116,8 @@ suite.test("append single elements")
   }
 }
 
-suite.test("initialize buffer of BitwiseCopyable elements")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let c = 48
-  let allocation: UnsafeMutableRawBufferPointer
-  allocation = .allocate(byteCount: c, alignment: 8)
-  defer { allocation.deallocate() }
-
-  let rb = allocation.bindMemory(to: Int16.self)
-  var ob = OutputSpan(_initializing: .init(rebasing: rb[4...]))
-  //OutputSpan<Int16>(_initializing: allocation[8...])
-  let r = Int16.max>>2
-  ob.append(r)
-  _ = ob.relinquishBorrowedBytes()
-
-  let o = allocation.load(fromByteOffset: 8, as: Int16.self)
-  expectEqual(o, r)
-}
-
 suite.test("initialize buffer with repeated elements")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -182,17 +137,12 @@ suite.test("initialize buffer with repeated elements")
 }
 
 suite.test("initialize buffer from Sequence")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
   a.initialize {
-    var it = $0.append(from: 0..<18)
-    expectNil(it.next())
+    $0.append(fromContentsOf: 0..<18)
   }
   a.withSpan {
     expectEqual($0.count, 18)
@@ -203,11 +153,7 @@ suite.test("initialize buffer from Sequence")
 }
 
 suite.test("initialize buffer from noncontiguous Collection")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -224,11 +170,7 @@ suite.test("initialize buffer from noncontiguous Collection")
 }
 
 suite.test("initialize buffer from contiguous Collection")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -245,11 +187,7 @@ suite.test("initialize buffer from contiguous Collection")
 }
 
 suite.test("initialize buffer from Span")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -271,11 +209,7 @@ suite.test("initialize buffer from Span")
 }
 
 suite.test("initialize buffer from empty contiguous Collection")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -289,11 +223,7 @@ suite.test("initialize buffer from empty contiguous Collection")
 }
 
 suite.test("moveAppend()")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   class I {
@@ -319,11 +249,7 @@ suite.test("moveAppend()")
 }
 
 suite.test("deinitialize buffer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   var a = Allocation(of: 48, Int.self)
@@ -344,17 +270,13 @@ suite.test("deinitialize buffer")
 }
 
 suite.test("mutate with MutableSpan prefix")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
+.require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 10)
   defer { b.deallocate() }
 
-  var span = OutputSpan(_initializing: b)
+  var span = unsafe OutputSpan(buffer: b)
   expectEqual(span.count, 0)
   span.append(fromContentsOf: 1...9)
   expectEqual(span.count, 9)
@@ -367,7 +289,8 @@ suite.test("mutate with MutableSpan prefix")
 
   span.append(20)
 
-  let r = span.relinquishBorrowedMemory()
-  expectTrue(r.elementsEqual((0..<10).map({2*(1+$0)})))
-  r.deinitialize()
+  let initialized = span.finalize(for: b)
+  expectEqual(initialized, 10)
+  expectTrue(b.elementsEqual((0..<10).map({2*(1+$0)})))
+  b.deinitialize()
 }
