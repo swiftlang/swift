@@ -158,7 +158,7 @@ swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // If the protocol is SendableMetatype, and there are no non-marker protocol
   // requirements, allow it via self-conformance.
   if (protocol->isSpecificProtocol(KnownProtocolKind::SendableMetatype) &&
-      !containsNonMarkerProtocols(layout.getProtocols()))
+      !layout.containsNonMarkerProtocols())
     return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
   // We didn't find our protocol in the existential's list; it doesn't
