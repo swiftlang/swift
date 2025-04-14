@@ -40,6 +40,11 @@ struct MyStruct {
 __attribute__((swift_name("MyStruct.static_const_int_as_a_member")))
 static const int static_const_int_as_a_member = 42;
 
+typedef int ImportAsStruct __attribute__((swift_wrapper(struct)));
+static const ImportAsStruct ImportAsStructFoo = 123;
+typedef int ImportAsEnum __attribute__((swift_wrapper(enum)));
+static const ImportAsEnum ImportAsEnumFoo = 123;
+
 //--- main.swift
 func foo() {
   print(MACRO_INT)
@@ -64,6 +69,9 @@ func foo() {
   print(static_const_enum)
 
   print(MyStruct.static_const_int_as_a_member)
+
+  print(ImportAsStruct.foo)
+  print(ImportAsEnum.foo)
 }
 
 // Globals that don't get their value imported stay as public_external:

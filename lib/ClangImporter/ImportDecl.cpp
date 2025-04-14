@@ -4620,13 +4620,21 @@ namespace {
               ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
               isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
 
-          auto convertKind = ConstantConvertKind::None;
-          if (decl->getType()->isEnumeralType())
-            convertKind = ConstantConvertKind::Construction;
+          // FIXME: Handle CGFloat too.
+          if (!type->isCGFloat()) {
+            auto convertKind = ConstantConvertKind::None;
+            // Request conversions on enums, and swift_wrapper((enum/struct))
+            // types
+            if (decl->getType()->isEnumeralType())
+              convertKind = ConstantConvertKind::Construction;
+            else if (findSwiftNewtype(decl, Impl.getClangSema(),
+                                      Impl.CurrentVersion))
+              convertKind = ConstantConvertKind::Construction;
 
-          result = synthesizer.createConstant(
-              name, dc, type, *val, convertKind, isStatic, decl,
-              importer::convertClangAccess(decl->getAccess()));
+            result = synthesizer.createConstant(
+                name, dc, type, *val, convertKind, isStatic, decl,
+                importer::convertClangAccess(decl->getAccess()));
+          }
         }
       }
 
