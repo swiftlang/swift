@@ -303,15 +303,6 @@ namespace {
       return CastStrategy::Address;
     }
 
-    static bool containsNonMarkerProtocols(ArrayRef<ProtocolDecl *> protocols) {
-      for (auto proto : protocols) {
-        if (!proto->isMarkerProtocol())
-          return true;
-      }
-
-      return false;
-    }
-
     CastingIsolatedConformances computedIsolatedConformances() const {
       // Non-existential types don't carry conformances, so we always allow
       // isolated conformances.
@@ -330,7 +321,7 @@ namespace {
       // If there are no non-marker protocols in the existential, there's no
       // need to prohibit isolated conformances.
       auto layout = checkType->getExistentialLayout();
-      if (!containsNonMarkerProtocols(layout.getProtocols()))
+      if (!layout.containsNonMarkerProtocols())
         return CastingIsolatedConformances::Allow;
 
       // If the type conforms to SendableMetatype, prohibit isolated

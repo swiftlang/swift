@@ -1186,6 +1186,15 @@ bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
   return false;
 }
 
+bool ExistentialLayout::containsNonMarkerProtocols() const {
+  for (auto proto : getProtocols()) {
+    if (!proto->isMarkerProtocol())
+      return true;
+  }
+
+  return false;
+}
+
 LayoutConstraint ExistentialLayout::getLayoutConstraint() const {
   if (hasExplicitAnyObject) {
     return LayoutConstraint::getLayoutConstraint(
