@@ -117,3 +117,11 @@ class Holder: @unchecked Sendable {
     2: String.self,
   ]
 }
+
+enum E: Sendable {
+case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' has non-sendable type 'any Q.Type'}}
+}
+
+struct S: Sendable {
+  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-sendable type '([any Q.Type], Int)'}}
+}
