@@ -374,8 +374,6 @@ public:
     Setter,
     ModifyCoroutine,
     ReadCoroutine,
-    Read2Coroutine,
-    Modify2Coroutine,
   };
 
 private:
@@ -438,21 +436,25 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isAsync() const { return Value & IsAsyncMask; }
+  bool _hasAsyncBitSet() const { return Value & IsAsyncMask; }
 
-  bool isCalleeAllocatedCoroutine() const {
+  bool isAsync() const { return !isCoroutine() && _hasAsyncBitSet(); }
+
+  bool isCoroutine() const {
     switch (getKind()) {
     case Kind::Method:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
+      return false;
     case Kind::ModifyCoroutine:
     case Kind::ReadCoroutine:
-      return false;
-    case Kind::Read2Coroutine:
-    case Kind::Modify2Coroutine:
       return true;
     }
+  }
+
+  bool isCalleeAllocatedCoroutine() const {
+    return isCoroutine() && _hasAsyncBitSet();
   }
 
   bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
@@ -615,8 +617,6 @@ public:
     ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
-    Read2Coroutine,
-    Modify2Coroutine,
   };
 
 private:
@@ -666,24 +666,28 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isAsync() const { return Value & IsAsyncMask; }
+  bool _hasAsyncBitSet() const { return Value & IsAsyncMask; }
 
-  bool isCalleeAllocatedCoroutine() const {
+  bool isAsync() const { return !isCoroutine() && _hasAsyncBitSet(); }
+
+  bool isCoroutine() const {
     switch (getKind()) {
     case Kind::BaseProtocol:
     case Kind::Method:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
-    case Kind::ReadCoroutine:
-    case Kind::ModifyCoroutine:
     case Kind::AssociatedTypeAccessFunction:
     case Kind::AssociatedConformanceAccessFunction:
       return false;
-    case Kind::Read2Coroutine:
-    case Kind::Modify2Coroutine:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
       return true;
     }
+  }
+
+  bool isCalleeAllocatedCoroutine() const {
+    return isCoroutine() && _hasAsyncBitSet();
   }
 
   bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }

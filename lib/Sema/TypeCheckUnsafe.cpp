@@ -33,8 +33,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
   switch (use.getKind()) {
   case UnsafeUse::Override: {
     auto override = use.getDecl();
-    override->diagnose(
-        diag::override_safe_with_unsafe, override->getDescriptiveKind());
+    override->diagnose(diag::override_safe_with_unsafe, override);
     if (auto overridingClass = override->getDeclContext()->getSelfClassDecl()) {
       overridingClass->diagnose(
           diag::make_subclass_unsafe, overridingClass->getName()
@@ -47,9 +46,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 
   case UnsafeUse::Witness: {
     auto witness = cast<ValueDecl>(use.getDecl());
-    witness->diagnose(diag::note_witness_unsafe,
-                      witness->getDescriptiveKind(),
-                      witness->getName());
+    witness->diagnose(diag::note_witness_unsafe, witness);
     return;
   }
 

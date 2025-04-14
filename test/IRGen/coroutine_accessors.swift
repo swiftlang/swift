@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-irgen                                            \
 // RUN:     %s                                                              \
+// RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors                 \
 // RUN: | %IRGenFileCheck %s
 
@@ -97,7 +98,7 @@ public var irm: Int {
 // CHECK-SAME:                   ptr @"$s19coroutine_accessors1SV3irmSivyTwc",
 // CHECK-SAME:                   ptr [[ALLOCATOR]],
 // CHECK-SAME:                   ptr [[FRAME]],
-// CHECK-SAME:                   ptr @"$s19coroutine_accessors1SVSiIetMIgYy_TC",
+// CHECK-SAME:                   $s19coroutine_accessors1SVSiIetMIgYy_TC
 // CHECK-SAME:                   ptr @_swift_coro_alloc,
 // CHECK-SAME:                   ptr @_swift_coro_dealloc
 // CHECK-SAME:               )
@@ -134,7 +135,7 @@ public var irm: Int {
 // CHECK-SAME:                   ptr @"$s19coroutine_accessors1SV3irmSivxTwc",
 // CHECK-SAME:                   ptr [[ALLOCATOR]],
 // CHECK-SAME:                   ptr [[FRAME]],
-// CHECK-SAME:                   ptr @"$s19coroutine_accessors1SVSiIetMIlYl_TC",
+// CHECK-SAME:                   $s19coroutine_accessors1SVSiIetMIlYl_TC
 // CHECK-SAME:                   ptr @_swift_coro_alloc,
 // CHECK-SAME:                   ptr @_swift_coro_dealloc
 // CHECK-SAME:               )
@@ -230,7 +231,7 @@ public mutating func increment_irm() {
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call swiftcc void @swift_task_dealloc_through(ptr [[FRAME]])
+// CHECK:         call swiftcc void @{{(_)?}}swift_task_dealloc_through(ptr [[FRAME]])
 // CHECK:       }
 @_silgen_name("increment_irm_async")
 public mutating func increment_irm_async() async {

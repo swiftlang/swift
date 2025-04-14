@@ -51,7 +51,7 @@ struct inspectableWithStruct {
   @GKInspectable var GKInspectableInStruct: Int // expected-error {{only class instance properties can be declared @GKInspectable}} {{3-18=}}
 }
 
-func foo(x: @convention(block) Int) {} // expected-error {{@convention attribute only applies to function types}}
+func foo(x: @convention(block) Int) {} // expected-error {{'@convention' only applies to function types}}
 func foo(x: @convention(block) (Int) -> Int) {}
 
 @_transparent

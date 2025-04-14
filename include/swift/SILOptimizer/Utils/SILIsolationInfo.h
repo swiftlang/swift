@@ -442,8 +442,16 @@ public:
   /// TODO: Fix the type checker.
   static bool isNonSendableType(SILType type, SILFunction *fn);
 
+  static bool isSendableType(SILType type, SILFunction *fn) {
+    return !isNonSendableType(type, fn);
+  }
+
   static bool isNonSendableType(SILValue value) {
     return isNonSendableType(value->getType(), value->getFunction());
+  }
+
+  static bool isSendableType(SILValue value) {
+    return !isNonSendableType(value);
   }
 
   bool hasSameIsolation(ActorIsolation actorIsolation) const;

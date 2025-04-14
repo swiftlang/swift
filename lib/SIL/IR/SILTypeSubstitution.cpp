@@ -77,7 +77,6 @@ public:
         return substOpaqueTypesWithUnderlyingTypes(
                ProtocolConformanceRef::forAbstract(conformingReplacementType,
                                                    conformedProtocol),
-               conformingReplacementType->getCanonicalType(),
                typeExpansionContext);
       },
       SubstFlags::SubstituteOpaqueArchetypes |
@@ -282,7 +281,7 @@ public:
       selfType = next;
     }
 
-    auto substConformance = conformance.subst(selfType, IFS);
+    auto substConformance = conformance.subst(IFS);
 
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.
@@ -292,7 +291,7 @@ public:
       });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
-            substConformance, substType, typeExpansionContext);
+            substConformance, typeExpansionContext);
       }
     }
 

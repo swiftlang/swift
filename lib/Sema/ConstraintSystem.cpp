@@ -1709,7 +1709,7 @@ struct TypeSimplifier {
           return memberTy;
         }
 
-        auto result = conformance.getTypeWitness(lookupBaseType, assocType);
+        auto result = conformance.getTypeWitness(assocType);
         if (result && !result->hasError())
           return result;
       }
@@ -3886,7 +3886,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
+  return conformance.getTypeWitnessByName(cs.getASTContext().Id_RawValue);
 }
 
 void ConstraintSystem::generateOverloadConstraints(

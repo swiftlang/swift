@@ -134,11 +134,13 @@ class ReflectionContext
   std::vector<std::tuple<RemoteAddress, RemoteAddress>> dataRanges;
 
   bool setupTargetPointers = false;
+  typename super::StoredPointer target_asyncTaskMetadata = 0;
   typename super::StoredPointer target_non_future_adapter = 0;
   typename super::StoredPointer target_future_adapter = 0;
   typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
   typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
   bool supportsPriorityEscalation = false;
+  typename super::StoredSize asyncTaskSize = 0;
 
 public:
   using super::getBuilder;
@@ -1816,16 +1818,32 @@ private:
           ChildTask = RecordObj->FirstChild;
       }
 
-      while (ChildTask) {
+      while (ChildTask && ChildTaskLoopCount++ < ChildTaskLimit) {
+        // Read the child task.
+        auto ChildTaskObj = readObj<AsyncTaskType>(ChildTask);
+        if (!ChildTaskObj)
+          return {std::string("found unreadable child task pointer"), Info};
+
         Info.ChildTasks.push_back(ChildTask);
 
-        StoredPointer ChildFragmentAddr = ChildTask + sizeof(*AsyncTaskObj);
-        auto ChildFragmentObj =
-            readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
-        if (ChildFragmentObj)
-          ChildTask = ChildFragmentObj->NextChild;
-        else
+        swift::JobFlags ChildJobFlags(AsyncTaskObj->Flags);
+        if (ChildJobFlags.task_isChildTask()) {
+          if (asyncTaskSize == 0)
+            return {std::string("target async task size unknown, unable to "
+                                "iterate child tasks"),
+                    Info};
+
+          StoredPointer ChildFragmentAddr = ChildTask + asyncTaskSize;
+          auto ChildFragmentObj =
+              readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
+          if (ChildFragmentObj)
+            ChildTask = ChildFragmentObj->NextChild;
+          else
+            ChildTask = 0;
+        } else {
+          // No child fragment, so we're done iterating.
           ChildTask = 0;
+        }
       }
 
       RecordPtr = RecordObj->Parent;
@@ -1927,7 +1945,7 @@ private:
     if (setupTargetPointers)
       return;
 
-    auto getFunc = [&](const std::string &name) -> StoredPointer {
+    auto getPointer = [&](const std::string &name) -> StoredPointer {
       auto Symbol = getReader().getSymbolAddress(name);
       if (!Symbol)
         return 0;
@@ -1936,18 +1954,26 @@ private:
         return 0;
       return Pointer->getResolvedAddress().getAddressData();
     };
+    target_asyncTaskMetadata =
+        getPointer("_swift_concurrency_debug_asyncTaskMetadata");
     target_non_future_adapter =
-        getFunc("_swift_concurrency_debug_non_future_adapter");
-    target_future_adapter = getFunc("_swift_concurrency_debug_future_adapter");
-    target_task_wait_throwing_resume_adapter =
-        getFunc("_swift_concurrency_debug_task_wait_throwing_resume_adapter");
+        getPointer("_swift_concurrency_debug_non_future_adapter");
+    target_future_adapter =
+        getPointer("_swift_concurrency_debug_future_adapter");
+    target_task_wait_throwing_resume_adapter = getPointer(
+        "_swift_concurrency_debug_task_wait_throwing_resume_adapter");
     target_task_future_wait_resume_adapter =
-        getFunc("_swift_concurrency_debug_task_future_wait_resume_adapter");
+        getPointer("_swift_concurrency_debug_task_future_wait_resume_adapter");
     auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
         "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {
       getReader().readInteger(supportsPriorityEscalationAddr,
                               &supportsPriorityEscalation);
+    }
+    auto asyncTaskSizeAddr =
+        getReader().getSymbolAddress("_swift_concurrency_debug_asyncTaskSize");
+    if (asyncTaskSizeAddr) {
+      getReader().readInteger(asyncTaskSizeAddr, &asyncTaskSize);
     }
 
     setupTargetPointers = true;

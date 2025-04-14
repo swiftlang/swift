@@ -164,6 +164,8 @@ public func registerOptimizerTests() {
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,
     linearLivenessTest,
+    localVariableReachableUsesTest,
+    localVariableReachingAssignmentsTest,
     parseTestSpecificationTest,
     variableIntroducerTest,
     gatherCallSitesTest,

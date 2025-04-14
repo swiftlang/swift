@@ -416,6 +416,9 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
+/// Enable inout lifetime dependence - @lifetime(&arg)
+EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
+
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
@@ -454,7 +457,7 @@ EXPERIMENTAL_FEATURE(TrailingComma, false)
 
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
-EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
+EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
@@ -464,7 +467,7 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
 /// Synthesize static factory methods for C++ foreign reference types and import
 /// them as Swift initializers.
-EXPERIMENTAL_FEATURE(CXXForeignReferenceTypeInitializers, true)
+EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
@@ -490,12 +493,7 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
 ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
-
-/// Allow public enumerations to be extensible by default
-/// regardless of whether the module they are declared in
-/// is resilient or not.
-EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
+EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)

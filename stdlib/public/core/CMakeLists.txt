@@ -216,6 +216,13 @@ split_embedded_sources(
   EMBEDDED UnsafeRawPointer.swift
   EMBEDDED UTFEncoding.swift
   EMBEDDED UTF8.swift
+  EMBEDDED UTF8EncodingError.swift
+  EMBEDDED UTF8Span.swift
+  EMBEDDED UTF8SpanBits.swift
+  EMBEDDED UTF8SpanComparisons.swift
+  EMBEDDED UTF8SpanFundamentals.swift
+  EMBEDDED UTF8SpanInternalHelpers.swift
+  EMBEDDED UTF8SpanIterators.swift
   EMBEDDED UTF16.swift
   EMBEDDED UTF32.swift
   EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
@@ -328,6 +335,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCo
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")

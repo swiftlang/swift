@@ -501,8 +501,9 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
   };
   Walker walker(*this, scopedAddress, boundary, liveness);
   AddressUseKind result = walker.walk(scopedAddress.value);
-  if (VerifyLifetimeCompletion && boundary != Boundary::Availability
-      && result != AddressUseKind::NonEscaping) {
+  if ((VerifyLifetimeCompletion || ForceLivenessVerification) &&
+      boundary != Boundary::Availability &&
+      result != AddressUseKind::NonEscaping) {
     llvm::errs() << "Incomplete liveness for:\n" << scopedAddress.value;
     if (auto *escapingUse = walker.getEscapingUse()) {
       llvm::errs() << "  escapes at:\n";

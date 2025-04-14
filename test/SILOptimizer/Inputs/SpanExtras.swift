@@ -40,7 +40,7 @@ internal func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@lifetime(&source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -310,7 +310,7 @@ extension MutableSpan where Element: ~Copyable {
       precondition(indices.contains(position), "index out of bounds")
       yield self[unchecked: position]
     }
-    @lifetime(borrow self)
+    @lifetime(&self)
     _modify {
       precondition(indices.contains(position), "index out of bounds")
       yield &self[unchecked: position]

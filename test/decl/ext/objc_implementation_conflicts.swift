@@ -108,6 +108,8 @@ import objc_implementation_private
     get { return 1 }
   }
 
+  @objc let readonlyPropertyFromHeader7: CInt
+
   @objc fileprivate var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
 
@@ -228,6 +230,17 @@ import objc_implementation_private
     // OK, provides an implementation with a computed property
     get { return 1 }
     set {}
+  }
+
+  @objc var categoryPropertyFromHeader5: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
+    set {}
+  }
+
+  @objc var categoryReadonlyPropertyFromHeader1: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
   }
 }
 

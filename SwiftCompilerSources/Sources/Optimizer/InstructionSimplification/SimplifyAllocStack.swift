@@ -257,9 +257,13 @@ private extension AllocStackInst {
       case is CheckedCastAddrBranchInst, is UnconditionalCheckedCastAddrInst:
         // To construct a new cast instruction we need a formal type.
         requiresLegalFormalType = true
-        fallthrough
-      case is UncheckedAddrCastInst:
         if use != use.instruction.operands[0] {
+          return nil
+        }
+      case is UncheckedAddrCastInst:
+        if self.type.isExistential {
+          // Bail if the address of the original existential escapes.
+          // This is not a problem if the alloc_stack already contains the opened existential.
           return nil
         }
       default:

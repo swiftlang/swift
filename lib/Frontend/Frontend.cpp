@@ -878,6 +878,7 @@ bool CompilerInstance::setUpPluginLoader() {
   /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
   auto loader = std::make_unique<PluginLoader>(
       *Context, getDependencyTracker(),
+      Invocation.getFrontendOptions().CacheReplayPrefixMap,
       Invocation.getFrontendOptions().DisableSandbox);
   Context->setPluginLoader(std::move(loader));
   return false;
@@ -1409,7 +1410,8 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::get(name, mainModule, kind, ctx);
+    auto *domain =
+        CustomAvailabilityDomain::get(name, kind, mainModule, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };
@@ -1472,8 +1474,6 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
-    if (Invocation.getLangOptions().hasFeature(Feature::ExtensibleEnums))
-      MainModule->setSupportsExtensibleEnums(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

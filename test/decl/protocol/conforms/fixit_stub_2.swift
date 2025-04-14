@@ -81,10 +81,10 @@ struct Struct1: MutabilityProto { // expected-error{{type 'Struct1' does not con
 
 import fixit_stub_mutability_proto_module
 
-class Class2: ExternalMutabilityProto { // expected-error{{type 'Class2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{add stubs for conformance}} {{40-40=\n    func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        set(newValue) {\n            <#code#>\n        \}\n    \}\n}}
+class Class2: ExternalMutabilityProto { // expected-error{{type 'Class2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{add stubs for conformance}} {{40-40=\n    func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
-struct Struct2: ExternalMutabilityProto { // expected-error{{type 'Struct2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{add stubs for conformance}} {{42-42=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        mutating get {\n            <#code#>\n        \}\n        nonmutating set(newValue) {\n            <#code#>\n        \}\n    \}\n}}
+struct Struct2: ExternalMutabilityProto { // expected-error{{type 'Struct2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{add stubs for conformance}} {{42-42=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        mutating get {\n            <#code#>\n        \}\n        nonmutating set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
 protocol PropertyMutabilityProto {

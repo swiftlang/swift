@@ -1678,7 +1678,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   }
 
   auto *ctx = const_cast<ASTContext *>(this);
-  witness = builtinConformance.getWitnessByName(type, initName(*ctx));
+  witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
     assert(false && "Missing required witness");
     witness = ConcreteDeclRef();
@@ -3724,8 +3724,9 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
   IntegerType::Profile(id, value, isNegative);
 
   void *insertPos;
-  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos))
+  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos)) {
     return intType;
+  }
 
   auto strCopy = ctx.AllocateCopy(value);
 
@@ -5865,11 +5866,11 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 }
 
 const CustomAvailabilityDomain *
-CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
-                              const ASTContext &ctx) {
+CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
+                              Decl *decl, const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
-  CustomAvailabilityDomain::Profile(id, identifier, mod, kind);
+  CustomAvailabilityDomain::Profile(id, identifier, mod);
 
   auto &foldingSet = ctx.getImpl().CustomAvailabilityDomains;
   void *insertPos;
@@ -5879,7 +5880,8 @@ CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
 
   void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
                            alignof(CustomAvailabilityDomain));
-  auto *newNode = ::new (mem) CustomAvailabilityDomain(identifier, mod, kind);
+  auto *newNode =
+      ::new (mem) CustomAvailabilityDomain(identifier, kind, mod, decl);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -6486,7 +6488,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = type;
 
     // Find the Objective-C class type we bridge to.
-    Type witnessTy = conformance.getTypeWitnessByName(type, Id_ObjectiveCType);
+    Type witnessTy = conformance.getTypeWitnessByName(Id_ObjectiveCType);
     // If Objective-C import is broken, witness type would be a dependent member
     // with `<<error type>>` base.
     return (witnessTy && !witnessTy->hasError()) ? witnessTy : Type();

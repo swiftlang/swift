@@ -2570,7 +2570,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
   if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
       !Context.SourceMgr.isImportMacroGeneratedLoc(atLoc)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
-             getFeatureName(Feature::LifetimeDependence));
+             Feature::LifetimeDependence.getName());
     status.setIsParseError();
     return status;
   }
@@ -4343,7 +4343,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
     diagnose(Tok, diag::type_attribute_applied_to_decl);
   else if (Tok.isContextualKeyword("unknown")) {
-    diagnose(Tok, diag::unknown_attribute, "unknown");
+    diagnose(Tok, diag::unknown_attr_name, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
     auto customAttr = parseCustomAttribute(AtLoc);
@@ -4713,7 +4713,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
         } else {
           // We could use diag::only_allowed_in_sil here, but it's better
           // not to mention SIL in general diagnostics.
-          diagnose(AtLoc, diag::unknown_attribute, Text);
+          diagnose(AtLoc, diag::unknown_attr_name, Text);
         }
       }
       return makeParserSuccess();
@@ -4772,7 +4772,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   case TypeAttrKind::Execution: {
     if (!Context.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
       diagnose(Tok, diag::requires_experimental_feature, "@execution", false,
-               getFeatureName(Feature::ExecutionAttribute));
+               Feature::ExecutionAttribute.getName());
       return makeParserError();
     }
 
@@ -5019,7 +5019,12 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
     if (Tok.isContextualKeyword("borrow") &&
         peekToken().isAny(tok::identifier, tok::integer_literal,
                           tok::kw_self)) {
-      return ParsedLifetimeDependenceKind::Scope;
+      return ParsedLifetimeDependenceKind::Borrow;
+    }
+    if (Tok.is(tok::amp_prefix) &&
+        peekToken().isAny(tok::identifier, tok::integer_literal,
+                          tok::kw_self)) {
+      return ParsedLifetimeDependenceKind::Inout;
     }
     return std::nullopt;
   };
@@ -5347,7 +5352,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("sending")) {
       if (!P.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::SendingArgsAndResults));
+                   false, Feature::SendingArgsAndResults.getName());
       }
 
       // Only allow for 'sending' to be written once.
@@ -5371,7 +5376,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
-                   getFeatureName(Feature::LifetimeDependence));
+                   Feature::LifetimeDependence.getName());
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'
@@ -5457,7 +5462,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   for (auto it = fixityAttrs.begin(); it != fixityAttrs.end(); ++it) {
     if (it != fixityAttrs.begin()) {
       auto *attr = *it;
-      P.diagnose(attr->getLocation(), diag::mutually_exclusive_attrs, attr,
+      P.diagnose(attr->getLocation(), diag::mutually_exclusive_decl_attrs, attr,
                  fixityAttrs.front(), attr->isDeclModifier())
           .fixItRemove(attr->getRange());
       attr->setInvalid();
@@ -6916,9 +6921,8 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
     IDC->setMaybeHasDerivativeDeclarations();
 
     if (Flags.contains(PD_StubOnly)) {
-      diagnose(LBLoc, diag::stub_decl_cannot_have_body,
-               IDC->getDecl()->getDescriptiveKind())
-        .fixItRemove({LBLoc, RBLoc});
+      diagnose(LBLoc, diag::stub_decl_cannot_have_body, IDC->getDecl())
+          .fixItRemove({LBLoc, RBLoc});
 
       // Cache the empty result to prevent delayed parsing.
       Context.evaluator.cacheOutput(ParseMembersRequest{IDC},
@@ -8299,9 +8303,8 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
 
   // Reject accessors when we're parsing stubs only.
   if (Flags.contains(PD_StubOnly) && !accessors.Accessors.empty()) {
-    diagnose(Tok, diag::stub_decl_cannot_have_body,
-             PrimaryVar->getDescriptiveKind())
-      .fixItRemove({ accessors.LBLoc, accessors.RBLoc });
+    diagnose(Tok, diag::stub_decl_cannot_have_body, PrimaryVar)
+        .fixItRemove({accessors.LBLoc, accessors.RBLoc});
     Invalid = true;
   }
 
@@ -9027,9 +9030,8 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD,
   setIDEInspectionDelayedDeclStateIfNeeded();
 
   if (Flags.contains(PD_StubOnly)) {
-    diagnose(BodyRange.Start, diag::stub_decl_cannot_have_body,
-             AFD->getDescriptiveKind())
-      .fixItRemove(BodyRange);
+    diagnose(BodyRange.Start, diag::stub_decl_cannot_have_body, AFD)
+        .fixItRemove(BodyRange);
     AFD->setBody(nullptr, AbstractFunctionDecl::BodyKind::None);
   }
 }

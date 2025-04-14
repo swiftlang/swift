@@ -95,12 +95,21 @@ const View* usedToCrash(const View* p) {
     return p;
 }
 
+struct SWIFT_ESCAPABLE Invalid {
+    View v;
+};
+
 //--- test.swift
 import Test
 import CxxStdlib
 
+// CHECK: error: cannot find type 'Invalid' in scope
+// CHECK: note: escapable record 'Invalid' cannot have non-escapable field 'v'
+public func importInvalid(_ x: Invalid) {
+}
+
 // CHECK: error: a function with a ~Escapable result needs a parameter to depend on
-// CHECK-NO-LIFETIMES: test.swift:6:32: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: test.swift:11:32: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
 public func noAnnotations() -> View {
     // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
     // CHECK-NO-LIFETIMES: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies

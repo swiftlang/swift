@@ -363,10 +363,6 @@ public:
   /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const;
 
-  /// Given a dependent type expressed in terms of the self parameter,
-  /// map it into the context of this conformance.
-  Type getAssociatedType(Type assocType) const;
-
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
   /// return its associated conformance.

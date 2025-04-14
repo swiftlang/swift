@@ -891,7 +891,7 @@ do {
 // https://github.com/apple/swift/issues/44772
 // Erroneous diagnostic when unable to infer generic type
 do {
-  struct S<A, B> { // expected-note 4 {{'B' declared as parameter to type 'S'}} expected-note 2 {{'A' declared as parameter to type 'S'}} expected-note * {{generic type 'S' declared here}}
+  struct S<A, B> { // expected-note 4 {{'B' declared as parameter to type 'S'}} expected-note 2 {{'A' declared as parameter to type 'S'}} expected-note * {{generic struct 'S' declared here}}
     init(a: A) {}
     init(b: B) {}
     init(c: Int) {}
@@ -899,11 +899,11 @@ do {
     init(e: A?) {}
   }
 
-  struct S_Array<A, B> { // expected-note {{'B' declared as parameter to type 'S_Array'}} expected-note * {{generic type 'S_Array' declared here}}
+  struct S_Array<A, B> { // expected-note {{'B' declared as parameter to type 'S_Array'}} expected-note * {{generic struct 'S_Array' declared here}}
     init(_ a: [A]) {}
   }
 
-  struct S_Dict<A: Hashable, B> { // expected-note {{'B' declared as parameter to type 'S_Dict'}} expected-note * {{generic type 'S_Dict' declared here}}
+  struct S_Dict<A: Hashable, B> { // expected-note {{'B' declared as parameter to type 'S_Dict'}} expected-note * {{generic struct 'S_Dict' declared here}}
     init(a: [A: Double]) {}
   }
 

@@ -1,7 +1,9 @@
 # `ExistentialAny`
 
 This diagnostic group includes errors and warnings pertaining to the `any` type
-syntax proposed in [SE-0335].
+syntax.
+
+This syntax was proposed in [SE-0335](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0335-existential-any.md).
 `any` syntax draws a line between constraint types and existential or boxed
 types.
 
@@ -20,5 +22,3 @@ func sillyFunction(collection: Collection) { // error
   // ...
 }
 ```
-
-[SE-0335]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0335-existential-any.md

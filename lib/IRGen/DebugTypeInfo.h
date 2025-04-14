@@ -76,7 +76,7 @@ public:
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV, IRGenModule &IGM);
   static DebugTypeInfo getGlobalFixedBuffer(SILGlobalVariable *GV,
-                                            Size SizeInBytes, Alignment align);
+                                            Alignment align, IRGenModule &IGM);
   /// ObjC classes.
   static DebugTypeInfo getObjCClass(ClassDecl *theClass, Size size,
                                     Alignment align);

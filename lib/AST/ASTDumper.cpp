@@ -4925,6 +4925,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
+  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -6532,6 +6533,7 @@ namespace {
       printCommon("integer_type", label);
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
+      printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
       printFoot();
     }
 

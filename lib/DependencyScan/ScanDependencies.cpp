@@ -214,9 +214,23 @@ private:
       depInfo.addMacroDependency(macro.first(), macro.second.LibraryPath,
                                  macro.second.ExecutablePath);
 
+    bool needPathRemapping = instance.getInvocation()
+                                 .getSearchPathOptions()
+                                 .ResolvedPluginVerification &&
+                             cache.getScanService().hasPathMapping();
+    auto mapPath = [&](StringRef path) {
+      if (!needPathRemapping)
+        return path.str();
+
+      return cache.getScanService().remapPath(path);
+    };
+    if (needPathRemapping)
+      commandline.push_back("-resolved-plugin-verification");
+
     for (auto &macro : depInfo.getMacroDependencies()) {
-      std::string arg = macro.second.LibraryPath + "#" +
-                        macro.second.ExecutablePath + "#" + macro.first;
+      std::string arg = mapPath(macro.second.LibraryPath) + "#" +
+                        mapPath(macro.second.ExecutablePath) + "#" +
+                        macro.first;
       commandline.push_back("-load-resolved-plugin");
       commandline.push_back(arg);
     }
@@ -480,9 +494,10 @@ private:
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(sourceDep->macroDependencies, [this](const auto &entry) {
-        tracker->trackFile(entry.second.LibraryPath);
-      });
+      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
+                     [this](const auto &entry) {
+                       tracker->trackFile(entry.second.LibraryPath);
+                     });
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return root.takeError();
@@ -496,7 +511,7 @@ private:
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(textualDep->macroDependencies,
+      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
                      [this](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });

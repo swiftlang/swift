@@ -249,7 +249,6 @@ namespace sil_block {
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
     TypeIDField, // ID of requirement subject type
-    TypeIDField, // ID of substituted subject type
     ProtocolConformanceIDField
   >;
 
@@ -261,7 +260,6 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField, // ID of associated type
     ProtocolConformanceIDField // ID of conformance
   >;
 

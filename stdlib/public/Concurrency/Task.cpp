@@ -30,12 +30,12 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskOptions.h"
+#include "swift/Basic/Casting.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
-#include "swift/Runtime/STLCompatibility.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -440,6 +440,8 @@ const void *const swift::_swift_concurrency_debug_jobMetadata =
     static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
+
+const size_t swift::_swift_concurrency_debug_asyncTaskSize = sizeof(AsyncTask);
 
 const HeapMetadata *swift::jobHeapMetadataPtr =
     static_cast<HeapMetadata *>(&jobHeapMetadata);
@@ -1059,6 +1061,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Initialize the parent context pointer to null.
   initialContext->Parent = nullptr;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   // Initialize the resumption funclet pointer (async return address) to
   // the final funclet for completing the task.
 
@@ -1072,20 +1076,21 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // The final funclet shouldn't release the task or the task function.
   } else if (asyncLet) {
     initialContext->ResumeParent =
-        std::bit_cast<TaskContinuationFunction *>(&completeTask);
+        function_cast<TaskContinuationFunction *>(&completeTask);
 
   // If we have a non-null closure context and the task function is not
   // consumed by calling it, use a final funclet that releases both the
   // task and the closure context.
   } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
     initialContext->ResumeParent =
-        std::bit_cast<TaskContinuationFunction *>(&completeTaskWithClosure);
+        function_cast<TaskContinuationFunction *>(&completeTaskWithClosure);
 
   // Otherwise, just release the task.
   } else {
     initialContext->ResumeParent =
-        std::bit_cast<TaskContinuationFunction *>(&completeTaskAndRelease);
+        function_cast<TaskContinuationFunction *>(&completeTaskAndRelease);
   }
+#pragma clang diagnostic pop
 
   // Initialize the task-local allocator and our other private runtime
   // state for the task.
@@ -1792,9 +1797,11 @@ static void swift_task_removeCancellationHandlerImpl(
     return;
   }
 
+  auto task = swift_task_getCurrent();
+  assert(task->_private()._status().load(std::memory_order_relaxed).getInnermostRecord() == record &&
+    "We expect that the popped record will be exactly first as well as that it is of the expected type");
   if (auto poppedRecord =
-      popStatusRecordOfType<CancellationNotificationStatusRecord>(swift_task_getCurrent())) {
-    assert(record == poppedRecord && "The removed record did not match the expected record!");
+      popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
     swift_task_dealloc(record);
   }
 }

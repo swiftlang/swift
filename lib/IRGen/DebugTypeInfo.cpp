@@ -105,8 +105,7 @@ DebugTypeInfo DebugTypeInfo::getForwardDecl(swift::Type Ty) {
   return DbgTy;
 }
 
-DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
-                                       IRGenModule &IGM) {
+static TypeBase *getTypeForGlobal(SILGlobalVariable *GV, IRGenModule &IGM) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
   auto LowTy = GV->getLoweredType().getASTType();
@@ -116,6 +115,15 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }
+  // If this global variable contains an opaque type, replace it with its
+  // underlying type.
+  Type = IGM.substOpaqueTypesWithUnderlyingTypes(Type).getPointer();
+  return Type;
+}
+
+DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
+                                       IRGenModule &IGM) {
+  auto *Type = getTypeForGlobal(GV, IGM);
   auto &TI = IGM.getTypeInfoForUnlowered(Type);
   DebugTypeInfo DbgTy = getFromTypeInfo(Type, TI, IGM);
   assert(!DbgTy.isContextArchetype() &&
@@ -124,17 +132,9 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
 }
 
 DebugTypeInfo DebugTypeInfo::getGlobalFixedBuffer(SILGlobalVariable *GV,
-                                                  Size SizeInBytes,
-                                                  Alignment Align) {
-  // Prefer the original, potentially sugared version of the type if
-  // the type hasn't been mucked with by an optimization pass.
-  auto LowTy = GV->getLoweredType().getASTType();
-  auto *Type = LowTy.getPointer();
-  if (auto *Decl = GV->getDecl()) {
-    auto DeclType = Decl->getTypeInContext();
-    if (DeclType->isEqual(LowTy))
-      Type = DeclType.getPointer();
-  }
+                                                  Alignment Align,
+                                                  IRGenModule &IGM) {
+  auto *Type = getTypeForGlobal(GV, IGM);
   DebugTypeInfo DbgTy(Type, Align, ::hasDefaultAlignment(Type),
                       /* IsMetadataType = */ false, /* IsFixedBuffer = */ true);
   assert(!DbgTy.isContextArchetype() &&

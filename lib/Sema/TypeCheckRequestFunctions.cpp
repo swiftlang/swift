@@ -369,7 +369,6 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         // into context when applying the result builder to the
         // function body in the constraint system.
         auto subs = SubstitutionMap::getProtocolSubstitutions(
-            protocol, dc->getSelfInterfaceType(),
             ProtocolConformanceRef(conformance));
         Type subResultBuilderType = resultBuilderType.subst(subs);
 

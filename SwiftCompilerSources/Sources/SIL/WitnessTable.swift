@@ -31,7 +31,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
     case associatedType(requirement: AssociatedTypeDecl, witness: CanonicalType)
 
     /// A witness table entry describing the witness for an associated type's protocol requirement.
-    case associatedConformance(requirement: CanonicalType, substType: CanonicalType, witness: Conformance)
+    case associatedConformance(requirement: CanonicalType, witness: Conformance)
 
     /// A witness table entry referencing the protocol conformance for a refined base protocol.
     case baseProtocol(requirement: ProtocolDecl, witness: Conformance)
@@ -48,7 +48,6 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
                                witness: CanonicalType(bridged: bridged.getAssociatedTypeWitness()))
       case .associatedConformance:
         self = .associatedConformance(requirement: CanonicalType(bridged: bridged.getAssociatedConformanceRequirement()),
-                                      substType: CanonicalType(bridged: bridged.getAssociatedConformanceSubstType()),
                                       witness: Conformance(bridged: bridged.getAssociatedConformanceWitness()))
       case .baseProtocol:
         self = .baseProtocol(requirement: bridged.getBaseProtocolRequirement().getAs(ProtocolDecl.self),
@@ -71,9 +70,8 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
                                                      OptionalBridgedFunction(obj: witness?.bridged.obj))
       case .associatedType(let requirement, let witness):
         return BridgedWitnessTableEntry.createAssociatedType(requirement.bridged, witness.bridged)
-      case .associatedConformance(let requirement, let substType, let witness):
+      case .associatedConformance(let requirement, let witness):
         return BridgedWitnessTableEntry.createAssociatedConformance(requirement.bridged,
-                                                                    substType.bridged,
                                                                     witness.bridged)
       case .baseProtocol(let requirement, let witness):
         return BridgedWitnessTableEntry.createBaseProtocol(requirement.bridged, witness.bridged)

@@ -206,7 +206,7 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
                            ApplySite(), origFunc, subs, IsNotSerialized,
                            /*ConvertIndirectToDirect=*/true,
-                           /*dropMetatypeArgs=*/false);
+                           /*dropUnusedArguments=*/false);
 
   if (!ReInfo.canBeSpecialized()) {
     return {nullptr};
@@ -530,10 +530,7 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, Bri
   static_assert((int)DynamicCastFeasibility::WillFail    == (int)BridgedDynamicCastResult::willFail);
 
   return static_cast<BridgedDynamicCastResult>(
-    classifyDynamicCast(function.getFunction()->getModule().getSwiftModule(),
-                        sourceTy.unbridged(),
-                        destTy.unbridged(),
-                        sourceTypeIsExact));
+    classifyDynamicCast(function.getFunction(), sourceTy.unbridged(), destTy.unbridged(), sourceTypeIsExact));
 }
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst) {

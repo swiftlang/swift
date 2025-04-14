@@ -43,34 +43,42 @@ public:
   enum HandleTrivialVariable_t { IgnoreTrivialVariable, ExtendTrivialVariable };
 
 private:
-  // If domInfo is nullptr, then InteriorLiveness never assumes dominance. As a
-  // result it may report extra unenclosedPhis. In that case, any attempt to
-  // create a new phi would result in an immediately redundant phi.
+  /// If domInfo is nullptr, then InteriorLiveness never assumes dominance. As a
+  /// result it may report extra unenclosedPhis. In that case, any attempt to
+  /// create a new phi would result in an immediately redundant phi.
   const DominanceInfo *domInfo = nullptr;
 
   DeadEndBlocks &deadEndBlocks;
 
-  // Cache intructions already handled by the recursive algorithm to avoid
-  // recomputing their lifetimes.
+  /// Cache intructions already handled by the recursive algorithm to avoid
+  /// recomputing their lifetimes.
   ValueSet completedValues;
 
-  // Extend trivial variables for lifetime diagnostics (only in SILGenCleanup).
+  /// Extend trivial variables for lifetime diagnostics (only in SILGenCleanup).
   HandleTrivialVariable_t handleTrivialVariable;
 
-public:
-  OSSALifetimeCompletion(SILFunction *function, const DominanceInfo *domInfo,
-                         DeadEndBlocks &deadEndBlocks,
-                         HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable)
-      : domInfo(domInfo), deadEndBlocks(deadEndBlocks),
-        completedValues(function), handleTrivialVariable(handleTrivialVariable) {}
+  /// Whether verification of the computed liveness should be run even when the
+  /// global setting is off.
+  /// TODO: Remove this option.
+  bool ForceLivenessVerification;
 
-  // The kind of boundary at which to complete the lifetime.
-  //
-  // Liveness: "As early as possible."  Consume the value after the last
-  //           non-consuming uses.
-  // Availability: "As late as possible."  Consume the value in the last blocks
-  //               beyond the non-consuming uses in which the value has been
-  //               consumed on no incoming paths.
+public:
+  OSSALifetimeCompletion(
+      SILFunction *function, const DominanceInfo *domInfo,
+      DeadEndBlocks &deadEndBlocks,
+      HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable,
+      bool forceLivenessVerification = false)
+      : domInfo(domInfo), deadEndBlocks(deadEndBlocks),
+        completedValues(function), handleTrivialVariable(handleTrivialVariable),
+        ForceLivenessVerification(forceLivenessVerification) {}
+
+  /// The kind of boundary at which to complete the lifetime.
+  ///
+  /// Liveness: "As early as possible."  Consume the value after the last
+  ///           non-consuming uses.
+  /// Availability: "As late as possible."  Consume the value in the last blocks
+  ///               beyond the non-consuming uses in which the value has been
+  ///               consumed on no incoming paths.
   struct Boundary {
     enum Value : uint8_t {
       Liveness,

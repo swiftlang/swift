@@ -12,6 +12,7 @@
 
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Punycode.h"
@@ -201,22 +202,25 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
   Demangler Dem;
   NodePointer Root = Dem.demangleSymbol(nameStr);
   if (!Root || treeContains(Root, Node::Kind::Suffix)) {
-    llvm::errs() << "Can't demangle: " << nameStr << '\n';
-    abort();
+    abortWithPrettyStackTraceMessage([&](auto &out) {
+      out << "Can't demangle: " << nameStr;
+    });
   }
   auto mangling = mangleNode(Root, Flavor);
   if (!mangling.isSuccess()) {
-    llvm::errs() << "Can't remangle: " << nameStr << '\n';
-    abort();
+    abortWithPrettyStackTraceMessage([&](auto &out) {
+      out << "Can't remangle: " << nameStr;
+    });
   }
   std::string Remangled = mangling.result();
   if (Remangled == nameStr)
     return;
 
-  llvm::errs() << "Remangling failed:\n"
-                  "original     = " << nameStr << "\n"
-                  "remangled    = " << Remangled << "\n";
-  abort();
+  abortWithPrettyStackTraceMessage([&](auto &out) {
+    out << "Remangling failed:\n";
+    out << "original     = " << nameStr << "\n";
+    out << "remangled    = " << Remangled;
+  });
 }
 
 void Mangler::appendIdentifier(StringRef ident, bool allowRawIdentifiers) {

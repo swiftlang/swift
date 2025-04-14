@@ -124,7 +124,6 @@ UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(AsyncCallerExecution)
-UNINTERESTING_FEATURE(ExtensibleEnums)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
@@ -271,6 +270,29 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
+  auto hasInoutLifetimeDependence = [](Decl *decl) {
+    for (auto attr : decl->getAttrs().getAttributes<LifetimeAttr>()) {
+      for (auto source : attr->getLifetimeEntry()->getSources()) {
+        if (source.getParsedLifetimeDependenceKind() ==
+            ParsedLifetimeDependenceKind::Inout) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasInoutLifetimeDependence);
+  }
+  default:
+    return hasInoutLifetimeDependence(decl);
+  }
+}
+
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -403,7 +425,7 @@ UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
-UNINTERESTING_FEATURE(CXXForeignReferenceTypeInitializers)
+UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -468,8 +490,10 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 }
 
 static bool usesFeatureCustomAvailability(Decl *decl) {
-  // FIXME: [availability] Check whether @available attributes for custom
-  // domains are attached to the decl.
+  for (auto attr : decl->getSemanticAvailableAttrs()) {
+    if (attr.getDomain().isCustom())
+      return true;
+  }
   return false;
 }
 
@@ -530,7 +554,7 @@ void FeatureSet::collectRequiredFeature(Feature feature,
 
 void FeatureSet::collectSuppressibleFeature(Feature feature,
                                             InsertOrRemove operation) {
-  suppressible.insertOrRemove(numFeatures() - size_t(feature),
+  suppressible.insertOrRemove(Feature::getNumFeatures() - size_t(feature),
                               operation == Insert);
 }
 

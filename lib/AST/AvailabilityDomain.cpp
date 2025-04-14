@@ -17,9 +17,60 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
+
+CustomAvailabilityDomain::Kind
+getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
+  switch (featureAvailKind) {
+  case clang::FeatureAvailKind::None:
+    llvm_unreachable("unexpected kind");
+  case clang::FeatureAvailKind::Available:
+    return CustomAvailabilityDomain::Kind::Enabled;
+  case clang::FeatureAvailKind::Unavailable:
+    return CustomAvailabilityDomain::Kind::Disabled;
+  case clang::FeatureAvailKind::Dynamic:
+    return CustomAvailabilityDomain::Kind::Dynamic;
+  }
+}
+
+static const CustomAvailabilityDomain *
+customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
+  auto *clangDecl = decl->getClangDecl();
+  ASSERT(clangDecl);
+
+  auto featureInfo = clangDecl->getASTContext().getFeatureAvailInfo(
+      const_cast<clang::Decl *>(clangDecl));
+
+  // Ensure the decl actually represents an availability domain.
+  if (featureInfo.first.empty())
+    return nullptr;
+
+  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+    return nullptr;
+
+  return CustomAvailabilityDomain::get(
+      featureInfo.first, getCustomDomainKind(featureInfo.second.Kind),
+      decl->getModuleContext(), decl, ctx);
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::forCustom(Decl *decl, const ASTContext &ctx) {
+  if (!decl)
+    return std::nullopt;
+
+  if (decl->hasClangNode()) {
+    if (auto *customDomain = customDomainForClangDecl(decl, ctx))
+      return AvailabilityDomain::forCustom(customDomain);
+  } else {
+    // FIXME: [availability] Handle Swift availability domains decls.
+  }
+
+  return std::nullopt;
+}
 
 std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
@@ -166,6 +217,13 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   }
 }
 
+Decl *AvailabilityDomain::getDecl() const {
+  if (auto *customDomain = getCustomDomain())
+    return customDomain->getDecl();
+
+  return nullptr;
+}
+
 ModuleDecl *AvailabilityDomain::getModule() const {
   if (auto customDomain = getCustomDomain())
     return customDomain->getModule();
@@ -268,19 +326,17 @@ bool StableAvailabilityDomainComparator::operator()(
   }
 }
 
-CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
-                                                   ModuleDecl *mod, Kind kind)
-    : name(name), kind(kind), mod(mod) {
+CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
+                                                   ModuleDecl *mod, Decl *decl)
+    : name(name), kind(kind), mod(mod), decl(decl) {
   ASSERT(!name.empty());
   ASSERT(mod);
 }
 
 void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
-                                       Identifier name, ModuleDecl *mod,
-                                       Kind kind) {
+                                       Identifier name, ModuleDecl *mod) {
   ID.AddPointer(name.getAsOpaquePointer());
   ID.AddPointer(mod);
-  ID.AddInteger(static_cast<unsigned>(kind));
 }
 
 std::optional<AvailabilityDomain>

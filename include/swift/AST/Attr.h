@@ -3781,6 +3781,10 @@ public:
   TypeAttrKind getKind() const {
     return TypeAttrKind(Bits.TypeAttribute.Kind);
   }
+
+  /// - Note: Do not call this directly when emitting a diagnostic. Instead,
+  /// define the diagnostic to accept a `const TypeAttribute *` and use the
+  /// appropriate format specifier.
   const char *getAttrName() const {
     return getAttrName(getKind());
   }

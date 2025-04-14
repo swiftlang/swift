@@ -321,14 +321,14 @@ public func alwaysUnavailable(
 ) {
   defer {
     _ = AtDeploymentTarget()
-    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+    _ = AfterDeploymentTarget()
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
   _ = AtDeploymentTarget()
-  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+  _ = AfterDeploymentTarget()
   _ = Unavailable()
   
   if #available(macOS 11, *) {
@@ -568,14 +568,14 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 ) {
   defer {
     _ = AtDeploymentTarget()
-    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+    _ = AfterDeploymentTarget()
   }
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
   _ = AtDeploymentTarget()
-  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+  _ = AfterDeploymentTarget()
   _ = Unavailable()
 
   if #available(macOS 11, *) {
@@ -718,7 +718,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   _ = AtInliningTarget()
   _ = BetweenTargets()
   _ = AtDeploymentTarget()
-  _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+  _ = AfterDeploymentTarget()
 
   if #available(macOS 11, *) {
     _ = AfterDeploymentTarget()
@@ -727,7 +727,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   return ()
 }
 
-@inlinable public var inlinedNoAvailableGlobalUnavailableSetter: Any { // expected-note {{add @available attribute to enclosing var}}
+@inlinable public var inlinedNoAvailableGlobalUnavailableSetter: Any {
   get {
     fatalError()
   }
@@ -738,7 +738,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
     _ = AtInliningTarget()
     _ = BetweenTargets()
     _ = AtDeploymentTarget()
-    _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+    _ = AfterDeploymentTarget()
 
     if #available(macOS 11, *) {
       _ = AfterDeploymentTarget()
@@ -847,7 +847,7 @@ public func defaultArgsUseUnavailable(
   _: Any = AtInliningTarget.self,
   _: Any = BetweenTargets.self,
   _: Any = AtDeploymentTarget.self,
-  _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+  _: Any = AfterDeploymentTarget.self,
   _: Any = Unavailable.self
 ) {}
 
@@ -909,7 +909,7 @@ public struct PropertyWrapper<T> {
   public init(_ value: T) { self.wrappedValue = value }
 }
 
-public struct PublicStruct { // expected-note 21 {{add @available attribute}}
+public struct PublicStruct { // expected-note 20 {{add @available attribute}}
   // Public property declarations are exposed.
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
@@ -961,7 +961,7 @@ public struct PublicStruct { // expected-note 21 {{add @available attribute}}
 
   @available(macOS, unavailable)
   public var fUnavailable: AfterDeploymentTarget {
-    AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
+    AfterDeploymentTarget()
   }
 
   // The inferred types of public properties are exposed.
@@ -1167,7 +1167,7 @@ public struct UnavailablePublicStruct {
              cPublicInit: Any = AtInliningTarget(),
              dPublicInit: Any = BetweenTargets(),
              ePublicInit: Any = AtDeploymentTarget(),
-             fPublicInit: Any = AfterDeploymentTarget(), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+             fPublicInit: Any = AfterDeploymentTarget(),
              gPublicInit: Any = Unavailable()
 
   var aInternal: NoAvailable = .init(),

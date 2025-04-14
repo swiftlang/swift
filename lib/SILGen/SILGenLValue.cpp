@@ -245,8 +245,9 @@ static LValueTypeData getPhysicalStorageTypeData(TypeExpansionContext context,
 }
 
 static bool shouldUseUnsafeEnforcement(VarDecl *var) {
-  if (var->isDebuggerVar())
+  if (var->isDebuggerVar()) {
     return true;
+  }
 
   return false;
 }
@@ -277,6 +278,22 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   } else if (hasExclusivityAttr(var, ExclusivityAttr::Checked)) {
     return SILAccessEnforcement::Dynamic;
   }
+
+  // Access markers are especially load-bearing for the move-only checker,
+  // so we also emit `begin_access` markers for cases where storage
+  // is move-only.
+  // TODO: It seems useful to do this for all unchecked declarations, since
+  // access scopes are useful semantic information.
+  if (var->getTypeInContext()->isNoncopyable()) {
+    return SILAccessEnforcement::Unsafe;
+  }
+  if (auto param = dyn_cast<ParamDecl>(var)) {
+    if (param->getSpecifier() == ParamSpecifier::Borrowing
+        || param->getSpecifier() == ParamSpecifier::Consuming) {
+      return SILAccessEnforcement::Unsafe;
+    }
+  }
+  
   return std::nullopt;
 }
 
@@ -2518,9 +2535,9 @@ namespace {
 
       // Perform the begin_apply.
       SmallVector<ManagedValue, 1> yields;
-      auto cleanup =
-        SGF.emitBeginApply(loc, projectFnRef, subs, { base, keyPathValue },
-                           substFnType, ApplyOptions(), yields);
+      auto cleanup = SGF.emitBeginApply(loc, projectFnRef, /*canUnwind=*/true,
+                                        subs, {base, keyPathValue}, substFnType,
+                                        ApplyOptions(), yields);
 
       // Push an operation to do the end_apply.
       pushEndApplyWriteback(SGF, loc, cleanup, getTypeData());
