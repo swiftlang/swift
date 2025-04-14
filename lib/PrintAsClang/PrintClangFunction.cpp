@@ -1238,7 +1238,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       os << "void **vtable_ = *selfPtr_;\n";
       os << "#endif\n";
       os << "struct FTypeAddress {\n";
-      os << "decltype(" << cxx_synthesis::getCxxImplNamespaceName()
+      os << "decltype(";
+      ClangSyntaxPrinter(os).printBaseName(moduleContext);
+      os << "::" << cxx_synthesis::getCxxImplNamespaceName()
          << "::" << swiftSymbolName << ") *";
       if (auto ptrAuthDisc = dispatchInfo->getPointerAuthDiscriminator())
         os << " __ptrauth_swift_class_method_pointer(" << ptrAuthDisc->value
