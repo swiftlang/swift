@@ -1530,6 +1530,10 @@ def print_target_info : Flag<["-"], "print-target-info">,
     Flags<[FrontendOption]>,
     HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 
+def print_supported_features : Flag<["-"], "print-supported-features">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print information about features supported by the compiler">;
+
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 

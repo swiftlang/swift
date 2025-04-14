@@ -206,6 +206,10 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PrintTargetInfo = true;
   }
 
+  if (Args.hasArg(OPT_print_supported_features)) {
+    Opts.PrintSupportedFeatures = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }

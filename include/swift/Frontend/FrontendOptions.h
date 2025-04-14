@@ -314,6 +314,10 @@ public:
   /// exit.
   bool PrintTargetInfo = false;
 
+  /// Indicates that the frontend should print the supported features and then
+  /// exit.
+  bool PrintSupportedFeatures = false;
+
   /// See the \ref SILOptions.EmitVerboseSIL flag.
   bool EmitVerboseSIL = false;
 
