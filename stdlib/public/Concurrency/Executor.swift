@@ -535,6 +535,9 @@ public protocol ExecutorFactory {
 }
 
 @available(SwiftStdlib 6.2, *)
+typealias DefaultExecutorFactory = PlatformExecutorFactory
+
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -556,7 +559,7 @@ extension MainActor {
   @available(SwiftStdlib 6.2, *)
   public static var executor: any MainExecutor {
     if _executor == nil {
-      _executor = PlatformExecutorFactory.mainExecutor
+      _executor = DefaultExecutorFactory.mainExecutor
     }
     return _executor!
   }
@@ -575,7 +578,7 @@ extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 6.2, *)
   public static var defaultExecutor: any TaskExecutor {
     if _defaultExecutor == nil {
-      _defaultExecutor = PlatformExecutorFactory.defaultExecutor
+      _defaultExecutor = DefaultExecutorFactory.defaultExecutor
     }
     return _defaultExecutor!
   }
