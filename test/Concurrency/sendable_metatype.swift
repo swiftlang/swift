@@ -19,14 +19,14 @@ func acceptMetaOnMainActor<T>(_: T.Type) { }
 // -------------------------------------------------------------------------
 nonisolated func staticCallThroughMetaSmuggled<T: Q>(_: T.Type) {
   let x: Q.Type = T.self
-  Task.detached { // expected-error{{risks causing data races}}
+  Task.detached { // expected-warning{{risks causing data races}}
     x.g() // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }
 
 nonisolated func passMetaSmuggled<T: Q>(_: T.Type) {
   let x: Q.Type = T.self
-  Task.detached { // expected-error{{risks causing data races}}
+  Task.detached { // expected-warning{{risks causing data races}}
     acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }
@@ -79,7 +79,7 @@ nonisolated func passSendableToMainActorSmuggledAny<T: Sendable>(_: T.Type) asyn
 // -------------------------------------------------------------------------
 nonisolated func passMetaSmuggledAnyFromExistential(_ pqT: (P & Q).Type) {
   let x: P.Type = pqT
-  Task.detached { // expected-error{{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+  Task.detached { // expected-warning{{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
     acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }

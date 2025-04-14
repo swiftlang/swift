@@ -879,6 +879,12 @@ SendableCheckContext::preconcurrencyBehavior(
   return std::nullopt;
 }
 
+std::optional<DiagnosticBehavior>
+SendableCheckContext::preconcurrencyBehavior(Type type) const {
+  return type->getConcurrencyDiagnosticBehaviorLimit(
+      const_cast<DeclContext *>(fromDC));
+}
+
 static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   switch (sf.Kind) {
   case SourceFileKind::Interface:
@@ -6681,8 +6687,7 @@ static bool checkSendableInstanceStorage(
           propertyType, context,
           /*inDerivedConformance*/Type(), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            auto preconcurrency =
-                context.preconcurrencyBehavior(type->getAnyNominal());
+            auto preconcurrency = context.preconcurrencyBehavior(type);
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
