@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
-// RN: %FileCheck %s < %t/structs.h
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -std=c++17)
 
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -std=c++17)
 
 public enum AudioFileType {
