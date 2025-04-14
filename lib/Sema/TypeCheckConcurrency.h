@@ -407,9 +407,17 @@ struct SendableCheckContext {
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
 
+  /// Determine the preconcurrency behavior when referencing the given
+  /// declaration from a type. This only has an effect when the declaration
+  /// is a nominal type.
   std::optional<DiagnosticBehavior> preconcurrencyBehavior(
       Decl *decl,
       bool ignoreExplicitConformance = false) const;
+
+  /// Determine the preconcurrency behavior when referencing the given
+  /// non-Sendable type. This only has an effect when the declaration
+  /// is a nominal or metatype type.
+  std::optional<DiagnosticBehavior> preconcurrencyBehavior(Type type) const;
 
   /// Whether to warn about a Sendable violation even in minimal checking.
   bool warnInMinimalChecking() const;
@@ -460,8 +468,7 @@ bool diagnoseNonSendableTypes(
       [&](Type specificType, DiagnosticBehavior behavior) {
         // FIXME: Reconcile preconcurrency declaration vs preconcurrency
         // import behavior.
-        auto preconcurrency =
-          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
+        auto preconcurrency = fromContext.preconcurrencyBehavior(specificType);
 
         ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
             .limitBehaviorWithPreconcurrency(behavior,
@@ -497,8 +504,7 @@ bool diagnoseIfAnyNonSendableTypes(
   diagnoseNonSendableTypes(
       type, fromContext, derivedConformance, typeLoc,
       [&](Type specificType, DiagnosticBehavior behavior) {
-        auto preconcurrency =
-          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
+        auto preconcurrency = fromContext.preconcurrencyBehavior(specificType);
 
         if (behavior == DiagnosticBehavior::Ignore ||
             preconcurrency == DiagnosticBehavior::Ignore)

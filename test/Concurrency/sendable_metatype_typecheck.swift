@@ -21,9 +21,9 @@ func testSendableExistential() {
 nonisolated func acceptMeta<T>(_: T.Type) { }
 
 nonisolated func staticCallThroughMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-error{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  let x = T.self // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
   Task.detached {
-    x.g() // expected-error{{capture of non-sendable type 'T.Type' in an isolated closure}}
+    x.g() // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -35,21 +35,21 @@ nonisolated func captureThroughMetaValMoReqs<T>(_: T.Type) {
 }
 
 nonisolated func passMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-error{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  let x = T.self // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
   Task.detached {
-    acceptMeta(x) // expected-error{{capture of non-sendable type}}
+    acceptMeta(x) // expected-warning{{capture of non-sendable type}}
   }
 }
 
 nonisolated func staticCallThroughMeta<T: Q>(_: T.Type) {
   Task.detached {
-    T.g() // expected-error{{capture of non-sendable type}}
+    T.g() // expected-warning{{capture of non-sendable type}}
   }
 }
 
 nonisolated func passMeta<T: Q>(_: T.Type) {
   Task.detached {
-    acceptMeta(T.self) // expected-error{{capture of non-sendable type 'T.Type' in an isolated closure}}
+    acceptMeta(T.self) // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -98,4 +98,22 @@ struct GenericThingy<Element> {
     let _: (Element, Element) -> Bool = (>)
     let _: @Sendable (Element, Element) -> Bool = (>) // expected-error{{converting non-sendable function value to '@Sendable (Element, Element) -> Bool' may introduce data races}}
   }
+}
+
+extension Int: Q {
+  static func g() { }
+}
+
+extension String: Q {
+  static func g() { }
+}
+
+class Holder: @unchecked Sendable {
+  // expected-note@+3{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+  // expected-note@+2{{add '@MainActor' to make static property 'globalExistentialThing' part of global actor 'MainActor'}}
+  // expected-warning@+1{{static property 'globalExistentialThing' is not concurrency-safe because non-'Sendable' type 'Dictionary<Int, any Q.Type>' may have shared mutable state}}
+  static let globalExistentialThing: Dictionary<Int, Q.Type> = [
+    1: Int.self,
+    2: String.self,
+  ]
 }
