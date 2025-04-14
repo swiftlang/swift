@@ -1800,8 +1800,7 @@ static void swift_task_removeCancellationHandlerImpl(
   auto task = swift_task_getCurrent();
   assert(task->_private()._status().load(std::memory_order_relaxed).getInnermostRecord() == record &&
     "We expect that the popped record will be exactly first as well as that it is of the expected type");
-  if (auto poppedRecord =
-      popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
+  if (popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
     swift_task_dealloc(record);
   }
 }
