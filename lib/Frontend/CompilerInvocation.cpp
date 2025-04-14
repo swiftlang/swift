@@ -2221,6 +2221,25 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
     Opts.MinimumAccessLevel = AccessLevel::Public;
   }
 
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_allow_availability_platforms)) {
+    llvm::SmallVector<StringRef> AvailabilityPlatforms;
+    StringRef(A->getValue())
+        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
+               /*KeepEmpty*/ false);
+    Opts.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
+        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
+    Opts.AvailabilityIsBlockList = false;
+  } else if (auto *A = Args.getLastArg(
+                 OPT_symbol_graph_block_availability_platforms)) {
+    llvm::SmallVector<StringRef> AvailabilityPlatforms;
+    StringRef(A->getValue())
+        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
+               /*KeepEmpty*/ false);
+    Opts.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
+        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
+    Opts.AvailabilityIsBlockList = true;
+  }
+
   // default values for generating symbol graphs during a build
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
