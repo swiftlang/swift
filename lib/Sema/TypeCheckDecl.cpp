@@ -3033,7 +3033,7 @@ static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
     }
 
     if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr &&
-        dyn_cast<StructType>(typealiasBoundGenericType) != nullptr) {
+        !typealiasBoundGenericType->hasTypeParameter()) {
       isInferredType = true;
     } else {
       isInferredType = false;
