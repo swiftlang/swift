@@ -3908,8 +3908,11 @@ static void printParameterFlags(ASTPrinter &printer,
       printer.printKeyword("isolated", options, " ");
   }
 
-  if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
-    printer.printKeyword("@escaping", options, " ");
+  // `inout` implies `@escaping`
+  if (flags.getOwnershipSpecifier() != ParamSpecifier::InOut) {
+    if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
+      printer.printKeyword("@escaping", options, " ");
+  }
 
   if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
