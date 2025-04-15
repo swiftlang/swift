@@ -41,6 +41,9 @@ def run_parallel(fn, pool_args, n_processes=0):
 
     if n_processes == 0:
         n_processes = cpu_count() * 2
+    if n_processes == 1:
+        print("Running ``%s`` with a single process." % fn.__name__)
+        return [fn(args) for args in pool_args]
 
     lk = Lock()
     print("Running ``%s`` with up to %d processes." %
