@@ -478,6 +478,8 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
             else:
               pool_args.append(new_args)
 
+    # Only use `run_parallel` when submodules are not used, since `.git` dir
+    # can't be accessed concurrently.
     if not use_submodules:
       if not pool_args:
           print("Not cloning any repositories.")
