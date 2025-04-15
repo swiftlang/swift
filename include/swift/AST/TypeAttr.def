@@ -67,7 +67,7 @@ TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf)
 TYPE_ATTR(isolated, Isolated)
 SIMPLE_TYPE_ATTR(nonisolated, Nonisolated)
 SIMPLE_TYPE_ATTR(_addressable, Addressable)
-TYPE_ATTR(execution, Execution)
+SIMPLE_TYPE_ATTR(concurrent, Concurrent)
 
 // SIL-specific attributes
 SIMPLE_SIL_TYPE_ATTR(async, Async)

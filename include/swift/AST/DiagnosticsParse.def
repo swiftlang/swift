@@ -1700,14 +1700,6 @@ ERROR(attr_isolated_expected_rparen,none,
 ERROR(attr_isolated_expected_kind,none,
       "expected 'any' as the isolation kind", ())
 
-ERROR(attr_execution_expected_lparen,none,
-      "expected '(' after '@execution'",
-      ())
-ERROR(attr_execution_expected_rparen,none,
-      "expected ')' after execution behavior", ())
-ERROR(attr_execution_expected_kind,none,
-      "expected 'concurrent' or 'caller' as the execution behavior", ())
-
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
 ERROR(attr_private_import_expected_sourcefile, none,
@@ -2171,6 +2163,19 @@ ERROR(sil_thunkinst_failed_to_parse_kind,none,
 
 ERROR(sil_failed_to_parse_sil_optional,none,
       "Expected SIL optional value of the form '[' NAME ']'", ())
+
+//------------------------------------------------------------------------------
+// MARK: nonisolated(nonsending)
+//------------------------------------------------------------------------------
+
+ERROR(nonisolated_nonsending_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following 'nonisolated'", ())
+ERROR(nonisolated_nonsending_incorrect_modifier,PointsToFirstBadToken,
+      "expected 'nonsending' in modifier", ())
+ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
+      "expected ')' after 'nonisolated' modifier", ())
+ERROR(nonisolated_nonsending_repeated,none,
+      "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -211,6 +211,14 @@ BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
       SendingTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
 }
 
+BridgedCallerIsolatedTypeRepr
+BridgedCallerIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+                                           BridgedTypeRepr base,
+                                           BridgedSourceLoc cSpecifierLoc) {
+  return new (cContext.unbridged())
+      CallerIsolatedTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
+}
+
 BridgedVarargTypeRepr
 BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
                                    BridgedTypeRepr base,

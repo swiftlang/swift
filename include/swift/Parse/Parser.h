@@ -1169,6 +1169,8 @@ public:
         Tok.isContextualKeyword("isolated") ||
         Tok.isContextualKeyword("_const"))
       return true;
+    if (isCallerIsolatedSpecifier())
+      return true;
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
@@ -1185,6 +1187,12 @@ public:
   bool isSILLifetimeDependenceToken() {
     return isInSILMode() && Tok.is(tok::at_sign) &&
            (peekToken().isContextualKeyword("lifetime"));
+  }
+
+  bool isCallerIsolatedSpecifier() {
+    if (!Tok.isContextualKeyword("nonisolated"))
+      return false;
+    return peekToken().isFollowingLParen();
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {
@@ -1421,6 +1429,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
+    SourceLoc CallerIsolatedLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     LifetimeEntry *lifetimeEntry = nullptr;
 
@@ -1722,6 +1731,10 @@ public:
 
   /// Returns true if a qualified declaration name base type can be parsed.
   bool canParseBaseTypeForQualifiedDeclName();
+
+  /// Returns true if `nonisolated` contextual keyword could be parsed
+  /// as part of the type a the current location.
+  bool canParseNonisolatedAsTypeModifier();
 
   /// Returns true if the current token is '->' or effects specifiers followed
   /// by '->'.

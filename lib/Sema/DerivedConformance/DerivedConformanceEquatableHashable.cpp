@@ -555,8 +555,7 @@ deriveHashable_hashInto(
   // The derived hash(into:) for an actor must be non-isolated.
   if (!addNonIsolatedToSynthesized(derived, hashDecl) &&
       derived.Nominal->isActor())
-    hashDecl->getAttrs().add(
-        new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
+    hashDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -912,8 +911,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived, hashValueDecl) &&
       derived.Nominal->isActor())
-    hashValueDecl->getAttrs().add(
-        new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
+    hashValueDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);

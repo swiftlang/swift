@@ -502,42 +502,52 @@ static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureExecutionAttribute(Decl *decl) {
-  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution, decl)) {
-    return false;
-  }
-
-  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
+static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
+  // Explicit `@concurrent` attribute on the declaration.
+  if (decl->getAttrs().hasAttribute<ConcurrentAttr>())
     return true;
 
-  auto hasExecutionAttr = [](TypeRepr *R) {
+  // Explicit `nonisolated(nonsending)` attribute on the declaration.
+  if (auto *nonisolated = decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+    if (nonisolated->isNonSending())
+      return true;
+  }
+
+  auto hasCallerIsolatedAttr = [](TypeRepr *R) {
     if (!R)
       return false;
 
     return R->findIf([](TypeRepr *repr) {
-      if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
-        return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
-          if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
-            return isa<ExecutionTypeAttr>(TA);
-          }
-          return false;
-        });
-      }
+      if (isa<CallerIsolatedTypeRepr>(repr))
+        return true;
+
+      // We don't check for @concurrent here because it's
+      // not printed in type positions since it indicates
+      // old "nonisolated" state.
+
       return false;
     });
   };
 
-  auto *VD = cast<ValueDecl>(decl);
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
 
-  // Check if any parameters that have `@execution` attribute.
+  // The declaration is going to be printed with `nonisolated(nonsending)`
+  // attribute.
+  if (getActorIsolation(VD).isCallerIsolationInheriting())
+    return true;
+
+  // Check if any parameters that have `nonisolated(nonsending)` attribute.
   if (auto *PL = VD->getParameterList()) {
-    for (auto *P : *PL) {
-      if (hasExecutionAttr(P->getTypeRepr()))
-        return true;
-    }
+    if (llvm::any_of(*PL, [&](const ParamDecl *P) {
+          return hasCallerIsolatedAttr(P->getTypeRepr());
+        }))
+      return true;
   }
 
-  if (hasExecutionAttr(VD->getResultTypeRepr()))
+  // Check if result type has explicit `nonisolated(nonsending)` attribute.
+  if (hasCallerIsolatedAttr(VD->getResultTypeRepr()))
     return true;
 
   return false;

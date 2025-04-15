@@ -1249,6 +1249,35 @@ public:
   static bool classof(const SendingTypeRepr *T) { return true; }
 };
 
+/// A 'nonisolated(nonsending)' function type.
+/// \code
+///   x : nonisolated(nonsending) () async -> Int
+/// \endcode
+class CallerIsolatedTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc Loc;
+
+public:
+  CallerIsolatedTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : TypeRepr(TypeReprKind::CallerIsolated), Base(Base), Loc(Loc) {
+    assert(Base);
+  }
+
+  TypeRepr *getBase() const { return Base; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CallerIsolated;
+  }
+  static bool classof(const CallerIsolatedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
+  SourceLoc getLocImpl() const { return Base->getLoc(); }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
@@ -1680,6 +1709,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::ConstValue:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Integer:
+  case TypeReprKind::CallerIsolated:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

@@ -43,6 +43,10 @@ struct TrivialHolder {
   var pointer: UnsafeRawPointer
 }
 
+struct A {
+  init()
+}
+
 struct Holder {
   var object: AnyObject
 }
@@ -58,6 +62,9 @@ sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 sil [ossa] @Wrapper_init : $@convention(method) (@owned NE, @thin Wrapper.Type) -> @lifetime(copy 0) @owned Wrapper
 
 sil [ossa] @NCContainer_ne_read : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed NE
+
+sil @yieldRawSpan : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
+sil @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> ()
 
 // NCContainer.wrapper._read:
 //   var wrapper: Wrapper {
@@ -236,4 +243,36 @@ bb0(%0 : @guaranteed $Holder):
   destroy_value %nevar
   %99 = tuple ()
   return %99 : $()
+}
+
+// FIXME: extend temporary lifetimes for coroutine access.
+//
+// CHECK-LABEL: sil [ossa] @testYieldSpan : $@convention(thin) (@in A) -> () {
+// CHECK:   alloc_stack [lexical] [var_decl] $A
+// CHECK:   (%{{.*}}, %{{.*}}) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved]
+// CHECK:   [[CP:%.*]] = copy_value [[MD]]
+// CHECK:   apply %{{.*}}([[CP]]) : $@convention(thin) (@guaranteed RawSpan) -> ()
+// CHECK:   destroy_value [[CP]]
+// CHECK:   end_apply
+// CHECK:   destroy_addr
+// CHECK-LABEL: } // end sil function 'testYieldSpan'
+sil [ossa] @testYieldSpan : $@convention(thin) (@in A) -> () {
+bb0(%0 : $*A):
+  %1 = alloc_stack [lexical] [var_decl] $A
+  copy_addr [take] %0 to [init] %1
+
+  %3 = function_ref @yieldRawSpan : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
+  (%4, %5) = begin_apply %3(%1) : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
+  %6 = mark_dependence [unresolved] %4 on %5
+  %7 = copy_value %6
+  %8 = end_apply %5 as $()
+
+  %9 = function_ref @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> ()
+  %10 = apply %9(%7) : $@convention(thin) (@guaranteed RawSpan) -> ()
+  destroy_value %7
+  destroy_addr %1
+  dealloc_stack %1
+  %14 = tuple ()
+  return %14
 }

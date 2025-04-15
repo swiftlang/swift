@@ -910,16 +910,6 @@ void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr);
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupTerminator(self:)")
 void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionKind {
-  BridgedExecutionKindConcurrent,
-  BridgedExecutionKindCaller,
-};
-
-SWIFT_NAME("BridgedExecutionAttr.createParsed(_:atLoc:range:behavior:)")
-BridgedExecutionAttr BridgedExecutionAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc atLoc,
-    BridgedSourceRange range, BridgedExecutionKind behavior);
-
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
   BridgedAccessLevelPrivate,
   BridgedAccessLevelFilePrivate,
@@ -1235,11 +1225,18 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNonSendableKind cKind);
 
-SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:isUnsafe:)")
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonIsolatedModifier {
+  BridgedNonIsolatedModifierNone,
+  BridgedNonIsolatedModifierUnsafe,
+  BridgedNonIsolatedModifierNonSending
+};
+
+SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:modifier:)")
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange, bool isUnsafe);
+                                    BridgedSourceRange cRange,
+                                    BridgedNonIsolatedModifier modifier);
 
 SWIFT_NAME("BridgedObjCAttr.createParsedUnnamed(_:atLoc:attrNameLoc:)")
 BridgedObjCAttr
@@ -2590,25 +2587,12 @@ BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
     BridgedSourceLoc cNameLoc, BridgedDeclNameRef cWitnessMethodProtocol,
     BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionTypeAttrExecutionKind {
-  BridgedExecutionTypeAttrExecutionKind_Concurrent,
-  BridgedExecutionTypeAttrExecutionKind_Caller
-};
-
 SWIFT_NAME("BridgedDifferentiableTypeAttr.createParsed(_:atLoc:nameLoc:"
            "parensRange:kind:kindLoc:)")
 BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
     BridgedDifferentiabilityKind cKind, BridgedSourceLoc cKindLoc);
-
-SWIFT_NAME("BridgedExecutionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
-           "behavior:behaviorLoc:)")
-BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
-    BridgedExecutionTypeAttrExecutionKind behavior,
-    BridgedSourceLoc cBehaviorLoc);
 
 SWIFT_NAME("BridgedIsolatedTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
            "isolationKind:isolationKindLoc:)")
@@ -2776,6 +2760,12 @@ BridgedSendingTypeRepr
 BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedTypeRepr base,
                                     BridgedSourceLoc cSpecifierLoc);
+
+SWIFT_NAME("BridgedCallerIsolatedTypeRepr.createParsed(_:base:specifierLoc:)")
+BridgedCallerIsolatedTypeRepr
+BridgedCallerIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+                                           BridgedTypeRepr base,
+                                           BridgedSourceLoc cSpecifierLoc);
 
 SWIFT_NAME(
     "BridgedTupleTypeRepr.createParsed(_:elements:leftParenLoc:rightParenLoc:)")

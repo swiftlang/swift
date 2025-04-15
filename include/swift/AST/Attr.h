@@ -226,8 +226,8 @@ protected:
       isEarlyAdopter : 1
     );
 
-    SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
-      isUnsafe : 1
+    SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, NumNonIsolatedModifierBits,
+      Modifier : NumNonIsolatedModifierBits
     );
 
     SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
@@ -235,10 +235,6 @@ protected:
       Inverted : 1,
 
       NumFeatures : 31
-    );
-
-    SWIFT_INLINE_BITFIELD(ExecutionAttr, DeclAttribute, NumExecutionKindBits,
-      Behavior : NumExecutionKindBits
     );
   } Bits;
   // clang-format on
@@ -2978,17 +2974,28 @@ public:
 /// Represents nonisolated modifier.
 class NonisolatedAttr final : public DeclAttribute {
 public:
-  NonisolatedAttr(SourceLoc atLoc, SourceRange range, bool unsafe,
-                  bool implicit)
+  NonisolatedAttr(SourceLoc atLoc, SourceRange range,
+                  NonIsolatedModifier modifier, bool implicit)
       : DeclAttribute(DeclAttrKind::Nonisolated, atLoc, range, implicit) {
-    Bits.NonisolatedAttr.isUnsafe = unsafe;
-    assert((isUnsafe() == unsafe) && "not enough bits for unsafe state");
+    Bits.NonisolatedAttr.Modifier = static_cast<unsigned>(modifier);
+    assert((getModifier() == modifier) && "not enough bits for modifier");
   }
 
-  NonisolatedAttr(bool unsafe, bool implicit)
-      : NonisolatedAttr({}, {}, unsafe, implicit) {}
+  NonIsolatedModifier getModifier() const {
+    return static_cast<NonIsolatedModifier>(Bits.NonisolatedAttr.Modifier);
+  }
 
-  bool isUnsafe() const { return Bits.NonisolatedAttr.isUnsafe; }
+  bool isUnsafe() const { return getModifier() == NonIsolatedModifier::Unsafe; }
+  bool isNonSending() const {
+    return getModifier() == NonIsolatedModifier::NonSending;
+  }
+
+  static NonisolatedAttr *
+  createImplicit(ASTContext &ctx,
+                 NonIsolatedModifier modifier = NonIsolatedModifier::None) {
+    return new (ctx) NonisolatedAttr(/*atLoc*/ {}, /*range*/ {}, modifier,
+                                     /*implicit=*/true);
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Nonisolated;
@@ -2996,11 +3003,11 @@ public:
 
   /// Create a copy of this attribute.
   NonisolatedAttr *clone(ASTContext &ctx) const {
-    return new (ctx) NonisolatedAttr(AtLoc, Range, isUnsafe(), isImplicit());
+    return new (ctx) NonisolatedAttr(AtLoc, Range, getModifier(), isImplicit());
   }
 
   bool isEquivalent(const NonisolatedAttr *other, Decl *attachedTo) const {
-    return isUnsafe() == other->isUnsafe();
+    return getModifier() == other->getModifier();
   }
 };
 
@@ -3272,34 +3279,6 @@ public:
   bool isEquivalent(const ABIAttr *other, Decl *attachedTo) const {
     // Unsupported: tricky to implement and unneeded.
     return true;
-  }
-};
-
-class ExecutionAttr : public DeclAttribute {
-public:
-  ExecutionAttr(SourceLoc AtLoc, SourceRange Range,
-                ExecutionKind behavior,
-                bool Implicit)
-      : DeclAttribute(DeclAttrKind::Execution, AtLoc, Range, Implicit) {
-    Bits.ExecutionAttr.Behavior = static_cast<uint8_t>(behavior);
-  }
-
-  ExecutionAttr(ExecutionKind behavior, bool Implicit)
-      : ExecutionAttr(/*AtLoc=*/SourceLoc(), /*Range=*/SourceRange(), behavior,
-                      Implicit) {}
-
-  ExecutionKind getBehavior() const {
-    return static_cast<ExecutionKind>(Bits.ExecutionAttr.Behavior);
-  }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Execution;
-  }
-
-  UNIMPLEMENTED_CLONE(ExecutionAttr)
-
-  bool isEquivalent(const ExecutionAttr *other, Decl *attachedTo) const {
-    return getBehavior() == other->getBehavior();
   }
 };
 
@@ -3762,10 +3741,6 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
       Kind : 8
     );
-
-    SWIFT_INLINE_BITFIELD_FULL(ExecutionTypeAttr, TypeAttribute, 8,
-      Behavior : 8
-    );
   } Bits;
   // clang-format on
 
@@ -4033,28 +4008,6 @@ public:
     return getIsolationKindName(getIsolationKind());
   }
   static const char *getIsolationKindName(IsolationKind kind);
-
-  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
-};
-
-/// The @execution function type attribute.
-class ExecutionTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Execution> {
-  SourceLoc BehaviorLoc;
-
-public:
-  ExecutionTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
-                    Located<ExecutionKind> behavior)
-      : SimpleTypeAttr(atLoc, kwLoc, parensRange), BehaviorLoc(behavior.Loc) {
-    Bits.ExecutionTypeAttr.Behavior = uint8_t(behavior.Item);
-  }
-
-  ExecutionKind getBehavior() const {
-    return ExecutionKind(Bits.ExecutionTypeAttr.Behavior);
-  }
-
-  SourceLoc getBehaviorLoc() const {
-    return BehaviorLoc;
-  }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

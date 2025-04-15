@@ -8550,43 +8550,79 @@ GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
       (ActorIsolation, Type, DeclName, ActorIsolation))
 
 //===----------------------------------------------------------------------===//
-// MARK: @execution Attribute
+// MARK: @concurrent and nonisolated(nonsending) attributes
 //===----------------------------------------------------------------------===//
 
-ERROR(attr_execution_only_on_async,none,
-      "cannot use '@execution' on non-async %kind0",
-      (ValueDecl *))
+ERROR(execution_behavior_only_on_async,none,
+      "cannot use %0 on non-async %kind1",
+      (DeclAttribute, ValueDecl *))
 
-ERROR(attr_execution_only_on_async_closure,none,
-      "cannot use '@execution' on non-async closure",
-      ())
+ERROR(cannot_specify_execution_behavior_for_decl,none,
+      "%0 is only applicable to asynchronous functions, "
+      "initializers, subscripts and computed properties",
+      (DeclAttribute))
 
-ERROR(attr_execution_type_attr_only_on_async,none,
-      "cannot use '@execution' on non-async function type",
-      ())
+ERROR(execution_behavior_only_on_async_closure,none,
+      "cannot use %0 on non-async closure",
+      (DeclAttribute))
 
-ERROR(attr_execution_incompatible_isolated_parameter,none,
-      "cannot use '@execution' on %kind0 because it has "
-      "an isolated parameter: %1",
-      (ValueDecl *, ValueDecl *))
+ERROR(execution_behavior_type_attr_only_on_async,none,
+      "cannot use '@%0' on non-async function type",
+      (StringRef))
 
-ERROR(attr_execution_incompatible_dynamically_isolated_parameter,none,
-      "cannot use '@execution' on %kind0 because it has "
-      "a dynamically isolated parameter: %1",
-      (ValueDecl *, ValueDecl *))
+ERROR(nonisolated_nonsending_only_on_function_types, none,
+      "%0 may only be used on function types",
+      (TypeRepr *))
 
-ERROR(attr_execution_type_attr_incompatible_with_global_isolation,none,
-      "cannot use '@execution' because function type is "
-      "isolated to a global actor %0",
-      (Type))
+ERROR(nonisolated_nonsending_only_on_async,none,
+      "cannot use %0 on non-async function type",
+      (TypeRepr *))
 
-ERROR(attr_execution_type_attr_incompatible_with_isolated_param,none,
-      "cannot use '@execution' together with an isolated parameter",
-      ())
+ERROR(cannot_use_nonisolated_nonsending_together_with_concurrent,none,
+      "cannot use %0 together with '@concurrent'",
+      (TypeRepr *))
 
-ERROR(attr_execution_type_attr_incompatible_with_isolated_any,none,
-      "cannot use '@execution' together with @isolated(any)",
-      ())
+ERROR(execution_behavior_incompatible_isolated_parameter,none,
+      "cannot use %0 on %kind1 because it has "
+      "an isolated parameter: %2",
+      (DeclAttribute, ValueDecl *, ValueDecl *))
+
+ERROR(execution_behavior_incompatible_dynamically_isolated_parameter,none,
+      "cannot use %0 on %kind1 because it has "
+      "a dynamically isolated parameter: %2",
+      (DeclAttribute, ValueDecl *, ValueDecl *))
+
+ERROR(execution_behavior_attr_incompatible_with_global_isolation,none,
+      "cannot use %0 because function type is isolated to a global actor %1",
+      (DeclAttribute, Type))
+
+ERROR(execution_behavior_attr_incompatible_with_isolated_param,none,
+      "cannot use %0 together with an isolated parameter",
+      (DeclAttribute))
+
+ERROR(execution_behavior_type_attr_incompatible_with_global_isolation,none,
+      "cannot use '@%0' because function type is isolated to a global actor %1",
+      (StringRef, Type))
+
+ERROR(nonisolated_nonsending_incompatible_with_global_isolation,none,
+      "cannot use %0 because function type is isolated to a global actor %1",
+      (TypeRepr *, Type))
+
+ERROR(execution_behavior_type_attr_incompatible_with_isolated_param,none,
+      "cannot use '@%0' together with an isolated parameter",
+      (StringRef))
+
+ERROR(nonisolated_nonsending_incompatible_with_isolated_param,none,
+      "cannot use %0 together with an isolated parameter",
+      (TypeRepr *))
+
+ERROR(execution_behavior_type_attr_incompatible_with_isolated_any,none,
+      "cannot use '@%0' together with @isolated(any)",
+      (StringRef))
+
+ERROR(nonisolated_nonsending_incompatible_with_isolated_any,none,
+      "cannot use %0 together with @isolated(any)",
+      (TypeRepr *))
 
 ERROR(invalid_function_conversion_with_non_sendable,none,
       "cannot convert %0 to %1 because crossing of an isolation boundary "
