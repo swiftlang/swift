@@ -64,9 +64,15 @@ func testEraseFromIsolatedArgument() {
   requireIsolatedAnyWithActorArgument(hasIsolatedArgument)
 }
 
-func requireSendableNonIsolated(_ fn: @Sendable () -> ()) {}
+func requireSendableNonIsolated(_ fn: @Sendable () async -> ()) {}
 func testConvertIsolatedAnyToNonIsolated(fn: @Sendable @isolated(any) () -> ()) {
   requireSendableNonIsolated(fn)
+}
+
+func requireSendableNonIsolated_sync(_ fn: @Sendable () -> ()) {}
+func testConvertIsolatedAnyToNonIsolated_sync(fn: @Sendable @isolated(any) () -> ()) {
+  // expected-error @+1 {{cannot convert value of type '@isolated(any) @Sendable () -> ()' to expected argument type '@Sendable () -> ()}}
+  requireSendableNonIsolated_sync(fn)
 }
 
 func requireSendableGlobalActor(_ fn: @Sendable @MainActor () -> ()) {}

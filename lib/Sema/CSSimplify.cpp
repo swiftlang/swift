@@ -2943,6 +2943,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
                                           ConstraintLocatorBuilder locator) {
   auto isolation1 = func1->getIsolation(), isolation2 = func2->getIsolation();
 
+  // An @isolated(any) function cannot be converted to a non-@isolated(any)
+  // synchronous function regardless of whether or not it is itself async.
+  if (isolation1.isErased() && !isolation2.isErased() && !func2->isAsync())
+    return false;
+
   // If we have a difference in isolation kind, we need a conversion.
   // Make sure that we're looking for a conversion, and increase the
   // function-conversion score to make sure this solution is worse than
