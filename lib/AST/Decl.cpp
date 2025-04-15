@@ -3200,6 +3200,14 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
   llvm_unreachable("bad access semantics");
 }
 
+bool AbstractStorageDecl::isAccessedViaPhysicalStorage(
+    AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+    ResilienceExpansion expansion) const {
+  return getAccessStrategy(semantics, accessKind, module, expansion,
+                           /*useOldABI=*/false)
+             .getKind() == AccessStrategy::Kind::Storage;
+}
+
 bool AbstractStorageDecl::requiresOpaqueAccessors() const {
   // Subscripts always require opaque accessors, so don't even kick off
   // a request.

@@ -6244,6 +6244,11 @@ public:
                                    ResilienceExpansion expansion,
                                    bool useOldABI) const;
 
+  /// Whether access is via physical storage.
+  bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
+                                    AccessKind accessKind, ModuleDecl *module,
+                                    ResilienceExpansion expansion) const;
+
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
   bool isResilient() const;
