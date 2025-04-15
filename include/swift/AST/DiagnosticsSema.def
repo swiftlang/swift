@@ -5045,6 +5045,10 @@ ERROR(capture_across_type_decl,none,
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
 
+ERROR(isolated_any_conversion_to_synchronous_func,none,
+      "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
+      (Type, Type))
+
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 

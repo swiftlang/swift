@@ -2694,6 +2694,18 @@ namespace {
             }
           }
 
+          // @isolated(any) functions (async or not) cannot be converted to
+          // synchronous, non-@isolated(any) functions.
+          if (fromIsolation.isErased() && !toIsolation.isErased() &&
+              !toFnType->isAsync()) {
+            ctx.Diags
+                .diagnose(funcConv->getLoc(),
+                          diag::isolated_any_conversion_to_synchronous_func,
+                          fromFnType, toFnType)
+                .warnUntilFutureSwiftVersion();
+            return;
+          }
+
           // Conversions from non-Sendable types are handled by
           // region-based isolation.
           // Function conversions are used to inject concurrency attributes
