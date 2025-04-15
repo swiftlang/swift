@@ -1,4 +1,3 @@
-// REQUIRES: rdar145735542
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %s %import-libdispatch -swift-version 6 -o %t/a.out
 // RUN: %target-codesign %t/a.out
@@ -62,6 +61,42 @@ extension ThreadID: @unchecked Sendable {}
 @globalActor
 actor MyGlobalActor {
   static let shared: MyGlobalActor = MyGlobalActor()
+
+  @MyGlobalActor
+  static func test() {}
+}
+
+final class NaiveQueueExecutor: SerialExecutor {
+  let queue: DispatchQueue
+
+  init(queue: DispatchQueue) {
+    self.queue = queue
+  }
+
+  public func enqueue(_ job: consuming ExecutorJob) {
+    let unowned = UnownedJob(job)
+    print("NaiveQueueExecutor(\(self.queue.label)) enqueue [thread:\(getCurrentThreadID())]")
+    queue.async {
+      unowned.runSynchronously(on: self.asUnownedSerialExecutor())
+    }
+  }
+}
+
+@globalActor
+actor DifferentGlobalActor {
+  static let queue = DispatchQueue(label: "DifferentGlobalActor-queue")
+  let executor: NaiveQueueExecutor
+  nonisolated let unownedExecutor: UnownedSerialExecutor
+
+  init() {
+    self.executor = NaiveQueueExecutor(queue: DifferentGlobalActor.queue)
+    self.unownedExecutor = executor.asUnownedSerialExecutor()
+  }
+
+  static let shared: DifferentGlobalActor = DifferentGlobalActor()
+
+  @DifferentGlobalActor
+  static func test() {}
 }
 
 // Test on all platforms
@@ -89,6 +124,49 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
     print("inside startSynchronously, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
     _ = try? await Task.sleep(for: .seconds(1))
     print("after sleep, inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  }
+
+  return [t1, tt]
+}
+
+func syncOnMyGlobalActorHopToDifferentActor() -> [Task<Void, Never>] {
+  MyGlobalActor.shared.preconditionIsolated("Should be executing on the global actor here")
+  print("Confirmed to be on @MyGlobalActor")
+
+  // This task must be guaranteed to happen AFTER 'tt' because we are already on this actor
+  // so this enqueue must happen after we give up the actor.
+  print("schedule Task { @DifferentGlobalActor }, before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  let t1 = Task { @DifferentGlobalActor in
+    print("inside Task { @DifferentGlobalActor } [thread:\(getCurrentThreadID())] @ :\(#line)")
+    DifferentGlobalActor.shared.preconditionIsolated("Expected Task{} to be on DifferentGlobalActor")
+  }
+
+  print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  let outerTID = getCurrentThreadID()
+  let tt = Task.startSynchronously { @DifferentGlobalActor in
+    let innerTID = getCurrentThreadID()
+    print("inside startSynchronously, outer thread = \(outerTID)")
+    print("inside startSynchronously, inner thread = \(innerTID)")
+    if (compareThreadIDs(outerTID, .equal, innerTID)) {
+      // This case specifically is NOT synchronously run because we specified a different isolation for the closure
+      // and FORCED a hop to the DifferentGlobalActor executor.
+      print("ERROR! Outer Thread ID must NOT equal Thread ID inside runSynchronously synchronous part!")
+    }
+    // We crucially need to see this task be enqueued on the different global actor,
+    // so it did not execute "synchronously" after all - it had to hop to the other actor.
+    dispatchPrecondition(condition: .onQueue(DifferentGlobalActor.queue))
+    DifferentGlobalActor.shared.preconditionIsolated("Expected Task.startSynchronously { @DifferentGlobalActor in } to be on DifferentGlobalActor")
+
+    print("inside startSynchronously, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
+    _ = try? await Task.sleep(for: .milliseconds(100))
+
+    print("inside startSynchronously, after sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
+    dispatchPrecondition(condition: .onQueue(DifferentGlobalActor.queue))
+    DifferentGlobalActor.shared.preconditionIsolated("Expected Task.startSynchronously { @DifferentGlobalActor in } to be on DifferentGlobalActor")
+
+    // do something here
+    await MyGlobalActor.test()
+    DifferentGlobalActor.test()
   }
 
   return [t1, tt]
@@ -161,6 +239,33 @@ await Task { @MyGlobalActor in
 // CHECK: inside Task { @MyGlobalActor }, after sleep
 // resume on some other thread
 // CHECK: after sleep, inside startSynchronously
+
+print("\n\n==== ------------------------------------------------------------------")
+print("syncOnMyGlobalActorHopToDifferentActor()")
+
+await Task { @MyGlobalActor in
+  MyGlobalActor.shared.preconditionIsolated("Should be executing on the global actor here")
+  for t in syncOnMyGlobalActorHopToDifferentActor() {
+    await t.value
+  }
+}.value
+
+// Assertion Notes: We expect the task to be on the specified queue as we force the Task.startSynchronously
+// task to enqueue on the DifferentGlobalActor, however we CANNOT use threads to verify this behavior,
+// because dispatch may still pull tricks and reuse threads. We can only verify that we're on the right
+// queue, and that the `enqueue` calls on the target executor happen when we expect them to.
+//
+// CHECK: syncOnMyGlobalActorHopToDifferentActor()
+// CHECK: Confirmed to be on @MyGlobalActor
+// CHECK: before startSynchronously
+
+// This IS actually enqueueing on the target actor (not synchronous), as expected:
+// CHECK: NaiveQueueExecutor(DifferentGlobalActor-queue) enqueue
+// CHECK: inside startSynchronously, sleep now
+
+// After the sleep we get back onto the specified executor as expected
+// CHECK: NaiveQueueExecutor(DifferentGlobalActor-queue) enqueue
+// CHECK: inside startSynchronously, after sleep
 
 print("\n\n==== ------------------------------------------------------------------")
 var behavior: SynchronousTaskBehavior = .suspend
@@ -346,23 +451,6 @@ callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(
 
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, done
-
-final class NaiveQueueExecutor: SerialExecutor {
-  let queue: DispatchQueue
-
-  init(queue: DispatchQueue) {
-    self.queue = queue
-  }
-
-  public func enqueue(_ job: consuming ExecutorJob) {
-    let unowned = UnownedJob(job)
-    print("NaiveQueueExecutor(\(self.queue.label)) enqueue... [thread:\(getCurrentThreadID())]")
-    queue.async {
-    print("NaiveQueueExecutor(\(self.queue.label)) enqueue: run [thread:\(getCurrentThreadID())]")
-      unowned.runSynchronously(on: self.asUnownedSerialExecutor())
-    }
-  }
-}
 
 actor RecipientOnQueue {
   let executor: NaiveQueueExecutor
