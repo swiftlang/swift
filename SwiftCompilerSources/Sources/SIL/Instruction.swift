@@ -1474,7 +1474,7 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Bor
 }
 
 final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
-  var allocStack: AllocStackInst {
+  public var allocStack: AllocStackInst {
     var dest = destination
     if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
       dest = mark.operand.value

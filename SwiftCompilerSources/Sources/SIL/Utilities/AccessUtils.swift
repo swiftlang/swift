@@ -556,10 +556,6 @@ public struct AccessBaseAndScopes {
     self.scopes = scopes
   }
 
-  public var outerAddress: Value? {
-    base.address ?? scopes.last?.address
-  }
-
   public var enclosingAccess: EnclosingAccessScope {
     return scopes.first ?? .base(base)
   }
