@@ -28,6 +28,11 @@ extension CopyBlockInst : Simplifiable, SILCombineSimplifiable {
   /// ```
   ///
   func simplify(_ context: SimplifyContext) {
+    // Temporarily guarded with an experimental feature flag.
+    if !context.options.hasFeature(.CopyBlockOptimization) {
+      return
+    }
+
     if hasValidUses(block: self) {
       replaceBlock( self, with: operand.value, context)
       context.erase(instruction: self)

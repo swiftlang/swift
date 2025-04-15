@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -I %t %t/test.swift -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -I %t %t/test.swift -enable-experimental-feature CopyBlockOptimization -O -emit-sil | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CopyBlockOptimization
 
 //--- module.modulemap
 

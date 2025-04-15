@@ -1,6 +1,8 @@
-// RUN: %target-sil-opt %s -simplification -simplify-instruction=copy_block | %FileCheck %s
+// RUN: %target-sil-opt %s -enable-experimental-feature CopyBlockOptimization -simplification -simplify-instruction=copy_block | %FileCheck --check-prefix=CHECK --check-prefix=ENABLED %s
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=copy_block | %FileCheck --check-prefix=CHECK --check-prefix=DISABLED %s
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CopyBlockOptimization
 
 sil_stage canonical
 
@@ -9,9 +11,10 @@ import SwiftShims
 import Builtin
 
 // CHECK-LABEL: sil [ossa] @remove_copy_block :
-// CHECK-NOT:     copy_block
-// CHECK:         apply %0
-// CHECK-NOT:     destroy_value
+// ENABLED-NOT:     copy_block
+// ENABLED:         apply %0
+// ENABLED-NOT:     destroy_value
+// DISABLED:        copy_block
 // CHECK:       } // end sil function 'remove_copy_block'
 sil [ossa] @remove_copy_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
 bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
