@@ -80,7 +80,7 @@ struct RunToolchains: AsyncParsableCommand {
     let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
     let date = self.dateAsDate
-    guard var tagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) < date }) else {
+    guard var tagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= date }) else {
       log("Failed to find tag with date: \(date)")
       fatalError()
     }
