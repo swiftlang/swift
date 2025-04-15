@@ -3890,7 +3890,7 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (flags.isSending()) {
     if (!options.SuppressSendingArgsAndResults) {
-      printer.printAttrName("sending ");
+      printer.printKeyword("sending", options, " ");
     } else if (flags.getOwnershipSpecifier() ==
                ParamSpecifier::ImplicitlyCopyableConsuming) {
       // Ok. We are suppressing sending. If our ownership specifier was
@@ -3911,14 +3911,14 @@ static void printParameterFlags(ASTPrinter &printer,
   // `inout` implies `@escaping`
   if (flags.getOwnershipSpecifier() != ParamSpecifier::InOut) {
     if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
-      printer.printKeyword("@escaping", options, " ");
+      printer.printAttrName("@escaping ");
   }
 
   if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
   
   if (flags.isConstValue())
-    printer.printKeyword("@const", options, " ");
+    printer.printAttrName("@const ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
