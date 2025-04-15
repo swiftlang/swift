@@ -254,6 +254,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
+LANGUAGE_FEATURE(IsolatedConformances, 470, "Global-actor isolated conformances")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -276,6 +277,7 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 
 // Optional language features / modes
 
@@ -499,12 +501,6 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// regardless of whether the module they are declared in
 /// is resilient or not.
 EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
-
-/// Allow isolated conformances.
-EXPERIMENTAL_FEATURE(IsolatedConformances, true)
-
-/// Infer conformance isolation on global-actor-conforming types.
-EXPERIMENTAL_FEATURE(InferIsolatedConformances, true)
 
 /// Allow SwiftSettings
 EXPERIMENTAL_FEATURE(SwiftSettings, false)

@@ -376,6 +376,19 @@ public:
   /// the given protocol.
   bool requiresProtocol(Type type, ProtocolDecl *proto) const;
 
+  /// Determine whether a conformance requirement of the given type to the
+  /// given protocol prohibits the use of an isolated conformance.
+  ///
+  /// The use of an isolated conformance to satisfy a requirement T: P is
+  /// prohibited when T is a type parameter and T, or some type that can be
+  /// used to reach T, also conforms to Sendable or SendableMetatype. In that
+  /// case, the conforming type and the protocol (Sendable or SendableMetatype)
+  /// is returned.
+  ///
+  /// If there is no such requirement, returns std::nullopt.
+  std::optional<std::pair<Type, ProtocolDecl *>>
+  prohibitsIsolatedConformance(Type type) const;
+
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type) const;
 
