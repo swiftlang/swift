@@ -29,17 +29,6 @@
 #include "bitset"
 #include "queue" // TODO: remove and replace with our own mpsc
 
-// Does the runtime provide priority escalation support?
-#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
-    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
-    (defined(__arm64__) || defined(__x86_64__))
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
-#else
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
-#endif
-#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
-
 namespace swift {
 class AsyncTask;
 class AsyncContext;
@@ -312,7 +301,7 @@ public:
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
     static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
 #else
-    static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
+    static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
 #endif
 
     // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
@@ -321,7 +310,7 @@ public:
       6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
       + sizeof(RecursiveMutex);
 
-    char Storage[PrivateStorageSize];
+    void *Storage[PrivateStorageSize];
 
     /// Initialize this storage during the creation of a task.
     void initialize(JobPriority basePri);
