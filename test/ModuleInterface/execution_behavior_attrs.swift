@@ -10,6 +10,11 @@ public struct TestWithAttrs {
   // CHECK-NEXT: public func test(_: nonisolated(nonsending) @escaping () async -> Swift.Void)
   // CHECK-NEXT: #endif
   public func test(_: nonisolated(nonsending) @escaping () async -> Void) {}
+
+  // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  // CHECK-NEXT: public func withInOut(fn: nonisolated(nonsending) inout () async -> Swift.Void)
+  // CHECK-NEXT: #endif
+  public func withInOut(fn: nonisolated(nonsending) inout () async -> Void) {}
 }
 
 public struct Test {
