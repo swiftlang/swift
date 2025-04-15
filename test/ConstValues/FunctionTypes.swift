@@ -1,6 +1,6 @@
 // Constant globals on function types / function pointers
 // REQUIRES: swift_feature_CompileTimeValues
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -enable-experimental-feature CompileTimeValues
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
 
 func foo_void_to_void() {}
 func foo_int_to_int(x: Int) -> Int { return 42 }

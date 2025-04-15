@@ -6520,7 +6520,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
 }
 
 bool NotCompileTimeLiteralFailure::diagnoseAsError() {
-  emitDiagnostic(diag::expect_compile_time_const);
+  emitDiagnostic(diag::expect_compile_time_literal);
   return true;
 }
 

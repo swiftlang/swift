@@ -405,6 +405,10 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
+static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }

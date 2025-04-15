@@ -1,6 +1,6 @@
 // Constant globals rejected for not being constant values
 // REQUIRES: swift_feature_CompileTimeValues
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -enable-experimental-feature CompileTimeValues
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
 
 @const let a: Bool = Bool.random()
 // expected-error@-1 {{'@const' value should be initialized with a compile-time value}}
