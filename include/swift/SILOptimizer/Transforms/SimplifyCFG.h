@@ -180,7 +180,6 @@ private:
     }
   }
 
-  void findLoopHeaders();
   bool addToWorklistAfterSplittingEdges(SILBasicBlock *BB);
 };
 
