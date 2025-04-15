@@ -83,7 +83,7 @@ SILPrintSourceInfo("sil-print-sourceinfo", llvm::cl::init(false),
                    llvm::cl::desc("Include source annotation in SIL output"));
 
 llvm::cl::opt<bool>
-SILPrintTypes("sil-print-types", llvm::cl::init(false),
+SILPrintTypes("sil-print-types", llvm::cl::init(true),
                    llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
 
 llvm::cl::opt<bool>

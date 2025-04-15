@@ -25,11 +25,11 @@
 using namespace swift;
 
 llvm::cl::opt<bool>
-SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
+SILPrintOnError("sil-print-on-error", llvm::cl::init(true),
                 llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
 
 llvm::cl::opt<bool> SILPrintModuleOnError(
-    "sil-print-module-on-error", llvm::cl::init(false),
+    "sil-print-module-on-error", llvm::cl::init(true),
     llvm::cl::desc("Printing SIL module in crash diagnostics."));
 
 static void printLocationDescription(llvm::raw_ostream &out,
