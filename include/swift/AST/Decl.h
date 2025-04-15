@@ -6902,6 +6902,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
+
+    /// Whether or not this parameter is isolated to a caller.
+    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -7188,6 +7191,18 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
+  }
+
+  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
+  bool isCallerIsolated() const {
+    return getOptions().contains(Flag::IsCallerIsolated);
+  }
+
+  void setCallerIsolated(bool value = true) {
+    if (value)
+      addFlag(Flag::IsCallerIsolated);
+    else
+      removeFlag(Flag::IsCallerIsolated);
   }
 
   /// Whether or not this parameter is marked with '@_addressable'.
