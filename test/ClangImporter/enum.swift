@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -compiler-assertions
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -compiler-assertions 2>&1 | %FileCheck %s
 // -- Check that we can successfully round-trip.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir -primary-file %s | %FileCheck -check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir -primary-file %s -compiler-assertions | %FileCheck -check-prefix=CHECK-IR %s
 
 // REQUIRES: objc_interop
 
