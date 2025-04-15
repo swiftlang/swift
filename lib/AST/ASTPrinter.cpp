@@ -3856,13 +3856,6 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("nonisolated(nonsending)", options, " ");
   }
 
-  if (!options.excludeAttrKind(TypeAttrKind::Autoclosure) &&
-      flags.isAutoClosure())
-    printer.printAttrName("@autoclosure ");
-  if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
-      flags.isNoDerivative())
-    printer.printAttrName("@noDerivative ");
-
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
     /*nothing*/
@@ -3908,15 +3901,22 @@ static void printParameterFlags(ASTPrinter &printer,
       printer.printKeyword("isolated", options, " ");
   }
 
+  if (flags.isCompileTimeLiteral())
+    printer.printKeyword("_const", options, " ");
+
+  if (!options.excludeAttrKind(TypeAttrKind::Autoclosure) &&
+      flags.isAutoClosure())
+    printer.printAttrName("@autoclosure ");
+  if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
+      flags.isNoDerivative())
+    printer.printAttrName("@noDerivative ");
+
   // `inout` implies `@escaping`
   if (flags.getOwnershipSpecifier() != ParamSpecifier::InOut) {
     if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
       printer.printAttrName("@escaping ");
   }
 
-  if (flags.isCompileTimeLiteral())
-    printer.printKeyword("_const", options, " ");
-  
   if (flags.isConstValue())
     printer.printAttrName("@const ");
 }
