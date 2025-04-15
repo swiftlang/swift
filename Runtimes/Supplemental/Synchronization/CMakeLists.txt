@@ -18,12 +18,13 @@ if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Synchronization must build as a standalone project")
 endif()
 
-set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR #ToDo: What is this for, why would i need this for a supplemental lib?
+set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
 find_package(SwiftCore)
 include(gyb)
+include(AvailabilityMacros)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -56,7 +57,7 @@ add_library(swiftSynchronization
   $<$<PLATFORM_ID:WINDOWS>:Mutex/WindowsImpl.swift>)
 
 set_target_properties(swiftSynchronization PROPERTIES
-  Swift_MODULE_NAME _Synchronization
+  Swift_MODULE_NAME Synchronization
   Swift_COMPILATION_MODE wholemodule)
 
 target_link_libraries(swiftSynchronization
