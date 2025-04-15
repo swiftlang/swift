@@ -18,7 +18,9 @@
 
 #include "swift/AST/DiagnosticBridge.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
@@ -755,6 +757,13 @@ public:
     auto &Serializer = getSerializer();
     assert(SM.getFileSystem() == Serializer.getSourceMgr().getFileSystem() &&
            "Caching for a different file system");
+
+    // Bypass the caching.
+    if (BypassDiagIDs.count(Info.ID)) {
+      for (auto *Diag : OrigConsumers)
+        Diag->handleDiagnostic(Serializer.getSourceMgr(), Info);
+      return;
+    }
     Serializer.handleDiagnostic(SM, Info, [&](const DiagnosticInfo &Info) {
       for (auto *Diag : OrigConsumers)
         Diag->handleDiagnostic(Serializer.getSourceMgr(), Info);
@@ -808,6 +817,8 @@ private:
   // be alive until all consumers finishProcessing() and user needs to keep
   // Processor/Serializer alive until then.
   std::unique_ptr<DiagnosticSerializer> Serializer;
+
+  const llvm::SmallDenseSet<DiagID> BypassDiagIDs = {diag::macro_loaded.ID};
 
   SourceManager &InstanceSourceMgr;
   const FrontendInputsAndOutputs &InAndOut;

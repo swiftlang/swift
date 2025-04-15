@@ -1262,6 +1262,10 @@ REMARK(macro_loaded,none,
        "compiler plugin server '%2' with shared library '%3'}1",
        (Identifier, unsigned, StringRef, StringRef))
 
+ERROR(resolved_macro_changed,none,
+      "resolved macro library '%0' failed verification: %1",
+      (StringRef, StringRef))
+
 REMARK(transitive_dependency_behavior,none,
        "%1 has %select{a required|an optional|an ignored}2 "
        "transitive dependency on '%0'",
