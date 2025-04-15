@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -mergeable-symbols -num-threads 2 -O -c -emit-module -o %t/MyModule.o             %t/MyModule.swift                   -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -mergeable-symbols -num-threads 2 -O -c              -o %t/MainA.o -o %t/MainB.o  %t/MainA.swift %t/MainB.swift -I %t -enable-experimental-feature Embedded -parse-as-library
-// RUN: %target-clang %linux_rng_support_c_if_needed %t/MainA.o %t/MainB.o %t/MyModule.o -o %t/a.out
+// RUN: %target-embedded-link %t/MainA.o %t/MainB.o %t/MyModule.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
