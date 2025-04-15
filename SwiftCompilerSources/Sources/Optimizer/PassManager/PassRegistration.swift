@@ -114,6 +114,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(LoadInst.self,             { run(LoadInst.self, $0) })
   registerForSILCombine(LoadBorrowInst.self,       { run(LoadBorrowInst.self, $0) })
   registerForSILCombine(CopyValueInst.self,        { run(CopyValueInst.self, $0) })
+  registerForSILCombine(CopyBlockInst.self,        { run(CopyBlockInst.self, $0) })
   registerForSILCombine(DestroyValueInst.self,     { run(DestroyValueInst.self, $0) })
   registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
