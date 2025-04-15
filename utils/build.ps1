@@ -1837,7 +1837,7 @@ function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $Te
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
         LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
-        LLVM_LIT_ARGS = "-v --no-gtest-sharding --show-xfail";
+        LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
         LLVM_UNITTEST_LINK_FLAGS = "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
       }
