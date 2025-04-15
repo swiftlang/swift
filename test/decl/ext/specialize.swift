@@ -47,7 +47,7 @@ extension IntField {
 }
 
 struct S<X, Y> {}
-typealias InferredSepcializedNestedTypes<X> = S<X, (Int, [Int]?)>
+typealias InferredSpecializedNestedTypes<X> = S<X, (Int, [Int]?)>
 
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
