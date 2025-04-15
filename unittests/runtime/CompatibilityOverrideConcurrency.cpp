@@ -118,7 +118,7 @@ static void swift_task_startOnMainActor_override(AsyncTask* task) {
 }
 
 SWIFT_CC(swift)
-static void swift_task_startSynchronously_override(AsyncTask* task) {
+static void swift_task_startSynchronously_override(AsyncTask* task, SerialExecutorRef targetExecutor) {
   Ran = true;
 }
 
@@ -351,7 +351,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startSynchronously) {
-  swift_task_startSynchronously(nullptr);
+  swift_task_startSynchronously(nullptr, SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
