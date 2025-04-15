@@ -5,6 +5,13 @@
 
 // REQUIRES: concurrency
 
+public struct TestWithAttrs {
+  // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
+  // CHECK-NEXT: public func test(_: nonisolated(nonsending) @escaping () async -> Swift.Void)
+  // CHECK-NEXT: #endif
+  public func test(_: nonisolated(nonsending) @escaping () async -> Void) {}
+}
+
 public struct Test {
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
   // CHECK-NEXT: nonisolated(nonsending) public init() async

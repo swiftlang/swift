@@ -3848,7 +3848,14 @@ static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
                                 const ParamDecl *param,
                                 ParameterTypeFlags flags,
-                                bool escaping) {
+                                bool escaping,
+                                bool isIsolatedToCaller = false) {
+  // Always print `nonisolated(nonsending)` specifier on a parameter
+  // first, to avoid any issues with ordering.
+  if (isIsolatedToCaller) {
+    printer.printKeyword("nonisolated(nonsending)", options, " ");
+  }
+
   if (!options.excludeAttrKind(TypeAttrKind::Autoclosure) &&
       flags.isAutoClosure())
     printer.printAttrName("@autoclosure ");
@@ -4024,11 +4031,24 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   printArgName();
 
+  auto interfaceTy = param->getInterfaceType();
+
+  // If type of this parameter is isolated to a caller, let's
+  // strip the isolation from the type to avoid printing it as
+  // part of the function type because that would break ordering
+  // between specifiers and attributes.
+  if (param->isCallerIsolated()) {
+    if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
+      interfaceTy =
+          funcTy->withIsolation(FunctionTypeIsolation::forNonIsolated());
+    }
+  }
+
   TypeLoc TheTypeLoc;
   if (auto *repr = param->getTypeRepr()) {
-    TheTypeLoc = TypeLoc(repr, param->getInterfaceType());
+    TheTypeLoc = TypeLoc(repr, interfaceTy);
   } else {
-    TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
+    TheTypeLoc = TypeLoc::withoutLoc(interfaceTy);
   }
 
   {
@@ -4040,7 +4060,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
         !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
       auto type = TheTypeLoc.getType();
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type));
+                          isEscaping(type),
+                          param->isCallerIsolated());
     }
 
     printTypeLocForImplicitlyUnwrappedOptional(
