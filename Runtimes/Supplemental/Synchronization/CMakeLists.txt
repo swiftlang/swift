@@ -27,6 +27,8 @@ include(gyb)
 include(AvailabilityMacros)
 
 add_compile_options(
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-enable-builtin-module> # Are these contradictory?
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
