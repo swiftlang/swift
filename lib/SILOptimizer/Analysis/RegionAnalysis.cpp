@@ -1917,8 +1917,11 @@ class PartitionOpTranslator {
 
   SILFunction *function;
 
-  /// A cache of argument IDs.
-  std::optional<Partition> functionArgPartition;
+  /// The initial partition of the entry block.
+  ///
+  /// This contains a single region for non-sending parameters as well as
+  /// separate regions for each sending parameter.
+  std::optional<Partition> initialEntryBlockPartition;
 
   /// A builder struct that we use to convert individual instructions into lists
   /// of PartitionOps.
@@ -1983,7 +1986,7 @@ public:
   PartitionOpTranslator(SILFunction *function, PostOrderFunctionInfo *pofi,
                         RegionAnalysisValueMap &valueMap,
                         IsolationHistory::Factory &historyFactory)
-      : function(function), functionArgPartition(), builder(),
+      : function(function), initialEntryBlockPartition(), builder(),
         partialApplyReachabilityDataflow(function, valueMap, pofi),
         valueMap(valueMap) {
     builder.translator = this;
@@ -2006,8 +2009,8 @@ public:
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    None.\n");
-      functionArgPartition = Partition::singleRegion(SILLocation::invalid(), {},
-                                                     historyFactory.get());
+      initialEntryBlockPartition = Partition::singleRegion(
+          SILLocation::invalid(), {}, historyFactory.get());
       return;
     }
 
@@ -2044,10 +2047,10 @@ public:
       }
     }
 
-    functionArgPartition = Partition::singleRegion(
+    initialEntryBlockPartition = Partition::singleRegion(
         SILLocation::invalid(), nonSendableJoinedIndices, historyFactory.get());
     for (Element elt : nonSendableSeparateIndices) {
-      functionArgPartition->trackNewElement(elt);
+      initialEntryBlockPartition->trackNewElement(elt);
     }
   }
 
@@ -2116,8 +2119,10 @@ private:
 public:
   /// Return the partition consisting of all function arguments.
   ///
-  /// Used to initialize the entry blocko of our analysis.
-  const Partition &getEntryPartition() const { return *functionArgPartition; }
+  /// Used to initialize the initial partition of the entry block of the CFG.
+  const Partition &getInitialEntryPartition() const {
+    return *initialEntryBlockPartition;
+  }
 
   /// Get the results of an apply instruction.
   ///
@@ -4139,7 +4144,7 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
   }
   // Set our entry partition to have the "entry partition".
   (*blockStates)[fn->getEntryBlock()].entryPartition =
-      translator->getEntryPartition();
+      translator->getInitialEntryPartition();
   runDataflow();
 }
 
