@@ -3013,6 +3013,19 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     }
   }
 
+  // If any overridden decl requires the underscored version, then this decl
+  // does too.  Otherwise dispatch to the underscored version on a value
+  // statically the super but dynamically this subtype would not dispatch to an
+  // override of the underscored version but rather (incorrectly) the
+  // supertype's implementation.
+  auto *current = this;
+  while ((current = current->getOverriddenDecl())) {
+    if (current->requiresCorrespondingUnderscoredCoroutineAccessor(kind,
+                                                                   nullptr)) {
+      return true;
+    }
+  }
+
   // Non-exported storage has no ABI to keep stable.
   if (isExported(storage) == ExportedLevel::None)
     return false;
