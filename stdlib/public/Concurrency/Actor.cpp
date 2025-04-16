@@ -506,7 +506,13 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
 static swift_task_is_current_executor_flag
 _getIsolationCheckingOptionsFromExecutorWitnessTable(const SerialExecutorWitnessTable *_wtable) {
   const WitnessTable* wtable = reinterpret_cast<const WitnessTable*>(_wtable);
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+  auto description = lookThroughOptionalConditionalWitnessTable(
+    reinterpret_cast<const RelativeWitnessTable*>(wtable))
+    ->getDescription();
+#else
   auto description = wtable->getDescription();
+#endif
   if (!description) {
     return swift_task_is_current_executor_flag::None;
   }
