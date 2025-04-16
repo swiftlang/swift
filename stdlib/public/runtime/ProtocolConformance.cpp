@@ -563,14 +563,19 @@ namespace {
                           ConformanceLookupResult result)
       : Type(key.Type), Witness(result.witnessTable)
     {
-      if (result.globalActorIsolationType) {
-        ProtoOrStorage = new ExtendedStorage{
-          key.Proto, result.globalActorIsolationType,
-          result.globalActorIsolationWitnessTable
-        };
-      } else {
+      if (!result.globalActorIsolationType) {
         ProtoOrStorage = key.Proto;
+        return;
       }
+
+      // Allocate extended storage.
+      void *memory = malloc(sizeof(ExtendedStorage));
+      auto storage = new (memory) ExtendedStorage{
+        key.Proto, result.globalActorIsolationType,
+        result.globalActorIsolationWitnessTable
+      };
+
+      ProtoOrStorage = storage;
     }
 
     bool matchesKey(const ConformanceCacheKey &key) const {
