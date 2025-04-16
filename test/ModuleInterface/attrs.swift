@@ -100,3 +100,12 @@ public enum TestExtensible {
   case a
   case b
 }
+
+public struct TestPlacementOfAttrsAndSpecifiers {
+  // CHECK: public func test1<T>(_: sending @autoclosure () -> T)
+  public func test1<T>(_: sending @autoclosure () -> T) {}
+  // CHECK: public func test2<T>(_: borrowing @autoclosure () -> T)
+  public func test2<T>(_: borrowing @autoclosure () -> T) {}
+  // CHECK: public func test3<T>(_: inout () async -> T)
+  public func test3<T>(_: inout () async -> T) {}
+}
