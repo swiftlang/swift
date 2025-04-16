@@ -586,7 +586,10 @@ namespace {
       if (auto proto = ProtoOrStorage.dyn_cast<const ProtocolDescriptor *>())
         return proto;
 
-      return ProtoOrStorage.get<const ExtendedStorage *>()->Proto;
+      if (auto storage = ProtoOrStorage.dyn_cast<const ExtendedStorage *>())
+        return storage->Proto;
+
+      return nullptr;
     }
 
     /// Get the conformance cache key.
