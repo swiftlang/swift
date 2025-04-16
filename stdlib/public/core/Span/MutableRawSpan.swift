@@ -18,8 +18,7 @@ import Swift
 // contains initialized `Element` instances.
 @safe
 @frozen
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 public struct MutableRawSpan: ~Copyable & ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
@@ -45,12 +44,10 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan: @unchecked Sendable {}
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   @unsafe
@@ -123,8 +120,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
   @_alwaysEmitIntoClient
   public var byteCount: Int { _count }
@@ -138,8 +134,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
@@ -164,8 +159,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   @_alwaysEmitIntoClient
@@ -177,8 +171,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   public var bytes: RawSpan {
@@ -214,8 +207,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -356,8 +348,7 @@ extension MutableRawSpan {
 #if !SPAN_COMPATIBILITY_STUB
 
 //MARK: copyMemory
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
@@ -450,8 +441,7 @@ extension MutableRawSpan {
 #endif
 
 // MARK: sub-spans
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   /// Constructs a new span over the items within the supplied range of
@@ -566,8 +556,7 @@ extension MutableRawSpan {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableRawSpan {
 
   /// Returns a span containing the initial elements of this span,

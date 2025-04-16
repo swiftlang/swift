@@ -18,8 +18,7 @@ import Swift
 // contains initialized `Element` instances.
 @safe
 @frozen
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 public struct MutableSpan<Element: ~Copyable>
 : ~Copyable, ~Escapable {
   @usableFromInline
@@ -46,12 +45,10 @@ public struct MutableSpan<Element: ~Copyable>
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan: @unchecked Sendable where Element: Sendable {}
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   @unsafe
@@ -94,8 +91,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan {
 
   @unsafe
@@ -110,8 +106,7 @@ extension MutableSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   @unsafe
@@ -163,8 +158,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -180,8 +174,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -193,8 +186,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   @_alwaysEmitIntoClient
@@ -210,8 +202,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -224,8 +215,7 @@ extension MutableSpan where Element: ~Copyable {
 }
 
 //MARK: Collection, RandomAccessCollection
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -242,8 +232,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   /// Construct a RawSpan over the memory represented by this span
@@ -269,8 +258,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -323,8 +311,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -347,8 +334,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -397,8 +383,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -429,8 +414,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -456,8 +440,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 }
 
 //MARK: bulk-update functions
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan {
 
   @_alwaysEmitIntoClient
@@ -542,8 +525,7 @@ extension MutableSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
 //  @_alwaysEmitIntoClient
@@ -576,8 +558,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan {
 
   @_alwaysEmitIntoClient
@@ -589,8 +570,7 @@ extension MutableSpan {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
@@ -684,8 +664,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 }
 
 // MARK: sub-spans
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
@@ -803,8 +782,7 @@ extension MutableSpan where Element: ~Copyable {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,
