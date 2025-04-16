@@ -256,6 +256,7 @@ LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(IsolatedConformances, 470, "Global-actor isolated conformances")
 LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
+LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
