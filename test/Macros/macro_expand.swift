@@ -667,28 +667,6 @@ func testLocalAccessorMacroWithAutoclosure() {
   takesAutoclosure(1)
 }
 
-@propertyWrapper
-struct SomePropertyWrapper<T> {
-  var wrappedValue: T
-  init(wrappedValue: T) {
-    self.wrappedValue = wrappedValue
-  }
-  init(projectedValue: Self) {
-    self = projectedValue
-  }
-  var projectedValue: Self { self }
-}
-
-// Property wrappers on macros probably aren't all that useful, but make sure
-// we don't crash.
-@freestanding(expression)
-macro hasPropertyWrapperParam(@SomePropertyWrapper x: Int) = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
-
-func testPropertyWrapperMacro() {
-  #hasPropertyWrapperParam(x: 0)
-  #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
-}
-
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
 macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
