@@ -145,7 +145,7 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
-      unsafe UnsafeMutablePointer<Element>(Builtin.addressOf(&self))
+      unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&self))
     }
   }
 
