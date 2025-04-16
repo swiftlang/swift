@@ -2577,8 +2577,13 @@ private:
 
     // Scope outermost fileprivate decls in an inline private discriminator
     // namespace.
+    //
+    // We need to don't do this for decls imported from Clang modules because
+    // the scopes of C/C++ symbols are not restricted to a particular file unit.
     if (auto *Decl = DbgTy.getDecl())
-      if (Decl->isOutermostPrivateOrFilePrivateScope())
+      if (Decl->isOutermostPrivateOrFilePrivateScope() &&
+          !isa<ClangModuleUnit>(
+              Decl->getDeclContext()->getModuleScopeContext()))
         Scope = getFilePrivateScope(Scope, Decl);
 
     return Scope;
