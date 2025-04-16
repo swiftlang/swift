@@ -1131,7 +1131,7 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
   }
 }
 
-static bool printSwiftFeature(CompilerInstance &instance) {
+static bool printSwiftArguments(CompilerInstance &instance) {
   ASTContext &context = instance.getASTContext();
   const CompilerInvocation &invocation = instance.getInvocation();
   const FrontendOptions &opts = invocation.getFrontendOptions();
@@ -1227,8 +1227,8 @@ static bool performAction(CompilerInstance &Instance,
     return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::PrintVersion:
     return printSwiftVersion(Instance.getInvocation());
-  case FrontendOptions::ActionType::PrintFeature:
-    return printSwiftFeature(Instance);
+  case FrontendOptions::ActionType::PrintArguments:
+    return printSwiftArguments(Instance);
   case FrontendOptions::ActionType::REPL:
     llvm::report_fatal_error("Compiler-internal integrated REPL has been "
                              "removed; use the LLDB-enhanced REPL instead.");

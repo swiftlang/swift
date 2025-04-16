@@ -1654,9 +1654,13 @@ def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def emit_supported_features : Flag<["-"], "emit-supported-features">,
-  HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
+def emit_supported_arguments : Flag<["-"], "emit-supported-arguments">,
+  HelpText<"Emit a JSON file including all supported compiler arguments">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_supported_features : Flag<["-"], "emit-supported-features">,
+  HelpText<"This is a compatibility alias for '-emit-supported-arguments'">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  Alias<emit_supported_arguments>;
 
 def enable_incremental_imports :
   Flag<["-"], "enable-incremental-imports">,

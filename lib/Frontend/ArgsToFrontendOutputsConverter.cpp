@@ -451,7 +451,7 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   case swift::FrontendOptions::ActionType::DumpPCM:
   case swift::FrontendOptions::ActionType::ScanDependencies:
   case swift::FrontendOptions::ActionType::PrintVersion:
-  case swift::FrontendOptions::ActionType::PrintFeature:
+  case swift::FrontendOptions::ActionType::PrintArguments:
     return false;
   }
 }
