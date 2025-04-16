@@ -929,7 +929,7 @@ extension LifetimeDependenceDefUseWalker {
       // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
       // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
       return .continueWalk
-    case .store:
+    case .store, .storeBorrow:
       // A store does not use the previous in-memory value.
       return .continueWalk
     case .apply:
