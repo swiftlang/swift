@@ -523,7 +523,6 @@ extension InlineArray where Element: ~Copyable {
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
-  @_addressableSelf
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
