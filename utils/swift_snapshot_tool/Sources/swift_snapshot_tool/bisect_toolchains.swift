@@ -95,7 +95,7 @@ struct BisectToolchains: AsyncParsableCommand {
     // just say 50 toolchains ago. To get a few weeks worth. This is easier than
     // writing dates a lot.
     let oldDateAsDate = self.oldDateAsDate
-    guard let goodTagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) < oldDateAsDate }) else {
+    guard let goodTagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= oldDateAsDate }) else {
       log("Failed to find tag with date: \(oldDateAsDate)")
       fatalError()
     }
