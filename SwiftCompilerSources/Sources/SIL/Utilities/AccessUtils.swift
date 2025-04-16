@@ -89,6 +89,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
   /// The access base is some SIL pattern which does not fit into any other case.
   /// This should be a very rare situation.
+  ///
+  /// TODO: unidentified should preserve its base address value, but AccessBase must be Hashable.
   case unidentified
 
   public init(baseAddress: Value) {
