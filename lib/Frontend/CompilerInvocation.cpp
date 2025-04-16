@@ -2649,7 +2649,7 @@ static void configureDiagnosticEngine(
   std::string docsPath = Options.DiagnosticDocumentationPath;
   if (docsPath.empty()) {
     // Point at the latest Markdown documentation on GitHub.
-    docsPath = "https://github.com/swiftlang/swift/tree/main/userdocs/diagnostics";
+    docsPath = "https://docs.swift.org/compiler/documentation/diagnostics";
   }
   Diagnostics.setDiagnosticDocumentationPath(docsPath);
 
