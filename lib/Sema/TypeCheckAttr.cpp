@@ -1260,7 +1260,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilSwiftVersion(7);
+                .warnUntilFutureSwiftVersion();
           }
         }
       }

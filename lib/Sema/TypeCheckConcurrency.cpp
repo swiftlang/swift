@@ -2675,7 +2675,7 @@ namespace {
                     fromType, toType);
 
                 if (downgradeToWarning)
-                  diag.warnUntilSwiftVersion(7);
+                  diag.warnUntilFutureSwiftVersion();
               }
 
               for (auto type : nonSendableTypes) {
