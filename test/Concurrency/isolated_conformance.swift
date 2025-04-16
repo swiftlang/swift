@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-experimental-feature IsolatedConformances %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s
 
-// REQUIRES: swift_feature_IsolatedConformances
 // REQUIRES: concurrency
 
 protocol P {
@@ -11,7 +10,7 @@ protocol P {
 // Definition of isolated conformances
 // ----------------------------------------------------------------------------
 
-// expected-error@+4{{conformance of 'CWithNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+// expected-warning@+4{{conformance of 'CWithNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
 // expected-note@+3{{mark all declarations used in the conformance 'nonisolated'}}
 // expected-note@+2{{isolate this conformance to the main actor with '@MainActor'}}{{25-25=@MainActor }}
 @MainActor
@@ -54,7 +53,7 @@ protocol Q {
   associatedtype A: P
 }
 
-// expected-error@+2{{conformance of 'SMissingIsolation' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
+// expected-warning@+2{{conformance of 'SMissingIsolation' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 struct SMissingIsolation: Q {
   // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
@@ -66,7 +65,7 @@ struct PWrapper<T: P>: P {
   func f() { }
 }
 
-// expected-error@+2{{conformance of 'SMissingIsolationViaWrapper' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
+// expected-warning@+2{{conformance of 'SMissingIsolationViaWrapper' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 struct SMissingIsolationViaWrapper: Q {
   // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
@@ -84,7 +83,7 @@ struct S: @MainActor Q {
   typealias A = C
 }
 
-// expected-error@+3{{conformance of 'SMismatchedActors' to protocol 'Q' crosses into global actor 'SomeGlobalActor'-isolated code and can cause data races}}
+// expected-warning@+3{{conformance of 'SMismatchedActors' to protocol 'Q' crosses into global actor 'SomeGlobalActor'-isolated code and can cause data races}}
 // expected-note@+2{{conformance depends on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to protocol 'P'}}
 @MainActor
 struct SMismatchedActors: @MainActor Q {
@@ -149,7 +148,41 @@ func testIsolatedConformancesOfOtherGlobalActor(c: CMismatchedIsolation) {
 }
 
 func testIsolationConformancesFromOutside(c: C) {
-  acceptP(c) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
-  let _: any P = c // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
-  let _ = PWrapper<C>() // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  acceptP(c) // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  let _: any P = c // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  let _ = PWrapper<C>() // expected-warning{{main actor-isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+}
+
+protocol HasAssociatedType {
+  associatedtype A
+}
+
+func acceptHasAssocWithP<T: HasAssociatedType>(_: T) where T.A: P { }
+
+func acceptSendableHasAssocWithP<T: Sendable & HasAssociatedType>(_: T) where T.A: P { }
+// expected-note@-1{{'acceptSendableHasAssocWithP' declared here}}
+
+
+struct HoldsC: HasAssociatedType {
+  typealias A = C
+}
+
+extension HasAssociatedType {
+  static func acceptAliased<T: P>(_: T.Type) where A == T { }
+}
+
+extension HasAssociatedType where Self: Sendable {
+  static func acceptSendableAliased<T: P>(_: T.Type) where A == T { }
+}
+
+func testIsolatedConformancesOnAssociatedTypes(hc: HoldsC, c: C) {
+  acceptHasAssocWithP(hc)
+  acceptSendableHasAssocWithP(hc) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a 'Sendable' type parameter }}
+
+  HoldsC.acceptAliased(C.self) // okay
+
+  // FIXME: the following should produce an error, because the isolated
+  // conformance of C: P can cross isolation boundaries via the Sendable Self's
+  // associated type.
+  HoldsC.acceptSendableAliased(C.self)
 }

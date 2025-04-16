@@ -1,9 +1,8 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedConformances -target %target-swift-5.1-abi-triple) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_IsolatedConformances
 // UNSUPPORTED: back_deployment_runtime
 
 // FIXME: WebAssembly doesn't currently have a good way to install the

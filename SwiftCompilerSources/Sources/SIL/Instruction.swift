@@ -1071,7 +1071,7 @@ class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {
 final public class ThickToObjCMetatypeInst : SingleValueInstruction {}
 final public class ObjCToThickMetatypeInst : SingleValueInstruction {}
 
-final public class CopyBlockInst : SingleValueInstruction {}
+final public class CopyBlockInst : SingleValueInstruction, UnaryInstruction {}
 final public class CopyBlockWithoutEscapingInst : SingleValueInstruction {}
 
 final public

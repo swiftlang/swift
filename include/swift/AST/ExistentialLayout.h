@@ -105,6 +105,9 @@ struct ExistentialLayout {
   /// calling this on a temporary is likely to be incorrect.
   ArrayRef<ProtocolDecl*> getProtocols() const && = delete;
 
+  /// Determine whether this refers to any non-marker protocols.
+  bool containsNonMarkerProtocols() const;
+
   ArrayRef<ParameterizedProtocolType *> getParameterizedProtocols() const & {
     return parameterized;
   }

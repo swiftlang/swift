@@ -10565,26 +10565,34 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
     auto shouldCheckSendabilityOfBase = [&]() {
       if (!Context.getProtocol(KnownProtocolKind::Sendable))
-        return false;
+        return Type();
 
-      return llvm::any_of(lookup, [&](const auto &result) {
+      for (const auto &result : lookup) {
         auto decl = result.getValueDecl();
         if (!isa_and_nonnull<FuncDecl>(decl))
-          return false;
+          continue;
 
-        if (!decl->isInstanceMember())
-          return false;
+        if (!decl->isInstanceMember() &&
+            !decl->getDeclContext()->getSelfProtocolDecl())
+          continue;
 
         auto hasAppliedSelf = decl->hasCurriedSelf() &&
                               doesMemberRefApplyCurriedSelf(baseObjTy, decl);
         auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-        return numApplies < decl->getNumCurryLevels();
-      });
+        if (numApplies >= decl->getNumCurryLevels())
+          continue;
+
+        return decl->isInstanceMember()
+          ? instanceTy
+          : MetatypeType::get(instanceTy);
+      }
+
+      return Type();
     };
 
-    if (shouldCheckSendabilityOfBase()) {
+    if (Type baseTyToCheck = shouldCheckSendabilityOfBase()) {
       auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = lookupConformance(instanceTy, sendableProtocol);
+      auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
 
       if (llvm::any_of(
               baseConformance.getConditionalRequirements(),
@@ -10593,8 +10601,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                   return false;
 
                 return (req.getFirstType()->hasTypeVariable() &&
-                        req.getProtocolDecl()->isSpecificProtocol(
-                            KnownProtocolKind::Sendable));
+                        (req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::Sendable) ||
+                         req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::SendableMetatype)));
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;

@@ -2567,13 +2567,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  // Complain if the global-actor-isolated conformances are not enabled.
-  if (conformance->isIsolated() &&
-      !Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
-    Context.Diags.diagnose(
-        ComplainLoc, diag::isolated_conformance_experimental_feature);
-  }
-  
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
@@ -4963,6 +4956,9 @@ static void diagnoseConformanceIsolationErrors(
       hasIsolatedConformances = true;
     }
 
+    // Take the least-restrictive behavior.
+    behavior = behavior.merge(assocConformanceError.behavior);
+
     anyNonDistributedIssues = true;
   }
 
@@ -4991,8 +4987,7 @@ static void diagnoseConformanceIsolationErrors(
     }
 
     // Suggest isolating the conformance, if possible.
-    if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-        potentialIsolation && potentialIsolation->isGlobalActor() &&
+    if (potentialIsolation && potentialIsolation->isGlobalActor() &&
         !conformance->isIsolated()) {
       bool isMainActor = false;
       Type globalActorIsolation = potentialIsolation->getGlobalActor();
@@ -5419,9 +5414,19 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
             // If the isolation doesn't match, record an error.
             if (!outerIsolation.isGlobalActor() ||
                 outerIsolation != innerIsolation) {
+              DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
+              // If we're working with requirements imported from Clang, or with
+              // global actor isolation in general, use the default diagnostic
+              // behavior based on the conformance context.
+              if (proto->hasClangNode() ||
+                  outerIsolation.isGlobalActor() ||
+                  innerIsolation.isGlobalActor())
+                behavior = SendableCheckContext(dc).defaultDiagnosticBehavior();
+
               ctx.getGlobalCache().conformanceIsolationErrors[conformance]
                 .push_back(
-                  AssociatedConformanceIsolationError{isolatedConformance});
+                  AssociatedConformanceIsolationError{
+                    isolatedConformance, behavior});
               return true;
             }
 

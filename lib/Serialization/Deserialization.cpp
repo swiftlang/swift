@@ -1058,8 +1058,11 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   auto globalActorType = globalActorTypeOrError.get();
 
   TypeExpr *globalActorTypeExpr = nullptr;
-  if (globalActorType)
+  if (globalActorType) {
     globalActorTypeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+    rawOptions |=
+        static_cast<unsigned>(ProtocolConformanceFlags::GlobalActorIsolated);
+  }
 
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
@@ -4107,6 +4110,7 @@ public:
     bool isIsolated;
     bool isCompileTimeLiteral, isConstValue;
     bool isSending;
+    bool isCallerIsolated;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -4119,6 +4123,7 @@ public:
                                          isCompileTimeLiteral,
                                          isConstValue,
                                          isSending,
+                                         isCallerIsolated,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -4164,6 +4169,7 @@ public:
     param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setConstValue(isConstValue);
     param->setSending(isSending);
+    param->setCallerIsolated(isCallerIsolated);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.

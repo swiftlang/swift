@@ -1631,6 +1631,29 @@ namespace {
       // Build a member reference.
       auto memberRef = resolveConcreteDeclRef(member, memberLocator);
 
+      // If our member reference is a value generic, then the resulting
+      // expression is the type value one to access the underlying parameter's
+      // value.
+      //
+      // This can occur in code that does something like: 'type(of: x).a' where
+      // 'a' is the static value generic member.
+      if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
+        if (gp->isValue()) {
+          auto refType = adjustedOpenedType;
+          auto ref = TypeValueExpr::createForDecl(memberLoc, gp, dc);
+          cs.setType(ref, refType);
+
+          auto gpTy = gp->getDeclaredInterfaceType();
+          auto subs = baseTy->getContextSubstitutionMap();
+          ref->setParamType(gpTy.subst(subs));
+
+          auto result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
+                                                           refType);
+          cs.setType(result, refType);
+          return result;
+        }
+      }
+
       // If we're referring to a member type, it's just a type
       // reference.
       if (auto *TD = dyn_cast<TypeDecl>(member)) {
@@ -1949,7 +1972,7 @@ namespace {
             solution.setExprTypes(base);
             auto capture = new (ctx) VarDecl(/*static*/ false,
                                              VarDecl::Introducer::Let,
-                                             SourceLoc(),
+                                             base->getEndLoc(),
                                              ctx.getIdentifier("$base$"),
                                              dc);
             capture->setImplicit();
@@ -3222,8 +3245,20 @@ namespace {
 
     Expr *visitTypeValueExpr(TypeValueExpr *expr) {
       auto toType = simplifyType(cs.getType(expr));
-      assert(toType->isEqual(expr->getParamDecl()->getValueType()));
+      ASSERT(toType->isEqual(expr->getParamDecl()->getValueType()));
       cs.setType(expr, toType);
+
+      auto declRefRepr = cast<DeclRefTypeRepr>(expr->getRepr());
+      auto resolvedTy =
+          TypeResolution::resolveContextualType(declRefRepr, cs.DC,
+                                             TypeResolverContext::InExpression,
+                                                nullptr, nullptr, nullptr);
+
+      if (!resolvedTy || resolvedTy->hasError())
+        return nullptr;
+
+      expr->setParamType(resolvedTy);
+
       return expr;
     }
 
@@ -5576,18 +5611,6 @@ namespace {
       ConcreteDeclRef macroRef = resolveConcreteDeclRef(macro, locator);
       E->setMacroRef(macroRef);
       E->setType(expandedType);
-
-      auto fnType =
-          simplifyType(overload.adjustedOpenedType)->castTo<FunctionType>();
-
-      auto newArgs = coerceCallArguments(
-          E->getArgs(), fnType, macroRef, /*applyExpr=*/nullptr,
-          cs.getConstraintLocator(E, ConstraintLocator::ApplyArgument),
-          solution.getAppliedPropertyWrappers(E));
-      if (!newArgs)
-        return nullptr;
-
-      E->setArgs(newArgs);
 
       // FIXME: Expansion should be lazy.
       // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
