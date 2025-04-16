@@ -1015,9 +1015,6 @@ Added: _$ss11InlineArrayVMa
 // InlineArray nominal type descriptor
 Added: _$ss11InlineArrayVMn
 
-// InlineArray.count property descriptor
-Added: _$ss11InlineArrayVsRi__rlE5countSivpZMV
-
 // InlineArray._storage _read accessor
 Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvr
 

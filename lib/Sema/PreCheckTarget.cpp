@@ -817,8 +817,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                    : D->getInterfaceType());
     } else {
       if (makeTypeValue) {
-        return TypeValueExpr::createForDecl(UDRE->getNameLoc(),
-                                            cast<GenericTypeParamDecl>(D));
+        return TypeValueExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
       } else {
         return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
       }
@@ -1853,7 +1852,7 @@ TypeExpr *PreCheckTarget::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
   // If this is a reference type a specialized type, form a TypeExpr.
   // The base should be a TypeExpr that we already resolved.
-  if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
+  if (auto *te = dyn_cast_or_null<TypeExpr>(us->getSubExpr())) {
     if (auto *declRefTR =
             dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
       return TypeExpr::createForSpecializedDecl(
