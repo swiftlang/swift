@@ -201,7 +201,7 @@ public:
 
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
-    PrintFeature,     ///< Print supported feature of this compiler
+    PrintArguments,   ///< Print supported arguments of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
