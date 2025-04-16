@@ -3323,11 +3323,13 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
   if (!storage) {
     return false;
   }
-  
+
+  auto pair = std::make_pair<>(subjectExpr->getSourceRange(), SGF.FunctionDC);
+
   // Check the access strategy used to read the storage.
   auto strategy =
       storage->getAccessStrategy(access, AccessKind::Read, SGF.SGM.SwiftModule,
-                                 SGF.F.getResilienceExpansion(),
+                                 SGF.F.getResilienceExpansion(), pair,
                                  /*useOldABI=*/false);
 
   switch (strategy.getKind()) {

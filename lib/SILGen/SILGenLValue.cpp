@@ -3115,10 +3115,12 @@ public:
 
     assert(!e->getType()->is<LValueType>());
 
+    auto pair = std::make_pair<>(e->getSourceRange(), SGF.FunctionDC);
+
     auto accessSemantics = e->getAccessSemantics();
     AccessStrategy strategy = var->getAccessStrategy(
         accessSemantics, getFormalAccessKind(accessKind),
-        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(), pair,
         /*useOldABI=*/false);
 
     auto baseFormalType = getBaseFormalType(e->getBase());
@@ -3396,7 +3398,7 @@ static LValue emitLValueForNonMemberVarDecl(
   auto access = getFormalAccessKind(accessKind);
   auto strategy = var->getAccessStrategy(
       semantics, access, SGF.SGM.M.getSwiftModule(),
-      SGF.F.getResilienceExpansion(), /*useOldABI=*/false);
+      SGF.F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -4032,6 +4034,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   AccessStrategy strategy = var->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
       /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
@@ -4053,6 +4056,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       strategy = var->getAccessStrategy(
           accessSemantics, getFormalAccessKind(accessKind),
           SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
           /*useOldABI=*/false);
     }
   }
@@ -4254,6 +4258,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto strategy = decl->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
       /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
@@ -4274,6 +4279,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       strategy = decl->getAccessStrategy(
           accessSemantics, getFormalAccessKind(accessKind),
           SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
           /*useOldABI=*/false);
     }
   }
@@ -4744,7 +4750,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy = ivar->getAccessStrategy(
       semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), /*useOldABI=*/false);
+      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -5460,7 +5466,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     bool isBaseGuaranteed) {
   AccessStrategy strategy = storage->getAccessStrategy(
       semantics, AccessKind::Read, SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), /*useOldABI=*/false);
+      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {
