@@ -59,14 +59,30 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func startSynchronously(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture _ operation: __owned sending @escaping () async throws -> Success
+    % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
+    % #       In this case: `func syncOnMyGlobalActor() { Task.startSynchronously { @MyGlobalActor in } }`
+    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    // Determine if we're switching isolation dynamically.
+    // If not, we can run the task synchronously and therefore MUST NOT "enqueue" it.
+    let flagsMustNotCrash: UInt64 = 0
+    let canRunSynchronously: Bool =
+    if let builtinSerialExecutor {
+      _taskIsCurrentExecutor(executor: builtinSerialExecutor, flags: flagsMustNotCrash)
+    } else {
+      true // if there is not target executor, we can run synchronously
+    }
+
     let flags = taskCreateFlags(
       priority: priority,
       isChildTask: false,
       copyTaskLocals: true,
       inheritContext: true,
-      enqueueJob: false, // don't enqueue, we'll run it manually
+      enqueueJob: !canRunSynchronously,
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false,
       isSynchronousStart: true
@@ -79,6 +95,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
         unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
             taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
         }
@@ -91,7 +108,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
         operation: operation).0
     }
 
-    _startTaskSynchronously(task!)
+    if canRunSynchronously {
+      _startTaskSynchronously(task!, targetExecutor: builtinSerialExecutor)
+    }
     return Task<Success, ${FAILURE_TYPE}>(task!)
   }
 }
@@ -161,7 +180,7 @@ extension ${GROUP_TYPE} {
   public func ${METHOD_NAME}( // in ${GROUP_TYPE}
     name: String? = nil,
     priority: TaskPriority? = nil,
-    operation: sending @escaping () async ${THROWS}-> ${RESULT_TYPE}
+    @_inheritActorContext @_implicitSelfCapture operation: sending @isolated(any) @escaping () async ${THROWS}-> ${RESULT_TYPE}
   ) {
     let flags = taskCreateFlags(
       priority: priority,
@@ -174,13 +193,18 @@ extension ${GROUP_TYPE} {
       isSynchronousStart: true
     )
 
+    // Create the asynchronous task.
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
     // Create the task in this group.
     let (task, _) = Builtin.createTask(
       flags: flags,
+      initialSerialExecutor: builtinSerialExecutor,
       taskGroup: self._group,
       operation: operation
     )
-    _startTaskSynchronously(task)
+    _startTaskSynchronously(task, targetExecutor: builtinSerialExecutor)
   }
 }
 %   end # METHOD_NAMES
@@ -241,4 +265,4 @@ extension Task where Failure == ${FAILURE_TYPE} {
 internal func _startTaskOnMainActor(_ task: Builtin.NativeObject)
 
 @_silgen_name("swift_task_startSynchronously")
-internal func _startTaskSynchronously(_ task: Builtin.NativeObject)
+internal func _startTaskSynchronously(_ task: Builtin.NativeObject, targetExecutor: Builtin.Executor?)

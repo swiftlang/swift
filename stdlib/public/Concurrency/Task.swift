@@ -807,8 +807,7 @@ extension Task where Failure == Error {
       unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
-                                       initialSerialExecutor:
-                                         builtinSerialExecutor,
+                                       initialSerialExecutor: builtinSerialExecutor,
                                        operation: operation)
 
     self._task = task
