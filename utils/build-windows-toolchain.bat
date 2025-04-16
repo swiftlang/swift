@@ -70,11 +70,14 @@ if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 
 call :CloneRepositories || (exit /b 1)
 
+set SCCACHE_DIRECT=true
+
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
+  -EnableCaching ^
   %SkipPackagingArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
