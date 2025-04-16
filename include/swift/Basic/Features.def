@@ -254,6 +254,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
+LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
+LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
+LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -276,6 +279,7 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 
 // Optional language features / modes
 
@@ -457,7 +461,7 @@ EXPERIMENTAL_FEATURE(TrailingComma, false)
 
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
-EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
+EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
@@ -467,7 +471,7 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
 /// Synthesize static factory methods for C++ foreign reference types and import
 /// them as Swift initializers.
-EXPERIMENTAL_FEATURE(CXXForeignReferenceTypeInitializers, true)
+EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
@@ -484,22 +488,12 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 /// Allow the @abi attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 
-/// Allow the @execution attribute. This is also connected to
-/// AsyncCallerExecution feature.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
-
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.
 ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
-
-/// Allow isolated conformances.
-EXPERIMENTAL_FEATURE(IsolatedConformances, true)
-
-/// Infer conformance isolation on global-actor-conforming types.
-EXPERIMENTAL_FEATURE(InferIsolatedConformances, true)
 
 /// Allow SwiftSettings
 EXPERIMENTAL_FEATURE(SwiftSettings, false)

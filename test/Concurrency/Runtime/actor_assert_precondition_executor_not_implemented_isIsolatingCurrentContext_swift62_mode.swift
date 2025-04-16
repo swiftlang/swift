@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %import-libdispatch -parse-as-library %s -o %t/a.out
+// RUN: %target-build-swift %import-libdispatch -Xfrontend -disable-availability-checking -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
@@ -80,25 +80,22 @@ actor ActorOnIsCheckImplementingExecutor<Ex: SerialExecutor> {
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 6.2, *) {
+    let hasIsIsolatingCurrentContextExecutor = IsIsolatingExecutor()
+    let justCheckIsolatedExecutor = JustCheckIsolatedExecutor()
 
-      let hasIsIsolatingCurrentContextExecutor = IsIsolatingExecutor()
-      let justCheckIsolatedExecutor = JustCheckIsolatedExecutor() 
-      
-      print("do checkIsolated with executor which does NOT implement isIsolatingCurrentContext")
-      let checkIsolatedActor = ActorOnIsCheckImplementingExecutor(on: justCheckIsolatedExecutor)
-      await checkIsolatedActor.checkPreconditionIsolated()
-      // CHECK: Before preconditionIsolated
-      // CHECK-NOT: called: isIsolatingCurrentContext
-      // CHECK: called: checkIsolated
-      // CHECK-NOT: called: isIsolatingCurrentContext
-      // CHECK: After preconditionIsolated
+    print("do checkIsolated with executor which does NOT implement isIsolatingCurrentContext")
+    let checkIsolatedActor = ActorOnIsCheckImplementingExecutor(on: justCheckIsolatedExecutor)
+    await checkIsolatedActor.checkPreconditionIsolated()
+    // CHECK: Before preconditionIsolated
+    // CHECK-NOT: called: isIsolatingCurrentContext
+    // CHECK: called: checkIsolated
+    // CHECK-NOT: called: isIsolatingCurrentContext
+    // CHECK: After preconditionIsolated
 
-      // CHECK: Before assumeIsolated
-      // CHECK-NOT: called: isIsolatingCurrentContext
-      // CHECK: called: checkIsolated
-      // CHECK-NOT: called: isIsolatingCurrentContext
-      // CHECK: After assumeIsolated
-    }
+    // CHECK: Before assumeIsolated
+    // CHECK-NOT: called: isIsolatingCurrentContext
+    // CHECK: called: checkIsolated
+    // CHECK-NOT: called: isIsolatingCurrentContext
+    // CHECK: After assumeIsolated
   }
 }

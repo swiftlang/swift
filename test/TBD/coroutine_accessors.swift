@@ -1,5 +1,6 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(thing)) \
 // RUN:     %s                                                    \
+// RUN:     -Xfrontend -enable-callee-allocated-coro-abi          \
 // RUN:     -emit-tbd                                             \
 // RUN:     -Xfrontend -validate-tbd-against-ir=all               \
 // RUN:     -enable-library-evolution                             \

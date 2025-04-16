@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
+// RUN:     -enable-callee-allocated-coro-abi               \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature BuiltinModule      \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
@@ -7,6 +8,7 @@
 
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
+// RUN:     -enable-callee-allocated-coro-abi               \
 // RUN:     -enable-experimental-feature BuiltinModule      \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s --check-prefix=CHECK-FRAGILE

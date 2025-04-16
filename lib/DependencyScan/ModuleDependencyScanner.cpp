@@ -201,6 +201,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       ScanASTContext.SourceMgr, Diagnostics));
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,
+      workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
       workerCompilerInvocation->getFrontendOptions().DisableSandbox);
   workerASTContext->setPluginLoader(std::move(loader));
 

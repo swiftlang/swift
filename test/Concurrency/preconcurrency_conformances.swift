@@ -108,6 +108,7 @@ final class K : @preconcurrency Initializable {
 final class MainActorK: Initializable {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
   init() { } // expected-note{{main actor-isolated initializer 'init()' cannot satisfy nonisolated requirement}}
 }
 
@@ -236,6 +237,7 @@ do {
     // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
     // expected-note@-2:45 {{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@-4{{isolate this conformance to the main actor with '@MainActor'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }
@@ -244,6 +246,7 @@ do {
     // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
     // expected-note@-2:25 {{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@-4{{isolate this conformance to the main actor with '@MainActor'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }
@@ -304,6 +307,7 @@ do {
     // expected-warning@-1:21 {{@preconcurrency attribute on conformance to 'P5' has no effect}}
     // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@-4{{isolate this conformance to the main actor with '@MainActor'}}
     func foo() {}
     // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }

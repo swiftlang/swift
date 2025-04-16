@@ -15,10 +15,16 @@ class C {}
 
 sil @getC : $@convention(thin) () -> @owned C
 sil @barrier : $@convention(thin) () -> ()
+sil @initC : $@convention(thin) (Builtin.Word) -> (@owned C, Builtin.RawPointer)
+sil [readnone] @finalC : $@convention(thin) (@owned C) -> @owned C
 
 struct CAndBit {
     var c: C
     var bit: Int1
+}
+
+struct Bool {
+  var _value: Builtin.Int1
 }
 
 struct MO: ~Copyable {
@@ -507,3 +513,28 @@ bb0(%0 : @owned $Outer):
   return %6 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_lifetime_end_of_escaping_value
+// CHECK:         [[FINALIZE:%[^,]+]] = function_ref @finalC
+// CHECK:         apply [[FINALIZE]]
+// CHECK-LABEL: } // end sil function 'dont_remove_lifetime_end_of_escaping_value'
+sil [ossa] @dont_remove_lifetime_end_of_escaping_value : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = function_ref @initC : $@convention(thin) (Builtin.Word) -> (@owned C, Builtin.RawPointer)
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Word) -> (@owned C, Builtin.RawPointer)
+  (%4, %5) = destructure_tuple %3
+  %6 = mark_dependence %5 on %4
+  %7 = pointer_to_address %6 to [strict] $*Bool
+  store %0 to [trivial] %7
+  br bb1
+
+bb1:
+  %13 = function_ref @finalC : $@convention(thin) (@owned C) -> @owned C
+  %14 = apply %13(%4) : $@convention(thin) (@owned C) -> @owned C
+  destroy_value %14
+  br bb2
+
+bb2:
+  %17 = tuple ()
+  return %17
+}

@@ -1,14 +1,13 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -parse-as-library -O %s -enable-experimental-feature IsolatedConformances -o %t/a.out
+// RUN: %target-build-swift -parse-as-library -O %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --check-prefix=CHECK-OUTPUT
 
-// RUN: %target-build-swift -parse-as-library -O %s -enable-experimental-feature IsolatedConformances -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
+// RUN: %target-build-swift -parse-as-library -O %s -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_IsolatedConformances
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 // UNSUPPORTED: back_deployment_runtime

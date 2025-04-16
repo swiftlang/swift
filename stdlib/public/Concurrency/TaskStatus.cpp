@@ -776,11 +776,13 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   });
 }
 
-/// Cancel all the child tasks that belong to `group`.
+/// Cancel the task group and all the child tasks that belong to `group`.
 ///
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
-void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
+void swift::_swift_taskGroup_cancel(TaskGroup *group) {
+  (void) group->statusCancel();
+
   // Because only the owning task of the task group can modify the
   // child list of a task group status record, and it can only do so
   // while holding the owning task's status record lock, we do not need
@@ -789,10 +791,10 @@ void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
     swift_task_cancel(childTask);
 }
 
-/// Cancel all the child tasks that belong to `group`.
+/// Cancel the task group and all the child tasks that belong to `group`.
 ///
 /// The caller must guarantee that this is called from the owning task.
-void swift::_swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
+void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
                                                         AsyncTask *owningTask) {
   // Early out. If there are no children, there's nothing to do. We can safely
   // check this without locking, since this can only be concurrently mutated
@@ -801,7 +803,7 @@ void swift::_swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
     return;
 
   withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
-    _swift_taskGroup_cancelAllChildren(group);
+    _swift_taskGroup_cancel(group);
   });
 }
 
@@ -825,7 +827,7 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // under the synchronous control of the task that owns the group.
   case TaskStatusRecordKind::TaskGroup: {
     auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
-    _swift_taskGroup_cancelAllChildren(groupRecord->getGroup());
+    _swift_taskGroup_cancel(groupRecord->getGroup());
     return;
   }
 

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 939; // cdecl isUnderscored
+const uint16_t SWIFTMODULE_VERSION_MINOR = 943; // cdecl isUnderscored
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1728,6 +1728,7 @@ namespace decls_block {
     BCFixed<1>,              // isCompileTimeLiteral?
     BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
+    BCFixed<1>,              // isCallerIsolated?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -2389,11 +2390,6 @@ namespace decls_block {
     BCFixed<2>  // exclusivity mode
   >;
 
-  using ExecutionDeclAttrLayout = BCRecordLayout<
-    Execution_DECL_ATTR,
-    BCFixed<1>  // execution behavior kind
-  >;
-
   using ABIDeclAttrLayout = BCRecordLayout<
     ABI_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -2552,7 +2548,7 @@ namespace decls_block {
 
   using NonisolatedDeclAttrLayout =
       BCRecordLayout<Nonisolated_DECL_ATTR,
-                     BCFixed<1>, // is the argument (unsafe)
+                     BCFixed<2>, // the modifier (unsafe, nonsending)
                      BCFixed<1>  // implicit flag
                      >;
 

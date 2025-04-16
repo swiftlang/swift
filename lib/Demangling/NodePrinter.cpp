@@ -3142,7 +3142,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@isolated(any) ";
     return nullptr;
   case Node::Kind::NonIsolatedCallerFunctionType:
-    Printer << "@execution(caller) ";
+    Printer << "nonisolated(nonsending) ";
     return nullptr;
   case Node::Kind::SendingResultFunctionType:
     Printer << "sending ";

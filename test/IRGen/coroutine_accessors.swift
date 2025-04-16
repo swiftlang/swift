@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-irgen                                            \
 // RUN:     %s                                                              \
+// RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors                 \
 // RUN: | %IRGenFileCheck %s
 
@@ -97,7 +98,7 @@ public var irm: Int {
 // CHECK-SAME:                   ptr @"$s19coroutine_accessors1SV3irmSivyTwc",
 // CHECK-SAME:                   ptr [[ALLOCATOR]],
 // CHECK-SAME:                   ptr [[FRAME]],
-// CHECK-SAME:                   ptr @"$s19coroutine_accessors1SVSiIetMIgYy_TC",
+// CHECK-SAME:                   $s19coroutine_accessors1SVSiIetMIgYy_TC
 // CHECK-SAME:                   ptr @_swift_coro_alloc,
 // CHECK-SAME:                   ptr @_swift_coro_dealloc
 // CHECK-SAME:               )
@@ -134,7 +135,7 @@ public var irm: Int {
 // CHECK-SAME:                   ptr @"$s19coroutine_accessors1SV3irmSivxTwc",
 // CHECK-SAME:                   ptr [[ALLOCATOR]],
 // CHECK-SAME:                   ptr [[FRAME]],
-// CHECK-SAME:                   ptr @"$s19coroutine_accessors1SVSiIetMIlYl_TC",
+// CHECK-SAME:                   $s19coroutine_accessors1SVSiIetMIlYl_TC
 // CHECK-SAME:                   ptr @_swift_coro_alloc,
 // CHECK-SAME:                   ptr @_swift_coro_dealloc
 // CHECK-SAME:               )

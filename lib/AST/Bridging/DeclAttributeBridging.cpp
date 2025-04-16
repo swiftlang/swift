@@ -627,12 +627,26 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
       NonSendableAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
+static NonIsolatedModifier unbridged(BridgedNonIsolatedModifier modifier) {
+  switch (modifier) {
+  case BridgedNonIsolatedModifierNone:
+    return NonIsolatedModifier::None;
+  case BridgedNonIsolatedModifierUnsafe:
+    return NonIsolatedModifier::Unsafe;
+  case BridgedNonIsolatedModifierNonSending:
+    return NonIsolatedModifier::NonSending;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange, bool isUnsafe) {
+                                    BridgedSourceRange cRange,
+                                    BridgedNonIsolatedModifier modifier) {
   return new (cContext.unbridged()) NonisolatedAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), isUnsafe, /*implicit=*/false);
+      cAtLoc.unbridged(), cRange.unbridged(), unbridged(modifier),
+      /*implicit=*/false);
 }
 
 BridgedObjCAttr
@@ -885,22 +899,4 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
   return new (cContext.unbridged())
       UnavailableFromAsyncAttr(cMessage.unbridged(), cAtLoc.unbridged(),
                                cRange.unbridged(), /*implicit=*/false);
-}
-
-static ExecutionKind unbridged(BridgedExecutionKind kind) {
-  switch (kind) {
-  case BridgedExecutionKindConcurrent:
-    return ExecutionKind::Concurrent;
-  case BridgedExecutionKindCaller:
-    return ExecutionKind::Caller;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
-BridgedExecutionAttr BridgedExecutionAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc atLoc,
-    BridgedSourceRange range, BridgedExecutionKind behavior) {
-  return new (cContext.unbridged())
-      ExecutionAttr(atLoc.unbridged(), range.unbridged(),
-                    unbridged(behavior), /*implicit=*/false);
 }

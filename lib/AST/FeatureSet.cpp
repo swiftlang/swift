@@ -12,6 +12,7 @@
 
 #include "FeatureSet.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -430,7 +431,7 @@ UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
-UNINTERESTING_FEATURE(CXXForeignReferenceTypeInitializers)
+UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -475,6 +476,54 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   return false;
 }
 
+class UsesTypeValueExpr : public ASTWalker {
+public:
+  bool used = false;
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    if (isa<TypeValueExpr>(expr)) {
+      used = true;
+      return Action::Stop();
+    }
+
+    return Action::Continue(expr);
+  }
+};
+
+static bool usesFeatureValueGenericsNameLookup(Decl *decl) {
+  // Be conservative and mark any function that has a TypeValueExpr in its body
+  // as having used this feature. It's a little difficult to fine grain this
+  // check because the following:
+  //
+  // func a() -> Int {
+  //   A<123>.n
+  // }
+  //
+  // Would appear to have the same expression as something like:
+  //
+  // extension A where n == 123 {
+  //   func b() -> Int {
+  //     n
+  //   }
+  // }
+
+  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
+
+  if (!fn)
+    return false;
+
+  auto body = fn->getMacroExpandedBody();
+
+  if (!body)
+    return false;
+
+  UsesTypeValueExpr utve;
+
+  body->walk(utve);
+
+  return utve.used;
+}
+
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
     return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
@@ -507,42 +556,52 @@ static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureExecutionAttribute(Decl *decl) {
-  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution, decl)) {
-    return false;
-  }
-
-  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
+static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
+  // Explicit `@concurrent` attribute on the declaration.
+  if (decl->getAttrs().hasAttribute<ConcurrentAttr>())
     return true;
 
-  auto hasExecutionAttr = [](TypeRepr *R) {
+  // Explicit `nonisolated(nonsending)` attribute on the declaration.
+  if (auto *nonisolated = decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+    if (nonisolated->isNonSending())
+      return true;
+  }
+
+  auto hasCallerIsolatedAttr = [](TypeRepr *R) {
     if (!R)
       return false;
 
     return R->findIf([](TypeRepr *repr) {
-      if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
-        return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
-          if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
-            return isa<ExecutionTypeAttr>(TA);
-          }
-          return false;
-        });
-      }
+      if (isa<CallerIsolatedTypeRepr>(repr))
+        return true;
+
+      // We don't check for @concurrent here because it's
+      // not printed in type positions since it indicates
+      // old "nonisolated" state.
+
       return false;
     });
   };
 
-  auto *VD = cast<ValueDecl>(decl);
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
 
-  // Check if any parameters that have `@execution` attribute.
+  // The declaration is going to be printed with `nonisolated(nonsending)`
+  // attribute.
+  if (getActorIsolation(VD).isCallerIsolationInheriting())
+    return true;
+
+  // Check if any parameters that have `nonisolated(nonsending)` attribute.
   if (auto *PL = VD->getParameterList()) {
-    for (auto *P : *PL) {
-      if (hasExecutionAttr(P->getTypeRepr()))
-        return true;
-    }
+    if (llvm::any_of(*PL, [&](const ParamDecl *P) {
+          return hasCallerIsolatedAttr(P->getTypeRepr());
+        }))
+      return true;
   }
 
-  if (hasExecutionAttr(VD->getResultTypeRepr()))
+  // Check if result type has explicit `nonisolated(nonsending)` attribute.
+  if (hasCallerIsolatedAttr(VD->getResultTypeRepr()))
     return true;
 
   return false;

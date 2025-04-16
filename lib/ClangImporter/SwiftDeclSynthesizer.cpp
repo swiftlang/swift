@@ -436,9 +436,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  auto nonisolatedAttr =
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true);
-  var->getAttrs().add(nonisolatedAttr);
+  var->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   // Set the function up as the getter.
   ImporterImpl.makeComputed(var, func, nullptr);
@@ -2537,6 +2535,9 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
 llvm::SmallVector<clang::CXXMethodDecl *, 4>
 SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     const clang::CXXRecordDecl *cxxRecordDecl) {
+
+  if (cxxRecordDecl->isAbstract())
+    return {};
 
   clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
   clang::Sema &clangSema = ImporterImpl.getClangSema();

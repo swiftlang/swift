@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend \
 // RUN:     %s \
+// RUN:     -enable-callee-allocated-coro-abi \
 // RUN:     -module-name Library \
 // RUN:     -emit-ir \
 // RUN:     -enable-experimental-feature CoroutineAccessors \

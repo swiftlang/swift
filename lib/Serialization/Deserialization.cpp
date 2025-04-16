@@ -1058,8 +1058,11 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   auto globalActorType = globalActorTypeOrError.get();
 
   TypeExpr *globalActorTypeExpr = nullptr;
-  if (globalActorType)
+  if (globalActorType) {
     globalActorTypeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+    rawOptions |=
+        static_cast<unsigned>(ProtocolConformanceFlags::GlobalActorIsolated);
+  }
 
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
@@ -4107,6 +4110,7 @@ public:
     bool isIsolated;
     bool isCompileTimeLiteral, isConstValue;
     bool isSending;
+    bool isCallerIsolated;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -4119,6 +4123,7 @@ public:
                                          isCompileTimeLiteral,
                                          isConstValue,
                                          isSending,
+                                         isCallerIsolated,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -4164,6 +4169,7 @@ public:
     param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setConstValue(isConstValue);
     param->setSending(isSending);
+    param->setCallerIsolated(isCallerIsolated);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -5922,14 +5928,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
-      case decls_block::Execution_DECL_ATTR: {
-        unsigned behavior;
-        serialization::decls_block::ExecutionDeclAttrLayout::readRecord(
-            scratch, behavior);
-        Attr = new (ctx) ExecutionAttr(static_cast<ExecutionKind>(behavior),
-                                       /*Implicit=*/false);
-        break;
-      }
       case decls_block::ABI_DECL_ATTR: {
         bool isImplicit;
         DeclID abiDeclID;
@@ -6514,11 +6512,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Nonisolated_DECL_ATTR: {
-        bool isUnsafe{};
+        unsigned modifier;
         bool isImplicit{};
         serialization::decls_block::NonisolatedDeclAttrLayout::readRecord(
-            scratch, isUnsafe, isImplicit);
-        Attr = new (ctx) NonisolatedAttr(isUnsafe, isImplicit);
+            scratch, modifier, isImplicit);
+        Attr = new (ctx) NonisolatedAttr(
+            {}, {}, static_cast<NonIsolatedModifier>(modifier), isImplicit);
         break;
       }
 

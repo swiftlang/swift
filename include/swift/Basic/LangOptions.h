@@ -409,10 +409,6 @@ namespace swift {
     /// Specifies how strict concurrency checking will be.
     StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
 
-    /// Specifies the name of the executor factory to use to create the
-    /// default executors for Swift Concurrency.
-    std::optional<std::string> ExecutorFactory;
-
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 

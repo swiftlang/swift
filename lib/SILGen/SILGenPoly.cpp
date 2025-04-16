@@ -7045,8 +7045,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> derivedYields;
     auto tokenAndCleanups = emitBeginApplyWithRethrow(
-        loc, derivedRef, SILType::getPrimitiveObjectType(derivedFTy), subs,
-        args, derivedYields);
+        loc, derivedRef, SILType::getPrimitiveObjectType(derivedFTy),
+        canUnwindAccessorDeclRef(base), subs, args, derivedYields);
     auto token = std::get<0>(tokenAndCleanups);
     auto abortCleanup = std::get<1>(tokenAndCleanups);
     auto allocation = std::get<2>(tokenAndCleanups);
@@ -7513,7 +7513,8 @@ void SILGenFunction::emitProtocolWitness(
   case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> witnessYields;
     auto tokenAndCleanups = emitBeginApplyWithRethrow(
-        loc, witnessFnRef, witnessSILTy, witnessSubs, args, witnessYields);
+        loc, witnessFnRef, witnessSILTy, canUnwindAccessorDeclRef(requirement),
+        witnessSubs, args, witnessYields);
     auto token = std::get<0>(tokenAndCleanups);
     auto abortCleanup = std::get<1>(tokenAndCleanups);
     auto allocation = std::get<2>(tokenAndCleanups);

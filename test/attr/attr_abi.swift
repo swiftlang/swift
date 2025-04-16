@@ -1,9 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -enable-experimental-feature ExecutionAttribute -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -Rabi-inference -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -Rabi-inference -debugger-support
 
 // REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_CImplementation
-// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_NoImplicitCopy
@@ -948,7 +947,7 @@ func addressableTest(
     _ e: @MainActor () -> AnyObject,
     _ f: (isolated MainActor) -> AnyObject,
     _ g: @isolated(any) () -> AnyObject, // expected-error {{parameter 'g' type '@isolated(any) () -> AnyObject' in '@abi' should match '() -> AnyObject'}}
-    _ h: @execution(caller) () async -> AnyObject,
+    _ h: nonisolated(nonsending) () async -> AnyObject,
     _ i: () -> AnyObject, // expected-error {{parameter 'i' type '() -> AnyObject' in '@abi' should match '@isolated(any) () -> AnyObject'}}
     _ j: () async -> Void,
     _ k: () -> Void, // expected-error {{parameter 'k' type '() -> Void' in '@abi' should match '() async -> Void'}}
@@ -1232,41 +1231,41 @@ nonisolated func isolation5() {}
 @abi(func isolation7(_: some Actor))
 func isolation7(_: isolated some Actor) {}
 
-@abi(@execution(concurrent) func isolation8() async)
-@execution(concurrent) func isolation8() async {}
+@abi(@concurrent func isolation8() async)
+@concurrent func isolation8() async {}
 
 @abi(func isolation9() async)
-@execution(concurrent) func isolation9() async {}
+@concurrent func isolation9() async {}
 
-@abi(@execution(concurrent) func isolation10() async)
+@abi(@concurrent func isolation10() async)
 func isolation10() async {}
 
 @abi(nonisolated func isolation11() async)
-@execution(concurrent) func isolation11() async {}
+@concurrent func isolation11() async {}
 
-@abi(@execution(concurrent) func isolation12() async)
+@abi(@concurrent func isolation12() async)
 nonisolated func isolation12() async {}
 
-@abi(@execution(caller) func isolation13() async)
-@execution(caller) func isolation13() async {}
+@abi(nonisolated(nonsending) func isolation13() async)
+nonisolated(nonsending) func isolation13() async {}
 
 @abi(func isolation14() async)
-@execution(caller) func isolation14() async {}
+nonisolated(nonsending) func isolation14() async {}
 
-@abi(@execution(caller) func isolation15() async)
+@abi(nonisolated(nonsending) func isolation15() async)
 func isolation15() async {}
 
 @abi(nonisolated func isolation16() async)
-@execution(caller) func isolation16() async {}
+nonisolated(nonsending) func isolation16() async {}
 
-@abi(@execution(caller) func isolation17() async)
+@abi(nonisolated(nonsending) func isolation17() async)
 nonisolated func isolation17() async {}
 
-@abi(@execution(caller) func isolation18() async)
-@execution(concurrent) func isolation18() async {}
+@abi(nonisolated(nonsending) func isolation18() async)
+@concurrent func isolation18() async {}
 
-@abi(@execution(concurrent) func isolation19() async)
-@execution(caller) func isolation19() async {}
+@abi(@concurrent func isolation19() async)
+nonisolated(nonsending) func isolation19() async {}
 
 // NSCopying - see attr/attr_abi_objc.swift
 

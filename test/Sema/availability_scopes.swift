@@ -253,19 +253,19 @@ extension SomeClass {
 
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeClass
 // CHECK-NEXT: {{^}}    (decl version=50 unavailable=macOS decl=extension.SomeClass
-// CHECK-NEXT: {{^}}      (decl version=51 unavailable=macOS decl=functionWithStmtConditionsInUnavailableExt()
+// CHECK-NEXT: {{^}}      (decl version=50 unavailable=macOS decl=functionWithStmtConditionsInUnavailableExt()
 // CHECK-NEXT: {{^}}        (condition_following_availability version=52 unavailable=macOS
 // CHECK-NEXT: {{^}}          (condition_following_availability version=53 unavailable=macOS
 // CHECK-NEXT: {{^}}        (if_then version=53 unavailable=macOS
 // CHECK-NEXT: {{^}}          (condition_following_availability version=54 unavailable=macOS
 // CHECK-NEXT: {{^}}          (if_then version=54 unavailable=macOS
 // CHECK-NEXT: {{^}}            (condition_following_availability version=55 unavailable=macOS
-// CHECK-NEXT: {{^}}            (decl version=55 unavailable=macOS decl=funcInGuardElse()
+// CHECK-NEXT: {{^}}            (decl version=54 unavailable=macOS decl=funcInGuardElse()
 // CHECK-NEXT: {{^}}            (guard_fallthrough version=55 unavailable=macOS
 // CHECK-NEXT: {{^}}              (condition_following_availability version=56 unavailable=macOS
 // CHECK-NEXT: {{^}}              (guard_fallthrough version=56 unavailable=macOS
-// CHECK-NEXT: {{^}}          (decl version=57 unavailable=macOS decl=funcInInnerIfElse()
-// CHECK-NEXT: {{^}}        (decl version=53 unavailable=macOS decl=funcInOuterIfElse()
+// CHECK-NEXT: {{^}}          (decl version=53 unavailable=macOS decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}        (decl version=50 unavailable=macOS decl=funcInOuterIfElse()
 @available(OSX, unavailable)
 extension SomeClass {
   @available(OSX 51, *)
@@ -401,7 +401,7 @@ extension SomeEnum {
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}    (decl version=50 unavailable=macOS decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=macOS decl=availableMacOS_52
-// CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=availableMacOS_52
+// CHECK-NEXT: {{^}}        (decl version=50 unavailable=macOS decl=availableMacOS_52
 // CHECK-NEXT: {{^}}      (decl version=50 unavailable=* decl=neverAvailable()
 
 @available(macOS, unavailable)
@@ -418,8 +418,23 @@ extension SomeEnum {
 
 // CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=unavailableOnMacOSAndIntroduced()
 
-@available(macOS, unavailable, introduced: 52)
+@available(macOS, unavailable)
+@available(macOS, introduced: 52)
 func unavailableOnMacOSAndIntroduced() {
+}
+
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=introducedOnMacOSAndUnavailable()
+
+@available(macOS, introduced: 53)
+@available(macOS, unavailable)
+func introducedOnMacOSAndUnavailable() {
+}
+
+
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=unavailableOnMacOSAndIntroducedSameAttr()
+
+@available(macOS, unavailable, introduced: 54)
+func unavailableOnMacOSAndIntroducedSameAttr() {
 }
 
 // CHECK-NEXT: {{^}}  (decl version=50 unavailable=* decl=NeverAvailable

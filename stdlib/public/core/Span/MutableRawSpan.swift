@@ -18,7 +18,7 @@ import Swift
 // contains initialized `Element` instances.
 @safe
 @frozen
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 public struct MutableRawSpan: ~Copyable & ~Escapable {
   @usableFromInline
@@ -45,11 +45,11 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan: @unchecked Sendable {}
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
@@ -109,20 +109,21 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(copy elements)
+  @lifetime(&elements)
   public init<Element: BitwiseCopyable>(
-    _elements elements: consuming MutableSpan<Element>
+    _elements elements: inout MutableSpan<Element>
   ) {
-    let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: elements._pointer,
-      count: elements.count &* MemoryLayout<Element>.stride
+    let (start, count) = unsafe (elements._pointer, elements._count)
+    let span = unsafe MutableRawSpan(
+      _unchecked: start,
+      byteCount: count == 1 ? MemoryLayout<Element>.size
+                 : count &* MemoryLayout<Element>.stride
     )
-    let span = unsafe MutableRawSpan(_unsafeBytes: bytes)
-    self = unsafe _overrideLifetime(span, copying: elements)
+    self = unsafe _overrideLifetime(span, mutating: &elements)
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
   @_alwaysEmitIntoClient
@@ -137,7 +138,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
@@ -163,7 +164,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension RawSpan {
 
@@ -176,7 +177,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
@@ -213,7 +214,7 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
@@ -355,7 +356,7 @@ extension MutableRawSpan {
 #if !SPAN_COMPATIBILITY_STUB
 
 //MARK: copyMemory
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
@@ -449,7 +450,7 @@ extension MutableRawSpan {
 #endif
 
 // MARK: sub-spans
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
@@ -565,7 +566,7 @@ extension MutableRawSpan {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftStdlib 5.0, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
