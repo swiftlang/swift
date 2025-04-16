@@ -47,12 +47,21 @@ struct A {
   init()
 }
 
+struct B: ~Copyable, ~Escapable {
+  let ne: NE
+
+  deinit
+}
+
 struct Holder {
   var object: AnyObject
 }
 
 @_addressableForDependencies
 struct AddressableForDeps {}
+
+sil @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+sil @useA : $@convention(thin) (A) -> ()
 
 sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
 sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
@@ -379,4 +388,54 @@ bb0:
 
   %99 = tuple ()
   return %99
+}
+
+// =============================================================================
+// Reduced bugs
+// =============================================================================
+
+// rdar149226564 (Compiler crash with non-escapable storing another non-escapable and having a deinit)
+//
+// Test that initializing LifetimeDependence.Scope from an unidentified enclosing access scope does not
+// unwrap nil.
+//
+// TODO: the mark_dependence should redirect to the drop_deinit, not the struct_element_addr, but AccessBase does not
+// currently preserve the address of an unidentified base.
+//
+// CHECK-LABEL: sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
+// CHECK: [[DD:%.*]] = drop_deinit
+// CHECK: [[SE:%.*]] = struct_element_addr [[DD]], #B.ne
+// CHECK: [[LB:%.*]] = load_borrow
+// CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+// CHECK: mark_dependence [unresolved] %{{.*}} on [[SE]]
+// CHECK-LABEL: } // end sil function 'testUnidentified'
+sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = alloc_stack $B, let, name "self", argno 1
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1
+  store %0 to [init] %2
+  %4 = drop_deinit %2
+  debug_value %4, let, name "self", argno 1, expr op_deref
+  %6 = struct_element_addr %4, #B.ne
+  %7 = load_borrow %6
+
+  %8 = function_ref @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+  %10 = struct_extract %9, #UnsafePointer._rawValue
+  %11 = pointer_to_address %10 to [strict] $*A
+  %12 = mark_dependence [unresolved] %11 on %7
+  %13 = begin_access [read] [unsafe] %12
+  %14 = load [trivial] %13
+  end_access %13
+
+  %16 = function_ref @useA : $@convention(thin) (A) -> ()
+  %17 = apply %16(%14) : $@convention(thin) (A) -> ()
+  end_borrow %7
+  %19 = struct_element_addr %4, #B.ne
+  %20 = begin_access [deinit] [static] %19
+  destroy_addr %20
+  end_access %20
+  dealloc_stack %1
+  %24 = tuple ()
+  return %24
 }
