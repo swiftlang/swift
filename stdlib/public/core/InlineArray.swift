@@ -522,11 +522,11 @@ extension InlineArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-
   @available(SwiftStdlib 6.2, *)
+  @_addressableSelf
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
     borrowing get {
       let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
@@ -534,9 +534,9 @@ extension InlineArray where Element: ~Copyable {
   }
 
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
-    @_alwaysEmitIntoClient
     mutating get {
       let span = unsafe MutableSpan(
         _unsafeStart: _protectedMutableAddress,
