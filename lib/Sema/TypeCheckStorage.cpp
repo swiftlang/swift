@@ -2676,6 +2676,19 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
 
+  // If any overridden decl requires the underscored version, then this decl
+  // does too.  Otherwise dispatch to the underscored version on a value
+  // statically the super but dynamically this subtype would not dispatch to an
+  // override of the underscored version but rather (incorrectly) the
+  // supertype's implementation.
+  auto *current = this;
+  while ((current = current->getOverriddenDecl())) {
+    if (current->requiresCorrespondingUnderscoredCoroutineAccessor(kind,
+                                                                   nullptr)) {
+      return true;
+    }
+  }
+
   // Non-stable modules have no ABI to keep stable.
   if (getModuleContext()->getResilienceStrategy() !=
       ResilienceStrategy::Resilient)
@@ -2700,7 +2713,7 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
     return true;
 
   auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
-  auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
+  auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.
   if (modifyAvailability.getPlatformRange().isContainedIn(featureAvailability))

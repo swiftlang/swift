@@ -256,6 +256,7 @@ LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
 LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
+SUPPRESSIBLE_LANGUAGE_FEATURE(CoroutineAccessors, 999, "Coroutine accessors")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -474,9 +475,6 @@ EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
-
-/// modify/read single-yield coroutines
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
 /// modify/read single-yield coroutines always execute code post-yield code
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
