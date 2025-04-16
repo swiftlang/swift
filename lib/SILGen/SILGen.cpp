@@ -1974,7 +1974,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   auto strategy = decl->getAccessStrategy(
       AccessSemantics::Ordinary,
       decl->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
-      M.getSwiftModule(), expansion,
+      M.getSwiftModule(), expansion, std::nullopt,
       /*useOldABI=*/false);
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
