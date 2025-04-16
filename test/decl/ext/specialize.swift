@@ -30,7 +30,7 @@ extension IntFoo where U == Int {
   }
 }
 
-Foo(x: "test", y: 1).hello() // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+Foo(x: "test", y: 1).hello()
 
 
 struct Field<Tag,Value> {

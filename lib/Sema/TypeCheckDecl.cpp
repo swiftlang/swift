@@ -3027,8 +3027,8 @@ static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
-    if (nominalBoundGenericType.getPointer()->getKind() ==
-        typealiasBoundGenericType.getPointer()->getKind()) {
+    if (nominalBoundGenericType.getPointer()->isEqual(
+            typealiasBoundGenericType.getPointer())) {
       continue;
     }
 
