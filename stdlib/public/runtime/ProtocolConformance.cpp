@@ -444,7 +444,7 @@ static bool _checkWitnessTableIsolation(
   llvm::ArrayRef<const void *> conditionalArgs,
   ConformanceExecutionContext &context
 ) {
-#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
   auto description = lookThroughOptionalConditionalWitnessTable(
                          reinterpret_cast<const RelativeWitnessTable *>(wtable))
                          ->getDescription();
