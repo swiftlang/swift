@@ -6239,10 +6239,11 @@ public:
                               bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
-  AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind, ModuleDecl *module,
-                                   ResilienceExpansion expansion,
-                                   bool useOldABI) const;
+  AccessStrategy getAccessStrategy(
+      AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+      ResilienceExpansion expansion,
+      std::optional<std::pair<SourceRange, const DeclContext *>> location,
+      bool useOldABI) const;
 
   /// Whether access is via physical storage.
   bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
