@@ -39,8 +39,18 @@ struct RunToolchains: AsyncParsableCommand {
       """)
   var script: String
 
-  @Option(help: "Snapshot tag to run the test for")
-  var tag: String
+  @Option(help: "Date. We use the first snapshot produced before the given date")
+  var date: String
+
+  var dateAsDate: Date {
+    let d = DateFormatter()
+    d.dateFormat = "yyyy-MM-dd"
+    guard let result = d.date(from: date) else {
+      log("Improperly formatted date: \(date)! Expected format: yyyy_MM_dd.")
+      fatalError()
+    }
+    return result
+  }
 
   @Flag(help: "Invert the test so that we assume the newest succeeds")
   var invert = false
@@ -69,8 +79,9 @@ struct RunToolchains: AsyncParsableCommand {
     // Load our tags from swift's github repo
     let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
-    guard var tagIndex = tags.firstIndex(where: { $0.tag.name == self.tag }) else {
-      log("Failed to find tag: \(self.tag)")
+    let date = self.dateAsDate
+    guard var tagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= date }) else {
+      log("Failed to find tag with date: \(date)")
       fatalError()
     }
 
