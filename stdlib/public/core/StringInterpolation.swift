@@ -199,8 +199,22 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
 
 extension DefaultStringInterpolation {
   @backDeployed(before: SwiftStdlib 6.2)
+  @inlinable
   public mutating func appendInterpolation<T>(
-    _ value: T?, 
+    _ value: T?,
+    default: @autoclosure () -> String
+  ) where T: TextOutputStreamable, T: CustomStringConvertible {
+    if let value {
+      self.appendInterpolation(value)
+    } else {
+      self.appendInterpolation(`default`())
+    }
+  }
+
+  @backDeployed(before: SwiftStdlib 6.2)
+  @inlinable
+  public mutating func appendInterpolation<T>(
+    _ value: T?,
     default: @autoclosure () -> String
   ) where T: TextOutputStreamable {
     if let value {
@@ -211,7 +225,7 @@ extension DefaultStringInterpolation {
   }
 
   @backDeployed(before: SwiftStdlib 6.2)
-  @_disfavoredOverload
+  @inlinable
   public mutating func appendInterpolation<T>(
     _ value: T?, 
     default: @autoclosure () -> String
@@ -224,7 +238,7 @@ extension DefaultStringInterpolation {
   }
 
   @backDeployed(before: SwiftStdlib 6.2)
-  @_disfavoredOverload
+  @inlinable
   public mutating func appendInterpolation<T>(
     _ value: T?, 
     default: @autoclosure () -> String
