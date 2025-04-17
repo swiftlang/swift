@@ -1343,6 +1343,11 @@ namespace {
 #include "clang/Basic/AMDGPUTypes.def"
         llvm_unreachable("AMDGPU type in ABI lowering");
 
+      // We should never see HLSL intangible types at all.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+        llvm_unreachable("HLSL intangible type in ABI lowering");
+
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
 #define SIGNED_TYPE(Id, SingletonId) \

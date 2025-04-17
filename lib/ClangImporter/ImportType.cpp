@@ -372,6 +372,10 @@ namespace {
 #include "clang/Basic/AMDGPUTypes.def"
         return Type();
 
+      // HLSL intangible builtin types that don't have Swift equivalents.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+        return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
