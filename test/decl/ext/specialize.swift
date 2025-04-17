@@ -49,6 +49,21 @@ extension IntField {
 struct S<X, Y> {}
 typealias InferredSpecializedNestedTypes<X> = S<X, (Int, [Int]?)>
 
+
+struct S2<X,Y,Z> {
+  let x: X
+  let y: Y
+  let z: Z
+}
+
+typealias A2<Y,X> = S2<Int,X,Y>
+
+extension A2 {
+  func adding(_ x: Int) -> Self {
+    S2(x: self.x + x, y: y, z: z) // expected-error {{binary operator '+' cannot be applied to operands of type 'X' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int)}}
+  }
+}
+
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
