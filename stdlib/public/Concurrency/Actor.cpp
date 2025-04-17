@@ -1167,8 +1167,8 @@ public:
 #endif
   }
 
-  Job *getFirstUnprioritisedJob() const { return FirstJob; }
-  ActiveActorStatus withFirstUnprioritisedJob(Job *firstJob) const {
+  Job *getFirstUnprioritizedJob() const { return FirstJob; }
+  ActiveActorStatus withFirstUnprioritizedJob(Job *firstJob) const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveActorStatus(Flags, DrainLock, firstJob);
 #else
@@ -1213,7 +1213,7 @@ public:
       break;
     }
     concurrency::trace::actor_state_changed(
-        actor, getFirstUnprioritisedJob(), traceState, distributedActorIsRemote,
+        actor, getFirstUnprioritizedJob(), traceState, distributedActorIsRemote,
         isMaxPriorityEscalated(), static_cast<uint8_t>(getMaxPriority()));
   }
 };
@@ -1397,7 +1397,7 @@ public:
   /// new priority
   void enqueueStealer(Job *job, JobPriority priority);
 
-  /// Dequeues one job from `prioritisedJobs`.
+  /// Dequeues one job from `prioritizedJobs`.
   /// The calling thread must be holding the actor lock while calling this
   Job *drainOne();
 
@@ -1586,9 +1586,9 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     auto newState = oldState;
 
     // Link this into the queue in the atomic state
-    Job *currentHead = oldState.getFirstUnprioritisedJob();
+    Job *currentHead = oldState.getFirstUnprioritizedJob();
     setNextJob(job, currentHead);
-    newState = newState.withFirstUnprioritisedJob(job);
+    newState = newState.withFirstUnprioritizedJob(job);
 
     if (oldState.isIdle()) {
       // Schedule the actor
@@ -1769,13 +1769,13 @@ void DefaultActorImpl::processIncomingQueue() {
   while (true) {
     // If there aren't any new jobs in the incoming queue, we can return
     // immediately without updating the status.
-    if (!oldState.getFirstUnprioritisedJob()) {
+    if (!oldState.getFirstUnprioritizedJob()) {
       return;
     }
     assert(oldState.isAnyRunning());
 
     auto newState = oldState;
-    newState = newState.withFirstUnprioritisedJob(nullptr);
+    newState = newState.withFirstUnprioritizedJob(nullptr);
 
     if (_status().compare_exchange_weak(
             oldState, newState,
@@ -1788,7 +1788,7 @@ void DefaultActorImpl::processIncomingQueue() {
     }
   }
 
-  handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+  handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
 }
 
 // Called with actor lock held on current thread
@@ -1956,7 +1956,7 @@ void DefaultActorImpl::destroy() {
   // Tasks on an actor are supposed to keep the actor alive until they start
   // running and we can only get here if ref count of the object = 0 which means
   // there should be no more tasks enqueued on the actor.
-  assert(!oldState.getFirstUnprioritisedJob() && "actor has queued jobs at destruction");
+  assert(!oldState.getFirstUnprioritizedJob() && "actor has queued jobs at destruction");
 
   if (oldState.isIdle()) {
     assert(prioritizedJobs.empty() && "actor has queued jobs at destruction");
@@ -2064,7 +2064,7 @@ retry:;
       }
 
       assert(oldState.getMaxPriority() == JobPriority::Unspecified);
-      assert(!oldState.getFirstUnprioritisedJob());
+      assert(!oldState.getFirstUnprioritizedJob());
       // We cannot assert here that prioritizedJobs is empty,
       // because lock is not held yet. Raise a flag to assert after getting the lock.
       assertNoJobs = true;
@@ -2083,7 +2083,7 @@ retry:;
     // check for higher priority jobs that could have been scheduled in the
     // meantime. And processing is more efficient when done in larger batches.
     if (asDrainer) {
-      newState = newState.withFirstUnprioritisedJob(nullptr);
+      newState = newState.withFirstUnprioritizedJob(nullptr);
     }
 
     // This needs an acquire since we are taking a lock
@@ -2096,7 +2096,7 @@ retry:;
       }
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
       if (asDrainer) {
-        handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+        handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
       }
       return true;
     }
@@ -2147,7 +2147,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
     auto newState = oldState;
     // Lock is still held at this point, so it is safe to access prioritizedJobs
-    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritisedJob()) {
+    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritizedJob()) {
       // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
