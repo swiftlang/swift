@@ -3015,6 +3015,11 @@ AllMembersRequest::evaluate(
 static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
                                             NominalTypeDecl *nominal) {
   bool isInferredType = false;
+
+  if (!nominal->isGeneric()){
+    return false;
+  }
+
   auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
                                      .getPointer()
                                      ->getAs<BoundGenericType>()
