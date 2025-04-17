@@ -1166,6 +1166,10 @@ bool TaskGroup::isCancelled() {
   return asBaseImpl(this)->isCancelled();
 }
 
+bool TaskGroup::statusCancel() {
+  return asBaseImpl(this)->statusCancel();
+}
+
 // =============================================================================
 // ==== offer ------------------------------------------------------------------
 
@@ -2116,8 +2120,8 @@ bool TaskGroupBase::cancelAll(AsyncTask *owningTask) {
 
   // Cancel all the child tasks.  TaskGroup is not a Sendable type,
   // so cancelAll() can only be called from the owning task.  This
-  // satisfies the precondition on cancelAllChildren_unlocked().
-  _swift_taskGroup_cancelAllChildren_unlocked(asAbstract(this), owningTask);
+  // satisfies the precondition on cancel_unlocked().
+  _swift_taskGroup_cancel_unlocked(asAbstract(this), owningTask);
 
   return true;
 }
@@ -2126,8 +2130,8 @@ SWIFT_CC(swift)
 static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
   // TaskGroup is not a Sendable type, and so this operation (which is not
   // currently exposed in the API) can only be called from the owning
-  // task.  This satisfies the precondition on cancelAllChildren_unlocked().
-  _swift_taskGroup_cancelAllChildren_unlocked(group, swift_task_getCurrent());
+  // task.  This satisfies the precondition on cancel_unlocked().
+  _swift_taskGroup_cancel_unlocked(group, swift_task_getCurrent());
 }
 
 // =============================================================================
