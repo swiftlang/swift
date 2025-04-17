@@ -223,6 +223,21 @@ public func modifyOldNoninlinableNew(_ n: inout StructOld) {
 public func takeInt(_ i: Int) {
 }
 
+open class BaseClassOld {
+  public init(_ i : Int) {
+    self._i = i
+  }
+  var _i: Int
+  open var i: Int {
+    read {
+      yield _i
+    }
+    modify {
+      yield &_i
+    }
+  }
+}
+
 //--- Downstream.swift
 
 import Library
@@ -348,3 +363,28 @@ func modifyOldOld() {
 
   n.i.increment()
 }
+
+public class DerivedOldFromBaseClassOld : BaseClassOld {
+  public init(_ i : Int, _ j : Int) {
+    self._j = j
+    super.init(i)
+  }
+  var _j: Int
+  override public var i: Int {
+    read {
+      yield _j
+    }
+    modify {
+      yield &_j
+    }
+  }
+}
+
+// CHECK-LABEL: sil_vtable [serialized] DerivedOldFromBaseClassOld {
+// CHECK-NEXT:    #BaseClassOld.init!allocator
+// CHECK-NEXT:    #BaseClassOld.i!read
+// CHECK-NEXT:    #BaseClassOld.i!read2
+// CHECK-NEXT:    #BaseClassOld.i!setter
+// CHECK-NEXT:    #BaseClassOld.i!modify
+// CHECK-NEXT:    #BaseClassOld.i!modify2
+// CHECK:       }

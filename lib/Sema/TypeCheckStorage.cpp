@@ -2672,10 +2672,27 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 /// stability.
 static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     AbstractStorageDecl const *storage, AccessorKind kind,
-    AccessorDecl const *decl) {
+    AccessorDecl const *decl, AbstractStorageDecl const *derived) {
   auto &ctx = storage->getASTContext();
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
+
+  // If any overridden decl requires the underscored version, then this decl
+  // does too.  Otherwise dispatch to the underscored version on a value
+  // statically the super but dynamically this subtype would not dispatch to an
+  // override of the underscored version but rather (incorrectly) the
+  // supertype's implementation.
+  if (storage == derived) {
+    auto *current = storage;
+    while ((current = current->getOverriddenDecl())) {
+      auto *currentDecl = cast_or_null<AccessorDecl>(
+          decl ? decl->getOverriddenDecl() : nullptr);
+      if (requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+              current, kind, currentDecl, derived)) {
+        return true;
+      }
+    }
+  }
 
   // Non-stable modules have no ABI to keep stable.
   if (storage->getModuleContext()->getResilienceStrategy() !=
@@ -2699,11 +2716,30 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
   if (!ctx.supportsVersionedAvailability())
     return true;
 
-  auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
+  AvailabilityContext accessorAvailability = [&] {
+    if (storage->getModuleContext()->isMainModule()) {
+      return AvailabilityContext::forDeclSignature(accessor);
+    }
+    // Calculate the availability of the imported declaration ourselves starting
+    // from always available and constraining by walking the enclosing decl
+    // contexts.
+    auto retval = AvailabilityContext::forAlwaysAvailable(ctx);
+    auto declContext = storage->getInnermostDeclContext();
+    while (declContext) {
+      const Decl *decl = declContext->getInnermostDeclarationDeclContext();
+      if (!decl)
+        break;
+
+      retval.constrainWithDecl(decl);
+      declContext = decl->getDeclContext();
+    }
+    return retval;
+  }();
   auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.
-  if (modifyAvailability.getPlatformRange().isContainedIn(featureAvailability))
+  if (accessorAvailability.getPlatformRange().isContainedIn(
+          featureAvailability))
     return false;
 
   // The underscored accessor is required for ABI stability.
@@ -2712,8 +2748,9 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
 
 bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
     AccessorKind kind, AccessorDecl const *decl) const {
-  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(this, kind,
-                                                               decl);
+  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+      this, kind, decl,
+      /*derived=*/this);
 }
 
 bool RequiresOpaqueModifyCoroutineRequest::evaluate(
