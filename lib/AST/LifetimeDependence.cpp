@@ -1100,7 +1100,8 @@ protected:
     }
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
-      // An implicit _read accessor is generated when a mutating getter is
+    case AccessorKind::Read2:
+      // An implicit _read/read accessor is generated when a mutating getter is
       // declared. Emit the same lifetime dependencies as an implicit _modify.
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
