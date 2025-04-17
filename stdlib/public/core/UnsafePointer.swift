@@ -410,6 +410,19 @@ extension UnsafePointer where Pointee: ~Copyable {
       ),
       "self must be a properly aligned pointer for types Pointee and T"
     )
+    return try unsafe _uncheckedWithMemoryRebound(
+      to: type, capacity: count, body)
+  }
+
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal func _uncheckedWithMemoryRebound<
+    T: ~Copyable, E: Error, Result: ~Copyable
+  >(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try unsafe body(.init(_rawValue))
@@ -1000,6 +1013,11 @@ extension UnsafeMutablePointer {
   public func update(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.update with negative count")
+    if _isPOD(Pointee.self) {
+      UnsafeRawPointer(self).copyMemory(
+        from: source, byteCount: count * MemoryLayout<Element>.stride)
+      return
+    }
     if unsafe UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
       // assign forward from a disjoint or following overlapping range.
       Builtin.assignCopyArrayFrontToBack(

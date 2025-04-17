@@ -24,7 +24,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   public let capacity: Int
 
   @usableFromInline
-  internal var _count: Int = 0
+  internal var _count: Int
 
   @_alwaysEmitIntoClient
   @inlinable
@@ -123,7 +123,7 @@ extension OutputSpan where Element: ~Copyable  {
   @lifetime(borrow buffer)
   public init(
     buffer: UnsafeMutableBufferPointer<Element>,
-    initializedCount: Int = 0
+    initializedCount: Int
   ) {
     _precondition(buffer._isWellAligned(), "Misaligned OutputSpan")
     if let baseAddress = buffer.baseAddress {
@@ -149,7 +149,7 @@ extension OutputSpan {
 //   @lifetime(borrow buffer)
 //   public init(
 //     buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
-//     initializedCount: Int = 0
+//     initializedCount: Int
 //   ) {
 //     let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
 //     let os = unsafe OutputSpan(
@@ -210,7 +210,7 @@ extension OutputSpan {
   @lifetime(self: copy self)
   @discardableResult
   public mutating func append(
-    fromContentsOf elements: inout some IteratorProtocol<Element>
+    from elements: inout some IteratorProtocol<Element>
   ) -> Bool {
     // FIXME: It may be best to delay this API until we've a chunking IteratorProtocol
     var p = unsafe _tail()
@@ -439,5 +439,30 @@ extension OutputSpan where Element: ~Copyable {
     let count = self._count
     discard self
     return count
+  }
+
+  /// Consume the output span (relinquishing its control over the buffer it is
+  /// addressing), and return the number of initialized elements in it.
+  ///
+  /// This method is designed to be invoked in the same context that created the
+  /// output span, when it is time to commit the contents of the updated buffer
+  /// back into the construct that it came from.
+  ///
+  /// The context that created the output span is expected to remember what
+  /// memory region the span is addressing. This consuming method expects to
+  /// receive a copy of the same buffer pointer as a (loose) proof of ownership.
+  ///
+  /// - Parameter buffer: The buffer that the `OutputSpan` is expected to
+  ///      address. This must be the same buffer as the one used to originally
+  ///      initialize the `OutputSpan` instance.
+  /// - Returns: The number of initialized elements in the same buffer, as
+  ///      tracked by the consumed `OutputSpan` instance.
+  @unsafe
+  @_alwaysEmitIntoClient
+  public consuming func finalize(
+    for buffer: Slice<UnsafeMutableBufferPointer<Element>>
+  ) -> Int {
+    //finalize(buffer.extracting(...)) // FIXME: Add this please please please
+    finalize(UnsafeMutableBufferPointer(rebasing: buffer))
   }
 }
