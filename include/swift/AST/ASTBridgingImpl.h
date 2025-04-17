@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -821,6 +822,10 @@ swift::GenericSignature BridgedGenericSignature::unbridged() const {
 
 BridgedASTTypeArray BridgedGenericSignature::getGenericParams() const {
   return {unbridged().getGenericParams()};
+}
+
+BridgedASTType BridgedGenericSignature::mapTypeIntoContext(BridgedASTType type) const {
+  return {unbridged().getGenericEnvironment()->mapTypeIntoContext(type.unbridged()).getPointer()};
 }
 
 //===----------------------------------------------------------------------===//
