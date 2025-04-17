@@ -1,4 +1,4 @@
-//===--- OutputRawSpan.swift -------------------------------------------------===//
+//===--- OutputRawSpan.swift ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// OutputRawSpan represents a span of memory which contains
-// a variable number of initialized bytes, followed by uninitialized memory.
+// OutputRawSpan is a reference to a contiguous region of memory which starts
+// some number of initialized bytes, followed by uninitialized memory.
 @safe
 @frozen
 @available(SwiftStdlib 6.2, *)
@@ -22,24 +22,15 @@ public struct OutputRawSpan: ~Copyable, ~Escapable {
   public let capacity: Int
 
   @usableFromInline
-  internal var _count: Int = 0
+  internal var _count: Int
 
   @_alwaysEmitIntoClient
-  internal func _start() -> UnsafeMutableRawPointer {
-    unsafe _pointer._unsafelyUnwrappedUnchecked
+  @lifetime(immortal)
+  public init() {
+    unsafe _pointer = nil
+    capacity = 0
+    _count = 0
   }
-
-  @_alwaysEmitIntoClient
-  public var freeCapacity: Int { capacity &- _count }
-
-  @_alwaysEmitIntoClient
-  public var count: Int { _count }
-
-  @_alwaysEmitIntoClient
-  public var isEmpty: Bool { _count == 0 }
-
-  @_alwaysEmitIntoClient
-  public var isFull: Bool { _count == capacity }
 
   @unsafe
   @_alwaysEmitIntoClient
@@ -60,17 +51,44 @@ extension OutputRawSpan: @unchecked Sendable {}
 
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
+  @_alwaysEmitIntoClient
+  internal func _start() -> UnsafeMutableRawPointer {
+    unsafe _pointer._unsafelyUnwrappedUnchecked
+  }
+
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal func _tail() -> UnsafeMutableRawPointer {
+    // NOTE: `_pointer` must be known to be not-nil.
+    unsafe _start().advanced(by: _count)
+  }
+
+  @_alwaysEmitIntoClient
+  public var freeCapacity: Int { capacity &- _count }
+
+  @_alwaysEmitIntoClient
+  public var count: Int { _count }
+
+  @_alwaysEmitIntoClient
+  public var isEmpty: Bool { _count == 0 }
+
+  @_alwaysEmitIntoClient
+  public var isFull: Bool { _count == capacity }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension OutputRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   internal init(
-    _unchecked buffer: UnsafeMutableRawBufferPointer,
-    initialized: Int
+    _uncheckedBuffer buffer: UnsafeMutableRawBufferPointer,
+    initializedCount: Int
   ) {
     unsafe _pointer = .init(buffer.baseAddress)
     capacity = buffer.count
-    _count = initialized
+    _count = initializedCount
   }
 
   @unsafe
@@ -78,21 +96,35 @@ extension OutputRawSpan {
   @lifetime(borrow buffer)
   public init(
     buffer: UnsafeMutableRawBufferPointer,
-    initialized: Int = 0
+    initializedCount: Int
   ) {
-    unsafe self.init(_unchecked: buffer, initialized: initialized)
+    if let baseAddress = buffer.baseAddress {
+      _precondition(
+        unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
+        "Buffer must not wrap around the address space"
+      )
+    }
+    _precondition(
+      0 <= initializedCount && initializedCount <= buffer.count,
+      "OutputSpan count is not within capacity"
+    )
+    unsafe self.init(
+      _uncheckedBuffer: buffer, initializedCount: initializedCount
+    )
   }
 
-//  @_alwaysEmitIntoClient
-//  @lifetime(borrow buffer)
-//  public init(
-//    _initializing buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
-//    initialized: Int = 0
-//  ) {
-//    let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
-//    let os = OutputRawSpan(_initializing: rebased, initialized: 0)
-//    self = unsafe _overrideLifetime(os, borrowing: buffer)
-//  }
+  @_alwaysEmitIntoClient
+  @lifetime(borrow buffer)
+  public init(
+    buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
+    initializedCount: Int
+  ) {
+    let rebased = unsafe UnsafeMutableRawBufferPointer(rebasing: buffer)
+    let os = unsafe OutputRawSpan(
+      buffer: rebased, initializedCount: initializedCount
+    )
+    self = unsafe _overrideLifetime(os, borrowing: buffer)
+  }
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -100,10 +132,9 @@ extension OutputRawSpan {
 
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func append(_ value: consuming UInt8) {
-    _precondition(_count < capacity, "Output buffer overflow")
-    let p = unsafe _start().advanced(by: _count&*MemoryLayout<UInt8>.stride)
-    unsafe p.initializeMemory(as: UInt8.self, to: value)
+  public mutating func append(_ value: UInt8) {
+    _precondition(_count < capacity, "OutputRawSpan capacity overflow")
+    unsafe _tail().storeBytes(of: value, as: UInt8.self)
     _count &+= 1
   }
 
@@ -112,61 +143,48 @@ extension OutputRawSpan {
   public mutating func removeLast() -> UInt8? {
     guard _count > 0 else { return nil }
     _count &-= 1
-    let p = unsafe _start().advanced(by: _count&*MemoryLayout<UInt8>.stride)
-    return unsafe p.withMemoryRebound(to: UInt8.self, capacity: 1, { unsafe $0.move() })
+    return unsafe _tail().load(as: UInt8.self)
   }
 
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func removeAll() {
-    _ = unsafe _start().withMemoryRebound(to: UInt8.self, capacity: _count) {
-      unsafe $0.deinitialize(count: _count)
-    }
+    // TODO: Consider an option to zero the `_count` bytes being removed.
     _count = 0
   }
 }
 
-//MARK: bulk-update functions
+//MARK: bulk-append functions
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
 
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: UInt8, count: Int) {
-    let freeCapacity = capacity &- _count
-    _precondition(
-      count <= freeCapacity,
-      "destination span cannot contain number of elements requested."
+    _precondition(count <= freeCapacity, "OutputRawSpan capacity overflow")
+    unsafe _tail().initializeMemory(
+      as: UInt8.self, repeating: repeatedValue, count: count
     )
-    let offset = _count&*MemoryLayout<UInt8>.stride
-    let p = unsafe _start().advanced(by: offset)
-    unsafe p.withMemoryRebound(to: UInt8.self, capacity: count) {
-      unsafe $0.initialize(repeating: repeatedValue, count: count)
-    }
     _count &+= count
   }
 
+  /// Returns true if the iterator has filled all the free capacity in the span.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func append<S: Sequence>(
-    from elements: S
-  ) -> S.Iterator where S.Element == UInt8 {
-    var iterator = elements.makeIterator()
-    append(from: &iterator)
-    return iterator
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @discardableResult
   public mutating func append(
     from elements: inout some IteratorProtocol<UInt8>
-  ) {
+  ) -> Bool {
+    // FIXME: It may be best to delay this API until
+    //        we have designed a chunking IteratorProtocol
+    var p = unsafe _tail()
     while _count < capacity {
-      guard let byte = elements.next() else { break }
-      let p = unsafe _start().advanced(by: _count&*MemoryLayout<UInt8>.stride)
+      guard let byte = elements.next() else { return false }
       unsafe p.initializeMemory(as: UInt8.self, to: byte)
+      unsafe p = p.advanced(by: MemoryLayout<UInt8>.stride)
       _count &+= 1
     }
+    return true
   }
 
   @_alwaysEmitIntoClient
@@ -174,26 +192,37 @@ extension OutputRawSpan {
   public mutating func append(
     fromContentsOf source: some Collection<UInt8>
   ) {
-    let void: Void? = source.withContiguousStorageIfAvailable {
-      append(fromContentsOf: unsafe Span(_unsafeElements: $0))
+    let done: Void? = source.withContiguousStorageIfAvailable {
+      unsafe append(fromContentsOf: $0)
     }
-    if void != nil {
+    if done != nil {
       return
     }
 
-    let freeCapacity = capacity &- _count
-    let tail = unsafe _start().advanced(by: _count&*MemoryLayout<UInt8>.stride)
-    var (iterator, copied) =
-    unsafe tail.withMemoryRebound(to: UInt8.self, capacity: freeCapacity) {
-      let suffix = unsafe UnsafeMutableBufferPointer(start: $0, count: freeCapacity)
+    let freeCapacity = freeCapacity
+    var (iterator, copied) = unsafe _tail().withMemoryRebound(
+      to: UInt8.self, capacity: freeCapacity
+    ) {
+      let suffix = unsafe UnsafeMutableBufferPointer(
+        start: $0, count: freeCapacity
+      )
       return unsafe source._copyContents(initializing: suffix)
     }
-    _precondition(
-      iterator.next() == nil,
-      "destination span cannot contain every UInt8 from source."
-    )
-    assert(_count + copied <= capacity) // invariant check
+    _precondition(iterator.next() == nil, "OutputRawSpan capacity overflow")
+    _precondition(_count + copied <= capacity, "Invalid Sequence._copyContents")
     _count &+= copied
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func append(
+    fromContentsOf source: UnsafeRawBufferPointer
+  ) {
+    guard unsafe !source.isEmpty else { return }
+    let addedBytes = source.count
+    _precondition(addedBytes <= freeCapacity, "OutputRawSpan capacity overflow")
+    unsafe _tail().copyMemory(from: source.baseAddress!, byteCount: addedBytes)
+    _count += addedBytes
   }
 
   @_alwaysEmitIntoClient
@@ -201,18 +230,7 @@ extension OutputRawSpan {
   public mutating func append(
     fromContentsOf source: Span<UInt8>
   ) {
-    guard !source.isEmpty else { return }
-    _precondition(
-      source.count <= freeCapacity,
-      "destination span cannot contain every UInt8 from source."
-    )
-    let tail = unsafe _start().advanced(by: _count&*MemoryLayout<UInt8>.stride)
-    _ = unsafe source.withUnsafeBufferPointer {
-      unsafe tail.initializeMemory(
-        as: UInt8.self, from: $0.baseAddress!, count: $0.count
-      )
-    }
-    _count += source.count
+    unsafe source.withUnsafeBytes { unsafe append(fromContentsOf: $0) }
   }
 
   @_alwaysEmitIntoClient
@@ -250,28 +268,82 @@ extension OutputRawSpan {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension OutputRawSpan {
+
+  /// Call the given closure with the unsafe buffer pointer addressed by this
+  /// OutputRawSpan and a mutable reference to its count of initialized bytes.
+  ///
+  /// This method provides a way for Swift code to process or populate an
+  /// `OutputRawSpan` using unsafe operations; for example, it allows
+  /// dispatching to code written in legacy (memory-unsafe) languages.
+  ///
+  /// The supplied function may process the buffer in any way it wants; however,
+  /// when it finishes (whether by returning or throwing), it must leave the
+  /// buffer in a state that satisfies the invariants of the output span:
+  ///
+  /// 1. The inout integer passed in as the second argument must be the exact
+  ///     number of initialized bytes in the buffer passed in as the first
+  ///     argument.
+  /// 2. These initialized elements must be located in a single contiguous
+  ///     region starting at the beginning of the buffer. The rest of the buffer
+  ///     must hold uninitialized memory.
+  ///
+  /// This function cannot verify these two invariants, and therefore
+  /// this is an unsafe operation. Violating the invariants of `OutputRawSpan`
+  /// may result in undefined behavior.
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func withUnsafeMutableBytes<E: Error, R: ~Copyable>(
+    _ body: (
+      UnsafeMutableRawBufferPointer,
+      _ initializedCount: inout Int
+    ) throws(E) -> R
+  ) throws(E) -> R {
+    guard let start = unsafe _pointer, capacity > 0 else {
+      let buffer = UnsafeMutableRawBufferPointer(_empty: ())
+      var initializedCount = 0
+      defer {
+        _precondition(initializedCount == 0, "OutputRawSpan capacity overflow")
+      }
+      return unsafe try body(buffer, &initializedCount)
+    }
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
+      _uncheckedStart: start, count: capacity
+    )
+    var initializedCount = _count
+    defer {
+      _precondition(
+        0 <= initializedCount && initializedCount <= capacity,
+        "OutputRawSpan capacity overflow"
+      )
+      _count = initializedCount
+    }
+    return unsafe try body(buffer, &initializedCount)
+  }
+}
 
 @available(SwiftStdlib 6.2, *)
 extension OutputRawSpan {
   /// Consume the output span (relinquishing its control over the buffer it is
   /// addressing), and return the number of initialized bytes in it.
   ///
-  /// This method is designed to be invoked in the same context that created the
-  /// output span, when it is time to commit the contents of the updated buffer
-  /// back into the construct that it came from.
+  /// This method should be invoked in the scope where the `OutputRawSpan` was
+  /// created, when it is time to commit the contents of the updated buffer
+  /// back into the construct being initialized.
   ///
   /// The context that created the output span is expected to remember what
   /// memory region the span is addressing. This consuming method expects to
   /// receive a copy of the same buffer pointer as a (loose) proof of ownership.
   ///
-  /// - Parameter buffer: The buffer that we the `OutputSpan` is expected to
-  ///      relinquish using. This must be the same buffer as the one used to
-  ///      originally initialize the `OutputSpan` instance.
+  /// - Parameter buffer: The buffer we expect the `OutputRawSpan` to reference.
+  ///      This must be the same region of memory passed to
+  ///      the `OutputRawSpan` initializer.
   /// - Returns: The number of initialized bytes in the same buffer, as
-  ///      tracked by the consumed `OutputSpan` instance.
+  ///      tracked by the consumed `OutputRawSpan` instance.
   @unsafe
   @_alwaysEmitIntoClient
-  public consuming func finalizeBytes(
+  public consuming func finalize(
     for buffer: UnsafeMutableRawBufferPointer
   ) -> Int {
     _precondition(
@@ -279,5 +351,30 @@ extension OutputRawSpan {
       && buffer.count == self.capacity,
       "OutputRawSpan identity mismatch")
     return _count
+  }
+
+  /// Consume the output span (relinquishing its control over the buffer it is
+  /// addressing), and return the number of initialized bytes in it.
+  ///
+  /// This method should be invoked in the scope where the `OutputRawSpan` was
+  /// created, when it is time to commit the contents of the updated buffer
+  /// back into the construct being initialized.
+  ///
+  /// The context that created the output span is expected to remember what
+  /// memory region the span is addressing. This consuming method expects to
+  /// receive a copy of the same buffer pointer as a (loose) proof of ownership.
+  ///
+  /// - Parameter buffer: The buffer we expect the `OutputRawSpan` to reference.
+  ///      This must be the same region of memory passed to
+  ///      the `OutputRawSpan` initializer.
+  /// - Returns: The number of initialized bytes in the same buffer, as
+  ///      tracked by the consumed `OutputRawSpan` instance.
+  @unsafe
+  @_alwaysEmitIntoClient
+  public consuming func finalize(
+    for buffer: Slice<UnsafeMutableRawBufferPointer>
+  ) -> Int {
+    let rebased = unsafe UnsafeMutableRawBufferPointer(rebasing: buffer)
+    return unsafe self.finalize(for: rebased)
   }
 }
