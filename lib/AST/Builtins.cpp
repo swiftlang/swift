@@ -2454,6 +2454,9 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Subdivide4Argument:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
+  case IITDescriptor::OneThirdVecArgument:
+  case IITDescriptor::OneFifthVecArgument:
+  case IITDescriptor::OneSeventhVecArgument:
     // These types cannot be expressed in swift yet.
     return Type();
 
