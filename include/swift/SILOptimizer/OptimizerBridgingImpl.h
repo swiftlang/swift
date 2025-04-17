@@ -183,6 +183,10 @@ bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
 }
 
+bool BridgedPassContext::moduleHasLoweredAddresses() const {
+  return invocation->getPassManager()->getModule()->useLoweredAddresses();
+}
+
 bool BridgedPassContext::isTransforming(BridgedFunction function) const {
   return invocation->getFunction() == function.getFunction();
 }
