@@ -24,7 +24,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   public let capacity: Int
 
   @usableFromInline
-  internal var _count: Int = 0
+  internal var _count: Int
 
   @_alwaysEmitIntoClient
   @inlinable
@@ -123,7 +123,7 @@ extension OutputSpan where Element: ~Copyable  {
   @lifetime(borrow buffer)
   public init(
     buffer: UnsafeMutableBufferPointer<Element>,
-    initializedCount: Int = 0
+    initializedCount: Int
   ) {
     _precondition(buffer._isWellAligned(), "Misaligned OutputSpan")
     if let baseAddress = buffer.baseAddress {
@@ -133,8 +133,8 @@ extension OutputSpan where Element: ~Copyable  {
       )
     }
     _precondition(
-      initializedCount >= 0 && initializedCount <= buffer.count,
-      "OutputSpan count is outside its capacity"
+      0 <= initializedCount && initializedCount <= buffer.count,
+      "OutputSpan count is not within capacity"
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
@@ -149,7 +149,7 @@ extension OutputSpan {
 //   @lifetime(borrow buffer)
 //   public init(
 //     buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
-//     initializedCount: Int = 0
+//     initializedCount: Int
 //   ) {
 //     let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
 //     let os = unsafe OutputSpan(
@@ -190,7 +190,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-//MARK: bulk-update functions
+//MARK: bulk-append functions
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan {
 
@@ -198,26 +198,26 @@ extension OutputSpan {
   @lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
     _precondition(count <= freeCapacity, "OutputSpan capacity overflow")
-    unsafe _tail().withMemoryRebound(to: Element.self, capacity: count) {
-      unsafe $0.initialize(repeating: repeatedValue, count: count)
-    }
+    unsafe _tail().initializeMemory(
+      as: Element.self, repeating: repeatedValue, count: count
+    )
     _count &+= count
   }
-
 
   /// Returns true if the iterator has filled all the free capacity in the span.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   @discardableResult
   public mutating func append(
-    fromContentsOf elements: inout some IteratorProtocol<Element>
+    from elements: inout some IteratorProtocol<Element>
   ) -> Bool {
-    // FIXME: It may be best to delay this API until we've a chunking IteratorProtocol
+    // FIXME: It may be best to delay this API until
+    //        we have designed a chunking IteratorProtocol
     var p = unsafe _tail()
     while _count < capacity {
       guard let element = elements.next() else { return false }
       unsafe p.initializeMemory(as: Element.self, to: element)
-      unsafe p += MemoryLayout<Element>.stride
+      unsafe p = p.advanced(by: MemoryLayout<Element>.stride)
       _count &+= 1
     }
     return true
@@ -239,7 +239,8 @@ extension OutputSpan {
     var (iterator, copied) = unsafe _tail().withMemoryRebound(
       to: Element.self, capacity: freeCapacity
     ) {
-      let suffix = unsafe UnsafeMutableBufferPointer(start: $0, count: freeCapacity)
+      let suffix = unsafe UnsafeMutableBufferPointer(
+        start: $0, count: freeCapacity)
       return unsafe source._copyContents(initializing: suffix)
     }
     _precondition(iterator.next() == nil, "OutputSpan capacity overflow")
@@ -264,9 +265,7 @@ extension OutputSpan {
   public mutating func append(
     fromContentsOf source: Span<Element>
   ) {
-    unsafe source.withUnsafeBufferPointer {
-      unsafe self.append(fromContentsOf: $0)
-    }
+    unsafe source.withUnsafeBufferPointer { unsafe append(fromContentsOf: $0) }
   }
 
   @_alwaysEmitIntoClient
@@ -353,7 +352,8 @@ extension OutputSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: ~Copyable {
   /// Call the given function with the unsafe buffer pointer addressed by this
-  /// `OutputSpan` and a mutable reference to its count of initialized elements.
+  /// OutputSpan and a mutable reference to its count of initialized elements.
+  ///
   /// This method provides a way for Swift code to process or populate an
   /// `OutputSpan` using unsafe operations; for example, it allows dispatching
   /// to code written in legacy (memory-unsafe) languages.
@@ -369,9 +369,9 @@ extension OutputSpan where Element: ~Copyable {
   ///     region starting at the beginning of the buffer. The rest of the buffer
   ///     must hold uninitialized memory.
   ///
-  /// This operation cannot verify that this is actually the case, and that
-  /// makes this a fundamentally unsafe operation. Violating the output span
-  /// invariants results in undefined behavior.
+  /// This function cannot verify these two invariants, and therefore
+  /// this is an unsafe operation. Violating the invariants of `OutputSpan`
+  /// may result in undefined behavior.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
@@ -399,7 +399,7 @@ extension OutputSpan where Element: ~Copyable {
     var initializedCount = self._count
     defer {
       _precondition(
-        initializedCount >= 0 && initializedCount <= self.capacity,
+        0 <= initializedCount && initializedCount <= capacity,
         "OutputSpan capacity overflow"
       )
       self._count = initializedCount
@@ -413,17 +413,17 @@ extension OutputSpan where Element: ~Copyable {
   /// Consume the output span (relinquishing its control over the buffer it is
   /// addressing), and return the number of initialized elements in it.
   ///
-  /// This method is designed to be invoked in the same context that created the
-  /// output span, when it is time to commit the contents of the updated buffer
-  /// back into the construct that it came from.
+  /// This method should be invoked in the scope where the `OutputSpan` was
+  /// created, when it is time to commit the contents of the updated buffer
+  /// back into the construct being initialized.
   ///
   /// The context that created the output span is expected to remember what
   /// memory region the span is addressing. This consuming method expects to
   /// receive a copy of the same buffer pointer as a (loose) proof of ownership.
   ///
-  /// - Parameter buffer: The buffer that the `OutputSpan` is expected to
-  ///      address. This must be the same buffer as the one used to originally
-  ///      initialize the `OutputSpan` instance.
+  /// - Parameter buffer: The buffer we expect the `OutputSpan` to reference.
+  ///      This must be the same region of memory passed to
+  ///      the `OutputSpan` initializer.
   /// - Returns: The number of initialized elements in the same buffer, as
   ///      tracked by the consumed `OutputSpan` instance.
   @unsafe
@@ -439,5 +439,33 @@ extension OutputSpan where Element: ~Copyable {
     let count = self._count
     discard self
     return count
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension OutputSpan {
+  /// Consume the output span (relinquishing its control over the buffer it is
+  /// addressing), and return the number of initialized elements in it.
+  ///
+  /// This method should be invoked in the scope where the `OutputSpan` was
+  /// created, when it is time to commit the contents of the updated buffer
+  /// back into the construct being initialized.
+  ///
+  /// The context that created the output span is expected to remember what
+  /// memory region the span is addressing. This consuming method expects to
+  /// receive a copy of the same buffer pointer as a (loose) proof of ownership.
+  ///
+  /// - Parameter buffer: The buffer we expect the `OutputSpan` to reference.
+  ///      This must be the same region of memory passed to
+  ///      the `OutputSpan` initializer.
+  /// - Returns: The number of initialized elements in the same buffer, as
+  ///      tracked by the consumed `OutputSpan` instance.
+  @unsafe
+  @_alwaysEmitIntoClient
+  public consuming func finalize(
+    for buffer: Slice<UnsafeMutableBufferPointer<Element>>
+  ) -> Int {
+    let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
+    return unsafe self.finalize(for: rebased)
   }
 }
