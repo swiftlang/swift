@@ -2378,6 +2378,12 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
                attr->Name);
   }
 
+  // @_cdecl was never accepted on enums. Keep the previous diagnostic.
+  if (isa<EnumDecl>(D) && attr->Underscored) {
+    diagnose(attr->getLocation(), diag::attr_only_one_decl_kind,
+             attr, "func");
+  }
+
   if (!attr->Underscored &&
       !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_feature_required);
