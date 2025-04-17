@@ -425,3 +425,24 @@ func conversionsFromSyncToAsync(_ x: @escaping @Sendable (NonSendableKlass) -> V
   let _: @concurrent (SendableKlass) async -> Void = y
   let _: @concurrent (NonSendableKlass) async -> Void = z
 }
+
+func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) async -> Void) {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+  let _: nonisolated(nonsending) () async -> Void = {
+    42
+  }
+
+  func testParam(_: nonisolated(nonsending) () async throws -> Void) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> @error any Error
+  testParam { 42 }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU1_ : $@convention(thin) @async () -> ()
+  testParam { @concurrent in 42 }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYaYCcfU2_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, Int) -> ()
+  fn = { _ in }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYacfU3_ : $@convention(thin) @async (Int) -> ()
+  fn = { @concurrent _ in }
+}
