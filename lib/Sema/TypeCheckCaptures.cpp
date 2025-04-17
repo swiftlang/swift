@@ -396,13 +396,11 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
-      if (var->getAccessStrategy(DRE->getAccessSemantics(),
-                                 var->supportsMutation() ? AccessKind::ReadWrite
-                                                         : AccessKind::Read,
-                                 CurDC->getParentModule(),
-                                 CurDC->getResilienceExpansion(),
-                                 /*useOldABI=*/false)
-              .getKind() == AccessStrategy::Storage)
+      if (var->isAccessedViaPhysicalStorage(
+              DRE->getAccessSemantics(),
+              var->supportsMutation() ? AccessKind::ReadWrite
+                                      : AccessKind::Read,
+              CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
     }
 
