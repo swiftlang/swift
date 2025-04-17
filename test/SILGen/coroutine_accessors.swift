@@ -160,6 +160,52 @@ mutating func update(irm newValue: Int) throws -> Int {
   try coroutine_accessors.update(at: &irm, to: newValue)
 }
 
+public var i_r_m: Int {
+// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors1SV5i_r_mSivr :
+// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      @convention(method)
+// CHECK-SAME:      (@guaranteed S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      @yields Int
+// CHECK-SAME:  {
+// CHECK:       } // end sil function '$s19coroutine_accessors1SV5i_r_mSivr'
+
+  _read {
+    yield _i
+  }
+// CHECK-NOT:   sil [ossa] @$s19coroutine_accessors1SV5i_r_mSivx :
+// CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV5i_r_mSivM :
+// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      @convention(method)
+// CHECK-SAME:      (@inout S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      @yields @inout Int
+// CHECK-SAME:  {
+// CHECK:       } // end sil function '$s19coroutine_accessors1SV5i_r_mSivM'
+  _modify {
+    yield &_i
+  }
+// CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV5i_r_mSivs :
+// CHECK-SAME:      $@convention(method)
+// CHECK-SAME:      (Int, @inout S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      ()
+// CHECK-SAME:  {
+// CHECK:       bb0(
+// CHECK-SAME:      [[NEW_VALUE:%[^,]+]] :
+// CHECK-SAME:      [[SELF:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
+// CHECK:         [[MODIFY_ACCESSOR:%[^,]+]] = function_ref @$s19coroutine_accessors1SV5i_r_mSivM
+// CHECK:         ([[VALUE_ADDRESS:%[^,]+]],
+// CHECK-SAME:     [[TOKEN:%[^)]+]])
+// CHECK-SAME:    = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
+// CHECK:         assign [[NEW_VALUE:%[^,]+]] to [[VALUE_ADDRESS]]
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         end_access [[SELF_ACCESS]]
+// CHECK-LABEL:} // end sil function '$s19coroutine_accessors1SV5i_r_mSivs'
+} // public var irm
+
 } // public struct S
 
 enum E : Error {

@@ -2689,7 +2689,6 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
 
   // The non-underscored accessor is not present, the underscored accessor
   // won't be either.
-  // TODO: CoroutineAccessors: What if only the underscored is written out?
   auto *accessor = decl ? decl : getOpaqueAccessor(kind);
   if (!accessor)
     return false;
