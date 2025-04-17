@@ -2022,6 +2022,17 @@ void ActorIsolation::dumpForDiagnostics() const {
   llvm::dbgs() << '\n';
 }
 
+unsigned ActorIsolation::getActorInstanceUnionIndex() const {
+  assert(isActorInstanceIsolated());
+  if (actorInstance.is<NominalTypeDecl *>())
+    return 0;
+  if (actorInstance.is<VarDecl *>())
+    return 1;
+  if (actorInstance.is<Expr *>())
+    return 2;
+  llvm_unreachable("Unhandled");
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   if (state.preconcurrency())
