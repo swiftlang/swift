@@ -425,3 +425,34 @@ func conversionsFromSyncToAsync(_ x: @escaping @Sendable (NonSendableKlass) -> V
   let _: @concurrent (SendableKlass) async -> Void = y
   let _: @concurrent (NonSendableKlass) async -> Void = z
 }
+
+func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) async -> Void) {
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>):
+  // CHECK: hop_to_executor [[EXECUTOR]]
+  let _: nonisolated(nonsending) () async -> Void = {
+    42
+  }
+
+  func testParam(_: nonisolated(nonsending) () async throws -> Void) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaYCXEfU0_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> @error any Error
+  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>):
+  // CHECK: hop_to_executor [[EXECUTOR]]
+  testParam { 42 }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFyyYaXEfU1_ : $@convention(thin) @async () -> ()
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
+  testParam { @concurrent in 42 }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYaYCcfU2_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, Int) -> ()
+  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>, %1 : $Int):
+  // CHECK: hop_to_executor [[EXECUTOR]]
+  fn = { _ in }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen31testThatClosuresAssumeIsolation2fnyySiYaYCcz_tFySiYacfU3_ : $@convention(thin) @async (Int) -> ()
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
+  fn = { @concurrent _ in }
+}
