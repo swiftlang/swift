@@ -445,7 +445,7 @@ OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedConfor
   return {mod->lookUpWitnessTable(ref.getConcrete())};
 }
 
-BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkage,
+BridgedWitnessTable BridgedPassContext::createSpecializedWitnessTable(BridgedLinkage linkage,
                                                            bool serialized,
                                                            BridgedConformance conformance,
                                                            BridgedArrayRef bridgedEntries) const {

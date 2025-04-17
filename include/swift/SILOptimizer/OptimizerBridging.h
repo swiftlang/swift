@@ -328,7 +328,7 @@ struct BridgedPassContext {
                                                        BridgedSubstitutionMap substitutions) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createSpecializedWitnessTable(BridgedLinkage linkage,
                                                                             bool serialized,
                                                                             BridgedConformance conformance,
                                                                             BridgedArrayRef bridgedEntries) const;
