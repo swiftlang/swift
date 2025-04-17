@@ -29,7 +29,7 @@
 @cdecl("noBody")
 func noBody(x: Int) -> Int // expected-error{{expected '{' in body of function}}
 
-@cdecl("property") // expected-error{{may only be used on 'func' declarations}}
+@cdecl("property") // expected-error{{'@cdecl' attribute cannot be applied to this declaration}}
 var property: Int
 
 var computed: Int {
@@ -66,10 +66,10 @@ class Foo {
   @cdecl("Foo_foo_2") // expected-error{{@cdecl can only be applied to global functions}}
   static func foo(x: Int) -> Int { return x }
 
-  @cdecl("Foo_init") // expected-error{{@cdecl may only be used on 'func'}}
+  @cdecl("Foo_init") // expected-error{{'@cdecl' attribute cannot be applied to this declaration}}
   init() {}
 
-  @cdecl("Foo_deinit") // expected-error{{@cdecl may only be used on 'func'}}
+  @cdecl("Foo_deinit") // expected-error{{'@cdecl' attribute cannot be applied to this declaration}}
   deinit {}
 }
 
