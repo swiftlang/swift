@@ -110,6 +110,21 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
 
+  /// True if a function with this type can be code-generated in Embedded Swift.
+  /// These are basically all non-generic functions. But also certain generic functions are supported:
+  /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for
+  /// such arguments, no metadata is needed, except the isa-pointer of the class.
+  public var hasValidSignatureForEmbedded: Bool {
+    let genericSignature = invocationGenericSignatureOfFunction
+    for genParam in genericSignature.genericParameters {
+      let mappedParam = genericSignature.mapTypeIntoContext(genParam)
+      if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
+        return false
+      }
+    }
+    return true
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Aggregates
   //===--------------------------------------------------------------------===//
