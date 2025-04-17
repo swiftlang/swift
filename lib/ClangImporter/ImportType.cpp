@@ -368,7 +368,8 @@ namespace {
         return Type();
 
       // AMDGPU builtin types that don't have Swift equivalents.
-#define AMDGPU_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
+      case clang::BuiltinType::Id:
 #include "clang/Basic/AMDGPUTypes.def"
         return Type();
 
