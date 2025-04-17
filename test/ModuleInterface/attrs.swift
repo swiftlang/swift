@@ -85,6 +85,20 @@ public struct MutatingTest {
 @abi(func abiSpiFunc())
 @_spi(spiGroup) public func abiSpiFunc() {}
 
+// We should print feature guards outside, but not inside, an @abi attribute.
+@abi(func sendingABI() -> sending Any?)
+public func sendingABI() -> Any? { nil }
+// CHECK: #if {{.*}} && $ABIAttribute
+// CHECK: @abi(func sendingABI() -> sending Any?)
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #elseif {{.*}} && $SendingArgsAndResults
+// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #else
+// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #endif
+
 @concurrent
 public func testExecutionConcurrent() async {}
 // CHECK: @concurrent public func testExecutionConcurrent() async
