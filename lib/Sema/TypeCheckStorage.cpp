@@ -2700,7 +2700,7 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
     return true;
 
   auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
-  auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
+  auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.
   if (modifyAvailability.getPlatformRange().isContainedIn(featureAvailability))
