@@ -402,6 +402,10 @@ BridgedCanType BridgedASTType::getCanonicalType() const {
   return unbridged()->getCanonicalType();
 }
 
+BridgedDiagnosticArgument BridgedASTType::asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(unbridged());
+}
+
 bool BridgedASTType::hasArchetype() const {
   return unbridged()->hasArchetype();
 }

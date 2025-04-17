@@ -62,3 +62,19 @@ extension Conformance {
     return function.bridged.conformanceMatchesActorIsolation(bridged)
   }
 }
+
+extension DiagnosticEngine {
+  public func diagnose(_ id: DiagID, _ args: DiagnosticArgument..., at location: Location) {
+    diagnose(id, args, at: location.sourceLoc)
+  }
+
+  public func diagnose(_ id: DiagID, _ args: [DiagnosticArgument], at location: Location) {
+    diagnose(id, args, at: location.sourceLoc)
+  }
+}
+
+extension Diagnostic {
+  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: Location) {
+    self.init(id, arguments, at: location.sourceLoc)
+  }
+}

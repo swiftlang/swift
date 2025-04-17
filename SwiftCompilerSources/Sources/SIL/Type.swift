@@ -267,6 +267,12 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
+extension Type: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    rawType._withBridgedDiagnosticArgument(fn)
+  }
+}
+
 extension BridgedType {
   public var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }

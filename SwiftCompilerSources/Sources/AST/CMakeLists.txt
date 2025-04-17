@@ -12,6 +12,7 @@ add_swift_compiler_module(AST
   SOURCES
     Declarations.swift
     Conformance.swift
+    DiagnosticEngine.swift
     GenericSignature.swift
     Registration.swift
     SubstitutionMap.swift

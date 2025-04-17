@@ -50,7 +50,7 @@ private struct VTableSpecializer {
     let classDecl = classType.nominal! as! ClassDecl
     guard let origVTable = context.lookupVTable(for: classDecl) else {
       if context.enableWMORequiredDiagnostics {
-        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_class, classType)
+        context.diagnosticEngine.diagnose(.cannot_specialize_class, classType, at: errorLocation)
       }
       return
     }
@@ -91,7 +91,7 @@ private struct VTableSpecializer {
             context.loadFunction(function: entry.implementation, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs) else
       {
-        context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
+        context.diagnosticEngine.diagnose(.non_final_generic_class_function, at: entry.methodDecl.location)
         return nil
       }
       notifyNewFunction(specializedMethod)
@@ -131,7 +131,7 @@ func specializeWitnessTable(forConformance conformance: Conformance,
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
       {
-        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)
+        context.diagnosticEngine.diagnose(.cannot_specialize_witness_method, requirement, at: errorLocation)
         return origEntry
       }
       return .method(requirement: requirement, witness: specializedMethod)

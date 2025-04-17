@@ -137,11 +137,11 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
         if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(destroyValue.location.sourceLoc, .deinit_not_visible)
+          context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyValue.location)
         }
       case let destroyAddr as DestroyAddrInst:
         if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
+          context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyAddr.location)
         }
 
       case let iem as InitExistentialMetatypeInst:
@@ -309,7 +309,7 @@ private func checkForGenericMethods(in witnessTable: WitnessTable,
        let witness,
        witness.isGeneric
     {
-      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)
+      context.diagnosticEngine.diagnose(.cannot_specialize_witness_method, requirement, at: errorLocation)
       return
     }
   }
@@ -318,7 +318,7 @@ private func checkForGenericMethods(in witnessTable: WitnessTable,
 private func checkVTablesForGenericFunctions(_ context: ModulePassContext) {
   for vTable in context.vTables where !vTable.class.isGenericAtAnyLevel {
     for entry in vTable.entries where entry.implementation.isGeneric {
-      context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
+      context.diagnosticEngine.diagnose(.non_final_generic_class_function, at: entry.methodDecl.location)
     }
   }
 }

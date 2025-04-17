@@ -13,40 +13,34 @@
 import ASTBridging
 
 import Basic
-import SIL
 
-typealias DiagID = BridgedDiagID
+public typealias DiagID = BridgedDiagID
 
-protocol DiagnosticArgument {
+public protocol DiagnosticArgument {
   func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void)
 }
 extension String: DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     _withBridgedStringRef { fn(BridgedDiagnosticArgument($0)) }
   }
 }
 extension StringRef: DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(BridgedDiagnosticArgument(_bridged))
   }
 }
 extension Int: DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(BridgedDiagnosticArgument(self))
   }
 }
 extension Type: DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    fn(bridged.asDiagnosticArgument())
-  }
-}
-extension DeclRef: DiagnosticArgument {
-  func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(bridged.asDiagnosticArgument())
   }
 }
 
-struct DiagnosticFixIt {
+public struct DiagnosticFixIt {
   let start: SourceLoc
   let byteLength: Int
   let text: String
@@ -67,10 +61,10 @@ struct DiagnosticFixIt {
   }
 }
 
-struct DiagnosticEngine {
+public struct DiagnosticEngine {
   private let bridged: BridgedDiagnosticEngine
 
-  init(bridged: BridgedDiagnosticEngine) {
+  public init(bridged: BridgedDiagnosticEngine) {
     self.bridged = bridged
   }
   init?(bridged: BridgedNullableDiagnosticEngine) {
@@ -80,9 +74,9 @@ struct DiagnosticEngine {
     self.bridged = BridgedDiagnosticEngine(raw: raw)
   }
 
-  func diagnose(_ position: SourceLoc?,
-                       _ id: DiagID,
+  public func diagnose(_ id: DiagID,
                        _ args: [DiagnosticArgument],
+                       at position: SourceLoc?,
                        highlight: CharSourceRange? = nil,
                        fixIts: [DiagnosticFixIt] = []) {
 
@@ -136,11 +130,32 @@ struct DiagnosticEngine {
     closure()
   }
 
-  func diagnose(_ position: SourceLoc?,
-                       _ id: DiagID,
+  public func diagnose(_ id: DiagID,
                        _ args: DiagnosticArgument...,
+                       at position: SourceLoc?,
                        highlight: CharSourceRange? = nil,
                        fixIts: DiagnosticFixIt...) {
-    diagnose(position, id, args, highlight: highlight, fixIts: fixIts)
+    diagnose(id, args, at: position, highlight: highlight, fixIts: fixIts)
+  }
+
+  public func diagnose(_ diagnostic: Diagnostic) {
+    diagnose(diagnostic.id, diagnostic.arguments, at: diagnostic.position)
+  }
+}
+
+/// A utility struct which allows throwing a Diagnostic.
+public struct Diagnostic : Error {
+  public let id: DiagID
+  public let arguments: [DiagnosticArgument]
+  public let position: SourceLoc?
+
+  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at position: SourceLoc?) {
+    self.init(id, arguments, at: position)
+  }
+
+  public init(_ id: DiagID, _ arguments: [DiagnosticArgument], at position: SourceLoc?) {
+    self.id = id
+    self.arguments = arguments
+    self.position = position
   }
 }
