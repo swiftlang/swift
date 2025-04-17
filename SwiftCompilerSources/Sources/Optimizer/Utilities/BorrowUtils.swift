@@ -425,7 +425,7 @@ enum BeginBorrowValue {
   var baseOperand: Operand? {
     switch self {
     case let .beginBorrow(beginBorrow):
-    return beginBorrow.operand
+      return beginBorrow.operand
     case let .loadBorrow(loadBorrow):
       return loadBorrow.operand
     case .beginApply, .functionArgument, .reborrow, .uncheckOwnershipConversion:
