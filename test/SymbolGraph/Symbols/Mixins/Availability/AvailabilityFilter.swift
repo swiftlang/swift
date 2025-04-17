@@ -42,22 +42,22 @@ public struct S {}
 @available(*, deprecated)
 public class C {}
 
-// DEFAULT-DAG: macOS
-// DEFAULT-DAG: iOS
-// DEFAULT-DAG: watchOS
+// DEFAULT-DAG: "domain":{{ ?}}"macOS"
+// DEFAULT-DAG: "domain":{{ ?}}"iOS"
+// DEFAULT-DAG: "domain":{{ ?}}"watchOS"
 // DEFAULT-DAG: "isUnconditionallyDeprecated":{{ ?}}true
 
-// ALLOWLIST-NOT: watchOS
-// ALLOWLIST-DAG: macOS
-// ALLOWLIST-DAG: iOS
+// ALLOWLIST-NOT: "domain":{{ ?}}"watchOS"
+// ALLOWLIST-DAG: "domain":{{ ?}}"macOS"
+// ALLOWLIST-DAG: "domain":{{ ?}}"iOS"
 // ALLOWLIST-DAG: "isUnconditionallyDeprecated":{{ ?}}true
 
-// BLOCKLIST-NOT: macOS
-// BLOCKLIST-NOT: iOS
-// BLOCKLIST-DAG: watchOS
+// BLOCKLIST-NOT: "domain":{{ ?}}"macOS"
+// BLOCKLIST-NOT: "domain":{{ ?}}"iOS"
+// BLOCKLIST-DAG: "domain":{{ ?}}"watchOS"
 // BLOCKLIST-DAG: "isUnconditionallyDeprecated":{{ ?}}true
 
-// EMPTY-NOT: macOS
-// EMPTY-NOT: iOS
-// EMPTY-NOT: watchOS
+// EMPTY-NOT: "domain":{{ ?}}"macOS"
+// EMPTY-NOT: "domain":{{ ?}}"iOS"
+// EMPTY-NOT: "domain":{{ ?}}"watchOS"
 // EMPTY-DAG: "isUnconditionallyDeprecated":{{ ?}}true
