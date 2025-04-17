@@ -165,6 +165,13 @@ public:
     return declOrAttr.get<DeclAttribute *>();
   }
 
+  // The foreign language targeted by the context.
+  ForeignLanguage getForeignLanguage() const {
+    if (kind == ExplicitlyCDecl)
+      return ForeignLanguage::C;
+    return ForeignLanguage::ObjectiveC;
+  }
+
   void setAttrInvalid() const;
 
   /// Emit an additional diagnostic describing why we are applying @objc to the
@@ -189,8 +196,7 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 bool isRepresentableInLanguage(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
-    std::optional<ForeignErrorConvention> &errorConvention,
-    ForeignLanguage lang);
+    std::optional<ForeignErrorConvention> &errorConvention);
 
 /// Determine whether the given variable can be represented in Objective-C.
 bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);

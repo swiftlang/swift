@@ -296,21 +296,21 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
 static void diagnoseFunctionParamNotRepresentable(
     const AbstractFunctionDecl *AFD, unsigned NumParams,
-    unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason,
-    ForeignLanguage Language) {
+    unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
   auto behavior = behaviorLimitForObjCReason(Reason, AFD->getASTContext());
+  auto language = Reason.getForeignLanguage();
 
   if (NumParams == 1) {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
                     AFD, getObjCDiagnosticAttrKind(Reason),
-                    (unsigned)Language)
+                    (unsigned)language)
           .limitBehavior(behavior));
   } else {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_param_type,
                     AFD, ParamIndex + 1, getObjCDiagnosticAttrKind(Reason),
-                    (unsigned)Language)
+                    (unsigned)language)
           .limitBehavior(behavior));
   }
   SourceRange SR;
@@ -329,12 +329,12 @@ static void diagnoseFunctionParamNotRepresentable(
 
 static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
                                                const ParameterList *PL,
-                                               ObjCReason Reason,
-                                               ForeignLanguage Language) {
+                                               ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
+  auto language = Reason.getForeignLanguage();
   bool IsObjC = true;
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ++ParamIndex) {
@@ -356,7 +356,8 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     if (param->isInOut()) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
-                       AFD, getObjCDiagnosticAttrKind(Reason), (unsigned)Language)
+                       AFD, getObjCDiagnosticAttrKind(Reason),
+                       (unsigned)language)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -369,11 +370,11 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
 
     if (param->hasAttachedPropertyWrapper()) {
       if (param->getPropertyWrapperBackingPropertyType()->isRepresentableIn(
-          Language,
+          language,
           const_cast<AbstractFunctionDecl *>(AFD)))
         continue;
     } else if (param->getTypeInContext()->isRepresentableIn(
-          Language,
+          language,
           const_cast<AbstractFunctionDecl *>(AFD))) {
       continue;
     }
@@ -394,7 +395,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
 
     IsObjC = false;
     diagnoseFunctionParamNotRepresentable(AFD, NumParams, ParamIndex,
-                                          param, Reason, Language);
+                                          param, Reason);
   }
   return IsObjC;
 }
@@ -656,13 +657,11 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
 bool swift::isRepresentableInLanguage(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
-    std::optional<ForeignErrorConvention> &errorConvention,
-    ForeignLanguage Language) {
+    std::optional<ForeignErrorConvention> &errorConvention) {
   auto abiRole = ABIRoleInfo(AFD);
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return isRepresentableInLanguage(abiRole.getCounterpart(), Reason,
-                                     asyncConvention, errorConvention,
-                                     Language);
+                                     asyncConvention, errorConvention);
 
   // Clear out the async and error conventions. They will be added later if
   // needed.
@@ -672,7 +671,7 @@ bool swift::isRepresentableInLanguage(
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
-
+  auto language = Reason.getForeignLanguage();
 
   if (checkObjCInForeignClassContext(AFD, Reason))
     return false;
@@ -787,8 +786,7 @@ bool swift::isRepresentableInLanguage(
   if (!isSpecialInit &&
       !isParamListRepresentableInLanguage(AFD,
                                           AFD->getParameters(),
-                                          Reason,
-                                          Language)) {
+                                          Reason)) {
     return false;
   }
 
@@ -798,12 +796,12 @@ bool swift::isRepresentableInLanguage(
         !ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
-        !ResultType->isRepresentableIn(Language,
+        !ResultType->isRepresentableIn(language,
                                        const_cast<FuncDecl *>(FD))) {
       softenIfAccessNote(AFD, Reason.getAttr(),
        AFD->diagnose(diag::objc_invalid_on_func_result_type,
                      FD, getObjCDiagnosticAttrKind(Reason),
-                     (unsigned)Language)
+                     (unsigned)language)
             .limitBehavior(behavior));
       diagnoseTypeNotRepresentableInObjC(FD, ResultType,
                                          FD->getResultTypeSourceRange(),
@@ -856,11 +854,11 @@ bool swift::isRepresentableInLanguage(
       completionHandlerParams.push_back(AnyFunctionType::Param(type));
 
       // Make sure that the parameter type is representable in Objective-C.
-      if (!type->isRepresentableIn(Language, const_cast<FuncDecl *>(FD))) {
+      if (!type->isRepresentableIn(language, const_cast<FuncDecl *>(FD))) {
         softenIfAccessNote(AFD, Reason.getAttr(),
           AFD->diagnose(diag::objc_invalid_on_func_result_type,
                         FD, getObjCDiagnosticAttrKind(Reason),
-                        (unsigned)Language)
+                        (unsigned)language)
               .limitBehavior(behavior));
         diagnoseTypeNotRepresentableInObjC(FD, type,
                                            FD->getResultTypeSourceRange(),
@@ -1278,8 +1276,7 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
     std::optional<ForeignErrorConvention> errorConvention;
     return isRepresentableInLanguage(func,
                                      ObjCReason::MemberOfObjCMembersClass,
-                                     asyncConvention, errorConvention,
-                                     ForeignLanguage::ObjectiveC);
+                                     asyncConvention, errorConvention);
   }
 
   if (auto var = dyn_cast<VarDecl>(decl))
@@ -1888,8 +1885,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Destructors need no additional checking.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (!isRepresentableInLanguage(
-            func, *isObjC, asyncConvention, errorConvention,
-            ForeignLanguage::ObjectiveC)) {
+            func, *isObjC, asyncConvention, errorConvention)) {
       isObjC->setAttrInvalid();
       return false;
     }
@@ -4185,8 +4181,7 @@ TypeCheckCDeclAttributeRequest::evaluate(Evaluator &evaluator,
 
   std::optional<ForeignAsyncConvention> asyncConvention;
   std::optional<ForeignErrorConvention> errorConvention;
-  if (isRepresentableInLanguage(FD, reason, asyncConvention, errorConvention,
-                                *lang)) {
+  if (isRepresentableInLanguage(FD, reason, asyncConvention, errorConvention)) {
     if (FD->hasAsync()) {
       FD->setForeignAsyncConvention(*asyncConvention);
       ctx.Diags.diagnose(attr->getLocation(), diag::attr_decl_async,
