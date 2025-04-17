@@ -2007,3 +2007,23 @@ nonisolated func localCaptureDataRace4() {
 
   x = 2 // expected-tns-note {{access can happen concurrently}}
 }
+
+// We shouldn't error here since every time around, we are using the same
+// isolation.
+func testIsolatedParamInference() {
+  class S : @unchecked Sendable {}
+
+  final class B {
+    var s = S()
+    var b: Bool = false
+
+    func foo(isolation: isolated Actor = #isolation) async {
+      while !b {
+        await withTaskGroup(of: Int.self) { group in
+          _ = isolation
+          self.s = S()
+        }
+      }
+    }
+  }
+}
