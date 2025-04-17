@@ -347,6 +347,10 @@ bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
 
+bool BridgedType::isBox() const {
+  return unbridged().is<swift::SILBoxType>();
+}
+
 bool BridgedType::containsNoEscapeFunction() const {
   return unbridged().containsNoEscapeFunction();
 }
@@ -377,6 +381,16 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
+}
+
+SwiftInt BridgedType::getNumBoxFields() const {
+  return unbridged().castTo<swift::SILBoxType>()->getLayout()->getFields().size();
+}
+
+BridgedType BridgedType::getBoxFieldType(SwiftInt idx, BridgedFunction f) const {
+  auto *fn = f.getFunction();
+  return swift::getSILBoxFieldType(fn->getTypeExpansionContext(), unbridged().castTo<swift::SILBoxType>(),
+                                   fn->getModule().Types, idx);
 }
 
 SwiftInt BridgedType::getNumNominalFields() const {

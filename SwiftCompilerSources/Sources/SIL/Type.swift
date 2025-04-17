@@ -59,6 +59,8 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isReferenceCounted(function.bridged)
   }
 
+  public var isBox: Bool { bridged.isBox() }
+
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
   /// Return true if this type conforms to Escapable.
@@ -123,6 +125,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public var tupleElements: TupleElementArray {
     precondition(isTuple)
     return TupleElementArray(type: self)
+  }
+
+  public func getBoxFields(in function: Function) -> BoxFieldsArray {
+    precondition(isBox)
+    return BoxFieldsArray(type: self, function: function)
   }
 
   /// Returns nil if the nominal is a resilient type because in this case the complete list
@@ -264,6 +271,18 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public subscript(_ index: Int) -> Type {
     type.bridged.getTupleElementType(index).type
+  }
+}
+
+public struct BoxFieldsArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+  fileprivate let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { Int(type.bridged.getNumBoxFields()) }
+
+  public subscript(_ index: Int) -> Type {
+    type.bridged.getBoxFieldType(index, function.bridged).type
   }
 }
 
