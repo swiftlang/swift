@@ -69,6 +69,7 @@ struct LocalVariableAccess: CustomStringConvertible {
     case dependenceSource // A value/address depends on this local here (like a load)
     case dependenceDest  // This local depends on another value/address here (like a store)
     case store       // 'var' initialization and destruction
+    case storeBorrow // scoped initialization of temporaries
     case apply       // indirect arguments
     case escape      // alloc_box captures
   }
@@ -103,7 +104,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       }
     case .load, .dependenceSource, .dependenceDest:
       return false
-    case .incomingArgument, .outgoingArgument, .store, .inoutYield:
+    case .incomingArgument, .outgoingArgument, .store, .storeBorrow, .inoutYield:
       return true
     case .apply:
       let apply = instruction as! FullApplySite
@@ -146,6 +147,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "dependenceDest"
     case .store:
       str += "store"
+    case .storeBorrow:
+      str += "storeBorrow"
     case .apply:
       str += "apply"
     case .escape:
@@ -178,9 +181,9 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       case .`init`, .modify:
         break // lazily compute full assignment
       }
-      case .load, .dependenceSource, .dependenceDest:
+    case .load, .dependenceSource, .dependenceDest:
       self._isFullyAssigned = false
-    case .store:
+    case .store, .storeBorrow:
       if let store = localAccess.instruction as? StoringInstruction {
         self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination)
       } else {
@@ -441,6 +444,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       return .continueWalk
     case is LoadBorrowInst:
       visit(LocalVariableAccess(.load, operand))
+      return .continueWalk
+    case is StoreBorrowInst:
+      visit(LocalVariableAccess(.storeBorrow, operand))
       return .continueWalk
     default:
       // A StoreBorrow should be guarded by an access scope.

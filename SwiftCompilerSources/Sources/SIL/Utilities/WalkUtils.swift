@@ -39,10 +39,11 @@ public enum WalkResult {
 }
 
 extension Sequence {
+  // Walk each element until the walk aborts.
   public func walk(
-    _ predicate: (Element) throws -> WalkResult
+    _ walker: (Element) throws -> WalkResult
   ) rethrows -> WalkResult {
-    return try contains { try predicate($0) == .abortWalk } ? .abortWalk : .continueWalk
+    return try contains { try walker($0) == .abortWalk } ? .abortWalk : .continueWalk
   }
 }
 
