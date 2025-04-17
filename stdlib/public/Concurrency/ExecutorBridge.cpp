@@ -14,6 +14,8 @@
 #include <dispatch/dispatch.h>
 #endif
 
+#include "swift/Threading/Once.h"
+
 #include "Error.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
@@ -26,6 +28,13 @@ using namespace swift;
 extern "C" SWIFT_CC(swift)
 void _swift_exit(int result) {
   exit(result);
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_createDefaultExecutorsOnce() {
+  static swift::once_t createExecutorsOnce;
+
+  swift::once(createExecutorsOnce, swift_createDefaultExecutors);
 }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
