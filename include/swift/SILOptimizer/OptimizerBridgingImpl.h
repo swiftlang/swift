@@ -591,6 +591,11 @@ bool BridgedPassContext::enableWMORequiredDiagnostics() const {
   return mod->getOptions().EnableWMORequiredDiagnostics;
 }
 
+bool BridgedPassContext::noAllocations() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().NoAllocations;
+}
+
 bool BridgedPassContext::enableAddressDependencies() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getOptions().EnableAddressDependencies;

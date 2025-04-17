@@ -385,6 +385,7 @@ struct BridgedPassContext {
   bool enableSimplificationFor(BridgedInstruction inst) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
+  BRIDGED_INLINE bool noAllocations() const;
 
   // Temporary for AddressableParameters Bootstrapping.
   BRIDGED_INLINE bool enableAddressDependencies() const;
