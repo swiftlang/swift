@@ -12,6 +12,8 @@ project(SwiftSynchronization
   LANGUAGES Swift
   VERSION 6.1.0${BUILD_NUMBER})
 
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
 include(GNUInstallDirs)
 
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -22,9 +24,14 @@ set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
+set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vendor"
+  CACHE FILEPATH "Location for private build system extension")
+
 find_package(SwiftCore)
 include(gyb)
 include(AvailabilityMacros)
+
+include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
 option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
@@ -90,3 +97,5 @@ install(TARGETS swiftSynchronization
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftSynchronization.cmake" OPTIONAL)
