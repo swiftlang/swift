@@ -29,6 +29,7 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
 
 find_package(SwiftCore)
 include(gyb)
+include(ResourceEmbedding)
 include(AvailabilityMacros)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
@@ -97,5 +98,9 @@ install(TARGETS swiftSynchronization
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+# Configure plist creation for Darwin platforms.
+generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
+embed_manifest(swiftSynchronization)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftSynchronization.cmake" OPTIONAL)
