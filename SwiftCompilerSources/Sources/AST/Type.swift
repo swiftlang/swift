@@ -48,6 +48,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var instanceTypeOfMetatype: Type { Type(bridged: bridged.getInstanceTypeOfMetatype()) }
 
+  public var staticTypeOfDynamicSelf: Type { Type(bridged: bridged.getStaticTypeOfDynamicSelf()) }
+
   public var superClassType: Type? {
     precondition(isClass)
     let bridgedSuperClassTy = bridged.getSuperClassType()
@@ -136,10 +138,12 @@ extension TypeProperties {
 
   public var isTuple: Bool { rawType.bridged.isTuple() }
   public var isFunction: Bool { rawType.bridged.isFunction() }
+  public var isArchetype: Bool { rawType.bridged.isArchetype() }
   public var isExistentialArchetype: Bool { rawType.bridged.isExistentialArchetype() }
   public var isExistentialArchetypeWithError: Bool { rawType.bridged.isExistentialArchetypeWithError() }
   public var isExistential: Bool { rawType.bridged.isExistential() }
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
+  public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }
   public var isUnownedStorageType: Bool { return rawType.bridged.isUnownedStorageType() }
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
@@ -187,6 +191,7 @@ extension TypeProperties {
   public var isEscapable: Bool { rawType.bridged.isEscapable() }
   public var isNoEscape: Bool { rawType.bridged.isNoEscape() }
   public var isBuiltinType: Bool { rawType.bridged.isBuiltinType() }
+  public var archetypeRequiresClass: Bool { rawType.bridged.archetypeRequiresClass() }
 
   public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {
     rawType.bridged.getRepresentationOfMetatype().representation
