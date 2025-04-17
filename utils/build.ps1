@@ -93,10 +93,6 @@ An array of names of projects to run tests for.
 .PARAMETER Stage
 The path to a directory where built msi's and the installer executable should be staged (for CI).
 
-.PARAMETER BuildTo
-The name of a build step after which the script should terminate.
-For example: -BuildTo ToolsSupportCore
-
 .PARAMETER ToBatch
 When set, runs the script in a special mode which outputs a listing of command invocations
 in batch file format instead of executing them.
@@ -150,15 +146,6 @@ param
   [switch] $IncludeDS2 = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
-  [ValidateSet("ArgumentParser", "ASN1", "BuildTools", "Certificates", "CMark",
-    "Collections", "Compilers", "Crypto", "CURL", "Dispatch", "DocC", "Driver",
-    "DS2", "ExperimentalRuntime", "Format", "Foundation", "FoundationMacros",
-    "IndexStoreDB", "Inspect", "Installer", "LLBuild", "LLVM", "LMDB",
-    "Markdown", "mimalloc", "PackageManager", "PlatformInfoPlist", "RegsGen2",
-    "Runtime", "Sanitizers", "SDKSettingsPlist", "SourceKitLSP", "SQLite",
-    "System", "Testing", "TestingMacros", "ToolsSupportCore", "XCTest", "XML2",
-    "ZLib")]
-  [string] $BuildTo = "",
   [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
   [ValidateSet("Asserts", "NoAsserts")]
@@ -593,9 +580,6 @@ function Invoke-BuildStep {
 
   if ($Summary) {
     Add-TimingData $Platform $Name $Stopwatch.Elapsed
-  }
-  if ($Name.Replace("Build-", "") -eq $BuildTo) {
-    exit 0
   }
 }
 
