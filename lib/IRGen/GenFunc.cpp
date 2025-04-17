@@ -2810,8 +2810,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
 
-llvm::Value *
-IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+llvm::Value *IRGenFunction::popAsyncContext(llvm::Value *calleeContext) {
   auto addr = Builder.CreateBitOrPointerCast(calleeContext, IGM.Int8PtrPtrTy);
   Address callerContextAddr(addr, IGM.Int8PtrTy, IGM.getPointerAlignment());
   llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
@@ -2820,6 +2819,13 @@ IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
         PointerAuthInfo::emit(*this, schema, addr, PointerAuthEntity());
     callerContext = emitPointerAuthAuth(*this, callerContext, authInfo);
   }
+  return callerContext;
+}
+
+llvm::Value *
+IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+  auto  callerContext = popAsyncContext(calleeContext);
+
   // TODO: remove this once all platforms support lowering the intrinsic.
   // At the time of this writing only arm64 supports it.
   if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
