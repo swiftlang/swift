@@ -1184,11 +1184,8 @@ bool swift::diagnoseNonSendableTypesInReference(
       // Check params of this function or subscript override for sendability
       for (auto param : *paramList) {
         Type paramType = param->getInterfaceType().subst(subs);
-        if (param->isSending() && !paramType->hasError()) {
-          continue;
-        }
-        if (diagnoseNonSendableTypes(
-                paramType, fromDC, derivedConformanceType, refLoc,
+        if (diagnoseNonSendableTypesWithSendingCheck(
+                param, paramType, fromDC, derivedConformanceType, refLoc,
                 diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 getSendableParamDiag(refKind), decl, getActorIsolation()))
           return true;
@@ -1198,27 +1195,19 @@ bool swift::diagnoseNonSendableTypesInReference(
     // Check the result type of a function or subscript.
     if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
       Type resultType;
-      bool hasSendingResult;
       if (auto func = dyn_cast<FuncDecl>(decl)) {
         resultType = func->getResultInterfaceType().subst(subs);
-        hasSendingResult = func->hasSendingResult();
         decl = func;
       } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
         resultType = subscript->getElementInterfaceType().subst(subs);
-        hasSendingResult = isa<SendingTypeRepr>(subscript->getResultTypeRepr());
       }
       if (!resultType) {
         return false;
       }
-      auto diag = getSendableResultDiag(refKind);
-      if (diag.ID == diag::non_sendable_result_in_witness.ID &&
-          hasSendingResult && !resultType->hasError()) {
-        return false;
-      }
-      if (diagnoseNonSendableTypes(
-              resultType, fromDC, derivedConformanceType, refLoc,
-              diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc, diag, decl,
-              getActorIsolation()))
+      if (diagnoseNonSendableTypesWithSendingCheck(
+              decl, resultType, fromDC, derivedConformanceType, refLoc,
+              diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+              getSendableResultDiag(refKind), decl, getActorIsolation()))
         return true;
     }
 
