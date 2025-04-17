@@ -1504,11 +1504,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy =
-          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
-                                module, ResilienceExpansion::Minimal,
-                                /*useOldABI=*/false);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),

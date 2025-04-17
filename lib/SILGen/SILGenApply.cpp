@@ -3334,12 +3334,15 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
 
   if (!storage)
     return nullptr;
+
   // This should match the strategy computation used in
   // SILGenLValue::visit{DeclRef,Member}RefExpr.
-  auto strategy = storage->getAccessStrategy(accessSemantics,
-         AccessKind::Read, SGM.M.getSwiftModule(), F.getResilienceExpansion(),
-         /* old abi*/ false);
-  
+  auto strategy = storage->getAccessStrategy(
+      accessSemantics, AccessKind::Read, SGM.M.getSwiftModule(),
+      F.getResilienceExpansion(),
+      std::make_pair<>(argExpr->getSourceRange(), FunctionDC),
+      /* old abi*/ false);
+
   switch (strategy.getKind()) {
   case AccessStrategy::Storage:
     // Storage can benefit from direct borrowing/consumption.
