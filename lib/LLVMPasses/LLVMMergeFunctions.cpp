@@ -258,7 +258,7 @@ private:
     FunctionEntry *First;
 
     /// A very cheap hash, used to early exit if functions do not match.
-    llvm::IRHash Hash;
+    llvm::stable_hash Hash;
 
   public:
     // Note the hash is recalculated potentially multiple times, but it is cheap.
@@ -714,7 +714,7 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
 
   // All functions in the module, ordered by hash. Functions with a unique
   // hash value are easily eliminated.
-  std::vector<std::pair<IRHash, Function *>> HashedFuncs;
+  std::vector<std::pair<stable_hash, Function *>> HashedFuncs;
 
   for (Function &Func : M) {
     if (isEligibleFunction(&Func)) {
@@ -722,10 +722,11 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     }
   }
 
-  std::stable_sort(
-      HashedFuncs.begin(), HashedFuncs.end(),
-      [](const std::pair<IRHash, Function *> &a,
-         const std::pair<IRHash, Function *> &b) { return a.first < b.first; });
+  std::stable_sort(HashedFuncs.begin(), HashedFuncs.end(),
+                   [](const std::pair<stable_hash, Function *> &a,
+                      const std::pair<stable_hash, Function *> &b) {
+                     return a.first < b.first;
+                   });
 
   std::vector<FunctionEntry> FuncEntryStorage;
   FuncEntryStorage.reserve(HashedFuncs.size());
