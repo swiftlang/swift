@@ -3123,6 +3123,7 @@ class BridgedCanType {
   swift::TypeBase * _Nullable type;
 
 public:
+  BRIDGED_INLINE BridgedCanType();
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;

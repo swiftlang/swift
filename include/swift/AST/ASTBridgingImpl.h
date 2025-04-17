@@ -623,6 +623,9 @@ static_assert((int)BridgedASTType::MetatypeRepresentation::ObjC == (int)swift::M
 // MARK: BridgedCanType
 //===----------------------------------------------------------------------===//
 
+BridgedCanType::BridgedCanType() : type(nullptr) {
+}
+
 BridgedCanType::BridgedCanType(swift::CanType ty) : type(ty.getPointer()) {
 }
 
