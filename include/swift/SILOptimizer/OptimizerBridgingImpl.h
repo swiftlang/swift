@@ -453,7 +453,7 @@ BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkag
   return {swift::SILWitnessTable::create(*mod, (swift::SILLinkage)linkage,
                                          serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                          conformance.unbridged().getConcrete(),
-                                         entries, {})};
+                                         entries, {}, /*specialized=*/true)};
 }
 
 BridgedVTable BridgedPassContext::createSpecializedVTable(BridgedType classType,

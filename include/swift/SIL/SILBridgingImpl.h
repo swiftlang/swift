@@ -1978,6 +1978,10 @@ bool BridgedWitnessTable::isDeclaration() const {
   return table->isDeclaration();
 }
 
+bool BridgedWitnessTable::isSpecialized() const {
+  return table->isSpecialized();
+}
+
 SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
   return SwiftInt(table->getEntries().size());
 }
