@@ -59,7 +59,7 @@ entry:
 ; trivial_alloc_eliminate2 - Show that we can eliminate an allocation with a
 ; destructor that does a retain on the 'self' object.
 @trivial_dtor_metadata2 = internal constant %swift.heapmetadata { ptr @trivial_dtor2, ptr null }
-define internal i64 @trivial_dtor2(ptr nocapture %this) nounwind readonly {
+define internal i64 @trivial_dtor2(ptr captures(none) %this) nounwind readonly {
 entry:
   %0 = getelementptr inbounds %swift.refcounted, ptr %this, i64 1, i32 0
   store ptr inttoptr (i64 4 to ptr), ptr %0, align 8
