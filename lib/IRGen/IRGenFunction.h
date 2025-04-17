@@ -196,6 +196,7 @@ public:
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
   llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *popAsyncContext(llvm::Value *calleeContext);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,

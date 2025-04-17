@@ -141,7 +141,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: ptr [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT: store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple2`
@@ -172,7 +173,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: ptr [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, i64, ptr, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 
 /// Extract information about `String` from result and call `end`
 
@@ -222,7 +224,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: ptr [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: [[INT_RES:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 1
 // CHECK: %._value = getelementptr inbounds %TSi, ptr [[RESULT_BUFF]], i32 0, i32 0
 // CHECK: store i64 [[INT_RES]], ptr %._value
@@ -262,7 +265,8 @@ public distributed actor MyOtherActor {
 
 // CHECK: [[THUNK_RESULT:%.*]] = call { ptr, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64p0s({{.*}}, ptr {{.*}}, i64 [[NATIVE_ENUM_VAL]], i64 [[NATIVE_INT_VAL]], ptr {{.*}})
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: [[ENUM_RESULT:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 1
 // CHECK: store i64 [[ENUM_RESULT]], ptr [[RESULT_BUFF]]
 
