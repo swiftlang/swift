@@ -838,6 +838,10 @@ bool BridgedFunction::conformanceMatchesActorIsolation(BridgedConformance confor
   return swift::matchesActorIsolation(conformance.unbridged(), getFunction());
 }
 
+bool BridgedFunction::isSpecialization() const {
+  return getFunction()->isSpecialization();
+}
+
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
   return decl.getAs<swift::NominalTypeDecl>()->isResilient(getFunction()->getModule().getSwiftModule(),
                                                            getFunction()->getResilienceExpansion());
