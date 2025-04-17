@@ -512,9 +512,6 @@ func testExprExtendTrivialTemp(outer: Outer) {
 
 func testExprExtendObjectTemp(outer: Outer) {
   parse(outer.innerObjectTemp.span())
-  // expected-error @-1{{lifetime-dependent value escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-  // expected-note  @-3{{this use of the lifetime-dependent value is out of scope}}
 }
 
 func testLocalExtendTrivialTemp(outer: Outer) {
@@ -524,9 +521,7 @@ func testLocalExtendTrivialTemp(outer: Outer) {
 
 func testLocalExtendObjectTemp(outer: Outer) {
   let span = outer.innerObjectTemp.span()
-  // expected-error @-1{{lifetime-dependent variable 'span' escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-  parse(span) // expected-note {{this use of the lifetime-dependent value is out of scope}}
+  parse(span)
 }
 
 @lifetime(borrow outer)

@@ -456,7 +456,7 @@ extension Instruction {
     }
   }
 
-  /// Returns true if `otherInst` is in the same block and dominated by this instruction.
+  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction.
   /// To be used as simple dominance check if both instructions are most likely located in the same block
   /// and no DominatorTree is available (like in instruction simplification).
   func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {

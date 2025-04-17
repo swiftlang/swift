@@ -279,8 +279,10 @@ extension LifetimeDependence.Scope {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
       self.init(base: projectBox.operand.value, context)
-    case .stack, .class, .tail, .pointer, .index, .unidentified:
+    case .stack, .class, .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
+    case .unidentified:
+      self = .unknown(address)
     case .global:
       // TODO: When AccessBase directly stores GlobalAccessBase, we don't need a check here and don't need to pass
       // 'address' in to this function.
@@ -638,7 +640,7 @@ extension LifetimeDependenceDefUseWalker {
          is DestroyNotEscapedClosureInst, is ClassMethodInst, is SuperMethodInst,
          is ClassifyBridgeObjectInst, is DebugValueInst,
          is ObjCMethodInst, is ObjCSuperMethodInst, is UnmanagedRetainValueInst,
-         is UnmanagedReleaseValueInst, is SelectEnumInst:
+         is UnmanagedReleaseValueInst, is SelectEnumInst, is IgnoredUseInst:
       // Catch .instantaneousUse operations that are dependence leaf uses.
       return leafUse(of: operand)
 
@@ -929,7 +931,7 @@ extension LifetimeDependenceDefUseWalker {
       // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
       // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
       return .continueWalk
-    case .store:
+    case .store, .storeBorrow:
       // A store does not use the previous in-memory value.
       return .continueWalk
     case .apply:
@@ -1064,6 +1066,276 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
   }
 }
 
+// =============================================================================
+// LifetimeDependenceUseDefWalker - upward walk
+// =============================================================================
+
+/// Walk up lifetime dependencies to the first value associated with a variable declaration.
+///
+/// To start walking:
+///     walkUp(newLifetime: Value) -> WalkResult
+///
+/// This utility finds a value or address that is the best-effort "root" of the chain of temporary lifetime-dependent
+/// values.
+///
+/// This "looks through" projections: a property that is either visible as a stored property or access via
+/// unsafe[Mutable]Address.
+///
+///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
+///
+///     dependsOn(lvalue.computed) // finds the temporary value directly returned by a getter.
+///
+/// SILGen emits temporary copies that violate lifetime dependence semantcs. This utility looks through such temporary
+/// copies, stopping at a value that introduces an immutable variable: move_value [var_decl] or begin_borrow [var_decl],
+/// or at an access of a mutable variable: begin_access [read] or begin_access [modify].
+///
+/// In this example, the dependence "root" is copied, borrowed, and forwarded before being used as the base operand of
+/// `mark_dependence`. The dependence "root" is the parent of the outer-most dependence scope.
+///
+///     %root = apply                  // lifetime dependence root
+///     %copy = copy_value %root
+///     %parent = begin_borrow %copy   // lifetime dependence parent value
+///     %base = struct_extract %parent // lifetime dependence base value
+///     %dependent = mark_dependence [nonescaping] %value on %base
+///
+/// LifetimeDependenceUseDefWalker extends the ForwardingUseDefWalker to follow copies, moves, and
+/// borrows. ForwardingUseDefWalker treats these as forward-extended lifetime introducers. But they inherit a lifetime
+/// dependency from their operand because non-escapable values can be copied, moved, and borrowed. Nonetheless, all of
+/// their uses must remain within original dependence scope.
+///
+///   # owned lifetime dependence
+///   %parent = apply               // begin dependence scope -+
+///   ...                                                      |
+///   %1 = mark_dependence [nonescaping] %value on %parent     |
+///   ...                                                      |
+///   %2 = copy_value %1        -+                             |
+///   # forwarding instruction   |                             |
+///   %3 = struct $S (%2)        | forward-extended lifetime   |
+///                              |                             | OSSA Lifetime
+///   %4 = move_value %3        -+                             |
+///   ...                        | forward-extended lifetime   |
+///   %5 = begin_borrow %4       | -+                          |
+///   # dependent use of %1      |  | forward-extended lifetime|
+///   end_borrow %5              | -+                          |
+///   destroy_value %4          -+                             |
+///   ...                                                      |
+///   destroy_value %parent        // end dependence scope    -+
+///
+/// All of the dependent uses including `end_borrow %5` and `destroy_value %4` must be before the end of the dependence
+/// scope: `destroy_value %parent`. In this case, the dependence parent is an owned value, so the scope is simply the
+/// value's OSSA lifetime.
+///
+/// The ForwardingUseDefWalker's PathContext is the most recent lifetime owner (Value?). If we ever want to track the
+/// access path as well, then we can aggregate both the owner and access path in a single PathContext.
+protocol LifetimeDependenceUseDefValueWalker : ForwardingUseDefWalker where PathContext == Value? {
+  var context: Context { get }
+
+  // 'path' is the lifetime "owner": the "def" into which the current 'value' is eventually forwarded.
+  mutating func introducer(_ value: Value, _ path: PathContext) -> WalkResult
+
+  // Minimally, check a ValueSet. This walker may traverse chains of
+  // aggregation and destructuring along with phis.
+  //
+  // 'path' is the "owner" of the forwarded value.
+  mutating func needWalk(for value: Value, _ path: PathContext) -> Bool
+
+  // The 'newLifetime' value is not forwarded to its uses.
+  mutating func walkUp(newLifetime: Value) -> WalkResult
+
+  // 'owner' is the "def" into which the current 'value' is eventually forwarded.
+  mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult
+}
+
+// Defaults
+extension LifetimeDependenceUseDefValueWalker {
+  mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
+    walkUpDefault(value: value, owner)
+  }
+}
+
+// Helpers
+extension LifetimeDependenceUseDefValueWalker {
+  mutating func walkUpDefault(value: Value, _ owner: Value?) -> WalkResult {
+    switch value.definingInstruction {
+    case let transition as OwnershipTransitionInstruction:
+      return walkUp(newLifetime: transition.operand.value)
+    case let load as LoadInstruction:
+      return walkUp(newLifetime: load.address)
+    default:
+      break
+    }
+    // If the dependence chain has a phi, consider it a root. Dependence roots dominate all dependent values.
+    if Phi(value) != nil {
+      return introducer(value, owner)
+    }
+    // ForwardingUseDefWalker will callback to introducer() when it finds no forwarding instruction.
+    return walkUpDefault(forwarded: value, owner)
+  }
+}
+
+protocol LifetimeDependenceUseDefAddressWalker {
+  var context: Context { get }
+
+  // If the scoped value is trivial, then only the variable's lexical scope is relevant, and access scopes can be
+  // ignored.
+  var isTrivialScope: Bool { get }
+
+  mutating func addressIntroducer(_ address: Value, access: AccessBaseAndScopes) -> WalkResult
+
+  // The 'newLifetime' value is not forwarded to its uses. It may be a non-address or an address.
+  mutating func walkUp(newLifetime: Value) -> WalkResult
+
+  mutating func walkUp(address: Value, access: AccessBaseAndScopes) -> WalkResult
+}
+
+// Defaults
+extension LifetimeDependenceUseDefAddressWalker {
+  mutating func walkUp(address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    walkUpDefault(address: address, access: access)
+  }
+}
+
+// Helpers
+extension LifetimeDependenceUseDefAddressWalker {
+  mutating func walkUp(address: Value) -> WalkResult {
+    walkUp(address: address, access: address.accessBaseWithScopes)
+  }
+
+  mutating func walkUpDefault(address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    // Continue walking for some kinds of access base.
+    switch access.base {
+    case .box, .global, .class, .tail, .pointer, .index, .unidentified:
+      break
+    case let .stack(allocStack):
+      // Ignore stack locations. Their access scopes do not affect lifetime dependence.
+      return walkUp(stackInitializer: allocStack, at: address, access: access)
+    case let .argument(arg):
+      // Ignore access scopes for @in or @in_guaranteed arguments when all scopes are reads. Do not ignore a [read]
+      // access of an inout argument or outer [modify]. Mutation later with the outer scope could invalidate the
+      // borrowed state in this narrow scope. Do not ignore any mark_depedence on the address.
+      if arg.convention.isIndirectIn && access.isOnlyReadAccess {
+        return addressIntroducer(arg, access: access)
+      }
+      // @inout arguments may be singly initialized (when no modification exists in this function), but this is not
+      // relevant here because they require nested access scopes which can never be ignored.
+    case let .yield(yieldedAddress):
+      // Ignore access scopes for @in or @in_guaranteed yields when all scopes are reads.
+      let apply = yieldedAddress.definingInstruction as! FullApplySite
+      if apply.convention(of: yieldedAddress).isIndirectIn && access.isOnlyReadAccess {
+        return addressIntroducer(yieldedAddress, access: access)
+      }
+    case .storeBorrow(let sb):
+      // Walk up through a store into a temporary.
+      if access.scopes.isEmpty,
+         case .stack = sb.destinationOperand.value.accessBase {
+        return walkUp(newLifetime: sb.source)
+      }
+    }
+    // Skip the access scope for unsafe[Mutable]Address. Treat it like a projection of 'self' rather than a separate
+    // variable access.
+    if case let .access(innerAccess) = access.scopes.first,
+       let addressorSelf = innerAccess.unsafeAddressorSelf {
+      return walkUp(newLifetime: addressorSelf)
+    }
+    // Ignore the acces scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
+    // need to be kept alive in memory and can be safely be overwritten in the same scope. Lifetime dependence only
+    // cares that the loaded value is within the lexical scope of the trivial value's variable declaration. Rather than
+    // skipping all access scopes, call 'walkUp' on each nested access in case one of them needs to redirect the walk,
+    // as required for 'access.unsafeAddressorSelf'.
+    if isTrivialScope {
+      switch access.scopes.first {
+      case .none, .base:
+        break
+      case let .access(beginAccess):
+        return walkUp(newLifetime: beginAccess.address)
+      case let .dependence(markDep):
+        return walkUp(newLifetime: markDep.value)
+      }
+    }
+    return addressIntroducer(access.enclosingAccess.address ?? address, access: access)
+  }
+
+  // Handle singly-initialized temporary stack locations.
+  mutating func walkUp(stackInitializer allocStack: AllocStackInst, at address: Value,
+                       access: AccessBaseAndScopes) -> WalkResult {
+    guard let initializer = allocStack.accessBase.findSingleInitializer(context) else {
+      return addressIntroducer(address, access: access)
+    }
+    if case let .store(store, _) = initializer {
+      switch store {
+      case let store as StoringInstruction:
+        return walkUp(newLifetime: store.source)
+      case let srcDestInst as SourceDestAddrInstruction:
+        return walkUp(newLifetime: srcDestInst.destination)
+      case let apply as FullApplySite:
+        if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
+          return walkUp(newLifetime: apply.parameterOperands[0].value)
+        }
+      default:
+        break
+      }
+    }
+    return addressIntroducer(address, access: access)
+  }
+}
+
+/// Walk up through all new lifetimes to find the roots of a lifetime dependence chain.
+struct LifetimeDependenceRootWalker : LifetimeDependenceUseDefValueWalker, LifetimeDependenceUseDefAddressWalker {
+  // The ForwardingUseDefWalker's context is the most recent lifetime owner.
+  typealias PathContext = Value?
+
+  let context: Context
+
+  // If the scoped value is trivial, then only the variable's lexical scope is relevant, and access scopes can be
+  // ignored.
+  let isTrivialScope: Bool
+
+  // This visited set is only really needed for instructions with
+  // multiple results, including phis.
+  private var visitedValues: ValueSet
+
+  var roots: SingleInlineArray<Value> = SingleInlineArray<Value>()
+
+  init(_ context: Context, scopedValue: Value) {
+    self.context = context
+    self.isTrivialScope = scopedValue.type.isAddress
+      ? scopedValue.type.objectType.isTrivial(in: scopedValue.parentFunction)
+      : scopedValue.isTrivial(context)
+    self.visitedValues = ValueSet(context)
+  }
+
+  mutating func deinitialize() {
+    visitedValues.deinitialize()
+  }
+ 
+  mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
+    roots.push(value)
+    return .continueWalk
+  }
+
+  mutating func addressIntroducer(_ address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    roots.push(address)
+    return .continueWalk
+  }
+
+  mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
+    visitedValues.insert(value)
+  }
+
+  mutating func walkUp(newLifetime: Value) -> WalkResult {
+    if newLifetime.type.isAddress {
+      return walkUp(address: newLifetime)
+    }
+    let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
+    return walkUp(value: newLifetime, newOwner)
+  }
+}
+
+// =============================================================================
+// Unit tests
+// =============================================================================
+
+
 let lifetimeDependenceUseTest = FunctionTest("lifetime_dependence_use") {
     function, arguments, context in
   let value = arguments.takeValue()
@@ -1086,6 +1358,18 @@ let lifetimeDependenceUseTest = FunctionTest("lifetime_dependence_use") {
   _ = printer.walkDown(dependence: dependence)
 }
 
+let lifetimeDependenceRootTest = FunctionTest("lifetime_dependence_root") {
+    function, arguments, context in
+  let value = arguments.takeValue()
+  print("Lifetime dependence roots of: \(value)")
+  var walker = LifetimeDependenceRootWalker(context, scopedValue: value)
+  let result = walker.walkUp(newLifetime: value)
+  assert(result == .continueWalk)
+  for root in walker.roots {
+    print("root: \(root)")
+  }
+  walker.deinitialize()
+}
 
 // SIL Unit tests
 
