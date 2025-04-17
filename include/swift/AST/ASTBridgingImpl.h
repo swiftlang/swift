@@ -180,6 +180,10 @@ BridgedDeclObj BridgedDeclObj::getModuleContext() const {
   return {unbridged()->getModuleContext()};
 }
 
+OptionalBridgedDeclObj BridgedDeclObj::getParent() const {
+  return {unbridged()->getDeclContext()->getAsDecl()};
+}
+
 BridgedStringRef BridgedDeclObj::Type_getName() const {
   return getAs<swift::TypeDecl>()->getName().str();
 }
@@ -226,6 +230,10 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
 
 BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
+  return getAs<swift::ProtocolDecl>()->requiresClass();
 }
 
 bool BridgedDeclObj::AbstractFunction_isOverridden() const {
