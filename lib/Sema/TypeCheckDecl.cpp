@@ -2272,6 +2272,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = lifetime->getBase();
   }
 
+  if (auto callerIsolated = dyn_cast<CallerIsolatedTypeRepr>(nestedRepr)) {
+    nestedRepr = callerIsolated->getBase();
+  }
+
   if (auto sending = dyn_cast<SendingTypeRepr>(nestedRepr)) {
     // If we do not have an Ownership Repr and do not have a no escape type,
     // return implicit copyable consuming.
@@ -2294,7 +2298,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     }
     return ownershipRepr->getSpecifier();
   }
-  
+
   return ParamSpecifier::Default;
 }
 

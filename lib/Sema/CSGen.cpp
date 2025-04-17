@@ -2584,14 +2584,8 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
-        if (auto *execution =
-                closure->getAttrs().getAttribute<ExecutionAttr>()) {
-          switch (execution->getBehavior()) {
-          case ExecutionKind::Caller:
-            return FunctionTypeIsolation::forNonIsolatedCaller();
-          case ExecutionKind::Concurrent:
-            return FunctionTypeIsolation::forNonIsolated();
-          }
+        if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+          return FunctionTypeIsolation::forNonIsolated();
         }
 
         return FunctionTypeIsolation::forNonIsolated();
@@ -4591,8 +4585,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // non-`Sendable` state across the isolation boundary. `next()` should
   // inherit the isolation of the caller, but for now, use the opt out.
   if (isAsync) {
-    auto *nonisolated = new (ctx)
-        NonisolatedAttr(/*unsafe=*/true, /*implicit=*/true);
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
     makeIteratorVar->getAttrs().add(nonisolated);
   }
 
