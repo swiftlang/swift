@@ -30,7 +30,6 @@
 
 #include "swift/Basic/Assertions.h"
 #include "swift/LLVMPasses/Passes.h"
-#include "clang/AST/StableHash.h"
 #include "clang/Basic/PointerAuthOptions.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -55,6 +54,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SipHash.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/FunctionComparator.h"
@@ -416,9 +416,10 @@ private:
         if (auto *GO = dyn_cast<GlobalObject>(value))
           concatenatedCalleeNames += GO->getName();
       }
-      uint64_t rawHash = clang::getStableStringHash(concatenatedCalleeNames);
+      uint64_t hash =
+          llvm::getPointerAuthStableSipHash(concatenatedCalleeNames);
       IntegerType *discrTy = Type::getInt64Ty(Context);
-      discriminator = ConstantInt::get(discrTy, (rawHash % 0xFFFF) + 1);
+      discriminator = ConstantInt::get(discrTy, hash);
     }
   };
 

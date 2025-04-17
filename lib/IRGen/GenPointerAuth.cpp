@@ -26,6 +26,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/Support/SipHash.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -332,7 +333,7 @@ static llvm::ConstantInt *getDiscriminatorForHash(IRGenModule &IGM,
 
 static llvm::ConstantInt *getDiscriminatorForString(IRGenModule &IGM,
                                                     StringRef string) {
-  uint64_t rawHash = clang::CodeGen::computeStableStringHash(string);
+  uint64_t rawHash = llvm::getPointerAuthStableSipHash(string);
   return getDiscriminatorForHash(IGM, rawHash);
 }
 
@@ -590,7 +591,7 @@ static uint64_t getTypeHash(IRGenModule &IGM, CanSILFunctionType type) {
   hashStringForFunctionType(
       IGM, type, Out,
       genericSig.getCanonicalSignature().getGenericEnvironment());
-  return clang::CodeGen::computeStableStringHash(Out.str());
+  return llvm::getPointerAuthStableSipHash(Out.str());
 }
 
 static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
@@ -629,7 +630,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     out << ":";
   }
 
-  return clang::CodeGen::computeStableStringHash(out.str());  
+  return llvm::getPointerAuthStableSipHash(out.str());
 }
 
 llvm::ConstantInt *
