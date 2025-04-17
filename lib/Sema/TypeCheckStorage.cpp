@@ -2672,24 +2672,25 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 ///
 /// The underscored accessor could, however, still be required for ABI
 /// stability.
-bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
-    AccessorKind kind, AccessorDecl const *decl) const {
-  auto &ctx = getASTContext();
+static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+    AbstractStorageDecl const *storage, AccessorKind kind,
+    AccessorDecl const *decl) {
+  auto &ctx = storage->getASTContext();
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
 
   // Non-stable modules have no ABI to keep stable.
-  if (getModuleContext()->getResilienceStrategy() !=
+  if (storage->getModuleContext()->getResilienceStrategy() !=
       ResilienceStrategy::Resilient)
     return false;
 
   // Non-exported storage has no ABI to keep stable.
-  if (!isExported(this))
+  if (!isExported(storage))
     return false;
 
   // The non-underscored accessor is not present, the underscored accessor
   // won't be either.
-  auto *accessor = decl ? decl : getOpaqueAccessor(kind);
+  auto *accessor = decl ? decl : storage->getOpaqueAccessor(kind);
   if (!accessor)
     return false;
 
@@ -2709,6 +2710,12 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
 
   // The underscored accessor is required for ABI stability.
   return true;
+}
+
+bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+    AccessorKind kind, AccessorDecl const *decl) const {
+  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(this, kind,
+                                                               decl);
 }
 
 bool RequiresOpaqueModifyCoroutineRequest::evaluate(
