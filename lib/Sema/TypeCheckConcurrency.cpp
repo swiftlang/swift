@@ -5838,6 +5838,22 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     // Use the overridden decl's isolation as the default isolation for this
     // decl.
     auto isolation = getOverriddenIsolationFor(value);
+
+    // If this is an override of an async completion handler, mark
+    // it `@concurrent` instead of inferring `nonisolated(nonsending)`
+    // to preserve pre-SE-0461 behavior.
+    if (isolation.isCallerIsolationInheriting() &&
+        overriddenValue->hasClangNode()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(overriddenValue)) {
+        if (AFD->getForeignAsyncConvention()) {
+          return {{ActorIsolation::forNonisolated(/*unsafe=*/false),
+                   IsolationSource(overriddenValue, IsolationSource::Override)},
+                  overriddenValue,
+                  isolation};
+        }
+      }
+    }
+
     return {{isolation,
              IsolationSource(overriddenValue, IsolationSource::Override)},
             overriddenValue,

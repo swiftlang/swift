@@ -29,6 +29,14 @@ MAIN_ACTOR
 
 //--- main.swift
 
+class OverrideTest1 : Test {
+  override func load() async {}
+}
+
+class OverrideTest2 : TestIsolated {
+  override func load() async {}
+}
+
 func test(t: Test, i: TestIsolated) async throws {
   let fn = t.load // nonisolated(nonsending) () async -> Void
 
@@ -38,4 +46,11 @@ func test(t: Test, i: TestIsolated) async throws {
   let isolatedFn = i.load
   let _: () -> Void = isolatedFn
   // expected-error@-1 {{invalid conversion from 'async' function of type '@MainActor @Sendable () async -> Void' to synchronous function type '() -> Void'}}
+}
+
+func testOverrides(o1: OverrideTest1, o2: OverrideTest2) {
+  let _: () -> Void = o1.load
+  // expected-error@-1 {{invalid conversion from 'async' function of type '() async -> ()' to synchronous function type '() -> Void'}}
+  let _: () -> Void = o2.load
+  // expected-error@-1 {{invalid conversion from 'async' function of type '@MainActor @Sendable () async -> ()' to synchronous function type '() -> Void'}}
 }
