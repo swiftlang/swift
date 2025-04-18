@@ -465,7 +465,6 @@ extension OutputSpan {
   public consuming func finalize(
     for buffer: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Int {
-    let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
-    return unsafe self.finalize(for: rebased)
+    unsafe finalize(for: UnsafeMutableBufferPointer(rebasing: buffer))
   }
 }
