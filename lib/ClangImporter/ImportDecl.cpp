@@ -3302,7 +3302,7 @@ namespace {
             decl->getLocation(),
             const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
             clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false);
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
         // If the template can't be instantiated, bail.
         if (notInstantiated)
           return nullptr;

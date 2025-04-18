@@ -7149,7 +7149,8 @@ ClangImporter::instantiateCXXClassTemplate(
     ctsd = clang::ClassTemplateSpecializationDecl::Create(
         decl->getASTContext(), decl->getTemplatedDecl()->getTagKind(),
         decl->getDeclContext(), decl->getTemplatedDecl()->getBeginLoc(),
-        decl->getLocation(), decl, arguments, nullptr);
+        decl->getLocation(), decl, arguments, /*StrictPackMatch*/ false,
+        nullptr);
     decl->AddSpecialization(ctsd, InsertPos);
   }
 
