@@ -1387,9 +1387,9 @@ public:
 class SpecializedConformanceInfo : public ConformanceInfo {
   friend ProtocolInfo;
 
-  const SpecializedProtocolConformance *Conformance;
+  const ProtocolConformance *Conformance;
 public:
-  SpecializedConformanceInfo(const SpecializedProtocolConformance *C)
+  SpecializedConformanceInfo(const ProtocolConformance *C)
       : Conformance(C) {}
 
   llvm::Value *getTable(IRGenFunction &IGF,
@@ -2608,8 +2608,15 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   const ConformanceInfo *info;
 
   auto *specConf = conformance;
-  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance)) {
+    SILWitnessTable *wt = getSILModule().lookUpWitnessTable(inheritedC);
+    if (wt && wt->getConformance() == inheritedC) {
+      info = new SpecializedConformanceInfo(inheritedC);
+      Conformances.try_emplace(conformance, info);
+      return *info;
+    }
     specConf = inheritedC->getInheritedConformance();
+  }
 
   // If there is a specialized SILWitnessTable for the specialized conformance,
   // directly use it.

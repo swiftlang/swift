@@ -18,6 +18,6 @@ func castToExistential<T>(x: T) {
 }
 
 public func callCastToExistential() {
-  castToExistential(x: 42)    // expected-note {{called from here}}
+  castToExistential(x: 42)    // expected-note {{generic specialization called here}}
 }
 

@@ -67,6 +67,7 @@ private func registerSwiftPasses() {
   registerPass(diagnoseUnknownConstValues, { diagnoseUnknownConstValues.run($0)})
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
+  registerPass(embeddedSwiftDiagnostics, { embeddedSwiftDiagnostics.run($0) })
 
   // Function passes
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
