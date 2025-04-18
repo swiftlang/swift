@@ -1,23 +1,24 @@
 // REQUIRES: swift_swift_parser, executable_test
+// REQUIRES: swift_feature_ABIAttribute
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
 
 // Diagnostics testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -enable-experimental-feature ABIAttribute
 
 // Diagnostics testing by importing macros from a module
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library_2.swiftmodule %S/Inputs/freestanding_macro_library_2.swift -module-name freestanding_macro_library_2 -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY -enable-experimental-feature ABIAttribute
 
-// RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics -Rmacro-loading > %t/macro-printing.txt
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics -Rmacro-loading > %t/macro-printing.txt -enable-experimental-feature ABIAttribute
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS -dump-input=always %s
 
 // RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
 
-// RUN: not %target-swift-frontend -swift-version 5 -typecheck -diagnostic-style=swift -load-plugin-library %t/%target-library-name(MacroDefinition)  -module-name MacroUser -DTEST_DIAGNOSTICS %s > %t/pretty-macro-diagnostics.txt 2>&1
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -diagnostic-style=swift -load-plugin-library %t/%target-library-name(MacroDefinition)  -module-name MacroUser -DTEST_DIAGNOSTICS %s -enable-experimental-feature ABIAttribute > %t/pretty-macro-diagnostics.txt 2>&1
 // RUN: %FileCheck %s --check-prefix PRETTY-DIAGS < %t/pretty-macro-diagnostics.txt
 
 // Debug info SIL testing
@@ -706,6 +707,29 @@ func testPropertyWrapperMacro() {
   #hasPropertyWrapperParam(x: 0)
   #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
 }
+
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
 
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
