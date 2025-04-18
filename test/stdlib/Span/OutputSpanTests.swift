@@ -324,3 +324,53 @@ suite.test("InlineArray initialization underflow")
     $0.append(1)
   }
 }
+
+suite.test("Array initialization")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let requested = 32
+  let actual = requested/2
+
+  let array: [UInt8] = Array(capacity: requested, initializingWith: { output in
+    for i in 0..<actual {
+      output.append(UInt8(clamping: UInt8(i)))
+    }
+  })
+  expectEqual(array.count, actual)
+  expectEqual(array.elementsEqual(0..<UInt8(actual)), true)
+  expectGE(array.capacity, requested)
+}
+
+suite.test("ContiguousArray initialization")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let requested = 32
+  let actual = requested/2
+
+  let array = ContiguousArray<UInt8>(capacity: requested) { output in
+    for i in 0..<actual {
+      output.append(UInt8(clamping: UInt8(i)))
+    }
+  }
+  expectEqual(array.count, actual)
+  expectEqual(array.elementsEqual(0..<UInt8(actual)), true)
+  expectGE(array.capacity, requested)
+}
+
+suite.test("ContiguousArray initialization throws")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  do {
+    let array = try ContiguousArray<Int>(capacity: 8) { _ in
+      throw MyTestError.error
+    }
+    expectTrue(false)
+    _ = array
+  } catch MyTestError.error {
+  } catch {
+    expectTrue(false)
+  }
+}

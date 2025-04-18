@@ -1106,6 +1106,22 @@ extension ContiguousArray {
       initializingWith: initializer))
   }
 
+  //FIXME: typed throws
+  @available(SwiftStdlib 6.2, *)
+  public init(
+    capacity: Int,
+    initializingWith initializer: (inout OutputSpan<Element>) throws -> Void
+  ) rethrows {
+    try unsafe self.init(
+      unsafeUninitializedCapacity: capacity,
+      initializingWith: { (buffer, count) in
+        var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+        try initializer(&output)
+        count = unsafe output.finalize(for: buffer)
+      }
+    )
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @usableFromInline
