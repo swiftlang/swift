@@ -379,6 +379,7 @@ struct BridgedDeclObj {
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE BridgedSourceLoc getLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParent() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc Value_getNameLoc() const;
@@ -391,6 +392,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
 };
@@ -3070,16 +3072,20 @@ struct BridgedASTType {
   BRIDGED_INLINE swift::Type unbridged() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
   BRIDGED_INLINE bool hasArchetype() const;
   BRIDGED_INLINE bool isLegalFormalType() const;
   BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool isArchetype() const;
+  BRIDGED_INLINE bool archetypeRequiresClass() const;
   BRIDGED_INLINE bool isExistentialArchetype() const;
   BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
   BRIDGED_INLINE bool isExistential() const;
   BRIDGED_INLINE bool isDynamicSelf() const;
   BRIDGED_INLINE bool isClassExistential() const;
+  BRIDGED_INLINE bool isGenericTypeParam() const;
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
@@ -3103,6 +3109,7 @@ struct BridgedASTType {
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getStaticTypeOfDynamicSelf() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getSuperClassType() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
@@ -3116,6 +3123,7 @@ class BridgedCanType {
   swift::TypeBase * _Nullable type;
 
 public:
+  BRIDGED_INLINE BridgedCanType();
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;
@@ -3182,6 +3190,7 @@ struct BridgedGenericSignature {
   BRIDGED_INLINE swift::GenericSignature unbridged() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoContext(BridgedASTType type) const;
 };
 
 struct BridgedFingerprint {

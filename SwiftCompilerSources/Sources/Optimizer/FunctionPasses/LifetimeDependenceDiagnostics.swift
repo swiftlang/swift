@@ -135,7 +135,7 @@ private struct DiagnoseDependence {
 
   func diagnose(_ position: SourceLoc?, _ id: DiagID,
                 _ args: DiagnosticArgument...) {
-    context.diagnosticEngine.diagnose(position, id, args)
+    context.diagnosticEngine.diagnose(id, args, at: position)
   }
 
   /// Check that this use is inside the dependence scope.

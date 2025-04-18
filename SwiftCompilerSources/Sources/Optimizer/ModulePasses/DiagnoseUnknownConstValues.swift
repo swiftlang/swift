@@ -39,8 +39,8 @@ let diagnoseUnknownConstValues = ModulePass(name: "diagnose-unknown-const-values
 private func verifyGlobals(_ context: ModulePassContext) {
   for gv in context.globalVariables where gv.isConst {
     if gv.staticInitValue == nil {
-      context.diagnosticEngine.diagnose(gv.varDecl?.location.sourceLoc,
-                                        .require_const_initializer_for_const)
+      context.diagnosticEngine.diagnose(.require_const_initializer_for_const,
+                                        at: gv.varDecl?.location.sourceLoc)
     }
   }
 }
@@ -66,8 +66,8 @@ private func verifyLocal(debugValueInst: DebugValueInst,
   }
   
   if !constExprState.isConstantValue(debugValueInst.operand.value) {
-    context.diagnosticEngine.diagnose(debugValueInst.location.sourceLoc,
-                                      .require_const_initializer_for_const)
+    context.diagnosticEngine.diagnose(.require_const_initializer_for_const,
+                                      at: debugValueInst.location)
   }
 }
 
@@ -92,8 +92,8 @@ private func verifyCallArguments(apply: FullApplySite,
   for (paramIdx, param) in calleeFn.convention.parameters.enumerated() where param.hasOption(.const) {
     let matchingOperand = apply.parameterOperands[paramIdx]
     if !constExprState.isConstantValue(matchingOperand.value) {
-      context.diagnosticEngine.diagnose(apply.location.sourceLoc,
-                                        .require_const_arg_for_parameter)
+      context.diagnosticEngine.diagnose(.require_const_arg_for_parameter,
+                                        at: apply.location)
     }
   }
 }

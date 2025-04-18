@@ -378,14 +378,16 @@ ERROR(bad_attr_on_non_const_global,none,
       "global variable must be a compile-time constant to use %0 attribute", (StringRef))
 ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
-ERROR(non_final_generic_class_function,none,
-      "classes cannot have non-final generic functions in embedded Swift", ())
-ERROR(cannot_specialize_witness_method,none,
-      "an existential type cannot contain a generic method %0 in embedded Swift", (DeclName))
+ERROR(embedded_cannot_specialize_class_method,none,
+      "classes cannot have a non-final, generic method %0 in embedded Swift", (DeclName))
+ERROR(embedded_cannot_specialize_witness_method,none,
+      "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
 ERROR(cannot_specialize_class,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
 ERROR(embedded_swift_existential_type,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
+ERROR(embedded_swift_existential_protocol,none,
+      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
 ERROR(embedded_swift_existential,none,
       "cannot use a value of protocol type in embedded Swift", ())
 ERROR(perf_diag_existential_type,none,
@@ -404,10 +406,22 @@ ERROR(embedded_swift_dynamic_cast,none,
       "cannot do dynamic casting in embedded Swift", ())
 ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
+ERROR(embedded_swift_allocating_coroutine,none,
+      "cannot use co-routines (like accessors) in -no-allocations mode", ())
+ERROR(embedded_swift_allocating_closure,none,
+      "cannot use escaping closures in -no-allocations mode", ())
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
 ERROR(embedded_capture_of_generic_value_with_deinit,none,
       "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+ERROR(embedded_call_generic_function,none,
+      "cannot specialize generic function in this context", ())
+NOTE(embedded_specialization_called_from,none,
+      "generic specialization called here", ())
+NOTE(embedded_existential_created,none,
+      "protocol type value created here", ())
+NOTE(embedded_constructor_called,none,
+      "instance of type created here", ())
 ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,

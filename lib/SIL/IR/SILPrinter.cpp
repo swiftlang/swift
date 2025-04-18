@@ -4373,6 +4373,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   printSerializedKind(OS, getSerializedKind());
 
+  if (isSpecialized())
+    OS << "[specialized] ";
+
   getConformance()->printName(OS, Options);
   Options.GenericSig =
     getConformance()->getDeclContext()->getGenericSignatureOfContext()
