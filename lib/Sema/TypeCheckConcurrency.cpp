@@ -2930,8 +2930,10 @@ namespace {
       auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
 
       bool preconcurrency = false;
-      if (explicitClosure) {
-        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+      if (closure) {
+        preconcurrency =
+            getActorIsolationOfContext(closure, getClosureActorIsolation)
+                .preconcurrency();
       }
 
       for (const auto &capture : localFunc.getCaptureInfo().getCaptures()) {
