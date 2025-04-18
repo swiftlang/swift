@@ -324,6 +324,9 @@ function(_add_host_variant_c_compile_flags target)
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_LARGEFILE_SOURCE _FILE_OFFSET_BITS=64>)
   endif()
+
+  target_compile_definitions(${target} PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>,$<BOOL:${SWIFT_ENABLE_SWIFT_IN_SWIFT}>>:SWIFT_ENABLE_SWIFT_IN_SWIFT>)
 endfunction()
 
 function(_add_host_variant_link_flags target)
