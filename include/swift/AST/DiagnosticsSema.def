@@ -7437,7 +7437,7 @@ ERROR(property_wrapper_effectful,none,
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
-      "%select{lazy|'@NSCopying'|'@NSManaged'|weak|unowned|unmanaged}1",
+      "%select{lazy|'@NSCopying'|'@NSManaged'|'@abi'|weak|unowned|unmanaged}1",
       (Identifier, int))
 ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
@@ -8497,6 +8497,10 @@ ERROR(attr_abi_mismatched_param_modifier,none,
 ERROR(attr_abi_no_default_arguments,none,
       "%kind0 in '@abi' should not have a default argument; it does not "
       "affect the parameter's ABI",
+      (Decl *))
+
+ERROR(attr_abi_no_macros,none,
+      "%kind0 cannot be expanded in '@abi' attribute",
       (Decl *))
 
 // These macros insert 'final', 'non-final', or nothing depending on both the
