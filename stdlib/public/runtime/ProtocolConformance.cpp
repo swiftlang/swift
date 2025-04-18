@@ -536,7 +536,7 @@ namespace {
   };
 
   struct ConformanceCacheEntry {
-  private:
+  public:
     /// Storage used when we have global actor isolation on the conformance.
     struct ExtendedStorage {
       /// The protocol to which the type conforms.
@@ -549,10 +549,13 @@ namespace {
       /// When the conformance is global-actor-isolated, this is the conformance
       /// of globalActorIsolationType to GlobalActor.
       const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+
+      /// The next pointer in the list of extended storage allocations.
+      ExtendedStorage *next = nullptr;
     };
 
     const Metadata *Type;
-    llvm::PointerUnion<const ProtocolDescriptor *, const ExtendedStorage *>
+    llvm::PointerUnion<const ProtocolDescriptor *, ExtendedStorage *>
         ProtoOrStorage;
 
     /// The witness table.
@@ -560,17 +563,34 @@ namespace {
 
   public:
     ConformanceCacheEntry(ConformanceCacheKey key,
-                          ConformanceLookupResult result)
+                          ConformanceLookupResult result,
+                          std::atomic<ExtendedStorage *> &storageHead)
       : Type(key.Type), Witness(result.witnessTable)
     {
-      if (result.globalActorIsolationType) {
-        ProtoOrStorage = new ExtendedStorage{
-          key.Proto, result.globalActorIsolationType,
-          result.globalActorIsolationWitnessTable
-        };
-      } else {
+      if (!result.globalActorIsolationType) {
         ProtoOrStorage = key.Proto;
+        return;
       }
+
+      // Allocate extended storage.
+      void *memory = malloc(sizeof(ExtendedStorage));
+      auto storage = new (memory) ExtendedStorage{
+        key.Proto, result.globalActorIsolationType,
+        result.globalActorIsolationWitnessTable
+      };
+
+      ProtoOrStorage = storage;
+
+      // Add the storage pointer to the list of extended storage allocations
+      // so that we can free them later.
+      auto head = storageHead.load(std::memory_order_relaxed);
+      while (true) {
+        storage->next = head;
+        if (storageHead.compare_exchange_weak(
+                head, storage, std::memory_order_release,
+                std::memory_order_relaxed))
+          break;
+      };
     }
 
     bool matchesKey(const ConformanceCacheKey &key) const {
@@ -586,7 +606,7 @@ namespace {
       if (auto proto = ProtoOrStorage.dyn_cast<const ProtocolDescriptor *>())
         return proto;
 
-      if (auto storage = ProtoOrStorage.dyn_cast<const ExtendedStorage *>())
+      if (auto storage = ProtoOrStorage.dyn_cast<ExtendedStorage *>())
         return storage->Proto;
 
       return nullptr;
@@ -606,7 +626,7 @@ namespace {
       if (ProtoOrStorage.is<const ProtocolDescriptor *>())
         return ConformanceLookupResult { Witness, nullptr, nullptr };
 
-      if (auto storage = ProtoOrStorage.dyn_cast<const ExtendedStorage *>()) {
+      if (auto storage = ProtoOrStorage.dyn_cast<ExtendedStorage *>()) {
         return ConformanceLookupResult(
             Witness, storage->globalActorIsolationType,
             storage->globalActorIsolationWitnessTable);
@@ -621,6 +641,11 @@ namespace {
 struct ConformanceState {
   ConcurrentReadableHashMap<ConformanceCacheEntry> Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
+
+  /// The head of an intrusive linked list that keeps track of all of the
+  /// conformance cache entries that require extended storage.
+  std::atomic<ConformanceCacheEntry::ExtendedStorage *> ExtendedStorageHead{nullptr};
+
   bool scanSectionsBackwards;
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
@@ -709,7 +734,8 @@ struct ConformanceState {
                           return false; // abandon the new entry
 
                         ::new (entry) ConformanceCacheEntry(
-                            ConformanceCacheKey(type, proto), result);
+                            ConformanceCacheKey(type, proto), result,
+                            ExtendedStorageHead);
                         return true; // keep the new entry
                       });
   }
@@ -743,7 +769,20 @@ static void _registerProtocolConformances(ConformanceState &C,
 
   // Blow away the conformances cache to get rid of any negative entries that
   // may now be obsolete.
-  C.Cache.clear();
+  C.Cache.clear([&](ConcurrentFreeListNode *&freeListHead) {
+    // The extended storage for conformance entries will need to be freed
+    // eventually. Put it on the concurrent free list so the cache will do so.
+    auto storageHead = C.ExtendedStorageHead.load(std::memory_order_relaxed);
+    while (storageHead) {
+      auto current = storageHead;
+      auto newHead = current->next;
+      if (C.ExtendedStorageHead.compare_exchange_weak(
+              storageHead, newHead, std::memory_order_release,
+              std::memory_order_relaxed)) {
+        ConcurrentFreeListNode::add(&freeListHead, current);
+      }
+    }
+  });
 }
 
 void swift::addImageProtocolConformanceBlockCallbackUnsafe(
