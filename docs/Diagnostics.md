@@ -99,6 +99,14 @@ Diagnostic group documentation should:
 - Include references to relevant chapters of _The Swift Programming Language_.
 - Be written in Markdown, but avoid excessive markup which negatively impacts the terminal UX.
 
+The diagnostic group documentation supports generating a DocC bundle for hosting. You can currently find the compiler diagnostics documentation at https://docs.swift.org/compiler/documentation/diagnostics/
+
+To generate this documentation locally, run the following command from the root of the repository:
+```
+docc preview --allow-arbitrary-catalog-directories userdocs/diagnostics
+```
+
+
 ### Quick-Start Guide for Contributing New Diagnostic Groups ###
 
 Adding new diagnostic groups is a great way to get familiar with the process of contributing to Swift, while also making a big impact!
