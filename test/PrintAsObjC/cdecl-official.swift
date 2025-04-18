@@ -14,7 +14,7 @@
 // RUN: %check-in-clang-cxx %t/cdecl.h
 
 /// Build a client against cdecl.h
-// RUN: %clang -c %t/Client.c -fobjc-arc -fmodules -I %t \
+// RUN: %clang -c %t/Client.c -fmodules -I %t \
 // RUN:   -F %S/../Inputs/clang-importer-sdk-path/frameworks \
 // RUN:   -I %clang-include-dir -Werror \
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
