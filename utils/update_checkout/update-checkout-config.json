@@ -443,7 +443,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch"],
+            "aliases": ["rebranch", "stable/20250402"],
             "repos": {
                 "llvm-project": "stable/20250402",
                 "swift-llvm-bindings": "stable/20240723",
