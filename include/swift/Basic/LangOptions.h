@@ -663,11 +663,9 @@ namespace swift {
     LangOptions();
 
     /// Sets the target we are building for and updates platform conditions
-    /// to match.
-    ///
-    /// \returns A pair - the first element is true if the OS was invalid.
-    /// The second element is true if the Arch was invalid.
-    std::pair<bool, bool> setTarget(llvm::Triple triple);
+    /// to match. Emits errors using `Diags` in case of an invalid OS, arch,
+    /// etc.
+    void setTarget(llvm::Triple triple, swift::DiagnosticEngine *Diags = nullptr);
 
     /// Returns the minimum platform version to which code will be deployed.
     ///
