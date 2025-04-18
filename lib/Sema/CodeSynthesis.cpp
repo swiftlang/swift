@@ -638,8 +638,7 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   std::optional<ForeignErrorConvention> errorConvention;
   if (superclassCtor->isObjC() &&
       !isRepresentableInLanguage(ctor, ObjCReason::MemberOfObjCSubclass,
-                                 asyncConvention, errorConvention,
-                                 ForeignLanguage::ObjectiveC))
+                                 asyncConvention, errorConvention))
     ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
