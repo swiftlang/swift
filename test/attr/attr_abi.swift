@@ -1285,6 +1285,7 @@ struct CustomAttrPropertyWrapper {
 }
 
 // CustomAttr for attached macro -- see Macros/macro_expand_peers.swift
+// Freestanding macro in @abi -- see Macros/macro_expand.swift
 
 // CustomAttr for result builder -- banned in '@abi'
 // Has no ABI impact on either a parameter or a decl.
