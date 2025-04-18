@@ -415,6 +415,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           return SILIsolationInfo::getGlobalActorIsolated(SILValue(), selfASTType);
         }
 
+        if (auto *fArg = dyn_cast<SILFunctionArgument>(actualIsolatedValue)) {
+          if (auto info =
+                  SILIsolationInfo::getActorInstanceIsolated(fArg, fArg))
+            return info;
+        }
+
         // TODO: We really should be doing this based off of an Operand. Then
         // we would get the SILValue() for the first element. Today this can
         // only mess up isolation history.
@@ -449,7 +455,21 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           }
         }
 
+        // Ok, we found an actor instance. Look for our actual isolated value.
         if (actorInstance) {
+          if (auto actualIsolatedValue =
+                  ActorInstance::getForValue(actorInstance)) {
+            // See if we have a function parameter. In that case, we want to see
+            // if we have a function argument. In such a case, we need to use
+            // the right parameter and the var decl.
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(
+                    actualIsolatedValue.getValue())) {
+              if (auto info =
+                      SILIsolationInfo::getActorInstanceIsolated(pai, fArg))
+                return info;
+            }
+          }
+
           return SILIsolationInfo::getActorInstanceIsolated(
               pai, actorInstance, actorIsolation.getActor());
         }
@@ -479,6 +499,14 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // This is important so we properly handle setters.
   if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(rei->getField());
+
+    if (auto instance = ActorInstance::getForValue(rei->getOperand())) {
+      if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
+              instance.maybeGetValue())) {
+        if (auto info = SILIsolationInfo::getActorInstanceIsolated(rei, fArg))
+          return info.withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+      }
+    }
 
     auto *nomDecl =
         rei->getOperand()->getType().getNominalOrBoundGenericNominal();
@@ -868,11 +896,11 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
-  if (auto *isolatedArg = fArg->getFunction()->maybeGetIsolatedArgument()) {
+  if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
+          fArg->getFunction()->maybeGetIsolatedArgument())) {
     auto astType = isolatedArg->getType().getASTType();
     if (auto *nomDecl = astType->lookThroughAllOptionalTypes()->getAnyActor()) {
-      return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg,
-                                                        nomDecl);
+      return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);
     }
   }
 
@@ -1017,10 +1045,10 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
   }
 }
 
-bool SILIsolationInfo::hasSameIsolation(ActorIsolation actorIsolation) const {
+bool SILIsolationInfo::hasSameIsolation(ActorIsolation other) const {
   if (getKind() != Kind::Actor)
     return false;
-  return getActorIsolation() == actorIsolation;
+  return getActorIsolation() == other;
 }
 
 bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
@@ -1360,6 +1388,25 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
 
   // Otherwise, just return other.
   return {other};
+}
+
+void ActorInstance::print(llvm::raw_ostream &os) const {
+  os << "Actor Instance. Kind: ";
+  switch (getKind()) {
+  case Kind::Value:
+    os << "Value.";
+    break;
+  case Kind::ActorAccessorInit:
+    os << "ActorAccessorInit.";
+    break;
+  case Kind::CapturedActorSelf:
+    os << "CapturedActorSelf.";
+    break;
+  }
+
+  if (auto value = maybeGetValue()) {
+    os << " Value: " << value;
+  };
 }
 
 //===----------------------------------------------------------------------===//
