@@ -218,6 +218,21 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
 
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
+
+  if (ctx.LangOpts.hasFeature(Feature::CDecl)) {
+    // For C compilers which don’t support nullability attributes, ignore them;
+    // for ones which do, suppress warnings about them being an extension.
+    out << "#if !__has_feature(nullability)\n"
+           "# define _Nonnull\n"
+           "# define _Nullable\n"
+           "# define _Null_unspecified\n"
+           "#elif !defined(__OBJC__)\n"
+           "# pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
+           "#endif\n"
+           "#if !__has_feature(nullability_nullable_result)\n"
+           "# define _Nullable_result _Nullable\n"
+           "#endif\n";
+  }
 }
 
 static int compareImportModulesByName(const ImportModuleTy *left,
