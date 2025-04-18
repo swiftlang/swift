@@ -4583,19 +4583,70 @@ namespace {
       if (dc->isTypeContext())
         isStatic = true;
 
-      // For now we don't import static constexpr
+      // For now we don't import static constexpr. TODO: Lift this restriction.
       if (isStatic && decl->isConstexpr())
         return nullptr;
 
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
                         ? VarDecl::Introducer::Let
                         : VarDecl::Introducer::Var;
-      auto result = Impl.createDeclWithClangNode<VarDecl>(
-          decl, importer::convertClangAccess(decl->getAccess()),
-          /*IsStatic*/ isStatic, introducer,
-          Impl.importSourceLoc(decl->getLocation()), name, dc);
-      result->setIsObjC(false);
-      result->setIsDynamic(false);
+
+      ValueDecl *result = nullptr;
+
+      bool initIsEvaluatable = false;
+      if (auto init = decl->getInit()) {
+        // Don't import values for partial specializations. TODO: Should we stop
+        // importing partially specialized variables completely?
+        bool partial = isa<clang::VarTemplatePartialSpecializationDecl>(decl);
+
+        // Don't import values when type-dependent or value-dependent.
+        bool typeDependent = decl->getType()->isDependentType();
+        bool valueDependent = init->isValueDependent();
+
+        initIsEvaluatable = !partial && !typeDependent && !valueDependent;
+      }
+
+      // If the variable is const (we're importing it as a let), and has an
+      // initializer, then ask Clang for its constant value and synthesize a
+      // getter with that value.
+      if (introducer == VarDecl::Introducer::Let && initIsEvaluatable) {
+        auto val = decl->evaluateValue();
+        // For now, only import integer and float constants. If in the future
+        // SwiftDeclSynthesizer::createConstant becomes able to import more
+        // types, we can lift this restriction.
+        if (val && (val->isFloat() || val->isInt())) {
+          auto type = Impl.importTypeIgnoreIUO(
+              decl->getType(), ImportTypeKind::Value,
+              ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+              isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
+
+          // FIXME: Handle CGFloat too.
+          if (!type->isCGFloat()) {
+            auto convertKind = ConstantConvertKind::None;
+            // Request conversions on enums, and swift_wrapper((enum/struct))
+            // types
+            if (decl->getType()->isEnumeralType())
+              convertKind = ConstantConvertKind::Construction;
+            else if (findSwiftNewtype(decl, Impl.getClangSema(),
+                                      Impl.CurrentVersion))
+              convertKind = ConstantConvertKind::Construction;
+
+            result = synthesizer.createConstant(
+                name, dc, type, *val, convertKind, isStatic, decl,
+                importer::convertClangAccess(decl->getAccess()));
+          }
+        }
+      }
+
+      // Otherwise, import as an external declaration
+      if (!result) {
+        result = Impl.createDeclWithClangNode<VarDecl>(
+            decl, importer::convertClangAccess(decl->getAccess()),
+            /*IsStatic*/ isStatic, introducer,
+            Impl.importSourceLoc(decl->getLocation()), name, dc);
+        result->setIsObjC(false);
+        result->setIsDynamic(false);
+      }
 
       // If imported as member, the member should be final.
       if (dc->getSelfClassDecl())
