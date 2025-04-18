@@ -4,14 +4,12 @@
 /// Generate cdecl.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/Lib.swift -emit-module -verify -o %t -emit-module-doc \
-// RUN:   -emit-objc-header-path %t/cdecl.h \
+// RUN:   -emit-clang-header-path %t/cdecl.h \
 // RUN:   -enable-experimental-feature CDecl
 
 /// Check cdecl.h directly
 // RUN: %FileCheck %s --input-file %t/cdecl.h
-// RUN: %check-in-clang %t/cdecl.h
 // RUN: %check-in-clang-c %t/cdecl.h -Wnullable-to-nonnull-conversion
-// RUN: %check-in-clang-cxx %t/cdecl.h
 
 /// Build a client against cdecl.h
 // RUN: %clang -c %t/Client.c -fmodules -I %t \
