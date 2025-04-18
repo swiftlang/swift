@@ -1815,14 +1815,14 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  auto headerFile = fileManager.getOptionalFileRef(header, /*OpenFile=*/true);
   // Prefer importing the header directly if the header content matches by
   // checking size and mod time. This allows correct import if some no-modular
   // headers are already imported into clang importer. If mod time is zero, then
   // the module should be built from CAS and there is no mod time to verify.
-  if (headerFile && (*headerFile)->getSize() == expectedSize &&
+  if (headerFile && headerFile->getSize() == expectedSize &&
       (expectedModTime == 0 ||
-       (*headerFile)->getModificationTime() == expectedModTime)) {
+       headerFile->getModificationTime() == expectedModTime)) {
     return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
@@ -1849,7 +1849,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  auto headerFile = fileManager.getOptionalFileRef(header, /*OpenFile=*/true);
   if (!headerFile) {
     Impl.diagnose(diagLoc, diag::bridging_header_missing, header);
     return true;
@@ -1998,9 +1998,9 @@ std::string ClangImporter::getBridgingHeaderContents(
     return "";
   }
 
-  if (auto fileInfo = fileManager.getFile(headerPath)) {
-    fileSize = (*fileInfo)->getSize();
-    fileModTime = (*fileInfo)->getModificationTime();
+  if (auto fileInfo = fileManager.getOptionalFileRef(headerPath)) {
+    fileSize = fileInfo->getSize();
+    fileModTime = fileInfo->getModificationTime();
   }
   return result;
 }
