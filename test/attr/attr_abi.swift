@@ -1267,6 +1267,60 @@ nonisolated func isolation17() async {}
 @abi(@concurrent func isolation19() async)
 nonisolated(nonsending) func isolation19() async {}
 
+// CustomAttr for property wrapper -- banned in and with '@abi'
+// Banned because we would need to design behavior for its auxiliary decls.
+@propertyWrapper struct PropertyWrapper {
+  var wrappedValue: Int { fatalError() }
+}
+
+struct CustomAttrPropertyWrapper {
+  @abi(@PropertyWrapper var v1: Int) // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
+  @PropertyWrapper var v1: Int // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
+
+  @abi(@PropertyWrapper var v2: Int) // expected-error {{property 'v2' with a wrapper cannot also be @abi}}
+  var v2: Int
+
+  @abi(var v3: Int)
+  @PropertyWrapper var v3: Int // expected-error {{property 'v3' with a wrapper cannot also be @abi}}
+}
+
+// CustomAttr for attached macro -- see Macros/macro_expand_peers.swift
+
+// CustomAttr for result builder -- banned in '@abi'
+// Has no ABI impact on either a parameter or a decl.
+@resultBuilder struct ResultBuilder {
+  static func buildBlock(_ values: Int...) -> Int { values.reduce(0, +) }
+}
+
+struct CustomAttrResultBuilder {
+  @abi(@ResultBuilder var v1: Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  @ResultBuilder var v1: Int { 0 }
+
+  @abi(@ResultBuilder var v2: Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  var v2: Int { 0 }
+
+  @abi(var v3: Int)
+  @ResultBuilder var v3: Int { 0 }
+
+  @abi(@ResultBuilder func fn11() -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  @ResultBuilder func fn11() -> Int { 0 }
+
+  @abi(@ResultBuilder func fn21() -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  func fn21() -> Int { 0 }
+
+  @abi(func fn31() -> Int)
+  @ResultBuilder func fn31() -> Int { 0 }
+
+  @abi(func fn12(@ResultBuilder _: () -> Int) -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}}  {{18-32=}}
+  func fn12(@ResultBuilder _: () -> Int) -> Int { 0 }
+
+  @abi(func fn22(@ResultBuilder _: () -> Int) -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{18-32=}}
+  func fn22(_: () -> Int) -> Int { 0 }
+
+  @abi(func fn32(_: () -> Int) -> Int)
+  func fn32(@ResultBuilder _: () -> Int) -> Int { 0 }
+}
+
 // NSCopying - see attr/attr_abi_objc.swift
 
 // @LLDBDebuggerFunction -- banned in @abi
