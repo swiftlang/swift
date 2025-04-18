@@ -12,6 +12,8 @@ import Glibc
 import MSVCRT
 #elseif canImport(Android)
 import Android
+#elseif canImport(FreeBSD)
+import FreeBSD
 #else
 import Darwin
 #endif

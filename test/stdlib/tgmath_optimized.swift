@@ -14,6 +14,8 @@
   import Android
 #elseif os(Windows)
   import CRT
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif
