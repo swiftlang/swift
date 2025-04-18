@@ -294,3 +294,33 @@ suite.test("mutate with MutableSpan prefix")
   expectTrue(b.elementsEqual((0..<10).map({2*(1+$0)})))
   b.deinitialize()
 }
+
+suite.test("InlineArray initialization")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var a: [Int] = []
+
+  let i = InlineArray<10, Int> {
+    (o: inout OutputSpan<Int>) in
+    for _ in 0..<o.capacity {
+      let r = Int.random(in: 10...99)
+      a.append(r)
+      o.append(r)
+    }
+  }
+  expectEqual(a.count, i.count)
+  for j in i.indices {
+    expectEqual(a[j], i[j])
+  }
+}
+
+suite.test("InlineArray initialization underflow")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  expectCrashLater()
+  _ = InlineArray<4, Int> {
+    $0.append(1)
+  }
+}
