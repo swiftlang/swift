@@ -786,6 +786,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
                 swiftTextualDeps->textualModuleDetails.bridgingSourceFiles),
             create_set(clangHeaderDependencyNames),
             create_set(bridgedOverlayDependencyNames),
+            /*sourceImportedDependencies*/ create_set({}),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
             /*bridgingHeaderBuildCommand*/ create_set({}),
             create_clone(swiftTextualDeps->contextHash.c_str()),
@@ -813,12 +814,25 @@ generateFullDependencyGraph(const CompilerInstance &instance,
         bridgeDependencyIDs(swiftSourceDeps->swiftOverlayDependencies,
                             bridgedOverlayDependencyNames);
 
+        // Create a set of directly-source-imported dependencies
+        std::vector<ModuleDependencyID> sourceImportDependencies;
+        std::copy(swiftSourceDeps->importedSwiftModules.begin(),
+                  swiftSourceDeps->importedSwiftModules.end(),
+                  std::back_inserter(sourceImportDependencies));
+        std::copy(swiftSourceDeps->importedClangModules.begin(),
+                  swiftSourceDeps->importedClangModules.end(),
+                  std::back_inserter(sourceImportDependencies));
+        std::vector<std::string> bridgedSourceImportedDependencyNames;
+        bridgeDependencyIDs(sourceImportDependencies,
+                            bridgedSourceImportedDependencyNames);
+
         details->swift_textual_details = {
             moduleInterfacePath, create_empty_set(), bridgingHeaderPath,
             create_set(
                 swiftSourceDeps->textualModuleDetails.bridgingSourceFiles),
             create_set(clangHeaderDependencyNames),
             create_set(bridgedOverlayDependencyNames),
+            create_set(bridgedSourceImportedDependencyNames),
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
             create_set(swiftSourceDeps->bridgingHeaderBuildCommandLine),
             /*contextHash*/

@@ -62,6 +62,8 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_set_dispose(
         details_impl->swift_textual_details.swift_overlay_module_dependencies);
     swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.source_import_module_dependencies);
+    swiftscan_string_set_dispose(
         details_impl->swift_textual_details.command_line);
     swiftscan_string_dispose(details_impl->swift_textual_details.context_hash);
     swiftscan_string_dispose(
@@ -324,6 +326,11 @@ bool swiftscan_swift_textual_detail_get_is_framework(
 swiftscan_string_set_t *swiftscan_swift_textual_detail_get_swift_overlay_dependencies(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.swift_overlay_module_dependencies;
+}
+
+swiftscan_string_set_t *swiftscan_swift_textual_detail_get_swift_source_import_module_dependencies(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.source_import_module_dependencies;
 }
 
 swiftscan_string_ref_t swiftscan_swift_textual_detail_get_cas_fs_root_id(
