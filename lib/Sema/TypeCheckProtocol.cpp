@@ -5185,7 +5185,8 @@ static bool diagnoseTypeWitnessAvailability(
     return false;
 
   // In Swift 6 and earlier type witness availability diagnostics are warnings.
-  const unsigned warnBeforeVersion = 7;
+  using namespace version;
+  const unsigned warnBeforeVersion = Version::getFutureMajorLanguageVersion();
   bool shouldError =
       ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
 
