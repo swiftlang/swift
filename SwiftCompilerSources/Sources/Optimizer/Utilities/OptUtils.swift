@@ -941,27 +941,74 @@ extension CheckedCastAddrBranchInst {
 
 extension CopyAddrInst {
   @discardableResult
-  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
-    let loadOwnership: LoadInst.LoadOwnership
-    let storeOwnership: StoreInst.StoreOwnership
-    if parentFunction.hasOwnership {
-      if source.type.isTrivial(in: parentFunction) {
-        loadOwnership = .trivial
-        storeOwnership = .trivial
-      } else {
-        loadOwnership = isTakeOfSrc ? .take : .copy
-        storeOwnership = isInitializationOfDest ? .initialize : .assign
-      }
-    } else {
-      loadOwnership = .unqualified
-      storeOwnership = .unqualified
-    }
-    
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     let builder = Builder(before: self, context)
-    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
-    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    if source.type.isStruct {
+      if (source.type.nominal as! StructDecl).hasUnreferenceableStorage {
+        return false
+      }
+      guard let fields = source.type.getNominalFields(in: parentFunction) else {
+        return false
+      }
+      for idx in 0..<fields.count {
+        let srcFieldAddr = builder.createStructElementAddr(structAddress: source, fieldIndex: idx)
+        let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
+        builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+      }
+      context.erase(instruction: self)
+      return true
+    } else if source.type.isTuple {
+      let builder = Builder(before: self, context)
+      for idx in 0..<source.type.tupleElements.count {
+        let srcFieldAddr = builder.createTupleElementAddr(tupleAddress: source, elementIndex: idx)
+        let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
+        builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+      }
+      context.erase(instruction: self)
+      return true
+    }
+    return false
+  }
+
+  private func isTake(for fieldValue: Value) -> Bool {
+    return isTakeOfSrc && !fieldValue.type.objectType.isTrivial(in: parentFunction)
+  }
+
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> (load: LoadInst, store: StoreInst) {
+    let builder = Builder(before: self, context)
+    let load = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: load, destination: destination, ownership: storeOwnership)
     context.erase(instruction: self)
-    return store
+    return (load, store)
+  }
+
+  var loadOwnership: LoadInst.LoadOwnership {
+    if !parentFunction.hasOwnership {
+      return .unqualified
+    }
+    if type.isTrivial(in: parentFunction) {
+      return .trivial
+    }
+    if isTakeOfSrc {
+      return .take
+    }
+    return .copy
+  }
+
+  var storeOwnership: StoreInst.StoreOwnership {
+    if !parentFunction.hasOwnership {
+      return .unqualified
+    }
+    if type.isTrivial(in: parentFunction) {
+      return .trivial
+    }
+    if isInitializationOfDest {
+      return .initialize
+    }
+    return .assign
   }
 }
 
