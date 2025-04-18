@@ -380,6 +380,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
+      case clang::TargetInfo::XtensaABIBuiltinVaList:
         return std::make_pair(Type(), "");
     }
     break;
