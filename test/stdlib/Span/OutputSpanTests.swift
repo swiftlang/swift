@@ -35,7 +35,7 @@ struct Allocation<T>: ~Copyable {
     _ body: (inout OutputSpan<T>) throws(E) -> Void
   ) throws(E) {
     if count != nil { fatalError() }
-    var outputBuffer = OutputSpan<T>(buffer: allocation)
+    var outputBuffer = OutputSpan<T>(buffer: allocation, initializedCount: 0)
     do {
       try body(&outputBuffer)
       let initialized = outputBuffer.finalize(for: allocation)
@@ -73,7 +73,7 @@ suite.test("Create Output Buffer")
   let allocation = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: c)
   defer { allocation.deallocate() }
 
-  let ob = unsafe OutputSpan(buffer: allocation)
+  let ob = unsafe OutputSpan(buffer: allocation, initializedCount: 0)
   let initialized = ob.finalize(for: allocation)
   expectEqual(initialized, 0)
 }
@@ -86,7 +86,7 @@ suite.test("deinit without relinquishing memory")
   let allocation = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: c)
   defer { allocation.deallocate() }
 
-  var ob = unsafe OutputSpan(buffer: allocation)
+  var ob = unsafe OutputSpan(buffer: allocation, initializedCount: 0)
   // OutputSpan(buffer: Slice(base: allocation, bounds: 0..<c))
   ob.append(repeating: 65, count: 12)
   expectEqual(ob.count, 12)
@@ -276,7 +276,7 @@ suite.test("mutate with MutableSpan prefix")
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 10)
   defer { b.deallocate() }
 
-  var span = unsafe OutputSpan(buffer: b)
+  var span = unsafe OutputSpan(buffer: b, initializedCount: 0)
   expectEqual(span.count, 0)
   span.append(fromContentsOf: 1...9)
   expectEqual(span.count, 9)
