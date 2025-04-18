@@ -1,8 +1,5 @@
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -suppress-remarks %t/some/subdir/file1.swift -verify-additional-file %t/Cxx/include/cxx-header.h -I %t/Cxx/include -cxx-interoperability-mode=default -module-name main
-
-// This test uses -verify-additional-file, which do not work well on Windows:
-// UNSUPPORTED: OS=windows-msvc
+// RUN: %target-swift-frontend -typecheck -verify -suppress-remarks %t%{fs-sep}some%{fs-sep}subdir%{fs-sep}file1.swift -verify-additional-file %t%{fs-sep}Cxx%{fs-sep}include%{fs-sep}cxx-header.h -I %t%{fs-sep}Cxx%{fs-sep}include -cxx-interoperability-mode=default -module-name main
 
 //--- Cxx/include/module.modulemap
 module CxxModule {
