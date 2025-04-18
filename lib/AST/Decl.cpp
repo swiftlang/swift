@@ -9010,6 +9010,12 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
         continue;
       }
 
+      if (auto *callerIsolated =
+              dyn_cast<CallerIsolatedTypeRepr>(unwrappedType)) {
+        setCallerIsolated(true);
+        unwrappedType = callerIsolated->getBase();
+      }
+
       break;
     }
   }
@@ -11094,6 +11100,9 @@ AccessorDecl *AccessorDecl::createParsed(
 
       if (subscriptParam->isSending())
         param->setSending();
+
+      if (subscriptParam->isCallerIsolated())
+        param->setCallerIsolated();
 
       newParams.push_back(param);
     }
