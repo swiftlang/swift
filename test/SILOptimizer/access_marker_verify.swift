@@ -618,11 +618,15 @@ func testShims() -> UInt32 {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify9testShimss6UInt32VyF : $@convention(thin) () -> UInt32 {
 // CHECK: bb0:
-// CHECK:   [[GA:%.*]] = global_addr @_SwiftKeyPathBufferHeader_SizeMask : $*UInt32
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[GA]] : $*UInt32
-// CHECK:   return
+// CHECK:   [[FR:%.*]] = function_ref @$sSo34_SwiftKeyPathBufferHeader_SizeMasks6UInt32Vvg : $@convention(thin) () -> UInt32
+// CHECK:   [[AP:%.*]] = apply [[FR]]() : $@convention(thin) () -> UInt32
+// CHECK:   return [[AP]]
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify9testShimss6UInt32VyF'
+// CHECK: sil shared [transparent] [serialized] [ossa] @$sSo34_SwiftKeyPathBufferHeader_SizeMasks6UInt32Vvg : $@convention(thin) () -> UInt32 {
+// CHECK: bb0:
+// CHECK:   integer_literal $Builtin.IntLiteral, 16777215
+// CHECK: } // end sil function '$sSo34_SwiftKeyPathBufferHeader_SizeMasks6UInt32Vvg'
+
 
 // --- global variable initialization.
 var globalString1 = "⓪" // start non-empty
