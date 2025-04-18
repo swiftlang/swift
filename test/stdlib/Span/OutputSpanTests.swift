@@ -325,3 +325,98 @@ suite.test("mutate with MutableSpan prefix")
   expectTrue(b.elementsEqual((0..<10).map({2*(1+$0)})))
   b.deinitialize()
 }
+
+suite.test("InlineArray initialization")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var a: [Int] = []
+
+  let i = InlineArray<10, Int> {
+    (o: inout OutputSpan<Int>) in
+    for _ in 0..<o.capacity {
+      let r = Int.random(in: 10...99)
+      a.append(r)
+      o.append(r)
+    }
+  }
+  expectEqual(a.count, i.count)
+  for j in i.indices {
+    expectEqual(a[j], i[j])
+  }
+}
+
+suite.test("InlineArray initialization underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  expectCrashLater()
+  _ = InlineArray<4, Int> {
+    $0.append(1)
+  }
+}
+
+#if false
+suite.test("InlineArray initialization throws 0")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  enum LocalError: Error { case error }
+
+  class I {
+    static public var count = 0
+    init() { Self.count += 1 }
+    deinit { Self.count -= 1 }
+  }
+
+  let a: InlineArray<4, I>
+  do throws(LocalError) {
+    var c = 1
+    a = try InlineArray(first: I()) {
+      i throws(LocalError) in
+      c += 1
+      if c < 4 {
+        return I()
+      }
+      print(I.count)
+      throw LocalError.error
+    }
+    _ = a
+  } catch {
+    print(error, I.count)
+    expectEqual(I.count, 0)
+  }
+}
+
+suite.test("InlineArray initialization throws")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  enum LocalError: Error { case error }
+
+  class I {
+    static var count = 0
+    init() { Self.count += 1 }
+    deinit { Self.count -= 1 }
+  }
+
+  let a: InlineArray<4, I>
+  do throws(LocalError) {
+    a = try InlineArray {
+      o throws(LocalError) in
+      o.append(I())
+      o.append(I())
+      o.append(I())
+      o.append(I())
+      expectEqual(I.count, 4)
+      print(I.count)
+      throw LocalError.error
+    }
+    _ = a
+  } catch {
+    print(error, I.count)
+    expectEqual(I.count, 0)
+  }
+}
+#endif
