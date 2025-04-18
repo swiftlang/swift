@@ -857,4 +857,7 @@ Func !=(_:_:) has been removed
 Func ==(_:_:) has been removed
 Func type(of:) has been removed
 
+// This API has a `@backDeployed(before:)` annotation, which supercedes the need for `@availability`.
+Func DefaultStringInterpolation.appendInterpolation(_:default:) is a new API without @available attribute
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
