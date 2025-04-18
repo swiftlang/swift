@@ -977,8 +977,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 
   CI.setInvocation(std::move(invocation));
   CI.setTarget(&Impl.Instance->getTarget());
-  CI.setDiagnostics(
-      &*clang::CompilerInstance::createDiagnostics(new clang::DiagnosticOptions()));
+  CI.setDiagnostics(&*clang::CompilerInstance::createDiagnostics(
+      Impl.Instance->getVirtualFileSystem(), new clang::DiagnosticOptions()));
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
@@ -1155,7 +1155,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
       new ClangDiagnosticConsumer(Impl, *tempDiagOpts,
                                   ctx.ClangImporterOpts.DumpClangDiagnostics);
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
-      tempDiagOpts.get(), tempDiagClient,
+      *VFS, tempDiagOpts.get(), tempDiagClient,
       /*owned*/ true);
 
   // If using direct cc1 module build, use extra args to setup ClangImporter.
@@ -1430,7 +1430,7 @@ ClangImporter::create(ASTContext &ctx,
     auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
         importer->Impl, instance.getDiagnosticOpts(),
         importerOpts.DumpClangDiagnostics);
-    instance.createDiagnostics(actualDiagClient.release());
+    instance.createDiagnostics(*VFS, actualDiagClient.release());
   }
 
   // Set up the file manager.
@@ -1942,13 +1942,14 @@ std::string ClangImporter::getBridgingHeaderContents(
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+
   clang::CompilerInstance rewriteInstance(
     Impl.Instance->getPCHContainerOperations(),
     &Impl.Instance->getModuleCache());
   rewriteInstance.setInvocation(invocation);
-  rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
-
-  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+  rewriteInstance.createDiagnostics(fileManager.getVirtualFileSystem(),
+                                    new clang::IgnoringDiagConsumer);
   rewriteInstance.setFileManager(&fileManager);
   rewriteInstance.createSourceManager(fileManager);
   rewriteInstance.setTarget(&Impl.Instance->getTarget());
@@ -2047,14 +2048,15 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   // Share the CASOption and the underlying CAS.
   invocation->setCASOption(Impl.Invocation->getCASOptsPtr());
 
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
     Impl.Instance->getPCHContainerOperations(),
     &Impl.Instance->getModuleCache());
   clonedInstance->setInvocation(std::move(invocation));
-  clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
+  clonedInstance->createDiagnostics(fileManager.getVirtualFileSystem(),
+                                    &Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
-
-  clang::FileManager &fileManager = Impl.Instance->getFileManager();
   clonedInstance->setFileManager(&fileManager);
   clonedInstance->createSourceManager(fileManager);
   clonedInstance->setTarget(&Impl.Instance->getTarget());
