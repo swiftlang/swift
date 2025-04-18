@@ -45,8 +45,8 @@ public func readDefinedConstMember() -> CInt {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc i32 @"$s4main22readDefinedConstMembers5Int32VyF"() #0
-// CHECK: [[VALUE:%.*]] = load i32, ptr @{{_ZN21WithConstStaticMember7definedE|"\?defined@WithConstStaticMember@@2HB"}}, align 4
-// CHECK: ret i32 [[VALUE]]
+// CHECK: ret i32 48
+
 public func readDefinedOutOfLineConstMember() -> CInt {
   return WithConstStaticMember.definedOutOfLine
 }
