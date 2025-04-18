@@ -248,11 +248,11 @@ struct BridgedType {
   BRIDGED_INLINE bool isAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
   BRIDGED_INLINE bool isLoadable(BridgedFunction f) const;
   BRIDGED_INLINE bool isReferenceCounted(BridgedFunction f) const;
+  BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
   BRIDGED_INLINE bool isMoveOnly() const;
@@ -261,6 +261,8 @@ struct BridgedType {
   BRIDGED_INLINE bool isMarkedAsImmortal() const;
   BRIDGED_INLINE bool isAddressableForDeps(BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
+  BRIDGED_INLINE SwiftInt getNumBoxFields() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBoxFieldType(SwiftInt idx, BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getNumNominalFields() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFieldType(SwiftInt idx, BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getFieldIdxOfNominalType(BridgedStringRef name) const;
@@ -401,6 +403,7 @@ struct BridgedLocation {
   BRIDGED_INLINE bool isEqualTo(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
   BRIDGED_INLINE bool hasSameSourceLocation(BridgedLocation rhs) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   static BRIDGED_INLINE BridgedLocation fromNominalTypeDecl(BridgedDeclObj decl);
   static BRIDGED_INLINE BridgedLocation getArtificialUnreachableLocation();
 };
@@ -508,11 +511,13 @@ struct BridgedFunction {
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
   BRIDGED_INLINE void setIsSerialized(bool isSerialized) const;
   BRIDGED_INLINE bool conformanceMatchesActorIsolation(BridgedConformance conformance) const;
+  BRIDGED_INLINE bool isSpecialization() const;
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAutodiffVJP() const;
   SwiftInt specializationLevel() const;
-  SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const;
+  SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs,
+                                                                    BridgedCanType selfType) const;
   BRIDGED_INLINE OptionalSourceFileKind getSourceFileKind() const;
 
   enum class ParseEffectsMode {
@@ -1089,6 +1094,7 @@ struct BridgedWitnessTable {
   BRIDGED_INLINE SwiftInt getNumEntries() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntry getEntry(SwiftInt index) const;
   BRIDGED_INLINE bool isDeclaration() const;
+  BRIDGED_INLINE bool isSpecialized() const;
 };
 
 struct OptionalBridgedWitnessTable {

@@ -229,6 +229,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
+    BCFixed<1>,          // Is this a specialized witness table.
     BCFixed<2>,          // SerializedKind.
     ProtocolConformanceIDField   // conformance
     // Witness table entries will be serialized after.

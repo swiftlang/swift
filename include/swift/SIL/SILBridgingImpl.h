@@ -331,10 +331,6 @@ BridgedType BridgedType::getObjectType() const {
   return unbridged().getObjectType();
 }
 
-BridgedDiagnosticArgument BridgedType::asDiagnosticArgument() const {
-  return swift::DiagnosticArgument(unbridged().getASTType());
-}
-
 bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
@@ -349,6 +345,10 @@ bool BridgedType::isLoadable(BridgedFunction f) const {
 
 bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
+}
+
+bool BridgedType::isBox() const {
+  return unbridged().is<swift::SILBoxType>();
 }
 
 bool BridgedType::containsNoEscapeFunction() const {
@@ -381,6 +381,16 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
+}
+
+SwiftInt BridgedType::getNumBoxFields() const {
+  return unbridged().castTo<swift::SILBoxType>()->getLayout()->getFields().size();
+}
+
+BridgedType BridgedType::getBoxFieldType(SwiftInt idx, BridgedFunction f) const {
+  auto *fn = f.getFunction();
+  return swift::getSILBoxFieldType(fn->getTypeExpansionContext(), unbridged().castTo<swift::SILBoxType>(),
+                                   fn->getModule().Types, idx);
 }
 
 SwiftInt BridgedType::getNumNominalFields() const {
@@ -626,6 +636,9 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
 }
+OptionalBridgedDeclObj BridgedLocation::getDecl() const {
+  return {getLoc().getLocation().getAsASTNode<swift::Decl>()};
+}
 BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedDeclObj decl) {
   return swift::SILDebugLocation(decl.unbridged(), nullptr);
 }
@@ -826,6 +839,10 @@ void BridgedFunction::setIsSerialized(bool isSerialized) const {
 
 bool BridgedFunction::conformanceMatchesActorIsolation(BridgedConformance conformance) const {
   return swift::matchesActorIsolation(conformance.unbridged(), getFunction());
+}
+
+bool BridgedFunction::isSpecialization() const {
+  return getFunction()->isSpecialization();
 }
 
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
@@ -1976,6 +1993,10 @@ BridgedWitnessTableEntry BridgedWitnessTable::getEntry(SwiftInt index) const {
 
 bool BridgedWitnessTable::isDeclaration() const {
   return table->isDeclaration();
+}
+
+bool BridgedWitnessTable::isSpecialized() const {
+  return table->isSpecialized();
 }
 
 SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {

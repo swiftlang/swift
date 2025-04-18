@@ -11,7 +11,6 @@ swift_compiler_sources(Optimizer
   AddressUtils.swift
   BorrowUtils.swift
   SpecializationCloner.swift
-  DiagnosticEngine.swift
   Devirtualization.swift
   EscapeUtils.swift
   ForwardingUtils.swift
