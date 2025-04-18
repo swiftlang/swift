@@ -158,13 +158,14 @@ bb0:
   %f = function_ref @transferIndirectWithOutResult : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%1, %0) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0 // expected-warning {{}}
 
+  // We do not error here on use after send since %1 is already isolated to the
+  // same global actor as transferIndirect which is not considered to be a
+  // send. We leave the actual error to be the error about returning an isolated
+  // value into a non-isolated context.
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%1) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{}}
-  // expected-note @-2 {{}}
   %useIndirect = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %useIndirect<NonSendableKlass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-note @-1 {{access can happen concurrently}}
 
   destroy_addr %1 : $*NonSendableKlass
   dealloc_stack %1 : $*NonSendableKlass
