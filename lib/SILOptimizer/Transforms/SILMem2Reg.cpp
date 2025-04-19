@@ -2235,10 +2235,6 @@ bool MemoryToRegisters::run() {
     f.verifyCriticalEdges();
 
   for (auto &block : f) {
-    // Don't waste time optimizing unreachable blocks.
-    if (!domInfo->isReachableFromEntry(&block)) {
-      continue;
-    }
     for (SILInstruction &inst : block.reverseDeletableInstructions()) {
       auto *asi = dyn_cast<AllocStackInst>(&inst);
       if (!asi)

@@ -517,6 +517,7 @@ class LoopRotation : public SILFunctionTransform {
     }
 
     if (changed) {
+      removeUnreachableBlocks(*f);
       updateAllGuaranteedPhis(PM, f);
       // We preserve loop info and the dominator tree.
       domAnalysis->lockInvalidation();
