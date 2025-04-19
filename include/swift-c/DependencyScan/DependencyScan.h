@@ -212,6 +212,10 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_textual_detail_get_swift_overlay_dependencies(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_textual_detail_get_swift_source_import_module_dependencies(
+swiftscan_module_details_t details);
+
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_cas_fs_root_id(
     swiftscan_module_details_t details);
