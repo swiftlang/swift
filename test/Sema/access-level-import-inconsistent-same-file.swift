@@ -58,8 +58,8 @@ public func dummyAPI(t1: Lib1.Type1, t2: Lib2.Type1, t3: Lib3.Type1) {}
 
 /// Simple public vs internal, imports defaults to public.
 import Lib1 // expected-note {{imported 'public' here}}
-// expected-error @-1 {{ambiguous implicit access level for import of 'Lib1'; it is imported as 'internal' elsewhere}}
-// expected-note @-2 {{silence these warnings by adopting the upcoming feature 'InternalImportsByDefault'}}
+// expected-warning @-1 {{ambiguous implicit access level for import of 'Lib1'; it is imported as 'internal' elsewhere}}
+// expected-note @-2 {{add an explicit access level modifier or make the default access level of imports safe by adopting 'InternalImportsByDefault'}}
 internal import Lib1 // expected-warning {{module 'Lib1' is imported as 'public' from the same file; this 'internal' access level will be ignored}}
 // expected-note @-1 {{imported 'internal' here}}
 
