@@ -160,11 +160,11 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
   func _legacyNarrowIllegalRange(buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
     var reversePacked: UInt32 = 0
     if let third = unsafe buf.dropFirst(2).first {
-      unsafe reversePacked |= UInt32(third)
+      reversePacked |= UInt32(third)
       reversePacked <<= 8
     }
     if let second = unsafe buf.dropFirst().first {
-      unsafe reversePacked |= UInt32(second)
+      reversePacked |= UInt32(second)
       reversePacked <<= 8
     }
     unsafe reversePacked |= UInt32(buf.first!)
@@ -177,8 +177,8 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     var endIndex = unsafe buf.startIndex
     var iter = unsafe buf.makeIterator()
     _ = unsafe iter.next()
-    while let cu = unsafe iter.next(), unsafe UTF8.isContinuation(cu) {
-      unsafe endIndex += 1
+    while let cu = unsafe iter.next(), UTF8.isContinuation(cu) {
+      endIndex += 1
       // Unicode's Maximal subpart of an ill-formed subsequence will yield
       // at most 3 bytes of error.
       if unsafe buf.distance(from: buf.startIndex, to: endIndex) >= 3 {
