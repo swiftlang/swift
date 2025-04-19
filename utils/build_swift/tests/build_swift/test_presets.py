@@ -44,6 +44,7 @@ PRESET_DEFAULTS = {
     'ndk_path': '/path/to/ndk',
     'arm_dir': '/path/to/arm',
     'toolchain_path': '/tmp/toolchain',
+    'build_subdir': 'test_build_subdir',
 }
 
 SAMPLE_PRESET = """
