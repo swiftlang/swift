@@ -316,6 +316,7 @@ suite.test("InlineArray initialization")
 }
 
 suite.test("InlineArray initialization underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
