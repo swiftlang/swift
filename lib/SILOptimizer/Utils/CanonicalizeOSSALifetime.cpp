@@ -1406,10 +1406,12 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     clear();
     return false;
   }
-  if (respectsDeinitBarriers()) {
-    extendLexicalLivenessToDeadEnds();
+  if (respectsDeadEnds()) {
+    if (respectsDeinitBarriers()) {
+      extendLexicalLivenessToDeadEnds();
+    }
+    extendLivenessToDeadEnds();
   }
-  extendLivenessToDeadEnds();
   if (respectsDeinitBarriers()) {
     extendLivenessToDeinitBarriers();
   }

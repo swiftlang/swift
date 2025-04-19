@@ -469,6 +469,12 @@ private:
     return explicitLifetimeEnds.size() > 0;
   }
 
+  bool respectsDeadEnds() const {
+    // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+    //                               this method.
+    return !endingLifetimeAtExplicitEnds();
+  }
+
   bool respectsDeinitBarriers() const {
     if (!currentDef->isLexical())
       return false;
