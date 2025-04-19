@@ -140,3 +140,5 @@ public func extractIsolation<each Arg, Result>(
   return Builtin.extractFunctionIsolation(fn)
 }
 #endif
+
+public typealias nonisolated = Never

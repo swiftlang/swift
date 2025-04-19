@@ -20,6 +20,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/LangOptions.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -58,9 +59,9 @@ using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 ///
 /// Vended by SourceFile::getLanguageOptions().
 struct SourceFileLangOptions {
-  /// If unset, no value was provided. If a Type, that type is the type of the
-  /// isolation. If set to an empty type, nil was specified explicitly.
-  std::optional<Type> defaultIsolation;
+  /// The default actor isolation to infer on declarations
+  /// within the source file.
+  std::optional<DefaultIsolation> defaultIsolation;
 };
 
 /// A file containing Swift source code.
