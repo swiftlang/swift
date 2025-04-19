@@ -73,11 +73,14 @@ func testElsewhere(x: X) {
 // expected-complete-tns-note @-1 {{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
 
 @preconcurrency @MainActor class MyModelClass {
+// expected-expected-minimal-targeted-note@-1 {{main actor isolation inferred from enclosing context}}
 
   // default init() is 'nonisolated' in '-strict-concurrency=complete'
 
   func f() { }
   // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note@-2 {{main actor isolation inferred from enclosing context}}
+  // expected-note@-3 {{main actor isolation inferred from enclosing context}}
 }
 
 func testCalls(x: X) {
@@ -238,6 +241,7 @@ extension MainActorPreconcurrency: NotIsolated {
   func requirement() {}
   // expected-complete-tns-note@-1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   // expected-complete-tns-note@-2 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note@-3 {{main actor isolation inferred from enclosing context}}
 
 
   class Nested {

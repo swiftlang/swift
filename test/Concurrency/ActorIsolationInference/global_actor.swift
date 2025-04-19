@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor.swiftmodule -module-name other_global_actor -strict-concurrency=complete %S/Inputs/other_global_actor.swift -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -enable-upcoming-feature GlobalActorIsolatedTypesUsability
@@ -10,7 +10,7 @@
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 // REQUIRES: swift_feature_RegionBasedIsolation
 
-import other_global_actor_inference
+import other_global_actor
 
 actor SomeActor { }
 
@@ -137,11 +137,15 @@ class Object: Interface {
 // Global actor inference for classes and extensions
 // ----------------------------------------------------------------------
 @SomeGlobalActor class C3 {
-  func method1() { }  // expected-note {{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
+  func method1() { }
+  // expected-note@-1 {{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{global actor 'SomeGlobalActor' isolation inferred from enclosing context}}
 }
 
 extension C3 {
-  func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
+  func method2() { }
+  // expected-note@-1 {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{global actor 'SomeGlobalActor' isolation inferred from enclosing context}}
 }
 
 class C4: C3 {
@@ -159,7 +163,9 @@ class C5 {
 }
 
 @SomeGlobalActor extension C5 {
-  func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
+  func method2() { }
+  // expected-note@-1 {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{global actor 'SomeGlobalActor' isolation inferred from enclosing context}}
 }
 
 @OtherGlobalActor func testGlobalActorInference(c3: C3, c4: C4, c5: C5) {
