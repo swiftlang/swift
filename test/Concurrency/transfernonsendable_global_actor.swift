@@ -329,3 +329,14 @@ struct Clock {
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
+
+@MainActor
+func localCaptureDataRace5() {
+  var x = 0
+  _ = x
+
+  Task.detached { @CustomActor in x = 1 } // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{'x' is captured by a global actor 'CustomActor'-isolated closure. global actor 'CustomActor'-isolated uses in closure may race against later main actor-isolated uses}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
+}

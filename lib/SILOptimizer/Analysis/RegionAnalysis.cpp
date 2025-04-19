@@ -1264,6 +1264,9 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
 
   // We were not reachable at entry but are at our exit... walk the block and
   // see if our user is before a gen instruction.
+
+  // To do so, first find the range of pairs in valueToGenInsts that contains
+  // our base value.
   auto genStart = std::lower_bound(
       valueToGenInsts.begin(), valueToGenInsts.end(),
       std::make_pair(baseValue, nullptr),
@@ -1272,20 +1275,29 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
   if (genStart == valueToGenInsts.end() || genStart->first != baseValue)
     return false;
 
+  // Then determine the end of that range.
   auto genEnd = genStart;
   while (genEnd != valueToGenInsts.end() && genEnd->first == baseValue)
     ++genEnd;
 
   // Walk forward from the beginning of the block to user. If we do not find a
   // gen instruction, then we know the gen occurs after the op.
+  //
+  // NOTE: It is important that we include the user within our range since our
+  // user might also be a gen instruction.
   return llvm::any_of(
-      user->getParent()->getRangeEndingAtInst(user), [&](SILInstruction &inst) {
+      llvm::make_range(user->getParent()->begin(),
+                       std::next(user->getIterator())), [&](SILInstruction &inst) {
+        // Our computation works by computing a lower bound and seeing if we
+        // have (baseValue, inst) within our sorted range.
         auto iter = std::lower_bound(
             genStart, genEnd, std::make_pair(baseValue, &inst),
             [](const std::pair<SILValue, SILInstruction *> &p1,
                const std::pair<SILValue, SILInstruction *> &p2) {
               return p1 < p2;
             });
+
+        // If we did not hit end and found our pair, then we are done.
         return iter != valueToGenInsts.end() && iter->first == baseValue &&
                iter->second == &inst;
       });
