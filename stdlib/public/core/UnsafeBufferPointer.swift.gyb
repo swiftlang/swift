@@ -53,6 +53,8 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
     @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
     count: Int
   ) {
+    _internalInvariant(count >= 0)
+    unsafe _internalInvariant(count == 0 || start != nil)
     _position = unsafe start
     self.count = count
   }
@@ -778,6 +780,15 @@ extension Unsafe${Mutable}BufferPointer:
     return try unsafe body(&self)
   }
 %  end
+}
+
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned()
+  }
 }
 
 extension Unsafe${Mutable}BufferPointer {

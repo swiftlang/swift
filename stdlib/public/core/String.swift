@@ -655,6 +655,63 @@ extension String {
     )
   }
 
+  //FIXME: typed throws
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.2, *)
+  public init(
+    capacity: Int,
+    initializingUTF8With initializer: (
+      inout OutputSpan<UTF8.CodeUnit>
+    ) throws -> Void
+  ) rethrows {
+    try unsafe self.init(
+      unsafeUninitializedCapacity: capacity,
+      initializingUTF8With: { buffer in
+        var output = unsafe OutputSpan<UTF8.CodeUnit>(
+          buffer: buffer, initializedCount: 0
+        )
+        try initializer(&output)
+        return unsafe output.finalize(for: buffer)
+      }
+    )
+  }
+
+  //FIXME: typed throws
+  //FIXME: take advantage of UTF8Span, then make public
+  @available(SwiftStdlib 6.2, *)
+  internal init?(
+    capacity: Int,
+    initializingValidUTF8With initializer: (
+      inout OutputSpan<UTF8.CodeUnit>
+    ) throws -> Void
+  ) rethrows {
+    var valid = false
+    let string = try unsafe String(
+      unsafeUninitializedCapacity: capacity,
+      initializingUTF8With: { buffer in
+        var output = unsafe OutputSpan<UTF8.CodeUnit>(
+          buffer: buffer, initializedCount: 0
+        )
+        try initializer(&output)
+        unsafe output.span.withUnsafeBufferPointer {
+          switch unsafe validateUTF8($0) {
+          case .error:
+            valid = false
+          case .success:
+            valid = true
+          }
+        }
+        guard valid else { return 0 }
+        return unsafe output.finalize(for: buffer)
+      }
+    )
+    if valid {
+      self = string
+    } else {
+      return nil
+    }
+  }
+
   @inline(__always)
   internal init(
     _uninitializedCapacity capacity: Int,
