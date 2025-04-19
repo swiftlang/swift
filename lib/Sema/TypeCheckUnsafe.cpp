@@ -377,7 +377,7 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
   if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
     return;
 
-  if (!type->getCanonicalType()->isUnsafe())
+  if (!type->isUnsafe())
     return;
 
   // Look for a specific @unsafe nominal type along the way.

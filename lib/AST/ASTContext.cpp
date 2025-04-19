@@ -3543,6 +3543,12 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   auto &ctx = underlying->getASTContext();
   auto arena = getArena(properties);
 
+  // Typealiases can't meaningfully be unsafe; it's the underlying type that
+  // matters.
+  properties.removeIsUnsafe();
+  if (underlying->isUnsafe())
+    properties |= RecursiveTypeProperties::IsUnsafe;
+
   // Profile the type.
   llvm::FoldingSetNodeID id;
   TypeAliasType::Profile(id, typealias, parent, genericArgs, underlying);
@@ -4212,8 +4218,7 @@ static RecursiveTypeProperties getRecursivePropertiesAsParent(Type type) {
 
   // Drop the "unsafe" bit. We have to recompute it without considering the
   // enclosing nominal type.
-  properties = RecursiveTypeProperties(
-      properties.getBits() & ~static_cast<unsigned>(RecursiveTypeProperties::IsUnsafe));
+  properties.removeIsUnsafe();
 
   // Check generic arguments of parent types.
   while (type) {
