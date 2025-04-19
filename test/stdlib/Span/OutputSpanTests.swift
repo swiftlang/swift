@@ -325,6 +325,70 @@ suite.test("InlineArray initialization underflow")
   }
 }
 
+#if false
+suite.test("InlineArray initialization throws 0")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  enum LocalError: Error { case error }
+
+  class I {
+    static public var count = 0
+    init() { Self.count += 1 }
+    deinit { Self.count -= 1 }
+  }
+
+  let a: InlineArray<4, I>
+  do throws(LocalError) {
+    var c = 1
+    a = try InlineArray(first: I()) {
+      i throws(LocalError) in
+      c += 1
+      if c < 4 {
+        return I()
+      }
+      print(I.count)
+      throw LocalError.error
+    }
+    _ = a
+  } catch {
+    print(error, I.count)
+    expectEqual(I.count, 0)
+  }
+}
+
+suite.test("InlineArray initialization throws")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  enum LocalError: Error { case error }
+
+  class I {
+    static var count = 0
+    init() { Self.count += 1 }
+    deinit { Self.count -= 1 }
+  }
+
+  let a: InlineArray<4, I>
+  do throws(LocalError) {
+    a = try InlineArray {
+      o throws(LocalError) in
+      o.append(I())
+      o.append(I())
+      o.append(I())
+      o.append(I())
+      expectEqual(I.count, 4)
+      print(I.count)
+      throw LocalError.error
+    }
+    _ = a
+  } catch {
+    print(error, I.count)
+    expectEqual(I.count, 0)
+  }
+}
+#endif
+
 suite.test("Array initialization")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
