@@ -4621,7 +4621,7 @@ namespace {
               isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
 
           // FIXME: Handle CGFloat too.
-          if (!type->isCGFloat()) {
+          if (type && !type->isCGFloat()) {
             auto convertKind = ConstantConvertKind::None;
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
