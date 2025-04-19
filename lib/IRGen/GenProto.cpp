@@ -2348,12 +2348,6 @@ namespace {
               LinkEntity::forBaseConformanceDescriptor(requirement));
           B.addRelativeAddress(baseConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
-          // distributed thunks don't need resilience
-          if (entry.getMethodWitness().Requirement.isDistributedThunk()) {
-            witnesses = witnesses.drop_back();
-            continue;
-          }
-
           // Method descriptor.
           auto declRef = entry.getMethodWitness().Requirement;
           auto requirement =
