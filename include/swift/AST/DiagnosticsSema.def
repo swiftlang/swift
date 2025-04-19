@@ -7457,7 +7457,7 @@ ERROR(property_wrapper_effectful,none,
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
-      "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
+      "%select{lazy|@NSCopying|@NSManaged|@abi|weak|unowned|unmanaged}1",
       (Identifier, int))
 ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
@@ -8467,9 +8467,6 @@ ERROR(attr_abi_extra_attr,none,
 ERROR(attr_abi_forbidden_attr,none,
       "unused '%0' %select{attribute|modifier}1 in '@abi'",
       (StringRef, bool))
-REMARK(abi_attr_inferred_attribute,none,
-       "inferred '%0' in '@abi' to match %select{attribute|modifier}1 on API",
-       (StringRef, bool))
 
 ERROR(attr_abi_mismatched_attr,none,
       "'%0' %select{attribute|modifier}1 in '@abi' should match '%2'",
@@ -8508,6 +8505,13 @@ ERROR(attr_abi_no_default_arguments,none,
       "%kind0 in '@abi' should not have a default argument; it does not "
       "affect the parameter's ABI",
       (Decl *))
+
+ERROR(attr_abi_no_macros,none,
+      "%kind0 cannot be expanded in '@abi' attribute",
+      (Decl *))
+ERROR(attr_abi_no_lazy,none,
+      "'lazy' is not compatible with '@abi' attribute",
+      ())
 
 // These macros insert 'final', 'non-final', or nothing depending on both the
 // current decl and its counterpart, such that 'non-final' is used if the

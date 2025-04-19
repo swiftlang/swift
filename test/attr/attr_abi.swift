@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -Rabi-inference -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
 // REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_AddressableParameters
@@ -1267,6 +1267,61 @@ nonisolated func isolation17() async {}
 @abi(@concurrent func isolation19() async)
 nonisolated(nonsending) func isolation19() async {}
 
+// CustomAttr for property wrapper -- banned in and with '@abi'
+// Banned because we would need to design behavior for its auxiliary decls.
+@propertyWrapper struct PropertyWrapper {
+  var wrappedValue: Int { fatalError() }
+}
+
+struct CustomAttrPropertyWrapper {
+  @abi(@PropertyWrapper var v1: Int) // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
+  @PropertyWrapper var v1: Int // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
+
+  @abi(@PropertyWrapper var v2: Int) // expected-error {{property 'v2' with a wrapper cannot also be @abi}}
+  var v2: Int
+
+  @abi(var v3: Int)
+  @PropertyWrapper var v3: Int // expected-error {{property 'v3' with a wrapper cannot also be @abi}}
+}
+
+// CustomAttr for attached macro -- see Macros/macro_expand_peers.swift
+// Freestanding macro in @abi -- see Macros/macro_expand.swift
+
+// CustomAttr for result builder -- banned in '@abi'
+// Has no ABI impact on either a parameter or a decl.
+@resultBuilder struct ResultBuilder {
+  static func buildBlock(_ values: Int...) -> Int { values.reduce(0, +) }
+}
+
+struct CustomAttrResultBuilder {
+  @abi(@ResultBuilder var v1: Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  @ResultBuilder var v1: Int { 0 }
+
+  @abi(@ResultBuilder var v2: Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  var v2: Int { 0 }
+
+  @abi(var v3: Int)
+  @ResultBuilder var v3: Int { 0 }
+
+  @abi(@ResultBuilder func fn11() -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  @ResultBuilder func fn11() -> Int { 0 }
+
+  @abi(@ResultBuilder func fn21() -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{8-22=}}
+  func fn21() -> Int { 0 }
+
+  @abi(func fn31() -> Int)
+  @ResultBuilder func fn31() -> Int { 0 }
+
+  @abi(func fn12(@ResultBuilder _: () -> Int) -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}}  {{18-32=}}
+  func fn12(@ResultBuilder _: () -> Int) -> Int { 0 }
+
+  @abi(func fn22(@ResultBuilder _: () -> Int) -> Int) // expected-error {{unused 'ResultBuilder' attribute in '@abi'}} {{18-32=}}
+  func fn22(_: () -> Int) -> Int { 0 }
+
+  @abi(func fn32(_: () -> Int) -> Int)
+  func fn32(@ResultBuilder _: () -> Int) -> Int { 0 }
+}
+
 // NSCopying - see attr/attr_abi_objc.swift
 
 // @LLDBDebuggerFunction -- banned in @abi
@@ -1813,45 +1868,48 @@ func section2() {}
 @abi(func section3())
 @_section("fnord") func section3() {}
 
-// @inlinable -- automatically cloned into @abi
-@abi(@inlinable func inlinable1())
+// @inlinable -- banned in @abi
+// Although the inlining *does* occasionally get mangled, it's only done in the
+// SpecializationManglers, which shouldn't get their serialization from an ABI
+// attribute.
+@abi(@inlinable func inlinable1()) // expected-error {{unused 'inlinable' attribute in '@abi'}} {{6-16=}}
 @inlinable func inlinable1() {}
 
-@abi(@inlinable func inlinable2()) // expected-error {{extra 'inlinable' attribute in '@abi'}} {{6-16=}}
+@abi(@inlinable func inlinable2()) // expected-error {{unused 'inlinable' attribute in '@abi'}} {{6-16=}}
 func inlinable2() {}
 
-@abi(func inlinable3()) // expected-remark {{inferred '@inlinable' in '@abi' to match attribute on API}}
-@inlinable func inlinable3() {} // expected-note {{matches attribute here}}
+@abi(func inlinable3())
+@inlinable func inlinable3() {}
 
-// @inline -- automatically cloned into @abi
-@abi(@inline(never) func inline1())
+// @inlinable -- banned in @abi
+@abi(@inline(never) func inline1()) // expected-error {{unused 'inline(never)' attribute in '@abi'}} {{6-20=}}
 @inline(never) func inline1() {}
 
-@abi(@inline(never) func inline2()) // expected-error {{extra 'inline(never)' attribute in '@abi'}} {{6-20=}}
+@abi(@inline(never) func inline2()) // expected-error {{unused 'inline(never)' attribute in '@abi'}} {{6-20=}}
 func inline2() {}
 
-@abi(func inline3()) // expected-remark {{inferred '@inline(never)' in '@abi' to match attribute on API}}
-@inline(never) func inline3() {} // expected-note {{matches attribute here}}
+@abi(func inline3())
+@inline(never) func inline3() {}
 
-// @_transparent -- automatically cloned into @abi
-@abi(@_transparent func transparent1())
+// @_transparent -- banned in @abi
+@abi(@_transparent func transparent1()) // expected-error {{unused '_transparent' attribute in '@abi'}} {{6-19=}}
 @_transparent func transparent1() {}
 
-@abi(@_transparent func transparent2()) // expected-error {{extra '_transparent' attribute in '@abi'}} {{6-19=}}
+@abi(@_transparent func transparent2()) // expected-error {{unused '_transparent' attribute in '@abi'}} {{6-19=}}
 func transparent2() {}
 
-@abi(func transparent3()) // expected-remark {{inferred '@_transparent' in '@abi' to match attribute on API}}
-@_transparent func transparent3() {} // expected-note {{matches attribute here}}
+@abi(func transparent3())
+@_transparent func transparent3() {}
 
-// @_alwaysEmitIntoClient -- automatically cloned into @abi
-@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient1())
+// @_alwaysEmitIntoClient -- banned in @abi
+@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient1()) // expected-error {{unused '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
 @_alwaysEmitIntoClient func alwaysEmitIntoClient1() {}
 
-@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient2()) // expected-error {{extra '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
+@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient2()) // expected-error {{unused '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
 func alwaysEmitIntoClient2() {}
 
-@abi(func alwaysEmitIntoClient3()) // expected-remark {{inferred '@_alwaysEmitIntoClient' in '@abi' to match attribute on API}}
-@_alwaysEmitIntoClient func alwaysEmitIntoClient3() {} // expected-note {{matches attribute here}}
+@abi(func alwaysEmitIntoClient3())
+@_alwaysEmitIntoClient func alwaysEmitIntoClient3() {}
 
 // @_optimize(none) -- banned in @abi
 @abi(@_optimize(none) func optimize1()) // expected-error {{unused '_optimize(none)' attribute in '@abi'}} {{6-22=}}
@@ -1891,16 +1949,17 @@ class Required {
   required init(i3: Void) { fatalError() } // expected-note {{should match modifier here}}
 }
 
-// lazy -- automatically cloned into @abi
+// lazy -- banned both in and with @abi
+// This introduces auxiliary decls whose ABI could not be controlled.
 class Lazy {
-  @abi(lazy var v1: Int)
-  lazy var v1: Int = 0
+  @abi(lazy var v1: Int) // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{8-12=}}
+  lazy var v1: Int = 0 // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{3-8=}}
 
-  @abi(lazy var v2: Int) // expected-error {{extra 'lazy' modifier in '@abi'}} {{8-12=}}
+  @abi(lazy var v2: Int) // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{8-12=}}
   var v2: Int = 0
 
-  @abi(var v3: Int) // expected-remark {{inferred 'lazy' in '@abi' to match modifier on API}}
-  lazy var v3: Int = 0 // expected-note {{matches modifier here}}
+  @abi(var v3: Int)
+  lazy var v3: Int = 0 // expected-error {{'lazy' is not compatible with '@abi' attribute}} {{3-8=}}
 }
 
 // @_fixed_layout -- banned in @abi
@@ -1975,15 +2034,15 @@ extension DynamicReplacement {
 
 // @_weakLinked -- tested in attr/attr_weaklinked.swift
 
-// @_borrowed -- automatically cloned into @abi
+// @_borrowed -- banned in @abi
 protocol BorrowedAttr {
-  @abi(@_borrowed var v1: Int)
+  @abi(@_borrowed var v1: Int) // expected-error {{unused '_borrowed' attribute in '@abi'}} {{8-18=}}
   @_borrowed var v1: Int { get set }
 
-  @abi(var v2: Int) // expected-remark {{inferred '@_borrowed' in '@abi' to match attribute on API}}
-  @_borrowed var v2: Int { get set } // expected-note {{matches attribute here}}
+  @abi(var v2: Int)
+  @_borrowed var v2: Int { get set }
 
-  @abi(@_borrowed var v3: Int) // expected-error {{extra '_borrowed' attribute in '@abi'}} {{8-18=}}
+  @abi(@_borrowed var v3: Int) // expected-error {{unused '_borrowed' attribute in '@abi'}} {{8-18=}}
   var v3: Int { get set }
 }
 
