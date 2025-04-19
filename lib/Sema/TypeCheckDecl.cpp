@@ -3017,6 +3017,42 @@ AllMembersRequest::evaluate(
   return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
+static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
+                                            NominalTypeDecl *nominal) {
+  bool isInferredType = false;
+
+  if (!nominal->isGeneric()){
+    return false;
+  }
+
+  auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
+                                     .getPointer()
+                                     ->getAs<BoundGenericType>()
+                                     ->getGenericArgs();
+  auto typealiasGenericArguments = typealias->getUnderlyingType()
+                                       .getPointer()
+                                       ->getAs<BoundGenericType>()
+                                       ->getGenericArgs();
+
+  for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
+    auto nominalBoundGenericType = nominalGenericArguments[i];
+    auto typealiasBoundGenericType = typealiasGenericArguments[i];
+    if (nominalBoundGenericType.getPointer()->isEqual(
+            typealiasBoundGenericType.getPointer())) {
+      continue;
+    }
+
+    if (!typealiasBoundGenericType->hasTypeParameter()) {
+      isInferredType = true;
+    } else {
+      isInferredType = false;
+      break;
+    }
+  }
+
+  return isInferredType;
+}
+
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                                          NominalTypeDecl *nominal) {
   // Pass-through only makes sense when the typealias refers to a nominal
@@ -3025,6 +3061,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // Check that the nominal type and the typealias are either both generic
   // at this level or neither are.
+  ASSERT(nominal->isGeneric() == typealias->isGeneric());
   if (nominal->isGeneric() != typealias->isGeneric())
     return false;
 
@@ -3037,11 +3074,14 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic, we're done: it's a pass-through alias.
   if (!nominalSig) return true;
 
-  // Check that the type parameters are the same the whole way through.
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
+
+  // Check for inferred types.
   if (nominalGenericParams.size() != typealiasGenericParams.size())
-    return false;
+    return isTypeInferredByTypealias(typealias, nominal);
+
+  // Check that the type parameters are the same the whole way through.
   if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
                   typealiasGenericParams.begin(),
                   [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
