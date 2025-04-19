@@ -58,6 +58,17 @@ static void emitObjCConditional(raw_ostream &out,
   out << "#endif\n";
 }
 
+static void emitExternC(raw_ostream &out,
+                        llvm::function_ref<void()> cCase) {
+  emitCxxConditional(out, [&] {
+    out << "extern \"C\" {\n";
+  });
+  cCase();
+  emitCxxConditional(out, [&] {
+    out << "} // extern \"C\"\n";
+  });
+}
+
 static void writePtrauthPrologue(raw_ostream &os, ASTContext &ctx) {
   emitCxxConditional(os, [&]() {
     ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
@@ -207,6 +218,21 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
 
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
+
+  if (ctx.LangOpts.hasFeature(Feature::CDecl)) {
+    // For C compilers which don’t support nullability attributes, ignore them;
+    // for ones which do, suppress warnings about them being an extension.
+    out << "#if !__has_feature(nullability)\n"
+           "# define _Nonnull\n"
+           "# define _Nullable\n"
+           "# define _Null_unspecified\n"
+           "#elif !defined(__OBJC__)\n"
+           "# pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
+           "#endif\n"
+           "#if !__has_feature(nullability_nullable_result)\n"
+           "# define _Nullable_result _Nullable\n"
+           "#endif\n";
+  }
 }
 
 static int compareImportModulesByName(const ImportModuleTy *left,
@@ -577,12 +603,21 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   llvm::PrettyStackTraceString trace("While generating Clang header");
 
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
+  writePrologue(os, M->getASTContext(), computeMacroGuard(M));
 
+  // C content (@cdecl)
+  if (M->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
+    SmallPtrSet<ImportModuleTy, 8> imports;
+    emitExternC(os, [&] {
+      printModuleContentsAsC(os, imports, *M, interopContext);
+    });
+  }
+
+  // Objective-C content
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string objcModuleContentsBuf;
   llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
   printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
-  writePrologue(os, M->getASTContext(), computeMacroGuard(M));
   emitObjCConditional(os, [&] {
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
@@ -591,6 +626,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   writePostImportPrologue(os, *M);
   emitObjCConditional(os, [&] { os << "\n" << objcModuleContents.str(); });
   writeObjCEpilogue(os);
+
+  // C++ content
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
     bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
