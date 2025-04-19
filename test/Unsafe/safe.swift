@@ -277,6 +277,15 @@ struct UnsafeContainingUnspecified {
   typealias A = Int
 
   func getA() -> A { 0 }
+
+  @safe
+  struct Y {
+    var value: Int
+  }
+
+  func f() {
+    _ = Y(value: 5)
+  }
 }
 
 
