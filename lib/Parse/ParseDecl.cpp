@@ -3359,9 +3359,18 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     if (abiDecl) {
-      Attributes.add(new (Context) ABIAttr(abiDecl,
-                                           AtLoc, { Loc, rParenLoc },
-                                           /*implicit=*/false));
+      auto attr = new (Context) ABIAttr(abiDecl, AtLoc, { Loc, rParenLoc },
+                                        /*implicit=*/false);
+
+      // Diagnose syntactically invalid abiDecl kind here to match behavior of
+      // Swift parser.
+      if (!attr->canAppearOnDecl(abiDecl) && !isa<PatternBindingDecl>(abiDecl)){
+        diagnose(abiDecl->getLoc(), diag::attr_abi_incompatible_kind,
+                 abiDecl->getDescriptiveKind());
+        attr->setInvalid();
+      }
+
+      Attributes.add(attr);
     }
 
     break;

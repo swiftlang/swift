@@ -1571,6 +1571,11 @@ ERROR(attr_unsupported_on_target, none,
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
+// abi attribute
+ERROR(attr_abi_incompatible_kind,none,
+      "cannot use %0 in '@abi'",
+      (DescriptiveDeclKind))
+
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))

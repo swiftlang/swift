@@ -709,8 +709,12 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
   while (!features.empty()) {
+    // If we were in an @abi attribute, collect from the API counterpart.
+    auto abiRole = ABIRoleInfo(enclosingDecl);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      enclosingDecl = abiRole.getCounterpart();
     // Find the next outermost enclosing declaration.
-    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+    else if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
     else
       enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
