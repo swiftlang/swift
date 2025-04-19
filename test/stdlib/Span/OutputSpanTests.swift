@@ -374,3 +374,20 @@ suite.test("ContiguousArray initialization throws")
     expectTrue(false)
   }
 }
+
+suite.test("String initialization")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let requested = 32
+  let actual = requested/2
+
+  let c = UInt8(ascii: "A")
+  let string = String(capacity: requested, initializingUTF8With: {
+    for i in 0..<actual {
+      $0.append(c + UInt8(clamping: i))
+    }
+  })
+  expectEqual(string.utf8.count, 16)
+  expectTrue(string.utf8.elementsEqual(c..<(c+16)))
+}
