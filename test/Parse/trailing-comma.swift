@@ -60,6 +60,7 @@ struct S {
 // String Literal Interpolation
 
 "\(1,)"
+"\(1, f:)" // expected-error {{expected expression in list of expressions}}
 
 // Availability Spec List
 
