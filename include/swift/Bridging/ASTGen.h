@@ -35,6 +35,14 @@ void swift_ASTGen_addQueuedDiagnostic(
     const BridgedCharSourceRange *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges,
     BridgedArrayRef /*BridgedFixIt*/ fixIts);
+void swift_ASTGen_renderSingleDiagnostic(
+    void *_Nonnull state,
+    BridgedStringRef text,
+    BridgedDiagnosticSeverity severity,
+    BridgedStringRef categoryName,
+    BridgedStringRef documentationPath,
+    ssize_t colorize,
+    BridgedStringRef *_Nonnull renderedString);
 void swift_ASTGen_renderQueuedDiagnostics(
     void *_Nonnull queued, ssize_t contextSize, ssize_t colorize,
     BridgedStringRef *_Nonnull renderedString);
