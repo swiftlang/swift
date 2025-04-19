@@ -213,8 +213,7 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   }
   case SILInstructionKind::StoreInst: {
     auto qual = cast<StoreInst>(memInst)->getOwnershipQualifier();
-    return qual == StoreOwnershipQualifier::Init ||
-           qual == StoreOwnershipQualifier::Trivial;
+    return qual == StoreOwnershipQualifier::Init;
   }
   case SILInstructionKind::BuiltinInst: {
     auto bi = cast<BuiltinInst>(memInst);
@@ -264,7 +263,9 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
   }
   case SILInstructionKind::StoreInst:
     return cast<StoreInst>(memInst)->getOwnershipQualifier() ==
-           StoreOwnershipQualifier::Assign;
+           StoreOwnershipQualifier::Assign
+        || cast<StoreInst>(memInst)->getOwnershipQualifier() ==
+           StoreOwnershipQualifier::Trivial;
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
   case SILInstructionKind::Store##Name##Inst:                                  \
@@ -506,6 +507,13 @@ struct SimpleTemporaryAllocStackElimVisitor
       // that if we have multiple projections on the final allocation, we can
       // tell these projections apart from projections from earlier allocations.
       return state.setFinalUser(op);
+    }
+    
+    if (auto *si = dyn_cast<StoreInst>(user);
+        si && si->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial) {
+      // Bail on trivial stores.
+      LLVM_DEBUG(llvm::dbgs() << "Found trivial store: " << *user);
+      return false;
     }
 
     if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
