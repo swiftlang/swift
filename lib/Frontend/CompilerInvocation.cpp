@@ -1364,12 +1364,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
-  // Get the executor factory name
-  if (const Arg *A = Args.getLastArg(OPT_executor_factory)) {
-    printf("Got executor-factory option\n");
-    Opts.ExecutorFactory = A->getValue();
-  }
-
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 

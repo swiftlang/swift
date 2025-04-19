@@ -1424,51 +1424,44 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   B.setInsertionPoint(entryBlock);
 
-  // If we're using a new enough deployment target, call swift_createExecutors()
-  if (ctx.LangOpts.ExecutorFactory) {
-    if (!isCreateExecutorsFunctionAvailable(SGM)) {
-      ctx.Diags.diagnose(SourceLoc(), diag::executor_factory_not_supported);
-    } else {
-      CanType factoryTy = SGM.getConfiguredExecutorFactory()->getCanonicalType();
+  // If we're using a new enough deployment target, and we can find a
+  // DefaultExecutorFactory type, call swift_createExecutors()
+  Type factoryNonCanTy = SGM.getConfiguredExecutorFactory();
 
-      if (!factoryTy) {
-        ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_executor_factory_type,
-                           *ctx.LangOpts.ExecutorFactory);
-      }
+  if (isCreateExecutorsFunctionAvailable(SGM) && factoryNonCanTy) {
+    CanType factoryTy = factoryNonCanTy->getCanonicalType();
 
-      ProtocolDecl *executorFactoryProtocol
-        = ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
-      auto conformance = lookupConformance(factoryTy, executorFactoryProtocol);
+    ProtocolDecl *executorFactoryProtocol
+      = ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
+    auto conformance = lookupConformance(factoryTy, executorFactoryProtocol);
 
-      if (conformance.isInvalid()) {
-        // If this type doesn't conform, ignore it and use the default factory
-        SourceLoc loc = extractNearestSourceLoc(factoryTy);
+    if (conformance.isInvalid()) {
+      // If this type doesn't conform, ignore it and use the default factory
+      SourceLoc loc = extractNearestSourceLoc(factoryTy);
 
-        ctx.Diags.diagnose(loc, diag::executor_factory_must_conform,
-                           *ctx.LangOpts.ExecutorFactory);
+      ctx.Diags.diagnose(loc, diag::executor_factory_must_conform);
 
-        factoryTy = SGM.getDefaultExecutorFactory()->getCanonicalType();
-        conformance = lookupConformance(factoryTy, executorFactoryProtocol);
+      factoryTy = SGM.getDefaultExecutorFactory()->getCanonicalType();
+      conformance = lookupConformance(factoryTy, executorFactoryProtocol);
 
-        assert(!conformance.isInvalid());
-      }
-
-      FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
-      assert(createExecutorsFuncDecl
-             && "Failed to find swift_createExecutors function decl");
-      SILFunction *createExecutorsSILFunc =
-        SGM.getFunction(SILDeclRef(createExecutorsFuncDecl, SILDeclRef::Kind::Func),
-                        NotForDefinition);
-      SILValue createExecutorsFunc =
-        B.createFunctionRefFor(moduleLoc, createExecutorsSILFunc);
-      MetatypeType *factoryThickMetaTy
-        = MetatypeType::get(factoryTy, MetatypeRepresentation::Thick);
-      SILValue factorySILMetaTy
-        = B.createMetatype(moduleLoc, getLoweredType(factoryThickMetaTy));
-      auto ceSubs = SubstitutionMap::getProtocolSubstitutions(
-        conformance.getProtocol(), factoryTy, conformance);
-      B.createApply(moduleLoc, createExecutorsFunc, ceSubs, { factorySILMetaTy });
+      assert(!conformance.isInvalid());
     }
+
+    FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
+    assert(createExecutorsFuncDecl
+           && "Failed to find swift_createExecutors function decl");
+    SILFunction *createExecutorsSILFunc =
+      SGM.getFunction(SILDeclRef(createExecutorsFuncDecl, SILDeclRef::Kind::Func),
+                        NotForDefinition);
+    SILValue createExecutorsFunc =
+      B.createFunctionRefFor(moduleLoc, createExecutorsSILFunc);
+    MetatypeType *factoryThickMetaTy
+      = MetatypeType::get(factoryTy, MetatypeRepresentation::Thick);
+    SILValue factorySILMetaTy
+      = B.createMetatype(moduleLoc, getLoweredType(factoryThickMetaTy));
+    auto ceSubs = SubstitutionMap::getProtocolSubstitutions(
+      conformance.getProtocol(), factoryTy, conformance);
+    B.createApply(moduleLoc, createExecutorsFunc, ceSubs, { factorySILMetaTy });
   }
 
   auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,

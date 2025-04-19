@@ -514,25 +514,14 @@ FuncDecl *SILGenModule::getExit() {
 Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
-  ModuleDecl *module;
+  // Look in the main module for a typealias
+  Type factory = ctx.getNamedSwiftType(ctx.MainModule, "DefaultExecutorFactory");
 
-  // Parse the executor factory name
-  StringRef qualifiedName = *ctx.LangOpts.ExecutorFactory;
-  StringRef typeName;
+  // If we don't find it, fall back to _Concurrency.PlatformExecutorFactory
+  if (!factory)
+    factory = getDefaultExecutorFactory();
 
-  auto parts = qualifiedName.split('.');
-
-  if (parts.second.empty()) {
-    // This was an unqualified name; assume it's relative to the main module
-    module = ctx.MainModule;
-    typeName = qualifiedName;
-  } else {
-    Identifier moduleName = ctx.getIdentifier(parts.first);
-    module = ctx.getModuleByIdentifier(moduleName);
-    typeName = parts.second;
-  }
-
-  return ctx.getNamedSwiftType(module, typeName);
+  return factory;
 }
 
 Type SILGenModule::getDefaultExecutorFactory() {
