@@ -271,3 +271,16 @@ struct UnsafeWrapTest {
 
 @safe @unsafe
 struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}
+
+@unsafe
+struct UnsafeContainingUnspecified {
+  typealias A = Int
+
+  func getA() -> A { 0 }
+}
+
+
+@unsafe func f(x: UnsafeContainingUnspecified) {
+  let a = unsafe x.getA()
+  _ = a
+}
