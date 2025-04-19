@@ -1880,6 +1880,58 @@ bool AllowArgumentMismatch::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool AllowArgumentMismatch::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto *primaryFix = commonFixes.front().second->getAs<AllowArgumentMismatch>();
+
+  if (llvm::all_of(
+          commonFixes,
+          [&primaryFix](
+              const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            auto *fix = entry.second->getAs<AllowArgumentMismatch>();
+            return primaryFix->getToType()->isEqual(fix->getToType());
+          })) {
+    auto primarySolution = commonFixes.front().first;
+    auto &CS = getConstraintSystem();
+    auto &DE = CS.getASTContext().Diags;
+
+    auto loc = CS.getConstraintLocator(simplifyLocatorToAnchor(getLocator()));
+    auto overload = primarySolution->getOverloadChoiceIfAvailable(
+        primarySolution->getCalleeLocator(loc));
+    if (!overload)
+      return false;
+
+    DeclNameRef name = DeclNameRef(overload->choice.getName().getBaseName());
+    DE.diagnose(getLoc(getAnchor()), diag::ambiguous_decl_ref, name);
+
+    bool callPassedAsArgument = false;
+    for (auto &entry : commonFixes) {
+      auto &solution = entry.first;
+      auto *fix = entry.second->getAs<AllowArgumentMismatch>();
+
+      auto overload = solution->getOverloadChoiceIfAvailable(
+          solution->getCalleeLocator(loc));
+      if (!overload)
+        continue;
+
+      if (!getAsExpr<OverloadedDeclRefExpr>(fix->getAnchor())) {
+        callPassedAsArgument = true;
+        DE.diagnose(getLoc(getAnchor()),
+                    diag::candidate_has_invalid_argument_at_position,
+                    fix->getToType(), fix->getParamIdx(), false,
+                    fix->getFromType());
+      }
+    }
+    if (!callPassedAsArgument)
+      DE.diagnose(getLoc(getAnchor()),
+                  diag::ambiguous_because_no_candidates_were_found, name);
+
+    return true;
+  }
+
+  return false;
+}
+
 AllowArgumentMismatch *
 AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
                               Type paramType, ConstraintLocator *locator) {
