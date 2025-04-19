@@ -106,69 +106,142 @@ protocol NativelySlowServing {
 extension SlowServer: NativelySlowServing {}
 
 class SlowServerlet: SlowServer {
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}011doSomethingE8Nullably{{.*}}
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
+    // Native Function
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> Int
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK:   hop_to_executor [[ACTOR]]
+    // CHECK:   // end sil function '$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaF'
+
+    // @objc thunk closure
+    //
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) @Sendable (Int) -> ()>, SlowServerlet) -> () {
+    // CHECK: [[STR_ARG:%.*]] = begin_borrow {{.*}} : $String
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK: [[FUNC:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> Int
+    // CHECK: apply [[FUNC]]([[STR_ARG]], [[SELF]])
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaFyyYacfU_To'
     override func doSomethingSlowNullably(_: String) async -> Int {
         return 0
     }
 
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}18findAnswerNullably{{.*}}
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
+    // Native function.
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> @owned String
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[ACTOR]]
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaF'
+
+    // @objc closure thunk
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) @Sendable (NSString) -> ()>, SlowServerlet) -> () {
+    // CHECK: [[STR_ARG:%.*]] = begin_borrow {{.*}} : $String
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK: [[FUNC:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> @owned String
+    // CHECK: apply [[FUNC]]([[STR_ARG]], [[SELF]])
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaFyyYacfU_To'
     override func findAnswerNullably(_ x: String) async -> String {
         return x
     }
 
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}28doSomethingDangerousNullably{{.*}} :
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
+    // Native
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[ACTOR]]
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKF'
+
+    // @objc thunk closure
+    //
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> ()>, SlowServerlet) -> () {
+    // CHECK: [[STR_ARG:%.*]] = begin_borrow {{.*}} : $String
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK: [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKF : $@convention(method) @async (@guaranteed String, @guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK: apply [[NATIVE]]([[STR_ARG]], [[SELF]])
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKFyyYacfU_To'
     override func doSomethingDangerousNullably(_ x: String) async throws -> String {
         return x
     }
 
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}30doSomethingUnspecifiedNullably{{.*}} :
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
+    // Native
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[ACTOR]]
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF'
+
+    // @objc closure thunk
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (Optional<@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> ()>, SlowServerlet) -> () {
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK: [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK: apply [[NATIVE]]([[SELF]])
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKFyyYacfU_To'
     override func doSomethingUnspecifiedNullably() async throws -> String {
       fatalError()
     }
 
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}17doSomethingFlaggy{{.*}} :
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
-    // CHECK-LABEL: sil private{{.*}}13SlowServerlet{{.*}}17doSomethingFlaggy{{.*}}To :
-    // CHECK:         try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
-    // CHECK:       [[NORMAL_BB]]({{.*}}):
-    // CHECK:         integer_literal {{.*}}0 
-    // CHECK:       [[ERROR_BB]]({{.*}}):
-    // CHECK:         integer_literal {{.*}}1 
+    // Native
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[ACTOR]]
+
+    // @objc thunk closure
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable ({{.*}}, Optional<NSString>, Optional<NSError>) -> (), SlowServerlet) -> () {
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK:   [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK:   try_apply [[NATIVE]]([[SELF]]) : {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+    // CHECK: [[NORMAL_BB]]({{.*}}):
+    // CHECK:   integer_literal {{.*}}0
+    // CHECK: [[ERROR_BB]]({{.*}}):
+    // CHECK:   integer_literal {{.*}}1
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKFyyYacfU_To'
     override func doSomethingFlaggy() async throws -> String {
         return ""
     }
 
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}21doSomethingZeroFlaggy{{.*}} :
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
-    // CHECK-LABEL: sil private{{.*}}13SlowServerlet{{.*}}21doSomethingZeroFlaggy{{.*}}To :
-    // CHECK:         try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
-    // CHECK:       [[NORMAL_BB]]({{.*}}):
-    // CHECK:         integer_literal {{.*}}1 
-    // CHECK:       [[ERROR_BB]]({{.*}}):
-    // CHECK:         integer_literal {{.*}}0 
+    // Native
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[ACTOR]]
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF'
+    //
+    // @objc thunk closure
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable (Optional<NSString>, {{.*}}, Optional<NSError>) -> (), SlowServerlet) -> () {
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK:    [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
+    // CHECK:    try_apply [[NATIVE]]([[SELF]]) : {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+    // CHECK:  [[NORMAL_BB]]({{.*}}):
+    // CHECK:    integer_literal {{.*}}1
+    // CHECK:  [[ERROR_BB]]({{.*}}):
+    // CHECK:    integer_literal {{.*}}0
     override func doSomethingZeroFlaggy() async throws -> String {
         return ""
     }
 
-    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}28doSomethingMultiResultFlaggy{{.*}} :
-    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
-    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
-    // CHECK-LABEL: sil private{{.*}}13SlowServerlet{{.*}}28doSomethingMultiResultFlaggy{{.*}}To :
-    // CHECK:         try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
-    // CHECK:       [[NORMAL_BB]]({{.*}}):
-    // CHECK:         integer_literal {{.*}}1 
-    // CHECK:       [[ERROR_BB]]({{.*}}):
-    // CHECK:         integer_literal {{.*}}0 
+    // Native
+    //
+    // CHECK-LABEL: sil hidden [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @owned String, @error any Error)
+    // CHECK-NOT: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>,
+    // CHECK: [[ACTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[ACTOR]]
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF'
+    //
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable ({{.*}}, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> (), SlowServerlet) -> () {
+    // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
+    // CHECK:   [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @owned String, @error any Error)
+    // CHECK:   try_apply [[NATIVE]]([[SELF]]) : {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+    // CHECK: [[NORMAL_BB]]({{.*}}):
+    // CHECK:   integer_literal {{.*}}1
+    // CHECK: [[ERROR_BB]]({{.*}}):
+    // CHECK:   integer_literal {{.*}}0
+    // CHECK: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKFyyYacfU_To'
     override func doSomethingMultiResultFlaggy() async throws -> (String, String) {
         return ("", "")
     }
