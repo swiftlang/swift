@@ -327,7 +327,12 @@ bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
 bool swift::enumerateUnsafeUses(SubstitutionMap subs,
                                 SourceLoc loc,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
-  // FIXME: Check replacement types?
+  // Replacement types.
+  for (auto replacementType : subs.getReplacementTypes()) {
+    if (replacementType->isUnsafe() &&
+        fn(UnsafeUse::forReferenceToUnsafe(nullptr, false, replacementType, loc)))
+      return true;
+  }
 
   // Check conformances.
   if (enumerateUnsafeUses(subs.getConformances(), loc, fn))
@@ -376,24 +381,69 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
     return;
 
   // Look for a specific @unsafe nominal type along the way.
-  auto findSpecificUnsafeType = [](Type type) {
+  class Walker : public TypeWalker {
+  public:
     Type specificType;
-    (void)type.findIf([&specificType](Type type) {
+
+    Action walkToTypePre(Type type) override {
+      if (specificType)
+        return Action::Stop;
+
+      // If this refers to a nominal type that is @unsafe, store that.
       if (auto typeDecl = type->getAnyNominal()) {
         if (typeDecl->getExplicitSafety() == ExplicitSafety::Unsafe) {
           specificType = type;
-          return false;
+          return Action::Stop;
         }
       }
 
-      return false;
-    });
-    return specificType;
+      // Do not recurse into nominal types, because we do not want to visit
+      // their "parent" types.
+      if (isa<NominalOrBoundGenericNominalType>(type.getPointer()) ||
+          isa<UnboundGenericType>(type.getPointer())) {
+        // Recurse into the generic arguments. This operation is recursive,
+        // because we also need to see the generic arguments of parent types.
+        walkGenericArguments(type);
+
+        return Action::SkipNode;
+      }
+
+      return Action::Continue;
+    }
+
+  private:
+    /// Recursively walk the generic arguments of this type and its parent
+    /// types.
+    void walkGenericArguments(Type type) {
+      if (!type)
+        return;
+
+      // Walk the generic arguments.
+      if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+        for (auto genericArg : boundGeneric->getGenericArgs())
+          genericArg.walk(*this);
+      }
+
+      if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>())
+        return walkGenericArguments(nominalOrBound->getParent());
+
+      if (auto unbound = type->getAs<UnboundGenericType>())
+        return walkGenericArguments(unbound->getParent());
+    }
   };
 
-  Type specificType = findSpecificUnsafeType(type);
-  if (!specificType)
-    specificType = findSpecificUnsafeType(type->getCanonicalType());
+  // Look for a canonical unsafe type.
+  Walker walker;
+  type->getCanonicalType().walk(walker);
+  Type specificType = walker.specificType;
+
+  // Look for an unsafe type in the non-canonical type, which is a better answer
+  // if we can find it.
+  walker.specificType = Type();
+  type.walk(walker);
+  if (specificType && walker.specificType &&
+      specificType->isEqual(walker.specificType))
+    specificType = walker.specificType;
 
   diagnose(specificType ? specificType : type);
 }
