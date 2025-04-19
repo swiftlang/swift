@@ -62,6 +62,24 @@ import SubE
 // CHECK-DAG: "swift": "F"
 // CHECK-DAG: "swift": "A"
 
+/// --------Swift module F
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-DAG:     "clang": "F"
+// CHECK-DAG:     "swift": "Swift"
+// CHECK-DAG:     "swift": "SwiftOnoneSupport"
+// CHECK: ],
+
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-DAG:   "clang": "A"
+// CHECK-DAG:   "swift": "Swift"
+
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "{{.*}}/C-{{.*}}.pcm",
 
@@ -98,25 +116,6 @@ import SubE
 // CHECK-NEXT: {
 // CHECK: "clang": "A"
 // CHECK-NEXT: }
-
-/// --------Swift module F
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
-// CHECK-NEXT: "sourceFiles": [
-// CHECK-NEXT: ],
-// CHECK-NEXT: "directDependencies": [
-// CHECK-NEXT:   {
-// CHECK-DAG:     "clang": "F"
-// CHECK-DAG:     "swift": "Swift"
-// CHECK-DAG:     "swift": "SwiftOnoneSupport"
-// CHECK: ],
-
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-DAG:   "clang": "A"
-// CHECK-DAG:   "swift": "Swift"
 
 /// --------Swift module G
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"

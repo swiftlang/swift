@@ -976,19 +976,19 @@ ModuleDependenciesCache::setCrossImportOverlayDependencies(ModuleDependencyID mo
 }
 
 ModuleDependencyIDSetVector
-ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) const {
+ModuleDependenciesCache::getDirectDependencies(const ModuleDependencyID &moduleID) const {
   const auto &moduleInfo = findKnownDependency(moduleID);
   ModuleDependencyIDSetVector result;
   if (moduleInfo.isSwiftModule()) {
     auto swiftImportedDepsRef = moduleInfo.getImportedSwiftDependencies();
-    auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
-    auto overlayDependenciesRef = moduleInfo.getSwiftOverlayDependencies();
     result.insert(swiftImportedDepsRef.begin(),
                   swiftImportedDepsRef.end());
+
+    // FIXME: Remove the header clang dependencies from this set,
+    // and when doing so, add it to `getAllDependencies`.
+    auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
     result.insert(headerClangDepsRef.begin(),
                   headerClangDepsRef.end());
-    result.insert(overlayDependenciesRef.begin(),
-                  overlayDependenciesRef.end());
   }
 
   if (moduleInfo.isSwiftSourceModule()) {
@@ -1000,6 +1000,19 @@ ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) 
   auto clangImportedDepsRef = moduleInfo.getImportedClangDependencies();
   result.insert(clangImportedDepsRef.begin(),
                 clangImportedDepsRef.end());
+
+  return result;
+}
+
+ModuleDependencyIDSetVector
+ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findKnownDependency(moduleID);
+  ModuleDependencyIDSetVector result = getDirectDependencies(moduleID);
+  if (moduleInfo.isSwiftModule()) {
+    auto overlayDependenciesRef = moduleInfo.getSwiftOverlayDependencies();
+    result.insert(overlayDependenciesRef.begin(),
+                  overlayDependenciesRef.end());
+  }
 
   return result;
 }

@@ -85,6 +85,31 @@ import SubE
 // CHECK-DAG:     "swift": "A"
 // CHECK-DAG:     "swift": "F"
 
+/// --------Swift module F
+// CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-DAG:     "clang": "F"
+// CHECK-DAG:     "swift": "Swift"
+// CHECK-DAG:     "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:   }
+// CHECK-NEXT: ],
+// CHECK: "details":
+// CHECK: "moduleCacheKey":
+
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-DAG:   "clang": "A"
+// CHECK-DAG:   "swift": "Swift"
+// CHECK-NEXT: }
+// CHECK: "details":
+// CHECK: "moduleCacheKey":
+
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}C-{{.*}}.pcm",
 
@@ -123,31 +148,6 @@ import SubE
 // CHECK-MAKE-DEPS-SAME: Bridging.h
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap
-
-/// --------Swift module F
-// CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
-// CHECK-NEXT: "sourceFiles": [
-// CHECK-NEXT: ],
-// CHECK-NEXT: "directDependencies": [
-// CHECK-NEXT:   {
-// CHECK-DAG:     "clang": "F"
-// CHECK-DAG:     "swift": "Swift"
-// CHECK-DAG:     "swift": "SwiftOnoneSupport"
-// CHECK-NEXT:   }
-// CHECK-NEXT: ],
-// CHECK: "details":
-// CHECK: "moduleCacheKey":
-
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-DAG:   "clang": "A"
-// CHECK-DAG:   "swift": "Swift"
-// CHECK-NEXT: }
-// CHECK: "details":
-// CHECK: "moduleCacheKey":
 
 /// --------Swift module G
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"

@@ -371,8 +371,8 @@ private:
 
   void addMacroDependencies(ModuleDependencyID moduleID,
                             const ModuleDependencyInfoStorageBase &dep) {
-    auto directDeps = cache.getAllDependencies(this->moduleID);
-    if (llvm::find(directDeps, moduleID) == directDeps.end())
+    auto dependencies = cache.getAllDependencies(this->moduleID);
+    if (llvm::find(dependencies, moduleID) == dependencies.end())
       return;
 
     for (auto &entry : dep.macroDependencies)
@@ -753,7 +753,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       sourceFiles = clangDeps->fileDependencies;
     }
 
-    auto directDependencies = cache.getAllDependencies(moduleID);
+    auto directDependencies = cache.getDirectDependencies(moduleID);
     std::vector<std::string> clangHeaderDependencyNames;
     for (const auto &headerDepID : moduleDependencyInfo.getHeaderClangDependencies())
       clangHeaderDependencyNames.push_back(headerDepID.ModuleName);
