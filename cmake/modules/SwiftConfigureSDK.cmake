@@ -439,6 +439,8 @@ macro(configure_sdk_unix name architectures)
 
         set(SWIFT_SDK_OPENBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-openbsd${openbsd_system_version}")
 
+        add_link_options("LINKER:-z,origin")
+
         if(CMAKE_SYSROOT)
           set(SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH}" CACHE INTERNAL "sysroot path" FORCE)
         endif()
