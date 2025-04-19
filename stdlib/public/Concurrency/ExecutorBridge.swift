@@ -119,3 +119,6 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_dispatchAssertMainQueue")
 internal func _dispatchAssertMainQueue()
+
+@_silgen_name("swift_createDefaultExecutorsOnce")
+func _createDefaultExecutorsOnce()

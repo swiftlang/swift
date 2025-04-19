@@ -546,6 +546,14 @@ public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   Task._defaultExecutor = factory.defaultExecutor
 }
 
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_createDefaultExecutors")
+func _createDefaultExecutors() {
+  if Task._defaultExecutor == nil {
+    _createExecutors(factory: DefaultExecutorFactory.self)
+  }
+}
+
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 extension MainActor {
   @available(SwiftStdlib 6.2, *)
@@ -558,9 +566,8 @@ extension MainActor {
   /// executor is a fatal error.
   @available(SwiftStdlib 6.2, *)
   public static var executor: any MainExecutor {
-    if _executor == nil {
-      _executor = DefaultExecutorFactory.mainExecutor
-    }
+    // It would be good if there was a Swift way to do this
+    _createDefaultExecutorsOnce()
     return _executor!
   }
 }
@@ -577,9 +584,8 @@ extension Task where Success == Never, Failure == Never {
   /// executor is a fatal error.
   @available(SwiftStdlib 6.2, *)
   public static var defaultExecutor: any TaskExecutor {
-    if _defaultExecutor == nil {
-      _defaultExecutor = DefaultExecutorFactory.defaultExecutor
-    }
+    // It would be good if there was a Swift way to do this
+    _createDefaultExecutorsOnce()
     return _defaultExecutor!
   }
 }
