@@ -44,11 +44,11 @@ class DeclNameLoc {
   /// The number of argument labels stored in the name.
   unsigned NumArgumentLabels;
 
-  enum {
-    BaseNameIndex = 0,
-    LParenIndex = 1,
-    RParenIndex = 2,
-    FirstArgumentLabelIndex = 3,
+  enum Index : uint8_t {
+    BaseName = 0,
+    LParen = 1,
+    RParen = 2,
+    FirstArgumentLabel = 3,
   };
 
   /// Retrieve a pointer to either the only source location that was
@@ -89,26 +89,26 @@ public:
 
   /// Retrieve the location of the base name.
   SourceLoc getBaseNameLoc() const {
-    return getSourceLocs()[BaseNameIndex];
+    return getSourceLocs()[Index::BaseName];
   }
 
   /// Retrieve the location of the left parentheses.
   SourceLoc getLParenLoc() const {
     if (NumArgumentLabels == 0) return SourceLoc();
-    return getSourceLocs()[LParenIndex];
+    return getSourceLocs()[Index::LParen];
   }
 
   /// Retrieve the location of the right parentheses.
   SourceLoc getRParenLoc() const {
     if (NumArgumentLabels == 0) return SourceLoc();
-    return getSourceLocs()[RParenIndex];
+    return getSourceLocs()[Index::RParen];
   }
 
   /// Retrieve the location of an argument label.
   SourceLoc getArgumentLabelLoc(unsigned index) const {
     if (index >= NumArgumentLabels)
       return SourceLoc();
-    return getSourceLocs()[FirstArgumentLabelIndex + index];
+    return getSourceLocs()[Index::FirstArgumentLabel + index];
   }
 
   SourceLoc getStartLoc() const {
