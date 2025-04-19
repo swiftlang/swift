@@ -468,7 +468,20 @@ extension InlineArray where Element: ~Copyable {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
-      fatalError("Span over InlineArray is not supported yet.")
+      let pointer = unsafe _address
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(&self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      let pointer = unsafe _mutableAddress
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
 }
