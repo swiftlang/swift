@@ -1438,15 +1438,18 @@ public:
       }
       std::tie(sentRegionIsolation, regionHasClosureCapturedElt) = *pairOpt;
 
-      // If we merged anything, we need to handle an attempt to send a
-      // never-sent value unless our value has the same isolation info as our
-      // callee.
       auto calleeIsolationInfo = getIsolationInfo(op);
-      if (!(calleeIsolationInfo &&
-            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) &&
-          !sentRegionIsolation.isDisconnected()) {
-        return handleSendNeverSentHelper(op, op.getOpArg1(),
-                                         sentRegionIsolation);
+
+      // If our callee and region are both actor isolated and part of the same
+      // isolation domain, do not treat this as a send.
+      if (calleeIsolationInfo.isActorIsolated() &&
+          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+        return;
+
+      // At this point, check if our sent value is not disconnected. If so, emit
+      // a sent never sendable helper.
+      if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
+        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
