@@ -214,6 +214,13 @@ AvailabilityContext AvailabilityContext::forDeclSignature(const Decl *decl) {
   return forLocation(decl->getLoc(), decl->getInnermostDeclContext());
 }
 
+AvailabilityContext
+AvailabilityContext::forAlwaysAvailable(const ASTContext &ctx) {
+  return AvailabilityContext(Storage::get(AvailabilityRange::alwaysAvailable(),
+                                          /*isDeprecated=*/false,
+                                          /*domainInfos=*/{}, ctx));
+}
+
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->platformRange;
 }
