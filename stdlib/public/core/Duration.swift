@@ -46,6 +46,7 @@ public struct Duration: Sendable {
     self._high = _high
   }
 
+  @_alwaysEmitIntoClient
   internal init(_attoseconds: _Int128) {
     self.init(_high: _attoseconds.high, low: _attoseconds.low)
   }
@@ -149,6 +150,7 @@ extension Duration {
   
   /// Construct a `Duration` given a duration and scale, taking care so that
   /// exact integer durations are preserved exactly.
+  @_alwaysEmitIntoClient
   internal init(_ duration: Double, scale: UInt64) {
     // Split the duration into integral and fractional parts, as we need to
     // handle them slightly differently to ensure that integer values are
@@ -193,7 +195,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of seconds milliseconds as a 
+  /// Construct a `Duration` given a number of milliseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .milliseconds(88.3)
@@ -222,7 +224,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of seconds microseconds as a 
+  /// Construct a `Duration` given a number of microseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .microseconds(382.9)
@@ -249,6 +251,18 @@ extension Duration {
     let lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
     let highScaled = high * 1_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
+  }
+  
+  /// Construct a `Duration` given a number of nanoseconds as a `Double`
+  /// by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .nanoseconds(1929)
+  ///
+  /// - Returns: A `Duration` representing the given number of nanoseconds.
+  @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  public static func nanoseconds(_ nanoseconds: Double) -> Duration {
+    Duration(nanoseconds, scale: 1_000_000_000)
   }
 }
 
