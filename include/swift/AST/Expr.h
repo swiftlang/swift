@@ -3780,6 +3780,19 @@ public:
   }
 };
 
+/// An expression that models an implicit conversion from a value to Void.
+class IgnoredExpr : public ImplicitConversionExpr {
+  IgnoredExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::Ignored, subExpr, ty) {}
+
+public:
+  static IgnoredExpr *create(ASTContext &ctx, Expr *subExpr);
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Ignored;
+  }
+};
+
 /// An expression that models an implicit conversion from an uninhabited value
 /// to any type. It cannot be evaluated.
 class UnreachableExpr : public ImplicitConversionExpr {

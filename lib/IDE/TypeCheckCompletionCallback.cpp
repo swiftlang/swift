@@ -38,8 +38,7 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   }
 
   SyntacticElementTarget completionTarget(fallback->E, fallback->DC, CTP_Unused,
-                                          Type(),
-                                          /*isDiscared=*/true);
+                                          Type());
   typeCheckForCodeCompletion(completionTarget, /*needsPrecheck=*/true,
                              [&](const Solution &S) { sawSolution(S); });
 }
