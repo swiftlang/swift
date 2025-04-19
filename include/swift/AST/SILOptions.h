@@ -160,7 +160,7 @@ public:
   bool EnableWMORequiredDiagnostics = true;
 
   /// Controls whether or not paranoid verification checks are run.
-  bool VerifyAll = false;
+  bool VerifyAll = true;
 
   /// Verify ownership after every pass.
   bool VerifyOwnershipAll = false;
