@@ -24,8 +24,7 @@ import Swift
 /// ensuring spcial safety and avoiding buffer overflow errors.
 @frozen
 @safe
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `Span`.
@@ -86,12 +85,10 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -168,8 +165,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span /*where Element: Copyable*/ {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -215,8 +211,7 @@ extension Span /*where Element: Copyable*/ {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: BitwiseCopyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -379,8 +374,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
@@ -412,8 +406,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
   @_semantics("fixed_storage.check_index")
   @inline(__always)
@@ -466,8 +459,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: BitwiseCopyable {
   /// Accesses the element at the specified position in the `Span`.
   ///
@@ -517,8 +509,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 // MARK: sub-spans
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
@@ -637,8 +628,7 @@ extension Span where Element: ~Copyable {
 }
 
 // MARK: UnsafeBufferPointer access hatch
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable  {
 
   /// Calls a closure with a pointer to the viewed contiguous storage.
@@ -671,8 +661,7 @@ extension Span where Element: ~Copyable  {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: BitwiseCopyable {
 
   /// Calls the given closure with a pointer to the underlying bytes of
@@ -704,8 +693,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
@@ -740,8 +728,7 @@ extension Span where Element: ~Copyable {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+@available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,
