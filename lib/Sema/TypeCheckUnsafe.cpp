@@ -375,21 +375,28 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
   if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
     return;
 
-  if (!type->isUnsafe() && !type->getCanonicalType()->isUnsafe())
+  if (!type->getCanonicalType()->isUnsafe())
     return;
 
-  // Look for a specific @unsafe nominal type.
-  Type specificType;
-  type.findIf([&specificType](Type type) {
-    if (auto typeDecl = type->getAnyNominal()) {
-      if (typeDecl->getExplicitSafety() == ExplicitSafety::Unsafe) {
-        specificType = type;
-        return false;
+  // Look for a specific @unsafe nominal type along the way.
+  auto findSpecificUnsafeType = [](Type type) {
+    Type specificType;
+    (void)type.findIf([&specificType](Type type) {
+      if (auto typeDecl = type->getAnyNominal()) {
+        if (typeDecl->getExplicitSafety() == ExplicitSafety::Unsafe) {
+          specificType = type;
+          return false;
+        }
       }
-    }
 
-    return false;
-  });
+      return false;
+    });
+    return specificType;
+  };
+
+  Type specificType = findSpecificUnsafeType(type);
+  if (!specificType)
+    specificType = findSpecificUnsafeType(type->getCanonicalType());
 
   diagnose(specificType ? specificType : type);
 }
