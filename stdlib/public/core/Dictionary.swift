@@ -838,7 +838,7 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
     for (key, value) in elements {
       let (bucket, found) = native.find(key)
       _precondition(!found, "Dictionary literal contains duplicate keys")
-      unsafe native._insert(at: bucket, key: key, value: value)
+      native._insert(at: bucket, key: key, value: value)
     }
     self.init(_native: native)
   }
@@ -904,11 +904,11 @@ extension Dictionary {
     }
     @inline(__always)
     _modify {
-      let (bucket, found) = unsafe _variant.mutatingFind(key)
+      let (bucket, found) = _variant.mutatingFind(key)
       let native = _variant.asNative
       if !found {
         let value = defaultValue()
-        unsafe native._insert(at: bucket, key: key, value: value)
+        native._insert(at: bucket, key: key, value: value)
       }
       let address = unsafe native._values + bucket.offset
       defer { _fixLifetime(self) }
@@ -1458,7 +1458,7 @@ extension Dictionary {
       }
       _modify {
         let native = _variant.ensureUniqueNative()
-        let bucket = unsafe native.validatedBucket(for: position)
+        let bucket = native.validatedBucket(for: position)
         let address = unsafe native._values + bucket.offset
         defer { _fixLifetime(self) }
         yield unsafe &address.pointee
@@ -1491,9 +1491,9 @@ extension Dictionary {
 #endif
       let isUnique = _variant.isUniquelyReferenced()
       let native = _variant.asNative
-      let a = unsafe native.validatedBucket(for: i)
-      let b = unsafe native.validatedBucket(for: j)
-      unsafe _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
+      let a = native.validatedBucket(for: i)
+      let b = native.validatedBucket(for: j)
+      _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
   }
 }

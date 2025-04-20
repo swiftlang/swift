@@ -1216,12 +1216,14 @@ ExplicitSafety Decl::getExplicitSafety() const {
                              ExplicitSafety::Unspecified);
   }
   
-  // Inference: Check the enclosing context.
-  if (auto enclosingDC = getDeclContext()) {
-    // Is this an extension with @safe or @unsafe on it?
-    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
-      if (auto extSafety = getExplicitSafetyFromAttrs(ext))
-        return *extSafety;
+  // Inference: Check the enclosing context, unless this is a type.
+  if (!isa<TypeDecl>(this)) {
+    if (auto enclosingDC = getDeclContext()) {
+      // Is this an extension with @safe or @unsafe on it?
+      if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+        if (auto extSafety = getExplicitSafetyFromAttrs(ext))
+          return *extSafety;
+      }
     }
   }
 
