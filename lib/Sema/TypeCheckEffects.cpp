@@ -670,6 +670,8 @@ public:
       recurse = asImpl().checkForEach(forEach);
     } else if (auto labeled = dyn_cast<LabeledConditionalStmt>(S)) {
       asImpl().noteLabeledConditionalStmt(labeled);
+    } else if (auto defer = dyn_cast<DeferStmt>(S)) {
+      recurse = asImpl().checkDefer(defer);
     }
 
     if (!recurse)
@@ -2110,6 +2112,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkDefer(DeferStmt *S) {
+      return ShouldNotRecurse;
+    }
+
     ShouldRecurse_t checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
       return ShouldRecurse;
     }
@@ -2255,6 +2261,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkDefer(DeferStmt *S) {
+      return ShouldNotRecurse;
+    }
+
     ShouldRecurse_t checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
       return ShouldRecurse;
     }
@@ -2351,6 +2361,10 @@ private:
     }
 
     ShouldRecurse_t checkForEach(ForEachStmt *S) {
+      return ShouldNotRecurse;
+    }
+
+    ShouldRecurse_t checkDefer(DeferStmt *S) {
       return ShouldNotRecurse;
     }
 
@@ -4396,6 +4410,17 @@ private:
     }
 
     return ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkDefer(DeferStmt *S) {
+    // Pretend we're in an 'unsafe'.
+    ContextScope scope(*this, std::nullopt);
+    scope.enterUnsafe(S->getDeferLoc());
+
+    // Walk the call expression. We don't care about the rest.
+    S->getCallExpr()->walk(*this);
+
+    return ShouldNotRecurse;
   }
 
   void diagnoseRedundantTry(AnyTryExpr *E) const {
