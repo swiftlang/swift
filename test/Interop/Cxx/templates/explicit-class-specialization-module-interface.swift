@@ -5,5 +5,5 @@
 // CHECK: }
 
 // CHECK: struct HasEmptySpecializationAndStaticDateMember<CChar> {
-// CHECK:   static var value: Bool { get }
+// CHECK:   static let value: Bool
 // CHECK: }
