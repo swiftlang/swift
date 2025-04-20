@@ -117,6 +117,7 @@ extension _NativeSet { // Primitive fields
 extension _NativeSet { // Low-level unchecked operations
   @inlinable
   @inline(__always)
+  @unsafe
   internal func uncheckedElement(at bucket: Bucket) -> Element {
     defer { _fixLifetime(self) }
     unsafe _internalInvariant(hashTable.isOccupied(bucket))
@@ -125,6 +126,7 @@ extension _NativeSet { // Low-level unchecked operations
 
   @inlinable
   @inline(__always)
+  @unsafe
   internal func uncheckedInitialize(
     at bucket: Bucket,
     to element: __owned Element
@@ -135,6 +137,7 @@ extension _NativeSet { // Low-level unchecked operations
 
   @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
   @inline(__always)
+  @unsafe
   internal func uncheckedAssign(
     at bucket: Bucket,
     to element: __owned Element
@@ -155,7 +158,7 @@ extension _NativeSet { // Low-level lookup operations
   @inlinable
   @inline(__always)
   internal func find(_ element: Element) -> (bucket: Bucket, found: Bool) {
-    return unsafe find(element, hashValue: self.hashValue(for: element))
+    return find(element, hashValue: self.hashValue(for: element))
   }
 
   /// Search for a given element, assuming it has the specified hash value.
@@ -172,11 +175,11 @@ extension _NativeSet { // Low-level lookup operations
     var bucket = unsafe hashTable.idealBucket(forHashValue: hashValue)
     while unsafe hashTable._isOccupied(bucket) {
       if unsafe uncheckedElement(at: bucket) == element {
-        return unsafe (bucket, true)
+        return (bucket, true)
       }
       unsafe bucket = unsafe hashTable.bucket(wrappedAfter: bucket)
     }
-    return unsafe (bucket, false)
+    return (bucket, false)
   }
 }
 
@@ -191,7 +194,7 @@ extension _NativeSet { // ensureUnique
     if count > 0 {
       for unsafe bucket in unsafe hashTable {
         let element = unsafe (self._elements + bucket.offset).move()
-        result._unsafeInsertNew(element)
+        unsafe result._unsafeInsertNew(element)
       }
       // Clear out old storage, ensuring that its deinit won't overrelease the
       // elements we've just moved out.
@@ -283,7 +286,7 @@ extension _NativeSet {
         let element = _forceBridgeFromObjectiveC(cocoa.element, Element.self)
         let (bucket, found) = find(element)
         if found {
-          return unsafe bucket
+          return bucket
         }
       }
       _preconditionFailure(
@@ -348,7 +351,7 @@ extension _NativeSet: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func element(at index: Index) -> Element {
-    let bucket = unsafe validatedBucket(for: index)
+    let bucket = validatedBucket(for: index)
     return unsafe uncheckedElement(at: bucket)
   }
 }
@@ -375,6 +378,7 @@ extension _NativeSet { // Insertions
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `element` must not be already present in the Set.
   @inlinable
+  @unsafe
   internal func _unsafeInsertNew(_ element: __owned Element) {
     _internalInvariant(count + 1 <= capacity)
     let hashValue = self.hashValue(for: element)
@@ -383,7 +387,7 @@ extension _NativeSet { // Insertions
       // elements -- these imply that the Element type violates Hashable
       // requirements. This is generally more costly than a direct insertion,
       // because we'll need to compare elements in case of hash collisions.
-      let (bucket, found) = unsafe find(element, hashValue: hashValue)
+      let (bucket, found) = find(element, hashValue: hashValue)
       guard !found else {
         #if !$Embedded
         ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
@@ -406,10 +410,11 @@ extension _NativeSet { // Insertions
   @inlinable
   internal mutating func insertNew(_ element: __owned Element, isUnique: Bool) {
     _ = ensureUnique(isUnique: isUnique, capacity: count + 1)
-    _unsafeInsertNew(element)
+    unsafe _unsafeInsertNew(element)
   }
 
   @inlinable
+  @unsafe
   internal func _unsafeInsertNew(_ element: __owned Element, at bucket: Bucket) {
     unsafe hashTable.insert(bucket)
     unsafe uncheckedInitialize(at: bucket, to: element)
@@ -423,7 +428,7 @@ extension _NativeSet { // Insertions
     isUnique: Bool
   ) {
     unsafe _internalInvariant(!hashTable.isOccupied(bucket))
-    var bucket = unsafe bucket
+    var bucket = bucket
     let rehashed = ensureUnique(isUnique: isUnique, capacity: count + 1)
     if rehashed {
       let (b, f) = find(element)
@@ -434,7 +439,7 @@ extension _NativeSet { // Insertions
         fatalError("duplicate elements in a Set")
         #endif
       }
-      unsafe bucket = unsafe b
+      bucket = b
     }
     unsafe _unsafeInsertNew(element, at: bucket)
   }
@@ -457,7 +462,7 @@ extension _NativeSet { // Insertions
         fatalError("duplicate elements in a Set")
         #endif
       }
-      unsafe bucket = unsafe b
+      bucket = b
     }
     if found {
       let old = unsafe (_elements + bucket.offset).move()
@@ -540,6 +545,7 @@ extension _NativeSet { // Deletion
 
   @inlinable
   @inline(__always)
+  @unsafe
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
     isUnique: Bool) -> Element {
@@ -547,7 +553,7 @@ extension _NativeSet { // Deletion
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _internalInvariant(!rehashed)
     let old = unsafe (_elements + bucket.offset).move()
-    unsafe _delete(at: bucket)
+    _delete(at: bucket)
     return old
   }
 
@@ -710,11 +716,11 @@ extension _NativeSet {
     while let next = it.next() {
       let (b, found) = find(next)
       if found {
-        unsafe bucket = unsafe b
+        bucket = b
         break
       }
     }
-    guard let bucket = unsafe bucket else { return self }
+    guard let bucket = bucket else { return self }
 
     // Rather than directly creating a new set, calculate the difference in a
     // bitset first. This ensures we hash each element (in both sets) only once,

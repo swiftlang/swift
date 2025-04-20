@@ -136,11 +136,11 @@ extension _NativeDictionary {
     // Each iteration of the loop below processes an unprocessed element, and/or
     // reduces the size of the unprocessed region, while ensuring the above
     // invariants.
-    var bucket = unsafe _HashTable.Bucket(offset: initializedCount - 1)
-    while unsafe bucket.offset >= 0 {
+    var bucket = _HashTable.Bucket(offset: initializedCount - 1)
+    while bucket.offset >= 0 {
       if unsafe hashTable._isOccupied(bucket) {
         // We've moved an element here in a previous iteration.
-        unsafe bucket.offset -= 1
+        bucket.offset -= 1
         continue
       }
       // Find the target bucket for this entry and mark it as in use.
@@ -148,35 +148,35 @@ extension _NativeDictionary {
       if _isDebugAssertConfiguration() || allowingDuplicates {
         let (b, found) = unsafe find(_keys[bucket.offset])
         if found {
-          unsafe _internalInvariant(b != bucket)
+          _internalInvariant(b != bucket)
           _precondition(allowingDuplicates, "Duplicate keys found")
           // Discard duplicate entry.
           unsafe uncheckedDestroy(at: bucket)
           unsafe _storage._count -= 1
-          unsafe bucket.offset -= 1
+          bucket.offset -= 1
           continue
         }
         unsafe hashTable.insert(b)
-        unsafe target = unsafe b
+        target = b
       } else {
         let hashValue = unsafe self.hashValue(for: _keys[bucket.offset])
         unsafe target = unsafe hashTable.insertNew(hashValue: hashValue)
       }
 
-      if unsafe target > bucket {
+      if target > bucket {
         // The target is outside the unprocessed region.  We can simply move the
         // entry, leaving behind an uninitialized bucket.
-        unsafe moveEntry(from: bucket, to: target)
+        moveEntry(from: bucket, to: target)
         // Restore invariants by lowering the region boundary.
-        unsafe bucket.offset -= 1
-      } else if unsafe target == bucket {
+        bucket.offset -= 1
+      } else if target == bucket {
         // Already in place.
-        unsafe bucket.offset -= 1
+        bucket.offset -= 1
       } else {
         // The target bucket is also in the unprocessed region. Swap the current
         // item into place, then try again with the swapped-in value, so that we
         // don't lose it.
-        unsafe swapEntry(target, with: bucket)
+        swapEntry(target, with: bucket)
       }
     }
     // When there are no more unprocessed entries, we're left with a valid

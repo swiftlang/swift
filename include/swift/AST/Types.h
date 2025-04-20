@@ -318,6 +318,11 @@ public:
     Bits &= ~HasDependentMember;
   }
 
+  /// Remove the IsUnsafe property from this set.
+  void removeIsUnsafe() {
+    Bits &= ~IsUnsafe;
+  }
+  
   /// Test for a particular property in this set.
   bool operator&(Property prop) const {
     return Bits & prop;
