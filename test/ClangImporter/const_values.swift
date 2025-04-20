@@ -128,10 +128,10 @@ func foo() {
 // CHECK-NEXT:   return %1
 // CHECK-NEXT: }
 
-// CHECK:      sil shared [transparent] @$sSo17static_const_long{{.*}} : $@convention(thin) () -> {{.*}} {
+// CHECK:      sil shared [transparent] @$sSo17static_const_longSivg : $@convention(thin) () -> Int {
 // CHECK-NEXT: bb0:
-// CHECK-NEXT:   %0 = integer_literal {{.*}}, 42
-// CHECK-NEXT:   %1 = struct {{.*}} (%0)
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 42
+// CHECK-NEXT:   %1 = struct $Int (%0)
 // CHECK-NEXT:   return %1
 // CHECK-NEXT: }
 
