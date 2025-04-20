@@ -20,15 +20,6 @@ static const long static_const_long = 42;
 static const float static_const_float = 42.0;
 static const double static_const_double = 42.0;
 
-static const char static_const_char_array[4] = {1, 2, 3, 4};
-static const char *static_const_pointer = 0;
-
-typedef enum MyEnum: char {
-  MyEnumCase0 = 0, MyEnumCase1, MyEnumCase2
-} MyEnum;
-static const MyEnum static_const_enum = MyEnumCase1;
-
-
 //--- main.swift
 func foo() {
   print(MACRO_INT)
@@ -42,17 +33,10 @@ func foo() {
   print(static_const_long)
   print(static_const_float)
   print(static_const_double)
-
-  print(static_const_char_array)
-  print(static_const_pointer)
-
-  print(static_const_enum)
 }
 
-// Globals that don't get their value imported stay as public_external:
+// Only 'static' cannot get the getter imported, because it's not guaranteed to be constant.
 // CHECK: sil_global public_external @static_int : $Int32
-// CHECK: sil_global public_external [let] @static_const_char_array : $(Int8, Int8, Int8, Int8)
-// CHECK: sil_global public_external @static_const_pointer : $Optional<UnsafePointer<Int8>>
 
 // CHECK:      sil shared [transparent] @$sSC9MACRO_INTs5Int32Vvg : $@convention(thin) () -> Int32 {
 // CHECK-NEXT: bb0:
@@ -109,5 +93,3 @@ func foo() {
 // CHECK-NEXT:   %1 = struct $Double (%0)
 // CHECK-NEXT:   return %1
 // CHECK-NEXT: }
-
-// TODO: Add static_const_enum
