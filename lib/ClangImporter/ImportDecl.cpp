@@ -4590,37 +4590,12 @@ namespace {
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
                         ? VarDecl::Introducer::Let
                         : VarDecl::Introducer::Var;
-
-      ValueDecl *result = nullptr;
-
-      // If the variable is const (we're importing it as a let), and has an
-      // initializer, then ask Clang for its constant value and synthesize a
-      // getter with that value.
-      if (introducer == VarDecl::Introducer::Let && decl->hasInit()) {
-        auto val = decl->evaluateValue();
-        // For now, only import integer and float constants. If in the future
-        // SwiftDeclSynthesizer::createConstant becomes able to import more
-        // types, we can lift this restriction.
-        if (val && (val->isFloat() || val->isInt())) {
-          auto type = Impl.importTypeIgnoreIUO(
-              decl->getType(), ImportTypeKind::Value,
-              ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-              isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
-          result = synthesizer.createConstant(
-              name, dc, type, *val, ConstantConvertKind::None, isStatic, decl,
-              importer::convertClangAccess(decl->getAccess()));
-        }
-      }
-
-      // Otherwise, import as an external declaration
-      if (!result) {
-        result = Impl.createDeclWithClangNode<VarDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()),
-            /*IsStatic*/ isStatic, introducer,
-            Impl.importSourceLoc(decl->getLocation()), name, dc);
-        result->setIsObjC(false);
-        result->setIsDynamic(false);
-      }
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, importer::convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ isStatic, introducer,
+          Impl.importSourceLoc(decl->getLocation()), name, dc);
+      result->setIsObjC(false);
+      result->setIsDynamic(false);
 
       // If imported as member, the member should be final.
       if (dc->getSelfClassDecl())
