@@ -29,7 +29,7 @@
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
