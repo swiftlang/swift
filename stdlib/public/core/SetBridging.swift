@@ -103,12 +103,12 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @objc
   internal func nextObject() -> AnyObject? {
-    if unsafe nextBucket == endBucket {
+    if nextBucket == endBucket {
       return nil
     }
-    let bucket = unsafe nextBucket
+    let bucket = nextBucket
     unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
-    return unsafe self.bridgedElement(at: bucket)
+    return self.bridgedElement(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -124,7 +124,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
       unsafe theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
-    if unsafe nextBucket == endBucket {
+    if nextBucket == endBucket {
       unsafe state.pointee = theState
       return 0
     }
@@ -276,7 +276,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
     var stored = 0
     for i in 0..<count {
-      if unsafe bucket == endBucket { break }
+      if bucket == endBucket { break }
       unsafe unmanagedObjects[i] = unsafe bridgedElements[bucket]
       stored += 1
       unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
