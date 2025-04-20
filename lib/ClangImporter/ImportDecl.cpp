@@ -4583,7 +4583,7 @@ namespace {
       if (dc->isTypeContext())
         isStatic = true;
 
-      // For now we don't import static constexpr. TODO: Lift this restriction.
+      // For now we don't import static constexpr
       if (isStatic && decl->isConstexpr())
         return nullptr;
 
@@ -4606,13 +4606,8 @@ namespace {
               decl->getType(), ImportTypeKind::Value,
               ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
               isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
-
-          auto convertKind = ConstantConvertKind::None;
-          if (decl->getType()->isEnumeralType())
-            convertKind = ConstantConvertKind::Construction;
-
           result = synthesizer.createConstant(
-              name, dc, type, *val, convertKind, isStatic, decl,
+              name, dc, type, *val, ConstantConvertKind::None, isStatic, decl,
               importer::convertClangAccess(decl->getAccess()));
         }
       }
