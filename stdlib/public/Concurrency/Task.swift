@@ -261,7 +261,7 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.1, *)
 extension Task: Hashable {
   public func hash(into hasher: inout Hasher) {
-    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 

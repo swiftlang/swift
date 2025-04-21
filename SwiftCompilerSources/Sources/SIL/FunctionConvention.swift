@@ -26,10 +26,14 @@ public struct FunctionConvention : CustomStringConvertible {
   let functionType: CanonicalType
   let hasLoweredAddresses: Bool
 
-  init(for functionType: CanonicalType, in function: Function) {
+  public init(for functionType: CanonicalType, in function: Function) {
+    self.init(for: functionType, hasLoweredAddresses: function.hasLoweredAddresses)
+  }
+
+  public init(for functionType: CanonicalType, hasLoweredAddresses: Bool) {
     assert(!functionType.hasTypeParameter, "requires contextual type")
     self.functionType = functionType
-    self.hasLoweredAddresses = function.hasLoweredAddresses
+    self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   /// All results including the error.
@@ -209,7 +213,7 @@ public struct ParameterInfo : CustomStringConvertible {
 }
 
 extension FunctionConvention {
-  public struct Parameters : Collection {
+  public struct Parameters : RandomAccessCollection {
     let bridged: BridgedParameterInfoArray
     let hasLoweredAddresses: Bool
 

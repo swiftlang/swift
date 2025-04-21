@@ -93,10 +93,6 @@ An array of names of projects to run tests for.
 .PARAMETER Stage
 The path to a directory where built msi's and the installer executable should be staged (for CI).
 
-.PARAMETER BuildTo
-The name of a build step after which the script should terminate.
-For example: -BuildTo ToolsSupportCore
-
 .PARAMETER ToBatch
 When set, runs the script in a special mode which outputs a listing of command invocations
 in batch file format instead of executing them.
@@ -150,15 +146,6 @@ param
   [switch] $IncludeDS2 = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
-  [ValidateSet("ArgumentParser", "ASN1", "BuildTools", "Certificates", "CMark",
-    "Collections", "Compilers", "Crypto", "CURL", "Dispatch", "DocC", "Driver",
-    "DS2", "ExperimentalRuntime", "Format", "Foundation", "FoundationMacros",
-    "IndexStoreDB", "Inspect", "Installer", "LLBuild", "LLVM", "LMDB",
-    "Markdown", "mimalloc", "PackageManager", "PlatformInfoPlist", "RegsGen2",
-    "Runtime", "Sanitizers", "SDKSettingsPlist", "SourceKitLSP", "SQLite",
-    "System", "Testing", "TestingMacros", "ToolsSupportCore", "XCTest", "XML2",
-    "ZLib")]
-  [string] $BuildTo = "",
   [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
   [ValidateSet("Asserts", "NoAsserts")]
@@ -396,6 +383,31 @@ $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.e
 $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -property installationPath
 $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
 
+function Get-CMake {
+  try {
+    return (Get-Command "cmake.exe" -ErrorAction Stop).Source
+  } catch {
+    if (Test-Path -Path "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin" -PathType Container) {
+      return "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+    }
+  }
+  throw "CMake not found on Path nor in the Visual Studio Installation. Please Install CMake to continue."
+}
+
+function Get-Ninja {
+  try {
+    return (Get-Command "Ninja.exe" -ErrorAction Stop).Source
+  } catch {
+      if (Test-Path -Path "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja" -PathType Container) {
+        return "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+      }
+  }
+  throw "Ninja not found on Path nor in the Visual Studio Installation. Please Install Ninja to continue."
+}
+
+$cmake = Get-CMake
+$ninja = Get-Ninja
+
 $NugetRoot = "$BinaryCache\nuget"
 $LibraryRoot = "$ImageRoot\Library"
 
@@ -593,9 +605,6 @@ function Invoke-BuildStep {
 
   if ($Summary) {
     Add-TimingData $Platform $Name $Stopwatch.Elapsed
-  }
-  if ($Name.Replace("Build-", "") -eq $BuildTo) {
-    exit 0
   }
 }
 
@@ -1222,14 +1231,6 @@ function Build-CMakeProject {
     }
 
     if ($Platform.OS -eq [OS]::Android) {
-      $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-      $VSInstallPath = & $vswhere -nologo -latest -products * -property installationPath
-      if (Test-Path "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
-        $env:Path = "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;${env:Path}"
-        Add-KeyValueIfNew $Defines CMAKE_MAKE_PROGRAM "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
-      } else {
-        throw "Missing CMake and Ninja in the visual studio installation that are needed to build Android"
-      }
       $androidNDKPath = Get-AndroidNDKPath
       Add-KeyValueIfNew $Defines CMAKE_C_COMPILER (Join-Path -Path $androidNDKPath -ChildPath "toolchains\llvm\prebuilt\windows-x86_64\bin\clang.exe")
       Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER (Join-Path -Path $androidNDKPath -ChildPath "toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe")
@@ -1428,6 +1429,8 @@ function Build-CMakeProject {
       Add-KeyValueIfNew $Defines CMAKE_INSTALL_PREFIX $InstallTo
     }
 
+    Add-KeyValueIfNew $Defines CMAKE_MAKE_PROGRAM "$ninja"
+
     # Generate the project
     $cmakeGenerateArgs = @("-B", $Bin, "-S", $Src, "-G", $Generator)
     if ($CacheScript) {
@@ -1467,26 +1470,25 @@ function Build-CMakeProject {
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
-
     if ($ToBatch) {
       Write-Output ""
-      Write-Output "echo cmake.exe $cmakeGenerateArgs"
+      Write-Output "echo $cmake $cmakeGenerateArgs"
     } else {
-      Write-Host "cmake.exe $cmakeGenerateArgs"
+      Write-Host "$cmake $cmakeGenerateArgs"
     }
-    Invoke-Program cmake.exe @cmakeGenerateArgs
+    Invoke-Program $cmake @cmakeGenerateArgs
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
       if ($Target -eq "default") {
-        Invoke-Program cmake.exe --build $Bin
+        Invoke-Program $cmake --build $Bin
       } else {
-        Invoke-Program cmake.exe --build $Bin --target $Target
+        Invoke-Program $cmake --build $Bin --target $Target
       }
     }
 
     if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-      Invoke-Program cmake.exe --build $Bin --target install
+      Invoke-Program $cmake --build $Bin --target install
     }
   }
 
@@ -2270,7 +2272,7 @@ function Build-ExperimentalRuntime {
     Invoke-VsDevShell $BuildPlatform
 
     Push-Location "${SourceCache}\swift\Runtimes"
-    Start-Process -Wait -WindowStyle Hidden -FilePath cmake.exe -ArgumentList @("-P", "Resync.cmake")
+    Start-Process -Wait -WindowStyle Hidden -FilePath $cmake -ArgumentList @("-P", "Resync.cmake")
     Pop-Location
   }
 
@@ -2681,7 +2683,7 @@ function Test-LLBuild {
   # Build additional llvm executables needed by tests
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $BuildPlatform
-    Invoke-Program ninja.exe -C (Get-ProjectBinaryCache $BuildPlatform BuildTools) FileCheck not
+    Invoke-Program $ninja -C (Get-ProjectBinaryCache $BuildPlatform BuildTools) FileCheck not
   }
 
   Invoke-IsolatingEnvVars {

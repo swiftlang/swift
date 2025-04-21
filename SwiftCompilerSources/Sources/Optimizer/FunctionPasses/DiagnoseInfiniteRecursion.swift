@@ -289,7 +289,7 @@ private struct Analysis {
     worklist.pushIfNotVisited(function.entryBlock)
     while let block = worklist.pop() {
       if case .recursive(let apply) = block.getKind(for: invariants, context) {
-        context.diagnosticEngine.diagnose(apply.location.sourceLoc, .warn_infinite_recursive_call)
+        context.diagnosticEngine.diagnose(.warn_infinite_recursive_call, at: apply.location)
       } else {
         for succ in block.successors where isInInfiniteRecursionLoop(succ) {
           worklist.pushIfNotVisited(succ)

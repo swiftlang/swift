@@ -111,7 +111,9 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
-// KEYWORD2-NEXT              Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder

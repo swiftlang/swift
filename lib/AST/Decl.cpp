@@ -1,4 +1,3 @@
-
 //===--- Decl.cpp - Swift Language Decl ASTs ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -15,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Strings.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -24,6 +22,7 @@
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -64,6 +63,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
+#include "swift/Strings.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1216,12 +1216,14 @@ ExplicitSafety Decl::getExplicitSafety() const {
                              ExplicitSafety::Unspecified);
   }
   
-  // Inference: Check the enclosing context.
-  if (auto enclosingDC = getDeclContext()) {
-    // Is this an extension with @safe or @unsafe on it?
-    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
-      if (auto extSafety = getExplicitSafetyFromAttrs(ext))
-        return *extSafety;
+  // Inference: Check the enclosing context, unless this is a type.
+  if (!isa<TypeDecl>(this)) {
+    if (auto enclosingDC = getDeclContext()) {
+      // Is this an extension with @safe or @unsafe on it?
+      if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+        if (auto extSafety = getExplicitSafetyFromAttrs(ext))
+          return *extSafety;
+      }
     }
   }
 
@@ -3026,9 +3028,11 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad impl kind");
 }
 
-static AccessStrategy
-getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch,
-                            bool useOldABI);
+static AccessStrategy getOpaqueReadAccessStrategy(
+    const AbstractStorageDecl *storage, bool dispatch, ModuleDecl *module,
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI);
 static AccessStrategy
 getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
 
@@ -3043,7 +3047,9 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     // If the storage isDynamic (and not @objc) use the accessors.
     if (storage->shouldUseNativeDynamicDispatch())
       return AccessStrategy::getMaterializeToTemporary(
-          getOpaqueReadAccessStrategy(storage, false, false),
+          getOpaqueReadAccessStrategy(storage, false, nullptr,
+                                      ResilienceExpansion::Minimal,
+                                      std::nullopt, false),
           getOpaqueWriteAccessStrategy(storage, false));
     return AccessStrategy::getStorage();
   }
@@ -3080,15 +3086,61 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad impl kind");
 }
 
-static AccessStrategy
-getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch,
-                            bool useOldABI) {
+static bool mayReferenceUseCoroutineAccessorOnStorage(
+    ModuleDecl *module, ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> reference,
+    const AbstractStorageDecl *storage) {
+  assert(storage);
+  ASTContext &ctx = storage->getASTContext();
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+
+  // For triples without platforms, coroutine accessors are always available.
+  auto domain = ctx.getTargetAvailabilityDomain();
+  if (domain.isUniversal())
+    return true;
+
+  // A non-resilient access to storage can always use the coroutine accessor,
+  // provided it exists.  Such an access is compiled with the version of the
+  // module that includes the accessor.
+  bool resilient = [&] {
+    if (module)
+      return storage->isResilient(module, expansion);
+    else
+      return storage->isResilient();
+  }();
+  if (!resilient)
+    return true;
+
+  // Without knowing where the storage is referenced, it can't be known that
+  // a coroutine accessor is available.
+  if (!reference) {
+    return false;
+  }
+
+  // A resilient access to storage may only use a coroutine accessor if the
+  // storage became available no earlier than the feature.
+  auto referenceAvailability = AvailabilityContext::forLocation(
+                                   reference->first.Start, reference->second)
+                                   .getPlatformRange();
+  auto featureAvailability =
+      storage->getASTContext().getCoroutineAccessorsAvailability();
+
+  return referenceAvailability.isContainedIn(featureAvailability);
+}
+
+static AccessStrategy getOpaqueReadAccessStrategy(
+    const AbstractStorageDecl *storage, bool dispatch, ModuleDecl *module,
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) {
   if (useOldABI) {
     assert(storage->requiresOpaqueRead2Coroutine());
     assert(storage->requiresOpaqueReadCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   }
-  if (storage->requiresOpaqueRead2Coroutine())
+  if (storage->requiresOpaqueRead2Coroutine() &&
+      mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
+                                                storage))
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
@@ -3102,41 +3154,53 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
-static AccessStrategy
-getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
-                                 bool dispatch, bool useOldABI) {
+static AccessStrategy getOpaqueReadWriteAccessStrategy(
+    const AbstractStorageDecl *storage, bool dispatch, ModuleDecl *module,
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) {
   if (useOldABI) {
     assert(storage->requiresOpaqueModify2Coroutine());
     assert(storage->requiresOpaqueModifyCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   }
-  if (storage->requiresOpaqueModify2Coroutine())
+  if (storage->requiresOpaqueModify2Coroutine() &&
+      mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
+                                                storage))
     return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
-      getOpaqueReadAccessStrategy(storage, dispatch, false),
+      getOpaqueReadAccessStrategy(storage, dispatch, nullptr,
+                                  ResilienceExpansion::Minimal, location,
+                                  false),
       getOpaqueWriteAccessStrategy(storage, dispatch));
 }
 
-static AccessStrategy
-getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
-                        AccessKind accessKind, bool dispatch, bool useOldABI) {
+static AccessStrategy getOpaqueAccessStrategy(
+    const AbstractStorageDecl *storage, AccessKind accessKind, bool dispatch,
+    ModuleDecl *module, ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) {
   switch (accessKind) {
   case AccessKind::Read:
-    return getOpaqueReadAccessStrategy(storage, dispatch, useOldABI);
+    return getOpaqueReadAccessStrategy(storage, dispatch, module, expansion,
+                                       location, useOldABI);
   case AccessKind::Write:
     assert(!useOldABI);
     return getOpaqueWriteAccessStrategy(storage, dispatch);
   case AccessKind::ReadWrite:
-    return getOpaqueReadWriteAccessStrategy(storage, dispatch, useOldABI);
+    return getOpaqueReadWriteAccessStrategy(storage, dispatch, module,
+                                            expansion, location, useOldABI);
   }
   llvm_unreachable("bad access kind");
 }
 
 AccessStrategy AbstractStorageDecl::getAccessStrategy(
     AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
-    ResilienceExpansion expansion, bool useOldABI) const {
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     assert(hasStorage() || getASTContext().Diags.hadAnyError());
@@ -3153,11 +3217,11 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
       // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true,
-                                       useOldABI);
+                                       module, expansion, location, useOldABI);
 
       if (shouldUseNativeDynamicDispatch())
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false,
-                                       useOldABI);
+                                       module, expansion, location, useOldABI);
 
       // If the storage is resilient from the given module and resilience
       // expansion, we cannot use direct access.
@@ -3180,7 +3244,7 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
 
       if (resilient)
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false,
-                                       useOldABI);
+                                       module, expansion, location, useOldABI);
     }
 
     LLVM_FALLTHROUGH;
@@ -3198,6 +3262,15 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
 
   }
   llvm_unreachable("bad access semantics");
+}
+
+bool AbstractStorageDecl::isAccessedViaPhysicalStorage(
+    AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+    ResilienceExpansion expansion) const {
+  return getAccessStrategy(semantics, accessKind, module, expansion,
+                           /*location=*/std::nullopt,
+                           /*useOldABI=*/false)
+             .getKind() == AccessStrategy::Kind::Storage;
 }
 
 bool AbstractStorageDecl::requiresOpaqueAccessors() const {
@@ -10447,6 +10520,15 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
 
 bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
+}
+
+std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  auto attr = getAttrs().getAttribute<CDeclAttr>();
+  if (!attr)
+    return std::nullopt;
+
+  return attr->Underscored ? ForeignLanguage::ObjectiveC
+                           : ForeignLanguage::C;
 }
 
 bool AbstractFunctionDecl::needsNewVTableEntry() const {

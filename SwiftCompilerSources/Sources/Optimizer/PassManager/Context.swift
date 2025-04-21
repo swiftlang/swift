@@ -50,6 +50,8 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
   /// only consumer that has this disabled today (as it disables WMO

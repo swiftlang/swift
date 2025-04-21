@@ -876,3 +876,22 @@ bb2(%10 : @owned $any Error):
   dealloc_stack %2 : $*T
   throw %10 : $any Error
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on optional_test: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %5 = ref_element_addr %4 : $MyActor, #MyActor.ns
+// CHECK-NEXT: Isolation: 'argument'-isolated
+// CHECK-NEXT: end running test 1 of 1 on optional_test: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @optional_test : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> () {
+bb0(%0 : @guaranteed $Optional<MyActor>):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $Optional<MyActor>, let, name "argument"
+  %1a = copy_value %0 : $Optional<MyActor>
+  %1b = begin_borrow %1a
+  %1c = unchecked_enum_data %1b : $Optional<MyActor>, #Optional.some!enumelt
+  %1d = ref_element_addr %1c : $MyActor, #MyActor.ns
+  debug_value [trace] %1d
+  end_borrow %1b
+  destroy_value %1a
+  %9999 = tuple ()
+  return %9999 : $()
+}

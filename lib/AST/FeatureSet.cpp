@@ -294,6 +294,23 @@ static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
   }
 }
 
+static bool usesFeatureLifetimeDependenceMutableAccessors(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
+    return false;
+  }
+  auto var = cast<VarDecl>(decl);
+  if (!var->isGetterMutating()) {
+    return false;
+  }
+  if (auto dc = var->getDeclContext()) {
+    if (auto nominal = dc->getSelfNominalTypeDecl()) {
+      auto sig = nominal->getGenericSignature();
+      return !var->getInterfaceType()->isEscapable(sig);
+    }
+  }
+  return false;
+}
+
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -391,6 +408,11 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
+}
+
+static bool usesFeatureCDecl(Decl *decl) {
+  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
+  return attr && !attr->Underscored;
 }
 
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
@@ -687,8 +709,12 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
   while (!features.empty()) {
+    // If we were in an @abi attribute, collect from the API counterpart.
+    auto abiRole = ABIRoleInfo(enclosingDecl);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      enclosingDecl = abiRole.getCounterpart();
     // Find the next outermost enclosing declaration.
-    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+    else if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
     else
       enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();

@@ -9,7 +9,7 @@
 // CHECK:     public init()
 // CHECK:     private init()
 // CHECK:     public func privateRecMethod()
-// CHECK:     public static let PRIVATE_REC_CONST: Bool
+// CHECK:     public static var PRIVATE_REC_CONST: Bool { get }
 // CHECK:   }
 
 // CHECK:   private struct PrivateEnum : Hashable, Equatable, RawRepresentable {
@@ -26,7 +26,7 @@
 // CHECK:     case privateEnumClassMember
 // CHECK:   }
 
-// CHECK:   private static let PRIVATE_CONST: Bool
+// CHECK:   private static var PRIVATE_CONST: Bool { get }
 
 // CHECK:   private static var privateAliasVal: Leaky.PrivateAlias
 // CHECK:   private static var privateRecVal: Leaky.PrivateRec

@@ -3074,10 +3074,12 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       if (DK == DeclAttrKind::SILGenName)
         Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), Raw, AtLoc,
                                                 AttrRange, /*Implicit=*/false));
-      else if (DK == DeclAttrKind::CDecl)
+      else if (DK == DeclAttrKind::CDecl) {
+        bool underscored = AttrName.starts_with("_");
         Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,
-                                               AttrRange, /*Implicit=*/false));
-      else if (DK == DeclAttrKind::Expose) {
+                                               AttrRange, /*Implicit=*/false,
+                                               /*isUnderscored*/underscored));
+      } else if (DK == DeclAttrKind::Expose) {
         for (auto *EA : Attributes.getAttributes<ExposeAttr>()) {
           // A single declaration cannot have two @_exported attributes with
           // the same exposure kind.
@@ -3357,9 +3359,18 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     if (abiDecl) {
-      Attributes.add(new (Context) ABIAttr(abiDecl,
-                                           AtLoc, { Loc, rParenLoc },
-                                           /*implicit=*/false));
+      auto attr = new (Context) ABIAttr(abiDecl, AtLoc, { Loc, rParenLoc },
+                                        /*implicit=*/false);
+
+      // Diagnose syntactically invalid abiDecl kind here to match behavior of
+      // Swift parser.
+      if (!attr->canAppearOnDecl(abiDecl) && !isa<PatternBindingDecl>(abiDecl)){
+        diagnose(abiDecl->getLoc(), diag::attr_abi_incompatible_kind,
+                 abiDecl->getDescriptiveKind());
+        attr->setInvalid();
+      }
+
+      Attributes.add(attr);
     }
 
     break;

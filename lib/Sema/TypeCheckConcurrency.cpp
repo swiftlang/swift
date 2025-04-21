@@ -2675,7 +2675,7 @@ namespace {
                     fromType, toType);
 
                 if (downgradeToWarning)
-                  diag.warnUntilSwiftVersion(7);
+                  diag.warnUntilFutureSwiftVersion();
               }
 
               for (auto type : nonSendableTypes) {
@@ -2930,8 +2930,10 @@ namespace {
       auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
 
       bool preconcurrency = false;
-      if (explicitClosure) {
-        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+      if (closure) {
+        preconcurrency =
+            getActorIsolationOfContext(closure, getClosureActorIsolation)
+                .preconcurrency();
       }
 
       for (const auto &capture : localFunc.getCaptureInfo().getCaptures()) {
@@ -4696,6 +4698,13 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
       }
     }
 
+    // `nonisolated(nonsending)` inferred from the context makes
+    // the closure caller isolated.
+    if (auto *closureTy = getType(closure)->getAs<FunctionType>()) {
+      if (closureTy->getIsolation().isNonIsolatedCaller())
+        return ActorIsolation::forCallerIsolationInheriting();
+    }
+
     // If a closure has an isolated parameter, it is isolated to that
     // parameter.
     for (auto param : *closure->getParameters()) {
@@ -5831,11 +5840,39 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     // Use the overridden decl's isolation as the default isolation for this
     // decl.
     auto isolation = getOverriddenIsolationFor(value);
+
+    // If this is an override of an async completion handler, mark
+    // it `@concurrent` instead of inferring `nonisolated(nonsending)`
+    // to preserve pre-SE-0461 behavior.
+    if (isolation.isCallerIsolationInheriting() &&
+        overriddenValue->hasClangNode()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(overriddenValue)) {
+        if (AFD->getForeignAsyncConvention()) {
+          return {{ActorIsolation::forNonisolated(/*unsafe=*/false),
+                   IsolationSource(overriddenValue, IsolationSource::Override)},
+                  overriddenValue,
+                  isolation};
+        }
+      }
+    }
+
     return {{isolation,
              IsolationSource(overriddenValue, IsolationSource::Override)},
             overriddenValue,
             isolation}; // use the overridden decl's iso as the default
                         // isolation for this decl.
+  }
+
+  // Asynchronous variants for functions imported from ObjC are
+  // `nonisolated(nonsending)` by default.
+  if (value->hasClangNode()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (!isa<ProtocolDecl>(AFD->getDeclContext()) &&
+          AFD->getForeignAsyncConvention()) {
+        return {
+            {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
+      }
+    }
   }
 
   // We did not find anything special, return unspecified.

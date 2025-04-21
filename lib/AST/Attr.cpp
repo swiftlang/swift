@@ -61,7 +61,7 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
                 DeclAttribute::APIBreakingToRemove | DeclAttribute::APIStableToRemove), \
                 #Name " needs to specify either APIBreakingToRemove or APIStableToRemove"); \
   static_assert(DeclAttribute::hasOneBehaviorFor##Id(DeclAttribute::InABIAttrMask), \
-                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, InferredInABIAttr, or UnreachableInABIAttr");
+                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, or UnreachableInABIAttr");
 #include "swift/AST/DeclAttr.def"
 
 #define TYPE_ATTR(_, Id)                                                       \
@@ -1783,7 +1783,9 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Alignment:
     return "_alignment";
   case DeclAttrKind::CDecl:
-    return "_cdecl";
+    if (cast<CDeclAttr>(this)->Underscored)
+      return "_cdecl";
+    return "cdecl";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:

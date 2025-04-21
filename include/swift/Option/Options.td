@@ -468,10 +468,6 @@ def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
 
-def remark_abi_inference : Flag<["-"], "Rabi-inference">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit a remark when an '@abi' attribute adds an attribute or modifier to the ABI declaration based on its presence in the API">;
-
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
@@ -1534,6 +1530,10 @@ def print_target_info : Flag<["-"], "print-target-info">,
     Flags<[FrontendOption]>,
     HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 
+def print_supported_features : Flag<["-"], "print-supported-features">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print information about features supported by the compiler">;
+
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 
@@ -1650,9 +1650,13 @@ def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def emit_supported_features : Flag<["-"], "emit-supported-features">,
-  HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
+def emit_supported_arguments : Flag<["-"], "emit-supported-arguments">,
+  HelpText<"Emit a JSON file including all supported compiler arguments">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_supported_features : Flag<["-"], "emit-supported-features">,
+  HelpText<"This is a compatibility alias for '-emit-supported-arguments'">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  Alias<emit_supported_arguments>;
 
 def enable_incremental_imports :
   Flag<["-"], "enable-incremental-imports">,

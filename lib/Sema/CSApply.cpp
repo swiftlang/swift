@@ -5612,6 +5612,18 @@ namespace {
       E->setMacroRef(macroRef);
       E->setType(expandedType);
 
+      auto fnType =
+          simplifyType(overload.adjustedOpenedType)->castTo<FunctionType>();
+
+      auto newArgs = coerceCallArguments(
+          E->getArgs(), fnType, macroRef, /*applyExpr=*/nullptr,
+          cs.getConstraintLocator(E, ConstraintLocator::ApplyArgument),
+          solution.getAppliedPropertyWrappers(E));
+      if (!newArgs)
+        return nullptr;
+
+      E->setArgs(newArgs);
+
       // FIXME: Expansion should be lazy.
       // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
       // 'getRewritten()', and performed on-demand. Unfortunately that requires
@@ -6073,13 +6085,15 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
                                         bool inheritActorContext,
                                         bool isPassedToSendingParameter,
-                                        bool requiresDynamicIsolationChecking) {
+                                        bool requiresDynamicIsolationChecking,
+                                        bool isMacroArg) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
     closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
     closure->setRequiresDynamicIsolationChecking(
         requiresDynamicIsolationChecking);
+    closure->setIsMacroArgument(isMacroArg);
     return;
   }
 
@@ -6087,14 +6101,16 @@ static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
     applyContextualClosureFlags(captureList->getClosureBody(),
                                 implicitSelfCapture, inheritActorContext,
                                 isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking);
+                                requiresDynamicIsolationChecking,
+                                isMacroArg);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
                                 inheritActorContext,
                                 isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking);
+                                requiresDynamicIsolationChecking,
+                                isMacroArg);
   }
 }
 
@@ -6219,7 +6235,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   }();
 
   auto applyFlagsToArgument = [&paramInfo,
-                               &closuresRequireDynamicIsolationChecking](
+                               &closuresRequireDynamicIsolationChecking,
+                               &locator](
                                   unsigned paramIdx, Expr *argument) {
     if (!isClosureLiteralExpr(argument))
       return;
@@ -6227,11 +6244,13 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
+    bool isMacroArg = isExpr<MacroExpansionExpr>(locator.getAnchor());
 
     applyContextualClosureFlags(argument, isImplicitSelfCapture,
                                 inheritsActorContext,
                                 isPassedToSendingParameter,
-                                closuresRequireDynamicIsolationChecking);
+                                closuresRequireDynamicIsolationChecking,
+                                isMacroArg);
   };
 
   // Quickly test if any further fix-ups for the argument types are necessary.
@@ -6514,18 +6533,31 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   return ArgumentList::createTypeChecked(ctx, args, newArgs);
 }
 
+/// Looks through any non-semantic expressions and a capture list
+/// to find out whether the given expression is an explicit closure.
+static ClosureExpr *isExplicitClosureExpr(Expr *expr) {
+  if (auto IE = dyn_cast<IdentityExpr>(expr))
+    return isExplicitClosureExpr(IE->getSubExpr());
+
+  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
+    return isExplicitClosureExpr(CLE->getClosureBody());
+
+  return dyn_cast<ClosureExpr>(expr);
+}
+
 /// Whether the given expression is a closure that should inherit
 /// the actor context from where it was formed.
 static bool closureInheritsActorContext(Expr *expr) {
-  if (auto IE = dyn_cast<IdentityExpr>(expr))
-    return closureInheritsActorContext(IE->getSubExpr());
-
-  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
-    return closureInheritsActorContext(CLE->getClosureBody());
-
-  if (auto CE = dyn_cast<ClosureExpr>(expr))
+  if (auto *CE = isExplicitClosureExpr(expr))
     return CE->inheritsActorContext();
+  return false;
+}
 
+/// Determine whether the given expression is a closure that
+/// is explicitly marked as `@concurrent`.
+static bool isClosureMarkedAsConcurrent(Expr *expr) {
+  if (auto *CE = isExplicitClosureExpr(expr))
+    return CE->getAttrs().hasAttribute<ConcurrentAttr>();
   return false;
 }
 
@@ -7764,6 +7796,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         auto newExpr =
             cs.cacheType(new (ctx) FunctionConversionExpr(expr, toFunc));
         return newExpr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the
+    // 'nonisolated(nonsending)' isolation if it's not explicitly
+    // marked as `@concurrent`.
+    if (toEI.getIsolation().isNonIsolatedCaller() &&
+        (fromEI.getIsolation().isNonIsolated() &&
+         !isClosureMarkedAsConcurrent(expr))) {
+      auto newFromFuncType = fromFunc->withIsolation(
+          FunctionTypeIsolation::forNonIsolatedCaller());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+        // Propagating 'nonisolated(nonsending)' might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
       }
     }
 

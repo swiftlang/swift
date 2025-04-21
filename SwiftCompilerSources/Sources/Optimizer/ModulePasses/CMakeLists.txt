@@ -8,6 +8,7 @@
 
 swift_compiler_sources(Optimizer
   DiagnoseUnknownConstValues.swift
+  EmbeddedSwiftDiagnostics.swift
   MandatoryPerformanceOptimizations.swift
   ReadOnlyGlobalVariables.swift
   StackProtection.swift

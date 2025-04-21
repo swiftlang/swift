@@ -1110,6 +1110,11 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
   // are already lazily initialized).
   if (VD->isStatic() || varDC->isModuleScopeContext())
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
+
+  // 'lazy' can't be used in or with `@abi` because it has auxiliary decls.
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesABI() || !abiRole.providesAPI())
+    diagnoseAndRemoveAttr(attr, diag::attr_abi_no_lazy);
 }
 
 bool AttributeChecker::visitAbstractAccessControlAttr(
@@ -1260,7 +1265,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilSwiftVersion(7);
+                .warnUntilFutureSwiftVersion();
           }
         }
       }
@@ -2368,16 +2373,23 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // Only top-level func decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level);
+    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level,
+             attr);
 
   // The name must not be empty.
   if (attr->Name.empty())
-    diagnose(attr->getLocation(), diag::cdecl_empty_name);
+    diagnose(attr->getLocation(), diag::cdecl_empty_name,
+             attr);
 
   // The standard library can use @_cdecl to implement runtime functions.
   if (!canDeclareSymbolName(attr->Name, D->getModuleContext())) {
       diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
                attr->Name);
+  }
+
+  if (!attr->Underscored &&
+      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_feature_required);
   }
 }
 
@@ -4399,6 +4411,12 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         }
       }
 
+      // Macros can't be attached to ABI-only decls. (If we diagnosed above,
+      // don't bother with this.)
+      if (attr->isValid() && !ABIRoleInfo(D).providesAPI()) {
+        diagnoseAndRemoveAttr(attr, diag::attr_abi_no_macros, macro);
+      }
+
       return;
     }
 
@@ -4480,16 +4498,25 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>()) {
     ValueDecl *decl;
+    ValueDecl *abiRelevantDecl;
     if (auto param = dyn_cast<ParamDecl>(D)) {
       decl = param;
+      abiRelevantDecl = dyn_cast<ValueDecl>(
+                            param->getDeclContext()->getAsDecl());
     } else if (auto func = dyn_cast<FuncDecl>(D)) {
       decl = func;
+      abiRelevantDecl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
+      abiRelevantDecl = storage;
 
       // Check whether this is a storage declaration that is not permitted
       // to have a result builder attached.
       auto shouldDiagnose = [&]() -> bool {
+        // We'll diagnose use in @abi later.
+        if (!ABIRoleInfo(abiRelevantDecl).providesAPI())
+          return false;
+
         // An uninitialized stored property in a struct can have a function
         // builder attached.
         if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -4530,6 +4557,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
                diag::result_builder_attribute_not_allowed_here,
                nominal->getName());
       attr->setInvalid();
+      return;
+    }
+
+    // Result builders shouldn't be applied to an ABI-only decl because they
+    // have no ABI effect.
+    if (!ABIRoleInfo(abiRelevantDecl).providesAPI()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_abi_forbidden_attr,
+                            nominal->getNameStr(), /*isModifier=*/false);
       return;
     }
 

@@ -1997,3 +1997,60 @@ func localCaptureDataRace3() async {
 
   print(x)
 }
+
+nonisolated func localCaptureDataRace4() {
+  var x = 0
+  _ = x
+
+  Task.detached { @MainActor in x = 1 } // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
+}
+
+// We shouldn't error here since every time around, we are using the same
+// isolation.
+func testIsolatedParamInference() {
+  class S : @unchecked Sendable {}
+
+  final class B {
+    var s = S()
+    var b: Bool = false
+
+    func foo(isolation: isolated Actor = #isolation) async {
+      while !b {
+        await withTaskGroup(of: Int.self) { group in
+          _ = isolation
+          self.s = S()
+        }
+      }
+    }
+  }
+}
+
+// We shouldn't error here since test2 is isolated to B since we are capturing
+// self and funcParam is also exposed to B's isolated since it is a parameter to
+// one of B's methods.
+func sendIsolatedValueToItsOwnIsolationDomain() {
+  class A {
+    func useValue() {}
+  }
+
+  func helper(_ x: @escaping () -> A) {}
+
+  actor B {
+    let field = A()
+
+    private func test(funcParam: A?) async {
+      helper {
+        if let funcParam {
+          return funcParam
+        } else {
+          return self.field
+        }
+      }
+
+      funcParam?.useValue()
+    }
+  }
+}

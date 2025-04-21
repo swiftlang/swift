@@ -6239,10 +6239,16 @@ public:
                               bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
-  AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind, ModuleDecl *module,
-                                   ResilienceExpansion expansion,
-                                   bool useOldABI) const;
+  AccessStrategy getAccessStrategy(
+      AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+      ResilienceExpansion expansion,
+      std::optional<std::pair<SourceRange, const DeclContext *>> location,
+      bool useOldABI) const;
+
+  /// Whether access is via physical storage.
+  bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
+                                    AccessKind accessKind, ModuleDecl *module,
+                                    ResilienceExpansion expansion) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -8127,6 +8133,11 @@ public:
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
   bool isObjCInstanceMethod() const;
+
+  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
+  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// formalizing the attribute.
+  std::optional<ForeignLanguage> getCDeclKind() const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.

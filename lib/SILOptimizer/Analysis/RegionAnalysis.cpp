@@ -1264,6 +1264,9 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
 
   // We were not reachable at entry but are at our exit... walk the block and
   // see if our user is before a gen instruction.
+
+  // To do so, first find the range of pairs in valueToGenInsts that contains
+  // our base value.
   auto genStart = std::lower_bound(
       valueToGenInsts.begin(), valueToGenInsts.end(),
       std::make_pair(baseValue, nullptr),
@@ -1272,20 +1275,29 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
   if (genStart == valueToGenInsts.end() || genStart->first != baseValue)
     return false;
 
+  // Then determine the end of that range.
   auto genEnd = genStart;
   while (genEnd != valueToGenInsts.end() && genEnd->first == baseValue)
     ++genEnd;
 
   // Walk forward from the beginning of the block to user. If we do not find a
   // gen instruction, then we know the gen occurs after the op.
+  //
+  // NOTE: It is important that we include the user within our range since our
+  // user might also be a gen instruction.
   return llvm::any_of(
-      user->getParent()->getRangeEndingAtInst(user), [&](SILInstruction &inst) {
+      llvm::make_range(user->getParent()->begin(),
+                       std::next(user->getIterator())), [&](SILInstruction &inst) {
+        // Our computation works by computing a lower bound and seeing if we
+        // have (baseValue, inst) within our sorted range.
         auto iter = std::lower_bound(
             genStart, genEnd, std::make_pair(baseValue, &inst),
             [](const std::pair<SILValue, SILInstruction *> &p1,
                const std::pair<SILValue, SILInstruction *> &p2) {
               return p1 < p2;
             });
+
+        // If we did not hit end and found our pair, then we are done.
         return iter != valueToGenInsts.end() && iter->first == baseValue &&
                iter->second == &inst;
       });
@@ -1598,11 +1610,33 @@ struct PartitionOpBuilder {
 
   /// List of partition ops mapped to the current instruction. Used when
   /// generating partition ops.
-  SmallVector<PartitionOp, 8> currentInstPartitionOps;
+  std::vector<PartitionOp> *currentInstPartitionOps = nullptr;
+
+  /// The initial partition op index since the last reset. We use this so that
+  /// we can dump out the partition ops that we generated for a specific
+  /// instruction without needing to waste cycles maintaining a separate
+  /// SmallVector of PartitionOps inside of PartitionOpBuilder.
+  unsigned initialPartitionOpIndex = 0;
+
+  void initialize(std::vector<PartitionOp> &foundPartitionOps) {
+    assert(foundPartitionOps.empty());
+    currentInstPartitionOps = &foundPartitionOps;
+    initialPartitionOpIndex = currentInstPartitionOps->size();
+  }
 
   void reset(SILInstruction *inst) {
+    assert(currentInstPartitionOps);
     currentInst = inst;
-    currentInstPartitionOps.clear();
+    initialPartitionOpIndex = currentInstPartitionOps->size();
+  }
+
+  /// Return an ArrayRef containing the PartitionOps associated with the current
+  /// instruction being built.
+  ArrayRef<PartitionOp> getPartitionOpsForCurrentInst() const {
+    assert(currentInstPartitionOps);
+    unsigned numElts =
+        currentInstPartitionOps->size() - initialPartitionOpIndex;
+    return llvm::ArrayRef(*currentInstPartitionOps).take_back(numElts);
   }
 
   Element lookupValueID(SILValue value);
@@ -1614,7 +1648,7 @@ struct PartitionOpBuilder {
     if (value.isSendable())
       return;
     auto id = lookupValueID(value.getRepresentative().getValue());
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(id, currentInst));
   }
 
@@ -1623,7 +1657,7 @@ struct PartitionOpBuilder {
       return;
 
     auto first = lookupValueID(values.front());
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(first, currentInst));
 
     auto transformedCollection =
@@ -1631,7 +1665,7 @@ struct PartitionOpBuilder {
           return lookupValueID(value);
         });
     for (auto id : transformedCollection) {
-      currentInstPartitionOps.emplace_back(
+      currentInstPartitionOps->emplace_back(
           PartitionOp::AssignFreshAssign(id, first, currentInst));
     }
   }
@@ -1650,7 +1684,7 @@ struct PartitionOpBuilder {
       return;
     }
 
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::Assign(lookupValueID(destValue),
                             lookupValueID(srcOperand->get()), srcOperand));
   }
@@ -1663,7 +1697,7 @@ struct PartitionOpBuilder {
     assert(valueHasID(representative) &&
            "sent value should already have been encountered");
 
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::Send(lookupValueID(representative), op));
   }
 
@@ -1671,7 +1705,7 @@ struct PartitionOpBuilder {
     assert(valueHasID(representative) &&
            "value should already have been encountered");
 
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::UndoSend(lookupValueID(representative), unsendingInst));
   }
 
@@ -1686,7 +1720,7 @@ struct PartitionOpBuilder {
     if (lookupValueID(rep) == lookupValueID(srcOperand->get()))
       return;
 
-    currentInstPartitionOps.emplace_back(PartitionOp::Merge(
+    currentInstPartitionOps->emplace_back(PartitionOp::Merge(
         lookupValueID(rep), lookupValueID(srcOperand->get()), srcOperand));
   }
 
@@ -1698,9 +1732,9 @@ struct PartitionOpBuilder {
            "merged values should already have been encountered");
 
     auto elt = getActorIntroducingRepresentative(actorIsolation);
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::Merge(lookupValueID(sourceValue), elt, sourceOperand));
   }
 
@@ -1723,7 +1757,7 @@ public:
     auto rep = value.getRepresentative().getValue();
     assert(valueHasID(rep, /*dumpIfHasNoID=*/true) &&
            "required value should already have been encountered");
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::InOutSendingAtFunctionExit(lookupValueID(rep),
                                                 currentInst));
   }
@@ -1733,7 +1767,7 @@ public:
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
   }
 
@@ -1741,7 +1775,7 @@ public:
     if (value.isSendable())
       return;
     auto rep = value.getRepresentative().getValue();
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::NonSendableIsolationCrossingResult(lookupValueID(rep),
                                                         currentInst));
   }
@@ -1917,8 +1951,11 @@ class PartitionOpTranslator {
 
   SILFunction *function;
 
-  /// A cache of argument IDs.
-  std::optional<Partition> functionArgPartition;
+  /// The initial partition of the entry block.
+  ///
+  /// This contains a single region for non-sending parameters as well as
+  /// separate regions for each sending parameter.
+  std::optional<Partition> initialEntryBlockPartition;
 
   /// A builder struct that we use to convert individual instructions into lists
   /// of PartitionOps.
@@ -1983,7 +2020,7 @@ public:
   PartitionOpTranslator(SILFunction *function, PostOrderFunctionInfo *pofi,
                         RegionAnalysisValueMap &valueMap,
                         IsolationHistory::Factory &historyFactory)
-      : function(function), functionArgPartition(), builder(),
+      : function(function), initialEntryBlockPartition(),
         partialApplyReachabilityDataflow(function, valueMap, pofi),
         valueMap(valueMap) {
     builder.translator = this;
@@ -2006,8 +2043,8 @@ public:
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    None.\n");
-      functionArgPartition = Partition::singleRegion(SILLocation::invalid(), {},
-                                                     historyFactory.get());
+      initialEntryBlockPartition = Partition::singleRegion(
+          SILLocation::invalid(), {}, historyFactory.get());
       return;
     }
 
@@ -2044,10 +2081,10 @@ public:
       }
     }
 
-    functionArgPartition = Partition::singleRegion(
+    initialEntryBlockPartition = Partition::singleRegion(
         SILLocation::invalid(), nonSendableJoinedIndices, historyFactory.get());
     for (Element elt : nonSendableSeparateIndices) {
-      functionArgPartition->trackNewElement(elt);
+      initialEntryBlockPartition->trackNewElement(elt);
     }
   }
 
@@ -2116,8 +2153,10 @@ private:
 public:
   /// Return the partition consisting of all function arguments.
   ///
-  /// Used to initialize the entry blocko of our analysis.
-  const Partition &getEntryPartition() const { return *functionArgPartition; }
+  /// Used to initialize the initial partition of the entry block of the CFG.
+  const Partition &getInitialEntryPartition() const {
+    return *initialEntryBlockPartition;
+  }
 
   /// Get the results of an apply instruction.
   ///
@@ -3002,13 +3041,13 @@ public:
         basicBlock->printID(llvm::dbgs()); llvm::dbgs() << SEP_STR;
         basicBlock->print(llvm::dbgs());
         llvm::dbgs() << SEP_STR << "Results:\n";);
+
     // Translate each SIL instruction to the PartitionOps that it represents if
     // any.
+    builder.initialize(foundPartitionOps);
     for (auto &instruction : *basicBlock) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Visiting: " << instruction);
       translateSILInstruction(&instruction);
-      copy(builder.currentInstPartitionOps,
-           std::back_inserter(foundPartitionOps));
     }
   }
 
@@ -3136,7 +3175,8 @@ bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
 void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 #ifndef NDEBUG
   // If we do not have anything to dump, just return.
-  if (currentInstPartitionOps.empty())
+  auto ops = getPartitionOpsForCurrentInst();
+  if (ops.empty())
     return;
 
   // First line.
@@ -3147,8 +3187,6 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   llvm::dbgs() << " │ └─╼  ";
   currentInst->getLoc().getSourceLoc().printLineAndColumn(
       llvm::dbgs(), currentInst->getFunction()->getASTContext().SourceMgr);
-
-  auto ops = llvm::ArrayRef(currentInstPartitionOps);
 
   // First op on its own line.
   llvm::dbgs() << "\n ├─────╼ ";
@@ -3192,9 +3230,7 @@ void PartitionOpBuilder::addRequire(TrackableValue value,
   assert(valueHasID(silValue, /*dumpIfHasNoID=*/true) &&
          "required value should already have been encountered");
 
-  // Check if this value
-
-  currentInstPartitionOps.emplace_back(
+  currentInstPartitionOps->emplace_back(
       PartitionOp::Require(lookupValueID(silValue), currentInst, options));
 }
 
@@ -4139,7 +4175,7 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
   }
   // Set our entry partition to have the "entry partition".
   (*blockStates)[fn->getEntryBlock()].entryPartition =
-      translator->getEntryPartition();
+      translator->getInitialEntryPartition();
   runDataflow();
 }
 

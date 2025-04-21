@@ -267,7 +267,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -295,7 +295,12 @@ protected:
     /// isolation checks when it either specifies or inherits isolation
     /// and was passed as an argument to a function that is not fully 
     /// concurrency checked.
-    RequiresDynamicIsolationChecking : 1
+    RequiresDynamicIsolationChecking : 1,
+
+    /// Whether this closure was type-checked as an argument to a macro. This
+    /// is only populated after type-checking, and only exists for diagnostic
+    /// logic. Do not add more uses of this.
+    IsMacroArgument : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -4316,6 +4321,7 @@ public:
     Bits.ClosureExpr.IsPassedToSendingParameter = false;
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
+    Bits.ClosureExpr.IsMacroArgument = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4392,6 +4398,17 @@ public:
 
   void setRequiresDynamicIsolationChecking(bool value = true) {
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = value;
+  }
+
+  /// Whether this closure was type-checked as an argument to a macro. This
+  /// is only populated after type-checking, and only exists for diagnostic
+  /// logic. Do not add more uses of this.
+  bool isMacroArgument() const {
+    return Bits.ClosureExpr.IsMacroArgument;
+  }
+
+  void setIsMacroArgument(bool value = true) {
+    Bits.ClosureExpr.IsMacroArgument = value;
   }
 
   /// Determine whether this closure expression has an

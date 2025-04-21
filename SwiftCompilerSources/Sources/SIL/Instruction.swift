@@ -149,7 +149,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   /// their operand.
   public final var isIncidentalUse: Bool {
     switch self {
-    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst:
+    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst,
+         is IgnoredUseInst:
       return true
     default:
       return isEndOfScopeMarker
@@ -1473,7 +1474,7 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Bor
 }
 
 final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
-  var allocStack: AllocStackInst {
+  public var allocStack: AllocStackInst {
     var dest = destination
     if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
       dest = mark.operand.value

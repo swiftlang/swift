@@ -10,7 +10,6 @@ public func initStaticVars() -> CInt {
 // CHECK: @{{_ZL9staticVar|staticVar}} = internal global i32 2, align 4
 // CHECK: @{{_ZL13staticVarInit|staticVarInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL19staticVarInlineInit|staticVarInlineInit}} = internal global i32 0, align 4
-// CHECK: @{{_ZL11staticConst|staticConst}} = internal constant i32 4, align 4
 // CHECK: @{{_ZL15staticConstInit|staticConstInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL21staticConstInlineInit|staticConstInlineInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL16staticNonTrivial|staticNonTrivial}} = internal global %class.NonTrivial zeroinitializer, align 4

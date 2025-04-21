@@ -271,3 +271,40 @@ struct UnsafeWrapTest {
 
 @safe @unsafe
 struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}
+
+@unsafe
+struct UnsafeContainingUnspecified {
+  typealias A = Int
+
+  func getA() -> A { 0 }
+
+  @safe
+  struct Y {
+    var value: Int
+  }
+
+  func f() {
+    _ = Y(value: 5)
+  }
+}
+
+
+@unsafe func f(x: UnsafeContainingUnspecified) {
+  let a = unsafe x.getA()
+  _ = a
+}
+
+extension Slice {
+  // Make sure we aren't diagnosing the 'defer' as unsafe.
+  public func withContiguousMutableStorageIfAvailable<R, Element>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
+    try unsafe base.withContiguousStorageIfAvailable { buffer in
+      let start = unsafe base.baseAddress?.advanced(by: startIndex)
+      var slice = unsafe UnsafeMutableBufferPointer(start: start, count: count)
+      defer {
+      }
+      return try unsafe body(&slice)
+    }
+  }
+}

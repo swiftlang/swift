@@ -425,6 +425,60 @@ public func addQueuedDiagnostic(
   queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
 }
 
+/// Render a single diagnostic that has no source location information.
+@_cdecl("swift_ASTGen_renderSingleDiagnostic")
+public func renderSingleDiagnostic(
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
+  text: BridgedStringRef,
+  severity: BridgedDiagnosticSeverity,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
+  )
+
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
+      // If this looks doesn't look like a URL, prepend file://.
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
+    }
+
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
+
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
+  let formatter = DiagnosticsFormatter(colorize: colorize != 0)
+
+  let renderedStr = formatter.formattedMessage(
+    SimpleDiagnostic(
+      message: String(bridged: text),
+      severity: severity.asSeverity,
+      category: category
+    )
+  )
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+}
+
 /// Render the queued diagnostics into a UTF-8 string.
 @_cdecl("swift_ASTGen_renderQueuedDiagnostics")
 public func renderQueuedDiagnostics(

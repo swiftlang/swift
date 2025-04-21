@@ -47,12 +47,21 @@ struct A {
   init()
 }
 
+struct B: ~Copyable, ~Escapable {
+  let ne: NE
+
+  deinit
+}
+
 struct Holder {
   var object: AnyObject
 }
 
 @_addressableForDependencies
 struct AddressableForDeps {}
+
+sil @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+sil @useA : $@convention(thin) (A) -> ()
 
 sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
 sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
@@ -65,6 +74,9 @@ sil [ossa] @NCContainer_ne_read : $@yield_once @convention(method) (@guaranteed 
 
 sil @yieldRawSpan : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
 sil @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> ()
+
+sil @initHolder : $@convention(method) (@thin Holder.Type) -> @owned Holder
+sil @readAccess : $@yield_once @convention(method) (@guaranteed Holder) -> @lifetime(borrow 0) @yields @guaranteed NE
 
 // NCContainer.wrapper._read:
 //   var wrapper: Wrapper {
@@ -198,6 +210,44 @@ bb0(%0 : @guaranteed $Holder):
   return %99 : $()
 }
 
+// Avoid extending a store_borrow with a small allocation range.
+//
+// CHECK-LABEL: sil hidden [ossa] @testSmallStoreBorrow : $@convention(thin) (@guaranteed Holder) -> () {
+// CHECK: bb0(%0 : @guaranteed $Holder):
+// CHECK: [[BORROWA:%.*]] = begin_borrow %0
+// CHECK: [[ALLOC:%.*]] = alloc_stack $Holder
+// CHECK: [[SB:%.*]] = store_borrow [[BORROWA]] to [[ALLOC]]
+// CHECK: [[APPLY:%.*]] = apply %{{.*}}([[SB]]) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[APPLY]] on [[SB]]
+// CHECK: end_borrow [[SB]]
+// CHECK: dealloc_stack [[ALLOC]]
+// CHECK: end_borrow [[BORROWA]]
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[MD]]
+// CHECK: apply %{{.*}}([[MV]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK: destroy_value [[MV]]
+// CHECK-LABEL: } // end sil function 'testSmallStoreBorrow'
+sil hidden [ossa] @testSmallStoreBorrow : $@convention(thin) (@guaranteed Holder) -> () {
+bb0(%0 : @guaranteed $Holder):
+  debug_value %0, let, name "arg", argno 1
+  %borrow0a = begin_borrow %0 : $Holder
+  // store-borrow
+  %sballoc = alloc_stack $Holder
+  %sb = store_borrow %borrow0a to %sballoc
+  %fdep = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %ne = apply %fdep(%sb) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %nedep = mark_dependence [unresolved] %ne on %sb
+  end_borrow %sb
+  dealloc_stack %sballoc
+  end_borrow %borrow0a : $Holder
+  %nevar = move_value [var_decl] %nedep
+  debug_value %nevar, let, name "ne"
+  %fuse = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %user = apply %fuse(%nevar) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %nevar
+  %99 = tuple ()
+  return %99 : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @testIndirectYield : $@convention(thin) (@guaranteed Holder) -> () {
 // CHECK: bb0(%0 : @guaranteed $Holder):
 // CHECK: [[BORROW0A:%.*]] = begin_borrow %0
@@ -275,4 +325,117 @@ bb0(%0 : $*A):
   dealloc_stack %1
   %14 = tuple ()
   return %14
+}
+
+// =============================================================================
+// Owned value extension
+// =============================================================================
+
+// Handle direct _read accessor. Extend the coroutine scope and extend the lifetime of the coroutine's guaranteed
+// argument.
+//
+// CHECK-LABEL: sil hidden [ossa] @testNestedCoro : $@convention(thin) () -> () {
+// CHECK: [[SPAN:%.*]] = alloc_box ${ var NE }, var, name "span"
+// CHECK: [[BORROW:%.*]] = begin_borrow [var_decl] [[SPAN]]
+// CHECK: [[A1:%.*]] = begin_access [read] [unknown] %2
+// CHECK: [[LD:%.*]] = load [copy] [[A1]]
+// CHECK: end_access [[A1]]
+// CHECK: (%{{.*}}, [[TOKEN:%.*]]) = begin_apply %13([[LD]]) : $@yield_once @convention(method) (@guaranteed Holder) -> @lifetime(borrow 0) @yields @guaranteed NE
+// CHECK: ignored_use [[DEP:%[0-9]+]]
+// CHECK: destroy_value [[DEP]]
+// CHECK: end_apply [[TOKEN]] as $()
+// CHECK: destroy_value [[LD]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK-LABEL: } // end sil function 'testNestedCoro'
+sil hidden [ossa] @testNestedCoro : $@convention(thin) () -> () {
+bb0:
+  %varH = alloc_box ${ var Holder }, var, name "h"
+  %borrowH = begin_borrow [lexical] [var_decl] %varH
+  %addrH = project_box %borrowH, 0
+  %metaH = metatype $@thin Holder.Type
+
+  %finit = function_ref @initHolder : $@convention(method) (@thin Holder.Type) -> @owned Holder
+  %newH = apply %finit(%metaH) : $@convention(method) (@thin Holder.Type) -> @owned Holder
+  store %newH to [init] %addrH
+
+  %varSpan = alloc_box ${ var NE }, var, name "span"
+  %borrowSpan = begin_borrow [var_decl] %varSpan
+  %addrSpan = project_box %borrowSpan, 0
+
+  %accessH = begin_access [read] [unknown] %addrH
+  %tempH = load [copy] %accessH
+  end_access %accessH
+
+  %fread = function_ref @readAccess : $@yield_once @convention(method) (@guaranteed Holder) -> @lifetime(borrow 0) @yields @guaranteed NE
+  (%yieldSpan, %token) = begin_apply %fread(%tempH) : $@yield_once @convention(method) (@guaranteed Holder) -> @lifetime(borrow 0) @yields @guaranteed NE
+  %depSpan = mark_dependence [unresolved] %yieldSpan on %token
+  %copySpan = copy_value %depSpan
+  %endCoro = end_apply %token as $()
+  destroy_value %tempH
+
+  store %copySpan to [init] %addrSpan
+  %accessSpan = begin_access [read] [unknown] %addrSpan
+  %span = load [copy] %accessSpan
+  end_access %accessSpan
+  ignored_use %span
+  destroy_value %span
+
+  end_borrow %borrowSpan
+  destroy_value %varSpan
+
+  end_borrow %borrowH
+  destroy_value %varH
+
+  %99 = tuple ()
+  return %99
+}
+
+// =============================================================================
+// Reduced bugs
+// =============================================================================
+
+// rdar149226564 (Compiler crash with non-escapable storing another non-escapable and having a deinit)
+//
+// Test that initializing LifetimeDependence.Scope from an unidentified enclosing access scope does not
+// unwrap nil.
+//
+// TODO: the mark_dependence should redirect to the drop_deinit, not the struct_element_addr, but AccessBase does not
+// currently preserve the address of an unidentified base.
+//
+// CHECK-LABEL: sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
+// CHECK: [[DD:%.*]] = drop_deinit
+// CHECK: [[SE:%.*]] = struct_element_addr [[DD]], #B.ne
+// CHECK: [[LB:%.*]] = load_borrow
+// CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+// CHECK: mark_dependence [unresolved] %{{.*}} on [[SE]]
+// CHECK-LABEL: } // end sil function 'testUnidentified'
+sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = alloc_stack $B, let, name "self", argno 1
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1
+  store %0 to [init] %2
+  %4 = drop_deinit %2
+  debug_value %4, let, name "self", argno 1, expr op_deref
+  %6 = struct_element_addr %4, #B.ne
+  %7 = load_borrow %6
+
+  %8 = function_ref @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
+  %10 = struct_extract %9, #UnsafePointer._rawValue
+  %11 = pointer_to_address %10 to [strict] $*A
+  %12 = mark_dependence [unresolved] %11 on %7
+  %13 = begin_access [read] [unsafe] %12
+  %14 = load [trivial] %13
+  end_access %13
+
+  %16 = function_ref @useA : $@convention(thin) (A) -> ()
+  %17 = apply %16(%14) : $@convention(thin) (A) -> ()
+  end_borrow %7
+  %19 = struct_element_addr %4, #B.ne
+  %20 = begin_access [deinit] [static] %19
+  destroy_addr %20
+  end_access %20
+  dealloc_stack %1
+  %24 = tuple ()
+  return %24
 }

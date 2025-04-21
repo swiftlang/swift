@@ -3362,6 +3362,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
+    unsigned(wt.isSpecialized()),
     unsigned(wt.getSerializedKind()),
     conformanceID);
 
