@@ -1100,6 +1100,237 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: UUIDCodingWrapper(uuid), lineNumber: testLine)
         }
     }
+
+    // MARK: - DecodingError
+    func expectErrorDescription(
+        _ expectedErrorDescription: String,
+        fromDecodingError error: DecodingError,
+        lineNumber: UInt = #line
+    ) {
+        expectEqual(String(describing: error), expectedErrorDescription, "Unexpectedly wrong error: \(error)", line: lineNumber)
+    }
+
+    func test_decodingError_typeMismatch_nilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Type mismatch: expected value of type String.
+            Debug description: This is where the debug description goes
+            Path: [0]/address/city/birds/[1]/name
+            """#,
+            fromDecodingError: DecodingError.typeMismatch(
+                String.self,
+                DecodingError.Context(
+                    codingPath: [0, "address", "city", "birds", 1, "name"] as [GenericCodingKey],
+                    debugDescription: "This is where the debug description goes"
+                )
+            )
+        )
+    }
+
+    func test_decodingError_typeMismatch_nonNilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Type mismatch: expected value of type String.
+            Debug description: Some debug description
+            Underlying error: GenericError(name: "some generic error goes here")
+            Path: [0]/address/[1]/street
+            """#,
+            fromDecodingError: DecodingError.typeMismatch(
+                String.self,
+                DecodingError.Context(
+                    codingPath: [0, "address", 1, "street"] as [GenericCodingKey],
+                    debugDescription: "Some debug description",
+                    underlyingError: GenericError(name: "some generic error goes here")
+                )
+            )
+        )
+    }
+
+    func test_decodingError_valueNotFound_nilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Expected value of type String but found null instead.
+            Debug description: Description for debugging purposes
+            Path: [0]/firstName
+            """#,
+            fromDecodingError: DecodingError.valueNotFound(
+                String.self,
+                DecodingError.Context(
+                    codingPath: [0, "firstName"] as [GenericCodingKey],
+                    debugDescription: "Description for debugging purposes"
+                )
+            )
+        )
+    }
+
+    func test_decodingError_valueNotFound_nonNilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Expected value of type Int but found null instead.
+            Debug description: Here is the debug description for value-not-found
+            Underlying error: GenericError(name: "these aren\'t the droids you\'re looking for")
+            Path: [0]/population
+            """#,
+            fromDecodingError: DecodingError.valueNotFound(
+                Int.self,
+                DecodingError.Context(
+                    codingPath: [0, "population"] as [GenericCodingKey],
+                    debugDescription: "Here is the debug description for value-not-found",
+                    underlyingError: GenericError(name: "these aren't the droids you're looking for")
+                )
+            )
+        )
+    }
+
+    func test_decodingError_keyNotFound_nilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Key 'name' not found in keyed decoding container.
+            Debug description: How would you describe your relationship with your debugger?
+            Path: [0]/address/city
+            """#,
+            fromDecodingError: DecodingError.keyNotFound(
+                GenericCodingKey(stringValue: "name"),
+                DecodingError.Context(
+                    codingPath: [0, "address", "city"] as [GenericCodingKey],
+                    debugDescription: "How would you describe your relationship with your debugger?"
+                )
+            )
+        )
+    }
+
+    func test_decodingError_keyNotFound_nonNilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Key 'name' not found in keyed decoding container.
+            Debug description: Just some info to help you out
+            Underlying error: GenericError(name: "hey, who turned out the lights?")
+            Path: [0]/address/city
+            """#,
+            fromDecodingError: DecodingError.keyNotFound(
+                GenericCodingKey(stringValue: "name"),
+                DecodingError.Context(
+                    codingPath: [0, "address", "city"] as [GenericCodingKey],
+                    debugDescription: "Just some info to help you out",
+                    underlyingError: GenericError(name: "hey, who turned out the lights?")
+                )
+            )
+        )
+    }
+
+    func test_decodingError_dataCorrupted_emptyCodingPath() {
+        expectErrorDescription(
+            #"""
+            Data was corrupted.
+            Debug description: The given data was not valid JSON
+            Underlying error: GenericError(name: "just some data corruption")
+            """#,
+            fromDecodingError: DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [] as [GenericCodingKey], // sometimes empty when generated by JSONDecoder
+                    debugDescription: "The given data was not valid JSON",
+                    underlyingError: GenericError(name: "just some data corruption")
+                )
+            )
+        )
+    }
+
+    func test_decodingError_dataCorrupted_nonEmptyCodingPath() {
+        expectErrorDescription(
+            #"""
+            Data was corrupted.
+            Debug description: There was apparently some data corruption!
+            Underlying error: GenericError(name: "This data corruption is getting out of hand")
+            Path: first/second/[2]
+            """#,
+            fromDecodingError: DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: ["first", "second", 2] as [GenericCodingKey],
+                    debugDescription: "There was apparently some data corruption!",
+                    underlyingError: GenericError(name: "This data corruption is getting out of hand")
+                )
+            )
+        )
+    }
+
+    // MARK: - EncodingError
+    func expectErrorDescription(
+        _ expectedErrorDescription: String,
+        fromEncodingError error: EncodingError,
+        lineNumber: UInt = #line
+    ) {
+        expectEqual(String(describing: error), expectedErrorDescription, "Unexpectedly wrong error: \(error)", line: lineNumber)
+    }
+
+    func test_encodingError_invalidValue_emptyCodingPath_nilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Invalid value: 123 (Int)
+            You cannot do that!
+            """#,
+            fromEncodingError: EncodingError.invalidValue(
+                123 as Int,
+                EncodingError.Context(
+                    codingPath: [] as [GenericCodingKey],
+                    debugDescription: "You cannot do that!"
+                )
+            )
+        )
+    }
+
+    func test_encodingError_invalidValue_nonEmptyCodingPath_nilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Invalid value: 234 (Int)
+            You cannot do that!
+            Path: first/second/[2]
+            """#,
+            fromEncodingError: EncodingError.invalidValue(
+                234 as Int,
+                EncodingError.Context(
+                    codingPath: ["first", "second", 2] as [GenericCodingKey],
+                    debugDescription: "You cannot do that!"
+                )
+            )
+        )
+    }
+
+    func test_encodingError_invalidValue_emptyCodingPath_nonNilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Invalid value: 345 (Int)
+            You cannot do that!
+            Underlying error: GenericError(name: "You really cannot do that")
+            """#,
+            fromEncodingError: EncodingError.invalidValue(
+                345 as Int,
+                EncodingError.Context(
+                    codingPath: [] as [GenericCodingKey],
+                    debugDescription: "You cannot do that!",
+                    underlyingError: GenericError(name: "You really cannot do that")
+                )
+            )
+        )
+    }
+
+    func test_encodingError_invalidValue_nonEmptyCodingPath_nonNilUnderlyingError() {
+        expectErrorDescription(
+            #"""
+            Invalid value: 456 (Int)
+            You cannot do that!
+            Underlying error: GenericError(name: "You really cannot do that")
+            Path: first/second/[2]
+            """#,
+            fromEncodingError: EncodingError.invalidValue(
+                456 as Int,
+                EncodingError.Context(
+                    codingPath: ["first", "second", 2] as [GenericCodingKey],
+                    debugDescription: "You cannot do that!",
+                    underlyingError: GenericError(name: "You really cannot do that")
+                )
+            )
+        )
+    }
 }
 
 // MARK: - Helper Types
@@ -1118,6 +1349,18 @@ struct GenericCodingKey: CodingKey {
     }
 }
 
+extension GenericCodingKey: ExpressibleByStringLiteral {
+    init(stringLiteral: String) {
+        self.init(stringValue: stringLiteral)
+    }
+}
+
+extension GenericCodingKey: ExpressibleByIntegerLiteral {
+    init(integerLiteral: Int) {
+        self.init(intValue: integerLiteral)
+    }
+}
+
 struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
     let value: T
 
@@ -1128,6 +1371,10 @@ struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable 
     static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
         return lhs.value == rhs.value
     }
+}
+
+struct GenericError: Error {
+    let name: String
 }
 
 // MARK: - Tests
@@ -1183,6 +1430,18 @@ var tests = [
     "test_URL_Plist" : TestCodable.test_URL_Plist,
     "test_UUID_JSON" : TestCodable.test_UUID_JSON,
     "test_UUID_Plist" : TestCodable.test_UUID_Plist,
+    "test_decodingError_typeMismatch_nilUnderlyingError" : TestCodable.test_decodingError_typeMismatch_nilUnderlyingError,
+    "test_decodingError_typeMismatch_nonNilUnderlyingError" : TestCodable.test_decodingError_typeMismatch_nonNilUnderlyingError,
+    "test_decodingError_valueNotFound_nilUnderlyingError" : TestCodable.test_decodingError_valueNotFound_nilUnderlyingError,
+    "test_decodingError_valueNotFound_nonNilUnderlyingError" : TestCodable.test_decodingError_valueNotFound_nonNilUnderlyingError,
+    "test_decodingError_keyNotFound_nilUnderlyingError" : TestCodable.test_decodingError_keyNotFound_nilUnderlyingError,
+    "test_decodingError_keyNotFound_nonNilUnderlyingError" : TestCodable.test_decodingError_keyNotFound_nonNilUnderlyingError,
+    "test_decodingError_dataCorrupted_emptyCodingPath" : TestCodable.test_decodingError_dataCorrupted_emptyCodingPath,
+    "test_decodingError_dataCorrupted_nonEmptyCodingPath" : TestCodable.test_decodingError_dataCorrupted_nonEmptyCodingPath,
+    "test_encodingError_invalidValue_emptyCodingPath_nilUnderlyingError": TestCodable.test_encodingError_invalidValue_emptyCodingPath_nilUnderlyingError,
+    "test_encodingError_invalidValue_nonEmptyCodingPath_nilUnderlyingError": TestCodable.test_encodingError_invalidValue_nonEmptyCodingPath_nilUnderlyingError,
+    "test_encodingError_invalidValue_emptyCodingPath_nonNilUnderlyingError": TestCodable.test_encodingError_invalidValue_emptyCodingPath_nonNilUnderlyingError,
+    "test_encodingError_invalidValue_nonEmptyCodingPath_nonNilUnderlyingError": TestCodable.test_encodingError_invalidValue_nonEmptyCodingPath_nonNilUnderlyingError,
 ]
 
 #if os(macOS)
