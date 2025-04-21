@@ -1,7 +1,7 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
-  AsyncCallerExecutionMigration.cpp
+  NonisolatedNonsendingByDefaultMigration.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
