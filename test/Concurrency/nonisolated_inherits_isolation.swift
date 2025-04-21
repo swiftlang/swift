@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -swift-version 6 -verify -verify-additional-prefix disabled- -c
-// RUN: %target-swift-frontend %s -swift-version 6 -verify -enable-experimental-feature AsyncCallerExecution -verify-additional-prefix enable- -c -verify-additional-prefix enabled-
+// RUN: %target-swift-frontend %s -swift-version 6 -verify -enable-upcoming-feature AsyncCallerExecution -verify-additional-prefix enable- -c -verify-additional-prefix enabled-
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
