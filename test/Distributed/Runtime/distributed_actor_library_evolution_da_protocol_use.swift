@@ -11,14 +11,10 @@
 // RUN: %target-build-swift -Xfrontend -validate-tbd-against-ir=all -target %target-cpu-apple-macosx13.0 -parse-as-library -lLibrary -module-name main -I %t -L %t %t/main.swift -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 //--- library.swift
 import Distributed
-
-//public protocol NormalProtocol {
-//  func NORMAL() async -> Int
-//}
 
 public protocol SimpleProtocol: DistributedActor
     where ActorSystem == LocalTestingDistributedActorSystem {
@@ -33,23 +29,18 @@ public protocol SimpleProtocol: DistributedActor
 import Distributed
 import Library
 
-//actor NormalActor: NormalProtocol {
-//  func NORMAL() async -> Int { 1 }
-//}
-
 public distributed actor SimpleActor: SimpleProtocol {
-  public distributed func test() -> Int { 1 }
+  public distributed func test() -> Int {
+    print("SimpleActor.test")
+    return 1
+  }
 }
 
-// Passes
-public func makeFromPass<Act: DistributedActor>(_ act: Act) {
-  print(act.id)
-}
-
-// Fails
 public func makeFromFail<Act: SimpleProtocol>(_ act: Act) async {
   print(act.id)
-  try! await print(act.test())
+  try! await print("act.test() = \(act.test())")
+  // CHECK: SimpleActor.test
+  // CHECK: act.test() = 1
 }
 
 @main
@@ -57,11 +48,7 @@ struct TestSwiftFrameworkTests {
   static func main() async {
     let system = LocalTestingDistributedActorSystem()
 
-    // let norm = NormalActor()
-
     let simpleActor = SimpleActor(actorSystem: system)
-//    makeFromPass(simpleActor)
-
     await makeFromFail(simpleActor)
   }
 }
