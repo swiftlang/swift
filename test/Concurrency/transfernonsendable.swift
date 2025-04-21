@@ -1997,3 +1997,13 @@ func localCaptureDataRace3() async {
 
   print(x)
 }
+
+nonisolated func localCaptureDataRace4() {
+  var x = 0
+  _ = x
+
+  Task.detached { @MainActor in x = 1 } // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
+}
