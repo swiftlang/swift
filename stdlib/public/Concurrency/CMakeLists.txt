@@ -339,35 +339,37 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     endif()
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
-    # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
-    add_swift_target_library_single(
-      embedded-concurrency-default-executor-${mod}
-      swift_ConcurrencyDefaultExecutor
-      STATIC
-      IS_FRAGILE
+    if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
+      # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
+      add_swift_target_library_single(
+        embedded-concurrency-default-executor-${mod}
+        swift_ConcurrencyDefaultExecutor
+        STATIC
+        IS_FRAGILE
 
-      CooperativeGlobalExecutor.cpp
+        CooperativeGlobalExecutor.cpp
 
-      C_COMPILE_FLAGS ${extra_c_compile_flags}
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${mod}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    swift_install_in_component(
-      TARGETS embedded-concurrency-default-executor-${mod}
-      DESTINATION "lib/swift/embedded/${mod}"
-      COMPONENT "stdlib"
-      )
-    swift_install_in_component(
-      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_ConcurrencyDefaultExecutor.a"
-      DESTINATION "lib/swift/embedded/${mod}/"
-      COMPONENT "stdlib"
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-      )
-    set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-    add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
+        C_COMPILE_FLAGS ${extra_c_compile_flags}
+        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+        SDK "embedded"
+        ARCHITECTURE "${mod}"
+        DEPENDS embedded-stdlib-${mod}
+        INSTALL_IN_COMPONENT stdlib
+        )
+      swift_install_in_component(
+        TARGETS embedded-concurrency-default-executor-${mod}
+        DESTINATION "lib/swift/embedded/${mod}"
+        COMPONENT "stdlib"
+        )
+      swift_install_in_component(
+        FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_ConcurrencyDefaultExecutor.a"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "stdlib"
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+      set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+      add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
+    endif()
   endforeach()
 
   # Copy the ExecutorImpl.h header into the local include directory
