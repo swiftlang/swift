@@ -335,6 +335,7 @@ private:
   PolymorphicEffectKind RethrowsKind = PolymorphicEffectKind::None;
   PolymorphicEffectKind ReasyncKind = PolymorphicEffectKind::None;
   SubstitutionMap Substitutions;
+  bool AppliedSelf = false;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
@@ -342,11 +343,13 @@ public:
     TheExpr = fn;
   }
 
-  explicit AbstractFunction(AbstractFunctionDecl *fn, SubstitutionMap subs)
+  explicit AbstractFunction(AbstractFunctionDecl *fn, SubstitutionMap subs,
+                            bool appliedSelf)
     : TheKind(Kind::Function),
       RethrowsKind(fn->getPolymorphicEffectKind(EffectKind::Throws)),
       ReasyncKind(fn->getPolymorphicEffectKind(EffectKind::Async)),
-      Substitutions(subs) {
+      Substitutions(subs),
+      AppliedSelf(appliedSelf) {
     TheFunction = fn;
   }
 
@@ -377,7 +380,7 @@ public:
     case Kind::Opaque: return getOpaqueFunction()->getType();
     case Kind::Function: {
       auto *AFD = getFunction();
-      if (AFD->hasImplicitSelfDecl())
+      if (AFD->hasImplicitSelfDecl() && AppliedSelf)
         return AFD->getMethodInterfaceType();
       return AFD->getInterfaceType();
     }
@@ -398,6 +401,11 @@ public:
                  .getParameterType();
 
     case Kind::Function: {
+      if (getFunction()->hasImplicitSelfDecl() && !AppliedSelf) {
+        assert(substIndex == 0);
+        return getFunction()->getImplicitSelfDecl()->getInterfaceType();
+      }
+
       auto *params = getFunction()->getParameters();
       auto origIndex = params->getOrigParamIndex(getSubstitutions(), substIndex);
       return params->get(origIndex)->getInterfaceType();
@@ -435,10 +443,13 @@ public:
   static AbstractFunction getAppliedFn(ApplyExpr *apply) {
     Expr *fn = apply->getFn()->getValueProvidingExpr();
 
-    if (auto *selfCall = dyn_cast<SelfApplyExpr>(fn))
+    bool appliedSelf = false;
+    if (auto *selfCall = dyn_cast<SelfApplyExpr>(fn)) {
       fn = selfCall->getFn()->getValueProvidingExpr();
+      appliedSelf = true;
+    }
 
-    return decomposeFunction(fn);
+    return decomposeFunction(fn, appliedSelf);
   }
 
   bool isPreconcurrency() const {
@@ -457,7 +468,7 @@ public:
     }
   }
 
-  static AbstractFunction decomposeFunction(Expr *fn) {
+  static AbstractFunction decomposeFunction(Expr *fn, bool appliedSelf) {
     assert(fn->getValueProvidingExpr() == fn);
 
     while (true) {
@@ -493,14 +504,16 @@ public:
     // Constructor delegation.
     if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       return AbstractFunction(otherCtorDeclRef->getDecl(),
-                              otherCtorDeclRef->getDeclRef().getSubstitutions());
+                              otherCtorDeclRef->getDeclRef().getSubstitutions(),
+                              appliedSelf);
     }
 
     // Normal function references.
     if (auto DRE = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = DRE->getDecl();
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-        return AbstractFunction(fn, DRE->getDeclRef().getSubstitutions());
+        return AbstractFunction(fn, DRE->getDeclRef().getSubstitutions(),
+                                appliedSelf);
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
         SubstitutionMap subs;
         if (auto genericEnv = param->getDeclContext()->getGenericEnvironmentOfContext())
@@ -2545,7 +2558,8 @@ private:
 
     // Decompose the function reference, then consider the type
     // of the decomposed function.
-    AbstractFunction fn = AbstractFunction::decomposeFunction(arg);
+    AbstractFunction fn = AbstractFunction::decomposeFunction(
+        arg, /*appliedSelf=*/false);
 
     // If it doesn't have function type, we must have invalid code.
     Type argType = fn.getType();
