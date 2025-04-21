@@ -3863,13 +3863,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       // non-argument debug variable -- usually via a !DIExpression -- we
       // need to make sure that dbg.value is before any non-phi / no-dbg
       // instruction.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, &*InsertPt);
+      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, InsertPt);
 
       return;
     }
   }
 
-  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
+  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock->end());
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
