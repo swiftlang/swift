@@ -1690,6 +1690,9 @@ void SignatureExpansion::expandExternalSignatureTypes() {
                                     paramTI.getStorageType(), paramTI);
         break;
       }
+      case clang::ParameterABI::HLSLOut:
+      case clang::ParameterABI::HLSLInOut:
+        llvm_unreachable("not implemented");
       }
 
       // If the coercion type is a struct which can be flattened, we need to
