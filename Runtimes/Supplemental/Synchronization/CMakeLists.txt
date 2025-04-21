@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.29)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE YES) # ToDo: What does this do?
+set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
