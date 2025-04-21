@@ -1562,6 +1562,8 @@ void FieldSensitiveMultiDefPrunedLiveRange::findBoundariesInBlock(
                          return getBlockLiveness(predBlock, bitNo) ==
                                 FieldSensitivePrunedLiveBlocks::IsLive::LiveOut;
                        })) {
+        PRUNED_LIVENESS_LOG(llvm::dbgs() << "Marking ourself as boundary edge: bb"
+                                << block->getDebugID() << '\n');
         boundary.getBoundaryEdgeBits(block).set(bitNo);
       }
     }
