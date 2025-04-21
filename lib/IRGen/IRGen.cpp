@@ -1169,8 +1169,8 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
-  
-  Module->setTargetTriple(IGM.Triple.str());
+
+  Module->setTargetTriple(IGM.Triple);
 
   if (IGM.Context.LangOpts.SDKVersion) {
     if (Module->getSDKVersion().empty())
