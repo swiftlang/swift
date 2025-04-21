@@ -2027,3 +2027,30 @@ func testIsolatedParamInference() {
     }
   }
 }
+
+// We shouldn't error here since test2 is isolated to B since we are capturing
+// self and funcParam is also exposed to B's isolated since it is a parameter to
+// one of B's methods.
+func sendIsolatedValueToItsOwnIsolationDomain() {
+  class A {
+    func useValue() {}
+  }
+
+  func helper(_ x: @escaping () -> A) {}
+
+  actor B {
+    let field = A()
+
+    private func test(funcParam: A?) async {
+      helper {
+        if let funcParam {
+          return funcParam
+        } else {
+          return self.field
+        }
+      }
+
+      funcParam?.useValue()
+    }
+  }
+}
