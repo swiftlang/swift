@@ -1,8 +1,8 @@
-// RUN: %target-swift-emit-silgen -swift-version 6 -enable-upcoming-feature AsyncCallerExecution %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault %s | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
-// REQUIRES: swift_feature_AsyncCallerExecution
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Declarations
