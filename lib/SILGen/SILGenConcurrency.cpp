@@ -206,8 +206,12 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::CallerIsolationInheriting:
+      assert(F.isAsync());
+      setExpectedExecutorForParameterIsolation(*this, actorIsolation);
       break;
 
     case ActorIsolation::Erased:
