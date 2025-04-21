@@ -422,6 +422,16 @@ namespace {
       return Type();
     }
 
+    ImportResult VisitHLSLAttributedResourceType(
+        const clang::HLSLAttributedResourceType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: (?) HLSL types are not supported in Swift.
+      return Type();
+    }
+
     ImportResult
     VisitCountAttributedType(const clang::CountAttributedType *type) {
       return Visit(type->desugar());
