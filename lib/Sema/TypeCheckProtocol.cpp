@@ -912,8 +912,7 @@ RequirementMatch swift::matchWitness(
 
     case ThrownErrorSubtyping::Subtype:
       // If there were no type parameters, we're done.
-      if (!reqThrownError->hasTypeVariable() &&
-          !reqThrownError->hasTypeParameter())
+      if (!reqThrownError->hasTypeParameter())
         break;
 
       LLVM_FALLTHROUGH;
