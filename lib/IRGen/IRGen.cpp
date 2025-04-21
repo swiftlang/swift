@@ -342,7 +342,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
             FPM.addPass(SwiftARCOptPass());
         });
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                          OptimizationLevel Level) {
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
       if (Level != OptimizationLevel::O0)
         MPM.addPass(createModuleToFunctionPassAdaptor(SwiftARCContractPass()));
       if (Level == OptimizationLevel::O0)
@@ -357,7 +358,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   if (Opts.Sanitizers & SanitizerKind::Address) {
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel Level) {
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
       AddressSanitizerOptions ASOpts;
       ASOpts.CompileKernel = false;
       ASOpts.Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
@@ -376,17 +378,19 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   }
 
   if (Opts.Sanitizers & SanitizerKind::Thread) {
-    PB.registerOptimizerLastEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel Level) {
-          MPM.addPass(ModuleThreadSanitizerPass());
-          MPM.addPass(createModuleToFunctionPassAdaptor(ThreadSanitizerPass()));
-        });
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
+      MPM.addPass(ModuleThreadSanitizerPass());
+      MPM.addPass(createModuleToFunctionPassAdaptor(ThreadSanitizerPass()));
+    });
   }
 
   if (Opts.SanitizeCoverage.CoverageType !=
       llvm::SanitizerCoverageOptions::SCK_None) {
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel Level) {
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
       std::vector<std::string> allowlistFiles;
       std::vector<std::string> ignorelistFiles;
       MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage,
@@ -395,14 +399,15 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   }
 
   if (RunSwiftSpecificLLVMOptzns && !Opts.DisableLLVMMergeFunctions) {
-    PB.registerOptimizerLastEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel Level) {
-          if (Level != OptimizationLevel::O0) {
-            const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
-            unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
-            MPM.addPass(SwiftMergeFunctionsPass(schema.isEnabled(), key));
-          }
-        });
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
+      if (Level != OptimizationLevel::O0) {
+        const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
+        unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
+        MPM.addPass(SwiftMergeFunctionsPass(schema.isEnabled(), key));
+      }
+    });
   }
 
   if (Opts.GenerateProfile) {
