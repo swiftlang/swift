@@ -1121,8 +1121,9 @@ static void determineBestChoicesInContext(
               return false;
           }
 
-          return bool(TypeChecker::containsProtocol(candidateType, P,
-                                                    /*allowMissing=*/false));
+          auto result = TypeChecker::containsProtocol(candidateType, P,
+                                                      /*allowMissing=*/false);
+          return result.first || result.second;
         });
       }
 
