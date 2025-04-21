@@ -5,6 +5,8 @@
 // RUN:   -import-bridging-header %t/src/test.h \
 // RUN:   -module-name main -I %t -emit-sil | %FileCheck %s
 
+// REQUIRES: objc_interop
+
 //--- test.h
 #include <objc/objc.h>
 
