@@ -89,6 +89,26 @@ extension CodingKey {
   public var debugDescription: String {
     return description
   }
+
+  /// A simplified description: the int value, if present, in square brackets.
+  /// Otherwise, the string value by itself. Used when concatenating coding keys
+  /// to form a path when printing debug information.
+  var errorPresentationDescription: String {
+    if let intValue {
+      "[\(intValue)]"
+    } else {
+      stringValue
+    }
+  }
+}
+
+private extension [any CodingKey] {
+  /// Concatenates the elements of an array of coding keys and joins them with "/" separators to make them read like a path.
+  var errorPresentationDescription: String {
+    self
+      .map { $0.errorPresentationDescription } // Can't use .map(\.errorPresentationDescription) due to https://github.com/swiftlang/swift/issues/80716
+      .joined(separator: "/")
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -3721,6 +3741,66 @@ public enum DecodingError: Error {
     #else
       return nil
     #endif
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension EncodingError: CustomDebugStringConvertible {
+  @available(SwiftStdlib 6.3, *)
+  public var debugDescription: String {
+    let (message, context) = switch self {
+      case .invalidValue(let value, let context):
+        (
+          "Invalid value: \(String(reflecting: value)) (\(type(of: value)))",
+          context
+        )
+    }
+
+    var output = """
+      \(message)
+      \(context.debugDescription)
+      """
+
+    if let underlyingError = context.underlyingError {
+      output.append("\nUnderlying error: \(underlyingError)")
+    }
+    if !context.codingPath.isEmpty {
+      output.append("\nPath: \(context.codingPath.errorPresentationDescription)")
+    }
+
+    return output
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension DecodingError: CustomDebugStringConvertible {
+  @available(SwiftStdlib 6.3, *)
+  public var debugDescription: String {
+    let (message, context) = switch self {
+      case .typeMismatch(let expectedType, let context):
+        ("Type mismatch: expected value of type \(expectedType).", context)
+      case .valueNotFound(let expectedType, let context):
+        ("Expected value of type \(expectedType) but found null instead.", context)
+      case .keyNotFound(let expectedKey, let context):
+        ("Key '\(expectedKey.errorPresentationDescription)' not found in keyed decoding container.", context)
+      case .dataCorrupted(let context):
+        ("Data was corrupted.", context)
+    }
+
+    var output = message
+
+    if !context.debugDescription.isEmpty {
+      output.append("\nDebug description: \(context.debugDescription)")
+    }
+
+    if let underlyingError = context.underlyingError {
+      output.append("\nUnderlying error: \(underlyingError)")
+    }
+    if !context.codingPath.isEmpty {
+      output.append("\nPath: \(context.codingPath.errorPresentationDescription)")
+    }
+
+    return output
   }
 }
 
