@@ -287,7 +287,7 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
   // that use only concrete types or generic parameters directly
   // in their parameter positions i.e. `(T, Int)`.
 
-  auto *paramList = getParameterList(decl);
+  auto *paramList = decl->getParameterList();
   if (!paramList)
     return false;
 
