@@ -287,7 +287,7 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
   // that use only concrete types or generic parameters directly
   // in their parameter positions i.e. `(T, Int)`.
 
-  auto *paramList = getParameterList(decl);
+  auto *paramList = decl->getParameterList();
   if (!paramList)
     return false;
 
@@ -581,7 +581,7 @@ static OverloadedDeclRefExpr *isOverloadedDeclRef(Constraint *disjunction) {
 static unsigned numOverloadChoicesMatchingOnArity(OverloadedDeclRefExpr *ODRE,
                                                   ArgumentList *arguments) {
   return llvm::count_if(ODRE->getDecls(), [&arguments](auto *choice) {
-    if (auto *paramList = getParameterList(choice))
+    if (auto *paramList = choice->getParameterList())
       return arguments->size() == paramList->size();
     return false;
   });
@@ -629,7 +629,7 @@ static void findFavoredChoicesBasedOnArity(
         }
 
         if (overloadType->getNumParams() == argumentList->size() ||
-            llvm::count_if(*getParameterList(decl), [](auto *param) {
+            llvm::count_if(*decl->getParameterList(), [](auto *param) {
               return !param->isDefaultArgument();
             }) == argumentList->size())
           favored.push_back(choice);
