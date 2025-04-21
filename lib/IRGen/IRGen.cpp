@@ -429,7 +429,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   bool isThinLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Thin;
   bool isFullLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Full;
   if (!Opts.shouldOptimize() || Opts.DisableLLVMOptzns) {
-    MPM = PB.buildO0DefaultPipeline(level, isFullLTO || isThinLTO);
+    auto phase = llvm::ThinOrFullLTOPhase::None;
+    if (isFullLTO) {
+      phase = llvm::ThinOrFullLTOPhase::FullLTOPreLink;
+    } else if (isThinLTO) {
+      phase = llvm::ThinOrFullLTOPhase::ThinLTOPreLink;
+    }
+    MPM = PB.buildO0DefaultPipeline(level, phase);
   } else if (isThinLTO) {
     MPM = PB.buildThinLTOPreLinkDefaultPipeline(level);
   } else if (isFullLTO) {
