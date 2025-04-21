@@ -174,8 +174,7 @@ internal func interpretIntTruncations() -> Int8 {
 internal func testInvalidIntTruncations(a: Int32) -> Int8 {
   return Int8(a)
     // CHECK: note: {{.*}}: Not enough bits to represent the passed value
-    // CHECK: note: operation performed during this call traps
-    // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
@@ -220,8 +219,7 @@ internal func interpretSingedUnsignedConversions() -> UInt32 {
 internal func testInvalidSingedUnsignedConversions(a: Int64) -> UInt64 {
   return UInt64(a)
     // CHECK: note: {{.*}}: Negative value is not representable
-    // CHECK: note: operation performed during this call traps
-    // CHECK: function_ref @$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
