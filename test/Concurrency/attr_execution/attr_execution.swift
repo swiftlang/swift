@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature AsyncCallerExecution %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-upcoming-feature AsyncCallerExecution %s | %FileCheck %s
 
 // REQUIRES: swift_feature_AsyncCallerExecution
 

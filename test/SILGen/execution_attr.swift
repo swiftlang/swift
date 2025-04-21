@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen %s  | %FileCheck -check-prefix CHECK -check-prefix DISABLED %s
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature AsyncCallerExecution | %FileCheck -check-prefix CHECK -check-prefix ENABLED %s
+// RUN: %target-swift-emit-silgen %s -enable-upcoming-feature AsyncCallerExecution | %FileCheck -check-prefix CHECK -check-prefix ENABLED %s
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_AsyncCallerExecution

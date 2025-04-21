@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 5 -enable-experimental-feature AsyncCallerExecution:adoption
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 6 -enable-experimental-feature AsyncCallerExecution:adoption
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 5 -enable-upcoming-feature AsyncCallerExecution:adoption
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 6 -enable-upcoming-feature AsyncCallerExecution:adoption
 
 // REQUIRES: swift_feature_AsyncCallerExecution
 
