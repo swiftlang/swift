@@ -1,5 +1,6 @@
 add_subdirectory(InternalShims)
 
+gyb_expand(Task+init.swift.gyb Task+init.swift)
 gyb_expand(TaskGroup+addTask.swift.gyb TaskGroup+addTask.swift)
 gyb_expand(Task+immediate.swift.gyb Task+immediate.swift)
 
