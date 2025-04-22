@@ -95,6 +95,7 @@ add_library(swift_Concurrency
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
+  Win32Executor.swift
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+startSynchronously.swift")
 
@@ -125,6 +126,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   swiftConcurrencyInternalShims
   $<$<BOOL:${BUILD_SHARED_LIBS}>:swiftThreading>
   $<$<PLATFORM_ID:Windows>:Synchronization>
+  $<$<PLATFORM_ID:Windows>:WinSDK>
   $<$<PLATFORM_ID:Windows>:mincore>
   # Link to the runtime that we are just building.
   swiftCore)

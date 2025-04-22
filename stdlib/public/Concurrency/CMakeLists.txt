@@ -165,6 +165,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorLinux.swift
   PlatformExecutorWindows.swift
   PlatformExecutorOpenBSD.swift
+  Win32Executor.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
@@ -223,7 +224,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_MODULE_DEPENDS_WINDOWS CRT
+  SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK Synchronization
 
   PRIVATE_LINK_LIBRARIES ${swift_concurrency_private_link_libraries}
   INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
