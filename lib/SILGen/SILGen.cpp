@@ -1558,15 +1558,22 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   // Emit differentiability witness for the function referenced in
   // @derivative(of:) attribute registering current function as VJP / JVP.
+  // Differentiability witnesses for a function could originate either from its
+  // @differentiable attribute or from explicit @derivative(of:) attribute on
+  // the derivative. In the latter case the derivative itself might not be
+  // emitted, while original function is (e.g. original function is @inlineable,
+  // but derivative is @usableFromInline). Ensure the differentiability witness
+  // originating from @derivative(of:) is emitted even if we're not going to
+  // emit body of the derivative.
   for (auto *derivAttr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-      auto *F = getFunction(SILDeclRef(AFD), NotForDefinition);
+      auto *f = getFunction(SILDeclRef(AFD), NotForDefinition);
       SILFunction *jvp = nullptr, *vjp = nullptr;
       switch (derivAttr->getDerivativeKind()) {
       case AutoDiffDerivativeFunctionKind::JVP:
-        jvp = F;
+        jvp = f;
         break;
       case AutoDiffDerivativeFunctionKind::VJP:
-        vjp = F;
+        vjp = f;
         break;
       }
       auto *origAFD = derivAttr->getOriginalFunction(getASTContext());

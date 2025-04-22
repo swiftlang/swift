@@ -1474,8 +1474,10 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   worklist.push_back(clonedFn);
 
   SILFunction *origFn = fri->getReferencedFunction();
-  for (auto *w : mod.lookUpDifferentiabilityWitnessesForFunction(
+  for (const auto *w : mod.lookUpDifferentiabilityWitnessesForFunction(
          origFn->getName())) {
+    // @derivative(of:) attribute could only be applied at global scope, therefore
+    // local functions might not have custom derivatives registered
     assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
     auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
     SILDifferentiabilityWitness::createDefinition(

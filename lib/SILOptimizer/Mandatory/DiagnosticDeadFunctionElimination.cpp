@@ -70,7 +70,7 @@ struct DiagnosticDeadFunctionEliminator : SILFunctionTransform {
 
     // Drop differentiability witnesses, if any
     if (!mod.lookUpDifferentiabilityWitnessesForFunction(fn->getName()).empty())
-      mod.eraseAllDifferentiabilityWittnesses(fn);
+      mod.eraseAllDifferentiabilityWitnesses(fn);
 
     // If the function has shared linkage, reduce this version to private
     // linkage, because we don't want the deleted-body form to win in any

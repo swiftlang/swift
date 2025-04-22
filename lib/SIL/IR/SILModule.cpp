@@ -504,20 +504,20 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *gv) {
   getSILGlobalList().erase(gv);
 }
 
-void SILModule::eraseDifferentiabilityWittness(SILDifferentiabilityWitness *dw) {
+void SILModule::eraseDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
   getSILLoader()->invalidateDifferentiabilityWitness(dw);
 
   Mangle::ASTMangler mangler(getASTContext());
-  auto *originalFunction = dw->getOriginalFunction();
+  auto originalFunction = dw->getOriginalFunction()->getName();
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
-    originalFunction->getName(), dw->getKind(), dw->getConfig());
+    originalFunction, dw->getKind(), dw->getConfig());
   DifferentiabilityWitnessMap.erase(mangledKey);
-  llvm::erase(DifferentiabilityWitnessesByFunction[originalFunction->getName()], dw);
+  llvm::erase(DifferentiabilityWitnessesByFunction[originalFunction], dw);
 
   getDifferentiabilityWitnessList().erase(dw);
 }
 
-void SILModule::eraseAllDifferentiabilityWittnesses(SILFunction *f) {
+void SILModule::eraseAllDifferentiabilityWitnesses(SILFunction *f) {
   Mangle::ASTMangler mangler(getASTContext());
 
   for (auto *dw : DifferentiabilityWitnessesByFunction.at(f->getName())) {

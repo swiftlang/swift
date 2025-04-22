@@ -592,10 +592,10 @@ public:
   void eraseGlobalVariable(SILGlobalVariable *G);
 
   /// Erase a differentiability witness from the module.
-  void eraseDifferentiabilityWittness(SILDifferentiabilityWitness *dw);
+  void eraseDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
 
   /// Erase all differentiability witnesses for function f.
-  void eraseAllDifferentiabilityWittnesses(SILFunction *f);
+  void eraseAllDifferentiabilityWitnesses(SILFunction *f);
 
   /// Create and return an empty SIL module suitable for generating or parsing
   /// SIL into.
