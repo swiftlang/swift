@@ -387,7 +387,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
 
 void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   SmallVector<SILInstruction *, 8> ends;
-  if (explicitLifetimeEnds.size() > 0) {
+  if (endingLifetimeAtExplicitEnds()) {
     visitExtendedUnconsumedBoundary(
         explicitLifetimeEnds,
         [&ends](auto *instruction, auto lifetimeEnding) {

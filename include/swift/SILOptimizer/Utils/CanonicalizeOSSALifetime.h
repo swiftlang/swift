@@ -465,6 +465,10 @@ public:
   UserRange getUsers() const { return liveness->getAllUsers(); }
 
 private:
+  bool endingLifetimeAtExplicitEnds() const {
+    return explicitLifetimeEnds.size() > 0;
+  }
+
   bool respectsDeinitBarriers() const {
     if (!currentDef->isLexical())
       return false;
