@@ -30,3 +30,30 @@ public class Test {
     }
   }
 }
+
+// So did this test case.
+enum E {
+  case a
+}
+
+protocol P {
+  associatedtype A
+  typealias S = C<A>.S
+
+  var v: E { get set }
+
+  var v2: (t: Int, i: S)? { get set }
+}
+
+class C<A> {
+  struct S { }
+
+  init(_: ClosedRange<Double>) { }
+}
+
+class C2<T>: P {
+  typealias A = T
+  var v: E = .a
+
+  var v2: (t: Int, i: S)?
+}
