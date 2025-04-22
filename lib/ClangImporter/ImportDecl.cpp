@@ -4198,7 +4198,8 @@ namespace {
         return;
 
       // FIXME: support C functions imported as members.
-      if (result->getImportAsMemberStatus().isImportAsMember() &&
+      if (!isClangNamespace(result->getDeclContext()) &&
+          result->getImportAsMemberStatus().isImportAsMember() &&
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
