@@ -875,7 +875,7 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
 }
 
-#if !defined(__APPLE__) && defined(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
+#if !defined(__APPLE__) && SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
   char *ptr = static_cast<char *>(b);
   while (len >= 8) {
@@ -898,9 +898,9 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
   }
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
-#ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+#if SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
-                  "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
+                  "\xF0\xEF\xBE\xAD\xDE\xED\xFE\x0F", // 0x0ffeeddeadbeeff0
                   allocatedSize - sizeof(HeapObject));
 #endif
 
