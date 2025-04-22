@@ -459,8 +459,9 @@ bool diagnoseNonSendableTypesWithSendingCheck(
       return false;
   }
   if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
-    if (isa<SendingTypeRepr>(subscript->getResultTypeRepr()))
-      return false;
+    if (auto resultTypeRepr = subscript->getResultTypeRepr())
+      if (isa<SendingTypeRepr>(resultTypeRepr))
+        return false;
   }
 
   return diagnoseNonSendableTypes(
