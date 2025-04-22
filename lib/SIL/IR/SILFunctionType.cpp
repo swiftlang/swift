@@ -1705,7 +1705,7 @@ private:
     }
 
     // If we are an async function that is unspecified or nonisolated, insert an
-    // isolated parameter if AsyncCallerExecution is enabled.
+    // isolated parameter if NonisolatedNonsendingByDefault is enabled.
     //
     // NOTE: The parameter is not inserted for async functions imported
     // from ObjC because they are handled in a special way that doesn't

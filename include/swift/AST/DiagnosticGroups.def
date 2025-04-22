@@ -41,7 +41,7 @@
 GROUP(no_group, "")
 
 GROUP(ActorIsolatedCall, "actor-isolated-call")
-GROUP(AsyncCallerExecution, "async-caller-execution")
+GROUP(NonisolatedNonsendingByDefault, "nonisolated-nonsending-by-default")
 GROUP(ConformanceIsolation, "conformance-isolation")
 GROUP(DeprecatedDeclaration, "deprecated-declaration")
 GROUP(DynamicCallable, "dynamic-callable-requirements")
