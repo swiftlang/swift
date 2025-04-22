@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature AsyncCallerExecution -emit-module-path %t/WithFeature.swiftmodule -module-name WithFeature %S/Inputs/caller_inheriting_isolation.swift -swift-version 6
+// RUN: %target-swift-frontend -enable-upcoming-feature NonisolatedNonsendingByDefault -emit-module-path %t/WithFeature.swiftmodule -module-name WithFeature %S/Inputs/caller_inheriting_isolation.swift -swift-version 6
 // RUN: %target-swift-frontend -emit-module-path %t/WithoutFeature.swiftmodule -module-name WithoutFeature %S/Inputs/caller_inheriting_isolation.swift -swift-version 6
 
 // RUN: %target-swift-frontend -module-name main -I %t %s -emit-sil -o - | %FileCheck %s
 
-// RUN: %target-swift-frontend -enable-experimental-feature AsyncCallerExecution -module-name main -I %t %s -emit-sil -verify -swift-version 6
+// RUN: %target-swift-frontend -enable-upcoming-feature NonisolatedNonsendingByDefault -module-name main -I %t %s -emit-sil -verify -swift-version 6
 
 // REQUIRES: asserts
-// REQUIRES: swift_feature_AsyncCallerExecution
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 import WithFeature
 import WithoutFeature
