@@ -50,6 +50,7 @@ option(${PROJECT_NAME}_PLATFORM_SUBDIR "Platform name used for installed swift{d
   ${SwiftCore_PLATFORM_SUBDIR})
 
 add_compile_options(
+  "$<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -87,7 +88,8 @@ set_target_properties(swiftSynchronization PROPERTIES
 
 target_link_libraries(swiftSynchronization
   PRIVATE
-    swiftCore)
+    swiftCore
+    $<$<PLATFORM_ID:Darwin>:swiftDarwin>)
 
 set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}/${Supplemental_ARCH_SUBDIR}>" CACHE STRING "")
 set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}>" CACHE STRING "")
