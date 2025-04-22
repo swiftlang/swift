@@ -67,7 +67,7 @@ extension OutputRawSpan {
   public var freeCapacity: Int { capacity &- _count }
 
   @_alwaysEmitIntoClient
-  public var count: Int { _count }
+  public var byteCount: Int { _count }
 
   @_alwaysEmitIntoClient
   public var isEmpty: Bool { _count == 0 }
@@ -139,6 +139,7 @@ extension OutputRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @discardableResult
   @lifetime(self: copy self)
   public mutating func removeLast() -> UInt8? {
     guard _count > 0 else { return nil }
@@ -160,37 +161,40 @@ extension OutputRawSpan {
 
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func append(repeating repeatedValue: UInt8, count: Int) {
-    _precondition(count <= freeCapacity, "OutputRawSpan capacity overflow")
+  public mutating func append<T: BitwiseCopyable>(
+    repeating repeatedValue: T, count: Int
+  ) {
+    let total = count * MemoryLayout<T>.stride
+    _precondition(total <= freeCapacity, "OutputRawSpan capacity overflow")
     unsafe _tail().initializeMemory(
-      as: UInt8.self, repeating: repeatedValue, count: count
+      as: T.self, repeating: repeatedValue, count: count
     )
-    _count &+= count
+    _count &+= total
   }
 
   /// Returns true if the iterator has filled all the free capacity in the span.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   @discardableResult
-  public mutating func append(
-    from elements: inout some IteratorProtocol<UInt8>
+  public mutating func append<T: BitwiseCopyable>(
+    from elements: inout some IteratorProtocol<T>
   ) -> Bool {
     // FIXME: It may be best to delay this API until
     //        we have designed a chunking IteratorProtocol
     var p = unsafe _tail()
-    while _count < capacity {
-      guard let byte = elements.next() else { return false }
-      unsafe p.initializeMemory(as: UInt8.self, to: byte)
-      unsafe p = p.advanced(by: MemoryLayout<UInt8>.stride)
-      _count &+= 1
+    while (_count + MemoryLayout<T>.stride) <= capacity {
+      guard let element = elements.next() else { return false }
+      unsafe p.initializeMemory(as: T.self, to: element)
+      unsafe p = p.advanced(by: MemoryLayout<T>.stride)
+      _count &+= MemoryLayout<T>.stride
     }
-    return true
+    return freeCapacity == 0
   }
 
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func append(
-    fromContentsOf source: some Collection<UInt8>
+  public mutating func append<T: BitwiseCopyable>(
+    fromContentsOf source: some Sequence<T>
   ) {
     let done: Void? = source.withContiguousStorageIfAvailable {
       unsafe append(fromContentsOf: $0)
@@ -201,7 +205,7 @@ extension OutputRawSpan {
 
     let freeCapacity = freeCapacity
     var (iterator, copied) = unsafe _tail().withMemoryRebound(
-      to: UInt8.self, capacity: freeCapacity
+      to: T.self, capacity: freeCapacity
     ) {
       let suffix = unsafe UnsafeMutableBufferPointer(
         start: $0, count: freeCapacity
@@ -209,8 +213,9 @@ extension OutputRawSpan {
       return unsafe source._copyContents(initializing: suffix)
     }
     _precondition(iterator.next() == nil, "OutputRawSpan capacity overflow")
-    _precondition(_count + copied <= capacity, "Invalid Sequence._copyContents")
-    _count &+= copied
+    let total = copied * MemoryLayout<T>.stride
+    _precondition(_count + total <= capacity, "Invalid Sequence._copyContents")
+    _count &+= total
   }
 
   @_alwaysEmitIntoClient
@@ -228,15 +233,7 @@ extension OutputRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(
-    fromContentsOf source: Span<UInt8>
-  ) {
-    unsafe source.withUnsafeBytes { unsafe append(fromContentsOf: $0) }
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func append(
-    fromContentsOf source: borrowing MutableRawSpan
+    fromContentsOf source: RawSpan
   ) {
     unsafe source.withUnsafeBytes { unsafe append(fromContentsOf: $0) }
   }
