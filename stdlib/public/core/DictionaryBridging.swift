@@ -98,12 +98,12 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   @objc
   internal func nextObject() -> AnyObject? {
-    if unsafe nextBucket == endBucket {
+    if nextBucket == endBucket {
       return nil
     }
-    let bucket = unsafe nextBucket
+    let bucket = nextBucket
     unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
-    return unsafe self.bridgedKey(at: bucket)
+    return self.bridgedKey(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -119,7 +119,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
       unsafe theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
-    if unsafe nextBucket == endBucket {
+    if nextBucket == endBucket {
       unsafe state.pointee = theState
       return 0
     }
@@ -411,7 +411,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     // Only need to bridge once, so we can hoist it out of the loop.
     let bridgedKeys = unsafe bridgeKeys()
     for i in 0..<count {
-      if unsafe bucket == endBucket { break }
+      if bucket == endBucket { break }
 
       unsafe unmanagedObjects[i] = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
       stored += 1

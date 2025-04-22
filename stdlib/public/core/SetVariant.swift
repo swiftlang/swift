@@ -287,7 +287,7 @@ extension Set._Variant {
       return (false, unsafe asNative.uncheckedElement(at: bucket))
     }
     let isUnique = self.isUniquelyReferenced()
-    unsafe asNative.insertNew(element, at: bucket, isUnique: isUnique)
+    asNative.insertNew(element, at: bucket, isUnique: isUnique)
     return (true, element)
   }
 
@@ -305,7 +305,7 @@ extension Set._Variant {
     }
 #endif
     let isUnique = isUniquelyReferenced()
-    let bucket = unsafe asNative.validatedBucket(for: index)
+    let bucket = asNative.validatedBucket(for: index)
     return unsafe asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
   }
 

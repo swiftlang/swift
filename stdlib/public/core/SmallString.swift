@@ -147,7 +147,7 @@ extension _SmallString {
     var copy = self
     unsafe withUnsafeBytes(of: &copy._storage) {
       unsafe _internalInvariant(
-        $0[count..<_SmallString.capacity].allSatisfy { unsafe $0 == 0 })
+        $0[count..<_SmallString.capacity].allSatisfy { $0 == 0 })
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED

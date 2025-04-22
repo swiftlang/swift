@@ -330,7 +330,7 @@ extension _ArrayBuffer {
       .assumingMemoryBound(to: AnyObject.self)
     let (_, c) = unsafe _nonNative._copyContents(
       initializing: UnsafeMutableBufferPointer(start: ptr, count: buffer.count))
-    return unsafe (IndexingIterator(_elements: self, _position: c), c)
+    return (IndexingIterator(_elements: self, _position: c), c)
   }
 
   /// Returns a `_SliceBuffer` containing the given sub-range of elements in

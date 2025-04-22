@@ -3543,6 +3543,12 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   auto &ctx = underlying->getASTContext();
   auto arena = getArena(properties);
 
+  // Typealiases can't meaningfully be unsafe; it's the underlying type that
+  // matters.
+  properties.removeIsUnsafe();
+  if (underlying->isUnsafe())
+    properties |= RecursiveTypeProperties::IsUnsafe;
+
   // Profile the type.
   llvm::FoldingSetNodeID id;
   TypeAliasType::Profile(id, typealias, parent, genericArgs, underlying);
@@ -4190,6 +4196,54 @@ void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(Parent.getPointer());
 }
 
+/// The safety of a parent type does not have an impact on a nested type within
+/// it. This produces the recursive properties of a given type that should
+/// be propagated to a nested type, which won't include any "IsUnsafe" bit
+/// determined based on the declaration itself.
+static RecursiveTypeProperties getRecursivePropertiesAsParent(Type type) {
+  if (!type)
+    return RecursiveTypeProperties();
+
+  // We only need to do anything interesting at all for unsafe types.
+  auto properties = type->getRecursiveProperties();
+  if (!properties.isUnsafe())
+    return properties;
+
+  if (auto nominal = type->getAnyNominal()) {
+    // If the nominal wasn't itself unsafe, then we got the unsafety from
+    // something else (e.g., a generic argument), so it won't change.
+    if (nominal->getExplicitSafety() != ExplicitSafety::Unsafe)
+      return properties;
+  }
+
+  // Drop the "unsafe" bit. We have to recompute it without considering the
+  // enclosing nominal type.
+  properties.removeIsUnsafe();
+
+  // Check generic arguments of parent types.
+  while (type) {
+    // Merge from the generic arguments.
+    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+      for (auto genericArg : boundGeneric->getGenericArgs())
+        properties |= genericArg->getRecursiveProperties();
+    }
+
+    if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>()) {
+      type = nominalOrBound->getParent();
+      continue;
+    }
+
+    if (auto unbound = type->getAs<UnboundGenericType>()) {
+      type = unbound->getParent();
+      continue;
+    }
+
+    break;
+  };
+
+  return properties;
+}
+
 UnboundGenericType *UnboundGenericType::
 get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID ID;
@@ -4198,7 +4252,7 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
 
   auto arena = getArena(properties);
 
@@ -4252,7 +4306,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   RecursiveTypeProperties properties;
   if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
   }
@@ -4335,7 +4389,7 @@ EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
@@ -4353,7 +4407,7 @@ StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
@@ -4371,7 +4425,7 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).ClassTypes[{D, Parent}];
@@ -5538,7 +5592,7 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).ProtocolTypes[{D, Parent}];
