@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
+// REQUIRES: macosx
 
 sil_stage canonical
 
@@ -2219,4 +2220,43 @@ sil [ossa] @keep_yield2ed_copy : $@convention(thin) () -> () {
   destroy_value %copy : $C
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_from_forward1 : {{.*}} {
+// CHECK-NOT:   copy_value
+// CHECK-LABEL: } // end sil function 'borrowed_from_forward1'
+sil [ossa] @borrowed_from_forward1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  br bb1(%0)
+
+bb1(%1 : @guaranteed $C):
+  %2 = borrowed %1 from (%0)
+  %copy = copy_value %2
+  %useC = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  apply %useC(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %copy
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_from_forward2 : {{.*}} {
+// CHECK-NOT:   copy_value
+// CHECK-LABEL: } // end sil function 'borrowed_from_forward2'
+sil [ossa] @borrowed_from_forward2 : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : @guaranteed $Array<Int>):
+  %1 = struct_extract %0, #Array._buffer
+  %2 = struct_extract %1, #_ArrayBuffer._storage
+  %3 = struct_extract %2, #_BridgeStorage.rawValue
+  %4 = unchecked_ref_cast %3 to $__ContiguousArrayStorageBase
+  br bb1(%4)
+
+bb1(%6 : @guaranteed $__ContiguousArrayStorageBase):
+  %7 = borrowed %6 from (%0)
+  %8 = copy_value %7
+  %9 = begin_borrow %8
+  %10 = ref_element_addr [immutable] %9, #__ContiguousArrayStorageBase.countAndCapacity
+  end_borrow %9
+  destroy_value %8
+  %13 = tuple ()
+  return %13
 }
