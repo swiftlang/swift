@@ -24,6 +24,7 @@ public struct OutputRawSpan: ~Copyable, ~Escapable {
   @usableFromInline
   internal var _count: Int
 
+  /// Create an OutputRawSpan with zero capacity
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init() {
@@ -91,6 +92,17 @@ extension OutputRawSpan {
     _count = initializedCount
   }
 
+  /// Unsafely create an OutputRawSpan over partly-initialized memory.
+  ///
+  /// The memory in `buffer` must remain valid throughout the lifetime
+  /// of the newly-created `OutputRawSpan`. Its prefix must contain
+  /// `initializedCount` initialized bytes, followed by uninitialized
+  /// memory.
+  ///
+  /// - Parameters:
+  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - initializedCount: the number of initialized elements
+  ///                       at the beginning of `buffer`.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -113,6 +125,17 @@ extension OutputRawSpan {
     )
   }
 
+  /// Unsafely create an OutputRawSpan over partly-initialized memory.
+  ///
+  /// The memory in `buffer` must remain valid throughout the lifetime
+  /// of the newly-created `OutputRawSpan`. Its prefix must contain
+  /// `initializedCount` initialized bytes, followed by uninitialized
+  /// memory.
+  ///
+  /// - Parameters:
+  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - initializedCount: the number of initialized elements
+  ///                       at the beginning of `buffer`.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
@@ -271,11 +294,11 @@ extension OutputRawSpan {
   /// Call the given closure with the unsafe buffer pointer addressed by this
   /// OutputRawSpan and a mutable reference to its count of initialized bytes.
   ///
-  /// This method provides a way for Swift code to process or populate an
-  /// `OutputRawSpan` using unsafe operations; for example, it allows
-  /// dispatching to code written in legacy (memory-unsafe) languages.
+  /// This method provides a way to process or populate an `OutputRawSpan` using
+  /// unsafe operations, such as dispatching to code written in legacy
+  /// (memory-unsafe) languages.
   ///
-  /// The supplied function may process the buffer in any way it wants; however,
+  /// The supplied closure may process the buffer in any way it wants; however,
   /// when it finishes (whether by returning or throwing), it must leave the
   /// buffer in a state that satisfies the invariants of the output span:
   ///
