@@ -261,7 +261,7 @@ private:
   SILValue currentDef;
 
   /// Instructions beyond which liveness is not extended by destroy uses.
-  ArrayRef<SILInstruction *> currentLexicalLifetimeEnds;
+  ArrayRef<SILInstruction *> explicitLifetimeEnds;
 
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed.  Each block either contains a consuming instruction (e.g.
@@ -368,7 +368,7 @@ public:
     clear();
 
     currentDef = def;
-    currentLexicalLifetimeEnds = lexicalLifetimeEnds;
+    explicitLifetimeEnds = lexicalLifetimeEnds;
 
     liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     liveness->initializeDef(getCurrentDef());
