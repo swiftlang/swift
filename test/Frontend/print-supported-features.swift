@@ -5,6 +5,6 @@
 // CHECK:     { "name": "{{.*}}"{{, "migratable": true}}, "enabled_in": {{[0-9]+}} }
 // CHECK:   ],
 // CHECK-NEXT:   "experimental": [
-// CHECK:     { "name": "{{.*}}"{{, "migratable": true}} }
+// CHECK:     { "name": "{{.*}}" }
 // CHECK:   ]
 // CHECK: }

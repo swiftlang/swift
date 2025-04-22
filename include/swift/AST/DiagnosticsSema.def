@@ -8643,7 +8643,7 @@ NOTE(type_does_not_conform_to_Sendable,none,
      "type %0 does not conform to 'Sendable' protocol", (Type))
 
 GROUPED_WARNING(
-    attr_execution_nonisolated_behavior_will_change_decl, AsyncCallerExecution,
+    attr_execution_nonisolated_behavior_will_change_decl, NonisolatedNonsendingByDefault,
     none,
     "feature '%0' will cause nonisolated async %kindbase1 to run on the "
     "caller's actor; use %2 to preserve behavior",
@@ -8651,14 +8651,14 @@ GROUPED_WARNING(
 
 GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_closure,
-    AsyncCallerExecution, none,
+    NonisolatedNonsendingByDefault, none,
     "feature '%0' will cause nonisolated async closure to run on the caller's "
     "actor; use %1 to preserve behavior",
     (StringRef, DeclAttribute))
 
 GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_typerepr,
-    AsyncCallerExecution, none,
+    NonisolatedNonsendingByDefault, none,
     "feature '%0' will cause nonisolated async function type to be treated as "
     "specified to run on the caller's actor; use %1 to preserve "
     "behavior",

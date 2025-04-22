@@ -1,4 +1,4 @@
-//===-- Sema/AsyncCallerExecutionMigration.cpp ------------------*- C++ -*-===//
+//===-- Sema/NonisolatedNonsendingByDefaultMigration.cpp --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file implements code migration support for the `AsyncCallerExecution`
-/// feature.
+/// This file implements code migration support for the
+/// `NonisolatedNonsendingByDefault` feature.
 ///
 //===----------------------------------------------------------------------===//
 
-#include "AsyncCallerExecutionMigration.h"
+#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -30,34 +30,34 @@
 using namespace swift;
 
 namespace {
-class AsyncCallerExecutionMigrationTarget {
+class NonisolatedNonsendingByDefaultMigrationTarget {
   ASTContext &ctx;
   PointerUnion<ValueDecl *, AbstractClosureExpr *, FunctionTypeRepr *> node;
   TaggedUnion<ActorIsolation, FunctionTypeIsolation> isolation;
 
 public:
-  AsyncCallerExecutionMigrationTarget(ASTContext &ctx, ValueDecl *decl,
+  NonisolatedNonsendingByDefaultMigrationTarget(ASTContext &ctx, ValueDecl *decl,
                                       ActorIsolation isolation)
       : ctx(ctx), node(decl), isolation(isolation) {}
 
-  AsyncCallerExecutionMigrationTarget(ASTContext &ctx,
+  NonisolatedNonsendingByDefaultMigrationTarget(ASTContext &ctx,
                                       AbstractClosureExpr *closure,
                                       ActorIsolation isolation)
       : ctx(ctx), node(closure), isolation(isolation) {}
 
-  AsyncCallerExecutionMigrationTarget(ASTContext &ctx, FunctionTypeRepr *repr,
+  NonisolatedNonsendingByDefaultMigrationTarget(ASTContext &ctx, FunctionTypeRepr *repr,
                                       FunctionTypeIsolation isolation)
       : ctx(ctx), node(repr), isolation(isolation) {}
 
   /// Warns that the behavior of nonisolated async functions will change under
-  /// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+  /// `NonisolatedNonsendingByDefault` and suggests `@concurrent` to preserve the current
   /// behavior.
   void diagnose() const;
 };
 } // end anonymous namespace
 
-void AsyncCallerExecutionMigrationTarget::diagnose() const {
-  const auto feature = Feature::AsyncCallerExecution;
+void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
+  const auto feature = Feature::NonisolatedNonsendingByDefault;
 
   ASSERT(node);
   ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption());
@@ -189,15 +189,15 @@ void AsyncCallerExecutionMigrationTarget::diagnose() const {
 
 void swift::warnAboutNewNonisolatedAsyncExecutionBehavior(
     ASTContext &ctx, FunctionTypeRepr *repr, FunctionTypeIsolation isolation) {
-  AsyncCallerExecutionMigrationTarget(ctx, repr, isolation).diagnose();
+  NonisolatedNonsendingByDefaultMigrationTarget(ctx, repr, isolation).diagnose();
 }
 
 void swift::warnAboutNewNonisolatedAsyncExecutionBehavior(
     ASTContext &ctx, ValueDecl *decl, ActorIsolation isolation) {
-  AsyncCallerExecutionMigrationTarget(ctx, decl, isolation).diagnose();
+  NonisolatedNonsendingByDefaultMigrationTarget(ctx, decl, isolation).diagnose();
 }
 
 void swift::warnAboutNewNonisolatedAsyncExecutionBehavior(
     ASTContext &ctx, AbstractClosureExpr *closure, ActorIsolation isolation) {
-  AsyncCallerExecutionMigrationTarget(ctx, closure, isolation).diagnose();
+  NonisolatedNonsendingByDefaultMigrationTarget(ctx, closure, isolation).diagnose();
 }

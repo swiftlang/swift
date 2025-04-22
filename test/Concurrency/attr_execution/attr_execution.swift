@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature AsyncCallerExecution %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-upcoming-feature NonisolatedNonsendingByDefault %s | %FileCheck %s
 
-// REQUIRES: swift_feature_AsyncCallerExecution
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 
 // CHECK-LABEL: // concurrentTest()
