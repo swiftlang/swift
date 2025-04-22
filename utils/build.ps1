@@ -3190,18 +3190,17 @@ try {
 Get-Dependencies
 
 if ($Clean) {
+  Remove-Item -Force -Recurse -Path "$BinaryCache\$($BuildPlatform.Triple)\" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path "$BinaryCache\$($HostPlatform.Triple)\" -ErrorAction Ignore
-
-  # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
-  Remove-Item -Force -Recurse -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
   foreach ($Platform in $WindowsSDKPlatforms) {
     Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
   }
   foreach ($Platform in $AndroidSDKPlatforms) {
     Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
   }
-
-  Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion)) -ErrorAction Ignore
+  Remove-Item -Force -Recurse -Path "$BinaryCache\1" -ErrorAction Ignore
+  Remove-Item -Force -Recurse -Path "$BinaryCache\5" -ErrorAction Ignore
+  Remove-Item -Force -Recurse -Path (Get-InstallDir $HostPlatform) -ErrorAction Ignore
 }
 
 if (-not $SkipBuild) {
