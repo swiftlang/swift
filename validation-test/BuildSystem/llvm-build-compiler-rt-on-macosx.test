@@ -1,0 +1,28 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=1 --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
+
+# LLVM-USE-RUNTIMES: Building llvm
+# LLVM-USE-RUNTIMES-DAG: cmake -G Ninja
+# LLVM-USE-RUNTIMES-SAME: -DBUILTINS_{{[^ ]*}}_CMAKE_OSX_SYSROOT
+# LLVM-USE-RUNTIMES-SAME: -DRUNTIMES_{{[^ ]*}}_CMAKE_OSX_SYSROOT
+# LLVM-USE-RUNTIMES-SAME: -DLLVM_BUILTIN_TARGETS
+# LLVM-USE-RUNTIMES-SAME: -DLLVM_RUNTIME_TARGETS
+# LLVM-USE-RUNTIMES-SAME: -DRUNTIMES_{{[^ ]*}}_COMPILER_RT_SANITIZERS_TO_BUILD
+# LLVM-USE-RUNTIMES-NOT: rtsan
+# LLVM-USE-RUNTIMES-SAME: -DBUILTINS_{{[^ ]*}}_COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS
+# LLVM-USE-RUNTIMES-SAME: llvm
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=EXTERNAL-COMPILER-RT %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=0 --cmake %cmake  2>&1 | %FileCheck --check-prefix=EXTERNAL-COMPILER-RT %s
+
+# EXTERNAL-COMPILER-RT: Building llvm
+# EXTERNAL-COMPILER-RT-DAG: cmake -G Ninja
+# EXTERNAL-COMPILER-RT-SAME: -DCOMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS
+# EXTERNAL-COMPILER-RT-SAME: llvm
