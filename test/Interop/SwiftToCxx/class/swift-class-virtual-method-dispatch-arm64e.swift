@@ -16,7 +16,7 @@
 // CHECK-NEXT: void **vtable_ = *selfPtr_;
 // CHECK-NEXT: #endif
 // CHECK-NEXT: struct FTypeAddress {
-// CHECK-NEXT: decltype(_impl::$s5Class04BaseA0C13virtualMethodyyF) * __ptrauth_swift_class_method_pointer([[#AUTH:]]) func;
+// CHECK-NEXT: decltype(Class::_impl::$s5Class04BaseA0C13virtualMethodyyF) * __ptrauth_swift_class_method_pointer([[#AUTH:]]) func;
 // CHECK-NEXT: };
 // CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + [[#VM1:]] / sizeof(void *));
 // CHECK-NEXT:   (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
