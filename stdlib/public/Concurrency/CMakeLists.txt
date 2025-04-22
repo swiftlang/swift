@@ -214,6 +214,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES}
 
   GYB_SOURCES
+    Task+init.swift.gyb
     TaskGroup+addTask.swift.gyb
     Task+immediate.swift.gyb
 
