@@ -20,7 +20,7 @@ For an introduction and motivation into Embedded Swift, please see "[A Vision fo
 | Metatypes                                             | No, currently only allowed as unused arguments (type hints)                        |
 | Untyped throwing                                      | No, intentionally unsupported long-term (typed throwing should be used instead)    |
 | Weak references, unowned references                   | No                                                                                 |
-| Non-final generic class methods                       | No, intentionally unsupported long-term                                            |
+| Non-final generic class methods                       | No, intentionally unsupported long-term, see <[Embedded Swift -- Non-final generic methods](NonFinalGenericMethods.md)>|
 | Parameter packs (variadic generics)                   | No, not yet supported                                                              |
 
 ## Embedded Standard Library Breakdown
