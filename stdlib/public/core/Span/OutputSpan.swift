@@ -269,14 +269,6 @@ extension OutputSpan {
   ) {
     unsafe source.withUnsafeBufferPointer { unsafe append(fromContentsOf: $0) }
   }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
-  public mutating func append(
-    fromContentsOf source: borrowing MutableSpan<Element>
-  ) {
-    unsafe source.withUnsafeBufferPointer { unsafe append(fromContentsOf: $0) }
-  }
 }
 
 @available(SwiftStdlib 6.2, *)

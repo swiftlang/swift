@@ -194,9 +194,9 @@ suite.test("initialize buffer from Span")
   let c = 24
   a.initialize {
     os in
-    var array = Array(0..<c)
-    array.withUnsafeMutableBufferPointer {
-      let span = MutableSpan(_unsafeElements: $0)
+    let array = Array(0..<c)
+    array.withUnsafeBufferPointer {
+      let span = Span(_unsafeElements: $0)
       os.append(fromContentsOf: span)
     }
   }
