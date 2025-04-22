@@ -39,6 +39,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
     }
   }
 
+  /// Create an OutputSpan with zero capacity
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init() {
@@ -194,6 +195,7 @@ extension OutputSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan {
 
+  /// Initialize this span's suffix to the repetitions of the given value.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
@@ -351,14 +353,14 @@ extension OutputSpan where Element: ~Copyable {
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: ~Copyable {
-  /// Call the given function with the unsafe buffer pointer addressed by this
+  /// Call the given closure with the unsafe buffer pointer addressed by this
   /// OutputSpan and a mutable reference to its count of initialized elements.
   ///
-  /// This method provides a way for Swift code to process or populate an
-  /// `OutputSpan` using unsafe operations; for example, it allows dispatching
-  /// to code written in legacy (memory-unsafe) languages.
+  /// This method provides a way to process or populate an `OutputSpan` using
+  /// unsafe operations, such as dispatching to code written in legacy
+  /// (memory-unsafe) languages.
   ///
-  /// The supplied function may process the buffer in any way it wants; however,
+  /// The supplied closure may process the buffer in any way it wants; however,
   /// when it finishes (whether by returning or throwing), it must leave the
   /// buffer in a state that satisfies the invariants of the output span:
   ///
