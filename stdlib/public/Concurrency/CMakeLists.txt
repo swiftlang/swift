@@ -285,7 +285,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         continue()
       endif()
 
-      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho")
+      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho" OR "${arch}" STREQUAL "armv7m" OR "${arch}" STREQUAL "armv7em")
         # Host is macOS with a macOS SDK. To be able to build the C++ Concurrency runtime for non-Darwin targets using the macOS SDK,
         # we need to pass some extra flags and search paths.
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
