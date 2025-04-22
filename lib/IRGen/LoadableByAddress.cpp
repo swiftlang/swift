@@ -3574,6 +3574,7 @@ void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
   for (auto *BB : po.getPostOrder()) {
     for (auto &I : llvm::reverse(*BB)) {
       switch (I.getKind()) {
+      case SILInstructionKind::UncheckedBitwiseCastInst:
       case SILInstructionKind::TupleExtractInst:
       case SILInstructionKind::StructExtractInst: {
         auto &proj = cast<SingleValueInstruction>(I);
