@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckType.h"
-#include "AsyncCallerExecutionMigration.h"
+#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
@@ -4245,7 +4245,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
   } else {
-    if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
+    if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
             .isEnabledForAdoption()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {

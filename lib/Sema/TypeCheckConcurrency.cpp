@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckConcurrency.h"
-#include "AsyncCallerExecutionMigration.h"
+#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
@@ -4764,7 +4764,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
   // Apply computed preconcurrency.
   isolation = isolation.withPreconcurrency(preconcurrency);
 
-  if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
+  if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
           .isEnabledForAdoption()) {
     warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, closure, isolation);
   }
@@ -4945,7 +4945,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // If the nonisolated async inherits isolation from context,
     // return caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
-            Feature::AsyncCallerExecution)) {
+            Feature::NonisolatedNonsendingByDefault)) {
       if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
           func && func->hasAsync() &&
           func->getModuleContext() == decl->getASTContext().MainModule) {
@@ -5809,7 +5809,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   }
 
   // If we have an async function... by default we inherit isolation.
-  if (ctx.LangOpts.hasFeature(Feature::AsyncCallerExecution)) {
+  if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
     if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
         func && func->hasAsync() &&
         func->getModuleContext() == ctx.MainModule) {
@@ -5926,7 +5926,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // did not have an ExecutionKind::Caller attached to it.
   //
   // DISCUSSION: This occurs when we have a value decl that is explicitly marked
-  // as nonisolated but since AsyncCallerExecution is enabled, we return
+  // as nonisolated but since NonisolatedNonsendingByDefault is enabled, we return
   // CallerIsolationInheriting.
   if (isolationFromAttr && isolationFromAttr->getKind() ==
           ActorIsolation::CallerIsolationInheriting) {
@@ -6227,7 +6227,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
 
         if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
             ctx.LangOpts.hasFeature(
-                Feature::AsyncCallerExecution) &&
+                Feature::NonisolatedNonsendingByDefault) &&
             func && func->hasAsync() &&
             func->getModuleContext() == ctx.MainModule &&
             isolation.isNonisolated()) {
@@ -6272,7 +6272,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(Evaluator &evaluator,
   const auto inferredIsolation = computeActorIsolation(evaluator, value);
 
   auto &ctx = value->getASTContext();
-  if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
+  if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
           .isEnabledForAdoption()) {
     warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, value,
                                                   inferredIsolation.isolation);
