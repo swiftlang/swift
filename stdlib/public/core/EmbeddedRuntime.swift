@@ -236,6 +236,15 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
   return unsafe object
 }
 
+@unsafe
+public var _emptyBoxStorage: (Int, Int) = (/*isa*/0, /*refcount*/-1)
+
+@_cdecl("swift_allocEmptyBox")
+public func swift_allocEmptyBox() -> Builtin.RawPointer {
+  let box = unsafe Builtin.addressof(&_emptyBoxStorage)
+  swift_retain(object: box)
+  return box
+}
 
 
 /// Refcounting
