@@ -33,6 +33,15 @@ public struct Holder {
   var c: C
 }
 
+struct A {}
+
+struct NCWrapper : ~Copyable, ~Escapable {
+  @_hasStorage let a: NE { get }
+  deinit
+}
+
+sil @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
+sil @useA : $@convention(thin) (A) -> ()
 sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
 sil @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
 sil @useNE : $@convention(thin) (NE) -> ()
@@ -79,4 +88,30 @@ bb0(%0 : @owned $Holder):
   destroy_value %val
   %99 = tuple ()
   return %99
+}
+
+// Test that local variable analysis can handle an address-type mark_dependence on an address base. The drop_deinit
+// also creates an an unknown address scope, preventing diagnostics from promoting the mark_dependence to noescape.
+sil [ossa] @testMarkDepAddressProjection : $@convention(thin) (@owned NCWrapper) -> () {
+bb0(%0 : @owned $NCWrapper):
+  %1 = alloc_stack $NCWrapper, let, name "self", argno 1
+  store %0 to [init] %1
+  %3 = drop_deinit %1
+  %4 = struct_element_addr %3, #NCWrapper.a
+  %5 = load_borrow %4
+
+  %6 = function_ref @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
+  %8 = pointer_to_address %7 to [strict] $*A
+  %9 = mark_dependence [unresolved] %8 on %4
+  %10 = begin_access [read] [unsafe] %9
+  %11 = load [trivial] %10
+  end_access %10
+
+  %13 = function_ref @useA : $@convention(thin) (A) -> ()
+  %14 = apply %13(%11) : $@convention(thin) (A) -> ()
+  end_borrow %5
+  dealloc_stack %1
+  %17 = tuple ()
+  return %17
 }
