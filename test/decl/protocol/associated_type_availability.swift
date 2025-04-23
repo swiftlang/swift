@@ -19,7 +19,7 @@ struct ModelP1<A, B: P>: P1 {
 // Associated types in where clauses
 func testWhereBad<T: P1, U>(_: T) where T.B == U { }
 // expected-error@-1{{'B' is only available in macOS 13 or newer}}
-// expected-note@-2{{add @available attribute to enclosing global function}}
+// expected-note@-2{{add '@available' attribute to enclosing global function}}
 
 @available(macOS 13, *)
 func testWhereGood<T: P1, U>(_: T) where T.B == U { }
@@ -27,7 +27,7 @@ func testWhereGood<T: P1, U>(_: T) where T.B == U { }
 // Associated types in opaque parameter position
 func testPrimaryOpaqueParamBad<U>(_: some P1<some Any, U>) {}
 // expected-error@-1 2{{'B' is only available in macOS 13 or newer}}
-// expected-note@-2 2{{add @available attribute to enclosing global function}}
+// expected-note@-2 2{{add '@available' attribute to enclosing global function}}
 
 @available(macOS 13, *)
 func testPrimaryOpaqueParamGood<U: P>(_: some P1<some Any, U>) {}
@@ -35,7 +35,7 @@ func testPrimaryOpaqueParamGood<U: P>(_: some P1<some Any, U>) {}
 // Associated types in opaque result position
 func testPrimaryOpaqueResultBad<U: P>() -> some P1<String, U> {
 // expected-error@-1{{'B' is only available in macOS 13 or newer}}
-// expected-note@-2 2{{add @available attribute to enclosing global function}}
+// expected-note@-2 2{{add '@available' attribute to enclosing global function}}
   return ModelP1<String, U>()
   // expected-error@-1{{'ModelP1' is only available in macOS 13 or newer}}
   // expected-note@-2{{add 'if #available' version check}}
@@ -49,7 +49,7 @@ func testPrimaryOpaqueResultGood<U: P>() -> some P1<String, U> {
 // Associated types in existentials
 func testPrimaryExistentialBad<U>(_: any P1<Int, U>) {}
 // expected-error@-1{{'B' is only available in macOS 13 or newer}}
-// expected-note@-2{{add @available attribute to enclosing global function}}
+// expected-note@-2{{add '@available' attribute to enclosing global function}}
 
 @available(macOS 13, *)
 func testPrimaryExistentialGood<U>(_: any P1<Int, U>) {}
@@ -74,7 +74,7 @@ struct ModelP2: P2 {
 }
 
 extension ModelP2 {
-  // expected-note@-1{{add @available attribute to enclosing extension}}
+  // expected-note@-1{{add '@available' attribute to enclosing extension}}
 
   // Ok, the inferred typealias for A is always available.
   func takesA(_ a: A) {}
@@ -82,7 +82,7 @@ extension ModelP2 {
   // Bad, the inferred typealias for B is introduced with associated type B.
   func takesB(_ b: B) {}
   // expected-error@-1{{'B' is only available in macOS 14 or newer}}
-  // expected-note@-2{{add @available attribute to enclosing instance method}}
+  // expected-note@-2{{add '@available' attribute to enclosing instance method}}
 }
 
 protocol P3 {

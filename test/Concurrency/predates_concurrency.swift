@@ -41,9 +41,9 @@ func testInAsync(x: X, plainClosure: () -> Void) async { // expected-note 2{{par
   let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
 
-  unsafelySendableClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a @Sendable closure}}
+  unsafelySendableClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
   unsafelyMainActorClosure(plainClosure)
-  unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a @Sendable closure}}
+  unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
 }
 
 func testElsewhere(x: X) {
@@ -148,10 +148,10 @@ struct S3: Q, Sendable {
 // Historical attribute names do nothing (but are permitted)
 // ---------------------------------------------------------------------------
 func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of '@preconcurrency'}}
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of '@preconcurrency'}}
 
 // ---------------------------------------------------------------------------
 // Random bugs

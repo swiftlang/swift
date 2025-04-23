@@ -88,7 +88,7 @@ struct Foo {
   var y: Int
   
   var value: (Int, Int) {
-    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in @storageRestrictions list}}
+    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in '@storageRestrictions' list}}
     init(initialValue) {
       self.x = initialValue.0
       self.y = initialValue.1
