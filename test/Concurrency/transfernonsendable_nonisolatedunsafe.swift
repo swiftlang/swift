@@ -10,7 +10,7 @@
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass { // expected-complete-note 98{{}}
+class NonSendableKlass {
   var field: NonSendableKlass? = nil
 }
 
@@ -821,3 +821,209 @@ actor ActorContainingSendableStruct {
 }
 
 
+////////////////////
+// MARK: Closures //
+////////////////////
+
+func closureTests() async {
+  func sendingClosure(_ x: sending () -> ()) {
+  }
+
+  func testLetOneNSVariableError() async {
+    let x = NonSendableKlass()
+    sendingClosure { _ = x } // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+    sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
+  }
+
+  func testLetNonIsolatedUnsafeNSVariableNoError() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    sendingClosure { _ = x }
+    sendingClosure { _ = x }
+  }
+
+  func testLetOneNSVariableSVariableError() async {
+    let x = NonSendableKlass()
+    let y = CustomActorInstance()
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
+    }
+    sendingClosure { // expected-note {{access can happen concurrently}}
+      _ = x
+      _ = y
+    }
+  }
+
+  func testLetNonIsolatedUnsafeNSSVariableNoError() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let y = CustomActorInstance()
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+  }
+
+  func testLetTwoNSVariableError() async {
+    let x = NonSendableKlass()
+    let y = NonSendableKlass()
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
+    }
+    sendingClosure { // expected-note {{access can happen concurrently}}
+      _ = x
+      _ = y
+    }
+  }
+
+  func testLetTwoNSVariableError2() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let y = NonSendableKlass()
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
+    }
+    sendingClosure { // expected-note {{access can happen concurrently}}
+      _ = x
+      _ = y
+    }
+  }
+
+  func testLetTwoNSVariableError3() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    nonisolated(unsafe) let y = NonSendableKlass()
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+  }
+
+  func testVarOneNSVariableError() async {
+    var x = NonSendableKlass()
+    x = NonSendableKlass()
+
+    sendingClosure { _ = x } // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+    sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
+  }
+
+  func testVarNonIsolatedUnsafeNSVariableNoError() async {
+    nonisolated(unsafe) var x = NonSendableKlass()
+    x = NonSendableKlass()
+
+    sendingClosure { _ = x }
+    sendingClosure { _ = x }
+  }
+
+  func testVarOneNSVariableSVariableError() async {
+    var x = NonSendableKlass()
+    x = NonSendableKlass()
+    var y = CustomActorInstance()
+    y = CustomActorInstance()
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
+    }
+    sendingClosure { // expected-note {{access can happen concurrently}}
+      _ = x
+      _ = y
+    }
+  }
+
+  func testVarNonIsolatedUnsafeNSSVariableNoError() async {
+    nonisolated(unsafe) var x = NonSendableKlass()
+    x = NonSendableKlass()
+    var y = CustomActorInstance()
+    y = CustomActorInstance()
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+  }
+
+  func testVarTwoNSVariableError() async {
+    var x = NonSendableKlass()
+    x = NonSendableKlass()
+    var y = NonSendableKlass()
+    y = NonSendableKlass()
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
+    }
+    sendingClosure { // expected-note {{access can happen concurrently}}
+      _ = x
+      _ = y
+    }
+  }
+
+  func testVarTwoNSVariableError2() async {
+    nonisolated(unsafe) var x = NonSendableKlass()
+    x = NonSendableKlass()
+    var y = NonSendableKlass()
+    y = NonSendableKlass()
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
+    }
+    sendingClosure { // expected-note {{access can happen concurrently}}
+      _ = x
+      _ = y
+    }
+  }
+
+  func testVarTwoNSVariableError3() async {
+    nonisolated(unsafe) var x = NonSendableKlass()
+    x = NonSendableKlass()
+    nonisolated(unsafe) var y = NonSendableKlass()
+    y = NonSendableKlass()
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+    sendingClosure {
+      _ = x
+      _ = y
+    }
+  }
+
+  func testWithTaskDetached() async {
+    let x1 = NonSendableKlass()
+    Task.detached { _ = x1 } // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+    Task.detached { _ = x1 } // expected-note {{access can happen concurrently}}
+
+    nonisolated(unsafe) let x2 = NonSendableKlass()
+    Task.detached { _ = x2 }
+    Task.detached { _ = x2 }
+
+    nonisolated(unsafe) let x3a = NonSendableKlass()
+    nonisolated(unsafe) let x3b = NonSendableKlass()
+    Task.detached { _ = x3a; _ = x3b }
+    Task.detached { _ = x3a; _ = x3b }
+
+    nonisolated(unsafe) let x4a = NonSendableKlass()
+    let x4b = NonSendableKlass()
+    Task.detached { _ = x4a; _ = x4b } // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+    Task.detached { _ = x4a; _ = x4b } // expected-note {{access can happen concurrently}}
+  }
+}
