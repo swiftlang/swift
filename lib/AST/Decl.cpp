@@ -11113,16 +11113,16 @@ AccessorDecl *AccessorDecl::createParsed(
           subscriptParam->getArgumentNameLoc(),
           subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
           subscriptParam->getName(), /*declContext*/ accessor);
-      param->setAutoClosure(subscriptParam->isAutoClosure());
 
       // The cloned parameter is implicit.
       param->setImplicit();
 
-      if (subscriptParam->isSending())
-        param->setSending();
-
-      if (subscriptParam->isCallerIsolated())
-        param->setCallerIsolated();
+      // TODO: Check why IsVariadic is not copied.
+      param->setAutoClosure(subscriptParam->isAutoClosure());
+      param->setIsolated(subscriptParam->isIsolated());
+      // TODO: Check why IsAddressable is not copied.
+      param->setSending(subscriptParam->isSending());
+      param->setCallerIsolated(subscriptParam->isCallerIsolated());
 
       newParams.push_back(param);
     }
