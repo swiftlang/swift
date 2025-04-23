@@ -20,7 +20,7 @@ var computed: Int {
 }
 
 @cdecl("inout")
-func noBody(x: inout Int) { } // expected-error{{global function cannot be marked @cdecl because inout parameters cannot be represented in C}}
+func noBody(x: inout Int) { } // expected-error{{global function cannot be marked '@cdecl' because inout parameters cannot be represented in C}}
 
 struct SwiftStruct { var x, y: Int }
 enum SwiftEnum { case A, B }

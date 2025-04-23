@@ -42,7 +42,7 @@ extension MyStruct5 where T == Never {
 @_section("__TEXT,__mysection") // expected-error {{'@_section' attribute cannot be applied to this declaration}}
 struct SomeStruct {}
 
-@_section("") var g1: Int = 1 // expected-error {{@_section section name cannot be empty}}
+@_section("") var g1: Int = 1 // expected-error {{'@_section' section name cannot be empty}}
 
 func function() {
   @_section("__TEXT,__mysection") var l0: Int = 1 // expected-error {{attribute '_section' can only be used in a non-local scope}}

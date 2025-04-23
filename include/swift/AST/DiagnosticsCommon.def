@@ -92,7 +92,7 @@ ERROR(require_literal_initializer_for_literal,none,
       "_const let should be initialized with a literal value", ())
       
 ERROR(require_const_initializer_for_const,none,
-      "@const value should be initialized with a compile-time value", ())
+      "'@const' value should be initialized with a compile-time value", ())
 
 ERROR(require_const_arg_for_parameter,none,
       "expected a compile-time value argument for a '@const' parameter", ())
