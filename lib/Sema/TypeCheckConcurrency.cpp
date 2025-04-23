@@ -4700,9 +4700,11 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
 
     // `nonisolated(nonsending)` inferred from the context makes
     // the closure caller isolated.
-    if (auto *closureTy = getType(closure)->getAs<FunctionType>()) {
-      if (closureTy->getIsolation().isNonIsolatedCaller())
-        return ActorIsolation::forCallerIsolationInheriting();
+    if (auto closureTy = getType(closure)) {
+      if (auto *closureFnTy = closureTy->getAs<FunctionType>()) {
+        if (closureFnTy->getIsolation().isNonIsolatedCaller())
+          return ActorIsolation::forCallerIsolationInheriting();
+      }
     }
 
     // If a closure has an isolated parameter, it is isolated to that
