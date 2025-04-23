@@ -355,7 +355,7 @@ public final class Win32EventLoopExecutor
           // message, in case we're nested somehow.  It doesn't matter too
           // much if this is the outermost loop - we'll just quit at that
           // point.
-          PostQuitMessage(msg.wParam)
+          PostQuitMessage(CInt(unsafe msg.wParam))
           break
         }
 
@@ -386,12 +386,11 @@ public final class Win32EventLoopExecutor
   /// - job:   The job to schedule.
   ///
   public func enqueue(_ job: consuming ExecutorJob) {
-    let unownedJob = UnownedJob(job)
-
     // Tag it with a sequence number to force ordering for same-priority jobs
     let (newSequence, _) = sequence.wrappingAdd(1, ordering: .relaxed)
     job.win32Sequence = newSequence
 
+    let unownedJob = UnownedJob(job)
     runQueue.withLock {
       $0.push(unownedJob)
     }
