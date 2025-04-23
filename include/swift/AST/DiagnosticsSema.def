@@ -166,10 +166,14 @@ ERROR(init_candidate_inaccessible,none,
       (Type, AccessLevel))
 
 ERROR(candidate_from_missing_import,none,
-      "%0 %1 is not available due to missing import of defining module %2",
-      (DescriptiveDeclKind, DeclName, ModuleDecl *))
+      "%kind0 is not available due to missing import of defining module %1",
+      (const ValueDecl *, const ModuleDecl *))
+ERROR(candidate_from_missing_imports_2_or_more,none,
+      "%kind0 is not available due to missing imports of defining modules "
+      "%2%select{ and|, }1 %3%select{|, and others}1",
+      (const ValueDecl *, bool, const ModuleDecl *, const ModuleDecl *))
 NOTE(candidate_add_import,none,
-     "add import of module %0", (ModuleDecl *))
+     "add import of module %0", (const ModuleDecl *))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
@@ -6019,7 +6023,7 @@ ERROR(actor_isolation_multiple_attr_2,none,
       "%kind0 has multiple actor-isolation attributes (%1 and %2)",
       (const Decl *, DeclAttribute, DeclAttribute))
 ERROR(actor_isolation_multiple_attr_3,none,
-      "%0 %1 has multiple actor-isolation attributes (%2, %3 and %4)",
+      "%0 %1 has multiple actor-isolation attributes (%2, %3, and %4)",
       (const Decl *, DeclAttribute, DeclAttribute, DeclAttribute))
 ERROR(actor_isolation_multiple_attr_4,none,
       "%0 %1 has multiple actor-isolation attributes (%2, %3, %4, and %5)",
