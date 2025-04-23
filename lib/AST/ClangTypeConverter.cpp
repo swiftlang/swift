@@ -123,9 +123,11 @@ const clang::ASTContext &clangCtx) {
 
 } // end anonymous namespace
 
-const clang::Type *ClangTypeConverter::getFunctionType(
-    ArrayRef<AnyFunctionType::Param> params, Type resultTy,
-    AnyFunctionType::Representation repr, bool templateArgument) {
+template <bool templateArgument>
+const clang::Type *
+ClangTypeConverter::getFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                    Type resultTy,
+                                    AnyFunctionType::Representation repr) {
   auto resultClangTy =
       templateArgument ? convertTemplateArgument(resultTy) : convert(resultTy);
   if (resultClangTy.isNull())
@@ -167,9 +169,11 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   llvm_unreachable("invalid representation");
 }
 
-const clang::Type *ClangTypeConverter::getFunctionType(
-    ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
-    SILFunctionType::Representation repr, bool templateArgument) {
+template <bool templateArgument>
+const clang::Type *
+ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
+                                    std::optional<SILResultInfo> result,
+                                    SILFunctionType::Representation repr) {
   clang::QualType resultClangTy = ClangASTContext.VoidTy;
   if (result) {
     // Using the interface type is sufficient as type parameters get mapped to
@@ -571,18 +575,18 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   }
 
   if (auto kind = classifyPointer(type))
-    return convertPointerType(argType, kind.value(),
-                              /*templateArgument=*/false);
+    return convertPointerType</*templateArgument=*/false>(argType,
+                                                          kind.value());
 
   if (auto width = classifySIMD(type))
-    return convertSIMDType(argType, width.value(), /*templateArgument=*/false);
+    return convertSIMDType</*templateArgument=*/false>(argType, width.value());
 
   return clang::QualType();
 }
 
+template <bool templateArgument>
 clang::QualType ClangTypeConverter::convertSIMDType(CanType scalarType,
-                                                    unsigned width,
-                                                    bool templateArgument) {
+                                                    unsigned width) {
   clang::QualType scalarTy = templateArgument
                                  ? convertTemplateArgument(scalarType)
                                  : convert(scalarType);
@@ -594,9 +598,9 @@ clang::QualType ClangTypeConverter::convertSIMDType(CanType scalarType,
   return vectorTy;
 }
 
+template <bool templateArgument>
 clang::QualType ClangTypeConverter::convertPointerType(CanType pointeeType,
-                                                       PointerKind kind,
-                                                       bool templateArgument) {
+                                                       PointerKind kind) {
   switch (kind) {
   case PointerKind::Unmanaged:
     return templateArgument ? clang::QualType() : convert(pointeeType);
@@ -657,8 +661,8 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
   return convert(type->getDecl()->getRawType());
 }
 
-clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type,
-                                                      bool templateArgument) {
+template <bool templateArgument>
+clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type) {
   const clang::Type *clangTy = nullptr;
   auto repr = type->getRepresentation();
   bool useClangTypes = type->getASTContext().LangOpts.UseClangFunctionTypes;
@@ -672,15 +676,15 @@ clang::QualType ClangTypeConverter::visitFunctionType(FunctionType *type,
     auto newRepr = (repr == FunctionTypeRepresentation::Swift
                         ? FunctionTypeRepresentation::Block
                         : repr);
-    clangTy = getFunctionType(type->getParams(), type->getResult(), newRepr,
-                              templateArgument);
+    clangTy = getFunctionType<templateArgument>(type->getParams(),
+                                                type->getResult(), newRepr);
   }
   return clang::QualType(clangTy, 0);
 }
 
+template <bool templateArgument>
 clang::QualType
-ClangTypeConverter::visitSILFunctionType(SILFunctionType *type,
-                                         bool templateArgument) {
+ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) {
   const clang::Type *clangTy = nullptr;
   auto repr = type->getRepresentation();
   bool useClangTypes = type->getASTContext().LangOpts.UseClangFunctionTypes;
@@ -698,8 +702,8 @@ ClangTypeConverter::visitSILFunctionType(SILFunctionType *type,
     auto optionalResult = results.empty()
                               ? std::nullopt
                               : std::optional<SILResultInfo>(results[0]);
-    clangTy = getFunctionType(type->getParameters(), optionalResult, newRepr,
-                              templateArgument);
+    clangTy = getFunctionType<templateArgument>(type->getParameters(),
+                                                optionalResult, newRepr);
   }
   return clang::QualType(clangTy, 0);
 }
@@ -984,8 +988,8 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
           auto pointeeType = argType->getAs<BoundGenericType>()
                                  ->getGenericArgs()[0]
                                  ->getCanonicalType();
-          return convertPointerType(pointeeType, kind.value(),
-                                    /*templateArgument=*/true);
+          return convertPointerType</*templateArgument=*/true>(pointeeType,
+                                                               kind.value());
         });
 
       // Arbitrary optional types are not (yet) supported
@@ -994,14 +998,14 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
 
     if (auto kind = classifyPointer(boundGenericType))
       return withCache([&]() {
-        return convertPointerType(argType, kind.value(),
-                                  /*templateArgument=*/true);
+        return convertPointerType</*templateArgument=*/true>(argType,
+                                                             kind.value());
       });
 
     if (auto width = classifySIMD(boundGenericType))
       return withCache([&]() {
-        return convertSIMDType(argType, width.value(),
-                               /*templateArgument=*/true);
+        return convertSIMDType</*templateArgument=*/true>(argType,
+                                                          width.value());
       });
 
     return clang::QualType();
@@ -1009,13 +1013,13 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
 
   if (auto functionType = type->getAs<FunctionType>()) {
     return withCache([&]() {
-      return visitFunctionType(functionType, /*templateArgument=*/true);
+      return visitFunctionType</*templateArgument=*/true>(functionType);
     });
   }
 
   if (auto functionType = type->getAs<SILFunctionType>()) {
     return withCache([&]() {
-      return visitSILFunctionType(functionType, /*templateArgument=*/true);
+      return visitSILFunctionType</*templateArgument=*/true>(functionType);
     });
   }
 
