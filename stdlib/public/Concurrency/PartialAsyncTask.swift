@@ -303,15 +303,26 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   public var priority: JobPriority {
-    let raw: UInt8
-    if #available(SwiftStdlib 6.2, *) {
-      raw = _jobGetPriority(self.context)
-    } else {
-      // We are building the new version of the code, so we should never
-      // get here.
-      Builtin.unreachable()
+    get {
+      let raw: UInt8
+      if #available(SwiftStdlib 6.2, *) {
+        raw = _jobGetPriority(self.context)
+      } else {
+        // We are building the new version of the code, so we should never
+        // get here.
+        Builtin.unreachable()
+      }
+      return JobPriority(rawValue: raw)
     }
-    return JobPriority(rawValue: raw)
+    set {
+      if #available(SwiftStdlib 6.2, *) {
+        _jobSetPriority(self.context, newValue.rawValue)
+      } else {
+        // We are building the new version of the code, so we should never
+        // get here.
+        Builtin.unreachable()
+      }
+    }
   }
 
   /// Execute a closure, passing it the bounds of the executor private data
@@ -546,6 +557,16 @@ public struct JobPriority: Sendable {
 
   /// The raw priority value.
   public var rawValue: RawValue
+
+  /// Construct from a raw value
+  public init(rawValue: RawValue) {
+    self.rawValue = rawValue
+  }
+
+  /// Construct from a TaskPriority
+  public init(_ p: TaskPriority) {
+    self.rawValue = p.rawValue
+  }
 }
 
 @available(SwiftStdlib 5.9, *)

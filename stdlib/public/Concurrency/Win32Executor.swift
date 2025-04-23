@@ -88,6 +88,21 @@ extension ExecutorJob {
     }
   }
 
+  fileprivate var win32Sequence: UInt {
+    get {
+      return unsafe withUnsafeExecutorPrivateData {
+        return unsafe $0.assumingMemoryBound(to: UInt.self)[0]
+      }
+    }
+    set {
+      return unsafe withUnsafeExecutorPrivateData {
+        unsafe $0.withMemoryRebound(to: UInt.self) {
+          unsafe $0[0] = newValue
+        }
+      }
+    }
+  }
+
   fileprivate mutating func setupWin32Timestamp() {
     // If a Timestamp won't fit, allocate
     if win32TimestampIsIndirect {
@@ -203,6 +218,7 @@ public final class Win32EventLoopExecutor
   private var hThread: HANDLE?
   private var hEvent: HANDLE?
   private let bShouldStop: Atomic<Bool>
+  private let sequence: Atomic<UInt>
 
   private(set) public var isMainExecutor: Bool
 
@@ -212,19 +228,34 @@ public final class Win32EventLoopExecutor
     self.isMainExecutor = isMainExecutor
     self.dwThreadId = 0
     self.bShouldStop = Atomic<Bool>(false)
+    self.sequence = Atomic<UInt>(0)
     unsafe self.hEvent = CreateEventW(nil, true, false, nil)
-    self.runQueue = Mutex(PriorityQueue(compare: { $0.priority > $1.priority }))
-    self.currentRunQueue = PriorityQueue(compare: { $0.priority > $1.priority })
+
+    let comparePriorities = { (lhs: UnownedJob, rhs: UnownedJob) -> Bool in
+      if lhs.priority == rhs.priority {
+        // If they're the same priority, compare the sequence numbers to
+        // ensure this queue gives stable ordering.  We want the lowest
+        // sequence number first, but note that we want to handle wrapping.
+        let delta = ExecutorJob(lhs).win32Sequence
+          &- ExecutorJob(rhs).win32Sequence
+        return (delta >> (UInt.bitWidth - 1)) != 0
+      } else {
+        return lhs.priority > rhs.priority
+      }
+    }
+
+    self.runQueue = Mutex(PriorityQueue(compare: comparePriorities))
+    self.currentRunQueue = PriorityQueue(compare: comparePriorities)
+
+    let compareTimestamps = { (lhs: UnownedJob, rhs: UnownedJob) -> Bool in
+      return ExecutorJob(lhs).win32Timestamp.deadline
+        < ExecutorJob(rhs).win32Timestamp.deadline
+    }
+
     self.waitQueues = Mutex(
       [
-        PriorityQueue(compare: {
-                        ExecutorJob($0).win32Timestamp.deadline
-                          < ExecutorJob($1).win32Timestamp.deadline
-                    }),
-        PriorityQueue(compare: {
-                        ExecutorJob($0).win32Timestamp.deadline
-                          < ExecutorJob($1).win32Timestamp.deadline
-                      })
+        PriorityQueue(compare: compareTimestamps),
+        PriorityQueue(compare: compareTimestamps)
       ]
     )
   }
@@ -356,9 +387,15 @@ public final class Win32EventLoopExecutor
   ///
   public func enqueue(_ job: consuming ExecutorJob) {
     let unownedJob = UnownedJob(job)
+
+    // Tag it with a sequence number to force ordering for same-priority jobs
+    let (newSequence, _) = sequence.wrappingAdd(1, ordering: .relaxed)
+    job.win32Sequence = newSequence
+
     runQueue.withLock {
       $0.push(unownedJob)
     }
+
     wakeEventLoop()
   }
 
@@ -565,9 +602,9 @@ public final class Win32ThreadPoolExecutor: TaskExecutor, @unchecked Sendable {
     for priority: JobPriority,
     body: (UnsafeMutablePointer<TP_CALLBACK_ENVIRON>) -> R
   ) -> R {
-    if priority.rawValue < 85 {
+    if priority.rawValue <= TaskPriority.low.rawValue {
       return unsafe withUnsafeMutablePointer(to: &cbeLowPriority, body)
-    } else if priority.rawValue > 170 {
+    } else if priority.rawValue >= TaskPriority.high.rawValue {
       return unsafe withUnsafeMutablePointer(to: &cbeHighPriority, body)
     } else {
       return unsafe withUnsafeMutablePointer(to: &cbeNormalPriority, body)

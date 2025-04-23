@@ -70,6 +70,21 @@ extension ExecutorJob {
     }
   }
 
+  fileprivate var cooperativeExecutorSequence: UInt {
+    get {
+      return unsafe withUnsafeExecutorPrivateData {
+        return unsafe $0.assumingMemoryBound(to: UInt.self)[0]
+      }
+    }
+    set {
+      return unsafe withUnsafeExecutorPrivateData {
+        unsafe $0.withMemoryRebound(to: UInt.self) {
+          unsafe $0[0] = newValue
+        }
+      }
+    }
+  }
+
   fileprivate mutating func setupCooperativeExecutorTimestamp() {
     // If a Timestamp won't fit, allocate
     if cooperativeExecutorTimestampIsIndirect {
@@ -100,10 +115,11 @@ extension ExecutorJob {
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
 @available(SwiftStdlib 6.2, *)
-class CooperativeExecutor: Executor, @unchecked Sendable {
+public class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   var waitQueue: PriorityQueue<UnownedJob>
   var shouldStop: Bool = false
+  var sequence: UInt = 0
 
   /// Internal representation of a duration for CooperativeExecutor
   struct Duration {
@@ -162,7 +178,21 @@ class CooperativeExecutor: Executor, @unchecked Sendable {
   }
 
   public init() {
-    runQueue = PriorityQueue(compare: { $0.priority > $1.priority })
+    runQueue = PriorityQueue(compare: {
+                               if $0.priority == $1.priority {
+                                 // If they're the same priority, compare the
+                                 // sequence numbers to ensure that this queue
+                                 // gives stable ordering.  We want the lowest
+                                 // sequence number first, but note that we
+                                 // want to handle wrapping.
+                                 let delta
+                                   = ExecutorJob($0).cooperativeExecutorSequence
+                                   &- ExecutorJob($1).cooperativeExecutorSequence
+                                 return (delta >> (UInt.bitWidth - 1)) != 0
+                               } else {
+                                 return $0.priority > $1.priority
+                               }
+                             })
     waitQueue =
       PriorityQueue(compare: {
                       ExecutorJob($0).cooperativeExecutorTimestamp
@@ -171,6 +201,8 @@ class CooperativeExecutor: Executor, @unchecked Sendable {
   }
 
   public func enqueue(_ job: consuming ExecutorJob) {
+    job.cooperativeExecutorSequence = sequence
+    sequence = sequence &+ 1
     runQueue.push(UnownedJob(job))
   }
 
