@@ -375,3 +375,15 @@ Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change f
 
 Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
 Func type(of:) has parameter 0 changing from Default to Shared
+
+// Renames made by SE-0370. There are also new deprecated methods to preserve
+// source compatibility. These only started being flagged when the ABI magic
+// switched from @_silgen_name to @abi.
+Func UnsafeMutableBufferPointer.assign(repeating:) has been renamed to Func update(repeating:)
+Func UnsafeMutablePointer.assign(from:count:) has been renamed to Func update(from:count:)
+Func UnsafeMutablePointer.assign(repeating:count:) has been renamed to Func update(repeating:count:)
+
+// False positive: this is a new overload of a method with some @abi trickery
+// that confuses the API checker into losing track of the old overload.
+// FIXME: It'd be nice if this didn't happen.
+Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has generic signature change from <T> to <T where T : Swift.BitwiseCopyable>
