@@ -7821,6 +7821,7 @@ public:
   }
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
+  void setAccessKind(OpenedExistentialAccess kind) { ForAccess = kind; }
 
   CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
