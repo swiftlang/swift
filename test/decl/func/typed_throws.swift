@@ -216,3 +216,9 @@ struct NotAnError<T> {}
 
 func badThrowingFunctionType<T>(_: () throws(NotAnError<T>) -> ()) {}
 // expected-error@-1 {{thrown type 'NotAnError<T>' does not conform to the 'Error' protocol}}
+
+enum ObjCError: Int, Error {
+  case Others
+}
+@objc func objcTypedThrow() throws(ObjCError) -> () {}
+// expected-error@-1 {{typed throw can't be applied to @objc functions}}

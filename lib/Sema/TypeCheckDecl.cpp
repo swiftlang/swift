@@ -2569,12 +2569,13 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       ProtocolDecl *errorProto = Context.getErrorDecl();
       if (thrownTy && !thrownTy->hasError() && errorProto) {
         Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
-        if (!checkConformance(thrownTyInContext, errorProto)) {
-          SourceLoc loc;
-          if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
-            loc = thrownTypeRepr->getLoc();
-          else
-            loc = AFD->getLoc();
+        auto thrownTypeRepr = AFD->getThrownTypeRepr();
+        SourceLoc loc =
+            (thrownTypeRepr) ? thrownTypeRepr->getLoc() : AFD->getLoc();
+        if (AFD->getAttrs().hasAttribute<ObjCAttr>()) {
+          Context.Diags.diagnose(loc, diag::typed_thrown_in_objc_forbidden,
+                                 thrownTy);
+        } else if (!checkConformance(thrownTyInContext, errorProto)) {
           Context.Diags.diagnose(loc, diag::thrown_type_not_error, thrownTy);
         }
       }

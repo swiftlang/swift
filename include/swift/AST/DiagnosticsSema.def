@@ -5461,6 +5461,9 @@ WARNING(no_throw_in_do_with_catch,none,
 ERROR(thrown_type_not_error,none,
       "thrown type %0 does not conform to the 'Error' protocol", (Type))
 
+ERROR(typed_thrown_in_objc_forbidden,none,
+      "typed throw can't be applied to @objc functions", ())
+
 //------------------------------------------------------------------------------
 // MARK: Concurrency
 //------------------------------------------------------------------------------
