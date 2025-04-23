@@ -426,7 +426,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, type, dc);
   func->setStatic(isStatic);
-  func->setAccess(getOverridableAccessLevel(dc));
   func->setIsObjC(false);
   func->setIsDynamic(false);
 
