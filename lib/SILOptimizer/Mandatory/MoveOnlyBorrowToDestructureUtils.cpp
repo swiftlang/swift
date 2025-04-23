@@ -877,7 +877,6 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       llvm::dbgs()
       << "    Destructuring available values in preds to smallest size for bb"
       << block->getDebugID() << '\n');
-  auto *fn = block->getFunction();
   IntervalMapAllocator::Map typeSpanToValue(getAllocator());
   for (auto *predBlock : predsSkippingBackEdges) {
     SWIFT_DEFER { typeSpanToValue.clear(); };
@@ -930,20 +929,10 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       // smallest offset size could result in further destructuring that an
       // earlier value required. Instead, we do a final loop afterwards using
       // the interval map to update each available value.
-      auto iterType = iterValue->getType();
       auto loc = getSafeLoc(predBlock->getTerminator());
       SILBuilderWithScope builder(predBlock->getTerminator());
 
       while (smallestOffsetSize->first.size < iterOffsetSize.size) {
-        TypeOffsetSizePair childOffsetSize;
-        SILType childType;
-
-        // We are returned an optional here and should never fail... so use a
-        // force unwrap.
-        std::tie(childOffsetSize, childType) =
-            *iterOffsetSize.walkOneLevelTowardsChild(iterOffsetSize, iterType,
-                                                     fn);
-
         // Before we destructure ourselves, erase our entire value from the
         // map. We do not need to consider the possibility of there being holes
         // in our range since we always store values whole to their entire
