@@ -2572,9 +2572,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         auto thrownTypeRepr = AFD->getThrownTypeRepr();
         SourceLoc loc =
             (thrownTypeRepr) ? thrownTypeRepr->getLoc() : AFD->getLoc();
-        if (AFD->getAttrs().hasAttribute<ObjCAttr>()) {
-          Context.Diags.diagnose(loc, diag::typed_thrown_in_objc_forbidden,
-                                 thrownTy);
+        if (AFD->getAttrs().hasAttribute<ObjCAttr>() && thrownTy) {
+          Context.Diags.diagnose(loc, diag::typed_thrown_in_objc_forbidden);
         } else if (!checkConformance(thrownTyInContext, errorProto)) {
           Context.Diags.diagnose(loc, diag::thrown_type_not_error, thrownTy);
         }

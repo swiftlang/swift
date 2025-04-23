@@ -221,4 +221,4 @@ enum ObjCError: Int, Error {
   case Others
 }
 @objc func objcTypedThrow() throws(ObjCError) -> () {}
-// expected-error@-1 {{typed throw can't be applied to @objc functions}}
+// expected-error@-1 {{@objc functions cannot have typed throw}}
