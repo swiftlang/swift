@@ -1390,8 +1390,8 @@ update_operand:
 
           // Then walk one level towards our target type.
           std::tie(iterOffsetSize, iterType) =
-              *useOffsetSize.walkOneLevelTowardsChild(parentOffsetSize,
-                                                      iterType, fn);
+              *useOffsetSize.walkOneLevelTowardsChild(
+                  parentOffsetSize, iterType, unwrappedOperandType, fn);
 
           unsigned start = parentOffsetSize.startOffset;
           consumeBuilder.emitDestructureValueOperation(
