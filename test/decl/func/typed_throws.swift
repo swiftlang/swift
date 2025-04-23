@@ -220,5 +220,9 @@ func badThrowingFunctionType<T>(_: () throws(NotAnError<T>) -> ()) {}
 enum ObjCError: Int, Error {
   case Others
 }
-@objc func objcTypedThrow() throws(ObjCError) -> () {}
-// expected-error@-1 {{@objc functions cannot have typed throw}}
+
+import Foundation
+@objc class ObjCClass: NSObject {
+  @objc func objcTypedThrow() throws(ObjCError) -> () {}
+  // expected-error@-1 {{@objc functions cannot have typed throw}}
+}
