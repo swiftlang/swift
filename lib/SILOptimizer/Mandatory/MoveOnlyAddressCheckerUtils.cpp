@@ -3431,6 +3431,10 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
       auto accessPath = AccessPathWithBase::computeInScope(copy->getSrc());
       if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
+      if (auto *oeai =
+              dyn_cast_or_null<OpenExistentialAddrInst>(copy->getSrc())) {
+        oeai->setAccessKind(OpenedExistentialAccess::Mutable);
+      }
       copy->setIsTakeOfSrc(IsTake);
       continue;
     }

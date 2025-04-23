@@ -127,6 +127,16 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
     llvm_unreachable("Not a child of this enum?!");
   }
 
+  if (ancestorType.isExistentialType()) {
+    assert(childType);
+    auto childArchetypeType =
+        childType.getASTType()->getAs<ExistentialArchetypeType>();
+    assert(childArchetypeType);
+    assert(childArchetypeType->getExistentialType()->getCanonicalType() ==
+           ancestorType.getASTType());
+    return {{ancestorOffsetSize, childType}};
+  }
+
   llvm_unreachable("Hit a leaf type?! Should have handled it earlier");
 }
 
