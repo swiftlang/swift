@@ -6576,13 +6576,16 @@ const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionTypeRepresentation trueRep) {
-  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep,
+                                                 /*templateArgument=*/false);
 }
 
 const clang::Type *ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
-  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  auto *ty =
+      getClangTypeConverter().getFunctionType(params, result, trueRep,
+                                              /*templateArgument=*/false);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
