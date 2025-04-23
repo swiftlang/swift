@@ -64,7 +64,9 @@ sil @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
 sil @useA : $@convention(thin) (A) -> ()
 
 sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
-sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
+
+sil @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+sil @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
 
 sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 
@@ -438,4 +440,67 @@ bb0(%0 : @owned $B):
   dealloc_stack %1
   %24 = tuple ()
   return %24
+}
+
+// =============================================================================
+// Return value extension
+// =============================================================================
+
+// Sink the end access to the "return" phi and rewrite mark_dependence on the argument.
+//
+// CHECK-LABEL: sil hidden [ossa] @testReturnPhi : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned Optional<NE> {
+// CHECK: bb0(%0 : $*Holder):
+// CHECK: bb1:
+// CHECK:   enum $Optional<NE>, #Optional.none!enumelt
+// CHECK: bb2:
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] %0
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] {{%.*}} on %0
+// CHECK:   [[OPT:%.*]] = enum $Optional<NE>, #Optional.some!enumelt, %7
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   br bb3([[OPT]])
+// CHECK: bb3([[RET:%.*]] : @owned $Optional<NE>):
+// CHECK:   return [[RET]]
+// CHECK-LABEL: } // end sil function 'testReturnPhi'
+sil hidden [ossa] @testReturnPhi : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned Optional<NE> {
+bb0(%0 : $*Holder):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %none = enum $Optional<NE>, #Optional.none!enumelt
+  br bb3(%none)
+
+bb2:
+  %access = begin_access [modify] [unknown] %0
+  %f = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %ne = apply %f(%access) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %md = mark_dependence [unresolved] %ne on %access
+  end_access %access
+  %some = enum $Optional<NE>, #Optional.some!enumelt, %md
+  br bb3(%some)
+
+bb3(%ret : @owned $Optional<NE>):
+  return %ret
+}
+
+// Allow a [read] access to depend on a caller's [modify] access.
+//
+// CHECK-LABEL: sil hidden [noinline] [ossa] @testNestedModRead : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE {
+// CHECK: bb0(%0 : $*Holder):
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] %0
+// CHECK:   [[LD:%.*]] = load [copy] [[ACCESS]]
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] %{{.*}} on %0
+// CHECK:   destroy_value [[LD]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   return [[MD]]
+// CHECK-LABEL: } // end sil function 'testNestedModRead'
+sil hidden [noinline] [ossa] @testNestedModRead : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : $*Holder):
+  %access = begin_access [read] [unknown] %0
+  %holder = load [copy] %access
+  end_access %access
+  %f = function_ref @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %ne = apply %f(%holder) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %md = mark_dependence [unresolved] %ne on %access
+  destroy_value %holder
+  return %md
 }
