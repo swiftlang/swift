@@ -1898,7 +1898,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // Otherwise, walk one level towards our child type. We unconditionally
     // unwrap since we should never fail here due to earlier checking.
     std::tie(iterPair, iterType) =
-        *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
+        *pair.walkOneLevelTowardsChild(iterPair, iterType, targetType, fn);
   }
 
   return {};

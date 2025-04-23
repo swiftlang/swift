@@ -26,7 +26,7 @@ static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
 std::optional<std::pair<TypeOffsetSizePair, SILType>>
 TypeOffsetSizePair::walkOneLevelTowardsChild(
     TypeOffsetSizePair ancestorOffsetSize, SILType ancestorType,
-    SILFunction *fn) const {
+    SILType childType, SILFunction *fn) const {
   assert(ancestorOffsetSize.size >= size &&
          "Too large to be a child of ancestorType");
   assert((ancestorOffsetSize.startOffset <= startOffset &&
