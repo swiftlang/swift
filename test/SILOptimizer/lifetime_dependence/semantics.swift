@@ -434,9 +434,8 @@ func testGlobal(local: InnerTrivial) -> Span<Int> {
 
 @lifetime(&a)
 func testInoutBorrow(a: inout [Int]) -> Span<Int> {
-  a.span() // expected-error {{lifetime-dependent value escapes its scope}}
-  // expected-note @-1{{it depends on this scoped access to variable 'a'}}
-} // expected-note {{this use causes the lifetime-dependent value to escape}}
+  a.span() // OK
+}
 
 @lifetime(&a)
 func testInoutMutableBorrow(a: inout [Int]) -> MutableSpan<Int> {
@@ -462,12 +461,10 @@ extension Container {
 
   @lifetime(&self)
   mutating func mutableView() -> MutableView {
-    // Reading 'self.owner' creates a local borrow scope. This new MutableView
-    // depends on a the local borrow scope for 'self.owner', so it cannot be
-    // returned.
-    MutableView(owner: self.owner) // expected-error {{lifetime-dependent value escapes its scope}}
-    // expected-note @-1{{it depends on this scoped access to variable 'self'}}
-  } // expected-note    {{this use causes the lifetime-dependent value to escape}}
+    // Reading 'self.owner' creates a local borrow scope. The caller's exclusive access on 'self' is sufficient for the
+    // result.
+    MutableView(owner: self.owner) // OK
+  }
 
   @lifetime(&self)
   mutating func mutableViewModifiesOwner() -> MutableView {

@@ -65,7 +65,8 @@ sil @useA : $@convention(thin) (A) -> ()
 
 sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
 
-sil @getOwnedNE : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+sil @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+sil @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
 
 sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 
@@ -470,7 +471,7 @@ bb1:
 
 bb2:
   %access = begin_access [modify] [unknown] %0
-  %f = function_ref @getOwnedNE : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %f = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
   %ne = apply %f(%access) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
   %md = mark_dependence [unresolved] %ne on %access
   end_access %access
@@ -479,4 +480,27 @@ bb2:
 
 bb3(%ret : @owned $Optional<NE>):
   return %ret
+}
+
+// Allow a [read] access to depend on a caller's [modify] access.
+//
+// CHECK-LABEL: sil hidden [noinline] [ossa] @testNestedModRead : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE {
+// CHECK: bb0(%0 : $*Holder):
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] %0
+// CHECK:   [[LD:%.*]] = load [copy] [[ACCESS]]
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] %{{.*}} on %0
+// CHECK:   destroy_value [[LD]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   return [[MD]]
+// CHECK-LABEL: } // end sil function 'testNestedModRead'
+sil hidden [noinline] [ossa] @testNestedModRead : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : $*Holder):
+  %access = begin_access [read] [unknown] %0
+  %holder = load [copy] %access
+  end_access %access
+  %f = function_ref @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %ne = apply %f(%holder) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %md = mark_dependence [unresolved] %ne on %access
+  destroy_value %holder
+  return %md
 }
