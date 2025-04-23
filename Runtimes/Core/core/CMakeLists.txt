@@ -281,6 +281,10 @@ endif()
 set_target_properties(swiftCore PROPERTIES
   Swift_MODULE_NAME Swift
   LINKER_LANGUAGE CXX)
+if(NOT BUILD_SHARED_LIBS AND CMAKE_STATIC_LIBRARY_PREFIX_Swift)
+  set_target_properties(swiftCore PROPERTIES
+    PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX_Swift})
+endif()
 
 target_compile_definitions(swiftCore
   PRIVATE
