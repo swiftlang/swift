@@ -377,3 +377,4 @@ foreach(platform ${platforms})
 endforeach()
 
 add_subdirectory(scripts)
+
