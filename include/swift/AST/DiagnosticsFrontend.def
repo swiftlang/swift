@@ -534,6 +534,7 @@ ERROR(error_cache_key_creation, none, "cannot create cache key for compilation %
 ERROR(error_cas_file_ref, none, "cannot load file %0 from CAS filesystem", (StringRef))
 ERROR(error_cas_conflict_options, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
 ERROR(error_cas_initialization, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
+ERROR(error_cas_malformed_input, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
 WARNING(cache_replay_failed, none, "cache replay failed: %0", (StringRef))
 
 ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
