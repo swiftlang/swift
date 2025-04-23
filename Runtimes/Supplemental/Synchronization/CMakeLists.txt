@@ -86,6 +86,10 @@ set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME Synchronization
   Swift_COMPILATION_MODE wholemodule)
 
+if(APPLE AND BUILD_SHARED_LIBS)
+  target_link_options(swiftSynchronization PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
+endif()
+
 target_link_libraries(swiftSynchronization
   PRIVATE
     swiftCore
