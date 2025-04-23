@@ -52,7 +52,7 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
       out << ", \"migratable\": true";
     }
     if (auto version = feature.getLanguageVersion()) {
-      out << ", \"enabled_in\": " << *version;
+      out << ", \"enabled_in\": \"" << *version << "\"";
     }
     out << " }";
   };

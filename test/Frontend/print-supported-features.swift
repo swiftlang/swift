@@ -2,7 +2,7 @@
 
 // CHECK: "features": {
 // CHECK-NEXT:   "upcoming": [
-// CHECK:     { "name": "{{.*}}"{{, "migratable": true}}, "enabled_in": {{[0-9]+}} }
+// CHECK:     { "name": "{{.*}}"{{, "migratable": true}}, "enabled_in": "{{.*}}" }
 // CHECK:   ],
 // CHECK-NEXT:   "experimental": [
 // CHECK:     { "name": "{{.*}}" }
