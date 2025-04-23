@@ -485,6 +485,12 @@ namespace {
 class LoopRotation : public SILFunctionTransform {
 
   void run() override {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+    // This pass results in verification failures when Swift sources are not
+    // enabled.
+    LLVM_DEBUG(llvm::dbgs() << "Loop Rotate disabled in C++-only Swift compiler\n");
+    return;
+#endif // !SWIFT_ENABLE_SWIFT_IN_SWIFT
     SILFunction *f = getFunction();
     SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
     DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
