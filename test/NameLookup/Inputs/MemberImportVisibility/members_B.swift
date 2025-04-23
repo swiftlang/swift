@@ -37,7 +37,6 @@ package enum EnumInB_package {
 
 open class DerivedClassInB: BaseClassInA {
   open func methodInB() {}
-  open override func overriddenMethod() {}
 }
 
 extension ProtocolInA {
