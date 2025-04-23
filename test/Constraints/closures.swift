@@ -55,7 +55,7 @@ func inoutToSharedConversions() {
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }
-f1(f: f2) // expected-error{{add () to forward @autoclosure parameter}}{{9-9=()}}
+f1(f: f2) // expected-error{{add () to forward '@autoclosure' parameter}}{{9-9=()}}
 f1(f: 5)
 
 // Ternary in closure
@@ -273,7 +273,7 @@ func someFunc(_ foo: ((String) -> String)?,
 
 func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
   func takesAC(_ arg: @autoclosure () -> ()) {}
-  takesAC(arg) // expected-error {{add () to forward @autoclosure parameter}} {{14-14=()}}
+  takesAC(arg) // expected-error {{add () to forward '@autoclosure' parameter}} {{14-14=()}}
 }
 
 // https://github.com/apple/swift/issues/43681

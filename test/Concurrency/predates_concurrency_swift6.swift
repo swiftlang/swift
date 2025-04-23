@@ -108,10 +108,10 @@ struct S3: Q, Sendable {
 // Historical attribute names do nothing (but are permitted)
 // ---------------------------------------------------------------------------
 func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of '@preconcurrency'}}
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of '@preconcurrency'}}
 
 // Override matching with @preconcurrency properties.
 do {

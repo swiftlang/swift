@@ -38,7 +38,7 @@ func availableInFutureSwift() -> AvailableInFutureSwift { // expected-note * {{'
 
 // MARK: Global functions
 
-func available_func( // expected-note * {{add @available attribute to enclosing global function}}
+func available_func( // expected-note * {{add '@available' attribute to enclosing global function}}
   _: AlwaysAvailable,
   _: NeverAvailable, // expected-error {{'NeverAvailable' is unavailable}}
   _: UnavailableInSwift4, // expected-error {{'UnavailableInSwift4' is unavailable}}
@@ -219,7 +219,7 @@ struct ExtendMe {}
 extension ExtendMe {
   func never_available_extension_available_method() {} // expected-note {{has been explicitly marked unavailable here}}
 
-  func never_available_extension_available_method( // expected-note * {{add @available attribute to enclosing instance method}}
+  func never_available_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
     _: NeverAvailable,
     _: UnavailableInSwift4,
