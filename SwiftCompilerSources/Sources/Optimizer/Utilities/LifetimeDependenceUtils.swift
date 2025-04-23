@@ -587,7 +587,7 @@ extension LifetimeDependenceDefUseWalker {
   // Override ForwardingDefUseWalker.
   mutating func walkDown(operand: Operand) -> WalkResult {
     // Initially delegate all uses to OwnershipUseVisitor.
-    // walkDownDefault will be called for uses that forward ownership.
+    // forwardingUse() will be called for uses that forward ownership, which then delegates to walkDownDefault().
     return classify(operand: operand)
   }
 
@@ -665,6 +665,11 @@ extension LifetimeDependenceDefUseWalker {
 
   mutating func forwardingUse(of operand: Operand, isInnerLifetime: Bool)
     -> WalkResult {
+    // Lifetime dependence is only interested in dominated uses. Treat a returned phi like a dominated use by stopping
+    // at the phi operand rather than following the forwarded value to the ReturnInst.
+    if let phi = Phi(using: operand), phi.isReturnValue {
+      return returnedDependence(result: operand)
+    }
     // Delegate ownership forwarding operations to the ForwardingDefUseWalker.
     return walkDownDefault(forwarding: operand)
   }
