@@ -3187,6 +3187,14 @@ void SILCloner<ImplClass>::visitEndCOWMutationInst(EndCOWMutationInst *Inst) {
                         getOpValue(Inst->getOperand()), Inst->doKeepUnique()));
 }
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndCOWMutationAddrInst(
+    EndCOWMutationAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndCOWMutationAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(
     DestroyNotEscapedClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

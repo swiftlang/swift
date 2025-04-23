@@ -2763,6 +2763,9 @@ public:
       *this << "[keep_unique] ";
     *this << getIDAndType(ECMI->getOperand());
   }
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *ECMI) {
+    *this << getIDAndType(ECMI->getOperand());
+  }
   void visitEndInitLetRefInst(EndInitLetRefInst *I) {
     *this << getIDAndType(I->getOperand());
   }
