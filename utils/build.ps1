@@ -1025,7 +1025,12 @@ function Get-Dependencies {
     Install-PythonWheel "packaging" # For building LLVM 18+
     Install-PythonWheel "distutils" # Required for SWIG support
     if ($Test -contains "lldb") {
-      Install-PythonWheel "psutil" # Required for testing LLDB
+      if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
+        Write-Output "Installing 'psutil' ..."
+        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "psutil==6.1.0" --disable-pip-version-check
+      } else {
+        Install-PythonWheel "psutil" # Required for testing LLDB
+      }
       $env:Path = "$(Get-PythonScriptsPath);$env:Path" # For unit.exe
       Install-PythonWheel "unittest2" # Required for testing LLDB
     }
