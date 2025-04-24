@@ -314,7 +314,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
       }
       return JobPriority(rawValue: raw)
     }
-    set {
+    @_spi(Testing) set {
       if #available(SwiftStdlib 6.2, *) {
         _jobSetPriority(self.context, newValue.rawValue)
       } else {

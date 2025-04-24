@@ -214,8 +214,7 @@ public final class Win32EventLoopExecutor
   private let runQueue: Mutex<PriorityQueue<UnownedJob>>
   private var currentRunQueue: PriorityQueue<UnownedJob>
 
-  private var dwThreadId: DWORD
-  private var hThread: HANDLE?
+  private var dwThreadId: DWORD?
   private var hEvent: HANDLE?
   private let bShouldStop: Atomic<Bool>
   private let sequence: Atomic<UInt>
@@ -226,7 +225,7 @@ public final class Win32EventLoopExecutor
 
   public init(isMainExecutor: Bool = false) {
     self.isMainExecutor = isMainExecutor
-    self.dwThreadId = 0
+    self.dwThreadId = nil
     self.bShouldStop = Atomic<Bool>(false)
     self.sequence = Atomic<UInt>(0)
     unsafe self.hEvent = CreateEventW(nil, true, false, nil)
@@ -261,9 +260,6 @@ public final class Win32EventLoopExecutor
   }
 
   deinit {
-    if let hThread = unsafe hThread {
-      unsafe CloseHandle(hThread)
-    }
     unsafe CloseHandle(hEvent!)
   }
 
@@ -279,25 +275,12 @@ public final class Win32EventLoopExecutor
   ///
   /// This method runs a Win32 event loop.
   public func run() throws {
+    // Make sure we're running on the same thread every time
     let dwCurrentThreadId = GetCurrentThreadId()
-    if let _ = unsafe hThread {
-      if dwThreadId != dwCurrentThreadId {
-        fatalError("tried to run executor on the wrong thread")
-      }
-    } else {
+    if dwThreadId == nil {
       dwThreadId = dwCurrentThreadId
-      let hProcess = unsafe GetCurrentProcess()
-      let bRet = unsafe DuplicateHandle(hProcess,
-                                        GetCurrentThread(),
-                                        hProcess,
-                                        &hThread,
-                                        0,
-                                        false,
-                                        DWORD(DUPLICATE_SAME_ACCESS))
-      if !bRet {
-        let dwError = GetLastError()
-        fatalError("unable to duplicate thread handle: error 0x\(String(dwError, radix: 16))")
-      }
+    } else if dwThreadId != dwCurrentThreadId {
+      fatalError("tried to run executor on the wrong thread")
     }
 
     while true {
@@ -718,7 +701,7 @@ extension Win32ThreadPoolExecutor: SchedulableExecutor {
       let (toleranceSecs, toleranceAttos) = toleranceAsDuration.components
       msWindowLength = DWORD(toleranceSecs * 1000)
         + DWORD(toleranceAttos / 1_000_000_000_000_000)
-      //                               ^ns ^us ^ms
+      //                                 ^ns     ^us ^ms
     } else {
       // Default tolerance is 10%, with a maximum of 100ms and a minimum of
       // 15ms, same as for the event loop.

@@ -25,14 +25,21 @@ fileprivate func createJob(priority: TaskPriority = TaskPriority.medium,
   return job
 }
 
-// If we ask to wait for a delay D, this sets the maximum acceptable delay
+// When testing waiting for a delay D, the tests will tolerate a delay
+// up to 25% longer, i.e.
 //
-//   T = D + maxDelayTolerance
+//   Dmax = D + D/4
 //
-// that we will allow during the test.
+// However, for smaller delays this may still not be sufficient,
+// particularly in CI where we need to tolerate noisy neighbours.
 //
-// Since we run in CI, this value probably needs to be fairly large.  We
-// could investigate dropping it for local testing, perhaps.
+// We therefore apply a floor to the 25% extra that we tolerate,
+// making
+//
+//   Dmax = D + max(D/4, maxDelayTolerance)
+//
+// Since we run in CI, this value probably needs to be fairly large.
+// We could investigate dropping it for local testing, perhaps.
 fileprivate let maxDelayTolerance = 50 // ms
 
 struct ExecutorFixture {
@@ -231,6 +238,9 @@ struct ExecutorFixture {
         // Must not return before the requested delay
         let minDelay: Duration = .milliseconds(delay)
 
+        // Warn if we return more than 25% after the requested delay
+        let warnDelay: Duration = .milliseconds(delay + delay / 4)
+
         // Must not return more than 25% after the requested delay
         let maxDelay: Duration = .milliseconds(delay + max(delay / 4,
                                                            maxDelayTolerance))
@@ -243,6 +253,10 @@ struct ExecutorFixture {
         if actualDelay > maxDelay {
           print("  * FAILED (\(actualDelay) > \(maxDelay))")
           return false
+        }
+
+        if actualDelay > warnDelay {
+          print("  * WARNING (\(actualDelay) > \(warnDelay))")
         }
       }
       print("  * OK")
@@ -303,6 +317,11 @@ struct ExecutorFixture {
         // Must not return before the requested time
         let minTime = target
 
+        // Warn if we return more than 25% after the requested time
+        let warnTime = target.advanced(
+          by: clock.convert(from: .milliseconds(delays[ndx] / 4))!
+        )
+
         // Must not return more than 25% after the requested time
         let maxTime = target.advanced(
           by: clock.convert(from: .milliseconds(max(delays[ndx] / 4,
@@ -317,6 +336,10 @@ struct ExecutorFixture {
         if actualTime > maxTime {
           print("  * FAILED (\(actualTime) > \(maxTime))")
           return false
+        }
+
+        if actualTime > warnTime {
+          print("  * WARNING (\(actualTime) > \(warnTime))")
         }
       }
       print("  * OK")
