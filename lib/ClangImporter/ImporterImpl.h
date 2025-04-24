@@ -474,7 +474,6 @@ public:
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
-  const bool UseClangIncludeTree;
   bool importSymbolicCXXDecls;
 
   bool IsReadingBridgingPCH;
