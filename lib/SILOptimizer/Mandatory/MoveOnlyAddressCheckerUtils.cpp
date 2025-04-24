@@ -1899,7 +1899,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // Otherwise, walk one level towards our child type. We unconditionally
     // unwrap since we should never fail here due to earlier checking.
     std::tie(iterPair, iterType) =
-        *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
+        *pair.walkOneLevelTowardsChild(iterPair, iterType, targetType, fn);
   }
 
   return {};
@@ -3431,6 +3431,10 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
       auto accessPath = AccessPathWithBase::computeInScope(copy->getSrc());
       if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
+      if (auto *oeai =
+              dyn_cast_or_null<OpenExistentialAddrInst>(copy->getSrc())) {
+        oeai->setAccessKind(OpenedExistentialAccess::Mutable);
+      }
       copy->setIsTakeOfSrc(IsTake);
       continue;
     }
