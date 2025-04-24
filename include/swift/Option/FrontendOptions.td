@@ -1454,9 +1454,6 @@ def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
-def cas_fs: Separate<["-"], "cas-fs">,
-  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
-
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,

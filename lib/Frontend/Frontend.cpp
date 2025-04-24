@@ -630,11 +630,9 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {
-    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTree.empty() ||
-        !CASOpts.ClangIncludeTreeFileList.empty()) {
+    if (Invocation.getCASOptions().HasImmutableFileSystem) {
       // Set up CASFS as BaseFS.
-      auto FS = createCASFileSystem(*CAS, CASOpts.CASFSRootIDs,
-                                    CASOpts.ClangIncludeTree,
+      auto FS = createCASFileSystem(*CAS, CASOpts.ClangIncludeTree,
                                     CASOpts.ClangIncludeTreeFileList);
       if (!FS) {
         Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
@@ -682,8 +680,8 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
       }
     }
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
-        new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
-    OverlayVFS->pushOverlay(MemFS);
+        new llvm::vfs::OverlayFileSystem(MemFS);
+    OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
     SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
@@ -967,10 +965,10 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // There is no input file when building PCM using ClangIncludeTree.
+  // There is no input file when building PCM using Caching.
   if (Invocation.getFrontendOptions().RequestedAction ==
           FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getClangImporterOptions().HasClangIncludeTreeRoot)
+      Invocation.getCASOptions().EnableCaching)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
