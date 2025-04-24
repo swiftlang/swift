@@ -129,7 +129,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+Embedded.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
@@ -199,6 +198,12 @@ set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
 )
 
+set(SWIFT_CONCURRENCY_GYB_SOURCES
+  Task+init.swift.gyb
+  TaskGroup+addTask.swift.gyb
+  Task+startSynchronously.swift.gyb
+)
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
@@ -206,9 +211,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES}
 
   GYB_SOURCES
-    Task+init.swift.gyb
-    TaskGroup+addTask.swift.gyb
-    Task+startSynchronously.swift.gyb
+    ${SWIFT_CONCURRENCY_GYB_SOURCES}
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
@@ -313,6 +316,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
+
+      GYB_SOURCES
+        ${SWIFT_CONCURRENCY_GYB_SOURCES}
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
