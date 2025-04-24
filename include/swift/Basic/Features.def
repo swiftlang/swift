@@ -527,6 +527,9 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
+/// Allow use of `@extensible` on public enums
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

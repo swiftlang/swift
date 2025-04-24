@@ -407,7 +407,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
       DeclAttrKind::AllowFeatureSuppression,
-      DeclAttrKind::Extensible,
   };
 
   return result;
@@ -3323,6 +3322,13 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList,
                         DeclAttrKind::AddressableForDependencies);
+  action();
+}
+
+static void
+suppressingFeatureExtensibleAttribute(PrintOptions &options,
+                                      llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Extensible);
   action();
 }
 
