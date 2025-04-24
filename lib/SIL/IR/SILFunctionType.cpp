@@ -1520,10 +1520,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
       return false;
 
     if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
-      // CF type as foreign class
-      if (substTy->getClassOrBoundGenericClass() &&
-          substTy->getClassOrBoundGenericClass()->getForeignClassKind() ==
-            ClassDecl::ForeignKind::CFType) {
+      // Foreign reference types
+      if (substTy->getClassOrBoundGenericClass()) {
         return false;
       }
     }
