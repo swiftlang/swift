@@ -827,6 +827,8 @@ bool swift::isRepresentableInLanguage(
     Reason.describe(AFD);
     return true;
   };
+  if (AFD->hasThrows() && isTypedThrow()) 
+    return false;
 
   if (AFD->hasAsync()) {
     // Asynchronous functions move all of the result value and thrown error
@@ -906,8 +908,6 @@ bool swift::isRepresentableInLanguage(
     // a thrown error.
     std::optional<unsigned> completionHandlerErrorParamIndex;
     if (FD->hasThrows()) {
-      if (isTypedThrow())
-        return false;
       completionHandlerErrorParamIndex = completionHandlerParams.size();
       auto errorType = ctx.getErrorExistentialType();
       addCompletionHandlerParam(OptionalType::get(errorType));
@@ -931,9 +931,6 @@ bool swift::isRepresentableInLanguage(
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
     SourceLoc throwsLoc;
     Type resultType;
-
-    if (isTypedThrow())
-      return false;
 
     const ConstructorDecl *ctor = nullptr;
     if (auto func = dyn_cast<FuncDecl>(AFD)) {
