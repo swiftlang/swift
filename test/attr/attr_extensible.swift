@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ExtensibleAttribute
+
+// REQUIRES: swift_feature_ExtensibleAttribute
 
 @extensible
 public enum E1 { // Ok
