@@ -809,6 +809,24 @@ bool swift::isRepresentableInLanguage(
       return false;
     }
   }
+  auto isTypedThrow = [&]() {
+    // With no AST token this should be `throws`
+    if (!AFD->getThrownTypeRepr())
+      return false;
+    // Or it is a `throws(<ErrorType>)`
+    CanType thrownType = AFD->getThrownInterfaceType()->getCanonicalType();
+    // TODO: only `throws(Error)` is allowed.
+    // Throwing `any MyError` that confronts `Error` is not implemented yet.
+    // Shall we allow `any MyError` in the future, we should check against
+    // `isExistentialType` instead.
+    if (thrownType->isErrorExistentialType())
+      return false;
+    softenIfAccessNote(AFD, Reason.getAttr(),
+                       AFD->diagnose(diag::typed_thrown_in_objc_forbidden)
+                           .limitBehavior(behavior));
+    Reason.describe(AFD);
+    return true;
+  };
 
   if (AFD->hasAsync()) {
     // Asynchronous functions move all of the result value and thrown error
@@ -888,6 +906,8 @@ bool swift::isRepresentableInLanguage(
     // a thrown error.
     std::optional<unsigned> completionHandlerErrorParamIndex;
     if (FD->hasThrows()) {
+      if (isTypedThrow())
+        return false;
       completionHandlerErrorParamIndex = completionHandlerParams.size();
       auto errorType = ctx.getErrorExistentialType();
       addCompletionHandlerParam(OptionalType::get(errorType));
@@ -911,6 +931,9 @@ bool swift::isRepresentableInLanguage(
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
     SourceLoc throwsLoc;
     Type resultType;
+
+    if (isTypedThrow())
+      return false;
 
     const ConstructorDecl *ctor = nullptr;
     if (auto func = dyn_cast<FuncDecl>(AFD)) {
