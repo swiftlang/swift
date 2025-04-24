@@ -880,6 +880,7 @@ SIMPLE_DECL_ATTR(extensible, Extensible,
   OnEnum,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   169)
+DECL_ATTR_FEATURE_REQUIREMENT(Extensible, ExtensibleAttribute)
 
 SIMPLE_DECL_ATTR(concurrent, Concurrent,
   OnFunc | OnConstructor | OnSubscript | OnVar,
