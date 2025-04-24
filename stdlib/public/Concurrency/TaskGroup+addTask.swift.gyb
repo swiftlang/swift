@@ -315,8 +315,8 @@ extension ${TYPE} {
     #endif // $BuiltinCreateAsyncTaskName
     % end # HAS_TASK_NAME
 
-    // Task name was not set, or task name createTask is unavailable
     % if HAS_TASK_EXECUTOR:
+    // Task name was not set, or task name createTask is unavailable
     if task == nil, let taskExecutor {
       #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task = ${TASK_CREATE_FN}(
