@@ -68,19 +68,7 @@ public:
     if (!typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes())
       return subs;
 
-    return subs.subst([&](SubstitutableType *s) -> Type {
-        return substOpaqueTypesWithUnderlyingTypes(s->getCanonicalType(),
-                                                   typeExpansionContext);
-      }, [&](CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
-        return substOpaqueTypesWithUnderlyingTypes(
-               ProtocolConformanceRef::forAbstract(conformingReplacementType,
-                                                   conformedProtocol),
-               typeExpansionContext);
-      },
-      SubstFlags::SubstituteOpaqueArchetypes |
-      SubstFlags::PreservePackExpansionLevel);
+    return subs.mapIntoTypeExpansionContext(typeExpansionContext);
   }
 
   // Substitute a function type.
