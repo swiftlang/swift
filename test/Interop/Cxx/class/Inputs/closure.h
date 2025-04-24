@@ -45,4 +45,34 @@ void cfuncARCWeak(ARCWeak) noexcept;
 void (* _Nonnull getFnPtr() noexcept)(NonTrivial) noexcept;
 void (* _Nonnull getFnPtr2() noexcept)(ARCWeak) noexcept;
 
+class SharedRef {
+public:
+  static SharedRef *_Nonnull makeSharedRef() { return new SharedRef(); }
+  int _refCount = 1;
+
+private:
+  SharedRef() = default;
+
+  SharedRef(const SharedRef &other) = delete;
+  SharedRef &operator=(const SharedRef &other) = delete;
+  SharedRef(SharedRef &&other) = delete;
+  SharedRef &operator=(SharedRef &&other) = delete;
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retainSharedRef")))
+__attribute__((swift_attr("release:releaseSharedRef")));
+
+inline void
+cppGo(void (*_Nonnull takeConstSharedRef)(const SharedRef *_Nonnull x)) {
+  SharedRef *ref = SharedRef::makeSharedRef();
+  takeConstSharedRef(ref);
+}
+
+inline void retainSharedRef(SharedRef *_Nonnull x) { x->_refCount += 1; }
+inline void releaseSharedRef(SharedRef *_Nonnull x) {
+  x->_refCount -= 1;
+  if (x->_refCount == 0) {
+    delete x;
+  }
+}
+
 #endif // __CLOSURE__
