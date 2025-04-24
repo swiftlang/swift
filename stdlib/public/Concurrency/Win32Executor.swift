@@ -561,7 +561,7 @@ public final class Win32ThreadPoolExecutor: TaskExecutor, @unchecked Sendable {
   ///
   /// This is a convenience initializer to avoid having to write unsafe
   /// in the normal case where you want to use the default thread pool.
-  convenience init() {
+  public convenience init() {
     unsafe self.init(pool: nil)
   }
 
@@ -572,7 +572,7 @@ public final class Win32ThreadPoolExecutor: TaskExecutor, @unchecked Sendable {
   /// - pool:  The thread pool to use; `nil` means use the default thread
   ///          pool.
   ///
-  init(pool: PTP_POOL?) {
+  public init(pool: PTP_POOL?) {
     unsafe InitializeThreadpoolEnvironment(&cbeHighPriority)
     unsafe InitializeThreadpoolEnvironment(&cbeLowPriority)
     unsafe InitializeThreadpoolEnvironment(&cbeNormalPriority)

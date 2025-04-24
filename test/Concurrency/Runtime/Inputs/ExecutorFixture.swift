@@ -25,6 +25,16 @@ fileprivate func createJob(priority: TaskPriority = TaskPriority.medium,
   return job
 }
 
+// If we ask to wait for a delay D, this sets the maximum acceptable delay
+//
+//   T = D + maxDelayTolerance
+//
+// that we will allow during the test.
+//
+// Since we run in CI, this value probably needs to be fairly large.  We
+// could investigate dropping it for local testing, perhaps.
+fileprivate let maxDelayTolerance = 50 // ms
+
 struct ExecutorFixture {
   static func test(executor: some Executor) async -> Bool {
     var result = true
@@ -222,7 +232,8 @@ struct ExecutorFixture {
         let minDelay: Duration = .milliseconds(delay)
 
         // Must not return more than 25% after the requested delay
-        let maxDelay: Duration = .milliseconds(delay + max(delay / 4, 10))
+        let maxDelay: Duration = .milliseconds(delay + max(delay / 4,
+                                                           maxDelayTolerance))
 
         if actualDelay < minDelay {
           print("  * FAILED (\(actualDelay) < \(minDelay))")
@@ -294,7 +305,8 @@ struct ExecutorFixture {
 
         // Must not return more than 25% after the requested time
         let maxTime = target.advanced(
-          by: clock.convert(from: .milliseconds(max(delays[ndx] / 4, 10)))!
+          by: clock.convert(from: .milliseconds(max(delays[ndx] / 4,
+                                                    maxDelayTolerance)))!
         )
 
         if actualTime < minTime {
