@@ -5818,9 +5818,16 @@ RValue SILGenFunction::emitApply(
     // we left during the first pass.
     auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
 
+    // We have already lowered foreign self/moved it into position at this
+    // point, so we know that self will be back.
+    ManagedValue self;
+    if (substFnType->hasSelfParam()) {
+      self = args.back();
+    }
+
     auto origFormalType = *calleeTypeInfo.origFormalType;
     completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
-        *this, origFormalType, loc);
+        *this, origFormalType, self, loc);
   }
   if (auto foreignError = calleeTypeInfo.foreign.error) {
     unsigned errorParamIndex =
