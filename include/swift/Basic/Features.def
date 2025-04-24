@@ -529,6 +529,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 /// to SendableMetatype (or Sendable).
 EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
 
+/// Allow use of `@extensible` on public enums
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

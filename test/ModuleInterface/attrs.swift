@@ -112,11 +112,3 @@ public struct TestPlacementOfAttrsAndSpecifiers {
   // CHECK: public func test3<T>(_: inout () async -> T)
   public func test3<T>(_: inout () async -> T) {}
 }
-
-// CHECK-NOT: @extensible
-// CHECK: public enum TestExtensible
-@extensible
-public enum TestExtensible {
-  case a
-  case b
-}
