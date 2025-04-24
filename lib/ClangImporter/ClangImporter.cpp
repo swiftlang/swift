@@ -1186,7 +1186,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
                clang::frontend::ActionKind::GenerateModule ||
            CI->getFrontendOpts().ProgramAction ==
                clang::frontend::ActionKind::GeneratePCH) &&
-          ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+          !ctx.CASOpts.ClangIncludeTree.empty()) {
         CI->getFrontendOpts().CASIncludeTreeID = ctx.CASOpts.ClangIncludeTree;
         CI->getFrontendOpts().Inputs.clear();
       }
@@ -1246,7 +1246,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (ctx.ClangImporterOpts.UseClangIncludeTree) {
+    if (ctx.CASOpts.HasImmutableFileSystem) {
       // There is no need to add any module map file here. Issue a warning and
       // drop the option.
       Impl.diagnose(SourceLoc(), diag::module_map_ignored, ModuleMapFile);
@@ -2731,7 +2731,6 @@ ClangImporter::Implementation::Implementation(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
-      UseClangIncludeTree(ctx.ClangImporterOpts.UseClangIncludeTree),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
@@ -4258,11 +4257,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   auto &CGOpts = instance.getCodeGenOpts();
   CGOpts.DebugCompilationDir.clear();
 
-  if (Impl.SwiftContext.ClangImporterOpts.UseClangIncludeTree) {
     // FileSystemOptions.
-    auto &FSOpts = instance.getFileSystemOpts();
-    FSOpts.WorkingDir.clear();
-  }
+  auto &FSOpts = instance.getFileSystemOpts();
+  FSOpts.WorkingDir.clear();
 
   if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
     // Remap all the paths if requested.

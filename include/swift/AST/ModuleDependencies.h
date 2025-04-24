@@ -1000,7 +1000,7 @@ using ModuleDependenciesKindMap =
 /// Track swift dependency
 class SwiftDependencyTracker {
 public:
-  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS,
+  SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
                          llvm::PrefixMapper *Mapper,
                          const CompilerInvocation &CI);
 
@@ -1009,7 +1009,8 @@ public:
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
 
 private:
-  llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
   llvm::PrefixMapper *Mapper;
 
   struct FileEntry {
@@ -1035,10 +1036,7 @@ class SwiftDependencyScanningService {
       ClangScanningService;
 
   /// CachingOnDiskFileSystem for dependency tracking.
-  llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS;
-
-  /// If use clang include tree.
-  bool UseClangIncludeTree = false;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CacheFS;
 
   /// CAS Instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
@@ -1076,8 +1074,8 @@ public:
     return *SharedFilesystemCache;
   }
 
-  llvm::cas::CachingOnDiskFileSystem &getSharedCachingFS() const {
-    assert(CacheFS && "Expect CachingOnDiskFileSystem");
+  llvm::vfs::FileSystem &getSharedCachingFS() const {
+    assert(CacheFS && "Expect a CASFileSystem");
     return *CacheFS;
   }
 
@@ -1088,19 +1086,16 @@ public:
 
   std::optional<SwiftDependencyTracker>
   createSwiftDependencyTracker(const CompilerInvocation &CI) {
-    if (!CacheFS)
+    if (!CAS)
       return std::nullopt;
 
-    return SwiftDependencyTracker(*CacheFS, Mapper.get(), CI);
+    return SwiftDependencyTracker(CAS, Mapper.get(), CI);
   }
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {
-    if (UseClangIncludeTree)
+    if (CAS)
       return llvm::cas::createCASProvidingFileSystem(
           CAS, llvm::vfs::createPhysicalFileSystem());
-
-    if (CacheFS)
-      return CacheFS->createProxyFS();
 
     return llvm::vfs::createPhysicalFileSystem();
   }
