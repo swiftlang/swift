@@ -1625,7 +1625,7 @@ func parseProtocolMacroParam(
       node: enumConstructorExpr)
   }
   let argumentList = enumConstructorExpr.arguments
-  let methodSignatureArg = try getArgumentBySignature(argumentList, "signature")
+  let methodSignatureArg = try getArgumentByName(argumentList, "signature")
   guard let methodSignatureStringLit = methodSignatureArg.as(StringLiteralExprSyntax.self) else {
     throw DiagnosticError(
       "expected string literal for 'signature' parameter, got \(methodSignatureArg)", node: methodSignatureArg)
@@ -1641,7 +1641,7 @@ func parseProtocolMacroParam(
       notes.append(Note(node: Syntax(method.name), message: MacroExpansionNoteMessage("did you mean '\(method.trimmed.description)'?")))
     }
     throw DiagnosticError(
-      "method with signature '\(methodSignature)' not found in protocol", node: methodNameArg, notes: notes)
+      "method with signature '\(methodSignature)' not found in protocol", node: methodSignatureArg, notes: notes)
   }
   let paramInfoArg = try getArgumentByName(argumentList, "paramInfo")
   guard let paramInfoArgList = paramInfoArg.as(ArrayExprSyntax.self) else {

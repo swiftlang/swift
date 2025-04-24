@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Span -enable-experimental-feature LifetimeDependence 2>&1 | %FileCheck --match-full-lines %s
 
-@_SwiftifyImportProtocol(.method(name: "func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len")]))
+@_SwiftifyImportProtocol(.method(signature: "func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len")]))
 protocol SimpleProtocol {
   func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt)
 }
@@ -14,8 +14,8 @@ protocol SimpleProtocol {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-@_SwiftifyImportProtocol(.method(name: "func foo(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1))]),
-                         .method(name: "func bar(_ len: CInt) -> UnsafePointer<CInt>", paramInfo: [.countedBy(pointer: .return, count: "len"), .nonescaping(pointer: .return), .lifetimeDependence(dependsOn: .self, pointer: .return, type: .borrow)]))
+@_SwiftifyImportProtocol(.method(signature: "func foo(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1))]),
+                         .method(signature: "func bar(_ len: CInt) -> UnsafePointer<CInt>", paramInfo: [.countedBy(pointer: .return, count: "len"), .nonescaping(pointer: .return), .lifetimeDependence(dependsOn: .self, pointer: .return, type: .borrow)]))
 protocol SpanProtocol {
   func foo(_ ptr: UnsafePointer<CInt>, _ len: CInt)
   func bar(_ len: CInt) -> UnsafePointer<CInt>
@@ -35,8 +35,8 @@ protocol SpanProtocol {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-@_SwiftifyImportProtocol(.method(name: "func foo(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1))]),
-                         .method(name: "func bar(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len")]))
+@_SwiftifyImportProtocol(.method(signature: "func foo(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1))]),
+                         .method(signature: "func bar(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len")]))
 protocol MixedProtocol {
   func foo(_ ptr: UnsafePointer<CInt>, _ len: CInt)
   func bar(_ ptr: UnsafePointer<CInt>, _ len: CInt)
@@ -55,8 +55,8 @@ protocol MixedProtocol {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-@_SwiftifyImportProtocol(.method(name: "func foo(_ ptr: UnsafePointer<CInt>, _ len1: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len1")]),
-                         .method(name: "func foo(bar: UnsafePointer<CInt>, _ len2: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len2")]))
+@_SwiftifyImportProtocol(.method(signature: "func foo(_ ptr: UnsafePointer<CInt>, _ len1: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len1")]),
+                         .method(signature: "func foo(bar: UnsafePointer<CInt>, _ len2: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len2")]))
 protocol OverloadedProtocol {
   func foo(_ ptr: UnsafePointer<CInt>, _ len1: CInt)
   func foo(bar: UnsafePointer<CInt>, _ len2: CInt)
@@ -74,7 +74,7 @@ protocol OverloadedProtocol {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-@_SwiftifyImportProtocol(.method(name: "open func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len")]))
+@_SwiftifyImportProtocol(.method(signature: "open func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt)", paramInfo: [.countedBy(pointer: .param(1), count: "len")]))
 class SimpleClass {
   open func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) {}
 }
