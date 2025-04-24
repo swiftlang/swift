@@ -33,6 +33,10 @@ public struct Holder {
   var c: C
 }
 
+public struct TrivialHolder {
+  var p: Builtin.RawPointer
+}
+
 struct A {}
 
 struct NCWrapper : ~Copyable, ~Escapable {
@@ -44,7 +48,13 @@ sil @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
 sil @useA : $@convention(thin) (A) -> ()
 sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
 sil @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
-sil @useNE : $@convention(thin) (NE) -> ()
+sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
+
+sil @initHolder : $@convention(thin) () -> @out Holder
+sil @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+sil @initTrivialHolder : $@convention(thin) () -> @out TrivialHolder
+sil @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
 
 // Test returning a owned dependence on a trivial value
 sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
@@ -80,8 +90,8 @@ bb0(%0 : @owned $Holder):
   %c1 = apply %f1() : $@convention(thin) () -> @lifetime(immortal) @owned NE
   %md = mark_dependence [unresolved] %c1 on %sb
   %mv = move_value [var_decl] %md
-  %f2 = function_ref @useNE : $@convention(thin) (NE) -> ()
-  %c2 = apply %f2(%mv) : $@convention(thin) (NE) -> ()
+  %f2 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %c2 = apply %f2(%mv) : $@convention(thin) (@guaranteed NE) -> ()
   destroy_value %mv
   end_borrow %sb
   dealloc_stack %stk
@@ -114,4 +124,42 @@ bb0(%0 : @owned $NCWrapper):
   dealloc_stack %1
   %17 = tuple ()
   return %17
+}
+
+// Test that LifetimeDependence.Scope recognizes a singly-initialized alloc_stack.
+sil [ossa] @testStackInit : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Holder, let, name "v"
+  %1 = function_ref @initHolder : $@convention(thin) () -> @out Holder
+  %2 = apply %1(%0) : $@convention(thin) () -> @out Holder
+  %3 = function_ref @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %0
+  %6 = move_value [var_decl] %5
+  %7 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %6
+  destroy_addr %0
+  dealloc_stack %0
+  %12 = tuple ()
+  return %12
+}
+
+// Test that LifetimeDependence.Scope.computeRange handles a singly-initialized alloc_stack of trivial type by treating
+// it as available for the entire function
+sil [ossa] @testTrivialStackInit : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $TrivialHolder, let, name "v"
+  %1 = function_ref @initTrivialHolder : $@convention(thin) () -> @out TrivialHolder
+  %2 = apply %1(%0) : $@convention(thin) () -> @out TrivialHolder
+  %3 = function_ref @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %0
+  dealloc_stack %0
+  %6 = move_value [var_decl] %5
+  %7 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %6
+  %12 = tuple ()
+  return %12
 }
