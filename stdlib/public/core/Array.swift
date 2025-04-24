@@ -1566,6 +1566,7 @@ extension Array {
   }
 
   //FIXME: typed throws
+  @_alwaysEmitIntoClient
   @available(SwiftStdlib 6.2, *)
   public init(
     capacity: Int,
