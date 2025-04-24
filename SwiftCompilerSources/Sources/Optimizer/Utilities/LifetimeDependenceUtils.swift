@@ -279,10 +279,18 @@ extension LifetimeDependence.Scope {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
       self.init(base: projectBox.operand.value, context)
-    case .stack, .class, .tail, .pointer, .index:
+    case .class, .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
     case .unidentified:
       self = .unknown(address)
+    case let .stack(allocStack):
+      if let initializer = accessBase.findSingleInitializer(context) {
+        if case let .store(store, _) = initializer {
+          self = .initialized(.store(initializingStore: store, initialAddress: allocStack))
+          return
+        }
+      }
+      self = .unknown(allocStack)
     case .global:
       // TODO: When AccessBase directly stores GlobalAccessBase, we don't need a check here and don't need to pass
       // 'address' in to this function.
@@ -402,6 +410,17 @@ extension LifetimeDependence.Scope {
   ///
   /// Returns nil if the dependence scope covers the entire function. Returns an empty range for an unknown scope.
   ///
+  /// Ignore the lifetime of temporary trivial values (with .initialized and .unknown scopes). Temporaries have an
+  /// unknown Scope, which means that LifetimeDependence.Scope did not recognize a VariableScopeInstruction. This is
+  /// important to promote mark_dependence instructions emitted by SILGen to [nonescaping] (e.g. unsafeAddressor). It
+  /// also allows trivial value to be "extended" without actually tracking their scope, which is expected behavior. For
+  /// example:
+  ///
+  ///     let span = Span(buffer.baseAddress)
+  ///
+  /// If 'baseAddress' is an opaque getter, then the temporary pointer is effectively valid
+  /// until the end of the function.
+  ///
   /// Note: The caller must deinitialize the returned range.
   func computeRange(_ context: Context) -> InstructionRange? {
     switch self {
@@ -439,18 +458,13 @@ extension LifetimeDependence.Scope {
       if case let .argument(arg) = initializer, arg.convention.isInout {
         return nil
       }
+      let address = initializer.initialAddress
+      if address.type.objectType.isTrivial(in: address.parentFunction) {
+        return nil
+      }
       return LifetimeDependence.Scope.computeInitializedRange(initializer: initializer, context)
     case let .unknown(value):
-      // Ignore the lifetime of temporary trivial values. Temporaries have an unknown Scope, which means that
-      // LifetimeDependence.Scope did not recognize a VariableScopeInstruction. This is important to promote
-      // mark_dependence instructions emitted by SILGen to [nonescaping] (e.g. unsafeAddressor). It also allows trivial
-      // value to be "extended" without actually tracking their scope, which is expected behavior. For example:
-      //
-      //     let span = Span(buffer.baseAddress)
-      //
-      // If 'baseAddress' is an opaque getter, then the temporary pointer is effectively valid
-      // until the end of the function.
-      if value.type.isTrivial(in: value.parentFunction) {
+      if value.type.objectType.isTrivial(in: value.parentFunction) {
         return nil
       }
       // Return an empty range.
