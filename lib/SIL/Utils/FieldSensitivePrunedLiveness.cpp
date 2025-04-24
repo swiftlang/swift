@@ -148,6 +148,12 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    if (auto *uaci =
+            dyn_cast<UncheckedAddrCastInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = uaci->getOperand();
+      continue;
+    }
+
     if (auto *sbi = dyn_cast<StoreBorrowInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = sbi->getDest();
       continue;
