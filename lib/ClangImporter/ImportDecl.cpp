@@ -9332,6 +9332,7 @@ void ClangImporter::Implementation::swiftify(
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
     if (!swiftifyImpl(printer, MappedDecl))
       return;
+    printer.printAvailability();
     printer.printTypeMapping();
   }
 

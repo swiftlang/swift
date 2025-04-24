@@ -9,11 +9,18 @@
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __noescape parameters.
 import SizedByNoEscapeClang
 
-// CHECK:      @_alwaysEmitIntoClient public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: RawSpan)
+// CHECK:      @available(macOS 9999, *)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: RawSpan)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_ p: RawSpan)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_  p: RawSpan)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func opaque(_  p: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeRawBufferPointer
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: RawSpan, _ p2: RawSpan)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: RawSpan)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: RawSpan)

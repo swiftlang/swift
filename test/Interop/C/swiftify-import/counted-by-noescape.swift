@@ -11,21 +11,28 @@
 
 import CountedByNoEscapeClang
 
-// CHECK:      @lifetime(p: copy p)
+// CHECK:      @available(macOS 9999, *)
+// CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func returnLifetimeBound(_ len1: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32>
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @lifetime(p1: copy p1)
 // CHECK-NEXT: @lifetime(p2: copy p2)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int32, _ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @available(macOS 9999, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_ p: inout MutableSpan<Int32>)
 
