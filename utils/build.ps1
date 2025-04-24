@@ -1748,7 +1748,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
     CMAKE_Swift_FLAGS = $SwiftFlags;
-    LibXml2_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\cmake\libxml2-2.11.5";
+    LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
     LLDB_PYTHON_EXT_SUFFIX = ".pyd";
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
@@ -2006,7 +2006,7 @@ function Build-ZLib([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\zlib `
     -Bin "$BinaryCache\$($Platform.Triple)\zlib" `
-    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
     -Defines @{
@@ -2020,7 +2020,7 @@ function Build-XML2([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
     -Bin "$BinaryCache\$($Platform.Triple)\libxml2-2.11.5" `
-    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C,CXX `
     -Defines @{
@@ -2076,7 +2076,7 @@ function Build-CURL([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\curl `
     -Bin "$BinaryCache\$($Platform.Triple)\curl" `
-    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
     -Defines ($PlatformDefines + @{
@@ -2166,8 +2166,8 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_IDN = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LARGE_FILES = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
-      ZLIB_ROOT = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr";
-      ZLIB_LIBRARY = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\zlibstatic.lib";
+      ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
+      ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
     })
 }
 
@@ -2391,14 +2391,14 @@ function Build-Foundation {
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-      CURL_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\cmake\CURL";
-      LibXml2_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\cmake\libxml2-2.11.5";
+      CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+      LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
       ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\zlibstatic.lib"
+        "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
       } else {
-        "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\libz.a"
+        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
-      ZLIB_INCLUDE_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include";
+      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
       SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
@@ -2418,11 +2418,11 @@ function Test-Foundation {
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK Windows)/usr/include"
-    $env:LIBXML_LIBRARY_PATH="$(Get-InstallDir $Platform)/Toolchains/$ProductVersion+$Variant/usr/lib"
-    $env:LIBXML_INCLUDE_PATH="$(Get-InstallDir $Platform)/Toolchains/$ProductVersion+$Variant/usr/include/libxml2"
-    $env:ZLIB_LIBRARY_PATH="$(Get-InstallDir $Platform)/Toolchains/$ProductVersion+$Variant/usr/lib"
-    $env:CURL_LIBRARY_PATH="$(Get-InstallDir $Platform)/Toolchains/$ProductVersion+$Variant/usr/lib"
-    $env:CURL_INCLUDE_PATH="$(Get-InstallDir $Platform)/Toolchains/$ProductVersion+$Variant/usr/include"
+    $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include/libxml2"
+    $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:CURL_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:CURL_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include"
     Build-SPMProject `
       -Action Test `
       -Src $SourceCache\swift-corelibs-foundation `
@@ -2589,7 +2589,7 @@ function Build-SQLite([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-toolchain-sqlite `
     -Bin "$BinaryCache\$($Platform.Triple)\sqlite" `
-    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
     -Defines @{
@@ -2631,8 +2631,8 @@ function Build-Build([Hashtable] $Platform) {
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      SQLite3_INCLUDE_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include";
-      SQLite3_LIBRARY = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
     } + $ArchSpecificOptions)
 }
 
@@ -2662,8 +2662,8 @@ function Build-LLBuild([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       LLBUILD_SUPPORT_BINDINGS = "Swift";
-      SQLite3_INCLUDE_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include";
-      SQLite3_LIBRARY = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
     }
 }
 
@@ -2692,8 +2692,8 @@ function Test-LLBuild {
         FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin", "FileCheck.exe"));
         LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
-        SQLite3_INCLUDE_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include";
-        SQLite3_LIBRARY = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\SQLite3.lib";
+        SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
       }
   }
 }
@@ -2727,8 +2727,8 @@ function Build-Driver([Hashtable] $Platform) {
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include";
-      SQLite3_LIBRARY = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
       SWIFT_DRIVER_BUILD_TOOLS = "YES";
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform Compilers)\lib\cmake\llvm";
       Clang_DIR = "$(Get-ProjectBinaryCache $Platform Compilers)\lib\cmake\clang";
@@ -2822,8 +2822,8 @@ function Build-PackageManager([Hashtable] $Platform) {
       SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
       SwiftCertificates_DIR = (Get-ProjectCMakeModules $Platform Certificates);
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
-      SQLite3_INCLUDE_DIR = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include";
-      SQLite3_LIBRARY = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
     }
 }
 
