@@ -338,29 +338,6 @@ $KnownPythons = @{
   }
 }
 
-$PythonWheels = @{
-  "packaging" = @{
-    File = "packaging-24.1-py3-none-any.whl";
-    URL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl";
-    SHA256 = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124";
-  };
-  "distutils" = @{
-    File = "setuptools-75.1.0-py3-none-any.whl";
-    URL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl";
-    SHA256 = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2";
-  };
-  "psutil" = @{
-    File = "psutil-6.1.0-cp37-abi3-win_amd64.whl";
-    URL = "https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl";
-    SHA256 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
-  };
-  "unittest2" = @{
-    File = "unittest2-1.1.0-py2.py3-none-any.whl";
-    URL = "https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl";
-    SHA256 = "13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8";
-  };
-}
-
 $KnownNDKs = @{
   r26b = @{
     URL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
@@ -1007,14 +984,12 @@ function Get-Dependencies {
     }
   }
 
-  function Install-PythonWheel([string] $ModuleName) {
+  function Install-PythonModule([string] $ModuleName, [string] $ModuleVersion) {
     try {
       Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
     } catch {
-      $Wheel = $PythonWheels[$ModuleName]
-      DownloadAndVerify $Wheel.URL "$BinaryCache\python\$($Wheel.File)" $Wheel.SHA256
-      Write-Output "Installing '$($Wheel.File)' ..."
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$($Wheel.File)" --disable-pip-version-check
+      Write-Output "Installing '$($ModuleName)' ..."
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$ModuleName==$ModuleVersion" --disable-pip-version-check
     } finally {
       Write-Output "$ModuleName installed."
     }
@@ -1022,17 +997,12 @@ function Get-Dependencies {
 
   function Install-PythonModules() {
     Install-PIPIfNeeded
-    Install-PythonWheel "packaging" # For building LLVM 18+
-    Install-PythonWheel "distutils" # Required for SWIG support
+    Install-PythonModule "packaging" "24.1" # For building LLVM 18+
+    Install-PythonModule "distutils" "75.1.0" # Required for SWIG support
     if ($Test -contains "lldb") {
-      if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
-        Write-Output "Installing 'psutil' ..."
-        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "psutil==6.1.0" --disable-pip-version-check
-      } else {
-        Install-PythonWheel "psutil" # Required for testing LLDB
-      }
+      Install-PythonModule "psutil" "6.1.0" # Required for testing LLDB
       $env:Path = "$(Get-PythonScriptsPath);$env:Path" # For unit.exe
-      Install-PythonWheel "unittest2" # Required for testing LLDB
+      Install-PythonModule "unittest2" "1.1.0" # Required for testing LLDB
     }
   }
 
