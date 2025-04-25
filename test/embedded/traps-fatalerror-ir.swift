@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -O                          | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
 // RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -Osize                      | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
 // RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -O     -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -Osize -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
+// One configuration removed, see https://github.com/swiftlang/swift/issues/81085
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
