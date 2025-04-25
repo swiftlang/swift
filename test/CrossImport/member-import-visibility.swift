@@ -39,8 +39,8 @@ import Swift
 // expected-note@-1 2 {{add import of module 'DeclaringLibrary'}}
 
 private func test() {
-  returnsDeclaringTy().overlayMember() // expected-error {{instance method 'overlayMember()' is not available due to missing imports of defining modules 'DeclaringLibrary' and 'BystandingLibrary'}}
-  returnsBystandingTy().overlayMember() // expected-error {{instance method 'overlayMember()' is not available due to missing imports of defining modules 'DeclaringLibrary' and 'BystandingLibrary'}}
+  returnsDeclaringTy().overlayMember() // expected-error {{instance method 'overlayMember()' is not available due to missing imports of defining modules 'BystandingLibrary' and 'DeclaringLibrary'}}
+  returnsBystandingTy().overlayMember() // expected-error {{instance method 'overlayMember()' is not available due to missing imports of defining modules 'BystandingLibrary' and 'DeclaringLibrary'}}
 }
 
 //--- BothDeclaringAndBystanding.swift

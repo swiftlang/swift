@@ -835,7 +835,7 @@ missingImportsForDefiningModule(ModuleDecl *owningModule, SourceFile &sf) {
   }
 
   std::sort(result.begin(), result.end(), [](ModuleDecl *LHS, ModuleDecl *RHS) {
-    return LHS->getNameStr() < LHS->getNameStr();
+    return LHS->getNameStr() < RHS->getNameStr();
   });
 
   return result;
