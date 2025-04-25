@@ -70,9 +70,9 @@ import Swift
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.2)
 #endif
-@execution(caller)
+nonisolated(nonsending)
 public func withTaskCancellationHandler<T>(
-  operation: @execution(caller) () async throws -> T,
+  operation: nonisolated(nonsending) () async throws -> T,
   onCancel handler: @Sendable () -> Void
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
@@ -85,7 +85,7 @@ public func withTaskCancellationHandler<T>(
 
 // Note: Deprecated version which would still hop if we did not close over an `isolated` parameter
 // with the operation closure. Instead, we should do what the docs of this method promise - and not hop at all,
-// by using the new @execution(caller)
+// by using the new nonisolated(nonsending)
 @available(SwiftStdlib 5.1, *)
 //#if !$Embedded
 //@backDeployed(before: SwiftStdlib 6.0)

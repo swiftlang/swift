@@ -133,7 +133,7 @@ Class AsyncThrowingStream._Storage is a new API without '@available'
 
 // withTaskCancellationHandler now uses caller execution
 // Old methods are kept for ABI compatibility but this test does not understand that
-Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: @execution(caller) () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A'
+Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: nonisolated(nonsending) () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A'
 Func withTaskCancellationHandler(operation:onCancel:) is now with @execution
 
 
