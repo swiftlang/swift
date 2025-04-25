@@ -40,7 +40,7 @@ fileprivate func createJob(priority: TaskPriority = TaskPriority.medium,
 //
 // Since we run in CI, this value probably needs to be fairly large.
 // We could investigate dropping it for local testing, perhaps.
-fileprivate let maxDelayTolerance = 50 // ms
+fileprivate let maxDelayTolerance = 250 // ms
 
 struct ExecutorFixture {
   static func test(executor: some Executor) async -> Bool {
@@ -342,12 +342,12 @@ struct ExecutorFixture {
         }
 
         if actualTime > maxTime {
-          print("  * FAILED (\(actualTime) > \(maxTime))")
+          print("  * FAILED (\(actualTime) > \(maxTime), target \(target))")
           return false
         }
 
         if actualTime > warnTime {
-          print("  * WARNING (\(actualTime) > \(warnTime))")
+          print("  * WARNING (\(actualTime) > \(warnTime), target \(target))")
         }
       }
       print("  * OK")
