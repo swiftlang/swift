@@ -31,6 +31,8 @@ public enum EnumInC {
 
 open class DerivedClassInC: DerivedClassInB {
   open func methodInC() {}
+  open override func overriddenMethod() {}
+  public func asDerivedClassInB() -> DerivedClassInB { return self }
 }
 
 extension ProtocolInA {
