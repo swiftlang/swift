@@ -367,9 +367,9 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 // CHECK: bb0([[ARG0:%.*]] : ${{.*}}, [[ARG1:%.*]] :
 // CHECK:   debug_value [[ARG0]]
 // CHECK:   debug_value [[ARG1]]
+// CHECK:   destroy_addr [[ARG1]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ARG1]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[ACCESS]]
-// CHECK:   destroy_addr [[ARG1]]
 // CHECK:   store [[ARG0]] to [trivial] [[GEP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function 'myBufferViewSetter'
