@@ -600,7 +600,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ) where Element: BitwiseCopyable {
     guard count > 0 else { return }
     // rebind _start manually in order to avoid assumptions about alignment.
-    let rp = unsafe _start()._rawValue
+    let rp = _start()._rawValue
     let binding = Builtin.bindMemory(rp, count._builtinWordValue, Element.self)
     let rebound = unsafe UnsafeMutablePointer<Element>(rp)
     unsafe rebound.update(repeating: repeatedValue, count: count)
