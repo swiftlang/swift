@@ -341,9 +341,7 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
   }
   case SILInstructionKind::StoreInst: {
     auto *si = cast<StoreInst>(memInst);
-    if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Trivial) {
-      si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
-    }
+    si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
     dest = si->getDest();
     break;
   }
@@ -367,8 +365,7 @@ static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
   }
   case SILInstructionKind::StoreInst: {
     auto *si = cast<StoreInst>(memInst);
-    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign
-        || si->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
+    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
   }
   }
 }
@@ -2161,7 +2158,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
     return true;
   }
-  
+
   // Then handle destroy_addr specially. We want to as part of our dataflow to
   // ignore destroy_addr, so we need to track it separately from other uses.
   if (auto *dvi = dyn_cast<DestroyAddrInst>(user)) {
