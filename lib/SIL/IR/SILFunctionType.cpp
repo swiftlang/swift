@@ -1345,18 +1345,43 @@ public:
     llvm_unreachable("unhandled ownership");
   }
 
-  // Determines owned/unowned ResultConvention of the returned value based on
-  // returns_retained/returns_unretained attribute.
+  // Determines the ownership ResultConvention (owned/unowned) of the return
+  // value using the SWIFT_RETURNS_(UN)RETAINED annotation on the C++ API; if
+  // not explicitly annotated, falls back to the
+  // SWIFT_RETURNS_(UN)RETAINED_BY_DEFAULT annotation on the C++
+  // SWIFT_SHARED_REFERENCE type.
   std::optional<ResultConvention>
   getCxxRefConventionWithAttrs(const TypeLowering &tl,
                                const clang::Decl *decl) const {
-    if (tl.getLoweredType().isForeignReferenceType() && decl->hasAttrs()) {
-      for (const auto *attr : decl->getAttrs()) {
-        if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-          if (swiftAttr->getAttribute() == "returns_unretained") {
-            return ResultConvention::Unowned;
-          } else if (swiftAttr->getAttribute() == "returns_retained") {
-            return ResultConvention::Owned;
+    if (tl.getLoweredType().isForeignReferenceType()) {
+      if (decl->hasAttrs()) {
+        for (const auto *attr : decl->getAttrs()) {
+          if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+            if (swiftAttr->getAttribute() == "returns_unretained") {
+              return ResultConvention::Unowned;
+            } else if (swiftAttr->getAttribute() == "returns_retained") {
+              return ResultConvention::Owned;
+            }
+          }
+        }
+      }
+      if (auto *classDecl = tl.getLoweredType()
+                                .getASTType()
+                                .getPointer()
+                                ->lookThroughAllOptionalTypes()
+                                ->getClassOrBoundGenericClass()) {
+        if (auto clangRecordDecl =
+                dyn_cast<clang::RecordDecl>(classDecl->getClangDecl())) {
+          for (const auto *attr : clangRecordDecl->getAttrs()) {
+            if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+              if (swiftAttr->getAttribute() ==
+                  "returns_unretained_by_default") {
+                return ResultConvention::Unowned;
+              } else if (swiftAttr->getAttribute() ==
+                         "returns_retained_by_default") {
+                return ResultConvention::Owned;
+              }
+            }
           }
         }
       }

@@ -1,4 +1,5 @@
 #pragma once
+#include "visibility.h"
 #include <functional>
 
 // FRT or SWIFT_SHARED_REFERENCE type
@@ -326,3 +327,107 @@ public:
   FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned() override
       __attribute__((swift_attr("returns_unretained")));
 };
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+namespace DefaultOwnershipConventionOnCXXForegnRefType {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defRetain1")))
+__attribute__((swift_attr("release:defRelease1"))) __attribute__((
+    swift_attr("returns_retained_by_default"))) RefTypeDefaultRetained {};
+
+RefTypeDefaultRetained *returnRefTypeDefaultRetained() {
+  return new RefTypeDefaultRetained();
+}
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defRetain2")))
+__attribute__((swift_attr("release:defRelease2"))) __attribute__((
+    swift_attr("returns_unretained_by_default"))) RefTypeDefaultUnretained {};
+
+RefTypeDefaultUnretained *returnRefTypeDefaultUnretained() {
+  return new RefTypeDefaultUnretained();
+}
+} // namespace DefaultOwnershipConventionOnCXXForegnRefType
+
+void defRetain1(
+    DefaultOwnershipConventionOnCXXForegnRefType::RefTypeDefaultRetained *v) {};
+void defRelease1(
+    DefaultOwnershipConventionOnCXXForegnRefType::RefTypeDefaultRetained *v) {};
+
+void defRetain2(
+    DefaultOwnershipConventionOnCXXForegnRefType::RefTypeDefaultUnretained *v) {
+};
+void defRelease2(
+    DefaultOwnershipConventionOnCXXForegnRefType::RefTypeDefaultUnretained *v) {
+};
+
+namespace FunctionAnnotationHasPrecedence {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defaultRetain1")))
+__attribute__((swift_attr("release:defaultRelease1"))) __attribute__((
+    swift_attr("returns_unretained_by_default"))) RefTypeDefaultUnRetained {};
+
+RefTypeDefaultUnRetained *returnRefTypeDefaultUnRetained() {
+  return new RefTypeDefaultUnRetained();
+}
+RefTypeDefaultUnRetained *returnRefTypeDefaultUnRetainedAnnotatedRetained()
+    __attribute__((swift_attr("returns_retained"))) {
+  return new RefTypeDefaultUnRetained();
+}
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defaultRetain2")))
+__attribute__((swift_attr("release:defaultRelease2"))) __attribute__((
+    swift_attr("returns_retained_by_default"))) RefTypeDefaultRetained {};
+
+RefTypeDefaultRetained *returnRefTypeDefaultRetained() {
+  return new RefTypeDefaultRetained();
+}
+RefTypeDefaultRetained *returnRefTypeDefaultRetainedAnnotatedUnRetained()
+    __attribute__((swift_attr("returns_unretained"))) {
+  return new RefTypeDefaultRetained();
+}
+
+} // namespace FunctionAnnotationHasPrecedence
+
+void defaultRetain1(
+    FunctionAnnotationHasPrecedence::RefTypeDefaultUnRetained *v) {};
+void defaultRelease1(
+    FunctionAnnotationHasPrecedence::RefTypeDefaultUnRetained *v) {};
+
+void defaultRetain2(
+    FunctionAnnotationHasPrecedence::RefTypeDefaultRetained *v) {};
+void defaultRelease2(
+    FunctionAnnotationHasPrecedence::RefTypeDefaultRetained *v) {};
+
+namespace DefaultOwnershipSuppressUnannotatedAPIWarning {
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:rretain")))
+__attribute__((swift_attr("release:rrelease"))) RefType {};
+
+RefType *returnRefType() { return new RefType(); }   // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:dretain")))
+__attribute__((swift_attr("release:drelease"))) __attribute__((
+    swift_attr("returns_retained_by_default"))) RefTypeDefaultRetained {};
+
+RefTypeDefaultRetained *returnRefTypeDefaultRetained() {
+  return new RefTypeDefaultRetained();
+}
+
+} // namespace DefaultOwnershipSuppressUnannotatedAPIWarning
+
+void rretain(DefaultOwnershipSuppressUnannotatedAPIWarning::RefType *v) {};
+void rrelease(DefaultOwnershipSuppressUnannotatedAPIWarning::RefType *v) {};
+
+void dretain(
+    DefaultOwnershipSuppressUnannotatedAPIWarning::RefTypeDefaultRetained *v) {
+};
+void drelease(
+    DefaultOwnershipSuppressUnannotatedAPIWarning::RefTypeDefaultRetained *v) {
+};
+
+SWIFT_END_NULLABILITY_ANNOTATIONS

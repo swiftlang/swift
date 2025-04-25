@@ -3664,6 +3664,25 @@ namespace {
             unannotatedAPIWarningNeeded = true;
           }
 
+          if (const auto *returnPtrTy = retType->getAs<clang::PointerType>()) {
+            clang::QualType returnPointeeType = returnPtrTy->getPointeeType();
+            if (const auto *returnRecordType =
+                    returnPointeeType->getAs<clang::RecordType>()) {
+              clang::RecordDecl *returnRecordDecl = returnRecordType->getDecl();
+              for (const auto *attr : returnRecordDecl->getAttrs()) {
+                if (const auto *swiftAttr =
+                        dyn_cast<clang::SwiftAttrAttr>(attr)) {
+                  if (swiftAttr->getAttribute() ==
+                          "returns_retained_by_default" ||
+                      swiftAttr->getAttribute() ==
+                          "returns_unretained_by_default") {
+                    unannotatedAPIWarningNeeded = false;
+                  }
+                }
+              }
+            }
+          }
+
           if (unannotatedAPIWarningNeeded) {
             HeaderLoc loc(decl->getLocation());
             Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
