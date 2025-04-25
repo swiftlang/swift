@@ -7,12 +7,12 @@
 // RUN: not %target-swift-frontend -vfsoverlay %/t/overlay.yaml -typecheck %s %/t/mapped-file.swift -serialize-diagnostics-path %/t/basic.dia 2>&1 | %FileCheck -check-prefix=BASIC_MAPPING_ERROR %s
 // RUN: c-index-test -read-diagnostics %/t/basic.dia 2>&1 | %FileCheck -check-prefix=BASIC_MAPPING_ERROR %s
 
-// BASIC_MAPPING_ERROR: {{.*}}/mapped-file.swift:2:17: error:
+// BASIC_MAPPING_ERROR: {{.*}}mapped-file.swift:2:17: error:
 
 // RUN: not %target-swift-frontend -vfsoverlay %/t/overlay.yaml -vfsoverlay %/t/secondary-overlay.yaml -vfsoverlay %/t/tertiary-overlay.yaml -typecheck %/s %/t/triple-mapped-swift-file.swift -serialize-diagnostics-path %/t/complex.dia 2>&1 | %FileCheck -check-prefix=COMPLEX_MAPPING_ERROR %s
 // RUN: c-index-test -read-diagnostics %/t/complex.dia 2>&1 | %FileCheck -check-prefix=COMPLEX_MAPPING_ERROR %s
 
-// COMPLEX_MAPPING_ERROR: {{.*}}/triple-mapped-swift-file.swift:2:17: error:
+// COMPLEX_MAPPING_ERROR: {{.*}}triple-mapped-swift-file.swift:2:17: error:
 
 // The Clang Importer should inherit Swift's VFS
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %/t -DTEST_VFS_CLANG_IMPORTER -vfsoverlay %/t//overlay.yaml -typecheck %/s

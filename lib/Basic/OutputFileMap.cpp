@@ -108,7 +108,9 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
 
 static void writeQuotedEscaped(llvm::raw_ostream &os,
                                const StringRef fileName) {
-  os << "\"" << llvm::yaml::escape(fileName) << "\"";
+  llvm::SmallString<261> Path{fileName};
+  llvm::sys::path::make_preferred(Path);
+  os << "\"" << llvm::yaml::escape(Path.str()) << "\"";
 }
 
 void OutputFileMap::write(llvm::raw_ostream &os,
@@ -130,9 +132,11 @@ void OutputFileMap::write(llvm::raw_ostream &os,
     // DenseMap is unordered. If you write a test, please sort the output.
     for (auto &typeAndOutputPath : *outputMap) {
       file_types::ID type = typeAndOutputPath.getFirst();
-      StringRef output = typeAndOutputPath.getSecond();
       os << "  " << file_types::getTypeName(type) << ": ";
-      writeQuotedEscaped(os, output);
+
+      llvm::SmallString<261> Path{typeAndOutputPath.getSecond()};
+      llvm::sys::path::make_preferred(Path);
+      writeQuotedEscaped(os, Path.str());
       os << "\n";
     }
   }

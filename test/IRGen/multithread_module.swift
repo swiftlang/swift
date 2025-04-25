@@ -72,8 +72,8 @@ public func mutateBaseArray(_ arr: inout [Base], _ x: Base) {
 
 // Check if the DI filename is correct and not "<unknown>".
 
-// CHECK-MAINLL: [[F:![0-9]+]] = !DIFile(filename: "{{.*}}IRGen/Inputs/multithread_module/main.swift", directory: "{{.*}}")
+// CHECK-MAINLL: [[F:![0-9]+]] = !DIFile(filename: "{{.*}}IRGen{{/|\\\\}}Inputs{{/|\\\\}}multithread_module{{/|\\\\}}main.swift", directory: "{{.*}}")
 // CHECK-MAINLL: DICompileUnit(language: DW_LANG_Swift, file: [[F]],
 
-// CHECK-MODULELL: [[F:![0-9]]] = !DIFile(filename: "{{.*}}IRGen/multithread_module.swift", directory: "{{.*}}")
+// CHECK-MODULELL: [[F:![0-9]]] = !DIFile(filename: "{{.*}}IRGen{{/|\\\\}}multithread_module.swift", directory: "{{.*}}")
 // CHECK-MODULELL: DICompileUnit(language: DW_LANG_Swift, file: [[F]],

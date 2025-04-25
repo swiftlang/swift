@@ -4,7 +4,7 @@
 
 // Verify some of the output of the -dump-pcm flag.
 // RUN: %swift-dump-pcm %t/script.pcm | %FileCheck %s --check-prefix=CHECK-DUMP
-// CHECK-DUMP: Information for module file '{{.*}}/script.pcm':
+// CHECK-DUMP: Information for module file '{{.*}}{{/|\\}}script.pcm':
 // CHECK-DUMP:   Module name: script
 // CHECK-DUMP:   Module map file: {{.*[/\\]}}Inputs{{/|\\}}custom-modules{{/|\\}}module.modulemap
 
