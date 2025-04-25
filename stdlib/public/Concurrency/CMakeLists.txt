@@ -303,8 +303,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
 
     # lib/swift/embedded/_Concurrency.swiftmodule
@@ -328,7 +330,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
-      ARCHITECTURE "${mod}"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
