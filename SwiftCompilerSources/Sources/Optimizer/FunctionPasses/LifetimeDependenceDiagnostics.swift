@@ -53,7 +53,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     }
   }
   for instruction in function.instructions {
-    if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
+    if let markDep = instruction as? MarkDependenceInstruction, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         if analyze(dependence: lifetimeDep, context) {
           // Note: This promotes the mark_dependence flag but does not invalidate analyses; preserving analyses is good,
