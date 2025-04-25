@@ -410,6 +410,19 @@ extension UnsafePointer where Pointee: ~Copyable {
       ),
       "self must be a properly aligned pointer for types Pointee and T"
     )
+    return try unsafe _uncheckedWithMemoryRebound(
+      to: type, capacity: count, body)
+  }
+
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal func _uncheckedWithMemoryRebound<
+    T: ~Copyable, E: Error, Result: ~Copyable
+  >(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
+  ) throws(E) -> Result {
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
     return try unsafe body(.init(_rawValue))
