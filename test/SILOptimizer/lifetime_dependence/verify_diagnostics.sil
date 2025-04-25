@@ -49,6 +49,7 @@ sil @useA : $@convention(thin) (A) -> ()
 sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
 sil @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
 sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
+sil @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
 
 sil @initHolder : $@convention(thin) () -> @out Holder
 sil @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
@@ -165,6 +166,26 @@ bb0:
   destroy_value %6
   %12 = tuple ()
   return %12
+}
+
+// Test that a borrowed dependency cannot inherit a copied dependency.
+sil [ossa] @testReborrow : $@convention(thin) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+bb0(%0 : @guaranteed $NE):
+  debug_value %0, let, name "ne", argno 1
+  %2 = function_ref @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  %4 = mark_dependence [unresolved] %3 on %0
+  return %4 // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+sil [ossa] @testBorrowValue : $@convention(thin) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+bb0(%0 : @guaranteed $NE):
+  %2 = function_ref @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  %4 = mark_dependence [unresolved] %3 on %0
+  return %4 // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
 
 // Test a borrowed dependency on an address

@@ -202,12 +202,23 @@ private struct DiagnoseDependence {
     // Check that the parameter dependence for this result is the same
     // as the current dependence scope.
     if let arg = dependence.scope.parentValue as? FunctionArgument,
-       function.argumentConventions[resultDependsOn: arg.index] != nil {
-      // The returned value depends on a lifetime that is inherited or
-      // borrowed in the caller. The lifetime of the argument value
-      // itself is irrelevant here.
-      log("  has dependent function result")
-      return .continueWalk
+       let argDep = function.argumentConventions[resultDependsOn: arg.index] {
+      switch argDep {
+      case .inherit:
+        if dependence.markDepInst != nil {
+          // A mark_dependence represents a "borrow" scope. A local borrow scope cannot inherit the caller's dependence
+          // because the borrow scope depends on the argument value itself, while the caller allows the result to depend
+          // on a value that the argument was copied from.
+          break
+        }
+        fallthrough
+      case .scope:
+        // The returned value depends on a lifetime that is inherited or
+        // borrowed in the caller. The lifetime of the argument value
+        // itself is irrelevant here.
+        log("  has dependent function result")
+        return .continueWalk
+      }
     }
     return .abortWalk
   }
