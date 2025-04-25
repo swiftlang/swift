@@ -790,7 +790,8 @@ protected:
         auto immortalParam =
           std::find_if(afd->getParameters()->begin(),
                        afd->getParameters()->end(), [](ParamDecl *param) {
-                         return strcmp(param->getName().get(), "immortal") == 0;
+                         return param->getName().nonempty()
+                           && strcmp(param->getName().get(), "immortal") == 0;
                        });
         if (immortalParam != afd->getParameters()->end()) {
           diagnose(*immortalParam,
