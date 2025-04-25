@@ -711,7 +711,8 @@ extension RawSpan {
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
-    return unsafe Self(_unchecked: _pointer, byteCount: newCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of trailing bytes.
@@ -734,7 +735,8 @@ extension RawSpan {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let count = byteCount &- droppedCount
-    return unsafe Self(_unchecked: _pointer, byteCount: count)
+    let newSpan = unsafe Self(_unchecked: _pointer, byteCount: count)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span containing the trailing bytes of the span,
