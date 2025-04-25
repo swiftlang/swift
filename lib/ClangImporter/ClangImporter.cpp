@@ -1139,6 +1139,8 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
 std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
     bool ignoreClangTarget) {
+  ASSERT(VFS && "Expected non-null file system");
+
   std::unique_ptr<clang::CompilerInvocation> CI;
 
   // Set up a temporary diagnostic client to report errors from parsing the
@@ -1240,9 +1242,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   // to missing files and report the error that clang would throw manually.
   // rdar://77516546 is tracking that the clang importer should be more
   // resilient and provide a module even if there were building it.
-  auto TempVFS = clang::createVFSFromCompilerInvocation(
-      *CI, *clangDiags,
-      VFS ? VFS : Impl.SwiftContext.SourceMgr.getFileSystem());
+  auto TempVFS = clang::createVFSFromCompilerInvocation(*CI, *clangDiags, VFS);
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
