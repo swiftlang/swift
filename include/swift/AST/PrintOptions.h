@@ -653,6 +653,7 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
+    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -660,6 +661,7 @@ struct PrintOptions {
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
+    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -686,6 +688,7 @@ struct PrintOptions {
     if (printFullConvention)
       result.PrintFunctionRepresentationAttrs =
           PrintOptions::FunctionRepresentationMode::Full;
+    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -711,6 +714,7 @@ struct PrintOptions {
     result.MapCrossImportOverlaysToDeclaringModule = true;
     result.PrintCurrentMembersOnly = false;
     result.SuppressExpandedMacros = true;
+    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 

@@ -254,6 +254,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
 
   // We should provide backward-compatible Swift interfaces when we can.
   result.PrintCompatibilityFeatureChecks = true;
+  
+  // Don't print a space before ':' in inheritance clauses.
+  result.PrintSpaceBeforeInheritance = false;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
