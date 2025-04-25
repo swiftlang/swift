@@ -1252,6 +1252,24 @@ enum class ConventionsKind : uint8_t {
   CXXMethod = 8,
 };
 
+template <typename T>
+std::optional<T>
+matchSwiftAttr(const clang::Decl *decl,
+               llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl || !decl->hasAttrs())
+    return std::nullopt;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      for (const auto &p : patterns) {
+        if (swiftAttr->getAttribute() == p.first)
+          return p.second;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 class Conventions {
   ConventionsKind kind;
 
@@ -1353,37 +1371,26 @@ public:
   std::optional<ResultConvention>
   getCxxRefConventionWithAttrs(const TypeLowering &tl,
                                const clang::Decl *decl) const {
-    if (tl.getLoweredType().isForeignReferenceType()) {
-      if (decl->hasAttrs()) {
-        for (const auto *attr : decl->getAttrs()) {
-          if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-            if (swiftAttr->getAttribute() == "returns_unretained") {
-              return ResultConvention::Unowned;
-            } else if (swiftAttr->getAttribute() == "returns_retained") {
-              return ResultConvention::Owned;
-            }
-          }
-        }
-      }
-      if (auto *classDecl = tl.getLoweredType()
-                                .getASTType()
-                                .getPointer()
-                                ->lookThroughAllOptionalTypes()
-                                ->getClassOrBoundGenericClass()) {
-        if (auto clangRecordDecl =
-                dyn_cast<clang::RecordDecl>(classDecl->getClangDecl())) {
-          for (const auto *attr : clangRecordDecl->getAttrs()) {
-            if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-              if (swiftAttr->getAttribute() ==
-                  "returns_unretained_by_default") {
-                return ResultConvention::Unowned;
-              } else if (swiftAttr->getAttribute() ==
-                         "returns_retained_by_default") {
-                return ResultConvention::Owned;
-              }
-            }
-          }
-        }
+    if (!tl.getLoweredType().isForeignReferenceType())
+      return std::nullopt;
+
+    if (auto result = matchSwiftAttr<ResultConvention>(
+            decl, {{"returns_unretained", ResultConvention::Unowned},
+                   {"returns_retained", ResultConvention::Owned}})) {
+      return result;
+    }
+
+    if (auto *classDecl = tl.getLoweredType()
+                              .getASTType()
+                              .getPointer()
+                              ->lookThroughAllOptionalTypes()
+                              ->getClassOrBoundGenericClass()) {
+      if (auto *clangRecordDecl = llvm::dyn_cast_or_null<clang::RecordDecl>(
+              classDecl->getClangDecl())) {
+        return matchSwiftAttr<ResultConvention>(
+            clangRecordDecl,
+            {{"returns_unretained_by_default", ResultConvention::Unowned},
+             {"returns_retained_by_default", ResultConvention::Owned}});
       }
     }
     return std::nullopt;
