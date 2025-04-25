@@ -93,6 +93,31 @@ public protocol SchedulableExecutor: Executor {
 
 }
 
+extension Actor {
+
+  /// Perform an operation with the actor's ``SerialExecutor``.
+  ///
+  /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
+  /// retaining the actor for the duration of the operation. This is to ensure the lifetime
+  /// of the executor while performing the operation.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T {
+    try operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
+  }
+
+  /// Perform an operation with the actor's ``SerialExecutor``.
+  ///
+  /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
+  /// retaining the actor for the duration of the operation. This is to ensure the lifetime
+  /// of the executor while performing the operation.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
+    try await operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
+  }
+}
+
 extension Executor {
   /// Return this executable as a SchedulableExecutor, or nil if that is
   /// unsupported.
