@@ -113,7 +113,7 @@ extension Actor {
   /// of the executor while performing the operation.
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 5.1, *)
-  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
     try await operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
   }
 }

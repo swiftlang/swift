@@ -37,8 +37,8 @@ func testSyncMember(obj: MyActor) -> Int {
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: actorMethod()[' async'][#Int#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedMethod()[' async'][#Void#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceVar]/CurrNominal:      unownedExecutor[#UnownedSerialExecutor#];
-// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) throws -> T##(any SerialExecutor) throws -> T#})[' rethrows'][#T#]; name=withSerialExecutor(:)
-// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) async throws -> T##(any SerialExecutor) async throws -> T#})[' async'][' rethrows'][#T#]; name=withSerialExecutor(:)
+// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) throws(Error) -> ~Copyable##(any SerialExecutor) throws(Error) -> ~Copyable#})[' throws'][#~Copyable#]; name=withSerialExecutor(:)
+// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) async throws(Error) -> ~Copyable##(any SerialExecutor) async throws(Error) -> ~Copyable#})[' async'][' throws'][#~Copyable#]; name=withSerialExecutor(:)
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated()[#Void#]; name=preconditionIsolated()
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated({#(message): String#})[#Void#]; name=preconditionIsolated(:)
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assertIsolated()[#Void#]; name=assertIsolated()
@@ -53,8 +53,8 @@ func testSyncMember(obj: MyActor) async -> Int {
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: actorMethod()[' async'][#Int#];
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedMethod()[' async'][#Void#];
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceVar]/CurrNominal:      unownedExecutor[#UnownedSerialExecutor#];
-// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) throws -> T##(any SerialExecutor) throws -> T#})[' rethrows'][#T#]; name=withSerialExecutor(:)
-// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) async throws -> T##(any SerialExecutor) async throws -> T#})[' async'][' rethrows'][#T#]; name=withSerialExecutor(:)
+// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) throws(Error) -> ~Copyable##(any SerialExecutor) throws(Error) -> ~Copyable#})[' throws'][#~Copyable#]; name=withSerialExecutor(:)
+// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: withSerialExecutor({#(operation): (any SerialExecutor) async throws(Error) -> ~Copyable##(any SerialExecutor) async throws(Error) -> ~Copyable#})[' async'][' throws'][#~Copyable#]; name=withSerialExecutor(:)
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated()[#Void#]; name=preconditionIsolated()
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated({#(message): String#})[#Void#]; name=preconditionIsolated(:)
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assertIsolated()[#Void#]; name=assertIsolated()
