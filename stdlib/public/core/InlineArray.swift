@@ -106,6 +106,7 @@ extension InlineArray where Element: ~Copyable {
   /// Converts the given raw pointer, which points at an uninitialized array
   /// instance, to a mutable buffer suitable for initialization.
   @available(SwiftStdlib 6.2, *)
+  @unsafe
   @_alwaysEmitIntoClient
   @_transparent
   internal static func _initializationBuffer(
