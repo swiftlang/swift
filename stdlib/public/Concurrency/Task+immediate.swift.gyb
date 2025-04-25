@@ -13,7 +13,7 @@
 import Swift
 @_implementationOnly import SwiftConcurrencyInternalShims
 
-// ==== Task.startSynchronously ------------------------------------------------
+// ==== Task.immediate ------------------------------------------------
 
 % METHOD_VARIANTS = [
 %   'THROWING',
@@ -56,11 +56,11 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
   @discardableResult
-  public static func startSynchronously(
+  public static func immediate(
     name: String? = nil,
     priority: TaskPriority? = nil,
     % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
-    % #       In this case: `func syncOnMyGlobalActor() { Task.startSynchronously { @MyGlobalActor in } }`
+    % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
     @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 

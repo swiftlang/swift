@@ -2552,6 +2552,12 @@ namespace decls_block {
                      BCFixed<1>  // implicit flag
                      >;
 
+  using InheritActorContextDeclAttrLayout =
+      BCRecordLayout<InheritActorContext_DECL_ATTR,
+                     BCFixed<2>, // the modifier (default (""), always)
+                     BCFixed<1>  // implicit flag
+                     >;
+
   using MacroRoleDeclAttrLayout = BCRecordLayout<
     MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag

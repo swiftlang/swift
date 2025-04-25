@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -34,6 +35,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Strings.h"
+
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -301,6 +303,33 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+const char *InheritActorContextAttr::getModifierName(
+  InheritActorContextModifier modifier) {
+  switch (modifier) {
+  case InheritActorContextModifier::Default: return "";
+  case InheritActorContextModifier::Always: return "any";
+  }
+  llvm_unreachable("bad kind");
+}
+
+
+void InheritActorContextAttr::printImpl(ASTPrinter &printer,
+  const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_inheritActorContext");
+
+  switch (getModifier()) {
+  case InheritActorContextModifier::Default:
+    break;
+  case InheritActorContextModifier::Always: {
+    printer << "(" << getModifierName() << ")";
+    break;
+  }
+  }
+
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -1531,6 +1560,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::InheritActorContext: {
+    Printer.printAttrName("@_inheritActorContext");
+    switch (cast<InheritActorContextAttr>(this)->getModifier()) {
+    case InheritActorContextModifier::Default:
+      break;
+    case InheritActorContextModifier::Always:
+      Printer << "(always)";
+      break;
+    }
+    break;
+  }
+
   case DeclAttrKind::MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
 
@@ -1914,6 +1955,13 @@ StringRef DeclAttribute::getAttrName() const {
       return "nonisolated(unsafe)";
     case NonIsolatedModifier::NonSending:
       return "nonisolated(nonsending)";
+    }
+  case DeclAttrKind::InheritActorContext:
+    switch (cast<InheritActorContextAttr>(this)->getModifier()) {
+    case InheritActorContextModifier::Default:
+      return "@_inheritActorContext";
+    case InheritActorContextModifier::Always:
+      return "@_inheritActorContext(always)";
     }
   case DeclAttrKind::MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {

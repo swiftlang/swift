@@ -142,6 +142,20 @@ enum : unsigned {
       static_cast<unsigned>(NonIsolatedModifier::Last_NonIsolatedModifier))
 };
 
+enum class InheritActorContextModifier: uint8_t {
+  /// Only inherit the actor execution context if the isolated parameter was
+  /// captured by the closure.
+  Default,
+
+  /// Always inherit the actor context, even when the isolated parameter
+  /// is not closed over explicitly.
+  Always,
+  Last_InheritActorContextKind = Always
+};
+
+enum : unsigned { NumInheritActorContextKindBits =
+  countBitsUsed(static_cast<unsigned>(InheritActorContextModifier::Last_InheritActorContextKind)) };
+
 enum class DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,

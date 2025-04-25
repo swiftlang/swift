@@ -326,6 +326,7 @@ IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
 // Attribute options
 IDENTIFIER_(_always)
+IDENTIFIER(always)
 IDENTIFIER_(assumed)
 IDENTIFIER(checked)
 IDENTIFIER(never)

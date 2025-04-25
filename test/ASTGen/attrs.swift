@@ -251,6 +251,9 @@ struct LayoutOuter {
 }
 @_rawLayout(like: LayoutOuter.Nested<Int>) struct TypeExprTest: ~Copyable {}
 
+func take(@_inheritActorContext param: () -> async ()) { }
+func take(@_inheritActorContext(always) param: () -> async ()) { }
+
 @reasync protocol ReasyncProtocol {}
 @rethrows protocol RethrowingProtocol {
   func source() throws

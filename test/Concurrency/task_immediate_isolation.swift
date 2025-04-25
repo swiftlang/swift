@@ -4,19 +4,19 @@
 
 @available(SwiftStdlib 6.2, *)
 func sync() -> Task<String, Never> {
-  Task.startSynchronously {
+  Task.immediate {
     return ""
   }
 }
 
 @available(SwiftStdlib 6.2, *)
 func async() async throws {
-  let t1 = Task.startSynchronously {
+  let t1 = Task.immediate {
     return ""
   }
   let _: String = await t1.value
   
-  let t2: Task<String, Error> = Task.startSynchronously {
+  let t2: Task<String, Error> = Task.immediate {
     throw CancellationError()
   }
   let _: String = try await t2.value

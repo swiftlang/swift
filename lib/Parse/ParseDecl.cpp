@@ -3773,6 +3773,24 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     break;
   }
+  case DeclAttrKind::InheritActorContext: {
+    AttrRange = Loc;
+    std::optional<InheritActorContextModifier> Modifier(InheritActorContextModifier::Default);
+    Modifier = parseSingleAttrOption<InheritActorContextModifier>(
+      *this, Loc, AttrRange, AttrName, DK, {
+        {Context.Id_always, InheritActorContextModifier::Always}
+      }, *Modifier, ParameterizedDeclAttributeKind::InheritActorContext);
+    if (!Modifier) {
+      makeParserSuccess();
+    }
+
+    if (!DiscardAttribute) {
+      Attributes.add(new (Context) InheritActorContextAttr(
+          AtLoc, AttrRange, *Modifier, /*implicit=*/false));
+    }
+
+    break;
+  }
   case DeclAttrKind::MacroRole: {
     auto syntax = (AttrName == "freestanding" ? MacroSyntax::Freestanding
                                               : MacroSyntax::Attached);

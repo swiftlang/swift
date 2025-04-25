@@ -389,7 +389,7 @@ Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
 Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
 Added: _swift_task_getCurrentTaskName
 
-// startSynchronously
+// immediate
 Added: _swift_task_startSynchronously
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously4name8priority9operationySSSg_ScPSgyyYaKYAcntF
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYaKYAcntF

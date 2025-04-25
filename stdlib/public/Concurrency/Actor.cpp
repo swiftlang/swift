@@ -2553,7 +2553,7 @@ swift_task_startSynchronouslyImpl(AsyncTask *task,
   _swift_task_setCurrent(originalTask);
   } else {
     assert(swift_task_isCurrentExecutor(targetExecutor) &&
-           "startSynchronously must only be invoked when it is correctly in "
+           "immediate must only be invoked when it is correctly in "
            "the same isolation already, but wasn't!");
 
     // We can run synchronously, we're on the expected executor so running in

@@ -1405,8 +1405,13 @@ func nonEphemeral2(_: UnsafeRawPointer) {}
 func nonEphemeral3(@_nonEphemeral _: UnsafeRawPointer) {}
 
 // @_inheritActorContext -- banned in @abi
-@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '@_inheritActorContext' attribute in '@abi'}} {{32-53=}}
 func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
+
+// FIXME: it must be allowed in ABI right?
+// @_inheritActorContext(always) -- banned in @abi
+@abi(func inheritActorContext1(@_inheritActorContext(always) fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '@_inheritActorContext(always)' attribute in '@abi'}} {{32-53=}}
+func inheritActorContext1(@_inheritActorContext(always) fn: @Sendable @escaping () async -> Void) {}
 
 @abi(func inheritActorContext2(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
 func inheritActorContext2(fn: @Sendable @escaping () async -> Void) {}

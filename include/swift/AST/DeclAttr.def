@@ -620,9 +620,10 @@ SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   115)
 
-SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
+DECL_ATTR(_inheritActorContext, InheritActorContext,
   OnParam,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  // since the _inheritActorContext(always) forces an actor capture, it changes ABI of the closure this applies to
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   116)
 
 SIMPLE_DECL_ATTR(_eagerMove, EagerMove,

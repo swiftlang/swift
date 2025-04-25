@@ -267,7 +267,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -279,6 +279,7 @@ protected:
     /// True if this @Sendable async closure parameter should implicitly
     /// inherit the actor context from where it was formed.
     InheritActorContext : 1,
+    InheritActorContextAlways : 1,
 
     /// True if this closure's actor isolation behavior was determined by an
     /// \c \@preconcurrency declaration.
@@ -4366,8 +4367,23 @@ public:
     return Bits.ClosureExpr.InheritActorContext;
   }
 
-  void setInheritsActorContext(bool value = true) {
-    Bits.ClosureExpr.InheritActorContext = value;
+  void setInheritsActorContext(InheritActorContextModifier modifier = InheritActorContextModifier::Default) { // TODO: change into enum
+    switch (modifier) {
+      case InheritActorContextModifier::Default: {
+        Bits.ClosureExpr.InheritActorContext = true;
+        Bits.ClosureExpr.InheritActorContextAlways = true;
+        break;
+      }
+      case InheritActorContextModifier::Always: {
+        Bits.ClosureExpr.InheritActorContext = true;
+        Bits.ClosureExpr.InheritActorContextAlways = true;
+        break;
+      }
+    }
+  }
+
+  bool inheritsActorContextAlways() const {
+    return Bits.ClosureExpr.InheritActorContextAlways;
   }
 
   /// Whether the closure's concurrency behavior was determined by an

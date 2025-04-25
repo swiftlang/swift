@@ -17,6 +17,7 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
+#include "Attr.h"
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -42,10 +43,10 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
-#include "llvm/ADT/bit.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -228,6 +229,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, NumNonIsolatedModifierBits,
       Modifier : NumNonIsolatedModifierBits
+    );
+
+    SWIFT_INLINE_BITFIELD(InheritActorContextAttr, DeclAttribute, NumInheritActorContextKindBits,
+      Modifier : NumInheritActorContextKindBits
     );
 
     SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
@@ -3009,6 +3014,51 @@ public:
   bool isEquivalent(const NonisolatedAttr *other, Decl *attachedTo) const {
     return getModifier() == other->getModifier();
   }
+};
+
+/// Represents @_inheritActorContext modifier.
+class InheritActorContextAttr final : public DeclAttribute {
+public:
+  InheritActorContextAttr(SourceLoc atLoc, SourceRange range,
+                          InheritActorContextModifier modifier, bool implicit)
+      : DeclAttribute(DeclAttrKind::InheritActorContext, atLoc, range, implicit) {
+    Bits.InheritActorContextAttr.Modifier = static_cast<unsigned>(modifier);
+    assert((getModifier() == modifier) && "not enough bits for modifier");
+  }
+
+  InheritActorContextModifier getModifier() const {
+    return static_cast<InheritActorContextModifier>(Bits.InheritActorContextAttr.Modifier);
+  }
+
+  bool isAlways() const { return getModifier() == InheritActorContextModifier::Always; }
+
+  static InheritActorContextAttr *
+  createImplicit(ASTContext &ctx,
+                 InheritActorContextModifier modifier = InheritActorContextModifier::Default) {
+    return new (ctx) InheritActorContextAttr(/*atLoc*/ {}, /*range*/ {}, modifier,
+                                             /*implicit=*/true);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::InheritActorContext;
+  }
+
+  /// Create a copy of this attribute.
+  InheritActorContextAttr *clone(ASTContext &ctx) const {
+    return new (ctx) InheritActorContextAttr(AtLoc, Range, getModifier(), isImplicit());
+  }
+
+  bool isEquivalent(const InheritActorContextAttr *other, Decl *attachedTo) const {
+    return getModifier() == other->getModifier();
+  }
+
+  const char *getModifierName() const {
+    return getModifierName(getModifier());
+  }
+  static const char *getModifierName(InheritActorContextModifier modifier);
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+
 };
 
 /// A macro role attribute, spelled with either @attached or @freestanding,

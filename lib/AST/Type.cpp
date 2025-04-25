@@ -1353,6 +1353,7 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
+  inheritActorContextAlways.resize(params.size()); // FIXME: don't need that?
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
 
@@ -1409,8 +1410,11 @@ ParameterListInfo::ParameterListInfo(
       implicitSelfCapture.set(i);
     }
 
-    if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
+    if (auto attr = param->getAttrs().getAttribute<InheritActorContextAttr>()) {
       inheritActorContext.set(i);
+      if (attr->isAlways()) {
+        inheritActorContextAlways.set(i);
+      }
     }
 
     if (param->getInterfaceType()->is<PackExpansionType>()) {
@@ -1447,6 +1451,12 @@ bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
 bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
   return paramIdx < inheritActorContext.size()
       ? inheritActorContext[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::inheritsActorContextAlways(unsigned paramIdx) const {
+  return paramIdx < inheritActorContextAlways.size()
+      ? inheritActorContextAlways[paramIdx]
       : false;
 }
 
