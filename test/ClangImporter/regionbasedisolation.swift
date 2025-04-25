@@ -61,7 +61,7 @@ extension ObjCObject {
     // We emit an error since loadObjects just returns an [NSObject], not a
     // sending [NSObject].
     try await loadObjects()
-  } // expected-error {{task or actor isolated value cannot be sent}}
+  } // expected-error {{task or actor-isolated value cannot be sent}}
 
   // Check if we do not mark the block as NS_SWIFT_SENDABLE
   //
@@ -121,5 +121,5 @@ extension ObjCObject {
     // We emit an error since loadObjects just returns an [NSObject], not a
     // sending [NSObject].
     try await loadObjects2()
-  } // expected-error {{task or actor isolated value cannot be sent}}
+  } // expected-error {{task or actor-isolated value cannot be sent}}
 }
