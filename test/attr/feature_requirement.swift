@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -disable-experimental-parser-round-trip -verify-additional-prefix disabled-
-// RUN: %target-typecheck-verify-swift -parse-as-library -verify-additional-prefix enabled- -enable-experimental-feature ABIAttribute
+// RUN: %target-typecheck-verify-swift -parse-as-library -verify-additional-prefix enabled- -enable-experimental-feature ABIAttribute -enable-experimental-feature ExtensibleAttribute
 
 // REQUIRES: asserts
 
@@ -14,3 +14,13 @@ func fn() {}  // expected-disabled-error@-1 {{'abi' attribute is only valid when
 #else
   #error("doesn't have @abi")  // expected-disabled-error {{doesn't have @abi}}
 #endif
+
+@extensible
+public enum E {}  // expected-disabled-error@-1 {{'extensible' attribute is only valid when experimental feature ExtensibleAttribute is enabled}}
+
+#if hasAttribute(extensible)
+  #error("does have @extensible")  // expected-enabled-error {{does have @extensible}}
+#else
+  #error("doesn't have @extensible")  // expected-disabled-error {{doesn't have @extensible}}
+#endif
+
