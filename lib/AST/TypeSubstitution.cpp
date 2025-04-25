@@ -1123,7 +1123,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
   auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
   if (!archetype)
-    return lookupConformance(replacementType, protocol);
+    return ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
 
   auto *genericEnv = archetype->getGenericEnvironment();
   auto *decl = genericEnv->getOpaqueTypeDecl();
@@ -1131,13 +1131,13 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   auto substitutionKind = shouldPerformSubstitution(decl);
   if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute)
-    return lookupConformance(replacementType, protocol);
+    return ProtocolConformanceRef::forAbstract(replacementType, protocol);
 
   auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
   if (!subs.has_value())
-    return lookupConformance(replacementType, protocol);
+    return ProtocolConformanceRef::forAbstract(replacementType, protocol);
 
   // Apply the underlying type substitutions to the interface type of the
   // archetype in question. This will map the inner generic signature of the
@@ -1158,13 +1158,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
               return true;
             return false;
           }))
-    return lookupConformance(replacementType, protocol);
-
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments. We perform this substitution after checking for
-  // visibility, since we do not want the result of the visibility check to
-  // depend on the substitutions previously applied.
-  auto substTy = partialSubstTy.subst(outerSubs);
+    return ProtocolConformanceRef::forAbstract(replacementType, protocol);
 
   auto partialSubstRef =
       subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
@@ -1172,7 +1166,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto substRef = partialSubstRef.subst(outerSubs);
 
   // If the type still contains opaque types, recur.
-  if (substTy->hasOpaqueArchetype()) {
+  if (substRef.getType()->hasOpaqueArchetype()) {
     SeenDecl seenKey(decl, outerSubs);
     
     if (auto *alreadySeen = this->seenDecls) {
