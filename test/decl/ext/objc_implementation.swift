@@ -432,20 +432,20 @@ protocol EmptySwiftProto {}
 }
 
 @objc(TypeMatchOptionalityInvalid) @implementation extension ObjCClass {
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @objc(InvalidMembers) @implementation extension ObjCClass {
   // expected-error@-1 {{extension for category 'InvalidMembers' should provide implementation for instance method 'unimplementedMember()'}}
 
   func nonObjCMethod(_: EmptySwiftProto) {
-    // expected-error@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+    // expected-error@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
 
   private func privateNonObjCMethod(_: EmptySwiftProto) {
-    // expected-error@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+    // expected-error@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
 

@@ -3,5 +3,5 @@
 
 // REQUIRES: swift_feature_Extern
 
-@_extern(c) // expected-warning {{C name '+' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning}}
+@_extern(c) // expected-warning {{C name '+' may be invalid; explicitly specify the name in '@_extern(c)' to suppress this warning}}
 func +(a: Int, b: Bool) -> Bool
