@@ -435,6 +435,24 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
+      tests.test("continuation equality") {
+        let (_, continuation1) = AsyncStream<Int>.makeStream()
+        let (_, continuation2) = AsyncStream<Int>.makeStream()
+        expectTrue(continuation1 == continuation1)
+        expectTrue(continuation1 != continuation2)
+        expectTrue(continuation1.hashValue == continuation1.hashValue)
+        expectTrue(continuation1.hashValue != continuation2.hashValue)
+      }
+
+      tests.test("throwing continuation equality") {
+        let (_, continuation1) = AsyncThrowingStream<Int, Error>.makeStream()
+        let (_, continuation2) = AsyncThrowingStream<Int, Error>.makeStream()
+        expectTrue(continuation1 == continuation1)
+        expectTrue(continuation1 != continuation2)
+        expectTrue(continuation1.hashValue == continuation1.hashValue)
+        expectTrue(continuation1.hashValue != continuation2.hashValue)
+      }
+
       // MARK: - Multiple consumers
 
       tests.test("finish behavior with multiple consumers") {
