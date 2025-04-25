@@ -71,17 +71,20 @@ struct ExecutorFixture {
   static func test(runLoopExecutor: some RunLoopExecutor) async -> Bool {
     print("\no RunLoopExecutor")
 
-    let stopJob = createJob(priority: .medium) {
-      print("  - stopping")
-      runLoopExecutor.stop()
+    // Do this twice, to make sure we can start after stopping
+    for _ in 0..<2 {
+      let stopJob = createJob(priority: .medium) {
+        print("  - stopping")
+        runLoopExecutor.stop()
+      }
+
+      runLoopExecutor.enqueue(stopJob)
+
+      print("  - running")
+      try! runLoopExecutor.run()
+
+      print("  - stopped")
     }
-
-    runLoopExecutor.enqueue(stopJob)
-
-    print("  - running")
-    try! runLoopExecutor.run()
-
-    print("  - stopped")
 
     return true
   }
@@ -101,6 +104,8 @@ struct ExecutorFixture {
       // (Otherwise, the executor might be running already, and could start
       // running mediumJob immediately before it has even seen highJob.)
       let enqueueJob = createJob(priority: .medium) {
+        print("  - Enqueuing jobs")
+
         let highJob = createJob(priority: .high) {
           print("  - High priority job")
           order.withLock {
@@ -204,9 +209,10 @@ struct ExecutorFixture {
             $0.append(actualDelay)
           }
         }
+        let theDelay = clock.convert(from: .milliseconds(delay))!
         schedulableExecutor.enqueue(job,
-                                    after: .milliseconds(delay),
-                                    clock: .suspending)
+                                    after: theDelay,
+                                    clock: clock)
       }
       let stopJob = createJob(priority: .low) {
         print("    + Stopping")
@@ -216,9 +222,10 @@ struct ExecutorFixture {
         }
         continuation.resume()
       }
+      let stopDelay = clock.convert(from: .milliseconds(1100))!
       schedulableExecutor.enqueue(stopJob,
-                                  after: .milliseconds(1100),
-                                  clock: .suspending)
+                                  after: stopDelay,
+                                  clock: clock)
       if let runLoopExecutor {
         print("    + Telling RunLoopExecutor to run")
         try! runLoopExecutor.run()
@@ -297,9 +304,10 @@ struct ExecutorFixture {
         }
         continuation.resume()
       }
+      let stopDelay = clock.convert(from: .milliseconds(1100))!
       schedulableExecutor.enqueue(stopJob,
-                                  after: .milliseconds(1100),
-                                  clock: .suspending)
+                                  after: stopDelay,
+                                  clock: clock)
       if let runLoopExecutor {
         print("    + Telling RunLoopExecutor to run")
         try! runLoopExecutor.run()

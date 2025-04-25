@@ -318,6 +318,7 @@ public final class Win32EventLoopExecutor
       //
       if dwRet == WAIT_OBJECT_0 {
         if bShouldStop.load(ordering: .acquiring) {
+          bShouldStop.store(false, ordering: .relaxed)
           break
         }
       }
@@ -450,18 +451,21 @@ public final class Win32EventLoopExecutor
       return INFINITE
     }
 
-    // Convert to milliseconds
-    var msToWait = lowestDelta / 10000
+    // Compute the desired fire time
+    let fireTime = lowestDelta - leeway
 
-    // If the deadline is less than 15ms away, or we have less than 15ms
-    // of leeway, reduce `msToWait` so that we spin up to the fire time.
+    // Convert to milliseconds
+    var msToWait = fireTime / 10000
+
+    // If we have less than 15ms of leeway, reduce `msToWait` so that
+    // we spin up to the fire time.
     //
     // The reason for this is that Windows waits in an unusual way; it actually
     // keeps track of time in 15.625ms (1/64s) "ticks", and if you ask to wait
     // for less than one tick it will run an inaccurate delay loop.  Further,
     // because of when it decrements the tick count, it may actually return by
     // up to one tick *early*, depending on when in a tick you ask to wait.
-    if lowestDelta < 156250 || leeway < 156250 {
+    if leeway < 156250 {
       msToWait -= min(msToWait, 15)
     }
 
