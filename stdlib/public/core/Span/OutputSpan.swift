@@ -173,11 +173,22 @@ extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func removeLast() -> Element? {
-    guard _count > 0 else { return nil }
+  public mutating func removeLast() -> Element {
+    _precondition(!isEmpty, "OutputSpan underflow")
     _count &-= 1
     return unsafe _tail().withMemoryRebound(to: Element.self, capacity: 1) {
       unsafe $0.move()
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func removeLast(_ k: Int) {
+    _precondition(k >= 0, "Can't remove a negative number of elements")
+    _precondition(k <= _count, "OutputSpan underflow")
+    _count &-= k
+    unsafe _tail().withMemoryRebound(to: Element.self, capacity: k) {
+      _ = unsafe $0.deinitialize(count: k)
     }
   }
 
