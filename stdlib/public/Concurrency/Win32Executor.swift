@@ -37,6 +37,10 @@ extension ExecutorJob {
     }
   }
 
+  // The code below deals with the fact that the Timestamp may not fit
+  // into the private storage.  If it doesn't, we need to allocate it
+  // somewhere and store a pointer instead.
+
   fileprivate var win32TimestampIsIndirect: Bool {
     return unsafe MemoryLayout<OpaquePointer>.stride * 2
       < MemoryLayout<Win32EventLoopExecutor.Timestamp>.size
@@ -118,7 +122,7 @@ extension ExecutorJob {
   }
 
   fileprivate mutating func clearWin32Timestamp() {
-    // If a Timestamp won't fit, deallocate
+    // If we allocated the Timestamp, deallocate
     if win32TimestampIsIndirect {
       let ptr = unsafe self.win32TimestampPointer
       if let allocator {
@@ -215,7 +219,7 @@ public final class Win32EventLoopExecutor
   private var currentRunQueue: PriorityQueue<UnownedJob>
 
   private var dwThreadId: DWORD?
-  private var hEvent: HANDLE?
+  private var hEvent: HANDLE!
   private let bShouldStop: Atomic<Bool>
   private let sequence: Atomic<UInt>
 
@@ -228,7 +232,11 @@ public final class Win32EventLoopExecutor
     self.dwThreadId = nil
     self.bShouldStop = Atomic<Bool>(false)
     self.sequence = Atomic<UInt>(0)
-    unsafe self.hEvent = CreateEventW(nil, true, false, nil)
+    guard let hEvent = unsafe CreateEventW(nil, true, false, nil) else {
+      let dwError = GetLastError()
+      fatalError("Unable to create event: \(String(dwError, radix: 16))")
+    }
+    unsafe self.hEvent = hEvent
 
     let comparePriorities = { (lhs: UnownedJob, rhs: UnownedJob) -> Bool in
       if lhs.priority == rhs.priority {
@@ -238,9 +246,8 @@ public final class Win32EventLoopExecutor
         let delta = ExecutorJob(lhs).win32Sequence
           &- ExecutorJob(rhs).win32Sequence
         return (delta >> (UInt.bitWidth - 1)) != 0
-      } else {
-        return lhs.priority > rhs.priority
       }
+      return lhs.priority > rhs.priority
     }
 
     self.runQueue = Mutex(PriorityQueue(compare: comparePriorities))
@@ -260,11 +267,11 @@ public final class Win32EventLoopExecutor
   }
 
   deinit {
-    unsafe CloseHandle(hEvent!)
+    unsafe CloseHandle(hEvent)
   }
 
   private func wakeEventLoop() {
-    let bRet = unsafe SetEvent(hEvent!)
+    let bRet = unsafe SetEvent(hEvent)
     if !bRet {
       let dwError = GetLastError()
       fatalError("SetEvent() failed while trying to wake event loop: error 0x\(String(dwError, radix: 16))")
@@ -279,15 +286,16 @@ public final class Win32EventLoopExecutor
     let dwCurrentThreadId = GetCurrentThreadId()
     if dwThreadId == nil {
       dwThreadId = dwCurrentThreadId
-    } else if dwThreadId != dwCurrentThreadId {
-      fatalError("tried to run executor on the wrong thread")
     }
+
+    precondition(dwThreadId == dwCurrentThreadId,
+                 "Win32EventLoopExecutor must always run on the same thread")
 
     while true {
       // Switch queues
       runQueue.withLock {
         swap(&$0, &currentRunQueue)
-        unsafe ResetEvent(hEvent!)
+        unsafe ResetEvent(hEvent)
       }
 
       // Move jobs from the timer queue to the run queue as needed

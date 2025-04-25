@@ -189,9 +189,8 @@ public class CooperativeExecutor: Executor, @unchecked Sendable {
                                    = ExecutorJob($0).cooperativeExecutorSequence
                                    &- ExecutorJob($1).cooperativeExecutorSequence
                                  return (delta >> (UInt.bitWidth - 1)) != 0
-                               } else {
-                                 return $0.priority > $1.priority
                                }
+                               return $0.priority > $1.priority
                              })
     waitQueue =
       PriorityQueue(compare: {
