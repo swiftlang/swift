@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend -enable-experimental-feature ABIAttribute %s -emit-ir > %t.ir
+// RUN: %target-swift-frontend %s -emit-ir > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
 // RUN: %FileCheck --check-prefix NEGATIVE --input-file %t.ir %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64 || CPU=arm64
-// REQUIRES: swift_feature_ABIAttribute
 
 // Non-Swift _silgen_name definitions
 

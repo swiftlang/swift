@@ -861,7 +861,6 @@ DECL_ATTR(abi, ABI,
   OnConstructor | OnFunc | OnSubscript | OnVar,
   LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   165)
-DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 
 // Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
 
