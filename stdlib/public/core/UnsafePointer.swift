@@ -400,8 +400,8 @@ extension UnsafePointer where Pointee: ~Copyable {
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    unsafe _debugPrecondition(
-      Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
+    _debugPrecondition(
+      _isWellAligned(for: T.self) &&
       ( count == 1 ||
         ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
           ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
@@ -469,6 +469,19 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
+extension UnsafePointer where Pointee: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+  }
+
+  @safe
+  @_alwaysEmitIntoClient
+  internal func _isWellAligned<T: ~Copyable>(for: T.Type) -> Bool {
+    UnsafeRawPointer(_rawValue)._isWellAligned(for: T.self)
+  }
+}
 
 /// A pointer for accessing and manipulating data of a
 /// specific type.
@@ -1248,8 +1261,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    unsafe _debugPrecondition(
-      Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
+    _debugPrecondition(
+      _isWellAligned(for: T.self) &&
       ( count == 1 ||
         ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
           ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
@@ -1380,5 +1393,19 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     return unsafe UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
+  }
+}
+
+extension UnsafeMutablePointer where Pointee: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    unsafe UnsafePointer(self)._isWellAligned()
+  }
+
+  @safe
+  @_alwaysEmitIntoClient
+  internal func _isWellAligned<T: ~Copyable>(for: T.Type) -> Bool {
+    UnsafeRawPointer(_rawValue)._isWellAligned(for: T.self)
   }
 }
