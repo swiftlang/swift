@@ -964,10 +964,10 @@ NOTE(sil_referencebinding_inout_binding_here, none,
       ())
 
 //===----------------------------------------------------------------------===//
-//                  MARK: Region Based Isolation Diagnostics
+//                  MARK: Region-Based Isolation Diagnostics
 //===----------------------------------------------------------------------===//
 
-// READ THIS: Please when adding diagnostics for region based isolation, keep
+// READ THIS: Please when adding diagnostics for region-based isolation, keep
 // them ordered in sections depending on which emitter uses it. It makes it
 // easier for people unfamiliar with the code to quickly see which diagnostics
 // are used by which of the SendNonSendable emitters use.
@@ -976,7 +976,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 // Misc
 
 ERROR(regionbasedisolation_unknown_pattern, none,
-      "pattern that the region based isolation checker does not understand how to check. Please file a bug",
+      "pattern that the region-based isolation checker does not understand how to check. Please file a bug",
       ())
 NOTE(regionbasedisolation_maybe_race, none,
      "access can happen concurrently", ())
@@ -1098,13 +1098,13 @@ NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
 ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
-      "task or actor isolated value cannot be sent", ())
+      "task or actor-isolated value cannot be sent", ())
 
 //===
 // InOut Sending Emitter
 
 NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
-     "'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value",
+     "'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value",
      ())
 ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
       "'inout sending' parameter %0 cannot be %1at end of function",

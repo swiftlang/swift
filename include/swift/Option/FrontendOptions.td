@@ -1491,7 +1491,7 @@ def platform_c_calling_convention_EQ :
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
-  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
+  HelpText<"Disable sending args and results when region-based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def scanner_module_validation: Flag<["-"], "scanner-module-validation">,
