@@ -62,7 +62,7 @@ FunctionTypeInfo SILGenFunction::getClosureTypeInfo(AbstractClosureExpr *expr) {
   auto fnType = cast<AnyFunctionType>(expr->getType()->getCanonicalType());
 
   // If we have a closure expr that has inherits actor context, work around AST
-  // issues that causes us to be able to get non-Sendable actor isolated
+  // issues that causes us to be able to get non-Sendable actor-isolated
   // closures.
   if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
     if (ce->inheritsActorContext() && fnType->isAsync() &&
