@@ -822,6 +822,7 @@ function(add_swift_target_library_single target name)
         IS_FRAGILE)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
+        ARCHITECTURE_SUBDIR_NAME
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
@@ -888,6 +889,9 @@ function(add_swift_target_library_single target name)
   precondition(SWIFTLIB_SINGLE_SDK MESSAGE "Should specify an SDK")
   precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
+  if (NOT SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME)
+    set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  endif()
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
@@ -903,12 +907,12 @@ function(add_swift_target_library_single target name)
 
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
 
   # macCatalyst ios-like builds are installed in the maccatalyst/x86_64 directory
   if(maccatalyst_build_flavor STREQUAL "ios-like")
     set(SWIFTLIB_SINGLE_SUBDIR
-        "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+        "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
   endif()
 
   if ("${SWIFTLIB_SINGLE_BOOTSTRAPPING}" STREQUAL "")
@@ -1033,6 +1037,7 @@ function(add_swift_target_library_single target name)
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
+      ARCHITECTURE_SUBDIR_NAME ${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}
       MODULE_NAME ${module_name}
       MODULE_DIR ${SWIFTLIB_SINGLE_MODULE_DIR}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
@@ -1058,9 +1063,9 @@ function(add_swift_target_library_single target name)
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
   if(maccatalyst_build_flavor STREQUAL "ios-like")
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    set(VARIANT_SUFFIX "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
   endif()
 
   if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGETS}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
