@@ -154,12 +154,12 @@ protected:
     Implicit : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumExprBits,
+  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumberOfExprBits,
     /// True if the type of this collection expr was inferred by the collection
     /// fallback type, like [Any].
     IsTypeDefaulted : 1,
     /// Number of comma source locations.
-    NumCommas : 32 - 1 - NumExprBits,
+    NumCommas : 32 - 1 - NumberOfExprBits,
     /// Number of entries in the collection. If this is a DictionaryExpr,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
@@ -256,8 +256,8 @@ protected:
     LitKind : 3
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumExprBits)+16,
-    : 16 - NumExprBits, // Align and leave room for subclasses
+  SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumberOfExprBits)+16,
+    : 16 - NumberOfExprBits, // Align and leave room for subclasses
     Discriminator : 16
   );
 

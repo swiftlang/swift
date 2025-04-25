@@ -1942,7 +1942,7 @@ private:
           nullptr, PtrSize, 0,
           /* DWARFAddressSpace */ std::nullopt, MangledName);
 
-      return DBuilder.createObjectPointerType(PTy);
+      return DBuilder.createObjectPointerType(PTy, /*Implicit=*/false);
     }
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
@@ -3853,19 +3853,23 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   }
 
   // Insert a dbg.value at the current insertion point.
-  if (isa<llvm::Argument>(Storage) && !Var->getArg() &&
-      ParentBlock->getFirstNonPHIOrDbg())
-    // SelectionDAGISel only generates debug info for a dbg.value
-    // that is associated with a llvm::Argument if either its !DIVariable
-    // is marked as argument or there is no non-debug intrinsic instruction
-    // before it. So In the case of associating a llvm::Argument with a
-    // non-argument debug variable -- usually via a !DIExpression -- we
-    // need to make sure that dbg.value is before any non-phi / no-dbg
-    // instruction.
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL,
-                                     ParentBlock->getFirstNonPHIOrDbg());
-  else
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
+  if (isa<llvm::Argument>(Storage) && !Var->getArg()) {
+    const auto InsertPt = ParentBlock->getFirstNonPHIOrDbg();
+    if (InsertPt != ParentBlock->end()) {
+      // SelectionDAGISel only generates debug info for a dbg.value
+      // that is associated with a llvm::Argument if either its !DIVariable
+      // is marked as argument or there is no non-debug intrinsic instruction
+      // before it. So In the case of associating a llvm::Argument with a
+      // non-argument debug variable -- usually via a !DIExpression -- we
+      // need to make sure that dbg.value is before any non-phi / no-dbg
+      // instruction.
+      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, InsertPt);
+
+      return;
+    }
+  }
+
+  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock->end());
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

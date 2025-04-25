@@ -380,6 +380,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
+      case clang::TargetInfo::XtensaABIBuiltinVaList:
         return std::make_pair(Type(), "");
     }
     break;
@@ -3301,7 +3302,7 @@ namespace {
             decl->getLocation(),
             const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
             clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false);
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
         // If the template can't be instantiated, bail.
         if (notInstantiated)
           return nullptr;

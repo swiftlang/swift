@@ -83,10 +83,14 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
-#define AMDGPU_TYPE(Name, Id, SingletonId)                                     \
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/AMDGPUTypes.def"
+#define HLSL_INTANGIBLE_TYPE(Name, Id, SingletonId)                            \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/HLSLIntangibleTypes.def"
   }
 
   // Not a valid BuiltinType.

@@ -197,11 +197,11 @@ renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
       if (!Sym->hasName() || !Sym->isCallable())
         continue;
 
-      if (ToRename.count(Sym->getName())) {
-        // FIXME: Get rid of the temporary when Swift's llvm-project is
-        // updated to LLVM 17.
-        auto NewName = G.allocateCString(Twine(mangle(Sym->getName())));
-        Sym->setName({NewName.data(), NewName.size() - 1});
+      const StringRef Name = *Sym->getName();
+
+      if (ToRename.count(Name)) {
+        auto NewName = G.intern(mangle(Name));
+        Sym->setName(NewName);
       }
     }
   }

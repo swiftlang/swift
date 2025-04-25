@@ -558,7 +558,7 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
   SmallVector<SILValue, 4> Args(1, Val);
   Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), SubVal));
   Args.push_back(B.createIntegerLiteral(
-      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
+      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), 1));
 
   auto *AI = B.createBuiltinBinaryFunctionWithOverflow(
       Loc, "ssub_with_overflow", Args);
@@ -570,7 +570,7 @@ static SILValue getAdd(SILLocation Loc, SILValue Val, unsigned AddVal,
   SmallVector<SILValue, 4> Args(1, Val);
   Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), AddVal));
   Args.push_back(B.createIntegerLiteral(
-      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), -1));
+      Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), 1));
 
   auto *AI = B.createBuiltinBinaryFunctionWithOverflow(
       Loc, "sadd_with_overflow", Args);
@@ -1342,7 +1342,7 @@ BoundsCheckOpts::findAndOptimizeInductionVariables(SILLoop *loop) {
           if (isComparisonKnownTrue(builtin, *ivar)) {
             if (!trueVal)
               trueVal = builder.createIntegerLiteral(builtin->getLoc(),
-                                                     builtin->getType(), -1);
+                                                     builtin->getType(), 1);
             builtin->replaceAllUsesWith(trueVal);
             changed = true;
             continue;

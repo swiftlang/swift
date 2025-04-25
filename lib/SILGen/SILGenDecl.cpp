@@ -1995,12 +1995,11 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
             emitOSVersionRangeCheck(loc, versionRange.value(), isMacCatalyst);
         if (availability->isUnavailability()) {
           // If this is an unavailability check, invert the result
-          // by emitting a call to Builtin.xor_Int1(lhs, -1).
+          // by emitting a call to Builtin.xor_Int1(lhs, 1).
           SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-          SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
-          booleanTestValue =
-            B.createBuiltinBinaryFunction(loc, "xor", i1, i1,
-                                          {booleanTestValue, minusOne});
+          SILValue one = B.createIntegerLiteral(loc, i1, 1);
+          booleanTestValue = B.createBuiltinBinaryFunction(
+              loc, "xor", i1, i1, {booleanTestValue, one});
         }
       }
       break;

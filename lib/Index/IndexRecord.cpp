@@ -602,7 +602,7 @@ static void emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
       case FileUnitKind::DWARFModule:
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
-        if (auto F = fileMgr.getFile(LFU->getFilename())) {
+        if (fileMgr.getOptionalFileRef(LFU->getFilename())) {
           if (FU->getKind() == FileUnitKind::ClangModule) {
             auto clangModUnit = cast<ClangModuleUnit>(LFU);
             if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {

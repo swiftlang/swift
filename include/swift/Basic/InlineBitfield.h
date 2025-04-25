@@ -41,7 +41,7 @@ namespace swift {
     uint64_t : 64 - (C); /* Better code gen */ \
   } T; \
   LLVM_PACKED_END \
-  enum { Num##T##Bits = (C) }; \
+  enum { NumberOf##T##Bits = (C) }; \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
 /// Define an bitfield for type 'T' with parent class 'U' and 'C' bits used.
@@ -49,11 +49,11 @@ namespace swift {
   LLVM_PACKED_START \
   class T##Bitfield { \
     friend class T; \
-    uint64_t : Num##U##Bits, __VA_ARGS__; \
-    uint64_t : 64 - (Num##U##Bits + (HC) + (C)); /* Better code gen */ \
+    uint64_t : NumberOf##U##Bits, __VA_ARGS__; \
+    uint64_t : 64 - (NumberOf##U##Bits + (HC) + (C)); /* Better code gen */ \
   } T; \
   LLVM_PACKED_END \
-  enum { Num##T##Bits = Num##U##Bits + (C) }; \
+  enum { NumberOf##T##Bits = NumberOf##U##Bits + (C) }; \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
 #define SWIFT_INLINE_BITFIELD(T, U, C, ...) \
@@ -75,8 +75,8 @@ namespace swift {
   LLVM_PACKED_START \
   class T##Bitfield { \
     friend class T; \
-    enum { NumPadBits = 64 - (Num##U##Bits + (C)) }; \
-    uint64_t : Num##U##Bits, __VA_ARGS__; \
+    enum { NumPadBits = 64 - (NumberOf##U##Bits + (C)) }; \
+    uint64_t : NumberOf##U##Bits, __VA_ARGS__; \
   } T; \
   LLVM_PACKED_END \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
@@ -101,15 +101,15 @@ namespace swift {
   class T##Bitfield {                                                          \
     template <typename TTy>                                                    \
     friend class T;                                                            \
-    enum { NumPadBits = 64 - (Num##U##Bits + (C)) };                           \
-    uint64_t : Num##U##Bits, __VA_ARGS__;                                      \
+    enum { NumPadBits = 64 - (NumberOf##U##Bits + (C)) };                      \
+    uint64_t : NumberOf##U##Bits, __VA_ARGS__;                                 \
   } T;                                                                         \
   LLVM_PACKED_END                                                              \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
 /// Define an empty bitfield for type 'T'.
 #define SWIFT_INLINE_BITFIELD_EMPTY(T, U) \
-  enum { Num##T##Bits = Num##U##Bits }
+  enum { NumberOf##T##Bits = NumberOf##U##Bits }
 
 // XXX/HACK: templated max() doesn't seem to work in a bitfield size context.
 constexpr unsigned bitmax(unsigned a, unsigned b) {

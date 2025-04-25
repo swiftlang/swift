@@ -85,7 +85,6 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
-#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
 #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
 #include "llvm/Transforms/Instrumentation/SanitizerCoverage.h"
@@ -93,6 +92,7 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Utils/Instrumentation.h"
 
 #include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -342,7 +342,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
             FPM.addPass(SwiftARCOptPass());
         });
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                          OptimizationLevel Level) {
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
       if (Level != OptimizationLevel::O0)
         MPM.addPass(createModuleToFunctionPassAdaptor(SwiftARCContractPass()));
       if (Level == OptimizationLevel::O0)
@@ -357,7 +358,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   if (Opts.Sanitizers & SanitizerKind::Address) {
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel Level) {
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
       AddressSanitizerOptions ASOpts;
       ASOpts.CompileKernel = false;
       ASOpts.Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
@@ -376,17 +378,19 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   }
 
   if (Opts.Sanitizers & SanitizerKind::Thread) {
-    PB.registerOptimizerLastEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel Level) {
-          MPM.addPass(ModuleThreadSanitizerPass());
-          MPM.addPass(createModuleToFunctionPassAdaptor(ThreadSanitizerPass()));
-        });
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
+      MPM.addPass(ModuleThreadSanitizerPass());
+      MPM.addPass(createModuleToFunctionPassAdaptor(ThreadSanitizerPass()));
+    });
   }
 
   if (Opts.SanitizeCoverage.CoverageType !=
       llvm::SanitizerCoverageOptions::SCK_None) {
     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel Level) {
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
       std::vector<std::string> allowlistFiles;
       std::vector<std::string> ignorelistFiles;
       MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage,
@@ -395,14 +399,15 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   }
 
   if (RunSwiftSpecificLLVMOptzns && !Opts.DisableLLVMMergeFunctions) {
-    PB.registerOptimizerLastEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel Level) {
-          if (Level != OptimizationLevel::O0) {
-            const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
-            unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
-            MPM.addPass(SwiftMergeFunctionsPass(schema.isEnabled(), key));
-          }
-        });
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                           OptimizationLevel Level,
+                                           llvm::ThinOrFullLTOPhase) {
+      if (Level != OptimizationLevel::O0) {
+        const PointerAuthSchema &schema = Opts.PointerAuth.FunctionPointers;
+        unsigned key = (schema.isEnabled() ? schema.getKey() : 0);
+        MPM.addPass(SwiftMergeFunctionsPass(schema.isEnabled(), key));
+      }
+    });
   }
 
   if (Opts.GenerateProfile) {
@@ -424,7 +429,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   bool isThinLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Thin;
   bool isFullLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Full;
   if (!Opts.shouldOptimize() || Opts.DisableLLVMOptzns) {
-    MPM = PB.buildO0DefaultPipeline(level, isFullLTO || isThinLTO);
+    auto phase = llvm::ThinOrFullLTOPhase::None;
+    if (isFullLTO) {
+      phase = llvm::ThinOrFullLTOPhase::FullLTOPreLink;
+    } else if (isThinLTO) {
+      phase = llvm::ThinOrFullLTOPhase::ThinLTOPreLink;
+    }
+    MPM = PB.buildO0DefaultPipeline(level, phase);
   } else if (isThinLTO) {
     MPM = PB.buildThinLTOPreLinkDefaultPipeline(level);
   } else if (isFullLTO) {
@@ -1169,8 +1180,8 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
-  
-  Module->setTargetTriple(IGM.Triple.str());
+
+  Module->setTargetTriple(IGM.Triple);
 
   if (IGM.Context.LangOpts.SDKVersion) {
     if (Module->getSDKVersion().empty())

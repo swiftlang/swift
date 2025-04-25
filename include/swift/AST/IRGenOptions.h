@@ -29,9 +29,9 @@
 #include "llvm/IR/CallingConv.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
-#include "llvm/Transforms/Instrumentation.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Instrumentation.h"
 #include <optional>
 #include <string>
 #include <tuple>

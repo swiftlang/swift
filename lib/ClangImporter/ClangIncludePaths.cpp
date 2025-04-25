@@ -129,7 +129,7 @@ ClangImporter::createClangDriver(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
   auto *silentDiagConsumer = new clang::DiagnosticConsumer();
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
-      new clang::DiagnosticOptions(), silentDiagConsumer);
+      *vfs, new clang::DiagnosticOptions(), silentDiagConsumer);
   clang::driver::Driver clangDriver(ClangImporterOpts.clangPath,
                                     LangOpts.Target.str(), *clangDiags,
                                     "clang LLVM compiler", vfs);

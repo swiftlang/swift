@@ -368,10 +368,15 @@ namespace {
         return Type();
 
       // AMDGPU builtin types that don't have Swift equivalents.
-#define AMDGPU_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
+      case clang::BuiltinType::Id:
 #include "clang/Basic/AMDGPUTypes.def"
         return Type();
 
+      // HLSL intangible builtin types that don't have Swift equivalents.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+        return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
@@ -414,6 +419,16 @@ namespace {
                                                 type->getTypeClassName()),
                                clang::SourceLocation());
       // FIXME: handle pointers and fields of atomic type
+      return Type();
+    }
+
+    ImportResult VisitHLSLAttributedResourceType(
+        const clang::HLSLAttributedResourceType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: (?) HLSL types are not supported in Swift.
       return Type();
     }
 

@@ -450,6 +450,11 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
 #define AMDGPU_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AMDGPUTypes.def"
       return OmissionTypeName();
+
+    // HLSL intangible builtin types that don't have Swift equivalents.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+      return OmissionTypeName();
     }
   }
 

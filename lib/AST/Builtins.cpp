@@ -2343,18 +2343,6 @@ bool swift::canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty) {
   return isBuiltinTypeOverloaded(Ty, OverloadedBuiltinKinds[unsigned(ID)]);
 }
 
-/// Table of string intrinsic names indexed by enum value.
-static const char *const IntrinsicNameTable[] = {
-    "not_intrinsic",
-#define GET_INTRINSIC_NAME_TABLE
-#include "llvm/IR/IntrinsicImpl.inc"
-#undef GET_INTRINSIC_NAME_TABLE
-};
-
-#define GET_INTRINSIC_TARGET_DATA
-#include "llvm/IR/IntrinsicImpl.inc"
-#undef GET_INTRINSIC_TARGET_DATA
-
 llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
@@ -2370,10 +2358,8 @@ llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
     NameS.push_back(C == '_' ? '.' : C);
 
   const char *Name = NameS.c_str();
-  ArrayRef<const char *> NameTable(&IntrinsicNameTable[1],
-                                   TargetInfos[1].Offset);
-  int Idx = Intrinsic::lookupLLVMIntrinsicByName(NameTable, Name);
-  return static_cast<Intrinsic::ID>(Idx + 1);
+
+  return Intrinsic::lookupIntrinsicID(Name);
 }
 
 llvm::Intrinsic::ID
@@ -2468,6 +2454,9 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Subdivide4Argument:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
+  case IITDescriptor::OneThirdVecArgument:
+  case IITDescriptor::OneFifthVecArgument:
+  case IITDescriptor::OneSeventhVecArgument:
     // These types cannot be expressed in swift yet.
     return Type();
 
