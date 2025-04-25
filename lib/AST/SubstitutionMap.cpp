@@ -174,14 +174,12 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (const auto &req : genericSig.getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance) continue;
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
 
-    Type depTy = req.getFirstType();
-    auto replacement = depTy.subst(IFS);
-    auto *proto = req.getProtocolDecl();
-    auto conformance = IFS.lookupConformance(
-        depTy->getCanonicalType(), replacement, proto, /*level=*/0);
-    conformances.push_back(conformance);
+    conformances.push_back(
+      IFS.lookupConformance(
+        req.getFirstType(), req.getProtocolDecl(), /*level=*/0));
   }
 
   return SubstitutionMap(genericSig, types, conformances);

@@ -52,8 +52,7 @@ public:
   Type substType(SubstitutableType *origType, unsigned level);
 
   /// Perform primitive conformance lookup on the given type.
-  ProtocolConformanceRef lookupConformance(CanType dependentType,
-                                           Type conformingReplacementType,
+  ProtocolConformanceRef lookupConformance(Type dependentType,
                                            ProtocolDecl *conformedProtocol,
                                            unsigned level);
 

@@ -273,13 +273,13 @@ Type InFlightSubstitution::substType(SubstitutableType *origType,
 }
 
 ProtocolConformanceRef
-InFlightSubstitution::lookupConformance(CanType dependentType,
-                                        Type conformingReplacementType,
+InFlightSubstitution::lookupConformance(Type dependentType,
                                         ProtocolDecl *conformedProtocol,
                                         unsigned level) {
-  auto substConfRef = BaselineLookupConformance(dependentType,
-                                                conformingReplacementType,
-                                                conformedProtocol);
+  auto substConfRef = BaselineLookupConformance(
+      dependentType->getCanonicalType(),
+      dependentType.subst(*this),
+      conformedProtocol);
   if (!substConfRef ||
       ActivePackExpansions.empty() ||
       !substConfRef.isPack())
@@ -430,22 +430,18 @@ Type TypeSubstituter::transformPackElementType(PackElementType *element,
 Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependent,
                                                    TypePosition pos) {
   auto origBase = dependent->getBase();
-  auto substBase = doIt(origBase, TypePosition::Invariant);
-
-  if (auto *selfType = substBase->getAs<DynamicSelfType>())
-    substBase = selfType->getSelfType();
 
   auto *assocType = dependent->getAssocType();
   ASSERT(assocType);
 
-  auto proto = assocType->getProtocol();
-  ProtocolConformanceRef conformance =
-    IFS.lookupConformance(origBase->getCanonicalType(), substBase,
-                          proto, level);
+  auto *proto = assocType->getProtocol();
+  auto conformance = IFS.lookupConformance(origBase, proto, level);
 
   auto result = conformance.getTypeWitness(assocType, IFS.getOptions());
-  if (result->is<ErrorType>())
+  if (result->is<ErrorType>()) {
+    auto substBase = origBase.subst(IFS);
     return DependentMemberType::get(ErrorType::get(substBase), assocType);
+  }
   return result;
 }
 
