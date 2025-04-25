@@ -1929,12 +1929,17 @@ private:
                 Fptr == target_task_wait_throwing_resume_adapter) ||
                (target_task_future_wait_resume_adapter &&
                 Fptr == target_task_future_wait_resume_adapter)) {
-      auto ContextBytes = getReader().readBytes(RemoteAddress(ResumeContextPtr),
-                                                sizeof(AsyncContext<Runtime>));
-      if (ContextBytes) {
-        auto ContextPtr =
-            reinterpret_cast<const AsyncContext<Runtime> *>(ContextBytes.get());
-        return stripSignedPointer(ContextPtr->ResumeParent);
+      // It's only safe to look through these adapters when there's a dependency
+      // record. If there isn't a dependency record, then the task was resumed
+      // and the pointers are potentially stale.
+      if (AsyncTaskObj->PrivateStorage.DependencyRecord) {
+        auto ContextBytes = getReader().readBytes(
+            RemoteAddress(ResumeContextPtr), sizeof(AsyncContext<Runtime>));
+        if (ContextBytes) {
+          auto ContextPtr = reinterpret_cast<const AsyncContext<Runtime> *>(
+              ContextBytes.get());
+          return stripSignedPointer(ContextPtr->ResumeParent);
+        }
       }
     }
 
