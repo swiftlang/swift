@@ -8483,14 +8483,10 @@ ERROR(attr_abi_mismatched_async,none,
       "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
       (Decl *, /*abiIsAsync=*/bool))
 
-ERROR(attr_abi_mismatched_pbd_size,none,
-      "cannot give pattern binding the ABI of a binding with "
-      "%select{more|fewer}0 patterns",
-      (/*abiHasExtra=*/bool))
-
-ERROR(attr_abi_mismatched_var,none,
-      "no match for %select{%kind0 in the ABI|ABI %kind0}1",
-      (Decl *, /*isABI=*/bool))
+ERROR(attr_abi_multiple_vars,none,
+      "'abi' attribute can only be applied to a single %0; declare each "
+      "%0 separately",
+      (DescriptiveDeclKind))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %kindonly0 because "
