@@ -102,7 +102,7 @@ extension Actor {
   /// of the executor while performing the operation.
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 5.1, *)
-  public nonisolated func withSerialExecutor<T>(_ operation: (any SerialExecutor) throws -> T) rethrows -> T {
+  public nonisolated func withSerialExecutor<T, E: Error>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T {
     try operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
   }
 
@@ -113,7 +113,7 @@ extension Actor {
   /// of the executor while performing the operation.
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 5.1, *)
-  public nonisolated func withSerialExecutor<T>(_ operation: (any SerialExecutor) async throws -> T) async rethrows -> T {
+  public nonisolated func withSerialExecutor<T, E: Error>(_ operation: (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
     try await operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
   }
 }
