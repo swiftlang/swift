@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser, executable_test
-// REQUIRES: swift_feature_ABIAttribute
 
 // For _Concurrency.
 // UNSUPPORTED: use_os_stdlib
@@ -7,12 +6,12 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -enable-experimental-feature ABIAttribute -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DTEST_DIAGNOSTICS
 
 // Check with the imported macro library vs. the local declaration of the macro.
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t -enable-experimental-feature ABIAttribute -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t -DTEST_DIAGNOSTICS
 
 
 // RUN: %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library %s -disable-availability-checking -dump-macro-expansions > %t/expansions-dump.txt 2>&1
