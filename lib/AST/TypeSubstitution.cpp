@@ -1200,3 +1200,35 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   }
   return substRef;
 }
+
+Type ReplaceExistentialArchetypesWithConcreteTypes::getInterfaceType(
+    ExistentialArchetypeType *type) const {
+  return type->getInterfaceType().transformRec(
+    [&](TypeBase *type) -> std::optional<Type> {
+      if (isa<GenericTypeParamType>(type))
+        return type->getASTContext().TheSelfType;
+      return std::nullopt;
+    });
+}
+
+Type ReplaceExistentialArchetypesWithConcreteTypes::operator()(
+    SubstitutableType *type) const {
+  auto *existentialArchetype = dyn_cast<ExistentialArchetypeType>(type);
+  if (!existentialArchetype ||
+      existentialArchetype->getGenericEnvironment() != env)
+    return type;
+
+  auto interfaceType = getInterfaceType(existentialArchetype);
+  return interfaceType.subst(subs);
+}
+
+ProtocolConformanceRef ReplaceExistentialArchetypesWithConcreteTypes::operator()(
+    CanType origType, Type substType, ProtocolDecl *proto) const {
+  auto existentialArchetype = dyn_cast<ExistentialArchetypeType>(origType);
+  if (!existentialArchetype ||
+      existentialArchetype->getGenericEnvironment() != env)
+    return ProtocolConformanceRef::forAbstract(substType, proto);
+
+  return subs.lookupConformance(
+      getInterfaceType(existentialArchetype)->getCanonicalType(), proto);
+}
