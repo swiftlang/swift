@@ -15,13 +15,43 @@ FieldsTestSuite.test("Zero sized field") {
   s.set_c(7)
   takeTypeWithZeroSizedMember(s)
   let s2 = s
-  let myInt : Empty.type = 6
+  let _ : Empty.type = 6
   expectEqual(s.a, 5)
   expectEqual(s.a, s.get_a())
   expectEqual(s2.c, 7)
   expectEqual(s2.c, s2.get_c())
   expectEqual(takesZeroSizedInCpp(s2), 5)
   expectEqual(s.b.getNum(), 42)
+}
+
+FieldsTestSuite.test("Field padding reused") {
+  var s = ReuseFieldPadding()
+  let opt = s.getOptional()
+  expectEqual(Int(opt.pointee), 2)
+  s.c = 5
+  expectEqual(Int(s.offset()),  MemoryLayout<ReuseFieldPadding>.offset(of: \.c)!)
+  expectEqual(s.c, 5)
+  expectEqual(s.get_c(), 5)
+  s.set_c(6)
+  expectEqual(s.c, 6)
+  expectEqual(s.get_c(), 6)
+  let s2 = s
+  expectEqual(s2.c, 6)
+  expectEqual(s2.get_c(), 6)
+}
+
+FieldsTestSuite.test("Typedef'd field padding reused") {
+  var s = ReuseFieldPaddingWithTypedef()
+  s.c = 5
+  expectEqual(Int(s.offset()),  MemoryLayout<ReuseFieldPadding>.offset(of: \.c)!)
+  expectEqual(s.c, 5)
+  expectEqual(s.get_c(), 5)
+  s.set_c(6)
+  expectEqual(s.c, 6)
+  expectEqual(s.get_c(), 6)
+  let s2 = s
+  expectEqual(s2.c, 6)
+  expectEqual(s2.get_c(), 6)
 }
 
 runAllTests()
