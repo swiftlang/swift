@@ -1051,6 +1051,9 @@ public:
   const CanType TheUnconstrainedAnyType;  /// This is 'any ~Copyable & ~Escapable',
                                           /// the empty protocol composition
                                           /// without any implicit constraints.
+  const CanGenericTypeParamType TheSelfType; /// The protocol 'Self' type;
+                                             /// a generic parameter with
+                                             /// depth 0 index 0
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
 #include "swift/AST/TypeNodes.def"

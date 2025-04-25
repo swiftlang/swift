@@ -1576,9 +1576,7 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()))
-                        .subst(subs);
+  auto nativeType = Type(SGF.getASTContext().TheSelfType).subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
   auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
@@ -4153,9 +4151,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto formalCanTy = formalTy->getCanonicalType();
       
       // Get the Equatable conformance from the Hashable conformance.
-      auto equatable = hashable.getAssociatedConformance(
-          GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
-          equatableProtocol);
+      auto equatable = hashable.getAssociatedConformance(C.TheSelfType, equatableProtocol);
 
       assert(equatable.isAbstract() == hashable.isAbstract());
       if (equatable.isConcrete())
