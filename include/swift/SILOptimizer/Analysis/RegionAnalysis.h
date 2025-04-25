@@ -391,7 +391,7 @@ public:
   }
 
   /// Returns the value for this instruction if it isn't a fake "represenative
-  /// value" to inject actor isolatedness. Asserts in such a case.
+  /// value" to inject actor isolation. Asserts in such a case.
   SILValue getRepresentative(Element trackableValueID) const;
 
   /// Returns the value for this instruction. If it is a fake "representative
@@ -399,7 +399,7 @@ public:
   SILValue maybeGetRepresentative(Element trackableValueID) const;
 
   /// Returns the value for this instruction if it isn't a fake "represenative
-  /// value" to inject actor isolatedness. Asserts in such a case.
+  /// value" to inject actor isolation. Asserts in such a case.
   RepresentativeValue getRepresentativeValue(Element trackableValueID) const;
 
   /// Returns the fake "representative value" for this element if it

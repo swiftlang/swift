@@ -1782,7 +1782,7 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
   return !(fn->hasAsync()); // basic case: not async = had restriction.
 }
 
-/// Note that while a direct access to the actor isolated property is not legal
+/// Note that while a direct access to the actor-isolated property is not legal
 /// you may want to consider introducing an accessing method for a mutation.
 static void
 maybeNoteMutatingMethodSuggestion(ASTContext &C,
@@ -2997,7 +2997,7 @@ namespace {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
             // Defer diagnosing checking of non-Sendable types that are passed
-            // into async let to SIL level region based isolation.
+            // into async let to SIL level region-based isolation.
             return;
           }
 
@@ -4803,7 +4803,7 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     // If the local function is not Sendable, its isolation differs
     // from that of the context, and both contexts are actor isolated,
     // then capturing non-Sendable values allows the closure to stash
-    // those values into actor isolated state. The original context
+    // those values into actor-isolated state. The original context
     // may also stash those values into isolated state, enabling concurrent
     // access later on.
     isolatedStateMayEscape =
@@ -7828,8 +7828,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
     return forSameConcurrencyDomain(declIsolation, options);
   }
 
-  // Initializing an actor isolated stored property with a value effectively
-  // passes that value from the init context into the actor isolated context.
+  // Initializing an actor-isolated stored property with a value effectively
+  // passes that value from the init context into the actor-isolated context.
   // It's only okay for the value to cross isolation boundaries if the property
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.

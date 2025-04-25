@@ -322,7 +322,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     SF->typeCheckDelayedFunctions();
   }
 
-  // If region based isolation is enabled, we diagnose unnecessary
+  // If region-based isolation is enabled, we diagnose unnecessary
   // preconcurrency imports in the SIL pipeline in the
   // DiagnoseUnnecessaryPreconcurrencyImports pass.
   if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))

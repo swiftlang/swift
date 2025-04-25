@@ -12,7 +12,7 @@
 //  - can't pass it into a curried/partially applied function
 //  - can't pass it inout to a function that doesn't directly touch it
 //  - can't pass it into a function that was passed into the calling method
-//  - can't call async mutating function on actor isolated state
+//  - can't call async mutating function on actor-isolated state
 
 struct Point {
   var x: Int
