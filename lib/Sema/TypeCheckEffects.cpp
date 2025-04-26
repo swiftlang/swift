@@ -4599,6 +4599,15 @@ private:
     if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
       return;
 
+    // Silence this warning in the expansion of the _SwiftifyImport macro.
+    // This is a hack because it's tricky to determine when to insert "unsafe".
+    unsigned bufferID =
+        Ctx.SourceMgr.findBufferContainingLoc(E->getUnsafeLoc());
+    if (auto sourceInfo = Ctx.SourceMgr.getGeneratedSourceInfo(bufferID)) {
+      if (sourceInfo->macroName == "_SwiftifyImport")
+        return;
+    }
+
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
       Ctx.Diags.diagnose(E->getUnsafeLoc(),
