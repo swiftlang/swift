@@ -1187,8 +1187,7 @@ public:
     Classification result;
     bool considerAsync = !onlyEffect || *onlyEffect == EffectKind::Async;
     bool considerThrows = !onlyEffect || *onlyEffect == EffectKind::Throws;
-    bool considerUnsafe = (!onlyEffect || *onlyEffect == EffectKind::Unsafe) &&
-        ctx.LangOpts.hasFeature(Feature::StrictMemorySafety);
+    bool considerUnsafe = (!onlyEffect || *onlyEffect == EffectKind::Unsafe);
 
     // If we're tracking "unsafe" effects, compute them here.
     if (considerUnsafe) {
@@ -1708,8 +1707,7 @@ public:
         !fnType->isAsync() &&
         !E->isImplicitlyAsync() &&
         !hasAnyConformances &&
-        (fnRef.getExplicitSafety() == ExplicitSafety::Safe ||
-         !ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))) {
+        fnRef.getExplicitSafety() == ExplicitSafety::Safe) {
       return Classification();
     }
 
@@ -1928,7 +1926,6 @@ public:
     // If the safety of the callee is unspecified, check the safety of the
     // arguments specifically.
     if (hasUnspecifiedSafety &&
-        ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
         !(assumedSafeArguments && assumedSafeArguments->contains(E))) {
       classifyApplyEffect(EffectKind::Unsafe);
     }
@@ -4554,8 +4551,7 @@ private:
         Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
           .fixItInsert(insertionLoc, "unsafe ");
       }
-    } else if (S->getUnsafeLoc().isValid() &&
-               Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+    } else if (S->getUnsafeLoc().isValid()) {
       // Extraneous "unsafe" on the sequence.
       Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
         .fixItRemove(S->getUnsafeLoc());
@@ -4600,9 +4596,6 @@ private:
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
-    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
-      return;
-
     // Silence this warning in the expansion of the _SwiftifyImport macro.
     // This is a hack because it's tricky to determine when to insert "unsafe".
     unsigned bufferID =

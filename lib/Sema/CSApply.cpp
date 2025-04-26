@@ -8149,7 +8149,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
     Diag<> brokenProtocolDiag, Diag<> brokenBuiltinProtocolDiag) {
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
-  if (type->is<UnresolvedType>()) {
+  if (type->is<UnresolvedType>() || type->is<ErrorType>()) {
     cs.setType(literal, type);
     return literal;
   }
