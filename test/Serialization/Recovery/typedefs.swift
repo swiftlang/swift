@@ -127,10 +127,10 @@ open class User {
   // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
-  // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
-  // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
+  // CHECK: func constrainedUnwrapped<T>(_: T) where T: HasAssoc, T.Assoc == Int32
+  // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T: HasAssoc, T.Assoc == Int32
   public func constrainedUnwrapped<T: HasAssoc>(_: T) where T.Assoc == UnwrappedInt { fatalError() }
-  // CHECK: func constrainedWrapped<T>(_: T) where T : HasAssoc, T.Assoc == WrappedInt
+  // CHECK: func constrainedWrapped<T>(_: T) where T: HasAssoc, T.Assoc == WrappedInt
   // CHECK-RECOVERY: /* placeholder for constrainedWrapped(_:) (vtable entries: 1) */
   public func constrainedWrapped<T: HasAssoc>(_: T) where T.Assoc == WrappedInt { fatalError() }
 
@@ -138,7 +138,7 @@ open class User {
   // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript(_: WrappedInt) -> () { return () }
 
-  // CHECK: subscript<T>(_: T) -> () where T : HasAssoc, T.Assoc == WrappedInt { get }
+  // CHECK: subscript<T>(_: T) -> () where T: HasAssoc, T.Assoc == WrappedInt { get }
   // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript<T: HasAssoc>(_: T) -> () where T.Assoc == WrappedInt { return () }
 
@@ -154,7 +154,7 @@ open class User {
   // CHECK-RECOVERY: convenience init(conveniently: Int)
   public convenience init(conveniently: Int) { self.init() }
 
-  // CHECK: convenience init<T>(generic: T) where T : HasAssoc, T.Assoc == WrappedInt
+  // CHECK: convenience init<T>(generic: T) where T: HasAssoc, T.Assoc == WrappedInt
   // CHECK-RECOVERY: /* placeholder for init(generic:) */
   public convenience init<T: HasAssoc>(generic: T) where T.Assoc == WrappedInt { self.init() }
 
@@ -324,7 +324,7 @@ public let wrappedIUO: WrappedInt! = nil
 // CHECK-DAG: let wrappedArray: [WrappedInt]
 // CHECK-RECOVERY-NEGATIVE-NOT: let wrappedArray:
 public let wrappedArray: [WrappedInt] = []
-// CHECK-DAG: let wrappedDictionary: [Int : WrappedInt]
+// CHECK-DAG: let wrappedDictionary: [Int: WrappedInt]
 // CHECK-RECOVERY-NEGATIVE-NOT: let wrappedDictionary:
 public let wrappedDictionary: [Int: WrappedInt] = [:]
 // CHECK-DAG: let wrappedTuple: (WrappedInt, Int)?
@@ -387,11 +387,11 @@ public typealias UnwrappedAlias = UnwrappedInt
 public typealias ConstrainedWrapped<T: HasAssoc> = T where T.Assoc == WrappedInt
 public typealias ConstrainedUnwrapped<T: HasAssoc> = T where T.Assoc == UnwrappedInt
 
-// CHECK-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-LABEL: extension Int32: UnwrappedProto {
 // CHECK-NEXT: func unwrappedMethod()
 // CHECK-NEXT: prefix static func *** (x: UnwrappedInt)
 // CHECK-NEXT: }
-// CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
+// CHECK-RECOVERY-LABEL: extension Int32: UnwrappedProto {
 // CHECK-RECOVERY-NEXT: func unwrappedMethod()
 // CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
 // CHECK-RECOVERY-NEXT: }
@@ -401,7 +401,7 @@ extension UnwrappedInt: UnwrappedProto {
   public static prefix func ***(x: UnwrappedInt) {}
 }
 
-// CHECK-LABEL: extension WrappedInt : WrappedProto {
+// CHECK-LABEL: extension WrappedInt: WrappedProto {
 // CHECK-NEXT: func wrappedMethod()
 // CHECK-NEXT: prefix static func *** (x: WrappedInt)
 // CHECK-NEXT: }

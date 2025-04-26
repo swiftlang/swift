@@ -8,7 +8,7 @@
 
 // CHECK-LABEL: struct AlreadyDeclaredStruct {
 
-// CHECK-LABEL: {{class Wrapper : Base {|extension Wrapper {|protocol Wrapper {}}
+// CHECK-LABEL: {{class Wrapper: Base {|extension Wrapper {|protocol Wrapper {}}
 // CHECK-NOT: struct
 // CHECK: var forward: ForwardDeclaredStruct
 // CHECK-NOT: struct

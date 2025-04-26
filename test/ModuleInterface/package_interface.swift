@@ -294,7 +294,7 @@ package func pkg(x: Int, y: String) { print("pkg func") }
 func int(x: Int, y: String) { print("int func") }
 private func priv(x: Int, y: String) { print("priv func") }
 
-// CHECK: extension Bar.PubEnum : Swift.Equatable {}
-// CHECK: extension Bar.PubEnum : Swift.Hashable {}
-// CHECK: extension Bar.FrozenPub : Swift.Sendable {}
+// CHECK: extension Bar.PubEnum: Swift.Equatable {}
+// CHECK: extension Bar.PubEnum: Swift.Hashable {}
+// CHECK: extension Bar.FrozenPub: Swift.Sendable {}
 

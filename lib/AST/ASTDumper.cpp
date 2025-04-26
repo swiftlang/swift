@@ -1471,7 +1471,7 @@ namespace {
         }, label);
       } else {
         printFieldQuotedRaw([&](raw_ostream &OS) {
-          Where->print(OS, /*printWhereKeyword*/ false);
+          Where->print(OS, PrintOptions(), /*printWhereKeyword*/ false);
         }, label);
       }
     };

@@ -822,7 +822,10 @@ public:
         out << "@_spi(" << DummyProtocolName << ")\n";
       out << "@available(*, unavailable)\nextension ";
       nominal->getDeclaredType().print(out, printOptions);
-      out << " : ";
+      if (printOptions.PrintSpaceBeforeInheritance) {
+        out << ' ';
+      }
+      out << ": ";
       llvm::interleave(
           conformanceProtos,
           [&out, &printOptions](const ProtocolType *protoTy) {
@@ -830,8 +833,11 @@ public:
           },
           [&out] { out << ", "; });
       out << " where "
-          << nominal->getGenericSignature().getGenericParams()[0]->getName()
-          << " : " << DummyProtocolName << " {}\n";
+          << nominal->getGenericSignature().getGenericParams()[0]->getName();
+          if (printOptions.PrintSpaceBeforeInheritance) {
+            out << ' ';
+          }
+          out << ": " << DummyProtocolName << " {}\n";
     };
 
     // We have to print conformances for invertible protocols in separate

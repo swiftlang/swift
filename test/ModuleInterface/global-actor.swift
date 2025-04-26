@@ -33,7 +33,7 @@ extension ClassBoundToGlobalActor {
   public func someMethod() { }
 }
 
-// CHECK: @Test.GlobalActor public class DerivedFromClassBoundToGlobalActor : Test.ClassBoundToGlobalActor
+// CHECK: @Test.GlobalActor public class DerivedFromClassBoundToGlobalActor: Test.ClassBoundToGlobalActor
 @available(SwiftStdlib 5.1, *)
 public class DerivedFromClassBoundToGlobalActor: ClassBoundToGlobalActor {}
 
@@ -52,5 +52,5 @@ public class NoActorClass {
   @GlobalActor public func methodBoundToGlobalActor() { }
 }
 
-// CHECK: extension Test.GlobalActor : _Concurrency.GlobalActor {}
-// CHECK: extension Test.ClassBoundToGlobalActor : Swift.Sendable {}
+// CHECK: extension Test.GlobalActor: _Concurrency.GlobalActor {}
+// CHECK: extension Test.ClassBoundToGlobalActor: Swift.Sendable {}

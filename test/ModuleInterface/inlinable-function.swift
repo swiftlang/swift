@@ -6,7 +6,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/TestFromModule.swiftinterface) -module-name Test
 // RUN: %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK < %t/TestFromModule.swiftinterface
 
-// CHECK-LABEL: public struct Foo : Swift.Hashable {
+// CHECK-LABEL: public struct Foo: Swift.Hashable {
 public struct Foo: Hashable {
   // CHECK: public var inlinableGetPublicSet: Swift.Int {
   public var inlinableGetPublicSet: Int {

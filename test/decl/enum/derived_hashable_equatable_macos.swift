@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx14 -print-ast %s | %FileCheck %s
 // REQUIRES: OS=macosx
 
-// CHECK-LABEL: internal enum HasElementsWithAvailability : Hashable
+// CHECK-LABEL: internal enum HasElementsWithAvailability: Hashable
 enum HasElementsWithAvailability: Hashable {
   // CHECK:       case alwaysAvailable
   case alwaysAvailable

@@ -2,7 +2,7 @@
 
 // Check that synthesized members show up as 'fileprivate', not 'private.
 
-// CHECK-LABEL: private struct PrivateConformer : Hashable {
+// CHECK-LABEL: private struct PrivateConformer: Hashable {
 private struct PrivateConformer: Hashable {
   var value: Int
   // CHECK-DAG: fileprivate var hashValue: Int { get }

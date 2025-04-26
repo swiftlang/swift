@@ -5,7 +5,7 @@ import CenumsNSOptions
 
 // CHECK-NOT: typealias NSBinarySearchingOptions = UInt
 
-// CHECK: struct NSBinarySearchingOptions : OptionSet, @unchecked Sendable {
+// CHECK: struct NSBinarySearchingOptions: OptionSet, @unchecked Sendable {
 // CHECK-NEXT:   init(rawValue: UInt)
 // CHECK-NEXT:   let rawValue: UInt
 // CHECK-NEXT:   typealias RawValue = UInt
@@ -22,7 +22,7 @@ import CenumsNSOptions
 // CHECK-NEXT:   static var InsertionIndex: NSBinarySearchingOptions { get }
 // CHECK-NEXT: }
 
-// CHECK: struct Bar : OptionSet, @unchecked Sendable
+// CHECK: struct Bar: OptionSet, @unchecked Sendable
 // CHECK: struct HasNSOptionField {
 // CHECK:   var bar: Bar
 // CHECK: }

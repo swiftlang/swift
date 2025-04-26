@@ -34,11 +34,11 @@ public protocol P {
 }
 
 // CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
-// CHECK: public struct X : @unsafe UserModule.P
+// CHECK: public struct X: @unsafe UserModule.P
 public struct X: @unsafe P {
 // CHECK:  @unsafe public func f()
 // CHECK:  #else
-// CHECK: public struct X : UserModule.P
+// CHECK: public struct X: UserModule.P
 // CHECK:  public func f()
 // CHECK:  #endif
   @unsafe public func f() { }

@@ -19,7 +19,7 @@ public func foo(_: Int) -> some Foo {
   return 679
 }
 
-// CHECK-LABEL: public func foo<T>(_ x: T) -> some OpaqueResultTypes.Foo where T : OpaqueResultTypes.Foo
+// CHECK-LABEL: public func foo<T>(_ x: T) -> some OpaqueResultTypes.Foo where T: OpaqueResultTypes.Foo
 @available(SwiftStdlib 5.1, *)
 public func foo<T: Foo>(_ x: T) -> some Foo {
   return x
@@ -65,7 +65,7 @@ public struct Bar<T>: AssocTypeInference {
     return 219
   }
 
-  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U: OpaqueResultTypes.Foo
   @available(SwiftStdlib 5.1, *)
   public func foo<U: Foo>(_ x: U) -> some Foo {
     return x
@@ -86,7 +86,7 @@ public struct Bar<T>: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U: OpaqueResultTypes.Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
@@ -127,7 +127,7 @@ public struct Bar<T>: AssocTypeInference {
       return x
     }
 
-    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes.Foo where V : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes.Foo where V: OpaqueResultTypes.Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x
@@ -174,7 +174,7 @@ public struct Zim: AssocTypeInference {
     return 219
   }
 
-  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+  // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U: OpaqueResultTypes.Foo
   @available(SwiftStdlib 5.1, *)
   public func foo<U: Foo>(_ x: U) -> some Foo {
     return x
@@ -194,7 +194,7 @@ public struct Zim: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<U>(_ x: U) -> some OpaqueResultTypes.Foo where U: OpaqueResultTypes.Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
@@ -230,7 +230,7 @@ public struct Zim: AssocTypeInference {
       return x
     }
 
-    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes.Foo where V : OpaqueResultTypes.Foo
+    // CHECK-LABEL: public func foo<V>(_ x: V) -> some OpaqueResultTypes.Foo where V: OpaqueResultTypes.Foo
     @available(SwiftStdlib 5.1, *)
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x

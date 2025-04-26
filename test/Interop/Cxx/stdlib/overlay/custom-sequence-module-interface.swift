@@ -2,25 +2,25 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=swift-6 -module-cache-path %t | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-cache-path %t | %FileCheck %s
 
-// CHECK: struct SimpleSequence : CxxConvertibleToCollection {
+// CHECK: struct SimpleSequence: CxxConvertibleToCollection {
 // CHECK:   typealias Element = ConstIterator.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequence>
 // CHECK:   typealias RawIterator = ConstIterator
 // CHECK: }
 
-// CHECK: struct SimpleSequenceWithOutOfLineEqualEqual : CxxConvertibleToCollection {
+// CHECK: struct SimpleSequenceWithOutOfLineEqualEqual: CxxConvertibleToCollection {
 // CHECK:   typealias Element = ConstIteratorOutOfLineEq.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequenceWithOutOfLineEqualEqual>
 // CHECK:   typealias RawIterator = ConstIteratorOutOfLineEq
 // CHECK: }
 
-// CHECK: struct SimpleArrayWrapperNullableIterators : CxxConvertibleToCollection {
+// CHECK: struct SimpleArrayWrapperNullableIterators: CxxConvertibleToCollection {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapperNullableIterators>
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK: }
 
-// CHECK: struct SimpleEmptySequence : CxxConvertibleToCollection {
+// CHECK: struct SimpleEmptySequence: CxxConvertibleToCollection {
 // CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleEmptySequence>
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
@@ -59,7 +59,7 @@
 // CHECK: }
 // CHECK: typealias HasUninstantiatableIterator = HasTemplatedIterator<CInt, NoDefinition<CInt>>
 
-// CHECK: struct HasInputOutputConstIterator : CxxConvertibleToCollection {
+// CHECK: struct HasInputOutputConstIterator: CxxConvertibleToCollection {
 // CHECK:   typealias Element = InputOutputConstIterator.Pointee
 // CHECK:   typealias Iterator = CxxIterator<HasInputOutputConstIterator>
 // CHECK:   typealias RawIterator = HasInputOutputConstIterator.iterator

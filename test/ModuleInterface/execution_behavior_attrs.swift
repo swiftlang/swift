@@ -56,12 +56,12 @@ public struct Test {
   public func concurrentResult(_: () async -> Void) -> @concurrent (Int) async -> Void {}
 
   // CHECK: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK-NEXT: public func nestedPositions1(_: Swift.Array<[Swift.String : nonisolated(nonsending) (Swift.Int) async -> Swift.Void]>)
+  // CHECK-NEXT: public func nestedPositions1(_: Swift.Array<[Swift.String: nonisolated(nonsending) (Swift.Int) async -> Swift.Void]>)
   // CHECK-NEXT: #endif
   public func nestedPositions1(_: Array<[String: nonisolated(nonsending) (Int) async -> Void]>) {}
 
   // CHECK-NOT: #if compiler(>=5.3) && $AsyncExecutionBehaviorAttributes
-  // CHECK: public func nestedPositions2(_: Swift.Array<[Swift.String : (Swift.Int) async -> Swift.Void]>)
+  // CHECK: public func nestedPositions2(_: Swift.Array<[Swift.String: (Swift.Int) async -> Swift.Void]>)
   // CHECK-NOT: #endif
   public func nestedPositions2(_: Array<[String: @concurrent (Int) async -> Void]>) {}
 

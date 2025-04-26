@@ -46,7 +46,7 @@ open class InlineBase {
   // CHECK: }
 }
 
-// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class Sub : Module.Base {
+// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class Sub: Module.Base {
 public class Sub : Base {
   // CHECK: override public init(arg: Swift.Int)
   public override init(arg: Int) {
@@ -61,7 +61,7 @@ public class Sub : Base {
 // CHECK: }
 }
 
-// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class SubSub : Module.Sub {
+// CHECK: @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class SubSub: Module.Sub {
 public class SubSub: Sub {
   // CHECK: override public init(arg: Swift.Int)
   public override init(arg: Int) {

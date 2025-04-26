@@ -27,7 +27,7 @@ public extension P where T : Most {
   func withMost() {}
 }
 
-// CHECK-LABEL: public struct S1 : print_synthesized_extensions_superclass.P {
+// CHECK-LABEL: public struct S1: print_synthesized_extensions_superclass.P {
 // CHECK-NEXT:    public typealias T = print_synthesized_extensions_superclass.Base
 // CHECK-NEXT:    public typealias U = Int
 // CHECK-NEXT:    public func withBase()
@@ -38,7 +38,7 @@ public struct S1 : P {
   public typealias U = Int
 }
 
-// CHECK-LABEL: public struct S2 : print_synthesized_extensions_superclass.P {
+// CHECK-LABEL: public struct S2: print_synthesized_extensions_superclass.P {
 // CHECK-NEXT:    public typealias T = print_synthesized_extensions_superclass.Middle<Int>
 // CHECK-NEXT:    public typealias U = Int
 // CHECK-NEXT:    public func withBase()
@@ -51,7 +51,7 @@ public struct S2 : P {
   public typealias U = Int
 }
 
-// CHECK-LABEL: public struct S3 : print_synthesized_extensions_superclass.P {
+// CHECK-LABEL: public struct S3: print_synthesized_extensions_superclass.P {
 // CHECK-NEXT:    public typealias T = print_synthesized_extensions_superclass.Middle<String>
 // CHECK-NEXT:    public typealias U = String
 // CHECK-NEXT:    public func withBase()
@@ -63,7 +63,7 @@ public struct S3 : P {
   public typealias U = String
 }
 
-// CHECK-LABEL: public struct S4 : print_synthesized_extensions_superclass.P {
+// CHECK-LABEL: public struct S4: print_synthesized_extensions_superclass.P {
 // CHECK-NEXT:    public typealias T = print_synthesized_extensions_superclass.Most
 // CHECK-NEXT:    public typealias U = Int
 // CHECK-NEXT:    public func withBase()
@@ -77,7 +77,7 @@ public struct S4 : P {
   public typealias U = Int
 }
 
-// CHECK-LABEL: public struct S5 : print_synthesized_extensions_superclass.P {
+// CHECK-LABEL: public struct S5: print_synthesized_extensions_superclass.P {
 // CHECK-NEXT:   public typealias T = print_synthesized_extensions_superclass.Most
 // CHECK-NEXT:   public typealias U = String
 // CHECK-NEXT:   public func withBase()
@@ -90,40 +90,40 @@ public struct S5 : P {
   public typealias U = String
 }
 
-// CHECK-LABEL: public struct S6<T, U> : print_synthesized_extensions_superclass.P where T : print_synthesized_extensions_superclass.Base {
+// CHECK-LABEL: public struct S6<T, U> : print_synthesized_extensions_superclass.P where T: print_synthesized_extensions_superclass.Base {
 // CHECK-NEXT:    public func withBase()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S6 where T : print_synthesized_extensions_superclass.Middle<U> {
+// CHECK-LABEL: extension S6 where T: print_synthesized_extensions_superclass.Middle<U> {
 // CHECK-NEXT:    public func withMiddleAbstract()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S6 where T : print_synthesized_extensions_superclass.Middle<Int> {
+// CHECK-LABEL: extension S6 where T: print_synthesized_extensions_superclass.Middle<Int> {
 // CHECK-NEXT:    public func withMiddleConcrete()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S6 where T : print_synthesized_extensions_superclass.Most {
+// CHECK-LABEL: extension S6 where T: print_synthesized_extensions_superclass.Most {
 // CHECK-NEXT:    public func withMost()
 // CHECK-NEXT:  }
 
 public struct S6<T, U> : P where T : Base {}
 
-// CHECK-LABEL: public struct S7<T, U> : print_synthesized_extensions_superclass.P where T : print_synthesized_extensions_superclass.Middle<U> {
+// CHECK-LABEL: public struct S7<T, U> : print_synthesized_extensions_superclass.P where T: print_synthesized_extensions_superclass.Middle<U> {
 // CHECK-NEXT:    public func withBase()
 // CHECK-NEXT:    public func withMiddleAbstract()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S7 where T : print_synthesized_extensions_superclass.Middle<Int> {
+// CHECK-LABEL: extension S7 where T: print_synthesized_extensions_superclass.Middle<Int> {
 // CHECK-NEXT:    public func withMiddleConcrete()
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: extension S7 where T : print_synthesized_extensions_superclass.Most {
+// CHECK-LABEL: extension S7 where T: print_synthesized_extensions_superclass.Most {
 // CHECK-NEXT:    public func withMost()
 // CHECK-NEXT:  }
 
 public struct S7<T, U> : P where T : Middle<U> {}
 
-// CHECK-LABEL: public struct S8<T, U> : print_synthesized_extensions_superclass.P where T : print_synthesized_extensions_superclass.Most {
+// CHECK-LABEL: public struct S8<T, U> : print_synthesized_extensions_superclass.P where T: print_synthesized_extensions_superclass.Most {
 // CHECK-NEXT:    public func withBase()
 // CHECK-NEXT:    public func withMiddleConcrete()
 // CHECK-NEXT:    public func withMost()

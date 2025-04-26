@@ -10,7 +10,7 @@ public protocol P { }
 
 // CHECK: public protocol Q
 public protocol Q {
-  // CHECK: associatedtype A : main.P
+  // CHECK: associatedtype A: main.P
   associatedtype A: P
 }
 
@@ -44,7 +44,7 @@ public protocol ProtocolTypealias {
   typealias A = P
 }
 
-// CHECK: public func dependentExistential<T>(value: (T) -> any main.P) where T : main.ProtocolTypealias
+// CHECK: public func dependentExistential<T>(value: (T) -> any main.P) where T: main.ProtocolTypealias
 public func dependentExistential<T: ProtocolTypealias>(value: (T) -> T.A) {}
 
 public protocol Yescopyable {}

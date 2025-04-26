@@ -89,8 +89,8 @@ public protocol Proto {
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}
 
-// CHECK-LABEL: struct ProtoLibImpl : Proto {
-// CHECK-RECOVERY-LABEL: struct ProtoLibImpl : Proto {
+// CHECK-LABEL: struct ProtoLibImpl: Proto {
+// CHECK-RECOVERY-LABEL: struct ProtoLibImpl: Proto {
 public struct ProtoLibImpl : Proto {
   public var unwrappedProp: UnwrappedInt?
   public var wrappedProp: WrappedInt?

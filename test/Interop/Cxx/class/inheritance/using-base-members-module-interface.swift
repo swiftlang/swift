@@ -72,7 +72,7 @@
 // CHECK-NEXT:   public func protectedGetter() -> Int32
 // CHECK-NEXT: }
 
-// CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
+// CHECK:      public struct OperatorBasePrivateInheritance: CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
 // CHECK-NEXT:   public var pointee: Int32 { get }
 // CHECK-NEXT:   public func __convertToBool() -> Bool

@@ -3,7 +3,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric -disable-availability-checking
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: public struct Slab<Element, let N : Swift.Int>
+// CHECK: public struct Slab<Element, let N: Swift.Int>
 public struct Slab<Element, let N: Int> {
   // CHECK-LABEL: public var count: Swift.Int {
   // CHECK-NEXT:    get {
@@ -18,7 +18,7 @@ public struct Slab<Element, let N: Int> {
   public init() {}
 }
 
-// CHECK: public func usesGenericSlab<let N : Swift.Int>(_: ValueGeneric.Slab<Swift.Int, N>)
+// CHECK: public func usesGenericSlab<let N: Swift.Int>(_: ValueGeneric.Slab<Swift.Int, N>)
 public func usesGenericSlab<let N: Int>(_: Slab<Int, N>) {}
 
 // CHECK: public func usesConcreteSlab(_: ValueGeneric.Slab<Swift.Int, 2>)

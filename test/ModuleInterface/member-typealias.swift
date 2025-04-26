@@ -17,7 +17,7 @@ public class MyBase<U> {
 }
 
 public class MyDerived<X>: MyBase<X> {
-// CHECK-LABEL: public class MyDerived<X> : MyModule.MyBase<X> {
+// CHECK-LABEL: public class MyDerived<X>: MyModule.MyBase<X> {
   public func bar(x: AliasU) -> AliasInt { fatalError() }
 // CHECK:  public func bar(x: MyModule.MyDerived<X>.AliasU) -> MyModule.MyDerived<X>.AliasInt
 }

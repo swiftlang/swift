@@ -2,7 +2,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: extension Swift.Int : @retroactive Swift.Identifiable {
+// CHECK: extension Swift.Int: @retroactive Swift.Identifiable {
 // CHECK:   public var id: Swift.Int {
 // CHECK:     get
 // CHECK:   }

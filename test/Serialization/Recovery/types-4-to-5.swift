@@ -61,23 +61,23 @@ public func A_renameAllTheThings(
 public func A_renameGeneric<T: Swift4RenamedProtocol>(obj: T) {}
 
 // CHECK-5-LABEL: func A_renameGeneric<T>(
-// CHECK-5-SAME: where T : RenamedProtocol
+// CHECK-5-SAME: where T: RenamedProtocol
 
 // FIXME: Preserve sugar in requirements.
 // CHECK-4-LABEL: func A_renameGeneric<T>(
-// CHECK-4-SAME: where T : RenamedProtocol
+// CHECK-4-SAME: where T: RenamedProtocol
 
 public class B_ConformsToProto: Swift4RenamedProtocol {}
 
-// CHECK-5-LABEL: class B_ConformsToProto : RenamedProtocol
-// CHECK-4-LABEL: class B_ConformsToProto : Swift4RenamedProtocol
+// CHECK-5-LABEL: class B_ConformsToProto: RenamedProtocol
+// CHECK-4-LABEL: class B_ConformsToProto: Swift4RenamedProtocol
 
 public struct B_RequiresConformance<T: Swift4RenamedProtocol> {}
 
-// CHECK-5-LABEL: struct B_RequiresConformance<T> where T : RenamedProtocol
+// CHECK-5-LABEL: struct B_RequiresConformance<T> where T: RenamedProtocol
 
 // FIXME: Preserve sugar in requirements.
-// CHECK-4-LABEL: struct B_RequiresConformance<T> where T : RenamedProtocol
+// CHECK-4-LABEL: struct B_RequiresConformance<T> where T: RenamedProtocol
 
 public protocol C_RelyOnConformance {
   associatedtype Assoc: Swift4RenamedProtocol

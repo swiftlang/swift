@@ -585,7 +585,7 @@ struct PrintOptions {
 
   /// Whether to print a space before the `:` of an inheritance list in a type
   /// decl.
-  bool PrintSpaceBeforeInheritance = true;
+  bool PrintSpaceBeforeInheritance = false;
 
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
@@ -653,7 +653,6 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
-    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -661,7 +660,6 @@ struct PrintOptions {
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
-    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -688,7 +686,6 @@ struct PrintOptions {
     if (printFullConvention)
       result.PrintFunctionRepresentationAttrs =
           PrintOptions::FunctionRepresentationMode::Full;
-    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -714,7 +711,6 @@ struct PrintOptions {
     result.MapCrossImportOverlaysToDeclaringModule = true;
     result.PrintCurrentMembersOnly = false;
     result.SuppressExpandedMacros = true;
-    result.PrintSpaceBeforeInheritance = false;
     return result;
   }
 
@@ -775,6 +771,7 @@ struct PrintOptions {
   static PrintOptions printQualifiedSILType() {
     PrintOptions result = PrintOptions::printSIL();
     result.FullyQualifiedTypesIfAmbiguous = true;
+    result.PrintSpaceBeforeInheritance = true;
     return result;
   }
 

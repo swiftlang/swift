@@ -2,12 +2,12 @@
 
 // RUN: %target-swift-ide-test -source-filename %s -print-module -module-to-print EnumExhaustivity -I %S/Inputs/custom-modules | %FileCheck %s
 
-// CHECK-LABEL: {{^}}enum RegularEnum : {{.+}} {
+// CHECK-LABEL: {{^}}enum RegularEnum: {{.+}} {
 // CHECK:      case A
 // CHECK-NEXT: case B
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-LABEL: {{^}}@frozen enum ExhaustiveEnum : {{.+}} {
+// CHECK-LABEL: {{^}}@frozen enum ExhaustiveEnum: {{.+}} {
 // CHECK:      case A
 // CHECK-NEXT: case B
 // CHECK-NEXT: {{^}$}}

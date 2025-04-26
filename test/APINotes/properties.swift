@@ -7,7 +7,7 @@
 // REQUIRES: objc_interop
 
 
-// CHECK-BOTH-LABEL: class TestProperties : Base {
+// CHECK-BOTH-LABEL: class TestProperties: Base {
 
 // CHECK-BOTH-DAG: func accessorsOnly() -> Any
 // CHECK-BOTH-DAG: func setAccessorsOnly(_ accessorsOnly: Any)
@@ -34,7 +34,7 @@
 
 // CHECK-BOTH: {{^}$}}
 
-// CHECK-BOTH-LABEL: class TestPropertiesSub : TestProperties {
+// CHECK-BOTH-LABEL: class TestPropertiesSub: TestProperties {
 // CHECK-BOTH-DAG: func accessorsOnly() -> Any
 // CHECK-BOTH-DAG: func setAccessorsOnly(_ accessorsOnly: Any)
 // CHECK-BOTH-DAG: class func accessorsOnlyForClass() -> Any

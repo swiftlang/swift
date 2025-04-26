@@ -81,7 +81,7 @@
 // CHECK-FOUNDATION: func withString(_: String!) -> Self!
 
 // Note: lowercasing enum constants.
-// CHECK-FOUNDATION: enum CountStyle : Int {
+// CHECK-FOUNDATION: enum CountStyle: Int {
 // CHECK-FOUNDATION: case file
 // CHECK-FOUNDATION-NEXT: case memory
 // CHECK-FOUNDATION-NEXT: case decimal

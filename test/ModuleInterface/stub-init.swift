@@ -17,7 +17,7 @@ public class Derived: Base {
 // CHECK-NEXT:    {{(@objc )?}}deinit
 // CHECK-NEXT: }
 
-// CHECK-LABEL: public class Derived : test.Base {
+// CHECK-LABEL: public class Derived: test.Base {
 // CHECK-NEXT:    public init(z: Swift.Int)
 // CHECK-NEXT:    {{(@objc )?}}deinit
 // CHECK-NEXT: }

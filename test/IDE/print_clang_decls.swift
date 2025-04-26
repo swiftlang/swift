@@ -90,12 +90,12 @@
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
+// FOUNDATION-NEXT: {{^}}class NSArray: NSObject {{{$}}
 // FOUNDATION-NEXT: init!(objects: UnsafePointer<AnyObject>?, count cnt: Int)
 // FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum NSRuncingMode: UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  typealias RawValue = UInt
@@ -108,7 +108,7 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions: OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  typealias RawValue = UInt

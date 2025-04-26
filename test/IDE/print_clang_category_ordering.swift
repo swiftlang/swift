@@ -10,16 +10,16 @@
 // CHECK: var foo: Any
 // CHECK: }
 
-// CHECK-LABEL: class Sub : Base {
+// CHECK-LABEL: class Sub: Base {
 // CHECK: }
 
-// CHECK-PROTO-FIRST-LABEL: extension Sub : Foo {
+// CHECK-PROTO-FIRST-LABEL: extension Sub: Foo {
 // CHECK-PROTO-FIRST-NEXT: }
 
 // CHECK-LABEL: extension Sub {
 // CHECK: var foo: Any!
 // CHECK: }
 
-// CHECK-PROP-FIRST-LABEL: extension Sub : Foo {
+// CHECK-PROP-FIRST-LABEL: extension Sub: Foo {
 // CHECK-PROP-FIRST-NEXT: }
 

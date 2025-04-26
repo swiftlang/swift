@@ -5,14 +5,14 @@
 // rdar://77558075
 // UNSUPPORTED: OS=tvos && CPU=x86_64
 
-// PRINT-CLASS-LABEL: class SomeClass : NSObject {
+// PRINT-CLASS-LABEL: class SomeClass: NSObject {
 // PRINT-CLASS-NEXT:   init()
 // PRINT-CLASS-NEXT: }
 // PRINT-CLASS-NEXT: extension SomeClass {
 // PRINT-CLASS-NEXT:   /*not inherited*/ init(value x: Double)
 // PRINT-CLASS-NEXT:   func applyOptions(_ options: SomeClass.Options)
 // PRINT-CLASS-NEXT:   func doIt()
-// PRINT-CLASS-NEXT:   struct Options : OptionSet {
+// PRINT-CLASS-NEXT:   struct Options: OptionSet {
 // PRINT-CLASS-NEXT:     init(rawValue rawValue: Int)
 // PRINT-CLASS-NEXT:     let rawValue: Int
 // PRINT-CLASS-NEXT:     typealias RawValue = Int

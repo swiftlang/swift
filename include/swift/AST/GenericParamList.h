@@ -215,8 +215,8 @@ public:
   }
 
   SWIFT_DEBUG_DUMP;
-  void print(raw_ostream &OS) const;
-  void print(ASTPrinter &Printer) const;
+  void print(raw_ostream &OS, const PrintOptions &Options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options = PrintOptions()) const;
 };
 
 /// GenericParamList - A list of generic parameters that is part of a generic
@@ -400,7 +400,7 @@ public:
     return SourceRange(WhereLoc, EndLoc);
   }
 
-  void print(llvm::raw_ostream &OS, bool printWhereKeyword) const;
+  void print(llvm::raw_ostream &OS, const PrintOptions &PO, bool printWhereKeyword) const;
 
 };
 

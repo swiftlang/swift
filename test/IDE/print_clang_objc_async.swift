@@ -8,7 +8,7 @@
 // REQUIRES: swift_feature_SendableCompletionHandlers
 import _Concurrency
 
-// CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
+// CHECK-LABEL: class SlowServer: NSObject, ServiceProvider {
 
 // CHECK: @available(*, renamed: "doSomethingSlow(_:)")
 // CHECK-NEXT: func doSomethingSlow(_ operation: String, completionHandler handler: @escaping @Sendable (Int) -> Void)

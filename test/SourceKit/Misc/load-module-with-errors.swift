@@ -72,16 +72,16 @@ func testInvalidTopLevelCompletion() {
 // Read the module back in to make sure it can be deserialized
 // RUN: %target-swift-ide-test -print-module -source-filename dummy -module-to-print errors -I %t -allow-compiler-errors | %FileCheck %s
 // CHECK: typealias InvalidAlias = <<error type>>
-// CHECK: class InvalidClass : <<error type>>, InvalidProtocol
+// CHECK: class InvalidClass: <<error type>>, InvalidProtocol
 // CHECK: var classMemberA: <<error type>>
 // CHECK: init(param1: <<error type>>, param2: <<error type>>)
 // CHECK: convenience init()
 // CHECK: convenience init(param: <<error type>>)
-// CHECK: class InvalidClassSub1 : InvalidClass
+// CHECK: class InvalidClassSub1: InvalidClass
 // CHECK: var classMemberB: <<error type>>
 // CHECK: init(param1: <<error type>>, param2: <<error type>>)
 // CHECK: convenience init()
-// CHECK: class InvalidClassSub2 : InvalidClass
+// CHECK: class InvalidClassSub2: InvalidClass
 // CHECK: var classMemberC: <<error type>>
 // CHECK: convenience init()
 // CHECK: enum InvalidEnum
@@ -95,7 +95,7 @@ func testInvalidTopLevelCompletion() {
 // CHECK: mutating func add(_: <<error type>>)
 // CHECK: func get() -> Self.Item
 // CHECK: func set(item: Self.Item)
-// CHECK: struct InvalidStruct : <<error type>>, InvalidProtocol
+// CHECK: struct InvalidStruct: <<error type>>, InvalidProtocol
 // CHECK: typealias Item = <<error type>>
 // CHECK: let memberA: Int
 // CHECK: let memberB: <<error type>>

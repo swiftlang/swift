@@ -4,7 +4,7 @@
 
 // REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
-// CHECK: class Innocuous : Confusing {
+// CHECK: class Innocuous: Confusing {
 
 import ForwardDeclarationsHelper
 

@@ -7,7 +7,7 @@
 
 // REQUIRES: swift_feature_LayoutPrespecialization
 
-// CHECK: @_specialize(exported: true, kind: full, where @_noMetadata A : _Class)
+// CHECK: @_specialize(exported: true, kind: full, where @_noMetadata A: _Class)
 // CHECK-NEXT: public func test<A>(a: A) -> A
 @_specialize(exported: true, where @_noMetadata A : _Class)
 public func test<A>(a: A) -> A {

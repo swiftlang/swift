@@ -50,13 +50,13 @@ public func A_renameAllTheThings(
 public func A_renameGeneric<T: RenamedProtocol>(obj: T) {}
 
 // CHECK-LABEL: func A_renameGeneric<T>(
-// CHECK-SAME: where T : RenamedProtocol
+// CHECK-SAME: where T: RenamedProtocol
 
 public class B_ConformsToProto: RenamedProtocol {}
-// CHECK-LABEL: class B_ConformsToProto : RenamedProtocol
+// CHECK-LABEL: class B_ConformsToProto: RenamedProtocol
 
 public struct B_RequiresConformance<T: RenamedProtocol> {}
-// CHECK-LABEL: struct B_RequiresConformance<T> where T : RenamedProtocol
+// CHECK-LABEL: struct B_RequiresConformance<T> where T: RenamedProtocol
 
 public protocol C_RelyOnConformance {
   associatedtype Assoc: RenamedProtocol

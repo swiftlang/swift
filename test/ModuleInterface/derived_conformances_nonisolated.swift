@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 
-// CHECK: @_Concurrency.MainActor public struct X1 : Swift.Equatable, Swift.Hashable, Swift.Codable
+// CHECK: @_Concurrency.MainActor public struct X1: Swift.Equatable, Swift.Hashable, Swift.Codable
 @MainActor public struct X1: Equatable, Hashable, Codable {
   let x: Int
   let y: String

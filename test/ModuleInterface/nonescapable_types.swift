@@ -6,7 +6,7 @@
 // REQUIRES: swift_feature_LifetimeDependence
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: public protocol P : ~Escapable {
+// CHECK: public protocol P: ~Escapable {
 // CHECK:   associatedtype A
 // CHECK: }
 // CHECK: #endif
@@ -15,7 +15,7 @@ public protocol P: ~Escapable {
 }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: public struct X<T> : ~Swift.Escapable where T : ~Escapable {
+// CHECK: public struct X<T>: ~Swift.Escapable where T: ~Escapable {
 // CHECK: }
 // CHECK: #endif
 public struct X<T: ~Escapable>: ~Escapable { }
@@ -29,7 +29,7 @@ extension X where T: Escapable {
 }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: extension Test.X where T : ~Escapable {
+// CHECK: extension Test.X where T: ~Escapable {
 // CHECK:   public func g(other: borrowing T)
 // CHECK: }
 // CHECK: #endif
@@ -38,7 +38,7 @@ extension X where T: ~Escapable {
 }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: public enum Y<T> : ~Swift.Escapable where T : ~Escapable {
+// CHECK: public enum Y<T>: ~Swift.Escapable where T: ~Escapable {
 // CHECK:   case none
 // CHECK:   case some(T)
 // CHECK: }
@@ -51,7 +51,7 @@ extension Y: Escapable where T: Escapable { }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK: @lifetime(copy y)
-// CHECK: public func derive<T>(_ y: Test.Y<T>) -> Test.Y<T> where T : ~Escapable
+// CHECK: public func derive<T>(_ y: Test.Y<T>) -> Test.Y<T> where T: ~Escapable
 // CHECK: #endif
 @lifetime(copy y)
 public func derive<T : ~Escapable>(_ y: Y<T>) -> Y<T> {
@@ -60,7 +60,7 @@ public func derive<T : ~Escapable>(_ y: Y<T>) -> Y<T> {
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK: @lifetime(copy x)
-// CHECK: public func derive<T>(_ x: Test.X<T>) -> Test.X<T> where T : ~Escapable
+// CHECK: public func derive<T>(_ x: Test.X<T>) -> Test.X<T> where T: ~Escapable
 // CHECK: #endif
 @lifetime(copy x)
 public func derive<T : ~Escapable>(_ x: X<T>) -> X<T> {

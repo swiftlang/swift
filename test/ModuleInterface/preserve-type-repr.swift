@@ -39,12 +39,12 @@ extension GenericToy {
 
 public protocol Pet {}
 
-// PREFER: public struct Parrot : Pet {
-// DONTPREFER: public struct Parrot : PreferTypeRepr.Pet {
+// PREFER: public struct Parrot: Pet {
+// DONTPREFER: public struct Parrot: PreferTypeRepr.Pet {
 // CHECK-NEXT: }
 public struct Parrot: Pet {}
 
-// CHECK: public struct Ex<T> where T : PreferTypeRepr.Pet {
+// CHECK: public struct Ex<T> where T: PreferTypeRepr.Pet {
 public struct Ex<T: Pet> {
   // PREFER: public var hasCeasedToBe: Bool {
   // DONTPREFER: public var hasCeasedToBe: Swift.Bool {
@@ -59,8 +59,8 @@ public struct Ex<T: Pet> {
 // CHECK-NEXT: }
 public struct My<T> {}
 
-// PREFER: extension My where T : PreferTypeRepr.Pet
-// DONTPREFER: extension PreferTypeRepr.My where T : PreferTypeRepr.Pet
+// PREFER: extension My where T: PreferTypeRepr.Pet
+// DONTPREFER: extension PreferTypeRepr.My where T: PreferTypeRepr.Pet
 extension My where T: Pet {
   // PREFER: public func isPushingUpDaisies() -> String
   // DONTPREFER: public func isPushingUpDaisies() -> Swift.String

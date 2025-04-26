@@ -4,14 +4,14 @@
 // REQUIRES: objc_interop
 
 extension ObjCObject {
-  // CHECK-LABEL: sil hidden [ossa] @$sSo10ObjCObjectC20regionbasedisolationE11sendObjectsSaySo8NSObjectCGyYaKF : $@convention(method) @async (@guaranteed ObjCObject) -> (@sil_sending @owned Array<NSObject>, @error any Error) {
-  // CHECK: bb0([[SELF:%.*]] : @guaranteed $ObjCObject):
+  // CHECK-LABEL: sil hidden [ossa] @$sSo10ObjCObjectC20regionbasedisolationE11sendObjectsSaySo8NSObjectCGyYaKF: $@convention(method) @async (@guaranteed ObjCObject) -> (@sil_sending @owned Array<NSObject>, @error any Error) {
+  // CHECK: bb0([[SELF:%.*]]: @guaranteed $ObjCObject):
 
   // Our result.
   // CHECK: [[RESULT:%.*]] = alloc_stack $Array<NSObject>
 
   // Our method.
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]], #ObjCObject.loadObjects!foreign : (ObjCObject) -> () async throws -> [NSObject], $@convention(objc_method) (@convention(block) @Sendable (Optional<NSArray>, Optional<NSError>) -> (), ObjCObject) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]], #ObjCObject.loadObjects!foreign: (ObjCObject) -> () async throws -> [NSObject], $@convention(objc_method) (@convention(block) @Sendable (Optional<NSArray>, Optional<NSError>) -> (), ObjCObject) -> ()
 
   // Begin setting up the unsafe continuation for our method. Importantly note
   // that [[UNSAFE_CONT]] is Sendable, so we lose any connection from the
@@ -27,7 +27,7 @@ extension ObjCObject {
 
   // Then create a checked continuation from the unsafe continuation.
   //
-  // CHECK: [[CREATE_CHECKED_CONT:%.*]] = function_ref @$ss34_createCheckedThrowingContinuationyScCyxs5Error_pGSccyxsAB_pGnlF : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
+  // CHECK: [[CREATE_CHECKED_CONT:%.*]] = function_ref @$ss34_createCheckedThrowingContinuationyScCyxs5Error_pGSccyxsAB_pGnlF: $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
   // CHECK: [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<Array<NSObject>, any Error>
   // CHECK: apply [[CREATE_CHECKED_CONT]]<Array<NSObject>>([[CHECKED_CONT]], [[UNSAFE_CONT]])
 
@@ -43,7 +43,7 @@ extension ObjCObject {
   // Then create the actual block. NOTE: Since the block is @Sendable, the block
   // does not propagate regions.
   //
-  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
+  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_: $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
   // CHECK: [[COMPLETION_BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]], invoke [[COMPLETION_HANDLER_BLOCK]]
   //
   // Since the block is @Sendable, it does not propagate the connection in
@@ -65,14 +65,14 @@ extension ObjCObject {
 
   // Check if we do not mark the block as NS_SWIFT_SENDABLE
   //
-  // CHECK-LABEL: sil hidden [ossa] @$sSo10ObjCObjectC20regionbasedisolationE12sendObjects2SaySo8NSObjectCGyYaKF : $@convention(method) @async (@guaranteed ObjCObject) -> (@sil_sending @owned Array<NSObject>, @error any Error) {
-  // CHECK: bb0([[SELF:%.*]] : @guaranteed $ObjCObject):
+  // CHECK-LABEL: sil hidden [ossa] @$sSo10ObjCObjectC20regionbasedisolationE12sendObjects2SaySo8NSObjectCGyYaKF: $@convention(method) @async (@guaranteed ObjCObject) -> (@sil_sending @owned Array<NSObject>, @error any Error) {
+  // CHECK: bb0([[SELF:%.*]]: @guaranteed $ObjCObject):
 
   // Our result.
   // CHECK: [[RESULT:%.*]] = alloc_stack $Array<NSObject>
 
   // Our method.
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]], #ObjCObject.loadObjects2!foreign : (ObjCObject) -> () async throws -> [NSObject], $@convention(objc_method) (@convention(block) @Sendable (Optional<NSArray>, Optional<NSError>) -> (), ObjCObject) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]], #ObjCObject.loadObjects2!foreign: (ObjCObject) -> () async throws -> [NSObject], $@convention(objc_method) (@convention(block) @Sendable (Optional<NSArray>, Optional<NSError>) -> (), ObjCObject) -> ()
 
   // Begin setting up the unsafe continuation for our method. Importantly note
   // that [[UNSAFE_CONT]] is Sendable, so we lose any connection from the
@@ -88,7 +88,7 @@ extension ObjCObject {
 
   // Then create a checked continuation from the unsafe continuation.
   //
-  // CHECK: [[CREATE_CHECKED_CONT:%.*]] = function_ref @$ss34_createCheckedThrowingContinuationyScCyxs5Error_pGSccyxsAB_pGnlF : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
+  // CHECK: [[CREATE_CHECKED_CONT:%.*]] = function_ref @$ss34_createCheckedThrowingContinuationyScCyxs5Error_pGSccyxsAB_pGnlF: $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
   // CHECK: [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<Array<NSObject>, any Error>
   // CHECK: apply [[CREATE_CHECKED_CONT]]<Array<NSObject>>([[CHECKED_CONT]], [[UNSAFE_CONT]])
 
@@ -104,7 +104,7 @@ extension ObjCObject {
   // Then create the actual block. NOTE: Since the block is @Sendable, the block
   // does not propagate regions.
   //
-  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
+  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_: $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
   // CHECK: [[COMPLETION_BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]], invoke [[COMPLETION_HANDLER_BLOCK]]
   //
   // Since the block is @Sendable, it does not propagate the connection in

@@ -39,7 +39,7 @@ public struct City {
 // CHECK1:      /// Alias comment
 // CHECK1-NEXT: typealias Alias<T> = (T, T)
 
-// CHECK1:      public class C1 : print_swift_module.P1 {
+// CHECK1:      public class C1: print_swift_module.P1 {
 // CHECK1-NEXT:   /// foo1 comment from P1
 // CHECK1-NEXT:   public func foo1()
 // CHECK1-NEXT:   /// foo2 comment from C1

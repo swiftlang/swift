@@ -24,7 +24,7 @@ extension CGColor {
   func foo() // expected-note{{satisfying requirement for instance method 'foo()' in protocol 'Foo'}}
 }
 
-// CHECK-LABEL: extension CGColor : Foo
+// CHECK-LABEL: extension CGColor: Foo
 extension CGColor: Foo { // expected-error{{Core Foundation class 'CGColor' cannot conform to '@objc' protocol 'Foo' because Core Foundation types are not classes in Objective-C}}
   // CHECK-LABEL: {{^}} func foo()
   func foo() {} // expected-error{{method cannot be an implementation of an '@objc' requirement because Core Foundation types are not classes in Objective-C}}

@@ -18,7 +18,7 @@
 // CHECK: @freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: Swift.String) -> (T, Swift.String) = #labeledStringify(value, label: "default label")
 @freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: String) -> (T, String) = #labeledStringify(value, label: "default label")
 
-// CHECK: @freestanding(expression) public macro publicLine<T>() -> T = #externalMacro(module: "MacroDefinition", type: "Line") where T : Swift.ExpressibleByIntegerLiteral
+// CHECK: @freestanding(expression) public macro publicLine<T>() -> T = #externalMacro(module: "MacroDefinition", type: "Line") where T: Swift.ExpressibleByIntegerLiteral
 @freestanding(expression) public macro publicLine<T: ExpressibleByIntegerLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "Line")
 
 // CHECK: @attached(accessor) public macro myWrapper() = #externalMacro(module: "MacroDefinition", type: "Wrapper")

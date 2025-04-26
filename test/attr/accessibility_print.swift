@@ -333,7 +333,7 @@ fileprivate protocol IB_FilePrivateAssocTypeProto {
   associatedtype FilePrivateValue
   var filePrivateValue: FilePrivateValue { get }
 }
-// CHECK-LABEL: public{{(\*/)?}} class IC_PublicAssocTypeImpl : IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
+// CHECK-LABEL: public{{(\*/)?}} class IC_PublicAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
 public class IC_PublicAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
   public var publicValue: Int = 0
   public var filePrivateValue: Int = 0
@@ -341,7 +341,7 @@ public class IC_PublicAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAsso
   // CHECK-DAG: {{^}} public typealias PublicValue
 } // CHECK: {{^[}]}}
 
-// CHECK-LABEL: private{{(\*/)?}} class ID_PrivateAssocTypeImpl : IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
+// CHECK-LABEL: private{{(\*/)?}} class ID_PrivateAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
 private class ID_PrivateAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
   public var publicValue: Int = 0
   public var filePrivateValue: Int = 0
@@ -363,13 +363,13 @@ public class PublicInitBase {
   fileprivate init(other: PublicInitBase) {}
 } // CHECK: {{^[}]}}
 
-// CHECK-LABEL: public{{(\*/)?}} class PublicInitInheritor : PublicInitBase {
+// CHECK-LABEL: public{{(\*/)?}} class PublicInitInheritor: PublicInitBase {
 public class PublicInitInheritor : PublicInitBase {
   // CHECK: {{^}} override public init()
   // CHECK: {{^}} override fileprivate init(other: PublicInitBase)
 } // CHECK: {{^[}]}}
 
-// CHECK-LABEL: {{(/\*)?private(\*/)?}} class PublicInitPrivateInheritor : PublicInitBase {
+// CHECK-LABEL: {{(/\*)?private(\*/)?}} class PublicInitPrivateInheritor: PublicInitBase {
 private class PublicInitPrivateInheritor : PublicInitBase {
   // CHECK: {{^}} override internal init()
   // CHECK: {{^}} override fileprivate init(other: PublicInitBase)

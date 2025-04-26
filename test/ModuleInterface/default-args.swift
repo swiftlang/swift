@@ -20,7 +20,7 @@ public class Base {
   public func foo(y: Int = 42) {}
 }
 
-// CHECK: class Derived : Test.Base {
+// CHECK: class Derived: Test.Base {
 public class Derived: Base {
   // CHECK: init(y: Swift.Int)
   public convenience init(y: Int) {

@@ -154,8 +154,8 @@ private:
 // CHECK: func returnsPointerToUnsafeReference() -> UnsafeNonCopyable!
 // CHECK: func takesPointerToUnsafeNonCopyable(_: UnsafeNonCopyable!)
 
-// CHECK: struct ConformsTo : Proto {
+// CHECK: struct ConformsTo: Proto {
 
-// CHECK: struct UnsafeSendable : @unchecked Sendable {
+// CHECK: struct UnsafeSendable: @unchecked Sendable {
 
 // CHECKLATEST: struct NonCopyableCopyable

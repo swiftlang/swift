@@ -45,11 +45,11 @@ public func globalAsync() async { }
 // CHECK-NEXT: }
 @_marker public protocol MP { }
 
-// CHECK:      @_marker public protocol MP2 : FeatureTest.MP {
+// CHECK:      @_marker public protocol MP2: FeatureTest.MP {
 // CHECK-NEXT: }
 @_marker public protocol MP2: MP { }
 
-// CHECK:      public protocol MP3 : AnyObject, FeatureTest.MP {
+// CHECK:      public protocol MP3: AnyObject, FeatureTest.MP {
 // CHECK-NEXT: }
 public protocol MP3: AnyObject, MP { }
 
@@ -59,13 +59,13 @@ extension MP2 {
   public func inMP2() { }
 }
 
-// CHECK: class OldSchool : FeatureTest.MP {
+// CHECK: class OldSchool: FeatureTest.MP {
 public class OldSchool: MP {
   // CHECK:     takeClass()
   public func takeClass() async { }
 }
 
-// CHECK: class OldSchool2 : FeatureTest.MP {
+// CHECK: class OldSchool2: FeatureTest.MP {
 public class OldSchool2: MP {
   // CHECK:     takeClass()
   public func takeClass() async { }
@@ -100,11 +100,11 @@ public struct IsRP: RP {
 // CHECK: public func acceptsRP
 public func acceptsRP<T: RP>(_: T) { }
 
-// CHECK:     extension Swift.Array : FeatureTest.MP where Element : FeatureTest.MP {
+// CHECK:     extension Swift.Array: FeatureTest.MP where Element: FeatureTest.MP {
 extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 // CHECK: }
 
-// CHECK:     extension FeatureTest.OldSchool : Swift.UnsafeSendable {
+// CHECK:     extension FeatureTest.OldSchool: Swift.UnsafeSendable {
 extension OldSchool: UnsafeSendable { }
 // CHECK-NEXT: }
 
@@ -135,4 +135,4 @@ public func unavailableFromAsyncFunc() { }
 @available(*, noasync, message: "Test")
 public func noAsyncFunc() { }
 
-// CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
+// CHECK-NOT: extension FeatureTest.MyActor: Swift.Sendable
