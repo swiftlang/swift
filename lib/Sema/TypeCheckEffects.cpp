@@ -385,7 +385,8 @@ public:
 
   Type getType() const {
     switch (getKind()) {
-    case Kind::Opaque: return getOpaqueFunction()->getType();
+    case Kind::Opaque:
+      return getOpaqueFunction()->getType()->lookThroughSingleOptionalType();
     case Kind::Function: {
       auto *AFD = getFunction();
       if (AFD->hasImplicitSelfDecl() && AppliedSelf)
@@ -393,7 +394,9 @@ public:
       return AFD->getInterfaceType();
     }
     case Kind::Closure: return getClosure()->getType();
-    case Kind::Parameter: return getParameter()->getInterfaceType();
+    case Kind::Parameter:
+      return getParameter()->getInterfaceType()
+          ->lookThroughSingleOptionalType();
     }
     llvm_unreachable("bad kind");
   }
@@ -1830,6 +1833,11 @@ public:
           result.merge(Classification::forInvalidCode());
           return;
         }
+
+        // Can end up with an optional type when dynamically dispatching to
+        // @objc.
+        if (auto optFnType = fnInterfaceType->getOptionalObjectType())
+          fnInterfaceType = optFnType;
 
         // Use the most significant result from the arguments.
         FunctionType *fnSubstType = nullptr;
