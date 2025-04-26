@@ -1639,9 +1639,10 @@ public:
         PotentialEffectReason::forApply());
   }
 
-  /// Check to see if the given function application throws or is async.
+  /// Check to see if the given function application throws, is async, or
+  /// involves unsafe behavior.
   Classification classifyApply(
-      ApplyExpr *E, 
+      ApplyExpr *E,
       llvm::DenseSet<const Expr *> *assumedSafeArguments
   ) {
     // An apply expression is a potential throw site if the function throws.
@@ -1657,9 +1658,28 @@ public:
     if (!type) return Classification::forInvalidCode();
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
-
     Expr *calleeFn = nullptr;
     auto fnRef = AbstractFunction::getAppliedFn(E, &calleeFn);
+
+    auto *args = E->getArgs();
+    return classifyApply(
+        E, fnRef, calleeFn, fnType, args,
+        E->isImplicitlyAsync().has_value(), E->implicitlyThrows(),
+        assumedSafeArguments);
+  }
+
+  /// Check to see if the given function application throws, is async, or
+  /// involves unsafe behavior.
+  Classification classifyApply(
+      Expr *call,
+      const AbstractFunction &fnRef,
+      Expr *calleeFn,
+      const AnyFunctionType *fnType,
+      ArgumentList *args,
+      bool implicitlyAsync,
+      bool implicitlyThrows,
+      llvm::DenseSet<const Expr *> *assumedSafeArguments
+  ) {
     auto substitutions = fnRef.getSubstitutions();
     const bool hasAnyConformances =
         llvm::any_of(substitutions.getConformances(),
@@ -1685,25 +1705,22 @@ public:
       // If this is calling a @safe function, treat local variables as being
       // safe.
       if (fnRef.getExplicitSafety() == ExplicitSafety::Safe) {
-        markArgumentsSafe(E->getArgs(), *assumedSafeArguments);
+        markArgumentsSafe(args, *assumedSafeArguments);
       }
     }
 
-    ASTContext &ctx = type->getASTContext();
+    ASTContext &ctx = fnType->getASTContext();
 
     // If the function doesn't have any effects or conformances, we're done
     // here.
     if (!fnType->isThrowing() &&
-        !E->implicitlyThrows() &&
+        !implicitlyThrows &&
         !fnType->isAsync() &&
-        !E->isImplicitlyAsync() &&
+        !implicitlyAsync &&
         !hasAnyConformances &&
         fnRef.getExplicitSafety() == ExplicitSafety::Safe) {
       return Classification();
     }
-
-    // Decompose the application.
-    auto *args = E->getArgs();
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : *args) {
@@ -1714,7 +1731,7 @@ public:
 
     Classification result;
     result.mergeImplicitEffects(
-        ctx, E->isImplicitlyAsync().has_value(), E->implicitlyThrows(),
+        ctx, implicitlyAsync, implicitlyThrows,
         PotentialEffectReason::forApply());
 
     // Downgrade missing 'await' errors for preconcurrency references.
@@ -1725,8 +1742,8 @@ public:
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (kind != EffectKind::Unsafe &&
           !fnType->hasEffect(kind) &&
-          !(kind == EffectKind::Async && E->isImplicitlyAsync()) &&
-          !(kind == EffectKind::Throws && E->implicitlyThrows())) {
+          !(kind == EffectKind::Async && implicitlyAsync) &&
+          !(kind == EffectKind::Throws && implicitlyThrows)) {
         return;
       }
 
@@ -1760,7 +1777,7 @@ public:
         } else if (kind == EffectKind::Unsafe) {
           // For explicitly @unsafe functions, the entire call is considered
           // unsafe.
-          AbstractFunctionDecl *calleeFn =
+          AbstractFunctionDecl *calleeDecl =
             fnRef.getKind() == AbstractFunction::Function
               ? fnRef.getFunction()
               : nullptr;
@@ -1769,7 +1786,7 @@ public:
               Classification::forUnsafe(
                 {
                   UnsafeUse::forReferenceToUnsafe(
-                    calleeFn, true, fnRef.getType(), E->getLoc())
+                    calleeDecl, true, fnRef.getType(), call->getLoc())
                 }
               ));
           return;
@@ -1800,7 +1817,7 @@ public:
           // to fix their code.
           if (kind == EffectKind::Async &&
               fnRef.getKind() == AbstractFunction::Function) {
-            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(E->getFn())) {
+            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(calleeFn)) {
               if (ctor->getFn()->isImplicit() && args->isUnlabeledUnary())
                 result.setDowngradeToWarning(true);
             }
@@ -1841,7 +1858,7 @@ public:
           return;
         }
 
-        AbstractFunctionDecl *calleeFn =
+        AbstractFunctionDecl *calleeDecl =
           fnRef.getKind() == AbstractFunction::Function
             ? fnRef.getFunction()
             : nullptr;
@@ -1849,7 +1866,7 @@ public:
         for (unsigned i = 0, e = args->size(); i < e; ++i) {
           Type origParamType = fnRef.getOrigParamInterfaceType(i);
           auto argClassification = classifyArgument(
-              E, calleeFn, args->getLabel(i), i,
+              call, calleeDecl, args->getLabel(i), i,
               args->getExpr(i), origParamType, fnRef.getSubstitutions(),
               kind);
 
@@ -1867,7 +1884,7 @@ public:
           if (auto appliedSelf = fnRef.getAppliedSelf()) {
             Type origParamType = fnRef.getOrigParamSelfType();
             auto selfClassification = classifyArgument(
-                E, calleeFn, ctx.Id_self, 0, appliedSelf->getBase(),
+                call, calleeDecl, ctx.Id_self, 0, appliedSelf->getBase(),
                 origParamType, fnRef.getSubstitutions(), kind);
             result.merge(selfClassification);
           }
@@ -1917,7 +1934,7 @@ public:
     // If the safety of the callee is unspecified, check the safety of the
     // arguments specifically.
     if (hasUnspecifiedSafety &&
-        !(assumedSafeArguments && assumedSafeArguments->contains(E))) {
+        !(assumedSafeArguments && assumedSafeArguments->contains(call))) {
       classifyApplyEffect(EffectKind::Unsafe);
     }
 
@@ -2604,7 +2621,7 @@ private:
 
   /// Classify an argument being passed to a rethrows/reasync function.
   Classification classifyArgument(
-      ApplyExpr *call, const Decl* calleeDecl, Identifier argName,
+      Expr *call, const Decl* calleeDecl, Identifier argName,
       unsigned argIndex, Expr *arg, Type paramType, SubstitutionMap subs,
       EffectKind kind) {
     // Check for an unsafe argument.
@@ -2711,7 +2728,7 @@ private:
   }
 
   /// Classify an argument to a rethrows/reasync function that's a tuple literal.
-  Classification classifyTupleArgument(ApplyExpr *call,
+  Classification classifyTupleArgument(Expr *call,
                                        const Decl* calleeDecl,
                                        Identifier argName,
                                        unsigned argIndex,
