@@ -151,6 +151,40 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
     return;
   }
 
+  case UnsafeUse::CallArgument: {
+    auto [argumentName, argumentIndex, argument] = use.getCallArgument();
+    Type paramType = use.getType();
+    ASTContext &ctx = paramType->getASTContext();
+
+    SourceLoc loc = argument->getLoc();
+    if (loc.isInvalid())
+      loc = use.getLocation();
+
+    if (auto calleeDecl = dyn_cast_or_null<ValueDecl>(use.getDecl())) {
+      if (argumentName.empty()) {
+        ctx.Diags.diagnose(
+            loc,
+            diag::note_unsafe_call_decl_argument_indexed,
+            calleeDecl, argumentIndex, paramType)
+          .highlight(argument->getSourceRange());
+      } else {
+        ctx.Diags.diagnose(
+            loc,
+            diag::note_unsafe_call_decl_argument_named,
+            calleeDecl, argumentName, paramType)
+          .highlight(argument->getSourceRange());
+      }
+    } else {
+      ctx.Diags.diagnose(
+          loc,
+          diag::note_unsafe_call_argument_indexed,
+          argumentIndex, paramType)
+        .highlight(argument->getSourceRange());
+    }
+
+    return;
+  }
+
   case UnsafeUse::TemporarilyEscaping: {
     Type type = use.getType();
     ASTContext &ctx = type->getASTContext();
@@ -177,6 +211,7 @@ static bool isReferenceToNonisolatedUnsafe(ValueDecl *decl) {
 bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
                                 SourceLoc loc,
                                 bool isCall,
+                                bool skipTypeCheck,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
   // If the declaration is explicitly unsafe, note that.
   auto decl = declRef.getDecl();
@@ -203,7 +238,7 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
   // If the type of this declaration involves unsafe types, diagnose that.
   ASTContext &ctx = decl->getASTContext();
   auto subs = declRef.getSubstitutions();
-  {
+  if (!skipTypeCheck) {
     auto type = decl->getInterfaceType();
     if (subs) {
       if (auto *genericFnType = type->getAs<GenericFunctionType>())
@@ -303,10 +338,6 @@ bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
     if (conformance.isInvalid())
       continue;
 
-    ASTContext &ctx = conformance.getProtocol()->getASTContext();
-    if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
-      return false;
-
     if (!conformance.hasEffect(EffectKind::Unsafe))
       continue;
 
@@ -343,7 +374,8 @@ bool swift::enumerateUnsafeUses(SubstitutionMap subs,
 
 bool swift::isUnsafe(ConcreteDeclRef declRef) {
   return enumerateUnsafeUses(
-      declRef, SourceLoc(), /*isCall=*/false, [&](UnsafeUse) {
+      declRef, SourceLoc(), /*isCall=*/false, /*skipTypeCheck=*/false,
+      [&](UnsafeUse) {
     return true;
   });
 }
@@ -374,9 +406,6 @@ bool swift::isUnsafeInConformance(const ValueDecl *requirement,
 
 void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
                                llvm::function_ref<void(Type)> diagnose) {
-  if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
-    return;
-
   if (!type->isUnsafe())
     return;
 

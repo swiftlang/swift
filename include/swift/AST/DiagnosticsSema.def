@@ -8341,6 +8341,15 @@ NOTE(note_reference_to_unsafe_decl,none,
 NOTE(note_reference_to_unsafe_typed_decl,none,
      "%select{reference|call}0 to %kind1 involves unsafe type %2",
      (bool, const ValueDecl *, Type))
+NOTE(note_unsafe_call_decl_argument_named,none,
+     "argument %1 in call to %kindbase0 has unsafe type %2",
+     (const ValueDecl *, Identifier, Type))
+NOTE(note_unsafe_call_decl_argument_indexed,none,
+     "argument #%1 in call to %kindbase0 has unsafe type %2",
+     (const ValueDecl *, unsigned, Type))
+NOTE(note_unsafe_call_argument_indexed,none,
+     "argument #%0 in call has unsafe type %1",
+     (unsigned, Type))
 NOTE(note_reference_to_unsafe_through_typealias,none,
      "reference to %kind0 whose underlying type involves unsafe type %1",
      (const ValueDecl *, Type))
@@ -8402,9 +8411,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-GROUPED_WARNING(no_unsafe_in_unsafe,StrictMemorySafety,none,
+WARNING(no_unsafe_in_unsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-GROUPED_WARNING(no_unsafe_in_unsafe_for,StrictMemorySafety,none,
+WARNING(no_unsafe_in_unsafe_for,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "
