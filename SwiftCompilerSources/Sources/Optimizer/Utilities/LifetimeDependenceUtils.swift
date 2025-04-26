@@ -161,7 +161,7 @@ extension LifetimeDependence {
 
   // Construct a LifetimeDependence from a return value. This only
   // constructs a dependence for ~Escapable results that do not have a
-  // lifetime dependence (@_unsafeNonescapableResult).
+  // lifetime dependence (@lifetime(immortal), @_unsafeNonescapableResult).
   //
   // This is necessary because inserting a mark_dependence placeholder for such an unsafe dependence would illegally
   // have the same base and value operand.
