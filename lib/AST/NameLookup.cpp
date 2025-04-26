@@ -323,23 +323,16 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
-      overridden.insert(overrides);
-
-      // Because initializers from Objective-C base classes have greater
-      // visibility than initializers written in Swift classes, we can
-      // have a "break" in the set of declarations we found, where
-      // C.init overrides B.init overrides A.init, but only C.init and
-      // A.init are in the chain. Make sure we still remove A.init from the
-      // set in this case.
-      if (decl->getBaseName().isConstructor()) {
-        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
-        ///        cause instead (incomplete circularity detection).
-        assert(decl != overrides && "Circular class inheritance?");
-        decl = overrides;
-        continue;
+      if (!overridden.insert(overrides).second) {
+        // If we've already seen a decl then there's no need to visit the decls
+        // that it overrides since they should already be in the set. This also
+        // prevents infinite loops in the case that the AST contains an
+        // override chain with a cycle due to circular inheritance.
+        break;
       }
 
-      break;
+      DEBUG_ASSERT(decl != overrides && "Circular class inheritance?");
+      decl = overrides;
     }
   }
 
@@ -2395,6 +2388,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
                                      ValueDecl *decl,
                                      bool onlyCompleteObjectInits,
                                      bool requireImport) {
+  auto &ctx = dc->getASTContext();
+
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -2412,19 +2407,43 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl) &&
-      !dc->getASTContext().isAccessControlDisabled()) {
+  if (!(options & NL_IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
     bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
   }
 
-  // Check that there is some import in the originating context that makes this
-  // decl visible.
-  if (requireImport && !(options & NL_IgnoreMissingImports))
-    if (!dc->isDeclImported(decl))
-      return false;
+  if (requireImport) {
+    // Check that there is some import in the originating context that makes
+    // this decl visible.
+    if (!(options & NL_IgnoreMissingImports)) {
+      if (!dc->isDeclImported(decl))
+        return false;
+    }
+
+    // Unlike in Swift, Obj-C allows method overrides to be declared in
+    // extensions (categories), even outside of the module that defines the
+    // type that is being extended. When MemberImportVisibility is enabled,
+    // if these overrides are not filtered out they can hijack name
+    // lookup and cause the compiler to insist that the module that defines
+    // the extension be imported, contrary to developer expectations.
+    //
+    // Filter results belonging to these extensions out, even when ignoring
+    // missing imports, if we're in a context that requires imports to access
+    // member declarations.
+    if (decl->getOverriddenDecl()) {
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+        if (auto *nominal = extension->getExtendedNominal()) {
+          auto extensionMod = extension->getModuleContext();
+          auto nominalMod = nominal->getModuleContext();
+          if (!extensionMod->isSameModuleLookingThroughOverlays(nominalMod) &&
+              !dc->isDeclImported(extension))
+            return false;
+        }
+      }
+    }
+  }
 
   // Check that it has the appropriate ABI role.
   if (!ABIRoleInfo(decl).matchesOptions(options))
