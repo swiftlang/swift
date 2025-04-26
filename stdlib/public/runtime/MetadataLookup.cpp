@@ -2907,25 +2907,6 @@ static NodePointer getParameterList(NodePointer funcType) {
   return parameterContainer;
 }
 
-static const Metadata *decodeType(TypeDecoder<DecodedMetadataBuilder> &decoder,
-                                  NodePointer type) {
-  assert(type->getKind() == Node::Kind::Type);
-
-  auto builtTypeOrError = decoder.decodeMangledType(type);
-
-  if (builtTypeOrError.isError()) {
-    auto err = builtTypeOrError.getError();
-    char *errStr = err->copyErrorString();
-    err->freeErrorString(errStr);
-    return nullptr;
-  }
-
-  if (!builtTypeOrError.getType().isMetadata())
-    return nullptr;
-
-  return builtTypeOrError.getType().getMetadata();
-}
-
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 unsigned swift_func_getParameterCount(const char *typeNameStart,
@@ -3009,8 +2990,21 @@ swift_func_getParameterTypeInfo(
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  // for each parameter (TupleElement), store it into the provided buffer
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto nodePointer = parameterList->getChild(index);
+
+    if (nodePointer->getKind() == Node::Kind::TupleElement) {
+      assert(nodePointer->getNumChildren() == 1);
+      nodePointer = nodePointer->getFirstChild();
+    }
+    assert(nodePointer->getKind() == Node::Kind::Type);
+
+    auto request = MetadataRequest(MetadataState::Complete);
+
+    auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -3019,24 +3013,13 @@ swift_func_getParameterTypeInfo(
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
       });
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
-  // for each parameter (TupleElement), store it into the provided buffer
-  for (unsigned index = 0; index != typesLength; ++index) {
-    auto *parameter = parameterList->getChild(index);
-
-    if (parameter->getKind() == Node::Kind::TupleElement) {
-      assert(parameter->getNumChildren() == 1);
-      parameter = parameter->getFirstChild();
+    if (typeInfoOrErr.isError()) {
+      return -3; // Failed to decode a type.
     }
 
-    assert(parameter->getKind() == Node::Kind::Type);
-
-    auto type = decodeType(decoder, parameter);
-    if (!type)
-      return -3; // Failed to decode a type.
-
-    types[index] = type;
+    auto typeInfo = typeInfoOrErr.getType();
+    types[index] = typeInfo.getMetadata();
   } // end foreach parameter
 
   return typesLength;
