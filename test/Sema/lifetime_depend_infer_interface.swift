@@ -7,6 +7,6 @@
 
 // Test that type checking continues to handle inference of lifetime
 // dependencies that may be required in older (early
-// 2025) .swiftinterface files. Source-level type checking is more strict.
+// 2025) .swiftinterface files. Source-level type checking is stricter.
 
 import lifetime_depend_infer
