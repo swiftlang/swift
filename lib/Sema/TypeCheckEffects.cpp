@@ -1398,7 +1398,8 @@ class ApplyClassifier {
     if (isa<SubscriptDecl>(cdr.getDecl()))
       return PotentialEffectReason::forSubscriptAccess();
 
-    assert(isa<VarDecl>(cdr.getDecl()));
+    // Note that declarations other than properties end up with
+    // "property access" effect reasons for historical... reasons.
     return PotentialEffectReason::forPropertyAccess();
   }
 
@@ -1537,17 +1538,17 @@ public:
     if (!member)
       return Classification::forInvalidCode();
 
-    PotentialEffectReason reason =
-        PotentialEffectReason::forPropertyAccess();
-    Classification classification;
+    ConcreteDeclRef declToClassify;
     if (auto getter = getEffectfulGetOnlyAccessor(member)) {
-      reason = getKindOfEffectfulProp(member);
-      classification = Classification::forDeclRef(
-          getter, ConditionalEffectKind::Always, reason, E->getLoc(),
-          assumedSafeArguments && assumedSafeArguments->contains(E));
-    } else if (isa<SubscriptExpr>(E) || isa<DynamicSubscriptExpr>(E)) {
-      reason = PotentialEffectReason::forSubscriptAccess();
+      declToClassify = getter;
+    } else {
+      declToClassify = member;
     }
+
+    PotentialEffectReason reason = getKindOfEffectfulProp(member);
+    Classification classification = Classification::forDeclRef(
+          declToClassify, ConditionalEffectKind::Always, reason, E->getLoc(),
+          assumedSafeArguments && assumedSafeArguments->contains(E));
 
     classification.setDowngradeToWarning(
         downgradeAsyncAccessToWarning(member.getDecl()));
@@ -1556,14 +1557,6 @@ public:
         member.getDecl()->getASTContext(),
         E->isImplicitlyAsync().has_value(), E->isImplicitlyThrows(),
         reason);
-
-    if (!classification.hasUnsafe()) {
-      classification.merge(
-          Classification::forDeclRef(
-            member, ConditionalEffectKind::Always, reason, E->getLoc(),
-            assumedSafeArguments && assumedSafeArguments->contains(E),
-            EffectKind::Unsafe));
-    }
 
     if (assumedSafeArguments) {
       // If the declaration we're referencing is explicitly @safe, mark arguments
