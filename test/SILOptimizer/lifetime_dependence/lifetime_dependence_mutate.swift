@@ -93,7 +93,10 @@ struct MutableSpan : ~Escapable, ~Copyable {
 
   var iterator: Iter {
     @lifetime(copy self)
-    get { Iter(base: base, count: count) }
+    get {
+      let newIter = Iter(base: base, count: count)
+      return _overrideLifetime(newIter, copying: self)
+    }
   }
 }
 
