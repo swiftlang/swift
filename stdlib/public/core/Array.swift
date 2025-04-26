@@ -951,6 +951,7 @@ extension Array: RangeReplaceableCollection {
   /// Entry point for `Array` literal construction; builds and returns
   /// an Array of `count` uninitialized elements.
   @inlinable
+  @unsafe
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -966,6 +967,7 @@ extension Array: RangeReplaceableCollection {
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
   @inlinable
+  @unsafe
   @_semantics("array.uninitialized")
   @_effects(escaping storage => return.0.value**)
   @_effects(escaping storage.class*.value** => return.0.value**.class*.value**)
