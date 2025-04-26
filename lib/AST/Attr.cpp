@@ -310,7 +310,7 @@ const char *InheritActorContextAttr::getModifierName(
   InheritActorContextModifier modifier) {
   switch (modifier) {
   case InheritActorContextModifier::Default: return "";
-  case InheritActorContextModifier::Always: return "any";
+  case InheritActorContextModifier::Always: return "always";
   }
   llvm_unreachable("bad kind");
 }

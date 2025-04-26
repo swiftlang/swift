@@ -4128,8 +4128,14 @@ public:
               ClosureModifierColor);
     printFlag(E->allowsImplicitSelfCapture(), "implicit_self",
               ClosureModifierColor);
-    printFlag(E->inheritsActorContext(), "inherits_actor_context",
+
+    if (E->inheritsActorContextAlways()) {
+      printFlag(E->inheritsActorContextAlways(), "inherits_actor_context(always)",
+                ClosureModifierColor);
+    } else {
+      printFlag(E->inheritsActorContext(), "inherits_actor_context",
               ClosureModifierColor);
+    }
 
     if (E->getParameters()) {
       printRec(E->getParameters(), Label::optional("params"),

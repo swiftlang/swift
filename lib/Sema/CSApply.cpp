@@ -7766,7 +7766,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // closure, do that here.
     fromEI = fromFunc->getExtInfo();
     bool shouldPropagateAsync =
-        !isEffectPolymorphic(EffectKind::Async) || closureInheritsActorContext(expr);
+        !isEffectPolymorphic(EffectKind::Async) || closureInheritsActorContext(expr); // NOTE HERE
     if (toEI.isAsync() && !fromEI.isAsync() && shouldPropagateAsync) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {

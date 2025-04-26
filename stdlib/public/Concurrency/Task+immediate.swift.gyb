@@ -61,7 +61,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
     priority: TaskPriority? = nil,
     % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
     % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
-    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
+    @_inheritActorContext(always) @_implicitSelfCapture _ operation: __owned @Sendable @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 
     let builtinSerialExecutor =
