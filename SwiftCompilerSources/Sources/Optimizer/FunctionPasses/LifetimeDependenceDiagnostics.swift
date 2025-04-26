@@ -219,6 +219,12 @@ private struct DiagnoseDependence {
         log("  has dependent function result")
         return .continueWalk
       }
+      // Briefly (April 2025), RawSpan._extracting, Span._extracting, and UTF8Span.span returned a borrowed value that
+      // depended on a copied argument. Continue to support those interfaces. The implementations were correct but
+      // needed an explicit _overrideLifetime.
+      if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
+        return .continueWalk
+      }
     }
     return .abortWalk
   }
