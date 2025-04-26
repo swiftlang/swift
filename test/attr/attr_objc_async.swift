@@ -56,7 +56,7 @@ actor MyActor {
 
   @objc func objcAsyncThrowsError() async throws(Error) -> Void {}
   @objc func objcAsyncThrowsObjCError() async throws(ObjCError) -> Void {}
-  // expected-error@-1 {{@objc functions cannot have typed throw}}
+  // expected-error@-1 {{typed 'throws' instance method cannot be represented in Objective-C}}
 }
 
 actor class MyActor2 { }
