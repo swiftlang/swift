@@ -30,9 +30,31 @@ final class IsIsolatingExecutor: SerialExecutor {
     print("called: checkIsolated")
   }
 
-  func isIsolatingCurrentContext() -> Bool {
+  func isIsolatingCurrentContext() -> Bool? {
     print("called: isIsolatingCurrentContext")
     return true
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+final class UnknownIfIsIsolatingExecutor: SerialExecutor {
+  init() {}
+
+  func enqueue(_ job: consuming ExecutorJob) {
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
+  }
+
+  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+
+  func checkIsolated() {
+    print("called: checkIsolated")
+  }
+
+  func isIsolatingCurrentContext() -> Bool? {
+    print("called: isIsolatingCurrentContext; return nil")
+    return nil
   }
 }
 
@@ -78,7 +100,7 @@ actor ActorOnIsCheckImplementingExecutor<Ex: SerialExecutor> {
     self.executor.asUnownedSerialExecutor()
   }
 
-  func checkIsIsolatingCurrentContext() async -> Bool {
+  func checkIsIsolatingCurrentContext() async -> Bool? {
     executor.isIsolatingCurrentContext()
   }
 }
@@ -87,6 +109,7 @@ actor ActorOnIsCheckImplementingExecutor<Ex: SerialExecutor> {
   static func main() async {
     let hasIsIsolatingCurrentContextExecutor = IsIsolatingExecutor()
     let hasIsCheckActor = ActorOnIsCheckImplementingExecutor(on: hasIsIsolatingCurrentContextExecutor)
+    let unknownIsIsolatingActor = ActorOnIsCheckImplementingExecutor(on: UnknownIfIsIsolatingExecutor())
 
     let anyActor: any Actor = hasIsCheckActor
 
@@ -99,5 +122,9 @@ actor ActorOnIsCheckImplementingExecutor<Ex: SerialExecutor> {
     let inside = await hasIsCheckActor.checkIsIsolatingCurrentContext()
     assert(inside == true)
     // CHECK: called: isIsolatingCurrentContext
+
+    _ = unknownIsIsolatingActor.preconditionIsolated()
+    // CHECK: called: isIsolatingCurrentContext; return nil
+    // CHECK: called: checkIsolated
   }
 }

@@ -155,7 +155,7 @@ void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
 }
 
 SWIFT_CC(swift)
-bool swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+IsIsolatingCurrentContextDecision swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
   return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
 }
 
