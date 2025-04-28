@@ -1031,7 +1031,7 @@ function Get-Dependencies {
     }
   }
 
-  function Is-Python-Module-Installed([string] $ModuleName) {
+  function Test-PythonModuleInstalled([string] $ModuleName) {
     try {
       Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
       return $true;
@@ -1048,7 +1048,7 @@ function Get-Dependencies {
   }
 
   function Install-PythonModule([string] $ModuleName) {
-    if (Is-Python-Module-Installed $ModuleName) {
+    if (Test-PythonModuleInstalled $ModuleName) {
       Write-Output "$ModuleName already installed."
       return;
     }
