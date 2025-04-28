@@ -65,7 +65,7 @@ func create<T>(_ t: T) -> C<T> {
 // OPT-LABEL: define hidden swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque) %0
 // OPT:  store i32 0, ptr [[BASE:%[0-9]+]]
 // OPT:  [[ADDR2:%.*]] = getelementptr inbounds i8, ptr [[BASE]], i64 4
-// OPT:  store i1 true, ptr [[ADDR2]]
+// OPT:  store i8 1, ptr [[ADDR2]]
 // OPT:  [[ADDR4:%.*]] = getelementptr inbounds i8, ptr [[BASE]], i64 8
 // OPT: call void @llvm.memset.p0.i64(ptr {{.*}}[[ADDR4]], i8 0, i64 16, i1 false)
 // OPT: ret void

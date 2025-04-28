@@ -231,9 +231,8 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // IR: [[BB1]]:
 // IR-NEXT:  [[LHS:%.*]] = load i64, ptr [[ALLOCA]]
 // IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
-// IR-NEXT:  [[RHS:%.*]] = load i1, ptr [[GEP]]
-// IR-NEXT:  [[RHS_ZEXT:%.*]] = zext i1 [[RHS]]
-// IR-NEXT:   call swiftcc void @"$s16moveonly_deinits31consumeIntEnumPairWithoutDeinityyAA0defgH0OnF"(i64 [[LHS]], i8 [[RHS_ZEXT]])
+// IR-NEXT:  [[RHS:%.*]] = load i8, ptr [[GEP]]
+// IR-NEXT:   call swiftcc void @"$s16moveonly_deinits31consumeIntEnumPairWithoutDeinityyAA0defgH0OnF"(i64 [[LHS]], i8 [[RHS]])
 // IR-NEXT:   br label %[[CONT:[0-9]+]]
 //
 // IR: [[BB2]]:
@@ -257,17 +256,15 @@ public func testIntEnumPairWithoutDeinit() {
 // IR: [[BB1]]:
 // IR-NEXT:  [[LHS:%.*]] = load i64, ptr [[ALLOCA]]
 // IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
-// IR-NEXT:  [[RHS:%.*]] = load i1, ptr [[GEP]]
-// IR-NEXT:  [[RHS_ZEXT:%.*]] = zext i1 [[RHS]]
-// IR-NEXT:  call swiftcc void @"$s16moveonly_deinits28consumeIntEnumPairWithDeinityyAA0defgH0OnF"(i64 [[LHS]], i8 [[RHS_ZEXT]])
+// IR-NEXT:  [[RHS:%.*]] = load i8, ptr [[GEP]]
+// IR-NEXT:  call swiftcc void @"$s16moveonly_deinits28consumeIntEnumPairWithDeinityyAA0defgH0OnF"(i64 [[LHS]], i8 [[RHS]])
 // IR-NEXT:  br label %[[CONT:[0-9]+]]
 //
 // IR: [[BB2]]:
 // IR-NEXT:  [[LHS:%.*]] = load i64, ptr [[ALLOCA]]
 // IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
-// IR-NEXT:  [[RHS:%.*]] = load i1, ptr [[GEP]]
-// IR-NEXT:  [[RHS_ZEXT:%.*]] = zext i1 [[RHS]]
-// IR-NEXT:  call swiftcc void @"$s16moveonly_deinits21IntEnumPairWithDeinitOfD"(i64 [[LHS]], i8 [[RHS_ZEXT]])
+// IR-NEXT:  [[RHS:%.*]] = load i8, ptr [[GEP]]
+// IR-NEXT:  call swiftcc void @"$s16moveonly_deinits21IntEnumPairWithDeinitOfD"(i64 [[LHS]], i8 [[RHS]])
 // IR-NEXT:  br label %[[CONT]]
 //
 // IR: [[CONT]]
@@ -404,7 +401,7 @@ func testSingleEnum() {
 
 // IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits13testMultiEnumyyF"()
 func testMultiEnum() {
-  // IR: call void @"$s16moveonly_deinits6EMultiOWOe"(i1 true)
+  // IR: call void @"$s16moveonly_deinits6EMultiOWOe"(i8 1)
   _ = EMulti.b(OtherEmptyMoveOnlyWithDeinit())
 }
 
