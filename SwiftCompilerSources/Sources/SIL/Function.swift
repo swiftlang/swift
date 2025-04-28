@@ -576,6 +576,10 @@ extension Function {
                                                 atIndex: calleeArgIdx,
                                                 withConvention: convention)
         return effects.memory.read
+      },
+      // isDeinitBarrier
+      { (f: BridgedFunction) -> Bool in
+        return f.function.getSideEffects().isDeinitBarrier
       }
     )
   }
