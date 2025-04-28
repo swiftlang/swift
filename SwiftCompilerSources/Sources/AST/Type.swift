@@ -182,6 +182,7 @@ extension TypeProperties {
   public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
   public var isEscapable: Bool { rawType.bridged.isEscapable() }
   public var isNoEscape: Bool { rawType.bridged.isNoEscape() }
+  public var isBuiltinType: Bool { rawType.bridged.isBuiltinType() }
   public var archetypeRequiresClass: Bool { rawType.bridged.archetypeRequiresClass() }
 
   public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {

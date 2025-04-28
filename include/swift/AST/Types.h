@@ -1054,6 +1054,9 @@ public:
   bool is##NAME();
   #include "swift/AST/KnownStdlibTypes.def"
 
+  /// Check if this type is from the Builtin module.
+  bool isBuiltinType();
+
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
   
@@ -8197,6 +8200,10 @@ inline Type TypeBase::getNominalParent() {
 
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
+}
+
+inline bool TypeBase::isBuiltinType() {
+  return isa<BuiltinType>(getCanonicalType());
 }
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
