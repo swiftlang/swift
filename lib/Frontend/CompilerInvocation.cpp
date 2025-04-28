@@ -872,7 +872,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     if (featureMode) {
       if (isEnableFeatureFlag) {
-        const auto isAdoptable = feature->isAdoptable();
+        const auto isMigratable = feature->isMigratable();
 
         // Diagnose an invalid mode.
         StringRef validModeName = "adoption";
@@ -880,13 +880,13 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
           Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
                          featureName,
                          /*didYouMean=*/validModeName,
-                         /*showDidYouMean=*/isAdoptable);
+                         /*showDidYouMean=*/isMigratable);
           continue;
         }
 
-        if (!isAdoptable) {
+        if (!isMigratable) {
           Diags.diagnose(SourceLoc(),
-                         diag::feature_does_not_support_adoption_mode,
+                         diag::feature_does_not_support_migration_mode,
                          featureName);
           continue;
         }
@@ -904,7 +904,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
-      Opts.enableFeature(*feature, /*forAdoption=*/featureMode.has_value());
+      Opts.enableFeature(*feature, /*forMigration=*/featureMode.has_value());
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in

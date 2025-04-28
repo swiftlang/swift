@@ -69,7 +69,7 @@ std::optional<unsigned> Feature::getLanguageVersion() const {
   }
 }
 
-bool Feature::isAdoptable() const {
+bool Feature::isMigratable() const {
   switch (kind) {
 #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
