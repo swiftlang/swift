@@ -9,46 +9,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-
-@_silgen_name("_swift_observation_lock_size")
-func _lockSize() -> Int
-
-@_silgen_name("_swift_observation_lock_init")
-func _lockInit(_: UnsafeRawPointer)
-
-@_silgen_name("_swift_observation_lock_lock")
-func _lockLock(_: UnsafeRawPointer)
-
-@_silgen_name("_swift_observation_lock_unlock")
-func _lockUnlock(_: UnsafeRawPointer)
+import Synchronization
 
 @available(SwiftStdlib 5.9, *)
-internal struct _ManagedCriticalState<State> {
-  final private class LockedBuffer: ManagedBuffer<State, UnsafeRawPointer> { }
-
-  private let buffer: ManagedBuffer<State, UnsafeRawPointer>
-
-  internal init(_ buffer: ManagedBuffer<State, UnsafeRawPointer>) {
-    self.buffer = buffer
+internal struct _ManagedCriticalState<State: Sendable>: Sendable {
+  final class StateContainer: Sendable {
+    let state: Mutex<State>
+    
+    init(state: State) {
+      self.state = Mutex(state)
+    }
   }
   
+  let container: StateContainer
+  
   internal init(_ initial: State) {
-    let roundedSize = (_lockSize() + MemoryLayout<UnsafeRawPointer>.size - 1) / MemoryLayout<UnsafeRawPointer>.size 
-    self.init(LockedBuffer.create(minimumCapacity: Swift.max(roundedSize, 1)) { buffer in
-      buffer.withUnsafeMutablePointerToElements { _lockInit(UnsafeRawPointer($0)) }
-      return initial
-    })
+    container = StateContainer(state: initial)
   }
-
-  internal func withCriticalRegion<R>(
-    _ critical: (inout State) throws -> R
+  
+  func withCriticalRegion<R>(
+      _ critical: (inout State) throws -> R
   ) rethrows -> R {
-    try buffer.withUnsafeMutablePointers { header, lock in
-      _lockLock(UnsafeRawPointer(lock))
-      defer {
-        _lockUnlock(UnsafeRawPointer(lock))
-      }
-      return try critical(&header.pointee)
+    try container.state.withLock { state in
+      try critical(&state)
     }
   }
 }
@@ -59,6 +42,6 @@ extension _ManagedCriticalState: @unchecked Sendable where State: Sendable { }
 @available(SwiftStdlib 5.9, *)
 extension _ManagedCriticalState: Identifiable {
   internal var id: ObjectIdentifier {
-    ObjectIdentifier(buffer)
+    ObjectIdentifier(container)
   }
 }
