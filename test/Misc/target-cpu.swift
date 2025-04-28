@@ -14,7 +14,7 @@
 // WATCHTARGETCPU1: "-target-cpu" "cortex-a7"
 
 // RUN: not %swift -typecheck -target arm64-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU2 %s
-// WATCHTARGETCPU2: "-target-cpu" "apple-a7"
+// WATCHTARGETCPU2: "-target-cpu" "apple-s4"
 
 // RUN: not %swift -typecheck -target armv7s-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=TARGETCPU2 %s
 // TARGETCPU2: "-target-cpu" "swift"
