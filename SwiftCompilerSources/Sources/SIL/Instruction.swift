@@ -1415,9 +1415,7 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// An instruction whose side effects extend across a scope including other instructions. These are always paired with a
 /// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
 /// `end_borrow`).
-public protocol ScopedInstruction {
-  var instruction: Instruction { get }
-
+public protocol ScopedInstruction: Instruction {
   var endOperands: LazyFilterSequence<UseList> { get }
 
   var endInstructions: EndInstructions { get }
@@ -1437,17 +1435,13 @@ extension Instruction {
 public protocol BorrowIntroducingInstruction : SingleValueInstruction, ScopedInstruction {
 }
 
-extension BorrowIntroducingInstruction {
-  public var instruction: Instruction { get { self } }
-}
-
 final public class EndBorrowInst : Instruction, UnaryInstruction {
   public var borrow: Value { operand.value }
 }
 
 extension BorrowIntroducingInstruction {
   public var endOperands: LazyFilterSequence<UseList> {
-    return uses.lazy.filter { $0.instruction is EndBorrowInst }
+    return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
   }
 }
 
@@ -1518,8 +1512,6 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 }
 
 extension BeginAccessInst : ScopedInstruction {
-  public var instruction: Instruction { get { self } }
-
   public var endOperands: LazyFilterSequence<UseList> {
     return uses.lazy.filter { $0.instruction is EndAccessInst }
   }
@@ -1556,8 +1548,6 @@ final public class AbortApplyInst : Instruction, UnaryInstruction {
 }
 
 extension BeginApplyInst : ScopedInstruction {
-  public var instruction: Instruction { get { self } }
-
   public var endOperands: LazyFilterSequence<UseList> {
     return token.uses.lazy.filter { $0.isScopeEndingUse }
   }

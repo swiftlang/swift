@@ -287,7 +287,7 @@ private struct ExtendableScope {
   var firstInstruction: Instruction {
     switch introducer {
     case let .scoped(scopedInst):
-      return scopedInst.instruction
+      return scopedInst
     case let .owned(value):
       if let definingInst = value.definingInstructionOrTerminator {
         return definingInst
