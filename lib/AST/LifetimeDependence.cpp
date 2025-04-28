@@ -962,7 +962,7 @@ protected:
         diagnose(returnLoc,
                  diag::lifetime_dependence_cannot_infer_scope_ownership,
                  param->getParameterName().str(), diagnosticQualifier());
-        continue;
+        return;
       }
       targetDeps = std::move(targetDeps).add(paramIndex, *kind);
     }
