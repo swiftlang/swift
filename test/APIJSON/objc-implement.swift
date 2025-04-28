@@ -44,6 +44,8 @@ module ObjcImplement {
 }
 
 
+// CHECK-NOT: "file": "{{.*}}.h"
+
 // CHECK:      "interfaces": [
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "name": "_TtC13ObjcImplement14SwiftObjCClass",

@@ -775,9 +775,9 @@ private:
   }
 
   bool shouldRecordDecl(const Decl *decl) const {
-    // In Swift, we cannot reason about API access for Clang declarations from
-    // header files as Swift doesn't know the header group. API records for
-    // header declarations should be deferred to Clang tools.
+    // We cannot reason about API access for Clang declarations from header
+    // files as we don't know the header group. API records for header
+    // declarations should be deferred to Clang tools.
     if (getAPILocForDecl(decl).getFilename().ends_with_insensitive(".h"))
       return false;
     return true;
