@@ -38,27 +38,27 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
   {
     ASSERT_FALSE(Feature::getUpcomingFeature(feature.name));
     ASSERT_FALSE(Feature::getExperimentalFeature(feature.name));
-    ASSERT_FALSE(feature.id.isAdoptable());
+    ASSERT_FALSE(feature.id.isMigratable());
   }
 
   feature = upcomingF;
   {
     ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
-    ASSERT_FALSE(feature.id.isAdoptable());
+    ASSERT_FALSE(feature.id.isMigratable());
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
   feature = adoptableUpcomingF;
   {
     ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
-    ASSERT_TRUE(feature.id.isAdoptable());
+    ASSERT_TRUE(feature.id.isMigratable());
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
   feature = strictConcurrencyF;
   {
     ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
-    ASSERT_FALSE(feature.id.isAdoptable());
+    ASSERT_FALSE(feature.id.isMigratable());
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
@@ -68,7 +68,7 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
     // it for another experimental feature one that is available in production.
     ASSERT_TRUE(feature.id.isAvailableInProduction());
     ASSERT_TRUE(Feature::getExperimentalFeature(feature.name));
-    ASSERT_FALSE(feature.id.isAdoptable());
+    ASSERT_FALSE(feature.id.isMigratable());
   }
 }
 
@@ -158,7 +158,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {{adoptableUpcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption"},
-      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+      {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
 // Swift 7 is asserts-only.
 #ifndef NDEBUG
   // Requesting adoption mode in target language mode has no effect.
@@ -176,7 +176,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {{adoptableUpcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", adoptableUpcomingF.name + ":adoption"},
-      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+      {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
 // Swift 7 is asserts-only.
 #ifndef NDEBUG
   // Requesting adoption mode in target language mode has no effect.
@@ -396,7 +396,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
         "-enable-upcoming-feature", adoptableUpcomingF.name,
         "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
       },
-      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+      {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", adoptableUpcomingF.name + ":undef",
         "-enable-experimental-feature", adoptableUpcomingF.name,
@@ -416,7 +416,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
         "-enable-upcoming-feature", adoptableUpcomingF.name,
         "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
       },
-      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+      {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", adoptableUpcomingF.name + ":undef",
         "-enable-upcoming-feature", adoptableUpcomingF.name,
@@ -436,7 +436,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
         "-enable-experimental-feature", adoptableUpcomingF.name,
         "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
       },
-      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+      {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", adoptableUpcomingF.name + ":undef",
         "-enable-experimental-feature", adoptableUpcomingF.name,
@@ -456,7 +456,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
         "-enable-experimental-feature", adoptableUpcomingF.name,
         "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
       },
-      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+      {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
 
   // MARK: Experimental
 
