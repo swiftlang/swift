@@ -1179,6 +1179,8 @@ final public class BorrowedFromInst : SingleValueInstruction, BeginBorrowInstruc
   public var enclosingValues: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
     enclosingOperands.values
   }
+
+  public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
@@ -1416,7 +1418,7 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
 /// `end_borrow`).
 public protocol ScopedInstruction: Instruction {
-  var endOperands: LazyFilterSequence<UseList> { get }
+  var scopeEndingOperands: LazyFilterSequence<UseList> { get }
 
   var endInstructions: EndInstructions { get }
 }
@@ -1425,7 +1427,7 @@ extension Instruction {
   /// Return the sequence of use points of any instruction.
   public var endInstructions: EndInstructions {
     if let scopedInst = self as? ScopedInstruction {
-      return .scoped(scopedInst.endOperands.users)
+      return .scoped(scopedInst.scopeEndingOperands.users)
     }
     return .single(self)
   }
@@ -1440,12 +1442,6 @@ final public class EndBorrowInst : Instruction, UnaryInstruction {
   public var borrow: Value { operand.value }
 }
 
-extension BeginBorrowInstruction {
-  public var endOperands: LazyFilterSequence<UseList> {
-    return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
-  }
-}
-
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BeginBorrowInstruction {
   public var borrowedValue: Value { operand.value }
 
@@ -1453,9 +1449,7 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
   public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
 
-  public var endOperands: LazyFilterSequence<UseList> {
-    return uses.endingLifetime
-  }
+  public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BeginBorrowInstruction {
@@ -1466,6 +1460,8 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Beg
   // code using noncopyable types that consumes or mutates a memory location while that location is borrowed,
   // but the move-only checker must diagnose those problems before canonical SIL is formed.
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
+
+  public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
 final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BeginBorrowInstruction {
@@ -1477,7 +1473,13 @@ final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction,
     return dest as! AllocStackInst
   }
 
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
+    return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
+  }
+
   public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+    // A `store_borrow` is an address value.
+    // Only `end_borrow`s (with this address operand) can end such a borrow scope.
     uses.users(ofType: EndBorrowInst.self)
   }
 }
@@ -1502,7 +1504,7 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public typealias EndAccessInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
 
   public var endAccessInstructions: EndAccessInstructions {
-    endOperands.map { $0.instruction as! EndAccessInst }
+    scopeEndingOperands.map { $0.instruction as! EndAccessInst }
   }
 }
 
@@ -1513,7 +1515,7 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 }
 
 extension BeginAccessInst : ScopedInstruction {
-  public var endOperands: LazyFilterSequence<UseList> {
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
     return uses.lazy.filter { $0.instruction is EndAccessInst }
   }
 }
@@ -1549,7 +1551,7 @@ final public class AbortApplyInst : Instruction, UnaryInstruction {
 }
 
 extension BeginApplyInst : ScopedInstruction {
-  public var endOperands: LazyFilterSequence<UseList> {
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
     return token.uses.lazy.filter { $0.isScopeEndingUse }
   }
 }

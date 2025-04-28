@@ -298,7 +298,7 @@ private struct ExtendableScope {
   var endInstructions: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     switch introducer {
     case let .scoped(scopedInst):
-      return scopedInst.endOperands.users
+      return scopedInst.scopeEndingOperands.users
     case let .owned(value):
       return value.uses.endingLifetime.users
     }
