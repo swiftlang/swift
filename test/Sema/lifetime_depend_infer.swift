@@ -168,6 +168,12 @@ struct EscapableNonTrivialSelf {
 // (for initializers and stand-alone functions)
 // =============================================================================
 
+// An implicit initializer illegally consumes its nontrivial parameter.
+public struct NonescapableImplicitInitializer: ~Escapable {
+  // expected-error @-1{{cannot borrow the lifetime of 'c', which has consuming ownership on an implicit initializer}}
+  var c: C
+}
+
 struct NonescapableInitializers: ~Escapable {
   var c: C
 
