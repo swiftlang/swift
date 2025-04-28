@@ -685,7 +685,7 @@ extension InteriorUseWalker: AddressUseVisitor {
       if handleInner(borrowed: ba) == .abortWalk {
         return .abortWalk
       }
-      return ba.endOperands.walk { useVisitor($0) }
+      return ba.scopeEndingOperands.walk { useVisitor($0) }
     case let ba as BeginApplyInst:
       if handleInner(borrowed: ba.token) == .abortWalk {
         return .abortWalk

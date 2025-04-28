@@ -826,7 +826,7 @@ extension GlobalVariable {
 
 extension InstructionRange {
   /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
-  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+  mutating func insert(borrowScopeOf borrow: BeginBorrowInstruction, _ context: some Context) {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
