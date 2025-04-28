@@ -17,8 +17,6 @@
 #ifndef SWIFT_ABI_EXECUTOR_H
 #define SWIFT_ABI_EXECUTOR_H
 
-#include "../../../stdlib/public/Concurrency/Error.h"
-
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Casting.h"
@@ -427,27 +425,10 @@ enum class IsIsolatingCurrentContextDecision : int8_t {
   Isolated,
 };
 
-inline IsIsolatingCurrentContextDecision
-getIsIsolatingCurrentContextDecisionFromInt(int8_t value) {
-  switch (value) {
-  case -1: return IsIsolatingCurrentContextDecision::Unknown;
-  case 0: return IsIsolatingCurrentContextDecision::NotIsolated;
-  case 1: return IsIsolatingCurrentContextDecision::Isolated;
-  default:
-    swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
-    return IsIsolatingCurrentContextDecision::Unknown; // silence warning about missing return
-  }
-}
+IsIsolatingCurrentContextDecision
+getIsIsolatingCurrentContextDecisionFromInt(int8_t value);
 
-inline StringRef getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision) {
-  switch (decision) {
-    case IsIsolatingCurrentContextDecision::Unknown: return "Unknown";
-    case IsIsolatingCurrentContextDecision::NotIsolated: return "NotIsolated";
-    case IsIsolatingCurrentContextDecision::Isolated: return "Isolated";
-  }
-  swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
-  return "<Unexpected Value>"; // silence warning about missing return
-}
+StringRef getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision);
 
 }
 

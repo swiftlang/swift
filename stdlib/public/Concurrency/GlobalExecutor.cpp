@@ -160,6 +160,28 @@ extern "C" void swift_job_dealloc(SwiftJob *job, void *ptr) {
   return _swift_task_dealloc_specific(task, ptr);
 }
 
+IsIsolatingCurrentContextDecision
+swift::getIsIsolatingCurrentContextDecisionFromInt(int8_t value) {
+  switch (value) {
+  case -1: return IsIsolatingCurrentContextDecision::Unknown;
+  case 0: return IsIsolatingCurrentContextDecision::NotIsolated;
+  case 1: return IsIsolatingCurrentContextDecision::Isolated;
+  default:
+    swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+  }
+}
+
+StringRef
+swift::getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision) {
+  switch (decision) {
+  case IsIsolatingCurrentContextDecision::Unknown: return "Unknown";
+  case IsIsolatingCurrentContextDecision::NotIsolated: return "NotIsolated";
+  case IsIsolatingCurrentContextDecision::Isolated: return "Isolated";
+  }
+  swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+}
+
+
 /*****************************************************************************/
 /****************************** MAIN EXECUTOR  *******************************/
 /*****************************************************************************/
