@@ -816,7 +816,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       continue;
     }
 
-    // For all other features, the argument format is `<name>[:adoption]`.
+    // For all other features, the argument format is `<name>[:migrate]`.
     StringRef featureName;
     std::optional<StringRef> featureMode;
     std::tie(featureName, featureMode) = argValue.rsplit(':');
@@ -875,7 +875,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
         const auto isMigratable = feature->isMigratable();
 
         // Diagnose an invalid mode.
-        StringRef validModeName = "adoption";
+        StringRef validModeName = "migrate";
         if (*featureMode != validModeName) {
           Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
                          featureName,

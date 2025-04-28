@@ -119,7 +119,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-upcoming-feature", baselineF.name + ":undef"},
       {{baselineF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase(
-      {"-enable-upcoming-feature", baselineF.name + ":adoption"},
+      {"-enable-upcoming-feature", baselineF.name + ":migrate"},
       {{baselineF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", baselineF.name},
@@ -128,7 +128,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-experimental-feature", baselineF.name + ":undef"},
       {{baselineF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase(
-      {"-enable-experimental-feature", baselineF.name + ":adoption"},
+      {"-enable-experimental-feature", baselineF.name + ":migrate"},
       {{baselineF, FeatureState::Enabled}}),
 
   IsFeatureEnabledTestCase(
@@ -138,7 +138,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-upcoming-feature", upcomingF.name + ":undef"},
       {{upcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-upcoming-feature", upcomingF.name + ":adoption"},
+      {"-enable-upcoming-feature", upcomingF.name + ":migrate"},
       {{upcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", upcomingF.name},
@@ -147,7 +147,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-experimental-feature", upcomingF.name + ":undef"},
       {{upcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-experimental-feature", upcomingF.name + ":adoption"},
+      {"-enable-experimental-feature", upcomingF.name + ":migrate"},
       {{upcomingF, FeatureState::Off}}),
 
   IsFeatureEnabledTestCase(
@@ -157,14 +157,14 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-upcoming-feature", adoptableUpcomingF.name + ":undef"},
       {{adoptableUpcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption"},
+      {"-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate"},
       {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
 // Swift 7 is asserts-only.
 #ifndef NDEBUG
-  // Requesting adoption mode in target language mode has no effect.
+  // Requesting migration mode in target language mode has no effect.
   IsFeatureEnabledTestCase({
         "-swift-version", adoptableUpcomingF.langMode,
-        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
 #endif
@@ -175,14 +175,14 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-experimental-feature", adoptableUpcomingF.name + ":undef"},
       {{adoptableUpcomingF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-experimental-feature", adoptableUpcomingF.name + ":adoption"},
+      {"-enable-experimental-feature", adoptableUpcomingF.name + ":migrate"},
       {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
 // Swift 7 is asserts-only.
 #ifndef NDEBUG
-  // Requesting adoption mode in target language mode has no effect.
+  // Requesting migration mode in target language mode has no effect.
   IsFeatureEnabledTestCase({
         "-swift-version", adoptableUpcomingF.langMode,
-        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
 #endif
@@ -193,7 +193,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-upcoming-feature", strictConcurrencyF.name + ":undef"},
       {{strictConcurrencyF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-upcoming-feature", strictConcurrencyF.name + ":adoption"},
+      {"-enable-upcoming-feature", strictConcurrencyF.name + ":migrate"},
       {{strictConcurrencyF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", strictConcurrencyF.name},
@@ -202,7 +202,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-experimental-feature", strictConcurrencyF.name + ":undef"},
       {{strictConcurrencyF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-experimental-feature", strictConcurrencyF.name + ":adoption"},
+      {"-enable-experimental-feature", strictConcurrencyF.name + ":migrate"},
       {{strictConcurrencyF, FeatureState::Off}}),
 
   IsFeatureEnabledTestCase(
@@ -212,7 +212,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-upcoming-feature", experimentalF.name + ":undef"},
       {{experimentalF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-upcoming-feature", experimentalF.name + ":adoption"},
+      {"-enable-upcoming-feature", experimentalF.name + ":migrate"},
       {{experimentalF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", experimentalF.name},
@@ -221,7 +221,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-experimental-feature", experimentalF.name + ":undef"},
       {{experimentalF, FeatureState::Off}}),
   IsFeatureEnabledTestCase(
-      {"-enable-experimental-feature", experimentalF.name + ":adoption"},
+      {"-enable-experimental-feature", experimentalF.name + ":migrate"},
       {{experimentalF, FeatureState::Off}}),
 };
 // clang-format on
@@ -300,7 +300,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+        "-enable-upcoming-feature", upcomingF.name + ":migrate",
         "-enable-upcoming-feature", upcomingF.name,
       },
       {{upcomingF, FeatureState::Enabled}}),
@@ -311,7 +311,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", upcomingF.name,
-        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+        "-enable-upcoming-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -320,7 +320,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+        "-enable-upcoming-feature", upcomingF.name + ":migrate",
         "-enable-experimental-feature", upcomingF.name,
       },
       {{upcomingF, FeatureState::Enabled}}),
@@ -331,7 +331,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", upcomingF.name,
-        "-enable-experimental-feature", upcomingF.name + ":adoption",
+        "-enable-experimental-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -340,7 +340,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-experimental-feature", upcomingF.name + ":adoption",
+        "-enable-experimental-feature", upcomingF.name + ":migrate",
         "-enable-upcoming-feature", upcomingF.name,
       },
       {{upcomingF, FeatureState::Enabled}}),
@@ -351,7 +351,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", upcomingF.name,
-        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+        "-enable-upcoming-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -360,7 +360,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-experimental-feature", upcomingF.name + ":adoption",
+        "-enable-experimental-feature", upcomingF.name + ":migrate",
         "-enable-experimental-feature", upcomingF.name,
       },
       {{upcomingF, FeatureState::Enabled}}),
@@ -371,7 +371,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", upcomingF.name,
-        "-enable-experimental-feature", upcomingF.name + ":adoption",
+        "-enable-experimental-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
 
@@ -383,7 +383,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate",
         "-enable-upcoming-feature", adoptableUpcomingF.name,
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
@@ -394,7 +394,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", adoptableUpcomingF.name,
-        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
   IsFeatureEnabledTestCase({
@@ -403,7 +403,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate",
         "-enable-experimental-feature", adoptableUpcomingF.name,
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
@@ -414,7 +414,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", adoptableUpcomingF.name,
-        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
   IsFeatureEnabledTestCase({
@@ -423,7 +423,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":migrate",
         "-enable-upcoming-feature", adoptableUpcomingF.name,
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
@@ -434,7 +434,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", adoptableUpcomingF.name,
-        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
   IsFeatureEnabledTestCase({
@@ -443,7 +443,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":migrate",
         "-enable-experimental-feature", adoptableUpcomingF.name,
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
@@ -454,7 +454,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{adoptableUpcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", adoptableUpcomingF.name,
-        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::EnabledForMigration}}),
 
@@ -466,7 +466,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       },
       {{experimentalF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-enable-experimental-feature", experimentalF.name + ":adoption",
+        "-enable-experimental-feature", experimentalF.name + ":migrate",
         "-enable-experimental-feature", experimentalF.name,
       },
       {{experimentalF, FeatureState::Enabled}}),
@@ -477,7 +477,7 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
       {{experimentalF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", experimentalF.name,
-        "-enable-experimental-feature", experimentalF.name + ":adoption",
+        "-enable-experimental-feature", experimentalF.name + ":migrate",
       },
       {{experimentalF, FeatureState::Enabled}}),
 };
@@ -501,7 +501,7 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", upcomingF.name,
-        "-disable-upcoming-feature", upcomingF.name + ":adoption",
+        "-disable-upcoming-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -521,7 +521,7 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", upcomingF.name,
-        "-disable-upcoming-feature", upcomingF.name + ":adoption",
+        "-disable-upcoming-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -541,7 +541,7 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", upcomingF.name,
-        "-disable-experimental-feature", upcomingF.name + ":adoption",
+        "-disable-experimental-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -561,7 +561,7 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", upcomingF.name,
-        "-disable-experimental-feature", upcomingF.name + ":adoption",
+        "-disable-experimental-feature", upcomingF.name + ":migrate",
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
@@ -581,7 +581,7 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       {{experimentalF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", experimentalF.name,
-        "-disable-experimental-feature", experimentalF.name + ":adoption",
+        "-disable-experimental-feature", experimentalF.name + ":migrate",
       },
       {{experimentalF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
