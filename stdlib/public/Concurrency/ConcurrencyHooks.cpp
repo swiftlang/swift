@@ -111,13 +111,13 @@ swift::swift_task_checkIsolated(SerialExecutorRef executor) {
     swift_task_checkIsolatedOrig(executor);
 }
 
-SWIFT_CC(swift) static bool
+SWIFT_CC(swift) static IsIsolatingCurrentContextDecision
 swift_task_isIsolatingCurrentContextOrig(SerialExecutorRef executor) {
   return swift_task_isIsolatingCurrentContextImpl(
       *reinterpret_cast<SwiftExecutorRef *>(&executor));
 }
 
-bool
+IsIsolatingCurrentContextDecision
 swift::swift_task_isIsolatingCurrentContext(SerialExecutorRef executor) {
   if (SWIFT_UNLIKELY(swift_task_isIsolatingCurrentContext_hook))
     return swift_task_isIsolatingCurrentContext_hook(executor, swift_task_isIsolatingCurrentContextOrig);

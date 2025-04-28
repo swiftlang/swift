@@ -17,10 +17,12 @@
 #ifndef SWIFT_ABI_EXECUTOR_H
 #define SWIFT_ABI_EXECUTOR_H
 
-#include <inttypes.h>
+#include "../../../stdlib/public/Concurrency/Error.h"
+
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Casting.h"
+#include <inttypes.h>
 
 namespace swift {
 class AsyncContext;
@@ -412,6 +414,40 @@ public:
   /// The expected size of the context.
   uint32_t ExpectedContextSize;
 };
+
+/// Type-safe wrapper around the return value of `isIsolatingCurrentContext`.
+enum class IsIsolatingCurrentContextDecision : int8_t {
+  // The function call could not determine if the current context is isolated
+  // by this executor or not. Default value for executors which do not implement
+  // `isIsolatingCurrentContext`.
+  Unknown,
+  // The current context is definitely not isolated by this executor.
+  NotIsolated,
+  // The current context is definitely isolated by this executor.
+  Isolated,
+};
+
+inline IsIsolatingCurrentContextDecision
+getIsIsolatingCurrentContextDecisionFromInt(int8_t value) {
+  switch (value) {
+  case -1: return IsIsolatingCurrentContextDecision::Unknown;
+  case 0: return IsIsolatingCurrentContextDecision::NotIsolated;
+  case 1: return IsIsolatingCurrentContextDecision::Isolated;
+  default:
+    swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+    return IsIsolatingCurrentContextDecision::Unknown; // silence warning about missing return
+  }
+}
+
+inline StringRef getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision) {
+  switch (decision) {
+    case IsIsolatingCurrentContextDecision::Unknown: return "Unknown";
+    case IsIsolatingCurrentContextDecision::NotIsolated: return "NotIsolated";
+    case IsIsolatingCurrentContextDecision::Isolated: return "Isolated";
+  }
+  swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+  return "<Unexpected Value>"; // silence warning about missing return
+}
 
 }
 
