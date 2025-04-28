@@ -1,7 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-compiler-version: Swift version 6.2-dev effective-5.10 (LLVM 09f3cd831902283, Swift 889522485775a5d)
 // swift-module-flags: -module-name lifetime_depend_infer -enable-experimental-feature LifetimeDependence -swift-version 5 -enable-library-evolution
-// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.2
 import Swift
 import _Concurrency
 import _StringProcessing
@@ -255,12 +253,15 @@ public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
     _modify
   }
   
+  // FIXME: rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
+  /*
   public var neComputedBorrow: lifetime_depend_infer.NE {
     @lifetime(borrow self)
     get
     @lifetime(&self)
     set
   }
+  */
   
   public var neYieldedBorrow: lifetime_depend_infer.NE {
     @lifetime(borrow self)

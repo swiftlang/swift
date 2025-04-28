@@ -105,7 +105,8 @@ func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferVie
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(independent: this.ptr)
   }
-  return BufferView(independent: that.ptr)
+  let newThat = BufferView(independent: that.ptr)
+  return _overrideLifetime(newThat, copying: that)
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVAD_ADntF : $@convention(thin) (@guaranteed BufferView, @owned BufferView) -> @lifetime(copy 1, borrow 0)  @owned BufferView {

@@ -119,7 +119,10 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     // Recursively sink enclosing end_access, end_borrow, end_apply, and destroy_value. If the scope can be extended
     // into the caller, return the function arguments that are the dependency sources.
     var scopeExtension = ScopeExtension(localReachabilityCache, context)
-    let args = scopeExtension.extendScopes(dependence: newLifetimeDep)
+    guard scopeExtension.extendScopes(dependence: newLifetimeDep) else {
+      continue
+    }
+    let args = scopeExtension.findArgumentDependencies()
 
     // Redirect the dependence base to the function arguments. This may create additional mark_dependence instructions.
     markDep.redirectFunctionReturn(to: args, context)
@@ -246,28 +249,25 @@ private struct ScopeExtension {
 // `mark_dependence` to the outer access `%0`. This ensures that exclusivity diagnostics correctly reports the
 // violation, and that subsequent optimizations do not shrink the inner access `%a1`.
 extension ScopeExtension {
-  mutating func extendScopes(dependence: LifetimeDependence) -> SingleInlineArray<FunctionArgument> {
+  mutating func extendScopes(dependence: LifetimeDependence) -> Bool {
     log("Scope fixup for lifetime dependent instructions: \(dependence)")
 
     gatherExtensions(dependence: dependence)
 
-    let noCallerScope = SingleInlineArray<FunctionArgument>()
-
     // computeDependentUseRange initializes scopeExtension.dependsOnCaller.
     guard var useRange = computeDependentUseRange(of: dependence) else {
-      return noCallerScope
+      return false
     }
     // tryExtendScopes deinitializes 'useRange'
     var scopesToExtend = SingleInlineArray<ExtendableScope>()
     guard canExtendScopes(over: &useRange, scopesToExtend: &scopesToExtend) else {
       useRange.deinitialize()
-      return noCallerScope
+      return false
     }
     // extend(over:) must receive the original unmodified `useRange`, without intermediate scope ending instructions.
     // This deinitializes `useRange` before erasing instructions.
     extend(scopesToExtend: scopesToExtend, over: &useRange, context)
-
-    return dependsOnArgs
+    return true
   }
 }
 
@@ -448,10 +448,15 @@ extension ScopeExtension {
 }
 
 extension ScopeExtension {
-  /// Return all scope owners as long as they are all function arguments and all nested accesses are compatible with
-  /// their argument convention. Then, if all nested accesses were extended to the return statement, it is valid to
-  /// logically combine them into a single access for the purpose of diagnostic lifetime dependence.
-  var dependsOnArgs: SingleInlineArray<FunctionArgument> {
+  /// Check if the dependent value depends only on function arguments and can therefore be returned to caller. If so,
+  /// return the list of arguments that it depends on. If this returns an empty list, then the dependent value cannot be
+  /// returned.
+  ///
+  /// The conditions for returning a dependent value are:
+  /// - The dependent value is returned from this function.
+  /// - All nested scopes are access scopes that are redundant with the caller's exclusive access scope.
+  /// - All scope owners are function arguments.
+  func findArgumentDependencies() -> SingleInlineArray<FunctionArgument> {
     let noCallerScope = SingleInlineArray<FunctionArgument>()
     // Check that the dependent value is returned by this function.
     if !dependsOnCaller! {

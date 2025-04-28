@@ -85,12 +85,14 @@ func testBasic() {
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0)  @owned BufferView {
 @lifetime(copy x)
 func derive(_ x: borrowing BufferView) -> BufferView {
-  return BufferView(x.ptr, x.c)
+  let newBV = BufferView(x.ptr, x.c)
+  return _overrideLifetime(newBV, copying: x)
 }
 
 @lifetime(copy x)
 func derive(_ unused: Int, _ x: borrowing BufferView) -> BufferView {
-  return BufferView(independent: x.ptr, x.c)
+  let newBV = BufferView(independent: x.ptr, x.c)
+  return _overrideLifetime(newBV, copying: x)
 }
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0)  @owned BufferView {
@@ -212,7 +214,9 @@ struct GenericBufferView<Element> : ~Escapable {
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0)  (@owned BufferView, @owned BufferView) {
 @lifetime(copy x)
 func tupleLifetimeDependence(_ x: borrowing BufferView) -> (BufferView, BufferView) {
-  return (BufferView(x.ptr, x.c), BufferView(x.ptr, x.c))
+  let newX1 = BufferView(x.ptr, x.c)
+  let newX2 = BufferView(x.ptr, x.c)
+  return (_overrideLifetime(newX1, copying: x), _overrideLifetime(newX2, copying: x))
 }
 
 public struct OuterNE: ~Escapable {
