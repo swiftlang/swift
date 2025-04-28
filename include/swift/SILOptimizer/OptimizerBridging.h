@@ -215,6 +215,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
 
   // AST
 
