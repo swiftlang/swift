@@ -36,6 +36,19 @@ struct A {}
 
 func useA(_:A){}
 
+struct NE : ~Escapable {}
+
+class C {}
+struct Holder {
+  var c: C? = nil
+}
+
+@_silgen_name("getGeneric")
+@lifetime(borrow holder)
+func getGeneric<T: ~Escapable>(_ holder: borrowing Holder, _: T.Type) -> T
+
+func mutate(_: inout Holder) {}
+
 // Test that conditionally returning an Optional succeeds.
 //
 // See scope_fixup.sil: testReturnPhi.
@@ -66,4 +79,15 @@ struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
   deinit {
     useA(a[])
   }
+}
+
+// Test a borrowed dependency on an address
+@lifetime(immortal)
+public func testGenericDep<T: ~Escapable>(type: T.Type) -> T {
+  let holder = Holder()
+  let result = getGeneric(holder, type)
+  // expected-error @-1{{lifetime-dependent variable 'result' escapes its scope}}
+  // expected-note  @-3{{it depends on the lifetime of variable 'holder'}}
+  return result
+  // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
 }
