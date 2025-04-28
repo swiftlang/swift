@@ -49,6 +49,12 @@ option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform
 option(${PROJECT_NAME}_PLATFORM_SUBDIR "Platform name used for installed swift{doc,module,interface} files"
   ${SwiftCore_PLATFORM_SUBDIR})
 
+option(${PROJECT_NAME}_COMPILER_VARIANT_TARGET "Compiler variant target to use when emiting modules"
+  ${SwiftCore_COMPILER_VARIANT_TARGET})
+
+include(CatalystSupport)
+include(EmitSwiftInterface)
+
 add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
@@ -104,6 +110,8 @@ install(TARGETS swiftSynchronization
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+emit_swift_interface(swiftSynchronization)
+install_swift_interface(swiftSynchronization)
 
 # Configure plist creation for Darwin platforms.
 generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
