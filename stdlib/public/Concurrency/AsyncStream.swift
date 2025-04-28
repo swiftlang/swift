@@ -480,19 +480,16 @@ extension AsyncStream.Continuation.YieldResult: Sendable where Element: Sendable
 extension AsyncStream.Continuation: Hashable {
   @inlinable
   @available(SwiftStdlib 6.2, *)
-  @inlinable
   public func hash(into hasher: inout Hasher) {
     return hasher.combine(ObjectIdentifier(storage))
   }
   @inlinable
   @available(SwiftStdlib 6.2, *)
-  @inlinable
   public var hashValue: Int {
     return _hashValue(for: self)
   }
   @inlinable
   @available(SwiftStdlib 6.2, *)
-  @inlinable
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.storage === rhs.storage
   }
