@@ -1169,7 +1169,7 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class BorrowedFromInst : SingleValueInstruction, BorrowIntroducingInstruction {
+final public class BorrowedFromInst : SingleValueInstruction, BeginBorrowInstruction {
   public var borrowedValue: Value { operands[0].value }
   public var borrowedPhi: Phi { Phi(borrowedValue)! }
   public var enclosingOperands: OperandArray {
@@ -1431,21 +1431,22 @@ extension Instruction {
   }
 }
 
-/// Instructions beginning a borrow-scope which must be ended by `end_borrow`.
-public protocol BorrowIntroducingInstruction : SingleValueInstruction, ScopedInstruction {
+/// Single-value instructions beginning a borrow-scope which end with an `end_borrow` or a branch to a re-borrow phi.
+/// See also `BeginBorrowValue` which represents all kind of `Value`s which begin a borrow scope.
+public protocol BeginBorrowInstruction : SingleValueInstruction, ScopedInstruction {
 }
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {
   public var borrow: Value { operand.value }
 }
 
-extension BorrowIntroducingInstruction {
+extension BeginBorrowInstruction {
   public var endOperands: LazyFilterSequence<UseList> {
     return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
   }
 }
 
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BeginBorrowInstruction {
   public var borrowedValue: Value { operand.value }
 
   public override var isLexical: Bool { bridged.BeginBorrow_isLexical() }
@@ -1457,7 +1458,7 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
   }
 }
 
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BeginBorrowInstruction {
 
   // True if the invariants on `load_borrow` have not been checked and should not be strictly enforced.
   //
@@ -1467,7 +1468,7 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Bor
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
 }
 
-final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BeginBorrowInstruction {
   public var allocStack: AllocStackInst {
     var dest = destination
     if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
