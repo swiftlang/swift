@@ -651,14 +651,14 @@ bool SubstitutionMap::isIdentity() const {
   return !hasNonIdentityReplacement;
 }
 
-SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
-    TypeExpansionContext context) const {
+SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
+    SubstitutionMap subs, TypeExpansionContext context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return this->subst(replacer, replacer,
-                     SubstFlags::SubstituteOpaqueArchetypes |
-                     SubstFlags::PreservePackExpansionLevel);
+  return subs.subst(replacer, replacer,
+                    SubstFlags::SubstituteOpaqueArchetypes |
+                    SubstFlags::PreservePackExpansionLevel);
 }
 
 bool OuterSubstitutions::isUnsubstitutedTypeParameter(Type type) const {

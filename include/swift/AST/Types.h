@@ -5032,9 +5032,15 @@ Type substOpaqueTypesWithUnderlyingTypes(Type type,
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
+
 ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref,
                                     TypeExpansionContext context);
+
+SubstitutionMap
+substOpaqueTypesWithUnderlyingTypes(SubstitutionMap subs,
+                                    TypeExpansionContext context);
+
 namespace Lowering {
   class TypeConverter;
 }
