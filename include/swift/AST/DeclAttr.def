@@ -887,7 +887,13 @@ SIMPLE_DECL_ATTR(concurrent, Concurrent,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   170)
 
-LAST_DECL_ATTR(Concurrent)
+SIMPLE_DECL_ATTR(preEnumExtensibility, PreEnumExtensibility,
+  OnEnum,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  171)
+DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, ExtensibleAttribute)
+  
+LAST_DECL_ATTR(PreEnumExtensibility)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

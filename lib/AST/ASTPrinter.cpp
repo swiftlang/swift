@@ -3328,7 +3328,8 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
 static void
 suppressingFeatureExtensibleAttribute(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
-  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Extensible);
+  ExcludeAttrRAII scope1(options.ExcludeAttrList, DeclAttrKind::Extensible);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::PreEnumExtensibility);
   action();
 }
 
