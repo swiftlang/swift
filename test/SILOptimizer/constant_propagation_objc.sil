@@ -45,6 +45,7 @@ sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Arra
 // CHECK-NEXT:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[FAIL_BB]]:
+// CHECK-NEXT:   destroy_addr [[CAST_TMP:%.*]]
 // CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
 // CHECK-NEXT:   dealloc_stack [[OUTPUT]]
 // CHECK-NEXT:   destroy_addr [[INPUT]]
@@ -117,6 +118,7 @@ bb4:
 // CHECK-NEXT:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[FAIL_BB]]:
+// CHECK-NEXT:   destroy_addr [[CAST_TMP:%.*]]
 // CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
 // CHECK-NEXT:   dealloc_stack [[OUTPUT]]
 // CHECK-NEXT:   destroy_addr [[INPUT]]
@@ -188,6 +190,7 @@ bb4:
 // CHECK-NEXT:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[FAIL_BB:bb[0-9]+]]:
+// CHECK-NEXT:   destroy_addr [[CAST_TMP:%.*]]
 // CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
 // CHECK-NEXT:   dealloc_stack [[OUTPUT]]
 // CHECK-NEXT:   dealloc_stack [[INPUT]]
@@ -258,6 +261,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -325,6 +329,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -394,6 +399,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -464,6 +470,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -531,6 +538,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -600,6 +608,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -670,6 +679,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -737,6 +747,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -806,6 +817,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -876,6 +888,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -943,6 +956,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -1012,6 +1026,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //

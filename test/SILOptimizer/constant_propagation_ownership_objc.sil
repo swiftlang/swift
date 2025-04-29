@@ -165,6 +165,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -233,6 +234,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: [[UNCAST_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
 // CHECK-NEXT: store [[UNCAST_INPUT:%.*]] to [init] [[INPUT]]
@@ -305,6 +307,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -375,6 +378,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -443,6 +447,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: [[UNCASTED_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
 // CHECK-NEXT: store [[UNCASTED_INPUT]] to [init] [[INPUT]]
@@ -515,6 +520,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -585,6 +591,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -653,6 +660,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: [[UNCASTED_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
 // CHECK-NEXT: store [[UNCASTED_INPUT]] to [init] [[INPUT]]
@@ -725,6 +733,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -795,6 +804,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //
@@ -863,6 +873,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: [[UNCASTED_INPUT:%.*]] = unchecked_ref_cast [[CASTED_INPUT]]
 // CHECK-NEXT: store [[UNCASTED_INPUT]] to [init] [[INPUT]]
@@ -935,6 +946,7 @@ bb4:
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_FAIL]]:
+// CHECK-NEXT: destroy_addr
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: br [[FAIL_EXIT_TRAMPOLINE]]
 //

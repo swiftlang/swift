@@ -39,7 +39,7 @@ public class Test {
   //
   // CHECK: [[START_STATE:%.*]] = enum $Test.State, #Test.State.start!enumelt
   // CHECK-NEXT: [[NEW_VALUE:%.*]] = alloc_stack $Test.State
-  // CHECK-NEXT: store [[START_STATE]] to [trivial] [[NEW_VALUE]] : $*Test.State
+  // CHECK-NEXT: store [[START_STATE]] to [init] [[NEW_VALUE]] : $*Test.State
   // CHECK: assign_or_init [set] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> @out Test.State, set {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> ()
   public init() {
     state = .start
