@@ -219,7 +219,7 @@ TreatArrayLiteralAsDictionary *
 TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
                                        Type arrayTy,
                                        ConstraintLocator *locator) {
-  if (!arrayTy->isArrayType())
+  if (!arrayTy->isArray())
     return nullptr;
 
   // Determine the ArrayExpr from the locator.
@@ -1834,7 +1834,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
     return nullptr;
 
-  auto elementType = argType->isArrayType();
+  auto elementType = argType->getArrayElementType();
   if (!elementType)
     return nullptr;
 

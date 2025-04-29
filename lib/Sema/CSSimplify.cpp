@@ -6018,7 +6018,7 @@ bool ConstraintSystem::repairFailures(
     // ```
     if (rhs->isKnownStdlibCollectionType()) {
       std::function<Type(Type)> getArrayOrSetType = [&](Type type) -> Type {
-        if (auto eltTy = type->isArrayType())
+        if (auto eltTy = type->getArrayElementType())
           return getArrayOrSetType(eltTy);
 
         if (auto eltTy = isSetType(type))
@@ -7992,7 +7992,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               if (inoutBaseType->isTypeVariableOrMember())
                 return formUnsolvedResult();
 
-              auto baseIsArray = inoutBaseType->isArrayType();
+              auto baseIsArray = inoutBaseType->isArray();
 
               if (baseIsArray)
                 conversionsOrFixes.push_back(
@@ -8061,7 +8061,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             if (pointerKind == PTK_UnsafePointer
                 || pointerKind == PTK_UnsafeRawPointer) {
               if (!isAutoClosureArgument) {
-                if (type1->isArrayType()) {
+                if (type1->isArray()) {
                   conversionsOrFixes.push_back(
                       ConversionRestrictionKind::ArrayToPointer);
 
@@ -9263,7 +9263,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     }
 
     // Array<T> -> Unsafe{Raw}Pointer<T>
-    if (auto elt = resolvedTy->isArrayType()) {
+    if (auto elt = resolvedTy->getArrayElementType()) {
       typesToCheck.push_back(getPointerFor(PTK_UnsafePointer, elt));
       typesToCheck.push_back(getPointerFor(PTK_UnsafeRawPointer, elt));
     }
@@ -9294,7 +9294,7 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
                                           Type fromType,
                                           Type toType) {
   // Array downcasts are handled specially.
-  if (fromType->isArrayType() && toType->isArrayType()) {
+  if (fromType->isArray() && toType->isArray()) {
     return CheckedCastKind::ArrayDowncast;
   }
 
@@ -9558,8 +9558,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
-    auto fromBaseType = fromType->isArrayType();
-    auto toBaseType = toType->isArrayType();
+    auto fromBaseType = fromType->getArrayElementType();
+    auto toBaseType = toType->getArrayElementType();
 
     auto elementLocator =
         locator.withPathElement(LocatorPathElt::GenericArgument(0));
@@ -12558,8 +12558,8 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   };
 
   // Bridging the elements of an array.
-  if (auto fromElement = unwrappedFromType->isArrayType()) {
-    if (auto toElement = unwrappedToType->isArrayType()) {
+  if (auto fromElement = unwrappedFromType->getArrayElementType()) {
+    if (auto toElement = unwrappedToType->getArrayElementType()) {
       countOptionalInjections();
       auto result = simplifyBridgingConstraint(
           fromElement, toElement, subflags,
@@ -14838,7 +14838,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     auto t2 = type2->getDesugaredType();
 
-    auto baseType1 = getFixedTypeRecursive(obj1->isArrayType(), false);
+    auto baseType1 = getFixedTypeRecursive(obj1->getArrayElementType(), false);
     auto ptr2 = getBaseTypeForPointer(t2);
 
     increaseScore(SK_ValueToOptional, locator, ptr2.getInt());
@@ -14941,7 +14941,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     increaseScore(SK_ValueToPointerConversion, locator);
 
-    type1 = getFixedTypeRecursive(type1->getInOutObjectType()->isArrayType(),
+    type1 = getFixedTypeRecursive(type1->getInOutObjectType()->getArrayElementType(),
                                   /*wantRValue=*/false);
     LLVM_FALLTHROUGH;
   }
@@ -14977,8 +14977,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
-    Type baseType1 = type1->isArrayType();
-    Type baseType2 = type2->isArrayType();
+    Type baseType1 = type1->getArrayElementType();
+    Type baseType2 = type2->getArrayElementType();
 
     increaseScore(SK_CollectionUpcastConversion, locator);
     return matchTypes(baseType1,
@@ -15774,7 +15774,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     auto dictionaryKeyTy = DependentMemberType::get(valueBaseTy, keyAssocTy);
 
     // Extract the array element type.
-    auto elemTy = type1->isArrayType();
+    auto elemTy = type1->getArrayElementType();
 
     ConstraintLocator *elemLoc = getConstraintLocator(AE->getElement(0));
     ConstraintKind kind = isDictionaryType(dictTy)
