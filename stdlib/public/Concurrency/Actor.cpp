@@ -520,7 +520,9 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
                          expectedExecutor.getIdentity());
     // The executor has the most recent 'isIsolatingCurrentContext' API
     // so available so we prefer calling that to 'checkIsolated'.
-    auto isIsolatingCurrentContextDecision = swift_task_isIsolatingCurrentContext(expectedExecutor);
+    auto isIsolatingCurrentContextDecision =
+        getIsIsolatingCurrentContextDecisionFromInt(
+            swift_task_isIsolatingCurrentContext(expectedExecutor));
 
     SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
                    expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
@@ -646,7 +648,8 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
   SWIFT_TASK_DEBUG_LOG("executor checking: call (%p).isIsolatingCurrentContext",
     expectedExecutor.getIdentity());
 
-  const auto isIsolatingCurrentContextDecision = swift_task_isIsolatingCurrentContext(expectedExecutor);
+  const auto isIsolatingCurrentContextDecision =
+    getIsIsolatingCurrentContextDecisionFromInt(swift_task_isIsolatingCurrentContext(expectedExecutor));
 
   SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
     expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));

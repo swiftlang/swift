@@ -62,22 +62,20 @@ int8_t _swift_task_isIsolatingCurrentContextSwift(
   const SerialExecutorWitnessTable *witnessTable
 );
 
-extern "C" SWIFT_CC(swift) IsIsolatingCurrentContextDecision swift_task_isIsolatingCurrentContextImpl(
+extern "C" SWIFT_CC(swift) int8_t
+swift_task_isIsolatingCurrentContextImpl(
     SerialExecutorRef executor) {
   HeapObject *identity = executor.getIdentity();
 
   // We might be being called with an actor rather than a "proper"
   // SerialExecutor; in that case, we won't have a SerialExecutor witness
   // table.
-  if (!executor.hasSerialExecutorWitnessTable()) {
-    return IsIsolatingCurrentContextDecision::Unknown;
-  }
+  if (!executor.hasSerialExecutorWitnessTable())
+    return static_cast<uint8_t>(IsIsolatingCurrentContextDecision::Unknown);
 
-  auto decision = _swift_task_isIsolatingCurrentContextSwift(
+  return _swift_task_isIsolatingCurrentContextSwift(
       identity, swift_getObjectType(identity),
       executor.getSerialExecutorWitnessTable());
-
-  return getIsIsolatingCurrentContextDecisionFromInt(decision);
 }
 
 extern "C" SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(
