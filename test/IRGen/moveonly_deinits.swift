@@ -66,11 +66,11 @@ var value: Bool { false }
 // IR:   br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
-// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds %TSi, ptr [[GEP]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
+// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[GEP]], i32 0, i32 0
 // IR-NEXT:   [[LHS:%.*]] = load i64, ptr [[GEP2]]
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
-// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds %TSi, ptr [[GEP]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[GEP]], i32 0, i32 0
 // IR-NEXT:   [[RHS:%.*]] = load i64, ptr [[GEP2]]
 // IR-NEXT:   call swiftcc void @"$s16moveonly_deinits27consumeIntPairWithoutDeinityyAA0defG0VnF"(i64 [[LHS]], i64 [[RHS]])
 // IR-NEXT:   br label %[[CONT:[0-9]+]]
@@ -95,21 +95,21 @@ public func testIntPairWithoutDeinit() {
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
-// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds %TSi, ptr [[GEP]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
+// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[GEP]], i32 0, i32 0
 // IR-NEXT:   [[LHS:%.*]] = load i64, ptr [[GEP2]]
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
-// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds %TSi, ptr [[GEP]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[GEP]], i32 0, i32 0
 // IR-NEXT:   [[RHS:%.*]] = load i64, ptr [[GEP2]]
 // IR-NEXT:  call swiftcc void @"$s16moveonly_deinits24consumeIntPairWithDeinityyAA0defG0VnF"(
 // IR-NEXT:  br label %[[CONT:[0-9]+]]
 //
 // IR: [[BB2]]:
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
-// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds %TSi, ptr [[GEP]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
+// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[GEP]], i32 0, i32 0
 // IR-NEXT:   [[LHS:%.*]] = load i64, ptr [[GEP2]]
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
-// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds %TSi, ptr [[GEP]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:   [[GEP2:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[GEP]], i32 0, i32 0
 // IR-NEXT:   [[RHS:%.*]] = load i64, ptr [[GEP2]]
 // IR-NEXT:  call swiftcc void @"$s16moveonly_deinits17IntPairWithDeinitVfD"(i64 [[LHS]], i64 [[RHS]])
 // IR-NEXT:  br label %[[CONT]]
@@ -130,9 +130,9 @@ public func testIntPairWithDeinit() {
 // IR:   br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
 // IR-NEXT:   [[LHS:%.*]] = load ptr, ptr [[GEP]]
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
 // IR-NEXT:   [[RHS:%.*]] = load ptr, ptr [[GEP]]
 // IR-NEXT:   call swiftcc void @"$s16moveonly_deinits29consumeKlassPairWithoutDeinityyAA0defG0VnF"(ptr [[LHS]], ptr [[RHS]])
 // IR-NEXT:   br label %[[CONT:[0-9]+]]
@@ -157,17 +157,17 @@ public func testKlassPairWithoutDeinit() {
 // IR:   br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
 // IR-NEXT:   [[LHS:%.*]] = load ptr, ptr [[GEP]]
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
 // IR-NEXT:   [[RHS:%.*]] = load ptr, ptr [[GEP]]
 // IR-NEXT:  call swiftcc void @"$s16moveonly_deinits26consumeKlassPairWithDeinityyAA0defG0VnF"(ptr [[LHS]], ptr [[RHS]])
 // IR-NEXT:  br label %[[CONT:[0-9]+]]
 //
 // IR: [[BB2]]:
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 0
 // IR-NEXT:   [[LHS:%.*]] = load ptr, ptr [[GEP]]
-// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:   [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
 // IR-NEXT:   [[RHS:%.*]] = load ptr, ptr [[GEP]]
 // IR-NEXT:  call swiftcc void @"$s16moveonly_deinits19KlassPairWithDeinitVfD"(ptr [[LHS]], ptr [[RHS]])
 // IR-NEXT:  br label %[[CONT]]
@@ -230,7 +230,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 //
 // IR: [[BB1]]:
 // IR-NEXT:  [[LHS:%.*]] = load i64, ptr [[ALLOCA]]
-// IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
 // IR-NEXT:  [[RHS:%.*]] = load i8, ptr [[GEP]]
 // IR-NEXT:   call swiftcc void @"$s16moveonly_deinits31consumeIntEnumPairWithoutDeinityyAA0defgH0OnF"(i64 [[LHS]], i8 [[RHS]])
 // IR-NEXT:   br label %[[CONT:[0-9]+]]
@@ -255,14 +255,14 @@ public func testIntEnumPairWithoutDeinit() {
 //
 // IR: [[BB1]]:
 // IR-NEXT:  [[LHS:%.*]] = load i64, ptr [[ALLOCA]]
-// IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
 // IR-NEXT:  [[RHS:%.*]] = load i8, ptr [[GEP]]
 // IR-NEXT:  call swiftcc void @"$s16moveonly_deinits28consumeIntEnumPairWithDeinityyAA0defgH0OnF"(i64 [[LHS]], i8 [[RHS]])
 // IR-NEXT:  br label %[[CONT:[0-9]+]]
 //
 // IR: [[BB2]]:
 // IR-NEXT:  [[LHS:%.*]] = load i64, ptr [[ALLOCA]]
-// IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
+// IR-NEXT:  [[GEP:%.*]] = getelementptr inbounds{{.*}} [[TYPE]], ptr [[ALLOCA]], i32 0, i32 1
 // IR-NEXT:  [[RHS:%.*]] = load i8, ptr [[GEP]]
 // IR-NEXT:  call swiftcc void @"$s16moveonly_deinits21IntEnumPairWithDeinitOfD"(i64 [[LHS]], i8 [[RHS]])
 // IR-NEXT:  br label %[[CONT]]

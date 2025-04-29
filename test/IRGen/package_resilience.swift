@@ -172,22 +172,22 @@ package class ClassWithResilientThenEmpty {
 // ClassWithResilientProperty.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T18package_resilience26ClassWithResilientPropertyC, ptr %0,
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience26ClassWithResilientPropertyC, ptr %0,
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T18package_resilience33ClassWithResilientlySizedPropertyC, ptr %0,
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience33ClassWithResilientlySizedPropertyC, ptr %0,
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
 
 // ClassWithIndirectResilientEnum.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T18package_resilience30ClassWithIndirectResilientEnumC, ptr %0, i32 0, i32 2
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_PTR]], i32 0, i32 0
+// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience30ClassWithIndirectResilientEnumC, ptr %0, i32 0, i32 2
+// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, ptr [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
 
@@ -197,8 +197,8 @@ package class ClassWithResilientThenEmpty {
 // MyResilientChild.field getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s18package_resilience16MyResilientChildC5fields5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T18package_resilience16MyResilientChildC, ptr %0, i32 0, i32 2
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience16MyResilientChildC, ptr %0, i32 0, i32 2
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, ptr [[PAYLOAD_ADDR]]
 // CHECK:      ret i32 [[RESULT]]
 
@@ -232,14 +232,14 @@ public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void  @"$s18package_resilience31constructResilientEnumNoPayload14resilient_enum6MediumOyF"
 package func constructResilientEnumNoPayload() -> Medium {
-  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T14resilient_enum6MediumO, ptr %0, i32 0, i32 1
+  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T14resilient_enum6MediumO, ptr %0, i32 0, i32 1
   // CHECK: ret void
   return Medium.Paper
 }
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s18package_resilience39constructExhaustiveWithResilientMembers14resilient_enum11SimpleShapeOyF"
 package func constructExhaustiveWithResilientMembers() -> SimpleShape {
-  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T14resilient_enum11SimpleShapeO, ptr %0, i32 0, i32 1
+  // CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T14resilient_enum11SimpleShapeO, ptr %0, i32 0, i32 1
   // CHECK: ret void
   return .KleinBottle
 }

@@ -15,9 +15,9 @@
 
 // Make sure that in the other module, we do call the deinit directly from the value witness.
 // DEFINING_MODULE-LABEL: define internal void @"$s6server8MoveOnlyVwxx"(ptr noalias %object, ptr %MoveOnly) {{.*}} {
-// DEFINING_MODULE: [[VAR:%.*]] = getelementptr inbounds {{%.*}}, ptr %object
+// DEFINING_MODULE: [[VAR:%.*]] = getelementptr inbounds{{.*}} {{%.*}}, ptr %object
 // DEFINING_MODULE: [[LOADED_VAR:%.*]] = load ptr, ptr [[VAR]],
-// DEFINING_MODULE: [[VAR2:%.*]] = getelementptr inbounds {{%.*}}, ptr %object
+// DEFINING_MODULE: [[VAR2:%.*]] = getelementptr inbounds{{.*}} {{%.*}}, ptr %object
 // DEFINING_MODULE: [[LOADED_VAR2:%.*]] = load ptr, ptr [[VAR2]],
 // DEFINING_MODULE: call swiftcc void @"$s6server8MoveOnlyVfD"(ptr [[LOADED_VAR]], ptr [[LOADED_VAR2]])
 @main

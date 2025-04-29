@@ -51,10 +51,10 @@ crashCaller()
 // VWT-macosx:   [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
 // VWT-macosx:   [[T3:%.*]] = getelementptr inbounds i8, ptr [[T2]], i64 -8
 // VWT-macosx:   [[T5:%.*]] = load ptr, ptr [[T3]]
-// VWT-macosx:   [[T6:%.*]] = getelementptr inbounds i8, ptr [[T5]], i64 4
+// VWT-macosx:   [[T6:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[T5]], i64 4
 // VWT-macosx:   [[T8:%.*]] = load ptr, ptr [[T6]]
 // VWT-macosx:   tail call ptr [[T8]](
-// VWT-macosx:   [[F01:%.*]] = getelementptr inbounds i8, ptr [[MT]], i64 24
+// VWT-macosx:   [[F01:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[MT]], i64 24
 // VWT-macosx:   [[F03:%.*]] = load i32, ptr [[F01]], align 8
 // VWT-macosx:   [[F04:%.*]] = sext i32 [[F03]] to i64
 // VWT-macosx:   [[FA1:%.*]] = getelementptr inbounds i8, ptr {{.*}}, i64 [[F04]]

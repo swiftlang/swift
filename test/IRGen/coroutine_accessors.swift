@@ -143,7 +143,7 @@ public var irm: Int {
 // CHECK-SAME:                   token [[ID]],
 // CHECK-SAME:                   ptr null
 // CHECK-SAME:               )
-// CHECK:               [[S_FIELD__I:%[^,]+]] = getelementptr inbounds %T19coroutine_accessors1SV,
+// CHECK:               [[S_FIELD__I:%[^,]+]] = getelementptr inbounds{{.*}} %T19coroutine_accessors1SV,
 // CHECK-SAME:                     ptr [[SELF]],
 // CHECK-SAME:                     i32 0,
 // CHECK-SAME:                     i32 1

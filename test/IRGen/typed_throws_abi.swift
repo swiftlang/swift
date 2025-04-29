@@ -888,8 +888,8 @@ func callImpl_g4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
 // CHECK: typed.error.load:
-// CHECK:   %swifterror1.x = getelementptr inbounds %T16typed_throws_abi7OneWordV, ptr %swifterror1, i32 0, i32 0
-// CHECK:   %swifterror1.x._value = getelementptr inbounds %TSi, ptr %swifterror1.x, i32 0, i32 0
+// CHECK:   %swifterror1.x = getelementptr inbounds{{.*}} %T16typed_throws_abi7OneWordV, ptr %swifterror1, i32 0, i32 0
+// CHECK:   %swifterror1.x._value = getelementptr inbounds{{.*}} %TSi, ptr %swifterror1.x, i32 0, i32 0
 // CHECK:   [[CALL_ERROR_RES:%.*]] = load i64, ptr %swifterror1.x._value, align 8
 // CHECK:   br label %[[SET_ERROR:.*]]
 // CHECK: [[SUCCESS]]:
@@ -1124,8 +1124,8 @@ func callImpl_h4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
 // CHECK: typed.error.load:
-// CHECK:   %swifterror1.x = getelementptr inbounds %T16typed_throws_abi8TwoWordsV, ptr %swifterror1, i32 0, i32 0
-// CHECK:   %swifterror1.x._value = getelementptr inbounds %TSi, ptr %swifterror1.x, i32 0, i32 0
+// CHECK:   %swifterror1.x = getelementptr inbounds{{.*}} %T16typed_throws_abi8TwoWordsV, ptr %swifterror1, i32 0, i32 0
+// CHECK:   %swifterror1.x._value = getelementptr inbounds{{.*}} %TSi, ptr %swifterror1.x, i32 0, i32 0
 // CHECK:   [[CALL_ERROR_RES0:%.*]] = load i64, ptr %swifterror1.x._value, align 8
 // CHECK:   [[CALL_ERROR_RES1:%.*]] = load i64, ptr %swifterror1.y._value, align 8
 // CHECK:   br label %[[SET_ERROR:.*]]
@@ -1377,8 +1377,8 @@ func callImpl_i4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
 // CHECK: typed.error.load:
-// CHECK:   %swifterror1.x = getelementptr inbounds %T16typed_throws_abi10ThreeWordsV, ptr %swifterror1, i32 0, i32 0
-// CHECK:   %swifterror1.x._value = getelementptr inbounds %TSi, ptr %swifterror1.x, i32 0, i32 0
+// CHECK:   %swifterror1.x = getelementptr inbounds{{.*}} %T16typed_throws_abi10ThreeWordsV, ptr %swifterror1, i32 0, i32 0
+// CHECK:   %swifterror1.x._value = getelementptr inbounds{{.*}} %TSi, ptr %swifterror1.x, i32 0, i32 0
 // CHECK:   [[CALL_ERROR_RES0:%.*]] = load i64, ptr %swifterror1.x._value, align 8
 // CHECK:   [[CALL_ERROR_RES1:%.*]] = load i64, ptr %swifterror1.y._value, align 8
 // CHECK:   [[CALL_ERROR_RES2:%.*]] = load i64, ptr %swifterror1.z._value, align 8
@@ -2401,8 +2401,8 @@ func callImplAsync_g4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
 // CHECK: typed.error.load:
-// CHECK:   %swifterror.x = getelementptr inbounds %T16typed_throws_abi7OneWordV, ptr %swifterror, i32 0, i32 0
-// CHECK:   %swifterror.x._value = getelementptr inbounds %TSi, ptr %swifterror.x, i32 0, i32 0
+// CHECK:   %swifterror.x = getelementptr inbounds{{.*}} %T16typed_throws_abi7OneWordV, ptr %swifterror, i32 0, i32 0
+// CHECK:   %swifterror.x._value = getelementptr inbounds{{.*}} %TSi, ptr %swifterror.x, i32 0, i32 0
 // CHECK:   [[ERROR_X:%.*]] = load i64, ptr %swifterror.x._value, align 8
 // CHECK:   br label %[[SET_ERROR:.*]]
 // CHECK: [[SUCCESS]]:
@@ -2667,8 +2667,8 @@ func callImplAsync_h4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
 // CHECK: typed.error.load:
-// CHECK:   %swifterror.x = getelementptr inbounds %T16typed_throws_abi8TwoWordsV, ptr %swifterror, i32 0, i32 0
-// CHECK:   %swifterror.x._value = getelementptr inbounds %TSi, ptr %swifterror.x, i32 0, i32 0
+// CHECK:   %swifterror.x = getelementptr inbounds{{.*}} %T16typed_throws_abi8TwoWordsV, ptr %swifterror, i32 0, i32 0
+// CHECK:   %swifterror.x._value = getelementptr inbounds{{.*}} %TSi, ptr %swifterror.x, i32 0, i32 0
 // CHECK:   [[ERROR_X:%.*]] = load i64, ptr %swifterror.x._value, align 8
 // CHECK:   [[ERROR_Y:%.*]] = load i64, ptr %swifterror.y._value, align 8
 // CHECK:   br label %[[SET_ERROR:.*]]
@@ -2947,8 +2947,8 @@ func callImplAsync_i4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
 // CHECK: typed.error.load:
-// CHECK:   %swifterror.x = getelementptr inbounds %T16typed_throws_abi10ThreeWordsV, ptr %swifterror, i32 0, i32 0
-// CHECK:   %swifterror.x._value = getelementptr inbounds %TSi, ptr %swifterror.x, i32 0, i32 0
+// CHECK:   %swifterror.x = getelementptr inbounds{{.*}} %T16typed_throws_abi10ThreeWordsV, ptr %swifterror, i32 0, i32 0
+// CHECK:   %swifterror.x._value = getelementptr inbounds{{.*}} %TSi, ptr %swifterror.x, i32 0, i32 0
 // CHECK:   [[ERROR_X:%.*]] = load i64, ptr %swifterror.x._value, align 8
 // CHECK:   [[ERROR_Y:%.*]] = load i64, ptr %swifterror.y._value, align 8
 // CHECK:   [[ERROR_Z:%.*]] = load i64, ptr %swifterror.z._value, align 8
