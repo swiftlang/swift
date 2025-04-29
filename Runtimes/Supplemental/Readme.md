@@ -9,7 +9,7 @@ The supplemental libraries are:
  - Distributed
  - Observation
  - StringProcessing
- - SwiftRuntime
+ - Runtime
  - Synchronization
 
 The top-level Supplemental CMakeLists supplies a super-build pattern for
