@@ -93,25 +93,26 @@ int8_t _task_serialExecutor_isIsolatingCurrentContext(
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
-using swift::IsIsolatingCurrentContextDecision;
-
-SWIFT_CC(swift) IsIsolatingCurrentContextDecision
+SWIFT_CC(swift) int8_t
 swift::swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor)
 {
   if (!executor.hasSerialExecutorWitnessTable()) {
-    return IsIsolatingCurrentContextDecision::NotIsolated;
+    return static_cast<int8_t>(IsIsolatingCurrentContextDecision::NotIsolated);
   }
 
   auto decision = _task_serialExecutor_isIsolatingCurrentContext(
         executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
         executor.getSerialExecutorWitnessTable());
 
-  return getIsIsolatingCurrentContextDecisionFromInt(decision);
+  return decision;
 }
 
-extern "C" swift::IsIsolatingCurrentContextDecision _swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
+extern "C" int8_t
+_swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
 {
-  return swift_task_invokeSwiftIsIsolatingCurrentContext(*reinterpret_cast<SerialExecutorRef *>(&executor));
+  return
+      static_cast<int8_t>(swift_task_invokeSwiftIsIsolatingCurrentContext(
+      *reinterpret_cast<SerialExecutorRef *>(&executor)));
 }
 
 extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
@@ -180,7 +181,6 @@ swift::getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDeci
   }
   swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
 }
-
 
 /*****************************************************************************/
 /****************************** MAIN EXECUTOR  *******************************/

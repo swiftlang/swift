@@ -418,11 +418,11 @@ enum class IsIsolatingCurrentContextDecision : int8_t {
   // The function call could not determine if the current context is isolated
   // by this executor or not. Default value for executors which do not implement
   // `isIsolatingCurrentContext`.
-  Unknown,
+  Unknown = -1,
   // The current context is definitely not isolated by this executor.
-  NotIsolated,
+  NotIsolated = 0,
   // The current context is definitely isolated by this executor.
-  Isolated,
+  Isolated = 1,
 };
 
 IsIsolatingCurrentContextDecision

@@ -777,12 +777,12 @@ bool swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor);
 
 /// Invoke an executor's `isIsolatingCurrentContext` implementation;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-IsIsolatingCurrentContextDecision swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
+int8_t swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// Invoke a Swift executor's `isIsolatingCurrentContext` implementation; returns
 /// `true` if it invoked the Swift implementation, `false` otherwise.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-IsIsolatingCurrentContextDecision swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
+int8_t swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
