@@ -1285,7 +1285,7 @@ extension LifetimeDependenceUseDefAddressWalker {
       case let store as StoringInstruction:
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
-        return walkUp(newLifetime: srcDestInst.destination)
+        return walkUp(newLifetime: srcDestInst.source)
       case let apply as FullApplySite:
         if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
           return walkUp(newLifetime: apply.parameterOperands[0].value)
