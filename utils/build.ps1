@@ -1217,6 +1217,8 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
 
+    Add-KeyValueIfNew $Defines Python3_EXECUTABLE (Get-PythonExecutable);
+
     if (($Platform.OS -ne [OS]::Windows) -or ($Platform.Architecture.CMakeName -ne $BuildPlatform.Architecture.CMakeName)) {
       Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME $Platform.OS.ToString()
       Add-KeyValueIfNew $Defines CMAKE_SYSTEM_PROCESSOR $Platform.Architecture.CMakeName
@@ -1761,7 +1763,6 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     LLVM_NATIVE_TOOL_DIR = $BuildTools;
     LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
     LLVM_USE_HOST_TOOLS = "NO";
-    Python3_EXECUTABLE = (Get-PythonExecutable);
     Python3_INCLUDE_DIR = "$PythonRoot\include";
     Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
     Python3_ROOT_DIR = $PythonRoot;
