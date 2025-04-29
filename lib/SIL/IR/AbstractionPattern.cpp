@@ -2423,7 +2423,8 @@ public:
       paramKind = GenericTypeParamKind::Pack;
     }
 
-    auto gp = GenericTypeParamType::get(paramKind, 0, paramIndex, Type(),
+    auto gp = GenericTypeParamType::get(paramKind, /*depth=*/0, paramIndex,
+                                        /*weight=*/0, /*valueType=*/Type(),
                                         TC.Context);
     substGenericParams.push_back(gp);
 
