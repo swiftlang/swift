@@ -306,7 +306,6 @@ public:
 };
 
 struct OverrideSubsInfo {
-  ASTContext &Ctx;
   unsigned BaseDepth;
   unsigned OrigDepth;
   SubstitutionMap BaseSubMap;

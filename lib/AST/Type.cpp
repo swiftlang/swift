@@ -2163,6 +2163,14 @@ Type GenericTypeParamType::getValueType() const {
   return ValueType;
 }
 
+GenericTypeParamType *GenericTypeParamType::withDepth(unsigned depth) const {
+  return GenericTypeParamType::get(getParamKind(),
+                                   depth,
+                                   getIndex(),
+                                   getValueType(),
+                                   getASTContext());
+}
+
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
   case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf();

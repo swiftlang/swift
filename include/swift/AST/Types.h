@@ -7366,6 +7366,8 @@ public:
 
   Type getValueType() const;
 
+  GenericTypeParamType *withDepth(unsigned depth) const;
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     // Note: We explicitly don't use 'getName()' because for canonical forms
     // which don't store an identifier we'll go create a tau based form. We
