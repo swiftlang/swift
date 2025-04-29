@@ -31,6 +31,7 @@ find_package(SwiftCore)
 include(gyb)
 include(ResourceEmbedding)
 include(AvailabilityMacros)
+include(PlatformInfo)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
