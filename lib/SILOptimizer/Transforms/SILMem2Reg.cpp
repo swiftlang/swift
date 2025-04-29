@@ -27,7 +27,6 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -854,9 +853,6 @@ class StackAllocationPromoter {
   /// Dominator info.
   DominanceInfo *domInfo;
 
-  /// The function's dead-end blocks.
-  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
-
   /// Map from dominator tree node to tree level.
   DomTreeLevelMap &domTreeLevels;
 
@@ -920,12 +916,10 @@ public:
   /// C'tor.
   StackAllocationPromoter(
       AllocStackInst *inputASI, DominanceInfo *inputDomInfo,
-      DeadEndBlocksAnalysis *inputDeadEndBlocksAnalysis,
       DomTreeLevelMap &inputDomTreeLevels, SILBuilderContext &inputCtx,
       InstructionDeleter &deleter,
       SmallVectorImpl<SILInstruction *> &instructionsToDelete)
       : asi(inputASI), dsi(nullptr), domInfo(inputDomInfo),
-        deadEndBlocksAnalysis(inputDeadEndBlocksAnalysis),
         domTreeLevels(inputDomTreeLevels), ctx(inputCtx), deleter(deleter),
         instructionsToDelete(instructionsToDelete) {
     // Scan the users in search of a deallocation instruction.
@@ -1773,8 +1767,6 @@ void StackAllocationPromoter::promoteAllocationToPhi(
 }
 
 void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
-  auto *function = asi->getFunction();
-
   // Reduce the number of load/stores in the function to minimum.
   // After this phase we are left with up to one load and store
   // per block and the last store is recorded.
@@ -1786,44 +1778,8 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   // Make sure that all of the allocations were promoted into registers.
   assert(isWriteOnlyAllocation(asi) && "Non-write uses left behind");
 
-  SmallVector<SILValue> valuesToComplete;
-
-  // Enum types may have incomplete lifetimes in address form, when promoted to
-  // value form after mem2reg, they will end up with incomplete ossa lifetimes.
-  // Use the lifetime completion utility to complete such lifetimes.
-  // First, collect the stored values to complete.
-  if (asi->getType().isOrHasEnum()) {
-    for (auto *block : livePhiBlocks) {
-      SILPhiArgument *argument = cast<SILPhiArgument>(
-          block->getArgument(block->getNumArguments() - 1));
-      assert(argument->isPhi());
-      valuesToComplete.push_back(argument);
-    }
-    for (auto it : initializationPoints) {
-      auto *si = it.second;
-      auto stored = si->getOperand(CopyLikeInstruction::Src);
-      valuesToComplete.push_back(stored);
-      if (auto lexical = getLexicalValueForStore(si, asi)) {
-        valuesToComplete.push_back(lexical);
-      }
-    }
-  }
-
   // ... and erase the allocation.
   deleter.forceDeleteWithUsers(asi);
-
-  // Now, complete lifetimes!
-  OSSALifetimeCompletion completion(function, domInfo,
-                                    *deadEndBlocksAnalysis->get(function));
-
-  // We may have incomplete lifetimes for enum locations on trivial paths.
-  // After promoting them, complete lifetime here.
-  for (auto it : valuesToComplete) {
-    // Set forceBoundaryCompletion as true so that we complete at boundary for
-    // lexical values as well.
-    completion.completeOSSALifetime(it,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2221,8 +2177,8 @@ bool MemoryToRegisters::promoteAllocation(AllocStackInst *alloc,
   // Promote this allocation, lazily computing dom tree levels for this function
   // if we have not done so yet.
   auto &domTreeLevels = getDomTreeLevels();
-  StackAllocationPromoter(alloc, domInfo, deadEndBlocksAnalysis, domTreeLevels,
-                          ctx, deleter, instructionsToDelete)
+  StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx, deleter,
+                          instructionsToDelete)
       .run(livePhiBlocks);
 
   return true;
