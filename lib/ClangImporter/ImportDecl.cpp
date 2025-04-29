@@ -9225,6 +9225,30 @@ private:
   }
 };
 
+static bool isLifetimeTarget(const FuncDecl *Func, const ParamDecl *Param,
+                             size_t paramIndex) {
+  for (auto attr : Func->getAttrs().getAttributes<LifetimeAttr>()) {
+    auto entry = attr->getLifetimeEntry();
+    auto descriptorOpt = entry->getTargetDescriptor();
+    if (!descriptorOpt.has_value())
+      continue;
+    auto descriptor = descriptorOpt.value();
+    switch (descriptor.getDescriptorKind()) {
+    case LifetimeDescriptor::DescriptorKind::Named:
+      if (Param->getParameterName() == descriptor.getName())
+        return true;
+      continue;
+    case LifetimeDescriptor::DescriptorKind::Ordered:
+      if (paramIndex == descriptor.getIndex())
+        return true;
+      continue;
+    case LifetimeDescriptor::DescriptorKind::Self:
+      continue;
+    }
+  }
+  return false;
+}
+
 static bool swiftifyImpl(SwiftifyInfoPrinter &printer, const FuncDecl *MappedDecl) {
   const clang::Decl *ClangDecl = MappedDecl->getClangDecl();
   auto FuncD = dyn_cast<clang::FunctionDecl>(ClangDecl);
@@ -9270,11 +9294,23 @@ static bool swiftifyImpl(SwiftifyInfoPrinter &printer, const FuncDecl *MappedDec
       paramHasLifetimeInfo = true;
     }
     if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
-      printer.printLifetimeboundReturn(
-          index, !paramHasBoundsInfo &&
-                     swiftParam->getInterfaceType()->isEscapable());
-      paramHasLifetimeInfo = true;
-      returnHasLifetimeInfo = true;
+      // Escapable types should have their ownership borrowed, while
+      // nonescapable should have their lifetime copied.
+      // If this parameter has bounds info, the wrapper version of it will be
+      // nonescapable (Span) however, so then it should be copied despite being
+      // escapable in the original.
+      bool shouldBorrowLifetime =
+          !paramHasBoundsInfo && swiftParam->getInterfaceType()->isEscapable();
+      // For inout parameters the callee could set the parameter to a new value
+      // with a lifetime that the caller is not aware of. So unless there is
+      // explicit lifetime info for the parameter, we can't borrow the lifetime
+      // of an inout.
+      if (!swiftParam->isInOut() ||
+          isLifetimeTarget(MappedDecl, swiftParam, index)) {
+        printer.printLifetimeboundReturn(index, shouldBorrowLifetime);
+        paramHasLifetimeInfo = true;
+        returnHasLifetimeInfo = true;
+      }
     }
     if (paramIsStdSpan && paramHasLifetimeInfo)
       attachMacro = true;

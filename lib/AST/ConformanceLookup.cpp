@@ -534,19 +534,7 @@ static ProtocolConformanceRef getPackTypeConformance(
 }
 
 static bool shouldExpandExtensionMacro(Evaluator &evaluator, NominalTypeDecl *nominal) {
-  if (evaluator.hasActiveRequest(ExpandExtensionMacros{nominal})) {
-    return false;
-  }
-
-  // Expanding an extension macro for this type will require pretty printing the node,
-  // leading to evaluation of it's members. Once the macro expansion requrest has started
-  // it's too late to check for cycles.
-  for (auto member : nominal->getMembers())
-    if (auto VD = dyn_cast<ValueDecl>(member))
-      if (evaluator.hasActiveRequest(InterfaceTypeRequest{VD}))
-        return false;
-
-  return true;
+  return !evaluator.hasActiveRequest(ExpandExtensionMacros{nominal});
 }
 
 ProtocolConformanceRef
