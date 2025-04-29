@@ -13,6 +13,8 @@
 // This is a benchmark that tracks how quickly Swift can convert a C++ set
 // to a Swift collection.
 
+/* FIXME: rdar://150067288
+
 import TestsUtils
 import CxxStdlibPerformance
 import Cxx
@@ -64,3 +66,5 @@ public func run_CxxSetOfU32_forEach(_ n: Int) {
     }
   }
 }
+
+*/
