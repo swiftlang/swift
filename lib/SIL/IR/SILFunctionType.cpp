@@ -1376,22 +1376,27 @@ public:
 
     if (auto result = matchSwiftAttr<ResultConvention>(
             decl, {{"returns_unretained", ResultConvention::Unowned},
-                   {"returns_retained", ResultConvention::Owned}})) {
+                   {"returns_retained", ResultConvention::Owned}}))
       return result;
-    }
 
-    if (auto *classDecl = tl.getLoweredType()
-                              .getASTType()
-                              .getPointer()
-                              ->lookThroughAllOptionalTypes()
-                              ->getClassOrBoundGenericClass()) {
-      if (auto *clangRecordDecl = llvm::dyn_cast_or_null<clang::RecordDecl>(
-              classDecl->getClangDecl())) {
+    const clang::Type *returnTy = nullptr;
+    if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(decl))
+      returnTy = func->getReturnType().getTypePtrOrNull();
+    else if (const auto *method = llvm::dyn_cast<clang::ObjCMethodDecl>(decl))
+      returnTy = method->getReturnType().getTypePtrOrNull();
+    if (!returnTy)
+      return std::nullopt;
+    const clang::Type *desugaredReturnTy =
+        returnTy->getUnqualifiedDesugaredType();
+
+    if (const auto *ptrType =
+            llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
+      if (clang::RecordDecl *clangRecordDecl =
+              ptrType->getPointeeType()->getAsRecordDecl())
         return matchSwiftAttr<ResultConvention>(
             clangRecordDecl,
             {{"returns_unretained_by_default", ResultConvention::Unowned},
              {"returns_retained_by_default", ResultConvention::Owned}});
-      }
     }
     return std::nullopt;
   }

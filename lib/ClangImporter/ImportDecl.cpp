@@ -3599,6 +3599,25 @@ namespace {
                                 std::nullopt);
     }
 
+    template <typename T>
+    std::optional<T>
+    matchSwiftAttr(const clang::Decl *decl,
+                   llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+      if (!decl || !decl->hasAttrs())
+        return std::nullopt;
+
+      for (const auto *attr : decl->getAttrs()) {
+        if (const auto *swiftAttr =
+                llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+          for (const auto &p : patterns) {
+            if (swiftAttr->getAttribute() == p.first)
+              return p.second;
+          }
+        }
+      }
+      return std::nullopt;
+    }
+
     /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
     /// SWIFT_RETURNS_UNRETAINED
     void checkBridgingAttrs(const clang::NamedDecl *decl) {
@@ -3665,21 +3684,15 @@ namespace {
           }
 
           if (const auto *returnPtrTy = retType->getAs<clang::PointerType>()) {
-            clang::QualType returnPointeeType = returnPtrTy->getPointeeType();
-            if (const auto *returnRecordType =
-                    returnPointeeType->getAs<clang::RecordType>()) {
-              clang::RecordDecl *returnRecordDecl = returnRecordType->getDecl();
-              for (const auto *attr : returnRecordDecl->getAttrs()) {
-                if (const auto *swiftAttr =
-                        dyn_cast<clang::SwiftAttrAttr>(attr)) {
-                  if (swiftAttr->getAttribute() ==
-                          "returns_retained_by_default" ||
-                      swiftAttr->getAttribute() ==
-                          "returns_unretained_by_default") {
-                    unannotatedAPIWarningNeeded = false;
-                  }
-                }
-              }
+            if (clang::RecordDecl *returnRecordDecl =
+                    returnPtrTy->getPointeeType()->getAsRecordDecl()) {
+              if (auto match = matchSwiftAttr<bool>(
+                      returnRecordDecl,
+                      {
+                          {"returns_retained_by_default", true},
+                          {"returns_unretained_by_default", true},
+                      }))
+                unannotatedAPIWarningNeeded = false;
             }
           }
 
