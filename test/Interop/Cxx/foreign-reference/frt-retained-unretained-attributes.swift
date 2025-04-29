@@ -266,4 +266,22 @@ func testDefaultOwnershipAnnotation() {
 
   let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultRetainedAnnotatedUnRetained()
   // CHECK: function_ref {{.*}}returnRefTypeDefaultRetainedAnnotatedUnRetained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTypeDefaultRetained
+
+  let _ = DefaultOwnershipInheritance.returnBaseType()
+  // CHECK: function_ref {{.*}}returnBaseType{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.BaseType
+
+  let _ = DefaultOwnershipInheritance.returnDerivedType()
+  // CHECK: function_ref {{.*}}returnDerivedType{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.DerivedType
+
+  let _ = DefaultOwnershipInheritance.returnDerivedType2()
+  // CHECK: function_ref {{.*}}returnDerivedType2{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.DerivedType2
+
+  let _ = DefaultOwnershipInheritance.returnDerivedTypeOverrideDefault()
+  // CHECK: function_ref {{.*}}returnDerivedTypeOverrideDefault{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedTypeOverrideDefault
+
+  let _ = DefaultOwnershipInheritance.returnBaseTypeNonDefault()
+  // CHECK: function_ref {{.*}}returnBaseTypeNonDefault{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.BaseTypeNonDefault
+
+  let _ = DefaultOwnershipInheritance.returnDerivedTypeNonDefault()
+  // CHECK: function_ref {{.*}}returnDerivedTypeNonDefault{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedTypeNonDefault
 }

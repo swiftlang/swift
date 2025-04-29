@@ -1270,6 +1270,31 @@ matchSwiftAttr(const clang::Decl *decl,
   return std::nullopt;
 }
 
+template <typename T>
+std::optional<T> matchSwiftAttrConsideringInheritance(
+    const clang::Decl *decl,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl)
+    return std::nullopt;
+
+  if (auto match = matchSwiftAttr<T>(decl, patterns))
+    return match;
+
+  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    for (const auto &baseSpecifier : recordDecl->bases()) {
+      const clang::CXXRecordDecl *baseDecl =
+          baseSpecifier.getType()->getAsCXXRecordDecl();
+      if (!baseDecl)
+        continue;
+      if (auto match =
+              matchSwiftAttrConsideringInheritance<T>(baseDecl, patterns))
+        return match;
+    }
+  }
+
+  return std::nullopt;
+}
+
 class Conventions {
   ConventionsKind kind;
 
@@ -1393,7 +1418,7 @@ public:
             llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
       if (clang::RecordDecl *clangRecordDecl =
               ptrType->getPointeeType()->getAsRecordDecl())
-        return matchSwiftAttr<ResultConvention>(
+        return matchSwiftAttrConsideringInheritance<ResultConvention>(
             clangRecordDecl,
             {{"returns_unretained_by_default", ResultConvention::Unowned},
              {"returns_retained_by_default", ResultConvention::Owned}});

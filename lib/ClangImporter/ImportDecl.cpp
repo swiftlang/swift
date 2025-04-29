@@ -3618,6 +3618,31 @@ namespace {
       return std::nullopt;
     }
 
+    template <typename T>
+    std::optional<T> matchSwiftAttrConsideringInheritance(
+        const clang::Decl *decl,
+        llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+      if (!decl)
+        return std::nullopt;
+
+      if (auto match = matchSwiftAttr<T>(decl, patterns))
+        return match;
+
+      if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+        for (const auto &baseSpecifier : recordDecl->bases()) {
+          const clang::CXXRecordDecl *baseDecl =
+              baseSpecifier.getType()->getAsCXXRecordDecl();
+          if (!baseDecl)
+            continue;
+          if (auto match =
+                  matchSwiftAttrConsideringInheritance<T>(baseDecl, patterns))
+            return match;
+        }
+      }
+
+      return std::nullopt;
+    }
+
     /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
     /// SWIFT_RETURNS_UNRETAINED
     void checkBridgingAttrs(const clang::NamedDecl *decl) {
@@ -3686,7 +3711,7 @@ namespace {
           if (const auto *returnPtrTy = retType->getAs<clang::PointerType>()) {
             if (clang::RecordDecl *returnRecordDecl =
                     returnPtrTy->getPointeeType()->getAsRecordDecl()) {
-              if (auto match = matchSwiftAttr<bool>(
+              if (auto match = matchSwiftAttrConsideringInheritance<bool>(
                       returnRecordDecl,
                       {
                           {"returns_retained_by_default", true},
