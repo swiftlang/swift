@@ -28,7 +28,7 @@ struct HasAnEnum {
 
 
 // CHECK: define {{.*}} swiftcc range(i64 -1, 5) i64 @"$s31enum_copy_init_with_take_memcpy9HasAnEnumV9readValueSiyF"(ptr {{.*}} %0)
-// CHECK:  [[T0:%.*]] = getelementptr inbounds i8, ptr %0, i64 160
+// CHECK:  [[T0:%.*]] = getelementptr inbounds{{.*}} i8, ptr %0, i64 160
 // CHECK:  [[T1:%.*]] = load i8, ptr [[T0]]
 // CHECK:  [[T2:%.*]] = and i8 [[T1]], -3
 // CHECK:  [[T3:%.*]] = icmp eq i8 [[T2]], 0

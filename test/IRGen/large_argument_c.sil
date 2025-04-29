@@ -21,7 +21,7 @@ sil @pass_and_return : $@convention(c) (large_thing, large_thing) -> large_thing
 
 // CHECK: define{{.*}} swiftcc void @test(ptr {{.*}} dereferenceable(256) %0)
 // CHECK:   [[TMP:%.*]] = alloca %TSo11large_thinga
-// CHECK:   [[PROJ_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, i64 128
+// CHECK:   [[PROJ_ADDR:%.*]] = getelementptr inbounds{{.*}} i8, ptr %0, i64 128
 // CHECK:   [[VAL:%.*]] = load i64, ptr %.sroa.3.0..sroa_idx
 // CHECK:   store i64 [[VAL]], ptr [[TMP]]
 sil @test : $@convention(thin) (@in ContainingLargeThing) -> () {
