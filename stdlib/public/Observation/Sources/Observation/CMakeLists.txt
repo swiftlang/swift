@@ -30,7 +30,7 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
     ${swift_runtime_library_compile_flags}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
-  SWIFT_MODULE_DEPENDS _Concurrency
+  SWIFT_MODULE_DEPENDS _Concurrency Synchronization
   INSTALL_IN_COMPONENT stdlib
 
   MACCATALYST_BUILD_FLAVOR "zippered"
