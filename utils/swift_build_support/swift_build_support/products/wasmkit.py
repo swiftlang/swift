@@ -47,19 +47,24 @@ class WasmKit(product.Product):
 
     def should_install(self, host_target):
         # Currently, it's only used for testing stdlib.
-        return False
+        return True
 
     def install(self, host_target):
-        pass
+        """
+        Install WasmKit to the target location
+        """
+        install_destdir = self.host_install_destdir(host_target)
+        build_toolchain_path = install_destdir + self.args.install_prefix + '/bin'
+        shutil.copy(self.bin_path, build_toolchain_path)
 
     def build(self, host_target):
-        bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
-        print("Built wasmkit-cli at: " + bin_path)
+        self.bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
+        print("Built wasmkit-cli at: " + self.bin_path)
         # Copy the built binary to ./bin
         dest_bin_path = self.__class__.cli_file_path(self.build_dir)
         print("Copying wasmkit-cli to: " + dest_bin_path)
         os.makedirs(os.path.dirname(dest_bin_path), exist_ok=True)
-        shutil.copy(bin_path, dest_bin_path)
+        shutil.copy(self.bin_path, dest_bin_path)
 
     @classmethod
     def cli_file_path(cls, build_dir):
