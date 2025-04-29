@@ -12,6 +12,8 @@ module Method {
     header "method.h"
 }
 
+//--- Inputs/method.h
+
 //--- method.swift
 import CoreImage
 
