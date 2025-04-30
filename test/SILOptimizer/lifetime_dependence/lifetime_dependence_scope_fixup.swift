@@ -300,3 +300,30 @@ func testReassignment(b: UnsafeMutableRawBufferPointer) {
   sub = span.update()
   use(sub)
 }
+
+
+// Coroutine nested in a mutable access scope.
+//
+// rdar://150275147 (Invalid SIL after lifetime dependence fixup involving coroutines)
+struct ArrayWrapper {
+  private var a: [Int]
+
+  var array: [Int] {
+    _read {
+      yield a
+    }
+    _modify {
+      yield &a
+    }
+  }
+}
+
+@_silgen_name("gms")
+func getMutableSpan(_: inout [Int]) -> MutableSpan<Int>
+
+func testWrite(_ w: inout ArrayWrapper) {
+  var span = getMutableSpan(&w.array)
+  for i in span.indices {
+    span[i] = 0
+  }
+}
