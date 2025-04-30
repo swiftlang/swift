@@ -2044,6 +2044,14 @@ function(add_swift_target_library name)
         list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
       endif()
     endif()
+
+    if(NOT name STREQUAL "swift_Builtin_float"
+       AND (SWIFT_BUILD_CLANG_OVERLAYS
+            OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+       AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+            OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+        list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS _Builtin_float)
+    endif()
   endif()
 
   if((NOT "${SWIFT_BUILD_STDLIB}") AND
