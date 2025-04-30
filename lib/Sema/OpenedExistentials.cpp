@@ -823,10 +823,11 @@ Type swift::typeEraseOpenedExistentialReference(
 
   auto applyOuterSubstitutions = [&](Type t) -> Type {
     if (t->hasTypeParameter()) {
-      auto outerSubs = existentialSig.Generalization;
-      unsigned depth = existentialSig.OpenedSig->getMaxDepth();
-      OuterSubstitutions replacer{outerSubs, depth};
-      return t.subst(replacer, replacer);
+      if (auto outerSubs = existentialSig.Generalization) {
+        unsigned depth = existentialSig.OpenedSig->getMaxDepth();
+        OuterSubstitutions replacer{outerSubs, depth};
+        return t.subst(replacer, replacer);
+      }
     }
 
     return t;
