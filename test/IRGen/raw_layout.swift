@@ -348,7 +348,7 @@ entry(%K: $*Keymaster):
     return undef : $()
 }
 
-// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself [[SELF:%.*]])
+// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself{{.*}} [[SELF:%.*]])
 // CHECK-NEXT:   entry:
 // CHECK-NEXT:     ret ptr [[SELF]]
 sil @get_cell_addr : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
