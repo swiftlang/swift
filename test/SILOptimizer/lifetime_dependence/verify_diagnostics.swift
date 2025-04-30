@@ -36,9 +36,15 @@ struct A {}
 
 func useA(_:A){}
 
-struct NE : ~Escapable {}
+public struct NE : ~Escapable {}
+
+public struct NEImmortal: ~Escapable {
+  @lifetime(immortal)
+  public init() {}
+}
 
 class C {}
+
 struct Holder {
   var c: C? = nil
 }
@@ -90,4 +96,31 @@ public func testGenericDep<T: ~Escapable>(type: T.Type) -> T {
   // expected-note  @-3{{it depends on the lifetime of variable 'holder'}}
   return result
   // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test diagnostics on implicit accessors.
+public struct ImplicitAccessors {
+  let c: C
+
+  public var neComputed: NEImmortal {
+    get {
+      NEImmortal()
+    }
+    set {
+    }
+  }
+}
+
+public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
+  public var ne: NE
+
+  public var neComputedBorrow: NE {
+    @lifetime(borrow self)
+    get { ne }
+
+    @lifetime(&self)
+    set {
+      ne = newValue
+    }
+  }
 }
