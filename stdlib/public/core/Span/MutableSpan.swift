@@ -256,6 +256,17 @@ extension MutableSpan where Element: BitwiseCopyable {
       RawSpan(_mutableSpan: self)
     }
   }
+
+  /// Construct a MutableRawSpan over the memory represented by this span
+  ///
+  /// - Returns: a MutableRawSpan over the memory represented by this span
+  @_alwaysEmitIntoClient
+  public var mutableBytes: MutableRawSpan {
+    @lifetime(&self)
+    mutating get {
+      MutableRawSpan(_elements: &self)
+    }
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
