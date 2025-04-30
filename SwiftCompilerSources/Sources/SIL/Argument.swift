@@ -61,6 +61,10 @@ final public class FunctionArgument : Argument {
     bridged.FunctionArgument_isLexical()
   }
 
+  public var isClosureCapture: Bool {
+    bridged.FunctionArgument_isClosureCapture()
+  }
+
   public var isSelf: Bool {
     parentFunction.argumentConventions.selfIndex == index
   }

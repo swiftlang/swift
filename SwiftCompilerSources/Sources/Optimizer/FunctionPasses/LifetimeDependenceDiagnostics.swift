@@ -274,7 +274,9 @@ private struct DiagnoseDependence {
     // function's source location is sufficient for argument diagnostics, but if the function has no location, don't
     // report any scope.
     if parentVar.isArgument, let argLoc = parentVar.sourceLoc ?? function.location.sourceLoc {
-      if let parentName = parentVar.name {
+      if parentVar.isClosureCapture {
+        diagnose(argLoc, .lifetime_outside_scope_capture)
+      } else if let parentName = parentVar.name {
         diagnose(argLoc, .lifetime_outside_scope_argument, parentName)
       } else {
         diagnose(argLoc, .lifetime_outside_scope_synthesized_argument, parentVar.accessorKind ?? function.name)
@@ -298,8 +300,9 @@ private struct DiagnoseDependence {
 private struct LifetimeVariable {
   var varDecl: VarDecl? = nil
   var sourceLoc: SourceLoc? = nil
-  var isArgument: Bool = false
   var isAccessScope: Bool = false
+  var isArgument: Bool = false
+  var isClosureCapture: Bool = false
   var accessorKind: String?
   var thunkKind: Function.ThunkKind = .noThunk
   
@@ -338,10 +341,11 @@ private struct LifetimeVariable {
   }
 
   private init(introducer: Value, _ context: some Context) {
-    if let arg = introducer as? Argument {
+    if let arg = introducer as? FunctionArgument {
       self.varDecl = arg.varDecl
       self.sourceLoc = arg.sourceLoc
       self.isArgument = true
+      self.isClosureCapture = arg.isClosureCapture
       return
     }
     if let varDecl = introducer.definingInstruction?.findVarDecl() {

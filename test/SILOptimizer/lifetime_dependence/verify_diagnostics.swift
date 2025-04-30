@@ -124,3 +124,35 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
     }
   }
 }
+
+struct HasMethods {
+  @lifetime(borrow self)
+  func data(index: Int) -> NEImmortal {
+    NEImmortal()
+  }
+}
+
+func testClosureCapture1(_ a: HasMethods) {
+  let fn = a.data
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-2{{it depends on a closure capture; this is not yet supported}}
+  // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
+  _ = consume fn
+
+  let fn2 = a.data(index:)
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-2{{it depends on a closure capture; this is not yet supported}}
+  // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
+  _ = consume fn2
+
+  // FIXME: rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
+  //
+  // withUnsafePointer is disabled because it generates a reabstraction thunk, which is impossible to diagenose.
+  /*
+  withUnsafePointer(to: a.data) { fptr in
+    // future-error @-1{{lifetime-dependent value escapes its scope}}
+    // future-note  @-2{{it depends on a closure capture; this is not yet supported}}
+    // future-note  @-3{{this use causes the lifetime-dependent value to escape}}
+    }
+   */
+}
