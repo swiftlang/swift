@@ -1169,14 +1169,22 @@ ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
 ERROR(lifetime_value_outside_scope, none,
       "lifetime-dependent value escapes its scope", ())
+ERROR(lifetime_value_outside_accessor, none,
+      "lifetime-dependent value returned by generated accessor '%0'", (StringRef))
+ERROR(lifetime_value_outside_thunk, none,
+      "lifetime-dependent value returned by generated %select{function|thunk}0 '%1'", (bool, StringRef))
 NOTE(lifetime_outside_scope_argument, none,
      "it depends on the lifetime of argument '%0'", (Identifier))
+NOTE(lifetime_outside_scope_synthesized_argument, none,
+     "it depends on the lifetime of an argument of '%0'", (Identifier))
 NOTE(lifetime_outside_scope_access, none,
      "it depends on this scoped access to variable '%0'", (Identifier))
 NOTE(lifetime_outside_scope_variable, none,
      "it depends on the lifetime of variable '%0'", (Identifier))
 NOTE(lifetime_outside_scope_value, none,
      "it depends on the lifetime of this parent value", ())
+NOTE(lifetime_outside_scope_capture, none,
+     "it depends on a closure capture; this is not yet supported", ())
 NOTE(lifetime_outside_scope_use, none,
      "this use of the lifetime-dependent value is out of scope", ())
 NOTE(lifetime_outside_scope_escape, none,

@@ -1221,6 +1221,24 @@ extension LifetimeDependenceUseDefAddressWalker {
   }
 
   mutating func walkUpDefault(address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    if let beginAccess = access.innermostAccess {
+      // Skip the access scope for unsafe[Mutable]Address. Treat it like a projection of 'self' rather than a separate
+      // variable access.
+      if let addressorSelf = beginAccess.unsafeAddressorSelf {
+        return walkUp(newLifetime: addressorSelf)
+      }
+      // Ignore the acces scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
+      // need to be kept alive in memory and can be safely be overwritten in the same scope. Lifetime dependence only
+      // cares that the loaded value is within the lexical scope of the trivial value's variable declaration. Rather
+      // than skipping all access scopes, call 'walkUp' on each nested access in case one of them needs to redirect the
+      // walk, as required for 'access.unsafeAddressorSelf' or in case the implementation overrides certain accesses.
+      if isTrivialScope {
+        return walkUp(newLifetime: beginAccess.address)
+      }
+      // Generally assume an access scope introduces a variable borrow scope. And generally ignore address forwarding
+      // mark_dependence.
+      return addressIntroducer(beginAccess, access: access)
+    }
     // Continue walking for some kinds of access base.
     switch access.base {
     case .box, .global, .class, .tail, .pointer, .index, .unidentified:
@@ -1229,14 +1247,9 @@ extension LifetimeDependenceUseDefAddressWalker {
       // Ignore stack locations. Their access scopes do not affect lifetime dependence.
       return walkUp(stackInitializer: allocStack, at: address, access: access)
     case let .argument(arg):
-      // Ignore access scopes for @in or @in_guaranteed arguments when all scopes are reads. Do not ignore a [read]
-      // access of an inout argument or outer [modify]. Mutation later with the outer scope could invalidate the
-      // borrowed state in this narrow scope. Do not ignore any mark_depedence on the address.
-      if arg.convention.isIndirectIn && access.isOnlyReadAccess {
+      if arg.convention.isExclusiveIndirect {
         return addressIntroducer(arg, access: access)
       }
-      // @inout arguments may be singly initialized (when no modification exists in this function), but this is not
-      // relevant here because they require nested access scopes which can never be ignored.
     case let .yield(yieldedAddress):
       // Ignore access scopes for @in or @in_guaranteed yields when all scopes are reads.
       let apply = yieldedAddress.definingInstruction as! FullApplySite
@@ -1248,27 +1261,6 @@ extension LifetimeDependenceUseDefAddressWalker {
       if access.scopes.isEmpty,
          case .stack = sb.destinationOperand.value.accessBase {
         return walkUp(newLifetime: sb.source)
-      }
-    }
-    // Skip the access scope for unsafe[Mutable]Address. Treat it like a projection of 'self' rather than a separate
-    // variable access.
-    if case let .access(innerAccess) = access.scopes.first,
-       let addressorSelf = innerAccess.unsafeAddressorSelf {
-      return walkUp(newLifetime: addressorSelf)
-    }
-    // Ignore the acces scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
-    // need to be kept alive in memory and can be safely be overwritten in the same scope. Lifetime dependence only
-    // cares that the loaded value is within the lexical scope of the trivial value's variable declaration. Rather than
-    // skipping all access scopes, call 'walkUp' on each nested access in case one of them needs to redirect the walk,
-    // as required for 'access.unsafeAddressorSelf'.
-    if isTrivialScope {
-      switch access.scopes.first {
-      case .none, .base:
-        break
-      case let .access(beginAccess):
-        return walkUp(newLifetime: beginAccess.address)
-      case let .dependence(markDep):
-        return walkUp(newLifetime: markDep.value)
       }
     }
     return addressIntroducer(access.enclosingAccess.address ?? address, access: access)
@@ -1285,7 +1277,7 @@ extension LifetimeDependenceUseDefAddressWalker {
       case let store as StoringInstruction:
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
-        return walkUp(newLifetime: srcDestInst.destination)
+        return walkUp(newLifetime: srcDestInst.source)
       case let apply as FullApplySite:
         if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
           return walkUp(newLifetime: apply.parameterOperands[0].value)
