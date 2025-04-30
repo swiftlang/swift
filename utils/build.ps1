@@ -350,7 +350,7 @@ $PythonModules = @{
       SHA256 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
     };
   };
-  "distutils" = @{
+  "setuptools" = @{
     Wheel = @{
       File = "setuptools-75.1.0-py3-none-any.whl";
       URL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl";
@@ -1067,7 +1067,7 @@ function Get-Dependencies {
   function Install-PythonModules() {
     Install-PIPIfNeeded
     Install-PythonModule "packaging" # For building LLVM 18+
-    Install-PythonModule "distutils" # Required for SWIG support
+    Install-PythonModule "setuptools" # Required for SWIG support
     if ($Test -contains "lldb") {
       Install-PythonModule "psutil" # Required for testing LLDB
       $env:Path = "$(Get-PythonScriptsPath);$env:Path" # For unit.exe
