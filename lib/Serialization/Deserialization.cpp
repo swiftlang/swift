@@ -7621,12 +7621,13 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
   unsigned rawParamKind;
   bool hasDecl;
   unsigned depth;
+  unsigned weight;
   unsigned index;
   DeclID declOrIdentifier;
   TypeID valueTypeID;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, rawParamKind, hasDecl, depth, index, declOrIdentifier,
+      scratch, rawParamKind, hasDecl, depth, weight, index, declOrIdentifier,
       valueTypeID);
 
   auto paramKind = getActualParamKind(rawParamKind);
@@ -7655,10 +7656,11 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     return valueType.takeError();
 
   if (declOrIdentifier == 0) {
-    return GenericTypeParamType::get(*paramKind, depth, index, *valueType,
+    return GenericTypeParamType::get(*paramKind, depth, index, weight, *valueType,
                                      MF.getContext());
   }
 
+  ASSERT(weight == 0);
   auto name = MF.getDeclBaseName(declOrIdentifier).getIdentifier();
   return GenericTypeParamType::get(name, *paramKind, depth, index, *valueType,
                                    MF.getContext());

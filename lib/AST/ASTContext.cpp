@@ -5099,8 +5099,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
                                                 Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
-                                name);
+  GenericTypeParamType::Profile(id, paramKind, depth, index, /*weight=*/0,
+                                valueType, name);
 
   void *insertPos;
   if (auto gpTy = ctx.getImpl().GenericParamTypes.FindNodeOrInsertPos(id, insertPos))
@@ -5110,8 +5110,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
   if (paramKind == GenericTypeParamKind::Pack)
     props |= RecursiveTypeProperties::HasParameterPack;
 
-  auto canType = GenericTypeParamType::get(paramKind, depth, index, valueType,
-                                           ctx);
+  auto canType = GenericTypeParamType::get(paramKind, depth, index, /*weight=*/0,
+                                           valueType, ctx);
 
   auto result = new (ctx, AllocationArena::Permanent)
       GenericTypeParamType(name, canType, ctx);
@@ -5130,10 +5130,10 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param) {
 
 GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
                                                 unsigned depth, unsigned index,
-                                                Type valueType,
+                                                unsigned weight, Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
+  GenericTypeParamType::Profile(id, paramKind, depth, index, weight, valueType,
                                 Identifier());
 
   void *insertPos;
@@ -5145,7 +5145,7 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
     props |= RecursiveTypeProperties::HasParameterPack;
 
   auto result = new (ctx, AllocationArena::Permanent)
-      GenericTypeParamType(paramKind, depth, index, valueType, props, ctx);
+      GenericTypeParamType(paramKind, depth, index, weight, valueType, props, ctx);
   ctx.getImpl().GenericParamTypes.InsertNode(result, insertPos);
   return result;
 }
@@ -5154,14 +5154,21 @@ GenericTypeParamType *GenericTypeParamType::getType(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
+}
+
+GenericTypeParamType *GenericTypeParamType::getOpaqueResultType(unsigned depth,
+                                                                unsigned index,
+                                                                const ASTContext &ctx) {
+  return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
+                                   /*weight=*/1, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getPack(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Pack, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
@@ -5169,7 +5176,7 @@ GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
                                                      Type valueType,
                                                      const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Value, depth, index,
-                                   valueType, ctx);
+                                   /*weight=*/0, valueType, ctx);
 }
 
 ArrayRef<GenericTypeParamType *>
