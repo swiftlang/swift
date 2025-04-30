@@ -181,12 +181,6 @@ public:
   /// subsystem.
   SubstitutionMap subst(InFlightSubstitution &subs) const;
 
-  /// Apply type expansion lowering to all types in the substitution map. Opaque
-  /// archetypes will be lowered to their underlying types if the type expansion
-  /// context allows.
-  SubstitutionMap mapIntoTypeExpansionContext(
-      TypeExpansionContext context) const;
-
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolConformanceRef conformance);
