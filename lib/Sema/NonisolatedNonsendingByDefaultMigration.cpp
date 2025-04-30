@@ -60,7 +60,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
   const auto feature = Feature::NonisolatedNonsendingByDefault;
 
   ASSERT(node);
-  ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption());
+  ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForMigration());
 
   ValueDecl *decl = nullptr;
   ClosureExpr *closure = nullptr;

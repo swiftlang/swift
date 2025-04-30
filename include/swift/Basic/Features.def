@@ -121,36 +121,36 @@
     LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
-// An upcoming feature that supports adoption mode.
+// An upcoming feature that supports migration mode.
 //
 // If the feature is source-breaking and provides for a
-// mechanical code migration, it should implement adoption mode.
+// mechanical code migration, it should implement migration mode.
 //
-// Adoption mode is a feature-oriented code migration mechanism: a mode
+// Migration mode is a feature-oriented code migration mechanism: a mode
 // of operation that should produce compiler warnings with attached
 // fix-its that can be applied to preserve the behavior of the code once
 // the upcoming feature is enacted.
 // These warnings must belong to a diagnostic group named after the
-// feature. Adoption mode itself *and* the fix-its it produces must be
+// feature. Migration mode itself *and* the fix-its it produces must be
 // source and binary compatible with how the code is compiled when the
 // feature is disabled.
-#ifndef ADOPTABLE_UPCOMING_FEATURE
+#ifndef MIGRATABLE_UPCOMING_FEATURE
   #if defined(UPCOMING_FEATURE)
-    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
       UPCOMING_FEATURE(FeatureName, SENumber, Version)
   #else
-    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
       LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
   #endif
 #endif
 
-// See `ADOPTABLE_UPCOMING_FEATURE`.
-#ifndef ADOPTABLE_EXPERIMENTAL_FEATURE
+// See `MIGRATABLE_UPCOMING_FEATURE`.
+#ifndef MIGRATABLE_EXPERIMENTAL_FEATURE
   #if defined(EXPERIMENTAL_FEATURE)
-    #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
+    #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
       EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
   #else
-    #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
+    #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
       LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
   #endif
 #endif
@@ -276,11 +276,11 @@ UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 
 // Swift 7
-ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
+MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
-ADOPTABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
+MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 
 // Optional language features / modes
 
@@ -520,8 +520,8 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
-#undef ADOPTABLE_UPCOMING_FEATURE
-#undef ADOPTABLE_EXPERIMENTAL_FEATURE
+#undef MIGRATABLE_UPCOMING_FEATURE
+#undef MIGRATABLE_EXPERIMENTAL_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
 #undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
