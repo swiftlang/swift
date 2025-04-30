@@ -318,7 +318,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
     return .continueWalk
   }
   defer { useDefVisitor.deinitialize() }
-  _ = useDefVisitor.walkUp(valueOrAddress: value)
+  _ = useDefVisitor.walkUp(newLifetime: value)
   assert(!introducers.isEmpty, "missing variable introducer")
   return introducers
 }
@@ -330,7 +330,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 /// Walk up lifetime dependencies to the first value associated with a variable declaration.
 ///
 /// To start walking:
-///     walkUp(valueOrAddress: Value) -> WalkResult
+///     walkUp(newLifetime: Value) -> WalkResult
 ///
 /// This utility finds the value or address associated with the lvalue (variable declaration) that is passed as the
 /// source of a lifetime dependent argument. If no lvalue is found, then it finds the "root" of the chain of temporary
@@ -382,10 +382,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 /// All of the dependent uses including `end_borrow %5` and `destroy_value %4` must be before the end of the dependence
 /// scope: `destroy_value %parent`. In this case, the dependence parent is an owned value, so the scope is simply the
 /// value's OSSA lifetime.
-struct VariableIntroducerUseDefWalker : ForwardingUseDefWalker {
-  // The ForwardingUseDefWalker's context is the most recent lifetime owner.
-  typealias PathContext = Value?
-
+struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, LifetimeDependenceUseDefAddressWalker {
   let context: Context
 
   // If the scoped value is trivial, then only the variable's lexical scope is relevant, and access scopes can be
@@ -412,128 +409,45 @@ struct VariableIntroducerUseDefWalker : ForwardingUseDefWalker {
     visitedValues.deinitialize()
   }
  
-  mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
-    visitedValues.insert(value)
-  }
-
   mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
     return visitorClosure(value)
   }
 
-  mutating func walkUp(valueOrAddress: Value) -> WalkResult {
-    if valueOrAddress.type.isAddress {
-      return walkUp(address: valueOrAddress)
-    }
-    return walkUp(newLifetime: valueOrAddress)
+  mutating func addressIntroducer(_ address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    return visitorClosure(address)
   }
-}
 
-// Helpers
-extension VariableIntroducerUseDefWalker {
+  mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
+    visitedValues.insert(value)
+  }
+
   mutating func walkUp(newLifetime: Value) -> WalkResult {
+    if newLifetime.type.isAddress {
+      return walkUp(address: newLifetime)
+    }
     let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
     return walkUp(value: newLifetime, newOwner)
   }
 
+  /// Override to check for variable introducers: move_value, begin_value, before following
+  /// OwnershipTransitionInstruction.
   mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
-    // Check for variable introducers: move_value, begin_value, before following OwnershipTransitionInstruction.
     if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
       return visitorClosure(value)
     }
-    switch value.definingInstruction {
-    case let transition as OwnershipTransitionInstruction:
-      return walkUp(newLifetime: transition.operand.value)
-    case let load as LoadInstruction:
-      return walkUp(address: load.address)
-    default:
-      break
-    }
-    // If the dependence chain has a phi, consider it a root. Dependence roots dominate all dependent values.
-    if Phi(value) != nil {
-      return introducer(value, owner)
-    }
-    // ForwardingUseDefWalker will callback to introducer() when it finds no forwarding instruction.
-    return walkUpDefault(forwarded: value, owner)
+    return walkUpDefault(value: value, owner)
   }
 
-  // Handle temporary allocations and access scopes.
-  mutating func walkUp(address: Value) -> WalkResult {
-    let accessBaseAndScopes = address.accessBaseWithScopes
-    // Continue walking for some kinds of access base.
-    switch accessBaseAndScopes.base {
-    case .box, .global, .class, .tail, .pointer, .index, .unidentified:
-      break
-    case let .stack(allocStack):
-      if allocStack.varDecl == nil {
-        // Ignore temporary stack locations. Their access scopes do not affect lifetime dependence.
-        return walkUp(stackInitializer: allocStack, at: address)
-      }
-    case let .argument(arg):
-      // Ignore access scopes for @in or @in_guaranteed arguments when all scopes are reads. Do not ignore a [read]
-      // access of an inout argument or outer [modify]. Mutation later with the outer scope could invalidate the
-      // borrowed state in this narrow scope. Do not ignore any mark_depedence on the address.
-      if arg.convention.isIndirectIn && accessBaseAndScopes.isOnlyReadAccess {
-        return introducer(arg, nil)
-      }
-      // @inout arguments may be singly initialized (when no modification exists in this function), but this is not
-      // relevant here because they require nested access scopes which can never be ignored.
-    case let .yield(yieldedAddress):
-      // Ignore access scopes for @in or @in_guaranteed yields when all scopes are reads.
-      let apply = yieldedAddress.definingInstruction as! FullApplySite
-      if apply.convention(of: yieldedAddress).isIndirectIn && accessBaseAndScopes.isOnlyReadAccess {
-        return introducer(yieldedAddress, nil)
-      }
-    case .storeBorrow(let sb):
-      // Walk up through a store into a temporary.
-      if accessBaseAndScopes.scopes.isEmpty,
-         case .stack = sb.destinationOperand.value.accessBase {
-        return walkUp(newLifetime: sb.source)
+  /// Override to check for on-stack variables before following an initializer.
+  mutating func walkUp(address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    // Check for stack locations that correspond to an lvalue.
+    if case let .stack(allocStack) = access.base {
+      if allocStack.varDecl != nil {
+        // Report this variable's innermmost access scope.
+        return addressIntroducer(access.enclosingAccess.address ?? address, access: access)
       }
     }
-    // Skip the access scope for unsafe[Mutable]Address. Treat it like a projection of 'self' rather than a separate
-    // variable access.
-    if case let .access(innerAccess) = accessBaseAndScopes.scopes.first,
-       let addressorSelf = innerAccess.unsafeAddressorSelf {
-      return walkUp(valueOrAddress: addressorSelf)
-    }
-    // Ignore the acces scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
-    // need to be kept alive in memory and can be safely be overwritten in the same scope. Lifetime dependence only
-    // cares that the loaded value is within the lexical scope of the trivial value's variable declaration. Rather than
-    // skipping all access scopes, call 'walkUp' on each nested access in case one of them needs to redirect the walk,
-    // as required for 'access.unsafeAddressorSelf'.
-    if isTrivialScope {
-      switch accessBaseAndScopes.scopes.first {
-      case .none, .base:
-        break
-      case let .access(beginAccess):
-        return walkUp(address: beginAccess.address)
-      case let .dependence(markDep):
-        return walkUp(address: markDep.value)
-      }
-    }
-    return introducer(accessBaseAndScopes.enclosingAccess.address ?? address, nil)
-  }
-
-  // Handle singly-initialized temporary stack locations.
-  mutating func walkUp(stackInitializer allocStack: AllocStackInst, at address: Value) -> WalkResult {
-    guard let initializer = allocStack.accessBase.findSingleInitializer(context) else {
-      return introducer(address, nil)
-    }
-    if case let .store(store, _) = initializer {
-      switch store {
-      case let store as StoringInstruction:
-        return walkUp(newLifetime: store.source)
-      case let srcDestInst as SourceDestAddrInstruction:
-        return walkUp(address: srcDestInst.destination)
-      case let apply as FullApplySite:
-        if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
-          return walkUp(address: apply.parameterOperands[0].value)
-        }
-      default:
-        break
-      }
-    }
-    return introducer(address, nil)
+    return walkUpDefault(address: address, access: access)
   }
 }
 

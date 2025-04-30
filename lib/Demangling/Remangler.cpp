@@ -2777,6 +2777,16 @@ ManglingError Remangler::mangleDependentConformanceIndex(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDependentProtocolConformanceOpaque(Node *node,
+                                                                  unsigned depth) {
+  DEMANGLER_ASSERT(node->getKind() == Node::Kind::DependentProtocolConformanceOpaque,
+                   node);
+  mangleAnyProtocolConformance(node->getChild(0), depth + 1);
+  mangleType(node->getChild(1), depth + 1);
+  Buffer << "HO";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleAnyProtocolConformance(Node *node,
                                                       unsigned depth) {
   switch (node->getKind()) {
@@ -2790,6 +2800,8 @@ ManglingError Remangler::mangleAnyProtocolConformance(Node *node,
     return mangleDependentProtocolConformanceInherited(node, depth + 1);
   case Node::Kind::DependentProtocolConformanceAssociated:
     return mangleDependentProtocolConformanceAssociated(node, depth + 1);
+  case Node::Kind::DependentProtocolConformanceOpaque:
+    return mangleDependentProtocolConformanceOpaque(node, depth + 1);
   default:
     // Should this really succeed?!
     return ManglingError::Success;

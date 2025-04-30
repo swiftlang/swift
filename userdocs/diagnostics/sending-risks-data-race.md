@@ -29,13 +29,13 @@ await person.printNameConcurrently()
 
 This happens because the `printNameConcurrently` function runs off of the main actor, and the `onMainActor` function suspends while waiting for `printNameConcurrently` to complete. While suspended, the main actor can run other tasks that still have access to `person`, which can lead to a data race.
 
-The most common fix is to change the `async` method to run on the caller's actor using the `@execution(caller)` attribute:
+The most common fix is to change the `async` method to run on the caller's actor using the `nonisolated(nonsending)` specifier:
 
 ```swift
 class Person {
   var name: String = ""
     
-  @execution(caller)
+  nonisolated(nonsending)
   func printNameConcurrently() async {
     print(name)
   }
@@ -49,4 +49,4 @@ func onMainActor(person: Person) async {
 
 This eliminates the risk of data-races because `printNameConcurrently` continues to run on the main actor, so all access to `person` is serialized.
 
-You can also enable the `AsyncCallerExecution` upcoming feature to make `@execution(caller)` the default for async functions on non-`Sendable` types.
+You can also enable the `AsyncCallerExecution` upcoming feature to make `nonisolated(nonsending)` the default for async functions on non-`Sendable` types.

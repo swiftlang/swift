@@ -29,7 +29,7 @@
 import Root
 // expected-member-visibility-note 3 {{add import of module 'Branch'}}
 // expected-member-visibility-note@-1 2 {{add import of module 'Leaf'}}
-// expected-member-visibility-note@-2 {{add import of module 'Fruit'}}
+// expected-member-visibility-note@-2 2 {{add import of module 'Fruit'}}
 
 func testImportRoot_overridden1() {
   makeRootObject().overridden1()
@@ -82,12 +82,29 @@ func testImportRoot_overridden3() {
   // expected-member-visibility-error@-2 {{instance method 'overridden3()' is not available due to missing import of defining module 'Branch'}}
 }
 
+func testImportRoot_overridden4() {
+  makeRootObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Root.h}}
+
+  makeBranchObject().overridden4()
+  // expected-no-member-visibility-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+  // expected-member-visibility-warning@-2 {{'overridden4()' is deprecated: Root.h}}
+
+  makeLeafObject().overridden4()
+  // expected-no-member-visibility-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+  // expected-member-visibility-warning@-2 {{'overridden4()' is deprecated: Root.h}}
+
+  makeFruitObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Fruit.h}}
+  // expected-member-visibility-error@-2 {{instance method 'overridden4()' is not available due to missing import of defining module 'Fruit'}}
+}
+
 
 //--- file2.swift
 
 import Branch
 // expected-member-visibility-note 2 {{add import of module 'Leaf'}}
-// expected-member-visibility-note@-1 {{add import of module 'Fruit'}}
+// expected-member-visibility-note@-1 2 {{add import of module 'Fruit'}}
 
 func testImportBranch_overridden1() {
   makeRootObject().overridden1()
@@ -137,11 +154,28 @@ func testImportBranch_overridden3() {
   // expected-warning@-1 {{'overridden3()' is deprecated: Branch.h}}
 }
 
+func testImportBranch_overridden4() {
+  makeRootObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Root.h}}
+
+  makeBranchObject().overridden4()
+  // expected-no-member-visibility-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+  // expected-member-visibility-warning@-2 {{'overridden4()' is deprecated: Root.h}}
+
+  makeLeafObject().overridden4()
+  // expected-no-member-visibility-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+  // expected-member-visibility-warning@-2 {{'overridden4()' is deprecated: Root.h}}
+
+  makeFruitObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Fruit.h}}
+  // expected-member-visibility-error@-2 {{instance method 'overridden4()' is not available due to missing import of defining module 'Fruit'}}
+}
+
 
 //--- file3.swift
 
 import Leaf
-// expected-member-visibility-note {{add import of module 'Fruit'}}
+// expected-member-visibility-note 2 {{add import of module 'Fruit'}}
 
 func testImportLeaf_overridden1() {
   makeRootObject().overridden1()
@@ -184,6 +218,21 @@ func testImportLeaf_overridden3() {
 
   makeFruitObject().overridden3()
   // expected-warning@-1 {{'overridden3()' is deprecated: Branch.h}}
+}
+
+func testImportLeaf_overridden4() {
+  makeRootObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Root.h}}
+
+  makeBranchObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+
+  makeLeafObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+
+  makeFruitObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Fruit.h}}
+  // expected-member-visibility-error@-2 {{instance method 'overridden4()' is not available due to missing import of defining module 'Fruit'}}
 }
 
 
@@ -237,6 +286,22 @@ func testImportFruit_overridden3() {
 
   makeFruitObject().overridden3()
   // expected-warning@-1 {{'overridden3()' is deprecated: Branch.h}}
+}
+
+func testImportFruit_overridden4() {
+  makeRootObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Root.h}}
+
+  makeBranchObject().overridden4()
+  // expected-no-member-visibility-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+  // expected-member-visibility-warning@-2 {{'overridden4()' is deprecated: Root.h}}
+
+  makeLeafObject().overridden4()
+  // expected-no-member-visibility-warning@-1 {{'overridden4()' is deprecated: Leaf.h}}
+  // expected-member-visibility-warning@-2 {{'overridden4()' is deprecated: Root.h}}
+
+  makeFruitObject().overridden4()
+  // expected-warning@-1 {{'overridden4()' is deprecated: Fruit.h}}
 }
 
 

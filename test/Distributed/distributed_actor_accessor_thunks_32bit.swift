@@ -145,7 +145,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, %swift.error* } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple2`
@@ -178,7 +179,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, i32, i32, %swift.error* } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 
 /// Initialize the result buffer with values produced by the thunk
 
@@ -247,7 +249,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: [[INT_RES:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 1
 // CHECK: %._value = getelementptr inbounds %TSi, %TSi* [[TYPED_RESULT_BUFF]], i32 0, i32 0
 // CHECK: store i32 [[INT_RES]], i32* %._value
@@ -292,7 +295,8 @@ public distributed actor MyOtherActor {
 
 // CHECK: [[THUNK_RESULT:%.*]] = call { i8*, i32, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8i32p0s_swift.errorss({{.*}}, %swift.context* {{.*}}, i32 [[NATIVE_ENUM_VAL]], i32 [[NATIVE_INT_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: [[ENUM_RESULT:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 1
 // CHECK: [[NATIVE_RESULT_PTR:%.*]] = bitcast %T27distributed_actor_accessors9IndirectEO* [[TYPED_RESULT_BUFF]] to i32*
 // CHECK-NEXT: store i32 [[ENUM_RESULT]], i32* [[NATIVE_RESULT_PTR]]

@@ -281,6 +281,10 @@ endif()
 set_target_properties(swiftCore PROPERTIES
   Swift_MODULE_NAME Swift
   LINKER_LANGUAGE CXX)
+if(NOT BUILD_SHARED_LIBS AND CMAKE_STATIC_LIBRARY_PREFIX_Swift)
+  set_target_properties(swiftCore PROPERTIES
+    PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX_Swift})
+endif()
 
 target_compile_definitions(swiftCore
   PRIVATE
@@ -301,7 +305,8 @@ target_compile_options(swiftCore PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>"
+  "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -previous-module-installname-map-file -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json>")
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   # Using these in MinSizeRel would result in a 15% increase in the binary size
   target_compile_options(swiftCore PRIVATE

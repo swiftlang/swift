@@ -5,6 +5,20 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(copy source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  dependent
+}
+
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
@@ -233,7 +247,9 @@ func test9() {
 
 @lifetime(copy x)
 func getViewTuple(_ x: borrowing View) -> (View, View) {
-  return (View(x.ptr, x.c), View(x.ptr, x.c))
+  let x1 = View(x.ptr, x.c)
+  let x2 = View(x.ptr, x.c)
+  return (_overrideLifetime(x1, copying: x), _overrideLifetime(x2, copying: x))
 }
 
 public func test10() {

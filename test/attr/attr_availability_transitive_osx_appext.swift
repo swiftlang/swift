@@ -413,7 +413,7 @@ func osx_app_ext_func_call_extension_methods(_ e: ExtendMe) {
 @available(OSXApplicationExtension, introduced: 99)
 func osx_app_extensions_future() {}
 
-func call_osx_app_extensions_future() { // expected-note {{add @available attribute to enclosing global function}} {{1-1=@available(macOSApplicationExtension 99, *)\n}}
+func call_osx_app_extensions_future() { // expected-note {{add '@available' attribute to enclosing global function}} {{1-1=@available(macOSApplicationExtension 99, *)\n}}
   osx_app_extensions_future() // expected-error {{'osx_app_extensions_future()' is only available in application extensions for macOS 99 or newer}}
   // expected-note@-1 {{add 'if #available' version check}} {{3-30=if #available(macOS 99, *) {\n      osx_app_extensions_future()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 }

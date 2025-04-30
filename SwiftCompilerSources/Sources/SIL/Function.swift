@@ -45,7 +45,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
-  
+
+  public var isSpecialization: Bool { bridged.isSpecialization() }
+
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
@@ -574,6 +576,10 @@ extension Function {
                                                 atIndex: calleeArgIdx,
                                                 withConvention: convention)
         return effects.memory.read
+      },
+      // isDeinitBarrier
+      { (f: BridgedFunction) -> Bool in
+        return f.function.getSideEffects().isDeinitBarrier
       }
     )
   }

@@ -136,7 +136,7 @@ private func constructLetInitRegion(
   // root-class initializer).
   initRegion.insert(markUninitialized)
 
-  var borrows = Stack<BorrowIntroducingInstruction>(context)
+  var borrows = Stack<BeginBorrowInstruction>(context)
   defer { borrows.deinitialize() }
 
   for inst in markUninitialized.parentFunction.instructions {

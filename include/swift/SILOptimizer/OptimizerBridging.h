@@ -205,6 +205,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool hadError() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
+  BRIDGED_INLINE bool moduleHasLoweredAddresses() const;
   BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
 
   // Analysis
@@ -327,7 +328,7 @@ struct BridgedPassContext {
                                                        BridgedSubstitutionMap substitutions) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createWitnessTable(BridgedLinkage linkage,
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTable createSpecializedWitnessTable(BridgedLinkage linkage,
                                                                             bool serialized,
                                                                             BridgedConformance conformance,
                                                                             BridgedArrayRef bridgedEntries) const;
@@ -384,6 +385,7 @@ struct BridgedPassContext {
   bool enableSimplificationFor(BridgedInstruction inst) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
+  BRIDGED_INLINE bool noAllocations() const;
 
   // Temporary for AddressableParameters Bootstrapping.
   BRIDGED_INLINE bool enableAddressDependencies() const;

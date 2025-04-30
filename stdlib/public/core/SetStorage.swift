@@ -289,7 +289,7 @@ final internal class _SetStorage<Element: Hashable>
       "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
-      if unsafe bucket == endBucket { break }
+      if bucket == endBucket { break }
       let element = unsafe _elements[bucket.offset]
       unsafe unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
       stored += 1
@@ -370,7 +370,7 @@ extension _SetStorage {
       bucketCount._builtinWordValue, Element.self)
 
     let metadataAddr = unsafe Builtin.projectTailElems(storage, _HashTable.Word.self)
-    let elementsAddr = unsafe Builtin.getTailAddr_Word(
+    let elementsAddr = Builtin.getTailAddr_Word(
       metadataAddr, wordCount._builtinWordValue, _HashTable.Word.self,
       Element.self)
     unsafe storage._count = 0

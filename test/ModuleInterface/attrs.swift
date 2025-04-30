@@ -85,6 +85,20 @@ public struct MutatingTest {
 @abi(func abiSpiFunc())
 @_spi(spiGroup) public func abiSpiFunc() {}
 
+// We should print feature guards outside, but not inside, an @abi attribute.
+@abi(func sendingABI() -> sending Any?)
+public func sendingABI() -> Any? { nil }
+// CHECK: #if {{.*}} && $ABIAttribute
+// CHECK: @abi(func sendingABI() -> sending Any?)
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #elseif {{.*}} && $SendingArgsAndResults
+// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #else
+// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #endif
+
 @concurrent
 public func testExecutionConcurrent() async {}
 // CHECK: @concurrent public func testExecutionConcurrent() async
@@ -93,10 +107,11 @@ nonisolated(nonsending)
 public func testExecutionCaller() async {}
 // CHECK: nonisolated(nonsending) public func testExecutionCaller() async
 
-// CHECK-NOT: @extensible
-// CHECK: public enum TestExtensible
-@extensible
-public enum TestExtensible {
-  case a
-  case b
+public struct TestPlacementOfAttrsAndSpecifiers {
+  // CHECK: public func test1<T>(_: sending @autoclosure () -> T)
+  public func test1<T>(_: sending @autoclosure () -> T) {}
+  // CHECK: public func test2<T>(_: borrowing @autoclosure () -> T)
+  public func test2<T>(_: borrowing @autoclosure () -> T) {}
+  // CHECK: public func test3<T>(_: inout () async -> T)
+  public func test3<T>(_: inout () async -> T) {}
 }

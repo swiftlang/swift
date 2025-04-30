@@ -19,6 +19,6 @@ macro someMacro() = #externalMacro(module: "", type: "")
 
 macro invalidMacro()
 // expected-error@-1 {{macro 'invalidMacro()' requires a definition}}
-// expected-error@-2 {{macro 'invalidMacro()' must declare its applicable roles via '@freestanding' or @attached'}}
+// expected-error@-2 {{macro 'invalidMacro()' must declare its applicable roles via '@freestanding' or '@attached'}}
 
 #invalidMacro() // expected-error {{no macro named 'invalidMacro'}}

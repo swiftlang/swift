@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 941; // remove @execution attr
+const uint16_t SWIFTMODULE_VERSION_MINOR = 945; // generic parameter weight
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1290,7 +1290,8 @@ namespace decls_block {
     GenericParamKindField, // param kind
     BCFixed<1>,            // has decl?
     BCFixed<15>,           // depth
-    BCFixed<16>,           // index
+    BCFixed<1>,            // weight
+    BCFixed<15>,           // index
     DeclIDField,           // generic type parameter decl or identifier
     TypeIDField            // value type (if param kind == Value)
   );
@@ -1728,6 +1729,7 @@ namespace decls_block {
     BCFixed<1>,              // isCompileTimeLiteral?
     BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
+    BCFixed<1>,              // isCallerIsolated?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -2232,7 +2234,8 @@ namespace decls_block {
   using CDeclDeclAttrLayout = BCRecordLayout<
     CDecl_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCBlob      // _silgen_name
+    BCFixed<1>, // underscored flag
+    BCBlob      // cname
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<

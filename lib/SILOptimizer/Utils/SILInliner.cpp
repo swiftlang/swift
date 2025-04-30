@@ -500,6 +500,9 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
           if (!enableLexicalLifetimes)
             continue;
 
+          if (!Original.isDeinitBarrier())
+            continue;
+
           // Exclusive mutating accesses don't entail a lexical scope.
           if (paramInfo.getConvention() == ParameterConvention::Indirect_Inout)
             continue;

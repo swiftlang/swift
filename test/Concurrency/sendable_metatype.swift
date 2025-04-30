@@ -1,8 +1,9 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature IsolatedConformances -emit-sil -o /dev/null
+// RUN: %target-typecheck-verify-swift -swift-version 6 -emit-sil -o /dev/null
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_IsolatedConformances
 
+protocol P {
+}
 
 protocol Q {
   static func g()
@@ -18,29 +19,35 @@ func acceptMetaOnMainActor<T>(_: T.Type) { }
 // -------------------------------------------------------------------------
 nonisolated func staticCallThroughMetaSmuggled<T: Q>(_: T.Type) {
   let x: Q.Type = T.self
-  Task.detached { // expected-error{{risks causing data races}}
+  Task.detached { // expected-warning{{risks causing data races}}
     x.g() // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }
 
 nonisolated func passMetaSmuggled<T: Q>(_: T.Type) {
   let x: Q.Type = T.self
-  Task.detached { // expected-error{{risks causing data races}}
+  Task.detached { // expected-warning{{risks causing data races}}
     acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }
 
 nonisolated func passMetaSmuggledAny<T: Q>(_: T.Type) {
   let x: Any.Type = T.self
-  Task.detached { // expected-error{{risks causing data races}}
-    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
+  Task.detached {
+    acceptMeta(x)
+  }
+}
+
+nonisolated func captureThroughMetaValMoReqs<T>(_: T.Type) {
+  let x = T.self
+  Task.detached {
+    _ = x
   }
 }
 
 nonisolated func passToMainActorSmuggledAny<T: Q>(_: T.Type) async {
   let x: Any.Type = T.self
-  await acceptMetaOnMainActor(x) // expected-error{{sending value of non-Sendable type '(Any).Type' risks causing data races}}
-  // expected-note@-1{{sending task-isolated value of non-Sendable type '(Any).Type' to main actor-isolated global function}}
+  await acceptMetaOnMainActor(x)
 }
 
 // -------------------------------------------------------------------------
@@ -70,9 +77,9 @@ nonisolated func passSendableToMainActorSmuggledAny<T: Sendable>(_: T.Type) asyn
 // -------------------------------------------------------------------------
 // Existential opening
 // -------------------------------------------------------------------------
-nonisolated func passMetaSmuggledAnyFromExistential(_ qT: Q.Type) {
-  let x: Any.Type = qT
-  Task.detached { // expected-error{{risks causing data races}}
+nonisolated func passMetaSmuggledAnyFromExistential(_ pqT: (P & Q).Type) {
+  let x: P.Type = pqT
+  Task.detached { // expected-warning{{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
     acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }

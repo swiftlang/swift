@@ -193,4 +193,11 @@ OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
   expectFalse(lhs == rhs)
 }
 
+OperatorsTestSuite.test("LValueAndRValueArithmetic.+") {
+  let lhs = LValueAndRValueArithmetic(value: 123)
+  let rhs = LValueAndRValueArithmetic(value: 146)
+
+  expectEqual(269, (lhs + rhs).value)
+}
+
 runAllTests()

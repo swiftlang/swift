@@ -1520,10 +1520,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
       return false;
 
     if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
-      // CF type as foreign class
-      if (substTy->getClassOrBoundGenericClass() &&
-          substTy->getClassOrBoundGenericClass()->getForeignClassKind() ==
-            ClassDecl::ForeignKind::CFType) {
+      // Foreign reference types
+      if (substTy->getClassOrBoundGenericClass()) {
         return false;
       }
     }
@@ -1705,9 +1703,13 @@ private:
     }
 
     // If we are an async function that is unspecified or nonisolated, insert an
-    // isolated parameter if AsyncCallerExecution is enabled.
+    // isolated parameter if NonisolatedNonsendingByDefault is enabled.
+    //
+    // NOTE: The parameter is not inserted for async functions imported
+    // from ObjC because they are handled in a special way that doesn't
+    // require it.
     if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
-        extInfoBuilder.isAsync()) {
+        extInfoBuilder.isAsync() && !Foreign.async) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
           ExistentialType::get(actorProtocol->getDeclaredInterfaceType());

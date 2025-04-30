@@ -1705,12 +1705,6 @@ extension BinaryInteger {
   }
 }
 
-#if !$Embedded
-public typealias _LosslessStringConvertibleOrNone = LosslessStringConvertible
-#else
-public protocol _LosslessStringConvertibleOrNone {}
-#endif
-
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -1779,7 +1773,7 @@ public protocol _LosslessStringConvertibleOrNone {}
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
+public protocol FixedWidthInteger: BinaryInteger, LosslessStringConvertible
 where Magnitude: FixedWidthInteger & UnsignedInteger,
       Stride: FixedWidthInteger & SignedInteger {
   /// The number of bits used for the underlying binary representation of
@@ -2158,6 +2152,7 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
 
 extension FixedWidthInteger {
   @inlinable
+  @_transparent
   public var bitWidth: Int { return Self.bitWidth }
 
   @inlinable
@@ -2770,7 +2765,7 @@ extension FixedWidthInteger {
   }
 
   @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
       self = Self(_truncatingBits: source._lowWord)
@@ -3015,7 +3010,7 @@ extension UnsignedInteger {
   /// This property is always `false` for unsigned integer types.
   @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
-    @inline(__always)
+    @_transparent
     get { return false }
   }
 }
@@ -3228,7 +3223,7 @@ extension SignedInteger {
   /// This property is always `true` for signed integer types.
   @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
-    @inline(__always)
+    @_transparent
     get { return true }
   }
 }

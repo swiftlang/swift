@@ -790,7 +790,8 @@ protected:
         auto immortalParam =
           std::find_if(afd->getParameters()->begin(),
                        afd->getParameters()->end(), [](ParamDecl *param) {
-                         return strcmp(param->getName().get(), "immortal") == 0;
+                         return param->getName().nonempty()
+                           && strcmp(param->getName().get(), "immortal") == 0;
                        });
         if (immortalParam != afd->getParameters()->end()) {
           diagnose(*immortalParam,
@@ -961,7 +962,7 @@ protected:
         diagnose(returnLoc,
                  diag::lifetime_dependence_cannot_infer_scope_ownership,
                  param->getParameterName().str(), diagnosticQualifier());
-        continue;
+        return;
       }
       targetDeps = std::move(targetDeps).add(paramIndex, *kind);
     }
@@ -1100,7 +1101,8 @@ protected:
     }
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
-      // An implicit _read accessor is generated when a mutating getter is
+    case AccessorKind::Read2:
+      // An implicit _read/read accessor is generated when a mutating getter is
       // declared. Emit the same lifetime dependencies as an implicit _modify.
     case AccessorKind::Modify:
     case AccessorKind::Modify2:

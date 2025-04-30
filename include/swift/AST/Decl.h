@@ -310,6 +310,9 @@ struct OverloadSignature {
   /// Whether this is a macro.
   unsigned IsMacro : 1;
 
+  /// Whether this is a generic argument.
+  unsigned IsGenericArg : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
@@ -323,8 +326,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsEnumElement(false), IsNominal(false),
+        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -6239,10 +6244,16 @@ public:
                               bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
-  AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind, ModuleDecl *module,
-                                   ResilienceExpansion expansion,
-                                   bool useOldABI) const;
+  AccessStrategy getAccessStrategy(
+      AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+      ResilienceExpansion expansion,
+      std::optional<std::pair<SourceRange, const DeclContext *>> location,
+      bool useOldABI) const;
+
+  /// Whether access is via physical storage.
+  bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
+                                    AccessKind accessKind, ModuleDecl *module,
+                                    ResilienceExpansion expansion) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -6902,6 +6913,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
+
+    /// Whether or not this parameter is isolated to a caller.
+    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -7188,6 +7202,18 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
+  }
+
+  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
+  bool isCallerIsolated() const {
+    return getOptions().contains(Flag::IsCallerIsolated);
+  }
+
+  void setCallerIsolated(bool value = true) {
+    if (value)
+      addFlag(Flag::IsCallerIsolated);
+    else
+      removeFlag(Flag::IsCallerIsolated);
   }
 
   /// Whether or not this parameter is marked with '@_addressable'.
@@ -8112,6 +8138,11 @@ public:
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
   bool isObjCInstanceMethod() const;
+
+  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
+  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// formalizing the attribute.
+  std::optional<ForeignLanguage> getCDeclKind() const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.

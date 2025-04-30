@@ -390,6 +390,17 @@ namespace swift {
       return limitBehaviorUntilSwiftVersion(limit, languageMode);
     }
 
+    /// Limit the diagnostic behavior to warning until the next future
+    /// language mode.
+    ///
+    /// This should be preferred over passing the next major version to
+    /// `warnUntilSwiftVersion` to make it easier to find and update clients
+    /// when a new language mode is introduced.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &warnUntilFutureSwiftVersion();
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings

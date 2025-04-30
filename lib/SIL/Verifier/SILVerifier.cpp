@@ -7787,14 +7787,20 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<ProtocolConformance*> wtableConformances;
+  llvm::DenseSet<llvm::PointerIntPair<ProtocolConformance *, 1, bool>> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
-    if (!wtableConformances.insert(conformance).second) {
+    if (!wtableConformances.insert({conformance, wt.isSpecialized()}).second) {
       llvm::errs() << "Witness table redefined: ";
       conformance->printName(llvm::errs());
       assert(false && "triggering standard assertion failure routine");
+    }
+    if (wt.isSpecialized()) {
+      ASSERT(specializedWitnessTableMap.find(conformance) != specializedWitnessTableMap.end());
+    } else {
+      auto *rootConf= cast<RootProtocolConformance>(conformance);
+      ASSERT(WitnessTableMap.find(rootConf) != WitnessTableMap.end());
     }
     wt.verify(*this);
   }

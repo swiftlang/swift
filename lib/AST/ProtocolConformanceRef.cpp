@@ -111,9 +111,7 @@ ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
 
   // Local conformance lookup into the substitution map.
   // FIXME: Pack element level?
-  return IFS.lookupConformance(origType->getCanonicalType(),
-                               origType.subst(IFS), proto,
-                               /*level=*/0);
+  return IFS.lookupConformance(origType, proto, /*level=*/0);
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {

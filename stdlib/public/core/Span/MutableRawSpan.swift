@@ -171,7 +171,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow mutableRawSpan)
   public init(_mutableRawSpan mutableRawSpan: borrowing MutableRawSpan) {
-    let (start, count) = unsafe (mutableRawSpan._start(), mutableRawSpan._count)
+    let (start, count) = (mutableRawSpan._start(), mutableRawSpan._count)
     let span = unsafe RawSpan(_unsafeStart: start, byteCount: count)
     self = unsafe _overrideLifetime(span, borrowing: mutableRawSpan)
   }

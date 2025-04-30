@@ -111,7 +111,9 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
-// KEYWORD2-NEXT              Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
@@ -328,7 +330,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding
 // ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
-// ON_MEMBER_LAST-DAG: Keyword/None:                       extensible[#Declaration Attribute#]; name=extensible
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -402,7 +403,6 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
 // KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
-// KEYWORD_LAST-DAG: Keyword/None:                       extensible[#Declaration Attribute#]; name=extensible
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct

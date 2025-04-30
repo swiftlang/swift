@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckConcurrency.h"
-#include "AsyncCallerExecutionMigration.h"
+#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
@@ -878,6 +878,12 @@ SendableCheckContext::preconcurrencyBehavior(
   return std::nullopt;
 }
 
+std::optional<DiagnosticBehavior>
+SendableCheckContext::preconcurrencyBehavior(Type type) const {
+  return type->getConcurrencyDiagnosticBehaviorLimit(
+      const_cast<DeclContext *>(fromDC));
+}
+
 static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   switch (sf.Kind) {
   case SourceFileKind::Interface:
@@ -1167,34 +1173,47 @@ bool swift::diagnoseNonSendableTypesInReference(
       return true;
   }
 
-  // For functions, check the parameter and result types.
+  // For functions or subscripts, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
-  if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
+  auto decl = declRef.getDecl();
+  if (isa<AbstractFunctionDecl>(decl) || isa<SubscriptDecl>(decl)) {
     if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
       // only check params if funcCheckKind specifies so
-      for (auto param : *function->getParameters()) {
+      ParameterList *paramList = nullptr;
+      if (auto function = dyn_cast<AbstractFunctionDecl>(decl)) {
+        paramList = function->getParameters();
+      } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+        paramList = subscript->getIndices();
+      }
+
+      // Check params of this function or subscript override for sendability
+      for (auto param : *paramList) {
         Type paramType = param->getInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
-                paramType, fromDC, derivedConformanceType,
-                refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                getSendableParamDiag(refKind),
-                function, getActorIsolation()))
+        if (diagnoseNonSendableTypesWithSendingCheck(
+                param, paramType, fromDC, derivedConformanceType, refLoc,
+                diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+                getSendableParamDiag(refKind), decl, getActorIsolation()))
           return true;
       }
     }
 
-    // Check the result type of a function.
-    if (auto func = dyn_cast<FuncDecl>(function)) {
-      if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
-        // only check results if funcCheckKind specifies so
-        Type resultType = func->getResultInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
-            resultType, fromDC, derivedConformanceType,
-            refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-            getSendableResultDiag(refKind),
-            func, getActorIsolation()))
-          return true;
+    // Check the result type of a function or subscript.
+    if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
+      Type resultType;
+      if (auto func = dyn_cast<FuncDecl>(decl)) {
+        resultType = func->getResultInterfaceType().subst(subs);
+        decl = func;
+      } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+        resultType = subscript->getElementInterfaceType().subst(subs);
       }
+      if (!resultType) {
+        return false;
+      }
+      if (diagnoseNonSendableTypesWithSendingCheck(
+              decl, resultType, fromDC, derivedConformanceType, refLoc,
+              diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+              getSendableResultDiag(refKind), decl, getActorIsolation()))
+        return true;
     }
 
     return false;
@@ -1210,34 +1229,6 @@ bool swift::diagnoseNonSendableTypesInReference(
             getSendablePropertyDiag(refKind),
             var, getActorIsolation()))
       return true;
-  }
-
-  if (auto subscript = dyn_cast<SubscriptDecl>(declRef.getDecl())) {
-    for (auto param : *subscript->getIndices()) {
-      if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
-        // Check params of this subscript override for sendability
-        Type paramType = param->getInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
-                paramType, fromDC, derivedConformanceType,
-                refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                getSendableParamDiag(refKind),
-                subscript, getActorIsolation()))
-          return true;
-      }
-    }
-
-    if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
-      // Check the element type of a subscript.
-      Type resultType = subscript->getElementInterfaceType().subst(subs);
-      if (diagnoseNonSendableTypes(
-              resultType, fromDC, derivedConformanceType,
-              refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-              getSendableResultDiag(refKind),
-              subscript, getActorIsolation()))
-        return true;
-    }
-
-    return false;
   }
 
   return false;
@@ -1776,7 +1767,7 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
   return !(fn->hasAsync()); // basic case: not async = had restriction.
 }
 
-/// Note that while a direct access to the actor isolated property is not legal
+/// Note that while a direct access to the actor-isolated property is not legal
 /// you may want to consider introducing an accessing method for a mutation.
 static void
 maybeNoteMutatingMethodSuggestion(ASTContext &C,
@@ -2669,7 +2660,7 @@ namespace {
                     fromType, toType);
 
                 if (downgradeToWarning)
-                  diag.warnUntilSwiftVersion(7);
+                  diag.warnUntilFutureSwiftVersion();
               }
 
               for (auto type : nonSendableTypes) {
@@ -2924,8 +2915,10 @@ namespace {
       auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
 
       bool preconcurrency = false;
-      if (explicitClosure) {
-        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+      if (closure) {
+        preconcurrency =
+            getActorIsolationOfContext(closure, getClosureActorIsolation)
+                .preconcurrency();
       }
 
       for (const auto &capture : localFunc.getCaptureInfo().getCaptures()) {
@@ -2989,7 +2982,7 @@ namespace {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
             // Defer diagnosing checking of non-Sendable types that are passed
-            // into async let to SIL level region based isolation.
+            // into async let to SIL level region-based isolation.
             return;
           }
 
@@ -3020,13 +3013,16 @@ namespace {
       // FIXME: When passing to a sending parameter, should this be handled
       // by region isolation? Or should it always be handled by region
       // isolation?
-      if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-          (mayExecuteConcurrentlyWith(
+      if (mayExecuteConcurrentlyWith(
               localFunc.getAsDeclContext(), getDeclContext()) ||
-           (explicitClosure && explicitClosure->isPassedToSendingParameter()))) {
-        GenericSignature genericSig;
-        if (auto afd = localFunc.getAbstractFunctionDecl())
-          genericSig = afd->getGenericSignature();
+          (explicitClosure && explicitClosure->isPassedToSendingParameter())) {
+        auto innermostGenericDC = localFunc.getAsDeclContext();
+        while (innermostGenericDC && !innermostGenericDC->isGenericContext())
+          innermostGenericDC = innermostGenericDC->getParent();
+
+        GenericSignature genericSig = innermostGenericDC
+            ? innermostGenericDC->getGenericSignatureOfContext()
+            : GenericSignature();
 
         for (const auto &capturedType :
                  localFunc.getCaptureInfo().getCapturedTypes()) {
@@ -3037,8 +3033,6 @@ namespace {
                 ->getDepth();
           } else if (type->isTypeParameter()) {
             genericDepth = type->getRootGenericParam()->getDepth();
-
-            type = localFunc.getAsDeclContext()->mapTypeIntoContext(type);
           } else {
             continue;
           }
@@ -3048,6 +3042,9 @@ namespace {
           if (genericSig.getNextDepth() > 0 &&
               genericDepth < genericSig.getNextDepth() - 1)
             continue;
+
+          if (type->isTypeParameter() && innermostGenericDC)
+            type = innermostGenericDC->mapTypeIntoContext(type);
 
           // Check that the metatype is sendable.
           SendableCheckContext sendableContext(getDeclContext(), preconcurrency);
@@ -4686,6 +4683,15 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
       }
     }
 
+    // `nonisolated(nonsending)` inferred from the context makes
+    // the closure caller isolated.
+    if (auto closureTy = getType(closure)) {
+      if (auto *closureFnTy = closureTy->getAs<FunctionType>()) {
+        if (closureFnTy->getIsolation().isNonIsolatedCaller())
+          return ActorIsolation::forCallerIsolationInheriting();
+      }
+    }
+
     // If a closure has an isolated parameter, it is isolated to that
     // parameter.
     for (auto param : *closure->getParameters()) {
@@ -4745,8 +4751,8 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
   // Apply computed preconcurrency.
   isolation = isolation.withPreconcurrency(preconcurrency);
 
-  if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
-          .isEnabledForAdoption()) {
+  if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
+          .isEnabledForMigration()) {
     warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, closure, isolation);
   }
 
@@ -4782,7 +4788,7 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     // If the local function is not Sendable, its isolation differs
     // from that of the context, and both contexts are actor isolated,
     // then capturing non-Sendable values allows the closure to stash
-    // those values into actor isolated state. The original context
+    // those values into actor-isolated state. The original context
     // may also stash those values into isolated state, enabling concurrent
     // access later on.
     isolatedStateMayEscape =
@@ -4926,7 +4932,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // If the nonisolated async inherits isolation from context,
     // return caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
-            Feature::AsyncCallerExecution)) {
+            Feature::NonisolatedNonsendingByDefault)) {
       if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
           func && func->hasAsync() &&
           func->getModuleContext() == decl->getASTContext().MainModule) {
@@ -5790,7 +5796,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   }
 
   // If we have an async function... by default we inherit isolation.
-  if (ctx.LangOpts.hasFeature(Feature::AsyncCallerExecution)) {
+  if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
     if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
         func && func->hasAsync() &&
         func->getModuleContext() == ctx.MainModule) {
@@ -5821,11 +5827,39 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     // Use the overridden decl's isolation as the default isolation for this
     // decl.
     auto isolation = getOverriddenIsolationFor(value);
+
+    // If this is an override of an async completion handler, mark
+    // it `@concurrent` instead of inferring `nonisolated(nonsending)`
+    // to preserve pre-SE-0461 behavior.
+    if (isolation.isCallerIsolationInheriting() &&
+        overriddenValue->hasClangNode()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(overriddenValue)) {
+        if (AFD->getForeignAsyncConvention()) {
+          return {{ActorIsolation::forNonisolated(/*unsafe=*/false),
+                   IsolationSource(overriddenValue, IsolationSource::Override)},
+                  overriddenValue,
+                  isolation};
+        }
+      }
+    }
+
     return {{isolation,
              IsolationSource(overriddenValue, IsolationSource::Override)},
             overriddenValue,
             isolation}; // use the overridden decl's iso as the default
                         // isolation for this decl.
+  }
+
+  // Asynchronous variants for functions imported from ObjC are
+  // `nonisolated(nonsending)` by default.
+  if (value->hasClangNode()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (!isa<ProtocolDecl>(AFD->getDeclContext()) &&
+          AFD->getForeignAsyncConvention()) {
+        return {
+            {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
+      }
+    }
   }
 
   // We did not find anything special, return unspecified.
@@ -5879,7 +5913,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // did not have an ExecutionKind::Caller attached to it.
   //
   // DISCUSSION: This occurs when we have a value decl that is explicitly marked
-  // as nonisolated but since AsyncCallerExecution is enabled, we return
+  // as nonisolated but since NonisolatedNonsendingByDefault is enabled, we return
   // CallerIsolationInheriting.
   if (isolationFromAttr && isolationFromAttr->getKind() ==
           ActorIsolation::CallerIsolationInheriting) {
@@ -6180,7 +6214,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
 
         if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
             ctx.LangOpts.hasFeature(
-                Feature::AsyncCallerExecution) &&
+                Feature::NonisolatedNonsendingByDefault) &&
             func && func->hasAsync() &&
             func->getModuleContext() == ctx.MainModule &&
             isolation.isNonisolated()) {
@@ -6225,8 +6259,8 @@ InferredActorIsolation ActorIsolationRequest::evaluate(Evaluator &evaluator,
   const auto inferredIsolation = computeActorIsolation(evaluator, value);
 
   auto &ctx = value->getASTContext();
-  if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
-          .isEnabledForAdoption()) {
+  if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
+          .isEnabledForMigration()) {
     warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, value,
                                                   inferredIsolation.isolation);
   }
@@ -6667,8 +6701,7 @@ static bool checkSendableInstanceStorage(
           propertyType, context,
           /*inDerivedConformance*/Type(), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            auto preconcurrency =
-                context.preconcurrencyBehavior(type->getAnyNominal());
+            auto preconcurrency = context.preconcurrencyBehavior(type);
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -6712,8 +6745,7 @@ static bool checkSendableInstanceStorage(
           elementType, context,
           /*inDerivedConformance*/Type(), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            auto preconcurrency =
-                context.preconcurrencyBehavior(type->getAnyNominal());
+            auto preconcurrency = context.preconcurrencyBehavior(type);
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -7781,8 +7813,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
     return forSameConcurrencyDomain(declIsolation, options);
   }
 
-  // Initializing an actor isolated stored property with a value effectively
-  // passes that value from the init context into the actor isolated context.
+  // Initializing an actor-isolated stored property with a value effectively
+  // passes that value from the init context into the actor-isolated context.
   // It's only okay for the value to cross isolation boundaries if the property
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
@@ -7917,8 +7949,6 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   auto dc = rootNormal->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::IsolatedConformances))
-    return ActorIsolation::forNonisolated(false);
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.
@@ -7926,7 +7956,7 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
     return ActorIsolation::forNonisolated(false);
 
   // If we are inferring isolated conformances and the conforming type is
-  // isolated to a global actor,
+  // isolated to a global actor, use the conforming type's isolation.
   auto nominal = dc->getSelfNominalTypeDecl();
   if (ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances) &&
       nominal) {
@@ -7995,7 +8025,8 @@ namespace {
           firstConformance->getIsolation(),
           firstConformance->getType(),
           firstConformance->getProtocol()->getName(),
-          getContextIsolation());
+          getContextIsolation())
+        .warnUntilSwiftVersion(6);
       return true;
     }
   };
