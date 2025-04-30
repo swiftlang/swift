@@ -657,21 +657,8 @@ SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
                     SubstFlags::PreservePackExpansionLevel);
 }
 
-bool OuterSubstitutions::isUnsubstitutedTypeParameter(Type type) const {
-  if (!type->isTypeParameter())
-    return false;
-
-  if (auto depMemTy = type->getAs<DependentMemberType>())
-    return isUnsubstitutedTypeParameter(depMemTy->getBase());
-
-  if (auto genericParam = type->getAs<GenericTypeParamType>())
-    return genericParam->getDepth() >= depth;
-
-  return false;
-}
-
 Type OuterSubstitutions::operator()(SubstitutableType *type) const {
-  if (isUnsubstitutedTypeParameter(type))
+  if (cast<GenericTypeParamType>(type)->getDepth() >= depth)
     return Type(type);
 
   return QuerySubstitutionMap{subs}(type);
@@ -681,9 +668,23 @@ ProtocolConformanceRef OuterSubstitutions::operator()(
                                         CanType dependentType,
                                         Type conformingReplacementType,
                                         ProtocolDecl *conformedProtocol) const {
-  if (isUnsubstitutedTypeParameter(dependentType))
-    return ProtocolConformanceRef::forAbstract(
+  auto sig = subs.getGenericSignature();
+  if (!sig->isValidTypeParameter(dependentType) ||
+      !sig->requiresProtocol(dependentType, conformedProtocol)) {
+    // FIXME: We need the isValidTypeParameter() check instead of just looking
+    // at the root generic parameter because in the case of an existential
+    // environment, the reduced type of a member type of Self might be an outer
+    // type parameter that is not formed from the outer generic signature's
+    // conformance requirements. Ideally, we'd either add these supplementary
+    // conformance requirements to the generalization signature, or we would
+    // store the supplementary conformances directly in the generic environment
+    // somehow.
+    //
+    // Once we check for that and handle it properly, the lookupConformance()
+    // can become a forAbstract().
+    return swift::lookupConformance(
       conformingReplacementType, conformedProtocol);
+  }
 
   return LookUpConformanceInSubstitutionMap(subs)(
       dependentType, conformingReplacementType, conformedProtocol);
