@@ -817,6 +817,8 @@ ASTContext::ASTContext(
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
       TheUnconstrainedAnyType(
           ProtocolCompositionType::theUnconstrainedAnyType(*this)),
+      TheSelfType(CanGenericTypeParamType(
+          GenericTypeParamType::getType(0, 0, *this))),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -6646,8 +6648,7 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
 
-  auto param = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, *this);
-  auto sig = GenericSignature::get(param, { });
+  auto sig = GenericSignature::get({TheSelfType}, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;

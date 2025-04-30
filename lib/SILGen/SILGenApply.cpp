@@ -452,7 +452,7 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()),
+        substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()),
         subs,
         l,
         callPreviousDynamicReplaceableImpl);
@@ -465,7 +465,7 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         Kind::EnumElement, SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
+        substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
   static Callee forClassMethod(SILGenFunction &SGF,
                                SILDeclRef c, SubstitutionMap subs,
@@ -473,7 +473,7 @@ public:
     auto base = c.getOverriddenVTableEntry();
     auto &baseCI = SGF.getConstantInfo(SGF.getTypeExpansionContext(), base);
     auto &derivedCI = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
-    subs = subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext());
+    subs = substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext());
 
     // We use an orig function type based on the overridden vtable entry, but
     // the substitutions we have are for the current function.  To get subs
@@ -497,7 +497,7 @@ public:
                                SILDeclRef c, SubstitutionMap subs,
                                SILLocation l) {
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
-    subs = subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext());
+    subs = substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext());
     auto origFunctionType = ci.FormalPattern.withSubstitutions(subs);
     return Callee(
         Kind::SuperMethod, SGF, c, origFunctionType, ci.FormalType, subs, l);
@@ -524,7 +524,7 @@ public:
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         Kind::WitnessMethod, SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
+        substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
   static Callee forDynamic(SILGenFunction &SGF,
                            SILDeclRef c, SubstitutionMap constantSubs,
@@ -550,7 +550,7 @@ public:
 
     return Callee(
         Kind::DynamicMethod, SGF, c, origFormalType, substFormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
+        substOpaqueTypesWithUnderlyingTypes(subs, SGF.getTypeExpansionContext()), l);
   }
 
   static Callee formCallee(SILGenFunction &SGF, AbstractFunctionDecl *decl,

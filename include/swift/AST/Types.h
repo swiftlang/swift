@@ -5032,9 +5032,15 @@ Type substOpaqueTypesWithUnderlyingTypes(Type type,
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
+
 ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref,
                                     TypeExpansionContext context);
+
+SubstitutionMap
+substOpaqueTypesWithUnderlyingTypes(SubstitutionMap subs,
+                                    TypeExpansionContext context);
+
 namespace Lowering {
   class TypeConverter;
 }
@@ -7080,6 +7086,32 @@ private:
   }
 
   bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
+};
+
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map existential
+/// archetypes in the given generic environment to known concrete types from
+/// the given substitution map.
+class ReplaceExistentialArchetypesWithConcreteTypes {
+private:
+  GenericEnvironment *env;
+  SubstitutionMap subs;
+
+  Type getInterfaceType(ExistentialArchetypeType *type) const;
+
+public:
+  ReplaceExistentialArchetypesWithConcreteTypes(GenericEnvironment *env,
+                                                SubstitutionMap subs)
+      : env(env), subs(subs) {}
+
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *type) const;
+
+  /// LookupConformanceFn
+  ProtocolConformanceRef operator()(CanType origType,
+                                    Type substType,
+                                    ProtocolDecl *protocol) const;
+
 };
 
 /// An archetype that's only valid in a portion of a local context.
