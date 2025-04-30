@@ -117,9 +117,20 @@ struct ExistentialLayout {
 
   LayoutConstraint getLayoutConstraint() const;
 
+  /// Whether this layout has any inverses within its signature.
+  bool hasInverses() const {
+    return !inverses.empty();
+  }
+
+  /// Whether this existential needs to have an extended existential shape. This
+  /// is relevant for the mangler to mangle as a symbolic link where possible
+  /// and for IRGen directly emitting some existentials.
+  bool needsExtendedShape() const;
+
 private:
   SmallVector<ProtocolDecl *, 4> protocols;
   SmallVector<ParameterizedProtocolType *, 4> parameterized;
+  InvertibleProtocolSet inverses;
 };
 
 }

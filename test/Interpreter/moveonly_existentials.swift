@@ -28,3 +28,19 @@ func mutate(_ b: inout any Boopable & ~Copyable) {
 borrow(S())
 var s = S() as any Boopable & ~Copyable
 mutate(&s)
+
+let a: Any = (any ~Copyable).self
+// CHECK: << invalid type >>
+print(a)
+
+let b: Any = (any ~Escapable).self
+// CHECK: << invalid type >>
+print(b)
+
+let c: Any = (any ~Copyable & ~Escapable).self
+// CHECK: << invalid type >>
+print(c)
+
+let d: Any = (any Boopable & ~Copyable).self
+// CHECK: << invalid type >>
+print(d)
