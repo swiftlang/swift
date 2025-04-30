@@ -1171,6 +1171,8 @@ NOTE(lifetime_outside_scope_variable, none,
      "it depends on the lifetime of variable '%0'", (Identifier))
 NOTE(lifetime_outside_scope_value, none,
      "it depends on the lifetime of this parent value", ())
+NOTE(lifetime_outside_scope_capture, none,
+     "it depends on a closure capture; this is not yet supported", ())
 NOTE(lifetime_outside_scope_use, none,
      "this use of the lifetime-dependent value is out of scope", ())
 NOTE(lifetime_outside_scope_escape, none,
