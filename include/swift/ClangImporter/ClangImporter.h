@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/AST/Attr.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -786,6 +787,52 @@ bool declIsCxxOnly(const Decl *decl);
 
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
+
+template <typename T>
+std::optional<T>
+matchSwiftAttr(const clang::Decl *decl,
+               llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl || !decl->hasAttrs())
+    return std::nullopt;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      for (const auto &p : patterns) {
+        if (swiftAttr->getAttribute() == p.first)
+          return p.second;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+template <typename T>
+std::optional<T> matchSwiftAttrConsideringInheritance(
+    const clang::Decl *decl,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl)
+    return std::nullopt;
+
+  if (auto match = matchSwiftAttr<T>(decl, patterns))
+    return match;
+
+  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    std::optional<T> result;
+    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+        result = baseMatch;
+        return false;
+      }
+
+      return true;
+    });
+
+    return result;
+  }
+
+  return std::nullopt;
+}
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {

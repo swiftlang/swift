@@ -1252,49 +1252,6 @@ enum class ConventionsKind : uint8_t {
   CXXMethod = 8,
 };
 
-template <typename T>
-std::optional<T>
-matchSwiftAttr(const clang::Decl *decl,
-               llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl || !decl->hasAttrs())
-    return std::nullopt;
-
-  for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      for (const auto &p : patterns) {
-        if (swiftAttr->getAttribute() == p.first)
-          return p.second;
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-template <typename T>
-std::optional<T> matchSwiftAttrConsideringInheritance(
-    const clang::Decl *decl,
-    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl)
-    return std::nullopt;
-
-  if (auto match = matchSwiftAttr<T>(decl, patterns))
-    return match;
-
-  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
-    for (const auto &baseSpecifier : recordDecl->bases()) {
-      const clang::CXXRecordDecl *baseDecl =
-          baseSpecifier.getType()->getAsCXXRecordDecl();
-      if (!baseDecl)
-        continue;
-      if (auto match =
-              matchSwiftAttrConsideringInheritance<T>(baseDecl, patterns))
-        return match;
-    }
-  }
-
-  return std::nullopt;
-}
-
 class Conventions {
   ConventionsKind kind;
 
@@ -1399,7 +1356,7 @@ public:
     if (!tl.getLoweredType().isForeignReferenceType())
       return std::nullopt;
 
-    if (auto result = matchSwiftAttr<ResultConvention>(
+    if (auto result = importer::matchSwiftAttr<ResultConvention>(
             decl, {{"returns_unretained", ResultConvention::Unowned},
                    {"returns_retained", ResultConvention::Owned}}))
       return result;
@@ -1418,7 +1375,7 @@ public:
             llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
       if (clang::RecordDecl *clangRecordDecl =
               ptrType->getPointeeType()->getAsRecordDecl())
-        return matchSwiftAttrConsideringInheritance<ResultConvention>(
+        return importer::matchSwiftAttrConsideringInheritance<ResultConvention>(
             clangRecordDecl,
             {{"returns_unretained_by_default", ResultConvention::Unowned},
              {"returns_retained_by_default", ResultConvention::Owned}});
