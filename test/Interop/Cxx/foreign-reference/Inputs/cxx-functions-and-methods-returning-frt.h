@@ -407,7 +407,7 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:rretain")))
 __attribute__((swift_attr("release:rrelease"))) RefType {};
 
-RefType *returnRefType() { return new RefType(); }   // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+RefType *returnRefType() { return new RefType(); } // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:dretain")))
@@ -449,16 +449,14 @@ __attribute__((swift_attr("release:derivedRelease2"))) DerivedType2
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:derivedRetain3")))
-__attribute__((swift_attr("release:derivedRelease3"))) __attribute__((
-    swift_attr("returns_unretained_by_default"))) DerivedTypeOverrideDefault
+__attribute__((swift_attr("release:derivedRelease3")))
+__attribute__((swift_attr("returns_unretained_by_default"))) DerivedOverride
     : public DerivedType {};
 
 BaseType *returnBaseType() { return new BaseType(); }
 DerivedType *returnDerivedType() { return new DerivedType(); }
 DerivedType2 *returnDerivedType2() { return new DerivedType2(); }
-DerivedTypeOverrideDefault *returnDerivedTypeOverrideDefault() {
-  return new DerivedTypeOverrideDefault();
-}
+DerivedOverride *returnDerivedOverride() { return new DerivedOverride(); }
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:bRetain")))
@@ -487,10 +485,8 @@ void derivedRelease(DefaultOwnershipInheritance::DerivedType *v) {};
 void derivedRetain2(DefaultOwnershipInheritance::DerivedType2 *v) {};
 void derivedRelease2(DefaultOwnershipInheritance::DerivedType2 *v) {};
 
-void derivedRetain3(
-    DefaultOwnershipInheritance::DerivedTypeOverrideDefault *v) {};
-void derivedRelease3(
-    DefaultOwnershipInheritance::DerivedTypeOverrideDefault *v) {};
+void derivedRetain3(DefaultOwnershipInheritance::DerivedOverride *v) {};
+void derivedRelease3(DefaultOwnershipInheritance::DerivedOverride *v) {};
 
 void bRetain(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};
 void bRelease(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};

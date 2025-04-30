@@ -276,8 +276,8 @@ func testDefaultOwnershipAnnotation() {
   let _ = DefaultOwnershipInheritance.returnDerivedType2()
   // CHECK: function_ref {{.*}}returnDerivedType2{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.DerivedType2
 
-  let _ = DefaultOwnershipInheritance.returnDerivedTypeOverrideDefault()
-  // CHECK: function_ref {{.*}}returnDerivedTypeOverrideDefault{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedTypeOverrideDefault
+  let _ = DefaultOwnershipInheritance.returnDerivedOverride()
+  // CHECK: function_ref {{.*}}returnDerivedOverride{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedOverride
 
   let _ = DefaultOwnershipInheritance.returnBaseTypeNonDefault()
   // CHECK: function_ref {{.*}}returnBaseTypeNonDefault{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.BaseTypeNonDefault
