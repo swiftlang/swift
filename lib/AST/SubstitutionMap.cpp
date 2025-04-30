@@ -427,8 +427,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
                                    const NominalTypeDecl *derivedNominal,
                                    GenericSignature baseSig,
                                    const GenericParamList *derivedParams)
-  : Ctx(baseSig->getASTContext()),
-    BaseDepth(0),
+  : BaseDepth(0),
     OrigDepth(0),
     DerivedParams(derivedParams) {
 
@@ -468,10 +467,7 @@ Type QueryOverrideSubs::operator()(SubstitutableType *type) const {
             ->getDeclaredInterfaceType();
       }
 
-      return GenericTypeParamType::get(
-          gp->getParamKind(),
-          gp->getDepth() + info.OrigDepth - info.BaseDepth,
-          gp->getIndex(), gp->getValueType(), info.Ctx);
+      return gp->withDepth(gp->getDepth() + info.OrigDepth - info.BaseDepth);
     }
   }
 
