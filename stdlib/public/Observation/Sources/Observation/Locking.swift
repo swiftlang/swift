@@ -25,6 +25,7 @@ import Musl
 import WinSDK
 #elseif canImport(Bionic)
 import Bionic
+#elseif arch(wasm32)
 #else
 #error("Unsupported platform")
 #endif
@@ -36,6 +37,8 @@ internal struct Lock {
   typealias Primitive = pthread_mutex_t
   #elseif canImport(WinSDK)
   typealias Primitive = SRWLOCK
+  #elseif arch(wasm32)
+  typealias Primitive = Int
   #else
   #error("Unsupported platform")
   #endif
@@ -55,6 +58,8 @@ internal struct Lock {
     precondition(result == 0, "pthread_mutex_init failed")
     #elseif canImport(WinSDK)
     InitializeSRWLock(platformLock)
+    #elseif arch(wasm32)
+    platformLock.initialize(to: 0)
     #else
     #error("Unsupported platform")
     #endif
@@ -75,6 +80,7 @@ internal struct Lock {
     pthread_mutex_lock(platformLock)
     #elseif canImport(WinSDK)
     AcquireSRWLockExclusive(platformLock)
+    #elseif arch(wasm32)
     #else
     #error("Unsupported platform")
     #endif
@@ -88,6 +94,7 @@ internal struct Lock {
     precondition(result == 0, "pthread_mutex_unlock failed")
     #elseif canImport(WinSDK)
     ReleaseSRWLockExclusive(platformLock)
+    #elseif arch(wasm32)
     #else
     #error("Unsupported platform")
     #endif
