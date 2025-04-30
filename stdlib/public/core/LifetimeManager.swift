@@ -290,7 +290,7 @@ public func _copy<T>(_ value: T) -> T {
 @_alwaysEmitIntoClient
 @_transparent
 @lifetime(borrow source)
-internal func _overrideLifetime<
+public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
   _ dependent: consuming T, borrowing source: borrowing U
@@ -308,7 +308,7 @@ internal func _overrideLifetime<
 @_alwaysEmitIntoClient
 @_transparent
 @lifetime(copy source)
-internal func _overrideLifetime<
+public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
   _ dependent: consuming T, copying source: borrowing U
@@ -326,7 +326,7 @@ internal func _overrideLifetime<
 @_alwaysEmitIntoClient
 @_transparent
 @lifetime(&source)
-internal func _overrideLifetime<
+public func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
   _ dependent: consuming T,
