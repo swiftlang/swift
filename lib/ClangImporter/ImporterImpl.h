@@ -1755,6 +1755,7 @@ public:
 
   void importSwiftAttrAttributes(Decl *decl);
   void swiftify(FuncDecl *MappedDecl);
+  void swiftifyProtocol(NominalTypeDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

@@ -533,6 +533,10 @@ static ProtocolConformanceRef getPackTypeConformance(
       PackConformance::get(type, protocol, patternConformances));
 }
 
+static bool shouldExpandExtensionMacro(Evaluator &evaluator, NominalTypeDecl *nominal) {
+  return !evaluator.hasActiveRequest(ExpandExtensionMacros{nominal});
+}
+
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
@@ -670,10 +674,11 @@ LookupConformanceInModuleRequest::evaluate(
   // extension macro can generate a conformance to the
   // given protocol, but conformance macros do not specify
   // that information upfront.
-  (void)evaluateOrDefault(
-      ctx.evaluator,
-      ExpandExtensionMacros{nominal},
-      { });
+  if (shouldExpandExtensionMacro(ctx.evaluator, nominal))
+    (void)evaluateOrDefault(
+        evaluator,
+        ExpandExtensionMacros{nominal},
+        { });
 
   // Find the root conformance in the nominal type declaration's
   // conformance lookup table.

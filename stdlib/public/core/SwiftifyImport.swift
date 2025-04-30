@@ -54,12 +54,74 @@ public enum _SwiftifyInfo {
 /// It will replace some std::span arguments with Swift's Span type when sufficient information is
 /// available.
 ///
-/// Currently not supported: return pointers, nested pointers, pointee "count" parameters, endedBy.
+/// Currently not supported: nested pointers, pointee "count" parameters, endedBy.
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
-public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
+public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., availability: [String: String] = [:], typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
+
+/// Allows annotating pointer parameters in a protocol method using the `@_SwiftifyImportProtocol` macro.
+///
+/// This is not marked @available, because _SwiftifyImportProtocolMethod is available for any target.
+/// Instances of _SwiftifyProtocolMethodInfo should ONLY be passed as arguments directly to
+/// _SwiftifyImportProtocolMethod, so they should not affect linkage since there are never any instances
+/// at runtime.
+public enum _SwiftifyProtocolMethodInfo {
+    case method(signature: String, paramInfo: [_SwiftifyInfo])
+}
+
+/// Like _SwiftifyImport, but since protocols cannot contain function implementations they need to
+/// be placed in a separate extension instead. Unlike _SwiftifyImport, which applies to a single
+/// function, this macro supports feeding info about multiple methods and generating safe overloads
+/// for all of them at once.
+#if hasFeature(Macros)
+@attached(extension, names: arbitrary)
+public macro _SwiftifyImportProtocol(_ methodInfo: _SwiftifyProtocolMethodInfo...,
+                                     availability: [String: String] = [:],
+                                     typeMappings: [String: String] = [:]) =
+    #externalMacro(module: "SwiftMacros", type: "SwiftifyImportProtocolMacro")
+#endif
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+public func _swiftifyOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(copy source)
+public func _swiftifyOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}

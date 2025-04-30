@@ -7,7 +7,7 @@ func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CInt) {
 }
 
 // CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer, _ size: CInt) {
+// CHECK-NEXT: public func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer, _ size: CInt) {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = size
 // CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")

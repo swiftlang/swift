@@ -545,7 +545,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
       } else {
         "MutableSpan"
       }
-    return "unsafe _cxxOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
+    return "unsafe _swiftifyOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
   }
 }
 
@@ -691,20 +691,24 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
         cast = optType.wrappedType
       }
       return """
-      { () in
-        let _resultValue = \(call)
-        if unsafe _resultValue == nil {
-          return nil
-        } else {
-          return unsafe \(raw: cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
-        }
-      }()
-      """
+        { () in
+          let _resultValue = \(call)
+          if unsafe _resultValue == nil {
+            return nil
+          } else {
+            return unsafe \(raw: cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
+          }
+        }()
+        """
     }
-    return
+    var expr = ExprSyntax(
       """
-      unsafe \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
-      """
+      \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
+      """)
+    if generateSpan {
+      expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
+    }
+    return "unsafe \(expr)"
   }
 }
 
@@ -778,6 +782,14 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
     args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
+
+    if skipTrivialCount {
+      if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+        let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
+        args[i] = castIntToTargetType(
+          expr: "\(unwrappedName).count", type: getParam(signature, i).type)
+      }
+    }
     let call = try base.buildFunctionCall(args)
     let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
 
@@ -851,11 +863,13 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         nullArgs[index] = ExprSyntax(NilLiteralExprSyntax(nilKeyword: .keyword(.nil)))
         return ExprSyntax(
           """
-            { () in return if \(name) == nil {
+            { () in
+              return if \(name) == nil {
                 \(try base.buildFunctionCall(nullArgs))
               } else {
                 \(unwrappedCall)
-              } }()
+              }
+            }()
           """)
       }
       return unwrappedCall
@@ -1057,14 +1071,7 @@ func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) thro
   return (pointer, dependence)
 }
 
-func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
-  guard let unwrappedParamAST = paramAST else {
-    return nil
-  }
-  let paramExpr = unwrappedParamAST.expression
-  guard let dictExpr = paramExpr.as(DictionaryExprSyntax.self) else {
-    return nil
-  }
+func parseStringLiteralDict(_ dictExpr: DictionaryExprSyntax) throws -> [String: String] {
   var dict: [String: String] = [:]
   switch dictExpr.content {
   case .colon(_):
@@ -1084,6 +1091,32 @@ func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: St
     throw DiagnosticError("unknown dictionary literal", node: dictExpr)
   }
   return dict
+}
+
+func parseStringMappingParam(_ paramAST: LabeledExprSyntax?, paramName: String) throws -> [String:
+  String]?
+{
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  guard let label = unwrappedParamAST.label else {
+    return nil
+  }
+  if label.trimmed.text != paramName {
+    return nil
+  }
+  let paramExpr = unwrappedParamAST.expression
+  guard let dictExpr = paramExpr.as(DictionaryExprSyntax.self) else {
+    return nil
+  }
+  return try parseStringLiteralDict(dictExpr)
+}
+
+func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
+  return try parseStringMappingParam(paramAST, paramName: "typeMappings")
+}
+func parseAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
+  return try parseStringMappingParam(paramAST, paramName: "availability")
 }
 
 func parseCxxSpansInSignature(
@@ -1117,11 +1150,10 @@ func parseCxxSpansInSignature(
 }
 
 func parseMacroParam(
-  _ paramAST: LabeledExprSyntax, _ signature: FunctionSignatureSyntax,
+  _ paramExpr: ExprSyntax, _ signature: FunctionSignatureSyntax,
   nonescapingPointers: inout Set<Int>,
   lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]]
 ) throws -> ParamInfo? {
-  let paramExpr = paramAST.expression
   guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
     throw DiagnosticError(
       "expected _SwiftifyInfo enum literal as argument, got '\(paramExpr)'", node: paramExpr)
@@ -1304,6 +1336,23 @@ func isMutableSpan(_ type: TypeSyntax) -> Bool {
   return name == "MutableSpan" || name == "MutableRawSpan"
 }
 
+func isImmutableSpan(_ type: TypeSyntax) -> Bool {
+  if let optType = type.as(OptionalTypeSyntax.self) {
+    return isImmutableSpan(optType.wrappedType)
+  }
+  if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+    return isImmutableSpan(impOptType.wrappedType)
+  }
+  if let attrType = type.as(AttributedTypeSyntax.self) {
+    return isImmutableSpan(attrType.baseType)
+  }
+  guard let identifierType = type.as(IdentifierTypeSyntax.self) else {
+    return false
+  }
+  let name = identifierType.name.text
+  return name == "Span" || name == "RawSpan"
+}
+
 func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSyntax) -> Bool {
   for elem in attrs {
     guard let attr = elem.as(AttributeSyntax.self) else {
@@ -1351,6 +1400,171 @@ func paramLifetimeAttributes(
   return defaultLifetimes
 }
 
+func getAvailability(_ newSignature: FunctionSignatureSyntax, _ typeAvailability: [String: String]?)
+  -> [AttributeListSyntax.Element]
+{
+  guard let typeAvailability = typeAvailability else {
+    return []
+  }
+  var hasMutableSpan = false
+  var hasSpan = false
+  if let returnClause = newSignature.returnClause {
+    hasMutableSpan = isMutableSpan(returnClause.type)
+    hasSpan = isImmutableSpan(returnClause.type)
+  }
+  for param in newSignature.parameterClause.parameters {
+    if hasMutableSpan {
+      break
+    }
+    hasMutableSpan = isMutableSpan(param.type)
+    hasSpan = hasSpan || isImmutableSpan(param.type)
+  }
+  if !hasMutableSpan && !hasSpan {
+    return []
+  }
+  let availability =
+    if hasMutableSpan {
+      typeAvailability["MutableSpan"]
+    } else {
+      typeAvailability["Span"]
+    }
+  return [.attribute(AttributeSyntax("@available(\(raw: availability!), *)"))]
+}
+
+func setVisibility(_ modifiers: inout DeclModifierListSyntax, _ funcKeyword: inout TokenSyntax) {
+  var hasVisibilityModifier = false
+  for i in modifiers.indices {
+    let modName = modifiers[i].name.trimmed.text
+    if modName == "public" || modName == "internal" || modName == "private" || modName == "filePrivate" {
+      return
+    }
+    if modName == "open" {
+      modifiers[i] = modifiers[i].with(\.name, .identifier("public",
+        leadingTrivia: modifiers[i].leadingTrivia, trailingTrivia: modifiers[i].trailingTrivia))
+      return
+    }
+  }
+  // We have no visibility modifier, so insert "public"
+  // If the next token has a line break, steal that to make it print consistently
+  if let firstMod = modifiers.first {
+    if !firstMod.leadingTrivia.isEmpty {
+      modifiers = [DeclModifierSyntax(name: .identifier("public", leadingTrivia: firstMod.leadingTrivia)),
+        firstMod.trimmed] + modifiers.dropFirst()
+    }
+    return
+  }
+  if !funcKeyword.leadingTrivia.isEmpty {
+    modifiers = [DeclModifierSyntax(name: .identifier("public", leadingTrivia: funcKeyword.leadingTrivia))] + modifiers
+    funcKeyword = .identifier("func", trailingTrivia: funcKeyword.trailingTrivia)
+    return
+  }
+  modifiers = [DeclModifierSyntax(name: .identifier("public"))] + modifiers
+}
+
+func constructOverloadFunction(
+  forDecl funcDecl: FunctionDeclSyntax,
+  args arguments: [ExprSyntax],
+  typeAvailability: [String: String]?,
+  typeMappings: [String: String]?
+) throws -> DeclSyntax {
+  var nonescapingPointers = Set<Int>()
+  var lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]] = [:]
+  var parsedArgs = try arguments.compactMap {
+    try parseMacroParam(
+      $0, funcDecl.signature, nonescapingPointers: &nonescapingPointers,
+      lifetimeDependencies: &lifetimeDependencies)
+  }
+  parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcDecl.signature, typeMappings))
+  setNonescapingPointers(&parsedArgs, nonescapingPointers)
+  setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
+  // We only transform non-escaping spans.
+  parsedArgs = parsedArgs.filter {
+    if let cxxSpanArg = $0 as? CxxSpan {
+      return cxxSpanArg.nonescaping || cxxSpanArg.pointerIndex == .return
+    } else {
+      return true
+    }
+  }
+  try checkArgs(parsedArgs, funcDecl)
+  parsedArgs.sort { a, b in
+    // make sure return value cast to Span happens last so that withUnsafeBufferPointer
+    // doesn't return a ~Escapable type
+    if a.pointerIndex != .return && b.pointerIndex == .return {
+      return true
+    }
+    if a.pointerIndex == .return && b.pointerIndex != .return {
+      return false
+    }
+    return paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
+  }
+  let baseBuilder = FunctionCallBuilder(funcDecl)
+
+  let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
+
+  let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
+    baseBuilder,
+    { (prev, parsedArg) in
+      parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
+    })
+  let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
+  let checks =
+    skipTrivialCount
+    ? [] as [CodeBlockItemSyntax]
+    : try builder.buildBoundsChecks().map { e in
+      CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
+    }
+  let call = CodeBlockItemSyntax(
+    item: CodeBlockItemSyntax.Item(
+      ReturnStmtSyntax(
+        returnKeyword: .keyword(.return, trailingTrivia: " "),
+        expression: try builder.buildFunctionCall([:]))))
+  let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
+  let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
+  let lifetimeAttrs =
+    returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
+  let availabilityAttr = getAvailability(newSignature, typeAvailability)
+  let disfavoredOverload: [AttributeListSyntax.Element] =
+    (onlyReturnTypeChanged
+      ? [
+        .attribute(
+          AttributeSyntax(
+            atSign: .atSignToken(),
+            attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
+      ] : [])
+  // non-@objc methods should not be open, fall back to public instead
+  var modifiers: DeclModifierListSyntax = funcDecl.modifiers
+  var funcKeyword: TokenSyntax = funcDecl.funcKeyword
+  setVisibility(&modifiers, &funcKeyword)
+  let newFunc =
+    funcDecl
+    .with(\.signature, newSignature)
+    .with(\.body, body)
+    .with(
+      \.attributes,
+      funcDecl.attributes.filter { e in
+        switch e {
+        case .attribute(let attr):
+          // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
+          let name = attr.attributeName.as(IdentifierTypeSyntax.self)?.name.text
+          return name == nil || (name != "_SwiftifyImport" && name != "_alwaysEmitIntoClient")
+        default: return true
+        }
+      } + [
+        .attribute(
+          AttributeSyntax(
+            atSign: .atSignToken(),
+            attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
+      ]
+        + availabilityAttr
+        + lifetimeAttrs
+        + disfavoredOverload
+    )
+  // Break up the expression to let the compiler type check
+  return DeclSyntax(newFunc
+    .with(\.modifiers, modifiers)
+    .with(\.funcKeyword, funcKeyword))
+}
+
 /// A macro that adds safe(r) wrappers for functions with unsafe pointer types.
 /// Depends on bounds, escapability and lifetime information for each pointer.
 /// Intended to map to C attributes like __counted_by, __ended_by and __no_escape,
@@ -1374,92 +1588,127 @@ public struct SwiftifyImportMacro: PeerMacro {
       if typeMappings != nil {
         arguments = arguments.dropLast()
       }
-      var nonescapingPointers = Set<Int>()
-      var lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]] = [:]
-      var parsedArgs = try arguments.compactMap {
-        try parseMacroParam(
-          $0, funcDecl.signature, nonescapingPointers: &nonescapingPointers,
-          lifetimeDependencies: &lifetimeDependencies)
+      let typeAvailability = try parseAvailabilityParam(arguments.last)
+      if typeAvailability != nil {
+        arguments = arguments.dropLast()
       }
-      parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcDecl.signature, typeMappings))
-      setNonescapingPointers(&parsedArgs, nonescapingPointers)
-      setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
-      // We only transform non-escaping spans.
-      parsedArgs = parsedArgs.filter {
-        if let cxxSpanArg = $0 as? CxxSpan {
-          return cxxSpanArg.nonescaping || cxxSpanArg.pointerIndex == .return
-        } else {
-          return true
-        }
-      }
-      try checkArgs(parsedArgs, funcDecl)
-      parsedArgs.sort { a, b in
-        // make sure return value cast to Span happens last so that withUnsafeBufferPointer
-        // doesn't return a ~Escapable type
-        if a.pointerIndex != .return && b.pointerIndex == .return {
-          return true
-        }
-        if a.pointerIndex == .return && b.pointerIndex != .return {
-          return false
-        }
-        return paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
-      }
-      let baseBuilder = FunctionCallBuilder(funcDecl)
+      let args = arguments.map { $0.expression }
+      return [
+        try constructOverloadFunction(
+          forDecl: funcDecl, args: args, typeAvailability: typeAvailability,
+          typeMappings: typeMappings)
+      ]
+    } catch let error as DiagnosticError {
+      context.diagnose(
+        Diagnostic(
+          node: error.node, message: MacroExpansionErrorMessage(error.description),
+          notes: error.notes))
+      return []
+    }
+  }
+}
 
-      let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
+func parseProtocolMacroParam(
+  _ paramAST: LabeledExprSyntax,
+  methods: [String: FunctionDeclSyntax]
+) throws -> (FunctionDeclSyntax, [ExprSyntax]) {
+  let paramExpr = paramAST.expression
+  guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected _SwiftifyProtocolMethodInfo enum literal as argument, got '\(paramExpr)'",
+      node: paramExpr)
+  }
+  let enumName = try parseEnumName(paramExpr)
+  if enumName != "method" {
+    throw DiagnosticError(
+      "expected 'method', got '\(enumName)'",
+      node: enumConstructorExpr)
+  }
+  let argumentList = enumConstructorExpr.arguments
+  let methodSignatureArg = try getArgumentByName(argumentList, "signature")
+  guard let methodSignatureStringLit = methodSignatureArg.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected string literal for 'signature' parameter, got \(methodSignatureArg)", node: methodSignatureArg)
+  }
+  let methodSignature = methodSignatureStringLit.representedLiteralValue!
+  guard let methodSyntax = methods[methodSignature] else {
+    var notes: [Note] = []
+    var name = methodSignature
+    if let methodSyntax = DeclSyntax("\(raw: methodSignature)").as(FunctionDeclSyntax.self) {
+      name = methodSyntax.name.trimmed.text
+    }
+    for (_, method) in methods where method.name.trimmed.text == name {
+      notes.append(Note(node: Syntax(method.name), message: MacroExpansionNoteMessage("did you mean '\(method.trimmed.description)'?")))
+    }
+    throw DiagnosticError(
+      "method with signature '\(methodSignature)' not found in protocol", node: methodSignatureArg, notes: notes)
+  }
+  let paramInfoArg = try getArgumentByName(argumentList, "paramInfo")
+  guard let paramInfoArgList = paramInfoArg.as(ArrayExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected array literal for 'paramInfo' parameter, got \(paramInfoArg)", node: paramInfoArg)
+  }
+  return (methodSyntax, paramInfoArgList.elements.map { ExprSyntax($0.expression) })
+}
 
-      let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
-        baseBuilder,
-        { (prev, parsedArg) in
-          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
-        })
-      let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
-      let checks =
-        skipTrivialCount
-        ? [] as [CodeBlockItemSyntax]
-        : try builder.buildBoundsChecks().map { e in
-          CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
+/// Similar to SwiftifyImportMacro, but for providing overloads to methods in
+/// protocols using an extension, rather than in the same scope as the original.
+public struct SwiftifyImportProtocolMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    do {
+      let members: MemberBlockItemListSyntax =
+        switch declaration.kind {
+        case .protocolDecl:
+          declaration.as(ProtocolDeclSyntax.self)!.memberBlock.members
+        case .classDecl:
+          declaration.as(ClassDeclSyntax.self)!.memberBlock.members
+        default:
+          throw DiagnosticError(
+            "@_SwiftifyImportProtocol only works on protocols and classes", node: declaration)
         }
-      let call = CodeBlockItemSyntax(
-        item: CodeBlockItemSyntax.Item(
-          ReturnStmtSyntax(
-            returnKeyword: .keyword(.return, trailingTrivia: " "),
-            expression: try builder.buildFunctionCall([:]))))
-      let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
-      let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
-      let lifetimeAttrs =
-        returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
-      let disfavoredOverload: [AttributeListSyntax.Element] =
-        (onlyReturnTypeChanged
-          ? [
-            .attribute(
-              AttributeSyntax(
-                atSign: .atSignToken(),
-                attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
-          ] : [])
-      let newFunc =
-        funcDecl
-        .with(\.signature, newSignature)
-        .with(\.body, body)
-        .with(
-          \.attributes,
-          funcDecl.attributes.filter { e in
-            switch e {
-            case .attribute(let attr):
-              // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
-              let name = attr.attributeName.as(IdentifierTypeSyntax.self)?.name.text
-              return name == nil || (name != "_SwiftifyImport" && name != "_alwaysEmitIntoClient")
-            default: return true
-            }
-          } + [
-            .attribute(
-              AttributeSyntax(
-                atSign: .atSignToken(),
-                attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
-          ]
-            + lifetimeAttrs
-            + disfavoredOverload)
-      return [DeclSyntax(newFunc)]
+      let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
+      var arguments = [LabeledExprSyntax](argumentList)
+      let typeMappings = try parseTypeMappingParam(arguments.last)
+      if typeMappings != nil {
+        arguments = arguments.dropLast()
+      }
+      let typeAvailability = try parseAvailabilityParam(arguments.last)
+      if typeAvailability != nil {
+        arguments = arguments.dropLast()
+      }
+
+      var methods: [String: FunctionDeclSyntax] = [:]
+      for member in members {
+        guard let methodDecl = member.decl.as(FunctionDeclSyntax.self) else {
+          continue
+        }
+        let trimmedDecl = methodDecl.with(\.body, nil)
+                                    .with(\.attributes, [])
+                                    .trimmed
+        methods[trimmedDecl.description] = methodDecl
+      }
+      let overloads = try arguments.map {
+        let (method, args) = try parseProtocolMacroParam($0, methods: methods)
+        let function = try constructOverloadFunction(
+          forDecl: method, args: args, typeAvailability: typeAvailability,
+          typeMappings: typeMappings)
+        return MemberBlockItemSyntax(decl: function)
+      }
+      return [
+        ExtensionDeclSyntax(
+          extensionKeyword: .identifier("extension"), extendedType: type,
+          memberBlock: MemberBlockSyntax(
+            leftBrace: .leftBraceToken(),
+            members: MemberBlockItemListSyntax(overloads),
+            rightBrace: .rightBraceToken())
+        )
+      ]
     } catch let error as DiagnosticError {
       context.diagnose(
         Diagnostic(
