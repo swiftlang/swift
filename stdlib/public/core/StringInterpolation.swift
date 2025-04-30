@@ -202,7 +202,7 @@ extension DefaultStringInterpolation {
   @inlinable
   public mutating func appendInterpolation<T>(
     _ value: T?,
-    default: @autoclosure () -> String
+    default: @autoclosure () -> some StringProtocol
   ) where T: TextOutputStreamable, T: CustomStringConvertible {
     if let value {
       self.appendInterpolation(value)
@@ -215,7 +215,7 @@ extension DefaultStringInterpolation {
   @inlinable
   public mutating func appendInterpolation<T>(
     _ value: T?,
-    default: @autoclosure () -> String
+    default: @autoclosure () -> some StringProtocol
   ) where T: TextOutputStreamable {
     if let value {
       self.appendInterpolation(value)
@@ -228,7 +228,7 @@ extension DefaultStringInterpolation {
   @inlinable
   public mutating func appendInterpolation<T>(
     _ value: T?, 
-    default: @autoclosure () -> String
+    default: @autoclosure () -> some StringProtocol
   ) where T: CustomStringConvertible {
     if let value {
       self.appendInterpolation(value)
@@ -241,7 +241,7 @@ extension DefaultStringInterpolation {
   @inlinable
   public mutating func appendInterpolation<T>(
     _ value: T?, 
-    default: @autoclosure () -> String
+    default: @autoclosure () -> some StringProtocol
   ) {
     if let value {
       self.appendInterpolation(value)
