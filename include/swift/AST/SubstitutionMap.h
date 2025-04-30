@@ -337,7 +337,6 @@ struct OuterSubstitutions {
   SubstitutionMap subs;
   unsigned depth;
 
-  bool isUnsubstitutedTypeParameter(Type type) const;
   Type operator()(SubstitutableType *type) const;
   ProtocolConformanceRef operator()(CanType dependentType,
                                     Type conformingReplacementType,
