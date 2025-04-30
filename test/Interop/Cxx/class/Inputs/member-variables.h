@@ -2,6 +2,7 @@
 #define TEST_INTEROP_CXX_CLASS_INPUTS_MEMBER_VARIABLES_H
 
 #include <cstddef>
+#include <type_traits>
 #include <optional>
 
 class MyClass {
@@ -46,6 +47,25 @@ struct ReuseOptionalFieldPaddingWithTypedef {
   int offset() const { return offsetof(ReuseOptionalFieldPadding, c); }
 };
 
+// Using a mix of private and public fields prevents this class from being
+// standard-layout, which is necessary to allow clang to reuse its padding.
+template<typename T>
+struct NonStandardLayoutClass {
+private:
+  T x;
+public:
+  char pad_me;
+};
+static_assert(std::is_standard_layout_v<NonStandardLayoutClass<int>> == false);
+
+struct ReuseNonStandardLayoutFieldPadding {
+  [[no_unique_address]] NonStandardLayoutClass<int> a;
+  char c;
+  char get_c() const { return c; }
+  void set_c(char c) { this->c = c; }
+  // C-style implementation of offsetof() to avoid non-standard-layout warning
+  int offset() const { return (char *) &this->c - (char *) this; }
+};
 
 inline int takesZeroSizedInCpp(HasZeroSizedField x) {
   return x.a;
