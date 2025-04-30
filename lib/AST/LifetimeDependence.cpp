@@ -954,7 +954,7 @@ protected:
       Type paramTypeInContext =
         afd->mapTypeIntoContext(param->getInterfaceType());
       if (paramTypeInContext->hasError()) {
-        continue;
+        return;
       }
       auto kind = inferLifetimeDependenceKind(paramTypeInContext,
                                               param->getValueOwnership());

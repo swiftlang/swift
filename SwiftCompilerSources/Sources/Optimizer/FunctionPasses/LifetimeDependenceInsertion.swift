@@ -300,8 +300,8 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
   }
 }
 
-/// Walk up the value dependence chain to find the best-effort variable declaration. Typically called while diagnosing
-/// an error.
+/// Walk up the value dependence chain to find the best-effort variable declaration. Used to find the source of a borrow
+/// dependence or to print the source variable in a diagnostic message.
 ///
 /// Returns an array with at least one introducer value.
 ///
@@ -440,11 +440,12 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
 
   /// Override to check for on-stack variables before following an initializer.
   mutating func walkUp(address: Value, access: AccessBaseAndScopes) -> WalkResult {
-    // Check for stack locations that correspond to an lvalue.
-    if case let .stack(allocStack) = access.base {
-      if allocStack.varDecl != nil {
-        // Report this variable's innermmost access scope.
-        return addressIntroducer(access.enclosingAccess.address ?? address, access: access)
+    // Check for stack locations that correspond to an lvalue if there isn't any nested access scope.
+    if access.innermostAccess == nil {
+      if case let .stack(allocStack) = access.base {
+        if allocStack.varDecl != nil {
+          return addressIntroducer(allocStack, access: access)
+        }
       }
     }
     return walkUpDefault(address: address, access: access)
