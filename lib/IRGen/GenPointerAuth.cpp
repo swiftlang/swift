@@ -325,16 +325,10 @@ PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
   llvm_unreachable("bad kind");
 }
 
-static llvm::ConstantInt *getDiscriminatorForHash(IRGenModule &IGM,
-                                                  uint64_t rawHash) {
-  uint16_t reducedHash = (rawHash % 0xFFFF) + 1;
-  return llvm::ConstantInt::get(IGM.Int64Ty, reducedHash);
-}
-
 static llvm::ConstantInt *getDiscriminatorForString(IRGenModule &IGM,
                                                     StringRef string) {
-  uint64_t rawHash = llvm::getPointerAuthStableSipHash(string);
-  return getDiscriminatorForHash(IGM, rawHash);
+  return llvm::ConstantInt::get(IGM.Int64Ty,
+                                llvm::getPointerAuthStableSipHash(string));
 }
 
 static std::string mangle(AssociatedTypeDecl *assocType) {
@@ -571,7 +565,8 @@ static void hashStringForFunctionType(IRGenModule &IGM, CanSILFunctionType type,
   }
 }
 
-static uint64_t getTypeHash(IRGenModule &IGM, CanSILFunctionType type) {
+static llvm::ConstantInt *getTypeDiscriminator(IRGenModule &IGM,
+                                               CanSILFunctionType type) {
   // The hash we need to do here ignores:
   //   - thickness, so that we can promote thin-to-thick without rehashing;
   //   - error results, so that we can promote nonthrowing-to-throwing
@@ -591,10 +586,11 @@ static uint64_t getTypeHash(IRGenModule &IGM, CanSILFunctionType type) {
   hashStringForFunctionType(
       IGM, type, Out,
       genericSig.getCanonicalSignature().getGenericEnvironment());
-  return llvm::getPointerAuthStableSipHash(Out.str());
+  return getDiscriminatorForString(IGM, Out.str());
 }
 
-static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
+static llvm::ConstantInt *
+getCoroutineYieldTypesDiscriminator(IRGenModule &IGM, CanSILFunctionType type) {
   SmallString<32> buffer;
   llvm::raw_svector_ostream out(buffer);
   auto genericSig = type->getInvocationGenericSignature();
@@ -630,7 +626,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     out << ":";
   }
 
-  return llvm::getPointerAuthStableSipHash(out.str());
+  return getDiscriminatorForString(IGM, out.str());
 }
 
 llvm::ConstantInt *
@@ -650,8 +646,7 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
       llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
       if (cache) return cache;
 
-      auto hash = getTypeHash(IGM, fnType);
-      cache = getDiscriminatorForHash(IGM, hash);
+      cache = ::getTypeDiscriminator(IGM, fnType);
       return cache;
     }
     
@@ -668,15 +663,6 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
     llvm_unreachable("invalid representation");
   };
 
-  auto getCoroutineYieldTypesDiscriminator = [&](CanSILFunctionType fnType) {
-    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
-    if (cache) return cache;
-
-    auto hash = getYieldTypesHash(IGM, fnType);
-    cache = getDiscriminatorForHash(IGM, hash);
-    return cache;
-  };
-
   switch (StoredKind) {
   case Kind::None:
   case Kind::Special:
@@ -688,7 +674,13 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
 
   case Kind::CoroutineYieldTypes: {
     auto fnType = Storage.get<CanSILFunctionType>(StoredKind);
-    return getCoroutineYieldTypesDiscriminator(fnType);
+
+    llvm::ConstantInt *&cache = IGM.getPointerAuthCaches().Types[fnType];
+    if (cache)
+      return cache;
+
+    cache = getCoroutineYieldTypesDiscriminator(IGM, fnType);
+    return cache;
   }
 
   case Kind::CanSILFunctionType: {
