@@ -6364,6 +6364,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
+
+      if (isSymbolicCircularBase(cxxRecord, baseRecord))
+        // Skip circular bases to avoid unbounded recursion
+        continue;
+
       if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
         // If we are looking up the base class, go no further. We will have
         // already found it during the other lookup.
@@ -8773,4 +8778,19 @@ bool importer::isClangNamespace(const DeclContext *dc) {
     return isa_and_nonnull<clang::NamespaceDecl>(ed->getClangDecl());
 
   return false;
+}
+
+bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,
+                                      const clang::RecordDecl *base) {
+  auto *classTemplate = symbolicClass->getDescribedClassTemplate();
+  if (!classTemplate)
+    return false;
+
+  auto *specializedBase =
+      dyn_cast<clang::ClassTemplateSpecializationDecl>(base);
+  if (!specializedBase)
+    return false;
+
+  return classTemplate->getCanonicalDecl() ==
+         specializedBase->getSpecializedTemplate()->getCanonicalDecl();
 }
