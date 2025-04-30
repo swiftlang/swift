@@ -198,6 +198,23 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
 }
 
 extension DefaultStringInterpolation {
+  /// Interpolates the given optional value's textual representation, or the
+  /// specified default string, into the string literal being created.
+  ///
+  /// You don't need to call this method directly. It is used by the compiler
+  /// when interpreting string interpolations where you provide a `default`
+  /// parameter.
+  ///
+  ///     var age: Int? = 48
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is 48
+  ///     age = nil
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is unknown
+  ///
+  /// - Parameters:
+  ///   - value: The value to include in a string interpolation, if non-`nil`.
+  ///   - default: The string to include if `value` is `nil`.
   @backDeployed(before: SwiftStdlib 6.2)
   @inlinable
   public mutating func appendInterpolation<T>(
@@ -211,6 +228,23 @@ extension DefaultStringInterpolation {
     }
   }
 
+  /// Interpolates the given optional value's textual representation, or the
+  /// specified default string, into the string literal being created.
+  ///
+  /// You don't need to call this method directly. It is used by the compiler
+  /// when interpreting string interpolations where you provide a `default`
+  /// parameter.
+  ///
+  ///     var age: Int? = 48
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is 48
+  ///     age = nil
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is unknown
+  ///
+  /// - Parameters:
+  ///   - value: The value to include in a string interpolation, if non-`nil`.
+  ///   - default: The string to include if `value` is `nil`.
   @backDeployed(before: SwiftStdlib 6.2)
   @inlinable
   public mutating func appendInterpolation<T>(
@@ -224,6 +258,23 @@ extension DefaultStringInterpolation {
     }
   }
 
+  /// Interpolates the given optional value's textual representation, or the
+  /// specified default string, into the string literal being created.
+  ///
+  /// You don't need to call this method directly. It is used by the compiler
+  /// when interpreting string interpolations where you provide a `default`
+  /// parameter.
+  ///
+  ///     var age: Int? = 48
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is 48
+  ///     age = nil
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is unknown
+  ///
+  /// - Parameters:
+  ///   - value: The value to include in a string interpolation, if non-`nil`.
+  ///   - default: The string to include if `value` is `nil`.
   @backDeployed(before: SwiftStdlib 6.2)
   @inlinable
   public mutating func appendInterpolation<T>(
@@ -237,6 +288,23 @@ extension DefaultStringInterpolation {
     }
   }
 
+  /// Interpolates the given optional value's textual representation, or the
+  /// specified default string, into the string literal being created.
+  ///
+  /// You don't need to call this method directly. It is used by the compiler
+  /// when interpreting string interpolations where you provide a `default`
+  /// parameter.
+  ///
+  ///     var age: Int? = 48
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is 48
+  ///     age = nil
+  ///     print("Your age is \(age, default: "unknown")")
+  ///     // Prints: Your age is unknown
+  ///
+  /// - Parameters:
+  ///   - value: The value to include in a string interpolation, if non-`nil`.
+  ///   - default: The string to include if `value` is `nil`.
   @backDeployed(before: SwiftStdlib 6.2)
   @inlinable
   public mutating func appendInterpolation<T>(
