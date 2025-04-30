@@ -55,7 +55,7 @@ class WasmKit(product.Product):
         """
         install_destdir = self.host_install_destdir(host_target)
         build_toolchain_path = install_destdir + self.args.install_prefix + '/bin'
-        shutil.copy(self.bin_path, build_toolchain_path)
+        shutil.copy(self.bin_path, build_toolchain_path + '/wasmkit')
 
     def build(self, host_target):
         self.bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
