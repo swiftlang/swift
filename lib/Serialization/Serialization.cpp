@@ -5812,6 +5812,7 @@ public:
                                            paramKind,
                                            hasDecl,
                                            genericParam->getDepth(),
+                                           genericParam->getWeight(),
                                            genericParam->getIndex(),
                                            declOrIdentifier,
                                            valueTypeID);

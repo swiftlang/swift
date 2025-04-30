@@ -46,10 +46,8 @@ RequirementEnvironment::RequirementEnvironment(
 
   auto conformanceToWitnessThunkGenericParamFn = [&](GenericTypeParamType *genericParam)
       -> GenericTypeParamType * {
-    return GenericTypeParamType::get(genericParam->getParamKind(),
-                                     genericParam->getDepth() + (covariantSelf ? 1 : 0),
-                                     genericParam->getIndex(),
-                                     genericParam->getValueType(), ctx);
+    return genericParam->withDepth(
+        genericParam->getDepth() + (covariantSelf ? 1 : 0));
   };
 
   // This is a substitution function from the generic parameters of the
@@ -109,9 +107,7 @@ RequirementEnvironment::RequirementEnvironment(
       // invalid code.
       if (genericParam->getDepth() != 1)
         return Type();
-      Type substGenericParam = GenericTypeParamType::get(
-          genericParam->getParamKind(), depth, genericParam->getIndex(),
-          genericParam->getValueType(), ctx);
+      Type substGenericParam = genericParam->withDepth(depth);
       if (genericParam->isParameterPack()) {
         substGenericParam = PackType::getSingletonPackExpansion(
             substGenericParam);
@@ -210,10 +206,7 @@ RequirementEnvironment::RequirementEnvironment(
     }
 
     // Create an equivalent generic parameter at the next depth.
-    auto substGenericParam = GenericTypeParamType::get(
-        genericParam->getParamKind(), depth, genericParam->getIndex(),
-        genericParam->getValueType(), ctx);
-
+    auto substGenericParam = genericParam->withDepth(depth);
     genericParamTypes.push_back(substGenericParam);
   }
 

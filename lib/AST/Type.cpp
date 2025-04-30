@@ -1736,7 +1736,8 @@ CanType TypeBase::computeCanonicalType() {
     auto &C = gpDecl->getASTContext();
     Result =
         GenericTypeParamType::get(gp->getParamKind(), gp->getDepth(),
-                                  gp->getIndex(), gp->getValueType(),
+                                  gp->getIndex(), gp->getWeight(),
+                                  gp->getValueType(),
                                   C);
     break;
   }
@@ -2081,8 +2082,9 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
   : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
     Decl(param) {
   ASSERT(param->getDepth() != GenericTypeParamDecl::InvalidDepth);
-  Depth = param->getDepth();
   IsDecl = true;
+  Depth = param->getDepth();
+  Weight = 0;
   Index = param->getIndex();
   ParamKind = param->getParamKind();
   ValueType = param->getValueType();
@@ -2095,8 +2097,9 @@ GenericTypeParamType::GenericTypeParamType(Identifier name,
                         canType->getRecursiveProperties()),
       Decl(nullptr) {
   Name = name;
-  Depth = canType->getDepth();
   IsDecl = false;
+  Depth = canType->getDepth();
+  Weight = canType->getWeight();
   Index = canType->getIndex();
   ParamKind = canType->getParamKind();
   ValueType = canType->getValueType();
@@ -2106,13 +2109,14 @@ GenericTypeParamType::GenericTypeParamType(Identifier name,
 
 GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
                                            unsigned depth, unsigned index,
-                                           Type valueType,
+                                           unsigned weight, Type valueType,
                                            RecursiveTypeProperties props,
                                            const ASTContext &ctx)
     : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
       Decl(nullptr) {
-  Depth = depth;
   IsDecl = false;
+  Depth = depth;
+  Weight = weight;
   Index = index;
   ParamKind = paramKind;
   ValueType = valueType;
@@ -2161,6 +2165,15 @@ Type GenericTypeParamType::getValueType() const {
     return getDecl()->getValueType();
 
   return ValueType;
+}
+
+GenericTypeParamType *GenericTypeParamType::withDepth(unsigned depth) const {
+  return GenericTypeParamType::get(getParamKind(),
+                                   depth,
+                                   getIndex(),
+                                   getWeight(),
+                                   getValueType(),
+                                   getASTContext());
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
