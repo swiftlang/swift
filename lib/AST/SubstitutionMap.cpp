@@ -473,16 +473,18 @@ Type QueryOverrideSubs::operator()(SubstitutableType *type) const {
 }
 
 ProtocolConformanceRef
-LookUpConformanceInOverrideSubs::operator()(CanType type,
-                                            Type substType,
+LookUpConformanceInOverrideSubs::operator()(InFlightSubstitution &IFS,
+                                            Type type,
                                             ProtocolDecl *proto) const {
   if (type->getRootGenericParam()->getDepth() >= info.BaseDepth)
-    return ProtocolConformanceRef::forAbstract(substType, proto);
+    return ProtocolConformanceRef::forAbstract(type.subst(IFS), proto);
 
-  if (auto conformance = info.BaseSubMap.lookupConformance(type, proto))
+  if (auto conformance = info.BaseSubMap.lookupConformance(
+        type->getCanonicalType(), proto)) {
     return conformance;
+  }
 
-  return lookupConformance(substType, proto);
+  return lookupConformance(type.subst(IFS), proto);
 }
 
 SubstitutionMap
@@ -665,8 +667,8 @@ Type OuterSubstitutions::operator()(SubstitutableType *type) const {
 }
 
 ProtocolConformanceRef OuterSubstitutions::operator()(
-                                        CanType dependentType,
-                                        Type conformingReplacementType,
+                                        InFlightSubstitution &IFS,
+                                        Type dependentType,
                                         ProtocolDecl *conformedProtocol) const {
   auto sig = subs.getGenericSignature();
   if (!sig->isValidTypeParameter(dependentType) ||
@@ -683,10 +685,10 @@ ProtocolConformanceRef OuterSubstitutions::operator()(
     // Once we check for that and handle it properly, the lookupConformance()
     // can become a forAbstract().
     return swift::lookupConformance(
-      conformingReplacementType, conformedProtocol);
+      dependentType.subst(IFS), conformedProtocol);
   }
 
   return LookUpConformanceInSubstitutionMap(subs)(
-      dependentType, conformingReplacementType, conformedProtocol);
+      IFS, dependentType, conformedProtocol);
 }
 

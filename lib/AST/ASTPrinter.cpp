@@ -1914,15 +1914,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     if (subMap.empty())
       return param;
 
-    return param.subst(
-      [&](SubstitutableType *type) -> Type {
-        if (cast<GenericTypeParamType>(type)->getDepth() < typeContextDepth)
-          return Type(type).subst(subMap);
-        return type;
-      },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return lookupConformance(substType, proto);
-      });
+    OuterSubstitutions replacer{subMap, typeContextDepth};
+    return param.subst(replacer, replacer,
+                       SubstFlags::PreservePackExpansionLevel);
   };
 
   /// Separate the explicit generic parameters from the implicit, opaque

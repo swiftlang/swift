@@ -112,10 +112,11 @@ RequirementEnvironment::RequirementEnvironment(
       return substGenericParam;
     },
     [substConcreteType, conformance, conformanceDC, covariantSelf, &ctx](
-        CanType type, Type replacement, ProtocolDecl *proto)
+        InFlightSubstitution &IFS, Type type, ProtocolDecl *proto)
           -> ProtocolConformanceRef {
       // The protocol 'Self' conforms concretely to the conforming type.
       if (type->isEqual(ctx.TheSelfType)) {
+        auto replacement = type.subst(IFS);
         ASSERT(covariantSelf || replacement->isEqual(substConcreteType));
 
         if (conformance) {
@@ -145,7 +146,7 @@ RequirementEnvironment::RequirementEnvironment(
 
       // All other generic parameters come from the requirement itself
       // and conform abstractly.
-      return MakeAbstractConformanceForGenericType()(type, replacement, proto);
+      return MakeAbstractConformanceForGenericType()(IFS, type, proto);
     });
 
   // If the requirement itself is non-generic, the witness thunk signature

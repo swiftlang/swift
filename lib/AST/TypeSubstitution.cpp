@@ -75,16 +75,29 @@ CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
 }
 
 ProtocolConformanceRef LookUpConformanceInModule::
-operator()(CanType dependentType, Type conformingReplacementType,
+operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
-  return lookupConformance(conformingReplacementType,
+  return lookupConformance(dependentType.subst(IFS),
                            conformedProtocol,
                            /*allowMissing=*/true);
 }
 
 ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
-operator()(CanType dependentType, Type conformingReplacementType,
+operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
+  if (dependentType->is<PrimaryArchetypeType>() ||
+      dependentType->is<PackArchetypeType>())
+    dependentType = dependentType->mapTypeOutOfContext();
+
+  auto result = Subs.lookupConformance(
+      dependentType->getCanonicalType(),
+      conformedProtocol);
+  if (!result.isInvalid())
+    return result;
+
+  // Don't compute this in the fast path above.
+  auto conformingReplacementType = dependentType.subst(IFS);
+
   // Lookup conformances for archetypes that conform concretely
   // via a superclass.
   if (conformingReplacementType->is<ArchetypeType>()) {
@@ -92,14 +105,6 @@ operator()(CanType dependentType, Type conformingReplacementType,
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
   }
-
-  if (isa<PrimaryArchetypeType>(dependentType) ||
-      isa<PackArchetypeType>(dependentType))
-    dependentType = dependentType->mapTypeOutOfContext()->getCanonicalType();
-
-  auto result = Subs.lookupConformance(dependentType, conformedProtocol);
-  if (!result.isInvalid())
-    return result;
 
   // Otherwise, the original type might be fixed to a concrete type in
   // the substitution map's input generic signature.
@@ -116,8 +121,27 @@ operator()(CanType dependentType, Type conformingReplacementType,
 }
 
 ProtocolConformanceRef MakeAbstractConformanceForGenericType::
-operator()(CanType dependentType, Type conformingReplacementType,
+operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
+  auto getConformance = [&](Type conformingReplacementType) {
+    if (conformingReplacementType->is<ErrorType>())
+      return ProtocolConformanceRef::forInvalid();
+
+    // A class-constrained archetype might conform to the protocol
+    // concretely.
+    if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
+      if (archetypeType->getSuperclass()) {
+        return lookupConformance(archetypeType, conformedProtocol);
+      }
+    }
+
+    return ProtocolConformanceRef::forAbstract(
+      conformingReplacementType, conformedProtocol);
+  };
+
+  // FIXME: Don't recompute this every time.
+  auto conformingReplacementType = dependentType.subst(IFS);
+
   // The places that use this can also produce conformance packs, generally
   // just for singleton pack expansions.
   if (auto conformingPack = conformingReplacementType->getAs<PackType>()) {
@@ -125,30 +149,16 @@ operator()(CanType dependentType, Type conformingReplacementType,
     for (auto conformingPackElt : conformingPack->getElementTypes()) {
       // Look through pack expansions; there's no equivalent conformance
       // expansion right now.
-      auto expansion = conformingPackElt->getAs<PackExpansionType>();
-      if (expansion) conformingPackElt = expansion->getPatternType();
+      if (auto expansion = conformingPackElt->getAs<PackExpansionType>())
+        conformingPackElt = expansion->getPatternType();
 
-      auto conformance =
-        (*this)(dependentType, conformingPackElt, conformedProtocol);
-      conformances.push_back(conformance);
+      conformances.push_back(getConformance(conformingPackElt));
     }
     return ProtocolConformanceRef(
         PackConformance::get(conformingPack, conformedProtocol, conformances));
   }
 
-  if (conformingReplacementType->is<ErrorType>())
-    return ProtocolConformanceRef::forInvalid();
-
-  // A class-constrained archetype might conform to the protocol
-  // concretely.
-  if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
-    if (archetypeType->getSuperclass()) {
-      return lookupConformance(archetypeType, conformedProtocol);
-    }
-  }
-
-  return ProtocolConformanceRef::forAbstract(
-    conformingReplacementType, conformedProtocol);
+  return getConformance(conformingReplacementType);
 }
 
 InFlightSubstitution::InFlightSubstitution(TypeSubstitutionFn substType,
@@ -274,12 +284,9 @@ Type InFlightSubstitution::substType(SubstitutableType *origType,
 
 ProtocolConformanceRef
 InFlightSubstitution::lookupConformance(Type dependentType,
-                                        ProtocolDecl *conformedProtocol,
+                                        ProtocolDecl *proto,
                                         unsigned level) {
-  auto substConfRef = BaselineLookupConformance(
-      dependentType->getCanonicalType(),
-      dependentType.subst(*this),
-      conformedProtocol);
+  auto substConfRef = BaselineLookupConformance(*this, dependentType, proto);
   if (!substConfRef ||
       ActivePackExpansions.empty() ||
       !substConfRef.isPack())
@@ -1115,7 +1122,7 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 }
 
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
-operator()(CanType maybeOpaqueType, Type replacementType,
+operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
            ProtocolDecl *protocol) const {
   auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
   if (!archetype)
@@ -1126,14 +1133,18 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   auto outerSubs = genericEnv->getOuterSubstitutions();
 
   auto substitutionKind = shouldPerformSubstitution(decl);
-  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute)
-    return ProtocolConformanceRef::forAbstract(replacementType, protocol);
+  if (substitutionKind == OpaqueSubstitutionKind::DontSubstitute) {
+    return ProtocolConformanceRef::forAbstract(
+      maybeOpaqueType.subst(IFS), protocol);
+  }
 
   auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
   // If the body of the opaque decl providing decl has not been type checked we
   // don't have a underlying substitution.
-  if (!subs.has_value())
-    return ProtocolConformanceRef::forAbstract(replacementType, protocol);
+  if (!subs.has_value()) {
+    return ProtocolConformanceRef::forAbstract(
+      maybeOpaqueType.subst(IFS), protocol);
+  }
 
   // Apply the underlying type substitutions to the interface type of the
   // archetype in question. This will map the inner generic signature of the
@@ -1153,8 +1164,10 @@ operator()(CanType maybeOpaqueType, Type replacementType,
                                        isContextWholeModule))
               return true;
             return false;
-          }))
-    return ProtocolConformanceRef::forAbstract(replacementType, protocol);
+          })) {
+    return ProtocolConformanceRef::forAbstract(
+      maybeOpaqueType.subst(IFS), protocol);
+  }
 
   auto partialSubstRef =
       subs->lookupConformance(archetype->getInterfaceType()->getCanonicalType(),
@@ -1170,7 +1183,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       // type back to the caller. This substitution will fail at runtime
       // instead.
       if (!alreadySeen->insert(seenKey).second) {
-        return lookupConformance(replacementType, protocol);
+        return lookupConformance(maybeOpaqueType.subst(IFS), protocol);
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
@@ -1213,11 +1226,11 @@ Type ReplaceExistentialArchetypesWithConcreteTypes::operator()(
 }
 
 ProtocolConformanceRef ReplaceExistentialArchetypesWithConcreteTypes::operator()(
-    CanType origType, Type substType, ProtocolDecl *proto) const {
+    InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto) const {
   auto existentialArchetype = dyn_cast<ExistentialArchetypeType>(origType);
   if (!existentialArchetype ||
       existentialArchetype->getGenericEnvironment() != env)
-    return ProtocolConformanceRef::forAbstract(substType, proto);
+    return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);
 
   return subs.lookupConformance(
       getInterfaceType(existentialArchetype)->getCanonicalType(), proto);
