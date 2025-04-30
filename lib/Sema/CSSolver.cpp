@@ -124,6 +124,15 @@ Solution ConstraintSystem::finalize() {
 
       CanType first = simplifyType(types.first)->getCanonicalType();
       CanType second = simplifyType(types.second)->getCanonicalType();
+
+      // Pick the restriction with the highest value to avoid depending on
+      // iteration order.
+      auto found = solution.ConstraintRestrictions.find({first, second});
+      if (found != solution.ConstraintRestrictions.end() &&
+          (unsigned) restriction <= (unsigned) found->second) {
+        continue;
+      }
+
       solution.ConstraintRestrictions[{first, second}] = restriction;
     }
   }
@@ -179,7 +188,7 @@ Solution ConstraintSystem::finalize() {
   // Remember the opened existential types.
   for (auto &openedExistential : OpenedExistentialTypes) {
     openedExistential.second = simplifyType(openedExistential.second)
-        ->castTo<OpenedArchetypeType>();
+        ->castTo<ExistentialArchetypeType>();
 
     assert(solution.OpenedExistentialTypes.count(openedExistential.first) == 0||
            solution.OpenedExistentialTypes[openedExistential.first]
@@ -256,8 +265,8 @@ Solution ConstraintSystem::finalize() {
     solution.PackExpansionEnvironments.insert(env);
   }
 
-  for (const auto &packEnv : PackEnvironments)
-    solution.PackEnvironments.insert(packEnv);
+  for (const auto &packEnv : PackElementExpansions)
+    solution.PackElementExpansions.insert(packEnv);
 
   for (const auto &synthesized : SynthesizedConformances) {
     solution.SynthesizedConformances.insert(synthesized);
@@ -355,10 +364,10 @@ void ConstraintSystem::replaySolution(const Solution &solution,
       recordPackExpansionEnvironment(expansion.first, expansion.second);
   }
 
-  // Register the solutions's pack environments.
-  for (auto &packEnvironment : solution.PackEnvironments) {
-    if (PackEnvironments.count(packEnvironment.first) == 0)
-      addPackEnvironment(packEnvironment.first, packEnvironment.second);
+  // Register the solutions's pack expansions.
+  for (auto &packEnvironment : solution.PackElementExpansions) {
+    if (PackElementExpansions.count(packEnvironment.first) == 0)
+      recordPackElementExpansion(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the defaulted type variables.
@@ -668,6 +677,10 @@ ConstraintSystem::SolverState::~SolverState() {
       tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options -= ConstraintSystemFlags::DebugConstraints;
   }
+
+  // This statistic is special because it's not a counter; we just update
+  // it in one shot at the end.
+  ASTBytesAllocated = CS.getASTContext().getSolverMemory();
 
   // Write our local statistics back to the overall statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
@@ -1168,6 +1181,11 @@ void ConstraintSystem::shrink(Expr *expr) {
         if (boundGeneric->hasUnresolvedType())
           return boundGeneric;
 
+        // Avoid handling InlineArray, building a tuple would be wrong, and
+        // we want to eliminate shrink.
+        if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
+          return Type();
+
         llvm::SmallVector<TupleTypeElt, 2> params;
         for (auto &type : boundGeneric->getGenericArgs()) {
           // One of the generic arguments in invalid or unresolved.
@@ -1338,8 +1356,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
-static bool debugConstraintSolverForTarget(ASTContext &C,
-                                           SyntacticElementTarget target) {
+bool constraints::debugConstraintSolverForTarget(
+    ASTContext &C, SyntacticElementTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
@@ -1876,8 +1894,8 @@ static Constraint *selectBestBindingDisjunction(
     if (!firstBindDisjunction)
       firstBindDisjunction = disjunction;
 
-    auto constraints = cs.getConstraintGraph().gatherConstraints(
-        typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+    auto constraints = cs.getConstraintGraph().gatherNearbyConstraints(
+        typeVar,
         [](Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Conversion;
         });
@@ -1906,8 +1924,8 @@ ConstraintSystem::findConstraintThroughOptionals(
   while (visitedVars.insert(rep).second) {
     // Look for a disjunction that binds this type variable to an overload set.
     TypeVariableType *optionalObjectTypeVar = nullptr;
-    auto constraints = getConstraintGraph().gatherConstraints(
-        rep, ConstraintGraph::GatheringKind::EquivalenceClass,
+    auto constraints = getConstraintGraph().gatherNearbyConstraints(
+        rep,
         [&](Constraint *match) {
           // If we have an "optional object of" constraint, we may need to
           // look through it to find the constraint we're looking for.
@@ -2549,13 +2567,13 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     }
   }
 
-  auto constraints = cs.CG.gatherConstraints(
+  auto constraints = cs.CG.gatherNearbyConstraints(
       typeVar,
-      ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *constraint) -> bool {
         switch (constraint->getKind()) {
         case ConstraintKind::Conversion:
         case ConstraintKind::Defaultable:
+        case ConstraintKind::NonisolatedConformsTo:
         case ConstraintKind::ConformsTo:
         case ConstraintKind::LiteralConformsTo:
         case ConstraintKind::TransitivelyConformsTo:

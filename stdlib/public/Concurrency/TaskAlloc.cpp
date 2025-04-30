@@ -17,9 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Task.h"
+#include "swift/Runtime/Concurrency.h"
 
 #include <stdlib.h>
 
@@ -66,4 +66,21 @@ void swift::swift_task_dealloc(void *ptr) {
 
 void swift::_swift_task_dealloc_specific(AsyncTask *task, void *ptr) {
   allocator(task).dealloc(ptr);
+}
+
+void swift::swift_task_dealloc_through(void *ptr) {
+  allocator(swift_task_getCurrent()).deallocThrough(ptr);
+}
+void *swift::swift_job_allocate(Job *job, size_t size) {
+  if (!job->isAsyncTask())
+    return nullptr;
+
+  return allocator(static_cast<AsyncTask *>(job)).alloc(size);
+}
+
+void swift::swift_job_deallocate(Job *job, void *ptr) {
+  if (!job->isAsyncTask())
+    return;
+
+  allocator(static_cast<AsyncTask *>(job)).dealloc(ptr);
 }

@@ -117,13 +117,13 @@ bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
 }
 
 void ModuleDependencyInfo::addOptionalModuleImport(
-    StringRef module, llvm::StringSet<> *alreadyAddedModules) {
+    StringRef module, bool isExported, llvm::StringSet<> *alreadyAddedModules) {
   if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
-    storage->optionalModuleImports.push_back(module.str());
+    storage->optionalModuleImports.push_back({module.str(), isExported});
 }
 
 void ModuleDependencyInfo::addModuleImport(
-    StringRef module, llvm::StringSet<> *alreadyAddedModules,
+    StringRef module, bool isExported, llvm::StringSet<> *alreadyAddedModules,
     const SourceManager *sourceManager, SourceLoc sourceLocation) {
   auto scannerImportLocToDiagnosticLocInfo =
       [&sourceManager](SourceLoc sourceLocation) {
@@ -137,14 +137,16 @@ void ModuleDependencyInfo::addModuleImport(
                              sourceManager->isOwning(sourceLocation);
 
   if (alreadyAddedModules && alreadyAddedModules->contains(module)) {
-    if (validSourceLocation) {
-      // Find a prior import of this module and add import location
-      for (auto &existingImport : storage->moduleImports) {
-        if (existingImport.importIdentifier == module) {
+    // Find a prior import of this module and add import location
+    // and adjust whether or not this module is ever imported as exported
+    for (auto &existingImport : storage->moduleImports) {
+      if (existingImport.importIdentifier == module) {
+        if (validSourceLocation) {
           existingImport.addImportLocation(
-              scannerImportLocToDiagnosticLocInfo(sourceLocation));
-          break;
+            scannerImportLocToDiagnosticLocInfo(sourceLocation));
         }
+        existingImport.isExported |= isExported;
+        break;
       }
     }
   } else {
@@ -153,15 +155,15 @@ void ModuleDependencyInfo::addModuleImport(
 
     if (validSourceLocation)
       storage->moduleImports.push_back(ScannerImportStatementInfo(
-          module.str(), scannerImportLocToDiagnosticLocInfo(sourceLocation)));
+          module.str(), isExported, scannerImportLocToDiagnosticLocInfo(sourceLocation)));
     else
       storage->moduleImports.push_back(
-          ScannerImportStatementInfo(module.str()));
+         ScannerImportStatementInfo(module.str(), isExported));
   }
 }
 
 void ModuleDependencyInfo::addModuleImport(
-    ImportPath::Module module, llvm::StringSet<> *alreadyAddedModules,
+    ImportPath::Module module, bool isExported, llvm::StringSet<> *alreadyAddedModules,
     const SourceManager *sourceManager, SourceLoc sourceLocation) {
   std::string ImportedModuleName = module.front().Item.str().str();
   auto submodulePath = module.getSubmodulePath();
@@ -174,7 +176,7 @@ void ModuleDependencyInfo::addModuleImport(
                               alreadyAddedModules);
   }
 
-  addModuleImport(ImportedModuleName, alreadyAddedModules,
+  addModuleImport(ImportedModuleName, isExported, alreadyAddedModules,
                   sourceManager, sourceLocation);
 }
 
@@ -203,7 +205,8 @@ void ModuleDependencyInfo::addModuleImports(
               importDecl->isExported()))
         continue;
 
-      addModuleImport(realPath, &alreadyAddedModules, sourceManager,
+      addModuleImport(realPath, importDecl->isExported(),
+                      &alreadyAddedModules, sourceManager,
                       importDecl->getLoc());
 
       // Additionally, keep track of which dependencies of a Source
@@ -487,7 +490,13 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr);
+      /* SharedFS */ nullptr,
+      // ScanningOptimizations::Default excludes the current working
+      // directory optimization. Clang needs to communicate with
+      // the build system to handle the optimization safely.
+      // Swift can handle the working directory optimizaiton
+      // already so it is safe to turn on all optimizations.
+      clang::tooling::dependencies::ScanningOptimizations::All);
   SharedFilesystemCache.emplace();
 }
 
@@ -745,19 +754,24 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       ClangScanningFormat,
       Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS);
+      UseClangIncludeTree ? nullptr : CacheFS,
+      // The current working directory optimization (off by default)
+      // should not impact CAS. We set the optization to all to be
+      // consistent with the non-CAS case.
+      clang::tooling::dependencies::ScanningOptimizations::All);
 
   return false;
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
     SwiftDependencyScanningService &globalScanningService,
-    std::string mainScanModuleName, std::string moduleOutputPath,
-    std::string scannerContextHash)
+    const std::string &mainScanModuleName, const std::string &moduleOutputPath,
+    const std::string &sdkModuleOutputPath, const std::string &scannerContextHash)
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
       moduleOutputPath(moduleOutputPath),
+      sdkModuleOutputPath(sdkModuleOutputPath),
       scanInitializationTime(std::chrono::system_clock::now()) {
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind)

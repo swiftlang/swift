@@ -100,6 +100,7 @@ public:
   virtual void addAsyncFunctionPointer(SILDeclRef declRef) {}
   virtual void addBaseConformanceDescriptor(BaseConformance BC) {}
   virtual void addClassMetadataBaseOffset(ClassDecl *CD) {}
+  virtual void addCoroFunctionPointer(SILDeclRef declRef) {}
   virtual void addDispatchThunk(SILDeclRef declRef) {}
   virtual void addDynamicFunction(AbstractFunctionDecl *AFD,
                                   DynamicKind dynKind) {}

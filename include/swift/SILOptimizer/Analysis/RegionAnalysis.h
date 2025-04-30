@@ -108,6 +108,7 @@ private:
 
 class TrackableValue;
 class TrackableValueState;
+struct TrackableValueLookupResult;
 
 enum class TrackableValueFlag {
   /// Base value that says a value is uniquely represented and is
@@ -272,6 +273,25 @@ public:
   }
 };
 
+/// A class that contains both a lookup value as well as extra metadata about
+/// properties of the original value that we looked up up from that we
+/// discovered as we searched for the lookup value.
+struct regionanalysisimpl::TrackableValueLookupResult {
+  /// The actual value that we are tracking.
+  ///
+  /// If we are tracking a Sendable address that has a non-Sendable base, this
+  /// will be an empty TrackableValue.
+  TrackableValue value;
+
+  /// If we are tracking an address, this is the base trackable value that is
+  /// being tracked. If the base is a Sendable value, then this will be an empty
+  /// TrackableValue.
+  std::optional<TrackableValue> base;
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+};
+
 class RegionAnalysis;
 
 class RegionAnalysisValueMap {
@@ -282,6 +302,8 @@ public:
   using Region = PartitionPrimitives::Region;
   using TrackableValue = regionanalysisimpl::TrackableValue;
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
+  using TrackableValueLookupResult =
+      regionanalysisimpl::TrackableValueLookupResult;
 
 private:
   /// A map from the representative of an equivalence class of values to their
@@ -301,30 +323,57 @@ private:
 
   /// State that the value -> representative computation yields to us.
   struct UnderlyingTrackedValueInfo {
+    /// The equivalence class value that we found that should be merged into
+    /// regions.
+    ///
+    /// Always set to a real value.
     SILValue value;
 
-    /// Only used for addresses.
-    std::optional<ActorIsolation> actorIsolation;
+    /// The actual base value that we found if we were looking for an address
+    /// equivilance class and had a non-Sendable base. If we have an object or
+    /// we do not have a separate base, this is SILValue().
+    SILValue base;
 
-    explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
+    /// Constructor for use if we only have either an object or an address
+    /// equivalence class that involves a complete non-Sendable path.
+    explicit UnderlyingTrackedValueInfo(SILValue value) : value(value), base() {
+      assert(value);
+    }
 
-    UnderlyingTrackedValueInfo() : value(), actorIsolation() {}
+    /// Constructor for use with addresses only where we have either:
+    ///
+    /// 1. A sendable address that is used but that has a non-Sendable base that
+    /// we have to insert requires for.
+    ///
+    /// 2. A non-Sendable address that is used but that has a separate
+    /// non-Sendable base due to an access path chain that has a split in
+    /// between the two due to the non-Sendable address being projected out of
+    /// an intervening sendable struct. The struct can be Sendable due to things
+    /// like being global actor isolated or by being marked @unchecked Sendable.
+    explicit UnderlyingTrackedValueInfo(SILValue value, SILValue base)
+        : value(value), base(base) {
+      assert(value);
+      assert(base);
+    }
+    UnderlyingTrackedValueInfo() : value(), base() {}
 
     UnderlyingTrackedValueInfo(const UnderlyingTrackedValueInfo &newVal)
-        : value(newVal.value), actorIsolation(newVal.actorIsolation) {}
+        : value(newVal.value), base(newVal.base) {}
 
     UnderlyingTrackedValueInfo &
     operator=(const UnderlyingTrackedValueInfo &newVal) {
       value = newVal.value;
-      actorIsolation = newVal.actorIsolation;
+      base = newVal.base;
       return *this;
     }
 
-    UnderlyingTrackedValueInfo(SILValue value,
-                               std::optional<ActorIsolation> actorIsolation)
-        : value(value), actorIsolation(actorIsolation) {}
-
     operator bool() const { return value; }
+
+    void print(llvm::raw_ostream &os) const;
+    SWIFT_DEBUG_DUMP {
+      print(llvm::dbgs());
+      llvm::dbgs() << '\n';
+    }
   };
 
   /// A map from a SILValue to its equivalence class representative.
@@ -342,7 +391,7 @@ public:
   }
 
   /// Returns the value for this instruction if it isn't a fake "represenative
-  /// value" to inject actor isolatedness. Asserts in such a case.
+  /// value" to inject actor isolation. Asserts in such a case.
   SILValue getRepresentative(Element trackableValueID) const;
 
   /// Returns the value for this instruction. If it is a fake "representative
@@ -350,7 +399,7 @@ public:
   SILValue maybeGetRepresentative(Element trackableValueID) const;
 
   /// Returns the value for this instruction if it isn't a fake "represenative
-  /// value" to inject actor isolatedness. Asserts in such a case.
+  /// value" to inject actor isolation. Asserts in such a case.
   RepresentativeValue getRepresentativeValue(Element trackableValueID) const;
 
   /// Returns the fake "representative value" for this element if it
@@ -363,10 +412,16 @@ public:
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
-  TrackableValue
+  TrackableValueLookupResult
   getTrackableValue(SILValue value,
                     bool isAddressCapturedByPartialApply = false) const;
 
+private:
+  TrackableValue
+  getTrackableValueHelper(SILValue value,
+                          bool isAddressCapturedByPartialApply = false) const;
+
+public:
   /// An actor introducing inst is an instruction that doesn't have any
   /// non-Sendable parameters and produces a new value that has to be actor
   /// isolated.
@@ -378,7 +433,8 @@ public:
 
 private:
   std::optional<TrackableValue> getValueForId(Element id) const;
-  std::optional<TrackableValue> tryToTrackValue(SILValue value) const;
+  std::optional<TrackableValueLookupResult>
+  tryToTrackValue(SILValue value) const;
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
@@ -399,6 +455,15 @@ private:
   /// call this directly! Only call it from getUnderlyingTrackedValue.
   UnderlyingTrackedValueInfo
   getUnderlyingTrackedValueHelper(SILValue value) const;
+
+  /// A helper function that performs the actual getUnderlyingTrackedValue
+  /// computation that is cached in getUnderlyingTrackedValue(). Please never
+  /// call this directly! Only call it from getUnderlyingTrackedValue.
+  UnderlyingTrackedValueInfo
+  getUnderlyingTrackedValueHelperObject(SILValue value) const;
+
+  UnderlyingTrackedValueInfo
+  getUnderlyingTrackedValueHelperAddress(SILValue value) const;
 
   UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) const {
     // Use try_emplace so we only construct underlying tracked value info on

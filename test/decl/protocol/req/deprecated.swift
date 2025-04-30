@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift
 
 protocol DeprecatedRequirement {
   @available(*, deprecated)
@@ -22,7 +22,7 @@ extension DeprecatedDefault {
   func f() {}  // expected-note {{'f()' declared here}}
 }
 
-// expected-warning@+1 {{deprecated default implementation is used to satisfy instance method 'f()' required by protocol 'DeprecatedDefault' [DeprecatedDeclaration]}}
+// expected-warning@+1 {{deprecated default implementation is used to satisfy instance method 'f()' required by protocol 'DeprecatedDefault'}}{{documentation-file=deprecated-declaration}}
 struct S2: DeprecatedDefault {}
 
 // No warning if the conformance itself is deprecated
@@ -56,5 +56,5 @@ extension DeprecatedDefaultWithMessage {
 }
 
 
-// expected-warning@+1 {{deprecated default implementation is used to satisfy instance method 'f()' required by protocol 'DeprecatedDefaultWithMessage': write it yourself [DeprecatedDeclaration]}}
+// expected-warning@+1 {{deprecated default implementation is used to satisfy instance method 'f()' required by protocol 'DeprecatedDefaultWithMessage': write it yourself}}{{documentation-file=deprecated-declaration}}
 struct S6: DeprecatedDefaultWithMessage {}

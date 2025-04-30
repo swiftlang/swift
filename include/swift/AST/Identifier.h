@@ -101,18 +101,21 @@ public:
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
-  /// FIXME: We should maybe cache this.
   bool isOperator() const {
     if (empty())
       return false;
     if (isEditorPlaceholder())
       return false;
-    if ((unsigned char)Pointer[0] < 0x80)
-      return isOperatorStartCodePoint((unsigned char)Pointer[0]);
 
     // Handle the high unicode case out of line.
     return isOperatorSlow();
   }
+
+  /// Returns true if this identifier contains non-identifier characters and
+  /// must always be escaped with backticks, even in contexts were other
+  /// escaped identifiers could omit backticks (like keywords as argument
+  /// labels).
+  bool mustAlwaysBeEscaped() const;
 
   bool isArithmeticOperator() const {
     return is("+") || is("-") || is("*") || is("/") || is("%");
@@ -350,6 +353,10 @@ public:
     return !isSpecial() && getIdentifier().isOperator();
   }
 
+  bool mustAlwaysBeEscaped() const {
+    return !isSpecial() && getIdentifier().mustAlwaysBeEscaped();
+  }
+
   bool isEditorPlaceholder() const {
     return !isSpecial() && getIdentifier().isEditorPlaceholder();
   }
@@ -378,7 +385,11 @@ public:
   }
 
   int compare(DeclBaseName other) const {
-    return userFacingName().compare(other.userFacingName());
+    if (int result = userFacingName().compare(other.userFacingName()))
+      return result;
+    if (getKind() == other.getKind())
+      return 0;
+    return getKind() < other.getKind() ? -1 : 1;
   }
 
   bool operator==(StringRef Str) const {
@@ -571,7 +582,12 @@ public:
   bool isOperator() const {
     return getBaseName().isOperator();
   }
-  
+
+  /// True if this name is an escaped identifier.
+  bool mustAlwaysBeEscaped() const {
+    return getBaseName().mustAlwaysBeEscaped();
+  }
+
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.
   ///
@@ -727,6 +743,8 @@ public:
   bool isOperator() const {
     return FullName.isOperator();
   }
+
+  bool mustAlwaysBeEscaped() const { return FullName.mustAlwaysBeEscaped(); }
 
   bool isCompoundName() const {
     return FullName.isCompoundName();

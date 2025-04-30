@@ -28,6 +28,7 @@
 namespace swift {
 class ASTScope;
 class AvailabilityScope;
+class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
 class Token;
@@ -52,6 +53,15 @@ enum class RestrictedImportKind {
 
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
+
+/// Language options only for use with a specific SourceFile.
+///
+/// Vended by SourceFile::getLanguageOptions().
+struct SourceFileLangOptions {
+  /// If unset, no value was provided. If a Type, that type is the type of the
+  /// isolation. If set to an empty type, nil was specified explicitly.
+  std::optional<Type> defaultIsolation;
+};
 
 /// A file containing Swift source code.
 ///
@@ -562,6 +572,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
+  /// File level language options.
+  SourceFileLangOptions getLanguageOptions() const;
+
 protected:
   virtual void
   lookupOperatorDirect(Identifier name, OperatorFixity fixity,
@@ -764,7 +777,7 @@ public:
 
   /// Get the root availability scope for the file. The root scope may be
   /// null if the scope tree has not been built yet. Use
-  /// TypeChecker::getOrBuildAvailabilityScope() to get a built
+  /// `AvailabilityScope::getOrBuildForSourceFile()` to get a built
   /// root of the tree.
   AvailabilityScope *getAvailabilityScope() const;
 

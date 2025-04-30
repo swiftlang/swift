@@ -75,7 +75,7 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT: Begin completions, 11 items
 // META_MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>.Type#]; name=self
 // META_MYSTRUCT_INT_DOT-DAG: Keyword/CurrNominal:                Type[#MyStruct<Int>.Type#]; name=Type
-// META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#T#]; name=Assoc
+// META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#Int#]; name=Assoc
 // META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#int: U#})[#MyStruct<Int>#]; name=init(int:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#withConstrainedGenericParam: SomeProto#})[#MyStruct<Int>#]; name=init(withConstrainedGenericParam:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#(self): MyStruct<Int>#})[#(x: SomeProto) -> Int#]; name=methodWithConstrainedGenericParam(:)

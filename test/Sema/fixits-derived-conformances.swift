@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -emit-library -module-name Types %S/Inputs/fixits-derived-conformances-multifile.swift -o %t/%target-library-name(Types)
-// RUN: %swift -typecheck -target %target-triple -I %t -verify %s
+// RUN: %target-typecheck-verify-swift %s -I %t
 
 import Types
 
@@ -17,5 +17,5 @@ extension GenericStruct: @retroactive Equatable { }
 
 extension Enum: @retroactive CaseIterable { }
 // expected-error@-1 {{extension outside of file declaring enum 'Enum' prevents automatic synthesis of 'allCases' for protocol 'CaseIterable'}}
-// expected-note@-2 {{add stubs for conformance}}{{44-44=\n    public static var allCases: [Enum]\n}}
+// expected-note@-2 {{add stubs for conformance}}{{44-44=\n    public static let allCases: [Enum]\n}}
 

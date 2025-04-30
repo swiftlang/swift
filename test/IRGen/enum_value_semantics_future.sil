@@ -8,6 +8,7 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 import Builtin
+import Swift
 
 enum NoPayload {
   case a

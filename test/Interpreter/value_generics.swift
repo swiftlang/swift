@@ -1,10 +1,9 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature ValueGenerics -Xfrontend  -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend  -disable-availability-checking) | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_ValueGenerics
 
 struct A<let N: Int, let M: Int> {}
 

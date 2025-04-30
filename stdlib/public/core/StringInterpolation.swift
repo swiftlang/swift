@@ -211,7 +211,7 @@ extension DefaultStringInterpolation: TextOutputStream {
   }
   
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    _storage._guts.append(_StringGuts(buffer, isASCII: true))
+    unsafe _storage._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }
 

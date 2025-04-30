@@ -370,23 +370,6 @@ done:
   if (SequencedExprs.size() == 1)
     return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
-  // If the left-most sequence expr is a 'try', hoist it up to turn
-  // '(try x) + y' into 'try (x + y)'. This is necessary to do in the
-  // parser because 'try' nodes are represented in the ASTScope tree
-  // to look up catch nodes. The scope tree must be syntactic because
-  // it's constructed before sequence folding happens during preCheckExpr.
-  // Otherwise, catch node lookup would find the incorrect catch node for
-  // 'try x + y' at the source location for 'y'.
-  //
-  // 'try' has restrictions for where it can appear within a sequence
-  // expr. This is still diagnosed in TypeChecker::foldSequence.
-  if (auto *tryEval = dyn_cast<AnyTryExpr>(SequencedExprs[0])) {
-    SequencedExprs[0] = tryEval->getSubExpr();
-    auto *sequence = SequenceExpr::create(Context, SequencedExprs);
-    tryEval->setSubExpr(sequence);
-    return makeParserResult(SequenceStatus, tryEval);
-  }
-
   return makeParserResult(SequenceStatus,
                           SequenceExpr::create(Context, SequencedExprs));
 }
@@ -436,8 +419,14 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     return sub;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Tok.isContextualKeyword("unsafe")) {
+  if (Tok.isContextualKeyword("unsafe") &&
+      !(peekToken().isAtStartOfLine() ||
+        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
+                          tok::equal, tok::colon, tok::comma, tok::eof) ||
+        (isExprBasic && peekToken().is(tok::l_brace)) ||
+        peekToken().is(tok::period) ||
+        (peekToken().isAny(tok::l_paren, tok::l_square) &&
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()))) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -553,8 +542,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse '@' sign, 'inout' or 'nonisolated' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      Tok.isContextualKeyword("nonisolated")) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);
@@ -844,8 +834,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     }
 
     // Record the name we parsed.
-    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
-                                                      nameLoc.getBaseNameLoc());
+    auto component = KeyPathExpr::Component::forUnresolvedMember(
+        name, FunctionRefInfo::unappliedBaseName(), nameLoc.getBaseNameLoc());
     components.push_back(component);
 
     // After the first component, we can start parsing keywords.
@@ -1918,11 +1908,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   default:
   UnknownCharacter:
     checkForInputIncomplete();
-    // Enable trailing comma in string literal interpolation
-    // Note that 'Tok.is(tok::r_paren)' is not used because the text is ")\"\n" but the kind is actualy 'eof'
-    if (Tok.is(tok::eof) && Tok.getText() == ")") {
-      return nullptr;
-    }
     // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);
     return nullptr;
@@ -1983,7 +1968,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(TokenLoc),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =
@@ -2164,7 +2149,8 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
     // the syntax for referring to the function pointer (foo(_:)),
     auto escaped = Tok.isEscapedIdentifier();
     auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
-    if (escaped && !underscore && canBeArgumentLabel(text)) {
+    if (escaped && !underscore && canBeArgumentLabel(text) &&
+        Lexer::isIdentifier(text)) {
       SourceLoc start = Tok.getLoc();
       SourceLoc end = start.getAdvancedLoc(Tok.getLength());
       diagnose(Tok, diag::escaped_parameter_name, text)
@@ -3470,6 +3456,20 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   if (!macroNameRef)
     return status;
 
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  // If we don't have swift-syntax and therefore have no support for macros,
+  // recognize #isolation as special and route it through
+  // CurrentContextIsolationExpr.
+  if (macroNameRef.getBaseName().userFacingName() == "isolation" &&
+      genericArgs.empty() &&
+      (!argList || argList->empty())) {
+    return makeParserResult(
+      status,
+      new (Context) CurrentContextIsolationExpr(
+          macroNameLoc.getStartLoc(), Type()));
+  }
+#endif
+
   return makeParserResult(
       status,
       MacroExpansionExpr::create(
@@ -3499,6 +3499,15 @@ ParserResult<Expr> Parser::parseExprCollection() {
   Parser::StructureMarkerRAII ParsingCollection(
                                 *this, LSquareLoc,
                                 StructureMarkerKind::OpenSquare);
+
+  // Check to see if we can parse an InlineArray type.
+  if (isStartOfInlineArrayTypeBody()) {
+    auto result = parseTypeInlineArray(LSquareLoc);
+    if (result.isNull() || result.isParseErrorOrHasCompletion())
+      return ParserStatus(result);
+
+    return makeParserResult(new (Context) TypeExpr(result.get()));
+  }
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
@@ -3674,8 +3683,6 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
   }
 }
 
-
-
 /// Parse availability query specification.
 ///
 ///  availability-spec:
@@ -3690,51 +3697,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 
     return makeParserResult(AvailabilitySpec::createWildcard(Context, StarLoc));
   }
-  if (Tok.isIdentifierOrUnderscore() &&
-       (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))
-      return parsePlatformAgnosticVersionConstraintSpec();
 
-  return parsePlatformVersionConstraintSpec();
-}
-
-/// Parse platform-agnostic version constraint specification.
-///
-///  language-version-constraint-spec:
-///     "swift" version-tuple
-///  package-description-version-constraint-spec:
-///     "_PackageDescription" version-tuple
-ParserResult<AvailabilitySpec>
-Parser::parsePlatformAgnosticVersionConstraintSpec() {
-  SourceLoc PlatformAgnosticNameLoc;
-  llvm::VersionTuple Version;
-  std::optional<AvailabilitySpecKind> Kind;
-  SourceRange VersionRange;
-
-  if (Tok.isIdentifierOrUnderscore()) {
-    if (Tok.getText() == "swift")
-      Kind = AvailabilitySpecKind::LanguageVersionConstraint;
-    else if (Tok.getText() == "_PackageDescription")
-      Kind = AvailabilitySpecKind::PackageDescriptionVersionConstraint;
-  }
-
-  if (!Kind.has_value())
-    return nullptr;
-
-  PlatformAgnosticNameLoc = Tok.getLoc();
-  consumeToken();
-  if (parseVersionTuple(Version, VersionRange,
-                        diag::avail_query_expected_version_number)) {
-    return nullptr;
-  }
-  return makeParserResult(AvailabilitySpec::createPlatformAgnostic(
-      Context, Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
-}
-
-/// Parse platform-version constraint specification.
-///
-///  platform-version-constraint-spec:
-///     identifier version-comparison version-tuple
-ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3760,30 +3723,13 @@ ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
   llvm::VersionTuple Version;
   SourceRange VersionRange;
 
-  if (parseVersionTuple(Version, VersionRange,
-                        diag::avail_query_expected_version_number)) {
-    return nullptr;
-  }
-
-  std::optional<PlatformKind> Platform =
-      platformFromString(PlatformIdentifier.str());
-
-  if (!Platform.has_value() || Platform.value() == PlatformKind::none) {
-    if (auto CorrectedPlatform =
-            closestCorrectedPlatformString(PlatformIdentifier.str())) {
-      diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
-               PlatformIdentifier, *CorrectedPlatform)
-          .fixItReplace(PlatformLoc, *CorrectedPlatform);
-    } else {
-      diagnose(PlatformLoc, diag::avail_query_unrecognized_platform_name,
-               PlatformIdentifier);
+  if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+    if (parseVersionTuple(Version, VersionRange,
+                          diag::avail_query_expected_version_number)) {
+      return nullptr;
     }
-    Platform = PlatformKind::none;
   }
 
-  // Register the platform name as a keyword token.
-  TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
-
-  return makeParserResult(AvailabilitySpec::createPlatformVersioned(
-      Context, Platform.value(), PlatformLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createForDomainIdentifier(
+      Context, PlatformIdentifier, PlatformLoc, Version, VersionRange));
 }

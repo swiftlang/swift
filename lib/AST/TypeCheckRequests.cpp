@@ -217,8 +217,7 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -248,10 +247,8 @@ void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const 
 }
 
 void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto requirement = std::get<0>(getStorage());
-  diags.diagnose(requirement, diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::Protocol,
-                 requirement->getName());
+  auto *proto = std::get<0>(getStorage());
+  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
@@ -274,9 +271,8 @@ void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) co
 }
 
 void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto requirement = std::get<0>(getStorage());
-  diags.diagnose(requirement, diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::Protocol, requirement->getName());
+  auto *proto = std::get<0>(getStorage());
+  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
@@ -301,9 +297,8 @@ void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
 
 void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
-  auto requirement = std::get<0>(getStorage());
-  diags.diagnose(requirement, diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::Protocol, requirement->getName());
+  auto *proto = std::get<0>(getStorage());
+  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool>
@@ -356,7 +351,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   decl->setIsDynamic(value);
 
   // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>())
+  if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
+        ABIRoleInfo(decl).providesAPI())
     decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
 }
 
@@ -1369,6 +1365,43 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// ConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<ActorIsolation>
+ConformanceIsolationRequest::getCachedResult() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return ActorIsolation::forNonisolated(false);
+
+  // Was actor isolation non-isolated?
+  if (rootNormal->isComputedNonisolated())
+    return ActorIsolation::forNonisolated(false);
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      cast<NormalProtocolConformance>(conformance->getRootConformance());
+
+  // Common case: conformance is nonisolated.
+  if (result.isNonisolated()) {
+    rootNormal->setComputedNonnisolated();
+    return;
+  }
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1381,8 +1414,7 @@ void HasCircularInheritedProtocolsRequest::diagnoseCycle(
 void HasCircularInheritedProtocolsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1396,8 +1428,7 @@ void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1655,16 +1686,16 @@ void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckSourceFileRequest computation.
+// TypeCheckPrimaryFileRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+evaluator::DependencySource TypeCheckPrimaryFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   return std::get<0>(getStorage());
 }
 
 std::optional<evaluator::SideEffect>
-TypeCheckSourceFileRequest::getCachedResult() const {
+TypeCheckPrimaryFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
     return std::make_tuple<>();
@@ -1672,7 +1703,7 @@ TypeCheckSourceFileRequest::getCachedResult() const {
   return std::nullopt;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
+void TypeCheckPrimaryFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.
@@ -1989,6 +2020,17 @@ void ActorIsolation::dump() const {
 void ActorIsolation::dumpForDiagnostics() const {
   printForDiagnostics(llvm::dbgs());
   llvm::dbgs() << '\n';
+}
+
+unsigned ActorIsolation::getActorInstanceUnionIndex() const {
+  assert(isActorInstanceIsolated());
+  if (actorInstance.is<NominalTypeDecl *>())
+    return 0;
+  if (actorInstance.is<VarDecl *>())
+    return 1;
+  if (actorInstance.is<Expr *>())
+    return 2;
+  llvm_unreachable("Unhandled");
 }
 
 void swift::simple_display(
@@ -2644,19 +2686,17 @@ void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed,
+                 "body");
 }
 
 void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity_through,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed_through,
+                 "body");
 }
 
 //----------------------------------------------------------------------------//
@@ -2716,6 +2756,23 @@ void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
 }
 
 //----------------------------------------------------------------------------//
+// PatternBindingCaptureInfoRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<CaptureInfo>
+PatternBindingCaptureInfoRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  return PBD->getPatternList()[idx].getCachedCaptureInfo();
+}
+
+void PatternBindingCaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setCaptureInfo(info);
+}
+
+//----------------------------------------------------------------------------//
 // SemanticAvailableAttrRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -2725,7 +2782,7 @@ SemanticAvailableAttrRequest::getCachedResult() const {
   if (!attr->hasComputedSemanticAttr())
     return std::nullopt;
 
-  if (!attr->hasCachedDomain()) {
+  if (!attr->getDomainOrIdentifier().isDomain()) {
     return std::optional<SemanticAvailableAttr>{};
   }
 

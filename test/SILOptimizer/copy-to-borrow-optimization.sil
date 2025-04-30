@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
+// REQUIRES: macosx
 
 sil_stage canonical
 
@@ -87,6 +88,7 @@ sil @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
 sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
 sil @closure : $@convention(thin) (@inout_aliasable Klass) -> ()
+sil @lendC : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
 sil @useC : $@convention(thin) (@guaranteed C) -> () {
 [global:]
 }
@@ -2156,3 +2158,105 @@ bb0(%0 : $*MultiPayload):
   return %2
 }
 
+// CHECK-LABEL: sil [ossa] @duplicate_lifetime_end1 :
+// CHECK:         load_borrow %0
+// CHECK:       } // end sil function 'duplicate_lifetime_end1'
+sil [ossa] @duplicate_lifetime_end1 : $@convention(thin) (@in_guaranteed (C, Optional<C>)) -> () {
+bb0(%0 : $*(C, Optional<C>)):
+  %1 = load [copy] %0
+  (%2, %3) = destructure_tuple %1
+  switch_enum %3, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : @owned $C):
+  destroy_value %2
+  destroy_value %4
+  br bb3
+
+bb2:
+  debug_value %2
+  destroy_value %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @duplicate_lifetime_end2 :
+// CHECK:         load_borrow %0
+// CHECK:       } // end sil function 'duplicate_lifetime_end2'
+sil [ossa] @duplicate_lifetime_end2 : $@convention(thin) (@in_guaranteed (C, Optional<C>)) -> () {
+bb0(%0 : $*(C, Optional<C>)):
+  %1 = load [copy] %0
+  (%2, %3) = destructure_tuple %1
+  switch_enum %3, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : @owned $C):
+  destroy_value %2
+  destroy_value %4
+  br bb3
+
+bb2:
+  destroy_value %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+
+// CHECK-LABEL: sil [ossa] @keep_yield2ed_copy : {{.*}} {
+// CHECK:         copy_value
+// CHECK:       } // end sil function 'keep_yield2ed_copy'
+sil [ossa] @keep_yield2ed_copy : $@convention(thin) () -> () {
+  %lendC = function_ref @lendC : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
+  (%c, %token, %alloc) = begin_apply %lendC()  : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
+  %copy = copy_value %c : $C
+  end_apply %token as $()
+  dealloc_stack %alloc : $*Builtin.SILToken
+  %useC = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  apply %useC(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %copy : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_from_forward1 : {{.*}} {
+// CHECK-NOT:   copy_value
+// CHECK-LABEL: } // end sil function 'borrowed_from_forward1'
+sil [ossa] @borrowed_from_forward1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  br bb1(%0)
+
+bb1(%1 : @guaranteed $C):
+  %2 = borrowed %1 from (%0)
+  %copy = copy_value %2
+  %useC = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  apply %useC(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %copy
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_from_forward2 : {{.*}} {
+// CHECK-NOT:   copy_value
+// CHECK-LABEL: } // end sil function 'borrowed_from_forward2'
+sil [ossa] @borrowed_from_forward2 : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : @guaranteed $Array<Int>):
+  %1 = struct_extract %0, #Array._buffer
+  %2 = struct_extract %1, #_ArrayBuffer._storage
+  %3 = struct_extract %2, #_BridgeStorage.rawValue
+  %4 = unchecked_ref_cast %3 to $__ContiguousArrayStorageBase
+  br bb1(%4)
+
+bb1(%6 : @guaranteed $__ContiguousArrayStorageBase):
+  %7 = borrowed %6 from (%0)
+  %8 = copy_value %7
+  %9 = begin_borrow %8
+  %10 = ref_element_addr [immutable] %9, #__ContiguousArrayStorageBase.countAndCapacity
+  end_borrow %9
+  destroy_value %8
+  %13 = tuple ()
+  return %13
+}

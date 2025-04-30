@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -89,6 +89,7 @@ extension String {
   ///     print(String(s1.utf8.prefix(15))!)
   ///     // Prints "They call me 'B"
   @frozen
+  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -233,7 +234,7 @@ extension String.UTF8View: BidirectionalCollection {
   @_alwaysEmitIntoClient @inline(__always)
   internal subscript(_unchecked i: Index) -> UTF8.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
-      return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
+      return unsafe _guts.withFastUTF8 { utf8 in unsafe utf8[_unchecked: i._encodedOffset] }
     }
 
     return _foreignSubscript(position: i)
@@ -278,7 +279,7 @@ extension String {
     @_effects(readonly) @_semantics("string.getUTF8CString")
     get {
       if _fastPath(_guts.isFastUTF8) {
-        var result = _guts.withFastCChar { ContiguousArray($0) }
+        var result = unsafe _guts.withFastCChar { unsafe ContiguousArray($0) }
         result.append(0)
         return result
       }
@@ -314,6 +315,48 @@ extension String.UTF8View {
       return _guts.count
     }
     return _foreignCount()
+  }
+}
+
+extension String.UTF8View {
+
+  /// A span over the UTF8 code units that make up this string.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property transcodes the code units the first time
+  /// it is called. The transcoded buffer is cached, and subsequent calls
+  /// to `span` can reuse the buffer.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this String.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings,
+  ///  amortized O(1) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+#if _runtime(_ObjC)
+      // handle non-UTF8 Objective-C bridging cases here
+      if !_guts.isFastUTF8, _guts._object.hasObjCBridgeableObject {
+        let storage = _guts._getOrAllocateAssociatedStorage()
+        let (start, count) = unsafe (storage.start, storage.count)
+        let span = unsafe Span(_unsafeStart: start, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let count = _guts.count
+      if _guts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
+        let span = unsafe Span(_unsafeStart: address, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      let isFastUTF8 = _guts.isFastUTF8
+      _precondition(isFastUTF8, "String must be contiguous UTF8")
+      let buffer = unsafe _guts._object.fastUTF8
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 
@@ -422,17 +465,17 @@ extension String.UTF8View {
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
-    guard buffer.baseAddress != nil else {
+    guard unsafe buffer.baseAddress != nil else {
         _preconditionFailure(
           "Attempt to copy string contents into nil buffer pointer")
     }
-    guard let written = _guts.copyUTF8(into: buffer) else {
+    guard let written = unsafe _guts.copyUTF8(into: buffer) else {
       _preconditionFailure(
         "Insufficient space allocated to copy string contents")
     }
 
     let it = String().utf8.makeIterator()
-    return (it, buffer.index(buffer.startIndex, offsetBy: written))
+    return (it, unsafe buffer.index(buffer.startIndex, offsetBy: written))
   }
 }
 
@@ -580,6 +623,6 @@ extension String.UTF8View {
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     guard _guts.isFastUTF8 else { return nil }
-    return try _guts.withFastUTF8(body)
+    return unsafe try _guts.withFastUTF8(body)
   }
 }

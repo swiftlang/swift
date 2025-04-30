@@ -335,6 +335,17 @@ public:
     lastAllocation = prev;
   }
 
+  void deallocThrough(void *ptr) {
+    void *current = nullptr;
+    do {
+      if (!lastAllocation) {
+        SWIFT_FATAL_ERROR(0, "freed pointer not among allocations");
+      }
+      current = lastAllocation->getAllocatedMemory();
+      dealloc(current);
+    } while (current != ptr);
+  }
+
   /// For unit testing.
   int getNumAllocatedSlabs() { return numAllocatedSlabs; }
 };

@@ -2,9 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Lib.swiftmodule -enable-objc-interop -I %S/Inputs/custom-modules %s
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -enable-objc-interop -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
-// FIXME: We need a way to handle the disappearing superclass in a position we
-// can't track easily from the containing class. rdar://problem/50835214
-// RUN: not --crash %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -enable-objc-interop -I %t -I %S/Inputs/custom-modules -Xcc -DBAD
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -enable-objc-interop -I %t -I %S/Inputs/custom-modules -Xcc -DBAD
 
 import SuperclassObjC
 

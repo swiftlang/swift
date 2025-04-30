@@ -16,9 +16,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILDeclRef_H
-#define SWIFT_SIL_SILDeclRef_H
+#ifndef SWIFT_SIL_SILDECLREF_H
+#define SWIFT_SIL_SILDECLREF_H
 
+#include "swift/AST/Attr.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/GenericSignature.h"
@@ -36,7 +38,6 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
-  class AutoDiffDerivativeFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -53,7 +54,6 @@ namespace swift {
   enum class SILLinkage : uint8_t;
   class AnyFunctionRef;
   class GenericSignature;
-  class CustomAttr;
 
 /// How a method is dispatched.
 enum class MethodDispatch {
@@ -407,13 +407,6 @@ struct SILDeclRef {
   /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
-  /// Return the hash code for the SIL declaration.
-  friend llvm::hash_code hash_value(const SILDeclRef &ref) {
-    return llvm::hash_combine(
-        ref.loc.getOpaqueValue(), static_cast<int>(ref.kind), ref.isForeign,
-        ref.distributedThunk, ref.defaultArgIndex, ref.isAsyncLetClosure);
-  }
-
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue() &&
            kind == rhs.kind && isForeign == rhs.isForeign &&
@@ -612,6 +605,25 @@ struct SILDeclRef {
   }
   
   bool hasAsync() const;
+  bool isCalleeAllocatedCoroutine() const;
+
+  /// Return the hash code for the SIL declaration.
+  friend llvm::hash_code hash_value(swift::SILDeclRef ref) {
+    return llvm::hash_combine(
+        llvm::hash_value(ref.loc.getOpaqueValue()),
+        llvm::hash_value(unsigned(ref.kind)),
+        llvm::hash_value(
+            (ref.kind == swift::SILDeclRef::Kind::DefaultArgGenerator)
+                ? ref.defaultArgIndex
+                : 0),
+        llvm::hash_value(ref.isForeign),
+        llvm::hash_value(ref.pointer.getOpaqueValue()),
+        llvm::hash_value(ref.distributedThunk),
+        llvm::hash_value(unsigned(ref.backDeploymentKind)),
+        llvm::hash_value(ref.isKnownToBeLocal),
+        llvm::hash_value(ref.isRuntimeAccessible),
+        llvm::hash_value(ref.isAsyncLetClosure));
+  }
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
@@ -660,19 +672,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                       nullptr);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
-    unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
-    unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
-    unsigned h3 = (Val.kind == Kind::DefaultArgGenerator)
-                    ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
-                    : 0;
-    unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
-    unsigned h5 = PointerInfo::getHashValue(Val.pointer.getOpaqueValue());
-    unsigned h6 = UnsignedInfo::getHashValue(Val.distributedThunk);
-    unsigned h7 = UnsignedInfo::getHashValue(unsigned(Val.backDeploymentKind));
-    unsigned h8 = UnsignedInfo::getHashValue(Val.isKnownToBeLocal);
-    unsigned h9 = UnsignedInfo::getHashValue(Val.isRuntimeAccessible);
-    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11) ^ (h6 << 8) ^
-      (h7 << 10) ^ (h8 << 13) ^ (h9 << 15);
+    return hash_value(Val);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {

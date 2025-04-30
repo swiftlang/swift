@@ -1,2 +1,3 @@
 target_sources(swift_Concurrency PRIVATE
-  CooperativeGlobalExecutor.cpp)
+  ExecutorImpl.swift
+  PlatformExecutorCooperative.swift)

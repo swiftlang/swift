@@ -732,11 +732,15 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
-          // Again, an injected no-payload case is treated like a "full"
-          // initialization. See initDataflowInBlock().
-          requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
-          locations.setBits(bits, IEAI->getOperand());
+        if (enumIdx >= 0) {
+          if (injectsNoPayloadCase(IEAI)) {
+            // Again, an injected no-payload case is treated like a "full"
+            // initialization. See initDataflowInBlock().
+            requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
+            locations.setBits(bits, IEAI->getOperand());
+          } else {
+            requireBitsSet(bits, IEAI->getOperand(), &I);
+          }
         }
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);
         break;
@@ -885,16 +889,18 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         locations.clearBits(bits, opVal);
         break;
       }
-      case SILInstructionKind::MarkDependenceInst: {
-        auto *mdi = cast<MarkDependenceInst>(&I);
-        if (mdi->getBase()->getType().isAddress() &&
+      case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst: {
+        auto mdi = MarkDependenceInstruction(&I);
+        if (mdi.getBase()->getType().isAddress() &&
             // In case the mark_dependence is used for a closure it might be that the base
             // is "self" in an initializer and "self" is not fully initialized, yet.
-            !mdi->getType().isFunction()) {
-          requireBitsSet(bits, mdi->getBase(), &I);
+            (!mdi.getType() || !mdi.getType().isFunction())) {
+          requireBitsSet(bits, mdi.getBase(), &I);
         }
         // TODO: check that the base operand is alive during the whole lifetime
-        // of the value operand.
+        // of the value operand. This requires treating all transitive uses of
+        // 'mdi' as uses of 'base' (including copies for non-Escapable types).
         break;
       }
       default:

@@ -335,8 +335,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
-  // Disabled due to a race condition (rdar://88652757)
+TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";
@@ -414,7 +413,9 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
     llvm::report_fatal_error("Did not receive a response for the first request");
 }
 
-TEST_F(CursorInfoTest, CursorInfoCancellation) {
+TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
+  // Disabled due to a race condition (rdar://88652757)
+
   // TODO: This test case relies on the following snippet being slow to type
   // check so that the first cursor info request takes longer to execute than it
   // takes time to schedule the second request. If that is fixed, we need to

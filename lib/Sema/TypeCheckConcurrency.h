@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Sema/Concurrency.h"
 
 #include <cassert>
@@ -407,9 +408,17 @@ struct SendableCheckContext {
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
 
+  /// Determine the preconcurrency behavior when referencing the given
+  /// declaration from a type. This only has an effect when the declaration
+  /// is a nominal type.
   std::optional<DiagnosticBehavior> preconcurrencyBehavior(
       Decl *decl,
       bool ignoreExplicitConformance = false) const;
+
+  /// Determine the preconcurrency behavior when referencing the given
+  /// non-Sendable type. This only has an effect when the declaration
+  /// is a nominal or metatype type.
+  std::optional<DiagnosticBehavior> preconcurrencyBehavior(Type type) const;
 
   /// Whether to warn about a Sendable violation even in minimal checking.
   bool warnInMinimalChecking() const;
@@ -439,6 +448,37 @@ namespace detail {
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
+/// \returns \c true if any errors were produced, \c false if no diagnostics or
+/// only warnings and notes were produced or if a decl contains a sending
+/// parameter or result
+template <typename... DiagArgs>
+bool diagnoseNonSendableTypesWithSendingCheck(
+    ValueDecl *decl, Type type, SendableCheckContext fromContext,
+    Type derivedConformance, SourceLoc typeLoc, SourceLoc diagnoseLoc,
+    Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type... diagArgs) {
+  if (auto param = dyn_cast<ParamDecl>(decl)) {
+    if (param->isSending()) {
+      return false;
+    }
+  }
+  if (auto *func = dyn_cast<FuncDecl>(decl)) {
+    if (func->hasSendingResult())
+      return false;
+  }
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    if (isa_and_nonnull<SendingTypeRepr>(subscript->getResultTypeRepr()))
+      return false;
+  }
+
+  return diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc, diagnoseLoc, diag,
+      std::forward<decltype(diagArgs)>(diagArgs)...);
+}
+
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
 /// \param typeLoc is the source location of the type being diagnosed
 ///
 /// \param diagnoseLoc is the source location at which the main diagnostic should
@@ -460,8 +500,7 @@ bool diagnoseNonSendableTypes(
       [&](Type specificType, DiagnosticBehavior behavior) {
         // FIXME: Reconcile preconcurrency declaration vs preconcurrency
         // import behavior.
-        auto preconcurrency =
-          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
+        auto preconcurrency = fromContext.preconcurrencyBehavior(specificType);
 
         ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
             .limitBehaviorWithPreconcurrency(behavior,
@@ -497,8 +536,7 @@ bool diagnoseIfAnyNonSendableTypes(
   diagnoseNonSendableTypes(
       type, fromContext, derivedConformance, typeLoc,
       [&](Type specificType, DiagnosticBehavior behavior) {
-        auto preconcurrency =
-          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
+        auto preconcurrency = fromContext.preconcurrencyBehavior(specificType);
 
         if (behavior == DiagnosticBehavior::Ignore ||
             preconcurrency == DiagnosticBehavior::Ignore)
@@ -617,9 +655,6 @@ ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
 ///          returns a pointer to the declaration.
 const AbstractFunctionDecl *isActorInitOrDeInitContext(const DeclContext *dc);
 
-/// Determine whether this declaration is always accessed asynchronously.
-bool isAsyncDecl(ConcreteDeclRef declRef);
-
 /// Determine whether this declaration can throw errors.
 bool isThrowsDecl(ConcreteDeclRef declRef);
 
@@ -698,6 +733,37 @@ void introduceUnsafeInheritExecutorReplacements(
 /// we route them to the @_unsafeInheritExecutor versions implicitly.
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
+
+/// Check for correct use of isolated conformances in the given reference.
+///
+/// This checks that any isolated conformances that occur in the given
+/// declaration reference match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the set given set of
+/// protocol conformances.
+///
+/// This checks that any isolated conformances that occur in the given
+/// declaration reference match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
+    const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the given substitution
+/// map.
+///
+/// This checks that any isolated conformances that occur in the given
+/// substitution map match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc);
+
+/// Check for correct use of isolated conformances in the given type.
+///
+/// This checks that any isolated conformances that occur in the given
+/// type match the isolated of the context.
+bool checkIsolatedConformancesInContext(
+    Type type, SourceLoc loc, const DeclContext *dc);
 
 } // end namespace swift
 

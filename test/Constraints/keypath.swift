@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct S {
   let i: Int
@@ -41,8 +42,10 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
-  _ = \S.init // expected-error {{key path cannot refer to initializer 'init()'}}
-  _ = ([S]()).map(\.init) // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = \S.Type.init
+  _ = \S.init // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
+  _ = ([S.Type]()).map(\.init)
+  _ = ([S]()).map(\.init) // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
 
   let kp = \S.i
   let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
@@ -317,4 +320,25 @@ extension Collection {
 // https://github.com/apple/swift/issues/56393
 func keypathToFunctionWithOptional() {
   _ = Array("").prefix(1...4, while: \.isNumber) // Ok
+}
+
+func test_new_key_path_type_requirements() {
+  struct V: ~Copyable {
+  }
+
+  struct S: ~Copyable {
+    var x: Int
+    var v: V
+  }
+
+  _ = \S.x // expected-error {{key path cannot refer to noncopyable type 'S'}}
+  _ = \S.v
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{key path cannot refer to noncopyable type 'V'}}
+
+  func test<R>(_: KeyPath<R, Int>) {} // expected-note {{'where R: Copyable' is implicit here}}
+
+  test(\S.x)
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
 }

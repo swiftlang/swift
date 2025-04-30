@@ -187,9 +187,13 @@ public:
   /// \param subReqs An out parameter initialized to a list of simpler
   /// requirements which the caller must check to ensure this
   /// requirement is completely satisfied.
+  /// \param isolatedConformances If non-NULL, will be provided with all of the
+  /// isolated conformances that
   CheckRequirementResult checkRequirement(
       SmallVectorImpl<Requirement> &subReqs,
-      bool allowMissing = false) const;
+      bool allowMissing = false,
+      SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances = nullptr
+  ) const;
 
   /// Determines if this substituted requirement can ever be satisfied,
   /// possibly with additional substitutions.

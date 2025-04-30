@@ -39,8 +39,8 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
-  return dyn_cast_or_null<OpenedArchetypeType>(getLocalArchetypeOf(Ty));
+CanExistentialArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+  return dyn_cast_or_null<ExistentialArchetypeType>(getLocalArchetypeOf(Ty));
 }
 CanLocalArchetypeType swift::getLocalArchetypeOf(CanType Ty) {
   if (!Ty)
@@ -157,6 +157,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
   if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
@@ -168,6 +169,13 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
+  if (auto bfa = getAs<BuiltinFixedArrayType>()) {
+    if (auto size = bfa->getFixedInhabitedSize()) {
+      return size == 0;
+    }
+  }
+
   return false;
 }
 
@@ -698,6 +706,39 @@ bool SILFunctionType::isNoReturnFunction(SILModule &M,
   return false;
 }
 
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
+  return isAddressable(paramIdx, caller->getModule(),
+                       caller->getGenericEnvironment(),
+                       caller->getModule().Types,
+                       caller->getTypeExpansionContext());
+}
+
+// 'genericEnv' may be null.
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
+                                    GenericEnvironment *genericEnv,
+                                    Lowering::TypeConverter &typeConverter,
+                                    TypeExpansionContext expansion) {
+  SILParameterInfo paramInfo = getParameters()[paramIdx];
+  for (auto &depInfo : getLifetimeDependencies()) {
+    auto *addressableIndices = depInfo.getAddressableIndices();
+    if (addressableIndices && addressableIndices->contains(paramIdx)) {
+      return true;
+    }
+    auto *condAddressableIndices = depInfo.getConditionallyAddressableIndices();
+    if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
+      CanType argType = paramInfo.getArgumentType(module, this, expansion);
+      CanType contextType = genericEnv
+        ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
+        : argType;
+      assert(!contextType->hasTypeParameter());
+      auto &tl = typeConverter.getTypeLowering(contextType, expansion);
+      if (tl.getRecursiveProperties().isAddressableForDependencies())
+        return true;
+    }
+  }
+  return false;
+}
+
 #ifndef NDEBUG
 static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   assert(type1->isLegalSILType());
@@ -1099,23 +1140,6 @@ SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   return tl.getLoweredType();
 }
 
-MetatypeRepresentation SILType::getRepresentationOfMetatype(SILFunction *function) const {
-  auto metaType = castTo<MetatypeType>();
-  return metaType->getRepresentation();
-}
-
-bool SILType::isOrContainsObjectiveCClass() const {
-  return getASTType().findIf([](Type ty) {
-    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
-      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
-        return true;
-    }
-    if (ty->is<ProtocolCompositionType>())
-      return true;
-    return false;
-  });
-}
-
 static bool hasImmortalAttr(NominalTypeDecl *nominal) {
   if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
     if (semAttr->Value == semantics::ARC_IMMORTAL) {
@@ -1155,6 +1179,13 @@ bool SILType::isMarkedAsImmortal() const {
     }
   }
   return false;
+}
+
+bool SILType::isAddressableForDeps(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto &tl = function.getTypeLowering(contextType);
+  return tl.getRecursiveProperties().isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {

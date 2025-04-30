@@ -19,14 +19,31 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include <optional>
 
+namespace swift {
+class AbstractConformance;
+}
+
 namespace llvm {
-  class raw_ostream;
+class raw_ostream;
+
+template <>
+struct PointerLikeTypeTraits<swift::AbstractConformance *> {
+public:
+  static inline void *getAsVoidPointer(swift::AbstractConformance *ptr) {
+    return ptr;
+  }
+  static inline swift::AbstractConformance *getFromVoidPointer(void *ptr) {
+    return (swift::AbstractConformance *)ptr;
+  }
+  enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+};
 }
 
 namespace swift {
@@ -52,21 +69,26 @@ enum class EffectKind : uint8_t;
 /// ProtocolConformanceRef allows the efficient recovery of the protocol
 /// even when the conformance is abstract.
 class ProtocolConformanceRef {
-  using UnionType = llvm::PointerUnion<ProtocolDecl *,
+public:
+  using UnionType = llvm::PointerUnion<AbstractConformance *,
                                        ProtocolConformance *,
                                        PackConformance *>;
+
+private:
   UnionType Union;
 
   explicit ProtocolConformanceRef(UnionType value) : Union(value) {}
 
-  /// Create an abstract protocol conformance reference.
-  explicit ProtocolConformanceRef(ProtocolDecl *proto) : Union(proto) {
-    assert(proto != nullptr &&
-           "cannot construct ProtocolConformanceRef with null");
-  }
-
 public:
   ProtocolConformanceRef() : Union() {}
+  ProtocolConformanceRef(std::nullptr_t) : Union() {}
+
+  /// Create an abstract protocol conformance reference.
+  explicit ProtocolConformanceRef(AbstractConformance *abstract)
+      : Union(abstract) {
+    assert(abstract != nullptr &&
+           "cannot construct ProtocolConformanceRef with null");
+  }
 
   /// Create a concrete protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolConformance *conf) : Union(conf) {
@@ -94,13 +116,14 @@ public:
   explicit operator bool() const { return !isInvalid(); }
 
   /// Create an abstract conformance for a type parameter or archetype.
-  static ProtocolConformanceRef forAbstract(Type subjectType,
+  static ProtocolConformanceRef forAbstract(Type conformingType,
                                             ProtocolDecl *protocol);
 
   bool isConcrete() const {
     return !isInvalid() && Union.is<ProtocolConformance*>();
   }
   ProtocolConformance *getConcrete() const {
+    ASSERT(isConcrete());
     return Union.get<ProtocolConformance*>();
   }
 
@@ -108,15 +131,16 @@ public:
     return !isInvalid() && Union.is<PackConformance*>();
   }
   PackConformance *getPack() const {
+    ASSERT(isPack());
     return Union.get<PackConformance*>();
   }
 
   bool isAbstract() const {
-    return !isInvalid() && Union.is<ProtocolDecl*>();
+    return !isInvalid() && Union.is<AbstractConformance*>();
   }
 
-  ProtocolDecl *getAbstract() const {
-    return Union.get<ProtocolDecl*>();
+  AbstractConformance *getAbstract() const {
+    return Union.get<AbstractConformance *>();
   }
 
   /// Determine whether this conformance (or a conformance it depends on)
@@ -140,21 +164,32 @@ public:
   bool forEachMissingConformance(
       llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const;
 
+  /// Enumerate all of the isolated conformances in the given conformance.
+  ///
+  /// The given `body` will be called on each isolated conformance. If it ever
+  /// returns `true`, this function will abort the search and return `true`.
+  bool forEachIsolatedConformance(
+      llvm::function_ref<bool(ProtocolConformanceRef)> body
+  ) const;
+
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
   static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {
     return ProtocolConformanceRef(UnionType::getFromOpaqueValue(value));
   }
 
+  /// Retrieve the conforming type.
+  Type getType() const;
+
   /// Return the protocol requirement.
-  ProtocolDecl *getRequirement() const;
+  ProtocolDecl *getProtocol() const;
   
   /// Apply a substitution to the conforming type.
-  ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,
+  ProtocolConformanceRef subst(SubstitutionMap subMap,
                                SubstOptions options = std::nullopt) const;
 
   /// Apply a substitution to the conforming type.
-  ProtocolConformanceRef subst(Type origType, TypeSubstitutionFn subs,
+  ProtocolConformanceRef subst(TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
                                SubstOptions options = std::nullopt) const;
 
@@ -162,26 +197,24 @@ public:
   ///
   /// This function should generally not be used outside of the substitution
   /// subsystem.
-  ProtocolConformanceRef subst(Type origType,
-                               InFlightSubstitution &IFS) const;
+  ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
 
   /// Map contextual types to interface types in the conformance.
   ProtocolConformanceRef mapConformanceOutOfContext() const;
 
   /// Look up the type witness for an associated type declaration in this
   /// conformance.
-  Type getTypeWitness(Type origType, AssociatedTypeDecl *assocType,
+  Type getTypeWitness(AssociatedTypeDecl *assocType,
                       SubstOptions options = std::nullopt) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
-  Type getAssociatedType(Type origType, Type dependentType) const;
+  Type getAssociatedType(Type dependentType) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol) and conformance, follow it from the conforming type.
   ProtocolConformanceRef
-  getAssociatedConformance(Type origType, Type dependentType,
-                           ProtocolDecl *requirement) const;
+  getAssociatedConformance(Type dependentType, ProtocolDecl *requirement) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0,
@@ -200,7 +233,7 @@ public:
     return llvm::hash_value(conformance.Union.getOpaqueValue());
   }
 
-  Type getTypeWitnessByName(Type type, Identifier name) const;
+  Type getTypeWitnessByName(Identifier name) const;
 
   /// Find a particular named function witness for a type that conforms to
   /// the given protocol.
@@ -208,7 +241,7 @@ public:
   /// \param type The conforming type.
   ///
   /// \param name The name of the requirement.
-  ConcreteDeclRef getWitnessByName(Type type, DeclName name) const;
+  ConcreteDeclRef getWitnessByName(DeclName name) const;
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;
@@ -227,5 +260,23 @@ void simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRe
 SourceLoc extractNearestSourceLoc(const ProtocolConformanceRef conformanceRef);
 
 } // end namespace swift
+
+namespace llvm {
+class raw_ostream;
+
+template <>
+struct PointerLikeTypeTraits<swift::ProtocolConformanceRef>
+  : PointerLikeTypeTraits<swift::ProtocolConformanceRef::UnionType>
+{
+public:
+  static inline void *getAsVoidPointer(swift::ProtocolConformanceRef ref) {
+    return ref.getOpaqueValue();
+  }
+  static inline swift::ProtocolConformanceRef getFromVoidPointer(void *ptr) {
+    return swift::ProtocolConformanceRef::getFromOpaqueValue(ptr);
+  }
+};
+
+}
 
 #endif // LLVM_SWIFT_AST_PROTOCOLCONFORMANCEREF_H

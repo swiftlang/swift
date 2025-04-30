@@ -566,7 +566,7 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -659,7 +659,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -854,7 +854,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -1067,7 +1067,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -1393,7 +1393,7 @@ extension AnySequence {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1499,7 +1499,7 @@ extension AnyCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1611,7 +1611,7 @@ extension AnyBidirectionalCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1723,7 +1723,7 @@ extension AnyRandomAccessCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1755,7 +1755,7 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
 
   @inlinable
   internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
-    return unsafeDowncast(other, to: _IndexBox.self)._base
+    return unsafe unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
   @inlinable

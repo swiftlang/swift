@@ -35,12 +35,6 @@ using namespace Lowering;
 //                              Helper Routines
 //===----------------------------------------------------------------------===//
 
-static unsigned getTupleSize(CanType t) {
-  if (auto tt = dyn_cast<TupleType>(t))
-    return tt->getNumElements();
-  return 1;
-}
-
 unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
   if (pattern.isTuple()) {
     if (pattern.doesTupleContainPackExpansionType())
@@ -483,7 +477,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
 }
 
 RValue::RValue(CanType type)
-  : type(type), elementsToBeAdded(getTupleSize(type)) {
+  : type(type), elementsToBeAdded(getRValueSize(type)) {
 }
 
 RValue::RValue(AbstractionPattern pattern, CanType type)
@@ -493,12 +487,14 @@ RValue::RValue(AbstractionPattern pattern, CanType type)
 void RValue::addElement(RValue &&element) & {
   assert(!element.isUsed() && "adding consumed value to r-value");
   assert(!element.isInSpecialState() && "adding special value to r-value");
-  assert(!isComplete() && "rvalue already complete");
-  assert(!isInSpecialState() && "cannot add elements to a special r-value");
-  --elementsToBeAdded;
-  values.insert(values.end(),
-                element.values.begin(), element.values.end());
-  element.makeUsed();
+  assert(elementsToBeAdded >= element.values.size() && "rvalue too full");
+  if (!element.values.empty()) {
+    assert(!isInSpecialState() && "cannot add elements to a special r-value");
+    elementsToBeAdded -= element.values.size();
+    values.insert(values.end(),
+                  element.values.begin(), element.values.end());
+    element.makeUsed();
+  }
 
   assert(!isComplete() || values.size() == getRValueSize(type));
   // Call into the verifier helper directly without an SGF since we know that

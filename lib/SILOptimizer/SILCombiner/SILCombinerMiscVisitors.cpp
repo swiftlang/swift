@@ -321,21 +321,7 @@ namespace {
 /// A SILInstruction visitor that analyzes alloc stack values for dead live
 /// range and promotion opportunities.
 ///
-/// init_existential_addr instructions behave like memory allocation within the
-/// allocated object. We can promote the init_existential_addr allocation into a
-/// dedicated allocation.
-///
-/// We detect this pattern
-/// %0 = alloc_stack $LogicValue
-/// %1 = init_existential_addr %0 : $*LogicValue, $*Bool
-/// ...
-/// use of %1
-/// ...
-/// destroy_addr %0 : $*LogicValue
-/// dealloc_stack %0 : $*LogicValue
-///
-/// At the same we time also look for dead alloc_stack live ranges that are only
-/// copied into.
+/// We look for dead alloc_stack live ranges that are only copied into.
 ///
 /// %0 = alloc_stack
 /// copy_addr %src, %0
@@ -347,22 +333,6 @@ struct AllocStackAnalyzer : SILInstructionVisitor<AllocStackAnalyzer> {
 
   /// Do all of the users of the alloc stack allow us to perform optimizations.
   bool LegalUsers = true;
-
-  /// If we saw an init_existential_addr in the use list of the alloc_stack,
-  /// this is the init_existential_addr. We are conservative in the face of
-  /// having multiple init_existential_addr. In such a case, we say that the use
-  /// list of the alloc_stack does not allow for optimizations to occur.
-  InitExistentialAddrInst *IEI = nullptr;
-
-  /// If we saw an open_existential_addr in the use list of the alloc_stack,
-  /// this is the open_existential_addr. We are conservative in the case of
-  /// multiple open_existential_addr. In such a case, we say that the use list
-  /// of the alloc_stack does not allow for optimizations to occur.
-  OpenExistentialAddrInst *OEI = nullptr;
-
-  /// Did we see any copies into the alloc stack.
-  bool HaveSeenCopyInto = false;
-
 public:
   AllocStackAnalyzer(AllocStackInst *ASI) : ASI(ASI) {}
 
@@ -402,26 +372,7 @@ public:
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *I) {}
   void visitDeallocStackInst(DeallocStackInst *I) {}
 
-  void visitInitExistentialAddrInst(InitExistentialAddrInst *I) {
-    // If we have already seen an init_existential_addr, we cannot
-    // optimize. This is because we only handle the single init_existential_addr
-    // case.
-    if (IEI || HaveSeenCopyInto) {
-      LegalUsers = false;
-      return;
-    }
-    IEI = I;
-  }
-
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
-    // If we have already seen an open_existential_addr, we cannot
-    // optimize. This is because we only handle the single open_existential_addr
-    // case.
-    if (OEI) {
-      LegalUsers = false;
-      return;
-    }
-
     // Make sure that the open_existential does not have any uses except
     // destroy_addr.
     for (auto *Use : getNonDebugUses(I)) {
@@ -430,22 +381,13 @@ public:
         return;
       }
     }
-
-    OEI = I;
   }
 
   void visitCopyAddrInst(CopyAddrInst *I) {
-    if (IEI) {
-      LegalUsers = false;
-      return;
-    }
-
     // Copies into the alloc_stack live range are safe.
     if (I->getDest() == ASI) {
-      HaveSeenCopyInto = true;
       return;
     }
-
     LegalUsers = false;
   }
 };
@@ -482,156 +424,7 @@ static bool somethingIsRetained(SILInstruction *from, AllocStackInst *alloc) {
   return false;
 }
 
-/// Replaces an alloc_stack of an enum by an alloc_stack of the payload if only
-/// one enum case (with payload) is stored to that location.
-///
-/// For example:
-///
-///   %loc = alloc_stack $Optional<T>
-///   %payload = init_enum_data_addr %loc
-///   store %value to %payload
-///   ...
-///   %take_addr = unchecked_take_enum_data_addr %loc
-///   %l = load %take_addr
-///
-/// is transformed to
-///
-///   %loc = alloc_stack $T
-///   store %value to %loc
-///   ...
-///   %l = load %loc
-bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
-  EnumDecl *enumDecl = AS->getType().getEnumOrBoundGenericEnum();
-  if (!enumDecl)
-    return false;
-  
-  EnumElementDecl *element = nullptr;
-  unsigned numInits =0;
-  unsigned numTakes = 0;
-  SILBasicBlock *initBlock = nullptr;
-  SILBasicBlock *takeBlock = nullptr;
-  SILType payloadType;
-  
-  // First step: check if the stack location is only used to hold one specific
-  // enum case with payload.
-  for (auto *use : AS->getUses()) {
-    SILInstruction *user = use->getUser();
-    switch (user->getKind()) {
-      case SILInstructionKind::DestroyAddrInst:
-      case SILInstructionKind::DeallocStackInst:
-      case SILInstructionKind::InjectEnumAddrInst:
-        // We'll check init_enum_addr below.
-        break;
-      case SILInstructionKind::DebugValueInst:
-        if (DebugValueInst::hasAddrVal(user))
-          break;
-        return false;
-      case SILInstructionKind::InitEnumDataAddrInst: {
-        auto *ieda = cast<InitEnumDataAddrInst>(user);
-        auto *el = ieda->getElement();
-        if (element && el != element)
-          return false;
-        element = el;
-        assert(!payloadType || payloadType == ieda->getType());
-        payloadType = ieda->getType();
-        numInits++;
-        initBlock = user->getParent();
-        break;
-      }
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        auto *el = cast<UncheckedTakeEnumDataAddrInst>(user)->getElement();
-        if (element && el != element)
-          return false;
-        element = el;
-        numTakes++;
-        takeBlock = user->getParent();
-        break;
-      }
-      default:
-        return false;
-    }
-  }
-  if (!element || !payloadType)
-    return false;
-
-  // If the enum has a single init-take pair in a single block, we know that
-  // the enum cannot contain any valid payload outside that init-take pair.
-  //
-  // This also means that we can ignore any inject_enum_addr of another enum
-  // case, because this can only inject a case without a payload.
-  bool singleInitTakePair =
-    (numInits == 1 && numTakes == 1 && initBlock == takeBlock);
-  if (!singleInitTakePair) {
-    // No single init-take pair: We cannot ignore inject_enum_addrs with a
-    // mismatching case.
-    for (auto *use : AS->getUses()) {
-      if (auto *inject = dyn_cast<InjectEnumAddrInst>(use->getUser())) {
-        if (inject->getElement() != element)
-          return false;
-      }
-    }
-  }
-
-  // Second step: replace the enum alloc_stack with a payload alloc_stack.
-  Builder.setCurrentDebugScope(AS->getDebugScope());
-  auto *newAlloc = Builder.createAllocStack(
-      AS->getLoc(), payloadType, {}, AS->hasDynamicLifetime(), IsNotLexical,
-      IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo, true);
-  if (auto varInfo = AS->getVarInfo()) {
-    // TODO: Add support for op_enum_fragment
-    // For now, we can't represent this variable correctly, so we drop it.
-    Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
-  }
-
-  while (!AS->use_empty()) {
-    Operand *use = *AS->use_begin();
-    SILInstruction *user = use->getUser();
-    switch (user->getKind()) {
-      case SILInstructionKind::InjectEnumAddrInst:
-        eraseInstFromFunction(*user);
-        break;
-      case SILInstructionKind::DestroyAddrInst:
-        if (singleInitTakePair) {
-          // It's not possible that the enum has a payload at the destroy_addr,
-          // because it must have already been taken by the take of the
-          // single init-take pair.
-          // We _have_ to remove the destroy_addr, because we also remove all
-          // inject_enum_addrs which might inject a payload-less case before
-          // the destroy_addr.
-          eraseInstFromFunction(*user);
-        } else {
-          // The enum payload can still be valid at the destroy_addr, so we have
-          // to keep the destroy_addr. Just replace the enum with the payload
-          // (and because it's not a singleInitTakePair, we can be sure that the
-          // enum cannot have any other case than the payload case).
-          use->set(newAlloc);
-        }
-        break;
-      case SILInstructionKind::DeallocStackInst:
-        use->set(newAlloc);
-        break;
-      case SILInstructionKind::InitEnumDataAddrInst:
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        auto *svi = cast<SingleValueInstruction>(user);
-        svi->replaceAllUsesWith(newAlloc);
-        eraseInstFromFunction(*svi);
-        break;
-      }
-      case SILInstructionKind::DebugValueInst:
-        // TODO: Add support for op_enum_fragment
-        use->set(SILUndef::get(AS));
-        break;
-      default:
-        llvm_unreachable("unexpected alloc_stack user");
-    }
-  }
-  return true;
-}
-
-SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
-  if (optimizeStackAllocatedEnum(AS))
-    return nullptr;
-
+SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
   // If we are testing SILCombine and we are asked not to eliminate
   // alloc_stacks, just return.
   if (DisableAllocStackOpts)
@@ -643,66 +436,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // If when analyzing, we found a user that makes our optimization, illegal,
   // bail early.
   if (!Analyzer.LegalUsers)
-    return nullptr;
-
-  InitExistentialAddrInst *IEI = Analyzer.IEI;
-  OpenExistentialAddrInst *OEI = Analyzer.OEI;
-
-  // If the only users of the alloc_stack are alloc, destroy and
-  // init_existential_addr then we can promote the allocation of the init
-  // existential.
-  // Be careful with open archetypes, because they cannot be moved before
-  // their definitions.
-  if (IEI && !OEI &&
-      !IEI->getLoweredConcreteType().hasOpenedExistential()) {
-    assert(!IEI->getLoweredConcreteType().isOpenedExistential());
-    Builder.setCurrentDebugScope(AS->getDebugScope());
-    auto varInfo = AS->getVarInfo();
-    if (varInfo) {
-      if (varInfo->Type == AS->getElementType()) {
-        varInfo->Type = {}; // Lower the variable's type too.
-      } else {
-        // Cannot salvage the variable, its type has changed and its expression
-        // cannot be rewritten.
-        Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
-        varInfo = {};
-      }
-    }
-    auto *ConcAlloc = Builder.createAllocStack(
-        AS->getLoc(), IEI->getLoweredConcreteType(), varInfo);
-    IEI->replaceAllUsesWith(ConcAlloc);
-    eraseInstFromFunction(*IEI);
-
-    for (auto UI = AS->use_begin(), UE = AS->use_end(); UI != UE;) {
-      auto *Op = *UI;
-      ++UI;
-      if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
-        Builder.setInsertionPoint(DA);
-        Builder.createDestroyAddr(DA->getLoc(), ConcAlloc);
-        eraseInstFromFunction(*DA);
-        continue;
-      }
-
-      if (isa<DeinitExistentialAddrInst>(Op->getUser())) {
-        eraseInstFromFunction(*Op->getUser());
-        continue;
-      }
-
-      if (!isa<DeallocStackInst>(Op->getUser()))
-        continue;
-
-      auto *DS = cast<DeallocStackInst>(Op->getUser());
-      Builder.setInsertionPoint(DS);
-      Builder.createDeallocStack(DS->getLoc(), ConcAlloc);
-      eraseInstFromFunction(*DS);
-    }
-
-    return eraseInstFromFunction(*AS);
-  }
-
-  // If we have a live 'live range' or a live range that we have not sen a copy
-  // into, bail.
-  if (!Analyzer.HaveSeenCopyInto || IEI)
     return nullptr;
 
   // Otherwise remove the dead live range that is only copied into.
@@ -802,6 +535,9 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   // Remove runtime asserts such as overflow checks and bounds checks.
   if (RemoveCondFails)
+    return eraseInstFromFunction(*CFI);
+
+  if (shouldRemoveCondFail(*CFI))
     return eraseInstFromFunction(*CFI);
 
   auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand());
@@ -1917,7 +1653,11 @@ static bool isLiteral(SILValue val) {
   return isa<LiteralInst>(val);
 }
 
-SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
+template<SILInstructionKind Opc, typename Derived>
+static SILInstruction *combineMarkDependenceBaseInst(
+  MarkDependenceInstBase<Opc, Derived> *mdi,
+  SILCombiner *C) {
+  
   if (!mdi->getFunction()->hasOwnership()) {
     // Simplify the base operand of a MarkDependenceInst to eliminate
     // unnecessary instructions that aren't adding value.
@@ -1928,7 +1668,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
       if (eiBase->hasOperand()) {
         mdi->setBase(eiBase->getOperand());
         if (eiBase->use_empty()) {
-          eraseInstFromFunction(*eiBase);
+          C->eraseInstFromFunction(*eiBase);
         }
         return mdi;
       }
@@ -1939,7 +1679,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     if (auto *ier = dyn_cast<InitExistentialRefInst>(mdi->getBase())) {
       mdi->setBase(ier->getOperand());
       if (ier->use_empty())
-        eraseInstFromFunction(*ier);
+        C->eraseInstFromFunction(*ier);
       return mdi;
     }
 
@@ -1948,7 +1688,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     if (auto *oeri = dyn_cast<OpenExistentialRefInst>(mdi->getBase())) {
       mdi->setBase(oeri->getOperand());
       if (oeri->use_empty())
-        eraseInstFromFunction(*oeri);
+        C->eraseInstFromFunction(*oeri);
       return mdi;
     }
   }
@@ -1959,12 +1699,17 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   {
     SILType baseType = mdi->getBase()->getType();
     if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
-      SILValue value = mdi->getValue();
-      mdi->replaceAllUsesWith(value);
-      return eraseInstFromFunction(*mdi);
+      if (auto mdValue = dyn_cast<MarkDependenceInst>(mdi)) {
+        auto &valOper = mdi->getAllOperands()[MarkDependenceInst::Dependent];
+        mdValue->replaceAllUsesWith(valOper.get());
+      }
+      return C->eraseInstFromFunction(*mdi);
     }
   }
+  return nullptr;
+}
 
+SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   if (isLiteral(mdi->getValue())) {
     // A literal lives forever, so no mark_dependence is needed.
     // This pattern can occur after StringOptimization when a utf8CString of
@@ -1972,8 +1717,12 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     replaceInstUsesWith(*mdi, mdi->getValue());
     return eraseInstFromFunction(*mdi);
   }
+  return combineMarkDependenceBaseInst(mdi, this);
+}
 
-  return nullptr;
+SILInstruction *
+SILCombiner::visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdi) {
+  return combineMarkDependenceBaseInst(mdi, this);
 }
 
 /// Returns true if reference counting and debug_value users of a global_value

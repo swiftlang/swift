@@ -143,6 +143,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Use \c let for a read-only computed property.
+  bool InferPropertyIntroducerFromAccessors = false;
+
   /// Whether to print *any* accessors on subscript.
   bool PrintSubscriptAccessors = true;
 
@@ -171,6 +174,10 @@ struct PrintOptions {
 
   /// Whether to print the bodies of accessors in protocol context.
   bool PrintAccessorBodiesInProtocols = false;
+
+  /// Whether to print the parameter list of accessors like \c set . (Even when
+  /// \c true , parameters marked implicit still won't be printed.)
+  bool PrintExplicitAccessorParameters = true;
 
   /// Whether to print type definitions.
   bool TypeDefinitions = false;
@@ -586,6 +593,10 @@ struct PrintOptions {
 
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
+
+  /// Whether to always desugar inline array types from
+  /// `[<count> x <element>]` to `InlineArray<count, element>`
+  bool AlwaysDesugarInlineArrayTypes = false;
 
   /// Whether to always desugar dictionary types
   /// from `[key_type:value_type]` to `Dictionary<key_type,value_type>`

@@ -164,7 +164,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
 
-  if (Info.Category == "deprecation") {
+  if (Info.Category == "deprecation" ||
+      Info.Category.starts_with("Deprecated")) {
     SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
   } else if (Info.Category == "no-usage") {
     SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
@@ -179,8 +180,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
-  for (auto notePath : Info.EducationalNotePaths)
-    SKInfo.EducationalNotePaths.push_back(notePath);
+  if (!Info.CategoryDocumentationURL.empty())
+    SKInfo.EducationalNotePaths.push_back(Info.CategoryDocumentationURL);
 
   std::optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
@@ -1453,9 +1454,8 @@ public:
     // We only report runtime name for classes and protocols with an explicitly
     // defined ObjC name, i.e. those that have @objc("SomeName")
     if (D && (isa<ClassDecl>(D) || isa<ProtocolDecl>(D))) {
-      auto *ObjCNameAttr = D->getAttrs().getAttribute<ObjCAttr>();
-      if (ObjCNameAttr && ObjCNameAttr->hasName())
-        return ObjCNameAttr->getName()->getString(Buf);
+      if (auto objcName = D->getExplicitObjCName())
+        return objcName->getString(Buf);
     }
     return StringRef();
   }

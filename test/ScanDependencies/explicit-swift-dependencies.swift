@@ -47,9 +47,9 @@ import F
 // CHECK-NEXT:            "-fno-implicit-modules",
 // CHECK-NEXT:            "-Xcc",
 // CHECK-NEXT:            "-fno-implicit-module-maps",
-// CHECK-NEXT:            "-o",
-// CHECK-NEXT:            "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-fmodule-file=F={{.*}}{{/|\\}}F-{{.*}}.pcm"
 // CHECK-DAG:             "-fmodule-file=SwiftShims={{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm"
+// CHECK-NEXT:            "-o",
+// CHECK-NEXT:            "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule"

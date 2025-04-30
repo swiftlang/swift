@@ -1,7 +1,18 @@
-// RUN: %target-typecheck-verify-swift -verify-additional-prefix default-swift-mode-
-// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift-6-
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -verify-additional-prefix default-swift-mode-
+
+// RUN: %target-typecheck-verify-swift -swift-version 6 \
+// RUN:   -verify-additional-prefix swift-6-
+
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny \
+// RUN:   -verify-additional-prefix default-swift-mode- \
+// RUN:   -verify-additional-prefix explicit-any-
+
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny:migrate \
+//        To verify that the message is not followed by
+//        "; this will be an error ...".
+// RUN:   -verify-additional-prefix default-swift-mode- \
+// RUN:   -verify-additional-prefix explicit-any-adopt-
 
 // REQUIRES: swift_feature_ExistentialAny
 
@@ -20,8 +31,10 @@ protocol Bar {
 class Bistro {
   convenience init(_: Bar){ self.init()}
   // expected-explicit-any-warning@-1 {{use of protocol 'Bar' as a type must be written 'any Bar'; this will be an error in a future Swift language mode}}{{23-26=any Bar}}
+  // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Bar' as a type must be written 'any Bar'}}{{documentation-file=existential-any}}{{23-26=any Bar}}
   class func returnBar() -> Bar {}
   // expected-explicit-any-warning@-1 {{use of protocol 'Bar' as a type must be written 'any Bar'; this will be an error in a future Swift language mode}}{{29-32=any Bar}}
+  // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Bar' as a type must be written 'any Bar'}}{{documentation-file=existential-any}}{{29-32=any Bar}}
 }
 
 func useBarAsType(_ x: any Bar) {}
@@ -159,13 +172,13 @@ protocol Collection<T> {
 struct TestParameterizedProtocol<T> : Collection {
   typealias T = T
 
-  let x : Collection<T> // expected-warning {{use of protocol 'Collection<T>' as a type must be written 'any Collection<T>'}}
+  let x : Collection<T> // expected-warning {{use of protocol 'Collection' as a type must be written 'any Collection'}}
 }
 
 func acceptAny(_: Collection<Int>) {}
-// expected-warning@-1 {{use of protocol 'Collection<Int>' as a type must be written 'any Collection<Int>'}}
+// expected-warning@-1 {{use of protocol 'Collection' as a type must be written 'any Collection'}}
 func returnsAny() -> Collection<Int> {}
-// expected-warning@-1 {{use of protocol 'Collection<Int>' as a type must be written 'any Collection<Int>'}}
+// expected-warning@-1 {{use of protocol 'Collection' as a type must be written 'any Collection'}}
 
 func testInvalidAny() {
   struct S: HasAssoc {
@@ -221,6 +234,7 @@ enum E1: RawRepresentable {
 
   var rawValue: P1 {
     // expected-explicit-any-warning@-1 {{use of protocol 'P1' as a type must be written 'any P1'; this will be an error in a future Swift language mode}}{{17-19=any P1}}
+    // expected-explicit-any-adopt-warning@-2 {{use of protocol 'P1' as a type must be written 'any P1'}}{{documentation-file=existential-any}}{{17-19=any P1}}
     return ConcreteComposition()
   }
 }
@@ -318,8 +332,10 @@ enum EE : Equatable, any Empty { // expected-error {{raw type 'any Empty' is not
 
 // Protocols from a serialized module (the standard library).
 do {
+  // expected-explicit-any-adopt-warning@+2 {{use of protocol 'Decodable' as a type must be written 'any Decodable'}}{{documentation-file=existential-any}}
   // expected-explicit-any-warning@+1 {{use of protocol 'Decodable' as a type must be written 'any Decodable'; this will be an error in a future Swift language mode}}
   let _: Decodable
+  // expected-explicit-any-adopt-warning@+2 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable')}}{{documentation-file=existential-any}}
   // expected-explicit-any-warning@+1 {{use of 'Codable' (aka 'Decodable & Encodable') as a type must be written 'any Codable' (aka 'any Decodable & Encodable'); this will be an error in a future Swift language mode}}
   let _: Codable
 }
@@ -357,8 +373,8 @@ func testAnyFixIt() {
   let _: Optional<HasAssoc>
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{19-28=any ~Copyable}}
   let _: Optional<~Copyable>
-  // FIXME: No fix-it + generic argument not diagnosed.
-  // expected-warning@+1 {{use of protocol 'HasAssocGeneric<any HasAssoc>' as a type must be written 'any HasAssocGeneric<any HasAssoc>'}}{{none}}
+  // expected-warning@+2:10 {{use of protocol 'HasAssocGeneric' as a type must be written 'any HasAssocGeneric'}}{{10-35=any HasAssocGeneric<HasAssoc>}}
+  // expected-warning@+1:26 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{26-34=any HasAssoc}}
   let _: HasAssocGeneric<HasAssoc>
   // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{14-22=any HasAssoc}}
   let _: S.G<HasAssoc>
@@ -390,8 +406,8 @@ func testAnyFixIt() {
   // expected-warning@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{13-21=any HasAssoc}}
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-37=any ~G<HasAssoc>.Copyable_Alias}}
   let _: ~G<HasAssoc>.Copyable_Alias
-  // FIXME: No fix-it + generic argument not diagnosed.
-  // expected-warning@+1 {{use of 'HasAssocGeneric<any HasAssoc>' as a type must be written 'any HasAssocGeneric<any HasAssoc>}}{{none}}
+  // expected-warning@+2:12 {{use of 'S.HasAssocGeneric_Alias' (aka 'HasAssocGeneric') as a type must be written 'any S.HasAssocGeneric_Alias' (aka 'any HasAssocGeneric')}} {{10-43=any S.HasAssocGeneric_Alias<HasAssoc>}}
+  // expected-warning@+1:34 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{34-42=any HasAssoc}}
   let _: S.HasAssocGeneric_Alias<HasAssoc>
   // FIXME: No diagnostic.
   let _: HasAssoc.Int_Alias
@@ -526,6 +542,8 @@ func testAnyFixIt() {
 
   // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc)?'}}{{10-23=(any HasAssoc)?}}
   let _: any HasAssoc?
+  // expected-error@+1:10 {{optional 'any' type must be written '(any HasAssocGeneric<Int>)?'}}{{10-35=(any HasAssocGeneric<Int>)?}}
+  let _: any HasAssocGeneric<Int>?
   // FIXME: Better recovery
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: any ~Copyable?
@@ -547,6 +565,7 @@ func testEnumAssociatedValue() {
     case c1((any HasAssoc) -> Void)
     // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
     case c2((HasAssoc) -> Void)
+    // expected-explicit-any-adopt-warning@+2 {{use of protocol 'P' as a type must be written 'any P'}}{{documentation-file=existential-any}}
     // expected-explicit-any-warning@+1 {{use of protocol 'P' as a type must be written 'any P'; this will be an error in a future Swift language mode}}
     case c3((P) -> Void)
   }
@@ -574,5 +593,7 @@ func f(_ x: Objectlike) {}
 typealias Copy = Copyable
 func h(_ z1: Copy,
        // expected-explicit-any-warning@-1 {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable'); this will be an error in a future Swift language mode}}
+       // expected-explicit-any-adopt-warning@-2 {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable')}}{{documentation-file=existential-any}}
        _ z2: Copyable) {}
        // expected-explicit-any-warning@-1 {{use of protocol 'Copyable' as a type must be written 'any Copyable'; this will be an error in a future Swift language mode}}
+       // expected-explicit-any-adopt-warning@-2 {{use of protocol 'Copyable' as a type must be written 'any Copyable'}}{{documentation-file=existential-any}}

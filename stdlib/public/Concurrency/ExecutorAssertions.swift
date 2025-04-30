@@ -57,7 +57,7 @@ extension SerialExecutor {
       return
     }
 
-    let expectationCheck = _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor)
+    let expectationCheck = unsafe _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor)
 
     /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
     precondition(expectationCheck,
@@ -109,10 +109,10 @@ extension Actor {
     // NOTE: This method will CRASH in new runtime versions,
     // if it would have previously returned `false`.
     // It will call through to SerialExecutor.checkIsolated` as a last resort.
-    let expectationCheck = _taskIsCurrentExecutor(self.unownedExecutor.executor)
+    let expectationCheck = unsafe _taskIsCurrentExecutor(self.unownedExecutor.executor)
 
     precondition(expectationCheck,
-        "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
+        unsafe "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
         file: file, line: line)
   }
 }
@@ -198,7 +198,7 @@ extension SerialExecutor {
       return
     }
 
-    guard _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor) else {
+    guard unsafe _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor) else {
       // TODO: offer information which executor we actually got
       let msg = "Incorrect actor executor assumption; Expected '\(self)' executor. \(message())"
       /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
@@ -247,8 +247,8 @@ extension Actor {
       return
     }
 
-    guard _taskIsCurrentExecutor(self.unownedExecutor.executor) else {
-      let msg = "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())"
+    guard unsafe _taskIsCurrentExecutor(self.unownedExecutor.executor) else {
+      let msg = unsafe "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())"
       /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
       assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
       return
@@ -354,7 +354,7 @@ extension Actor {
 
     /// This is guaranteed to be fatal if the check fails,
     /// as this is our "safe" version of this API.
-    let executor: Builtin.Executor = self.unownedExecutor.executor
+    let executor: Builtin.Executor = unsafe self.unownedExecutor.executor
     guard _taskIsCurrentExecutor(executor) else {
       // TODO: offer information which executor we actually got
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
@@ -363,7 +363,7 @@ extension Actor {
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
       return try rawFn(self)
     }
   }

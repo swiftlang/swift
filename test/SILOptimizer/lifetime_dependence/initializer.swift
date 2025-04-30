@@ -28,6 +28,7 @@ struct Span<T>: ~Escapable {
 struct Wrapper<T: BitwiseCopyable>: ~Escapable {
   private let span: Span<T>
 
+  @lifetime(copy span)
   init(span: borrowing Span<T>) {
     self.span = copy span
   }
@@ -41,6 +42,7 @@ struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
 
   // Make sure that LocalVariableUtils can successfully analyze 'self'. That's required to determine that the assignment
   // of `wrapper` is returned without escaping
+  @lifetime(copy span)
   init(span: borrowing Span<T>) {
     self.wrapper = Wrapper(span: span)
   }

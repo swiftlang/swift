@@ -31,8 +31,9 @@ using namespace swift;
 static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
   ClangSyntaxPrinter printer(type->getASTContext(), os);
   printer.printModuleNameCPrefix(*type->getParentModule());
-  if (!ClangSyntaxPrinter(type->getASTContext(), os).printNestedTypeNamespaceQualifiers(type))
-    os << "::";
+  if (!ClangSyntaxPrinter(type->getASTContext(), os)
+           .printNestedTypeNamespaceQualifiers(type, /*forC=*/true))
+    os << "_";
   printer.printBaseName(type);
 }
 
@@ -629,19 +630,24 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     bool isOpaqueLayout) {
   auto *NTD = dyn_cast<NominalTypeDecl>(typeDecl);
   ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
+  if (typeDecl->hasClangNode()) {
+    /// Print a reference to the type metadata function for a C++ type.
+    printer.printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &os) {
+      printer.printNamespace(
+          cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
+            ClangSyntaxPrinter(typeDecl->getASTContext(), os)
+                .printCTypeMetadataTypeFunction(typeDecl, typeMetadataFuncName,
+                                                typeMetadataFuncRequirements);
+          });
+    });
+  }
+
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";
-
-  if (typeDecl->hasClangNode()) {
-    /// Print a reference to the type metadata function for a C++ type.
-    ClangSyntaxPrinter(typeDecl->getASTContext(), os).printNamespace(
-        cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
-          ClangSyntaxPrinter(typeDecl->getASTContext(), os).printCTypeMetadataTypeFunction(
-              typeDecl, typeMetadataFuncName, typeMetadataFuncRequirements);
-        });
-  }
-  bool addPointer = typeDecl->isObjC();
+  auto classDecl = dyn_cast<ClassDecl>(typeDecl);
+  bool addPointer =
+      typeDecl->isObjC() || (classDecl && classDecl->isForeignReferenceType());
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
@@ -673,10 +679,11 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
-  if (!typeDecl->hasClangNode()) {
+  if (typeDecl->hasClangNode())
+    printer.printBaseName(moduleContext);
+  else
     printer.printBaseName(typeDecl->getModuleContext());
-    os << "::";
-  }
+  os << "::";
   if (!printer.printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";

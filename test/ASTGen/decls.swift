@@ -1,18 +1,20 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ValueGenerics -enable-experimental-feature ParserASTGen \
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ParserASTGen \
+// RUN:    -enable-experimental-feature CoroutineAccessors \
 // RUN:    | %sanitize-address > %t/astgen.ast
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ValueGenerics \
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency \
+// RUN:    -enable-experimental-feature CoroutineAccessors \
 // RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature ValueGenerics -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_ValueGenerics
+// REQUIRES: swift_feature_CoroutineAccessors
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -109,6 +111,10 @@ func testVars() {
   var s: Int {
     get async throws { return 0 }
   }
+  var t: Int {
+    read { yield q }
+    modify { yield &q }
+  }
 }
 
 func rethrowingFn(fn: () throws -> Void) rethrows {}
@@ -173,6 +179,10 @@ struct TestSubscripts {
       return 0
     }
     set(x) {}
+  }
+
+  subscript<I: Proto3, J: Proto3>(i: I, j: J) -> Int where I.A == J.B {
+    1
   }
 }
 
@@ -342,3 +352,5 @@ func testBuilder() {
     1
   }
 }
+
+struct ExpansionRequirementTest<each T> where repeat each T: Comparable {}

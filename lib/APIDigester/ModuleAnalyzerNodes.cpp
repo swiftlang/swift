@@ -1498,7 +1498,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
-    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
+    SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {
@@ -1935,8 +1935,6 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<EnumCaseDecl>(Member)) {
       // All containing variables should have been handled.
-    } else if (isa<PoundDiagnosticDecl>(Member)) {
-      // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
     } else if (isa<MissingMemberDecl>(Member)) {
@@ -2439,7 +2437,7 @@ class ConstExtractor: public ASTWalker {
     }
     assert(ReferencedDecl);
     if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
-      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeLiteralAttr>()) {
         return false;
       }
       if (auto *PD = VAR->getParentPatternBinding()) {

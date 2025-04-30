@@ -192,6 +192,22 @@ public struct Phi {
   }
 }
 
+extension Phi {
+  /// Return true of this phi is directly returned with no side effects between the phi and the return.
+  public var isReturnValue: Bool {
+    if let singleUse = value.uses.singleUse, let ret = singleUse.instruction as? ReturnInst,
+       ret.parentBlock == successor {
+      for inst in successor.instructions {
+        if inst.mayHaveSideEffects {
+          return false
+        }
+      }
+      return true
+    }
+    return false
+  }
+}
+
 extension Operand {
   public var forwardingBorrowedFromUser: BorrowedFromInst? {
     if let bfi = instruction as? BorrowedFromInst, index == 0 {
@@ -587,19 +603,6 @@ public enum ArgumentConvention : CustomStringConvertible {
       return "packGuaranteed"
     case .packOut:
       return "packOut"
-    }
-  }
-}
-
-extension BeginAccessInst.AccessKind {
-  public func isCompatible(with convention: ArgumentConvention) -> Bool {
-    switch self {
-    case .`init`, .deinit:
-      return false
-    case .read:
-      return convention.isIndirectIn
-    case .modify:
-      return convention.isInout
     }
   }
 }

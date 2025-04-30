@@ -103,7 +103,7 @@ enum class MatchKind : uint8_t {
   EnumCaseWithAssociatedValues,
 
   /// The witness did not match due to _const/non-_const differences.
-  CompileTimeConstConflict,
+  CompileTimeLiteralConflict,
 };
 
 // Describes the kind of optional adjustment performed when
@@ -357,7 +357,7 @@ struct RequirementMatch {
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
-    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::CompileTimeLiteralConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:
@@ -394,7 +394,7 @@ struct RequirementMatch {
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
-    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::CompileTimeLiteralConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:
@@ -430,7 +430,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::StaticNonStaticConflict:
-    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::CompileTimeLiteralConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:

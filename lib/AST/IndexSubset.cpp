@@ -52,6 +52,14 @@ bool IndexSubset::isSupersetOf(IndexSubset *other) const {
   return true;
 }
 
+bool IndexSubset::isDisjointWith(IndexSubset *other) const {
+  assert(capacity == other->capacity);
+  for (auto index : range(numBitWords))
+    if (getBitWord(index) & other->getBitWord(index))
+      return false;
+  return true;
+}
+
 IndexSubset *IndexSubset::adding(unsigned index, ASTContext &ctx) const {
   assert(index < getCapacity());
   if (contains(index))

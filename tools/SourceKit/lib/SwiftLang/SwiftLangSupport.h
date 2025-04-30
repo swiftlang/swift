@@ -456,8 +456,11 @@ public:
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
   /// Generate a USR for a Decl, including the prefix.
+  /// @param distinguishSynthesizedDecls Whether to use the USR of the
+  /// synthesized declaration instead of the USR of the underlying Clang USR.
   /// \returns true if the results should be ignored, false otherwise.
-  static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
+  static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS,
+                       bool distinguishSynthesizedDecls = false);
 
   /// Generate a USR for the Type of a given decl.
   /// \returns true if the results should be ignored, false otherwise.

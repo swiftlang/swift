@@ -36,7 +36,7 @@ class ASTContext;
 class GenericTypeParamType;
 class OpaqueTypeDecl;
 class ElementArchetypeType;
-class OpenedArchetypeType;
+class ExistentialArchetypeType;
 class PackArchetypeType;
 class PackExpansionType;
 class SILModule;
@@ -324,19 +324,6 @@ public:
   /// This operation will also reabstract dependent types according to the
   /// abstraction level of their associated type requirements.
   SILType mapTypeIntoContext(SILModule &M, SILType type) const;
-
-  /// Map an interface type's protocol conformance into the corresponding
-  /// conformance for the contextual type.
-  static std::pair<Type, ProtocolConformanceRef>
-  mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
-                               Type conformingType,
-                               ProtocolConformanceRef conformance);
-
-  /// Map an interface type's protocol conformance into the corresponding
-  /// conformance for the contextual type.
-  std::pair<Type, ProtocolConformanceRef>
-  mapConformanceRefIntoContext(Type conformingType,
-                               ProtocolConformanceRef conformance) const;
 
   /// Returns a substitution map that sends every generic parameter to its
   /// corresponding archetype in this generic environment.

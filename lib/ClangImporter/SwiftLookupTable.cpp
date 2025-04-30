@@ -1287,6 +1287,7 @@ namespace {
       }
     }
   };
+
 } // end anonymous namespace
 
 void SwiftLookupTableWriter::writeExtensionContents(
@@ -1548,6 +1549,7 @@ namespace {
       return result;
     }
   };
+
 } // end anonymous namespace
 
 clang::NamedDecl *SwiftLookupTable::mapStoredDecl(StoredSingleEntry &entry) {
@@ -1657,6 +1659,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   std::unique_ptr<SerializedGlobalsAsMembersIndex> globalsAsMembersIndex;
   std::unique_ptr<SerializedGlobalsAsMembersTable> globalsAsMembersTable;
   ArrayRef<clang::serialization::DeclID> categories;
+
   while (next.Kind != llvm::BitstreamEntry::EndBlock) {
     if (next.Kind == llvm::BitstreamEntry::Error)
       return nullptr;
@@ -1868,9 +1871,9 @@ SwiftNameLookupExtension::hashExtension(ExtensionHashBuilder &HBuilder) const {
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                      clang::NamedDecl *named,
                                      NameImporter &nameImporter) {
+  auto &clangContext = nameImporter.getClangContext();
   clang::PrettyStackTraceDecl trace(
-      named, named->getLocation(),
-      nameImporter.getClangContext().getSourceManager(),
+      named, named->getLocation(), clangContext.getSourceManager(),
       "while adding SwiftName lookup table entries for clang declaration");
 
   // Determine whether this declaration is suppressed in Swift.

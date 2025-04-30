@@ -58,7 +58,7 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}{{25-25=\nvar wrappedValue: <#Value#>}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{documentation-file=property-wrapper-requirements}}{{25-25=\nvar wrappedValue: <#Value#>}}
 
 @propertyWrapper
 struct StaticValue {
@@ -76,7 +76,7 @@ protocol CannotBeAWrapper {
 
 @propertyWrapper
 struct NonVisibleValueWrapper<Value> {
-  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}} {{educational-notes=property-wrapper-requirements}}
+  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}} {{documentation-file=property-wrapper-requirements}}
 }
 
 @propertyWrapper
@@ -92,7 +92,7 @@ struct NonVisibleInitWrapper<Value> {
 struct InitialValueTypeMismatch<Value> {
   var wrappedValue: Value // expected-note{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}} {{educational-notes=property-wrapper-requirements}}
+  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an '@autoclosure' thereof}} {{documentation-file=property-wrapper-requirements}}
     self.wrappedValue = initialValue!
   }
 }
@@ -101,10 +101,10 @@ struct InitialValueTypeMismatch<Value> {
 struct MultipleInitialValues<Value> {
   var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an '@autoclosure' thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an '@autoclosure' thereof}}
   }
 }
 
@@ -112,7 +112,7 @@ struct MultipleInitialValues<Value> {
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}} {{educational-notes=property-wrapper-requirements}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}} {{documentation-file=property-wrapper-requirements}}
     return nil
   }
 }

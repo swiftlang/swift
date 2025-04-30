@@ -188,8 +188,8 @@ public:
     // that reference pack elements have to bring expansion's shape
     // type in scope to make sure that the shapes match.
     if (auto *packElement = getAsExpr<PackElementExpr>(expr)) {
-      if (auto *outerEnvironment = CS.getPackEnvironment(packElement)) {
-        auto *expansionTy = CS.simplifyType(CS.getType(outerEnvironment))
+      if (auto *outerExpansion = CS.getPackElementExpansion(packElement)) {
+        auto *expansionTy = CS.simplifyType(CS.getType(outerExpansion))
                                 ->castTo<PackExpansionType>();
         expansionTy->getCountType()->getTypeVariables(ReferencedVars);
       }
@@ -295,9 +295,7 @@ static bool isViableElement(ASTNode element,
                             ConstraintSystem &cs) {
   if (auto *decl = element.dyn_cast<Decl *>()) {
     // - Ignore variable declarations, they are handled by pattern bindings;
-    // - Skip #warning and #error, they are handled during solution
-    //   application.
-    if (isa<VarDecl>(decl) || isa<PoundDiagnosticDecl>(decl))
+    if (isa<VarDecl>(decl))
       return false;
   }
 
@@ -878,10 +876,6 @@ private:
       }
     }
 
-    // Skip #warning/#error; we'll handle them when applying the closure.
-    if (isa<PoundDiagnosticDecl>(decl))
-      return;
-
     // Ignore variable declarations, because they're always handled within
     // their enclosing pattern bindings.
     if (isa<VarDecl>(decl))
@@ -975,7 +969,7 @@ private:
     auto throwLoc = throwStmt->getThrowLoc();
     Type errorType;
     if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc))
-      errorType = catchNode.getExplicitCaughtType(cs.getASTContext());
+      errorType = cs.getExplicitCaughtErrorType(catchNode);
 
     if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {
@@ -1065,8 +1059,8 @@ private:
         cs.setTargetFor(switchStmt, target);
       }
 
-      for (auto rawCase : switchStmt->getRawCases())
-        elements.push_back(makeElement(rawCase, locator));
+      for (auto &CS : switchStmt->getCases())
+        elements.push_back(makeElement(CS, locator));
     }
 
     createConjunction(elements, locator);
@@ -1969,18 +1963,12 @@ private:
 
     // Visit the raw cases.
     bool limitExhaustivityChecks = false;
-    for (auto rawCase : switchStmt->getRawCases()) {
-      if (auto decl = rawCase.dyn_cast<Decl *>()) {
-        visitDecl(decl);
-        continue;
-      }
-
-      auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
+    for (auto *CS : switchStmt->getCases()) {
       // Body of the `case` statement can contain a `fallthrough`
       // statement that requires both source and destination
       // `case` preambles to be type-checked, so bodies of `case`
       // statements should be visited after preambles.
-      visitCaseStmtPreamble(caseStmt);
+      visitCaseStmtPreamble(CS);
     }
 
     for (auto *caseStmt : switchStmt->getCases()) {

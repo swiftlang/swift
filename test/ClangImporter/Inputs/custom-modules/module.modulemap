@@ -271,3 +271,7 @@ module CommonName {
   header "CommonName.h"
   export *
 }
+
+module "Weird C Module" {
+  header "WeirdCModule.h"
+}

@@ -45,3 +45,12 @@ void ApplySite::insertAfterApplication(
   llvm_unreachable("covered switch isn't covered");
 }
 
+bool ApplySite::isAddressable(const Operand &operand) const {
+  unsigned calleeArgIndex = getCalleeArgIndex(operand);
+  assert(calleeArgIndex >= getSubstCalleeConv().getSILArgIndexOfFirstParam());
+  unsigned paramIdx =
+    calleeArgIndex - getSubstCalleeConv().getSILArgIndexOfFirstParam();
+
+  CanSILFunctionType calleeType = getSubstCalleeType();
+  return calleeType->isAddressable(paramIdx, getFunction());
+}

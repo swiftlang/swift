@@ -71,6 +71,9 @@ static SILInstruction *getConstant(SILValue V) {
   if (auto *uc = dyn_cast<UpcastInst>(V))
     V = uc->getOperand();
 
+  if (auto *oer = dyn_cast<OpenExistentialRefInst>(V))
+    V = oer->getOperand();
+
   if (auto *kp = dyn_cast<KeyPathInst>(V)) {
     // We could support operands, if they are constants, to enable propagation
     // of subscript keypaths. This would require to add the operands in the
@@ -493,7 +496,7 @@ static SILFunction *getSpecializedWithDeadParams(
         FuncBuilder.getModule().getSwiftModule(),
         FuncBuilder.getModule().isWholeModule(), ApplySite(), Specialized,
         PAI->getSubstitutionMap(), Specialized->getSerializedKind(),
-        /* ConvertIndirectToDirect */ false, /*dropMetatypeArgs=*/false);
+        /* ConvertIndirectToDirect */ false, /*dropUnusedArguments=*/false);
     GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                            Specialized,
                                            ReInfo.getClonerParamSubstitutionMap(),
@@ -566,11 +569,13 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       // instruction.
       //
       // For non-escaping closures:
-      // The keypath is not consumed by the PAI. We don't need todelete the
+      // The keypath is not consumed by the PAI. We don't need to delete the
       // keypath instruction in this pass, but let dead-object-elimination clean
       // it up later.
       if (!PAI->isOnStack()) {
         SILInstruction *user = getSingleNonDebugUser(kp);
+        if (auto *oer = dyn_cast_or_null<OpenExistentialRefInst>(user))
+          user = getSingleNonDebugUser(oer);
         if (auto *uc = dyn_cast_or_null<UpcastInst>(user))
           user = getSingleNonDebugUser(uc);
 

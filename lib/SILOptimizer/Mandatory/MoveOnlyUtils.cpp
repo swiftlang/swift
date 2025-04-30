@@ -583,6 +583,7 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
   };
   FindCopyAddrWalker walker(copiesToVisit);
   std::move(walker).walk(markedInst);
+  // FIXME: should check walk() == AddressUseKind::NonEscaping.
 
   bool madeChange = false;
 
@@ -612,6 +613,8 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
       nextCAI = nullptr;
       SimpleTemporaryAllocStackElimVisitor visitor(state, cai, nextCAI);
 
+      // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
+      // PointerEscape.
       if (AddressUseKind::Unknown == std::move(visitor).walk(cai->getDest()))
         return false;
 

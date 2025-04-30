@@ -339,7 +339,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       case SILInstructionKind::MarkDependenceInst: {
         auto *mdi = cast<MarkDependenceInst>(user);
-        if (use == &mdi->getAllOperands()[MarkDependenceInst::Value]) {
+        if (use == &mdi->getAllOperands()[MarkDependenceInst::Dependent]) {
           if (!analyzeLocationUsesRecursively(mdi, locIdx, collectedVals, subLocationMap))
             return false;
         }
@@ -436,7 +436,7 @@ bool MemoryLocations::analyzeAddrProjection(
       // open_existential_addr).
       if (!isa<OpenExistentialAddrInst>(loc->representativeValue))
         return false;
-      assert(loc->representativeValue->getType().isOpenedExistential());
+      assert(loc->representativeValue->getType().is<ExistentialArchetypeType>());
       loc->representativeValue = projection;
     }
   }

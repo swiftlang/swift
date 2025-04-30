@@ -16,6 +16,7 @@
 
 #include "GenStruct.h"
 
+#include "IRGen.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -42,6 +43,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/Error.h"
 #include <iterator>
 
 #include "GenDecl.h"
@@ -547,6 +549,8 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isCopyConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }
@@ -559,6 +563,8 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isMoveConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }
@@ -1455,6 +1461,14 @@ private:
     unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
     Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
+    std::optional<Size> dataSize;
+    if (clangField->hasAttr<clang::NoUniqueAddressAttr>()) {
+      if (const auto *rd = clangField->getType()->getAsRecordDecl()) {
+        // Clang can store the next field in the padding of this one.
+        const auto &fieldLayout = ClangContext.getASTRecordLayout(rd);
+        dataSize = Size(fieldLayout.getDataSize().getQuantity());
+      }
+    }
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
@@ -1467,7 +1481,8 @@ private:
 
     // Otherwise, add it as an opaque blob.
     auto fieldSize = isZeroSized ? clang::CharUnits::Zero() : ClangContext.getTypeSizeInChars(clangField->getType());
-    return addOpaqueField(offset, Size(fieldSize.getQuantity()));
+    return addOpaqueField(offset,
+                          dataSize.value_or(Size(fieldSize.getQuantity())));
   }
 
   /// Add opaque storage for bitfields spanning the given range of bits.

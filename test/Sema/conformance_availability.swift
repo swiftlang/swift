@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -print-diagnostic-groups -swift-version 6
+// RUN: %target-typecheck-verify-swift -swift-version 6
 
 // REQUIRES: OS=macosx
 
@@ -166,12 +166,12 @@ public struct HasDeprecatedConformance1 {}
 extension HasDeprecatedConformance1 : Horse {}
 
 func passDeprecatedConformance1(x: HasDeprecatedConformance1) {
-  takesHorse(x) // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
-  takesHorseExistential(x) // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
-  x.giddyUp() // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
-  _ = x.isGalloping // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
-  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
-  _ = UsesHorse<HasDeprecatedConformance1>.self // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
+  takesHorse(x) // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
+  takesHorseExistential(x) // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
+  x.giddyUp() // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
+  _ = x.isGalloping // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
+  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
+  _ = UsesHorse<HasDeprecatedConformance1>.self // expected-warning {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
 }
 
 @available(*, deprecated)
@@ -191,12 +191,12 @@ public struct HasDeprecatedConformance2 {}
 extension HasDeprecatedConformance2 : Horse {}
 
 func passDeprecatedConformance2(x: HasDeprecatedConformance2) {
-  takesHorse(x) // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated [DeprecatedDeclaration]}}
-  takesHorseExistential(x) // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated [DeprecatedDeclaration]}}
-  x.giddyUp() // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated [DeprecatedDeclaration]}}
-  _ = x.isGalloping // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated [DeprecatedDeclaration]}}
-  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated [DeprecatedDeclaration]}}
-  _ = UsesHorse<HasDeprecatedConformance2>.self // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated [DeprecatedDeclaration]}}
+  takesHorse(x) // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated}}{{documentation-file=deprecated-declaration}}
+  takesHorseExistential(x) // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated}}{{documentation-file=deprecated-declaration}}
+  x.giddyUp() // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated}}{{documentation-file=deprecated-declaration}}
+  _ = x.isGalloping // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated}}{{documentation-file=deprecated-declaration}}
+  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated}}{{documentation-file=deprecated-declaration}}
+  _ = UsesHorse<HasDeprecatedConformance2>.self // expected-warning {{conformance of 'HasDeprecatedConformance2' to 'Horse' is deprecated: This conformance is deprecated}}{{documentation-file=deprecated-declaration}}
 }
 
 @available(*, deprecated)
@@ -216,12 +216,12 @@ public struct HasDeprecatedConformance3 {}
 extension HasDeprecatedConformance3 : Horse {}
 
 func passDeprecatedConformance3(x: HasDeprecatedConformance3) {
-  takesHorse(x) // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8 [DeprecatedDeclaration]}}
-  takesHorseExistential(x) // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8 [DeprecatedDeclaration]}}
-  x.giddyUp() // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8 [DeprecatedDeclaration]}}
-  _ = x.isGalloping // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8 [DeprecatedDeclaration]}}
-  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8 [DeprecatedDeclaration]}}
-  _ = UsesHorse<HasDeprecatedConformance3>.self // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8 [DeprecatedDeclaration]}}
+  takesHorse(x) // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8}}{{documentation-file=deprecated-declaration}}
+  takesHorseExistential(x) // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8}}{{documentation-file=deprecated-declaration}}
+  x.giddyUp() // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8}}{{documentation-file=deprecated-declaration}}
+  _ = x.isGalloping // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8}}{{documentation-file=deprecated-declaration}}
+  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8}}{{documentation-file=deprecated-declaration}}
+  _ = UsesHorse<HasDeprecatedConformance3>.self // expected-warning {{conformance of 'HasDeprecatedConformance3' to 'Horse' was deprecated in macOS 10.8}}{{documentation-file=deprecated-declaration}}
 }
 
 func passDeprecatedConformance3a(x: HasDeprecatedConformance3) {
@@ -249,7 +249,7 @@ extension HasAvailableConformance1 : Horse {}
 // See the other test case in test/Sema/conformance_availability_warn.swift for
 // the same example for -swift-version 5.
 
-func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add @available attribute to enclosing global function}}
+func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add '@available' attribute to enclosing global function}}
   takesHorse(x) // expected-error {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}
 
@@ -301,7 +301,7 @@ struct AssocConformanceUnavailable : Rider {
 
 // Associated conformance with deprecation
 struct AssocConformanceDeprecated : Rider {
-// expected-warning@-1 {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated [DeprecatedDeclaration]}}
+// expected-warning@-1 {{conformance of 'HasDeprecatedConformance1' to 'Horse' is deprecated}}{{documentation-file=deprecated-declaration}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasDeprecatedConformance1')}}
   typealias H = HasDeprecatedConformance1
 }
@@ -310,7 +310,7 @@ struct AssocConformanceDeprecated : Rider {
 struct AssocConformanceAvailable1 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
-// expected-note@-3 {{add @available attribute to enclosing struct}}
+// expected-note@-3 {{add '@available' attribute to enclosing struct}}
   typealias H = HasAvailableConformance1
 }
 
@@ -324,7 +324,7 @@ struct AssocConformanceAvailable3 {}
 extension AssocConformanceAvailable3 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
-// expected-note@-3 {{add @available attribute to enclosing extension}}
+// expected-note@-3 {{add '@available' attribute to enclosing extension}}
   typealias H = HasAvailableConformance1
 }
 
@@ -348,14 +348,14 @@ struct ConformsToSaddle2 : Saddle {
 
 struct ConformsToSaddle3 : Saddle {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   typealias H = HasAvailableConformance3
 }
 
 struct ConformsToSaddle4 : Saddle {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   @available(macOS 200, *)
   typealias H = HasAvailableConformance3
@@ -374,14 +374,14 @@ struct ConformsToBarn2 : Barn {
 
 struct ConformsToBarn3 : Barn {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   typealias H = HasAvailableConformance3
 }
 
 struct ConformsToBarn4 : Barn {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   @available(macOS 200, *)
   typealias H = HasAvailableConformance3
@@ -443,7 +443,7 @@ struct UnavailableHashable {
 extension UnavailableHashable : Hashable {}
 
 func usesUnavailableHashable(_ c: UnavailableHashable) {
-  // expected-note@-1 2 {{add @available attribute to enclosing global function}}
+  // expected-note@-1 2 {{add '@available' attribute to enclosing global function}}
   _ = Set([c])
   // expected-error@-1 2 {{conformance of 'UnavailableHashable' to 'Hashable' is only available in macOS 100 or newer}}
   // expected-note@-2 2 {{add 'if #available' version check}}
@@ -466,6 +466,14 @@ extension Bike : Vehicle {
   func move() {}
 }
 
+@available(macOS, introduced: 100)
+struct Wagon {}
+
+@available(macOS, introduced: 100)
+extension Wagon : Vehicle {
+  func move() {}
+}
+
 class Car {}
 class ClownCar : Car {}
 
@@ -477,6 +485,63 @@ extension Car {
 @available(macOS 100, *)
 extension ClownCar : Vehicle {}
 // expected-error@-1 {{protocol 'Vehicle' requires 'move()' to be available in macOS 100 and newer}}
+
+@available(macOS, unavailable)
+struct Truck : Vehicle {
+  func move() {}
+}
+
+struct Scooter {}
+
+@available(macOS, unavailable)
+extension Scooter : Vehicle {
+  func move() {}
+}
+
+struct Motorcycle {}
+
+@available(macOS, unavailable)
+extension Motorcycle : Vehicle {
+  @available(macOS, introduced: 100)
+  func move() {}
+}
+
+@available(macOS, unavailable)
+struct AircraftCarrier {
+  struct Jet : Vehicle {
+    @available(macOS, introduced: 100)
+    func move() {}
+  }
+}
+
+struct Unicycle {
+  @available(macOS, introduced: 100)
+  func move() {}
+}
+
+@available(macOS, unavailable)
+extension Unicycle : Vehicle {}
+
+@available(macOS, unavailable, introduced: 100)
+struct Train : Vehicle {
+  func move() {}
+}
+
+struct Blimp {}
+
+@available(macOS, unavailable, introduced: 100)
+extension Blimp : Vehicle {
+  func move() {}
+}
+
+@available(macOS, unavailable, introduced: 100)
+struct Spaceship {
+}
+
+@available(macOS, unavailable, introduced: 100)
+extension Spaceship : Vehicle {
+  func move() {}
+}
 
 // rdar://problem/75430966 - Allow using unavailable conformances from unavailable contexts.
 @available(*, unavailable)

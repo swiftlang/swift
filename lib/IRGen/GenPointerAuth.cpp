@@ -160,7 +160,7 @@ struct IRGenModule::PointerAuthCachesType {
   llvm::DenseMap<SILDeclRef, llvm::ConstantInt*> Decls;
   llvm::DenseMap<CanType, llvm::ConstantInt*> Types;
   llvm::DenseMap<CanType, llvm::ConstantInt*> YieldTypes;
-  llvm::DenseMap<AssociatedType, llvm::ConstantInt*> AssociatedTypes;
+  llvm::DenseMap<AssociatedTypeDecl *, llvm::ConstantInt*> AssociatedTypes;
   llvm::DenseMap<AssociatedConformance, llvm::ConstantInt*> AssociatedConformances;
 };
 
@@ -193,6 +193,8 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     if (fnType->isAsync()) {
       return options.AsyncSwiftFunctionPointers;
+    } else if (fnType->isCalleeAllocatedCoroutine()) {
+      return options.CoroSwiftFunctionPointers;
     }
 
     return options.SwiftFunctionPointers;
@@ -334,9 +336,9 @@ static llvm::ConstantInt *getDiscriminatorForString(IRGenModule &IGM,
   return getDiscriminatorForHash(IGM, rawHash);
 }
 
-static std::string mangle(AssociatedType association) {
-  return IRGenMangler(association.getAssociation()->getASTContext())
-    .mangleAssociatedTypeAccessFunctionDiscriminator(association);
+static std::string mangle(AssociatedTypeDecl *assocType) {
+  return IRGenMangler(assocType->getASTContext())
+    .mangleAssociatedTypeAccessFunctionDiscriminator(assocType);
 }
 
 static std::string mangle(const AssociatedConformance &association) {
@@ -428,7 +430,7 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
   }
 
   case Kind::AssociatedType: {
-    auto association = Storage.get<AssociatedType>(StoredKind);
+    auto association = Storage.get<AssociatedTypeDecl *>(StoredKind);
     llvm::ConstantInt *&cache =
       IGM.getPointerAuthCaches().AssociatedTypes[association];
     if (cache) return cache;
@@ -766,4 +768,8 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
 
   addSignedPointer(pointer, schema.getKey(), schema.isAddressDiscriminated(),
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
+}
+
+llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
+  return getDiscriminatorForString(IGM, CurFn->getName());
 }

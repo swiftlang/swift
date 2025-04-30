@@ -13,6 +13,7 @@
 #ifndef SWIFT_IRGEN_LINKING_H
 #define SWIFT_IRGEN_LINKING_H
 
+#include "swift/ABI/Coro.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
@@ -24,8 +25,8 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalObject.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 
 namespace llvm {
@@ -165,6 +166,9 @@ class LinkEntity {
     ExtendedExistentialIsUniqueMask = 0x100,
     ExtendedExistentialIsSharedShift = 9,
     ExtendedExistentialIsSharedMask = 0x200,
+
+    // Used by CoroAllocator.  2 bits.
+    CoroAllocatorKindShift = 8, CoroAllocatorKindMask = 0x300,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -389,6 +393,11 @@ class LinkEntity {
     /// The pointer is an AbstractFunctionDecl*.
     AsyncFunctionPointerAST,
 
+    /// The same as CoroFunctionPointer but with a different stored value, for
+    /// use by TBDGen.
+    /// The pointer is an AbstractFunctionDecl*.
+    CoroFunctionPointerAST,
+
     /// The pointer is a SILFunction*.
     DynamicallyReplaceableFunctionKey,
 
@@ -444,6 +453,7 @@ class LinkEntity {
     ProtocolConformanceDescriptorRecord,
 
     // These are both type kinds and protocol-conformance kinds.
+    // TYPE KINDS: BEGIN {{
 
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
@@ -494,9 +504,6 @@ class LinkEntity {
     /// A coroutine continuation prototype function.
     CoroutineContinuationPrototype,
 
-    /// A global function pointer for dynamically replaceable functions.
-    DynamicallyReplaceableFunctionVariable,
-
     /// A reference to a metaclass-stub for a statically specialized generic
     /// class.
     /// The pointer is a canonical TypeBase*.
@@ -515,6 +522,16 @@ class LinkEntity {
     /// passed to swift_getCanonicalSpecializedMetadata.
     /// The pointer is a canonical TypeBase*.
     NoncanonicalSpecializedGenericTypeMetadataCacheVariable,
+
+    /// Extended existential type shape.
+    /// Pointer is the (generalized) existential type.
+    /// SecondaryPointer is the GenericSignatureImpl*.
+    ExtendedExistentialTypeShape,
+
+    // TYPE KINDS: END }}
+
+    /// A global function pointer for dynamically replaceable functions.
+    DynamicallyReplaceableFunctionVariable,
 
     /// Provides the data required to invoke an async function using the async
     /// calling convention in the form of the size of the context to allocate
@@ -547,10 +564,46 @@ class LinkEntity {
     /// The pointer is a SILFunction*.
     AccessibleFunctionRecord,
 
-    /// Extended existential type shape.
-    /// Pointer is the (generalized) existential type.
-    /// SecondaryPointer is the GenericSignatureImpl*.
-    ExtendedExistentialTypeShape,
+    /// A global struct containing a relative pointer to the single-yield
+    /// coroutine ramp function and the fixed-size to be allocated in the
+    /// caller.
+    /// The pointer is a SILFunction*.
+    CoroFunctionPointer,
+
+    /// An coro function pointer for a method dispatch thunk.  The pointer is
+    /// a FuncDecl* inside a protocol or a class.
+    DispatchThunkCoroFunctionPointer,
+
+    /// An coro function pointer for a method dispatch thunk for an
+    /// initializing constructor.  The pointer is a ConstructorDecl* inside a
+    /// class.
+    DispatchThunkInitializerCoroFunctionPointer,
+
+    /// An coro function pointer for a method dispatch thunk for an allocating
+    /// constructor.  The pointer is a ConstructorDecl* inside a protocol or
+    /// a class.
+    DispatchThunkAllocatorCoroFunctionPointer,
+
+    /// An coro function pointer for a distributed thunk.
+    /// The pointer is a FuncDecl* inside an actor (class).
+    DistributedThunkCoroFunctionPointer,
+
+    /// An coro function pointer to a partial apply forwarder.
+    /// The pointer is the llvm::Function* for a partial apply forwarder.
+    PartialApplyForwarderCoroFunctionPointer,
+
+    /// An coro function pointer to a function which is known to exist whose
+    /// name is known.
+    /// The pointer is a const char* of the name.
+    KnownCoroFunctionPointer,
+
+    /// A coro function pointer for a distributed accessor (method or
+    /// property).
+    /// The pointer is a SILFunction*.
+    DistributedAccessorCoroFunctionPointer,
+
+    /// An allocator to be passed to swift_coro_alloc and swift_coro_dealloc.
+    CoroAllocator,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -572,11 +625,10 @@ class LinkEntity {
     return !(LHS == RHS);
   }
 
-  static bool isDeclKind(Kind k) {
-    return k <= Kind::AsyncFunctionPointerAST;
-  }
+  static bool isDeclKind(Kind k) { return k <= Kind::CoroFunctionPointerAST; }
   static bool isTypeKind(Kind k) {
-    return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
+    return k >= Kind::ProtocolWitnessTableLazyAccessFunction &&
+           k < Kind::DynamicallyReplaceableFunctionVariable;
   }
 
   static bool isRootProtocolConformanceKind(Kind k) {
@@ -1457,6 +1509,127 @@ public:
     return entity;
   }
 
+  static LinkEntity forCoroAllocator(CoroAllocatorKind kind) {
+    LinkEntity entity;
+    entity.Pointer = nullptr;
+    entity.SecondaryPointer = nullptr;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::CoroAllocator)) |
+                  LINKENTITY_SET_FIELD(CoroAllocatorKind, unsigned(kind));
+    return entity;
+  }
+
+  static LinkEntity forCoroFunctionPointer(LinkEntity other) {
+    LinkEntity entity;
+    entity.Pointer = other.Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (other.getKind()) {
+    case LinkEntity::Kind::SILFunction:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::CoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunk:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkCoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(
+              LinkEntity::Kind::DispatchThunkInitializerCoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocator:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(
+              LinkEntity::Kind::DispatchThunkAllocatorCoroFunctionPointer));
+      break;
+    case LinkEntity::Kind::PartialApplyForwarder:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::PartialApplyForwarderCoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DistributedAccessor: {
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::DistributedAccessorCoroFunctionPointer));
+      break;
+    }
+
+    default:
+      llvm_unreachable("Link entity kind cannot have an coro function pointer");
+    }
+
+    return entity;
+  }
+
+  static LinkEntity forCoroFunctionPointer(SILDeclRef declRef) {
+    LinkEntity entity;
+    entity.setForDecl(declRef.isDistributedThunk()
+                          ? Kind::DistributedThunkCoroFunctionPointer
+                          : Kind::CoroFunctionPointerAST,
+                      declRef.getAbstractFunctionDecl());
+    entity.SecondaryPointer =
+        reinterpret_cast<void *>(static_cast<uintptr_t>(declRef.kind));
+    return entity;
+  }
+
+  static LinkEntity forKnownCoroFunctionPointer(const char *name) {
+    LinkEntity entity;
+    entity.Pointer = const_cast<char *>(name);
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownCoroFunctionPointer));
+    return entity;
+  }
+
+  LinkEntity getUnderlyingEntityForCoroFunctionPointer() const {
+    LinkEntity entity;
+    entity.Pointer = Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (getKind()) {
+    case LinkEntity::Kind::CoroFunctionPointer:
+      entity.Data =
+          LINKENTITY_SET_FIELD(Kind, unsigned(LinkEntity::Kind::SILFunction));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkCoroFunctionPointer:
+      entity.Data =
+          LINKENTITY_SET_FIELD(Kind, unsigned(LinkEntity::Kind::DispatchThunk));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializerCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkInitializer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocatorCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAllocator));
+      break;
+
+    case LinkEntity::Kind::PartialApplyForwarderCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
+      break;
+
+    case LinkEntity::Kind::DistributedAccessorCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DistributedAccessor));
+      break;
+
+    default:
+      llvm_unreachable("Link entity is not an coro function pointer");
+    }
+
+    return entity;
+  }
+
   void mangle(ASTContext &Ctx, llvm::raw_ostream &out) const;
   void mangle(ASTContext &Ctx, SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString(ASTContext &Ctx) const;
@@ -1554,6 +1727,11 @@ public:
            getKind() == Kind::MethodDescriptorDerivative);
     return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
         SecondaryPointer);
+  }
+
+  CoroAllocatorKind getCoroAllocatorKind() const {
+    assert(getKind() == Kind::CoroAllocator);
+    return CoroAllocatorKind(LINKENTITY_GET_FIELD(Data, CoroAllocatorKind));
   }
 
   CanGenericSignature getExtendedExistentialTypeShapeGenSig() const {

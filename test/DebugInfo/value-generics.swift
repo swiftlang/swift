@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -enable-experimental-feature ValueGenerics -disable-availability-checking -o - | %FileCheck %s
-
-// REQUIRES: swift_feature_ValueGenerics
+// RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -disable-availability-checking -o - | %FileCheck %s
 
 import Builtin
 
@@ -24,5 +22,5 @@ func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 // CHECK-DAG: ![[COUNT_PARAM]] = !DITemplateTypeParameter(type: ![[COUNT_TYPE:.*]])
 // CHECK-DAG: ![[COUNT_TYPE]] = !DICompositeType({{.*}}name: "$s$1_D"
 // CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
-// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}identifier: "$sSiD"
+// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}"$sSiD"
 func concreteV(_: Slab<2, Int>) {}

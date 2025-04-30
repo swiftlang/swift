@@ -45,17 +45,6 @@
 #define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
 #endif
 
-// Does the runtime provide priority escalation support?
-#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
-    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
-    (defined(__arm64__) || defined(__x86_64__))
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
-#else
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
-#endif
-#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
-
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;
@@ -118,6 +107,37 @@ void *swift_task_alloc(size_t size);
 /// must be allocated and deallocated in a strict stack discipline.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_dealloc(void *ptr);
+
+/// Deallocate multiple memory allocations in a task.
+///
+/// The pointer provided must be a pointer previously allocated on
+/// this task that has not yet been deallocated.  All allocations up to and
+/// including that allocation will be deallocated.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void swift_task_dealloc_through(void *ptr);
+
+/// Deallocate memory in a task.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_dealloc(void *ptr);
+
+/// Allocate memory in a job.
+///
+/// All allocations will be rounded to a multiple of MAX_ALIGNMENT;
+/// if the job does not support allocation, this will return NULL.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_job_allocate(Job *job, size_t size);
+
+/// Deallocate memory in a job.
+///
+/// The pointer provided must be the last pointer allocated on
+/// this task that has not yet been deallocated; that is, memory
+/// must be allocated and deallocated in a strict stack discipline.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_deallocate(Job *job, void *ptr);
 
 /// Cancel a task and all of its child tasks.
 ///
@@ -743,8 +763,8 @@ void swift_task_enqueue(Job *job, SerialExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
-/// Invoke an executor's `checkIsolated` or otherwise equivalent API,
-/// that will crash if the current executor is NOT the passed executor.
+/// Invoke an executor's `checkIsolated` implementation;
+/// It will crash if the current executor is NOT the passed executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_checkIsolated(SerialExecutorRef executor);
 
@@ -754,6 +774,15 @@ void swift_task_checkIsolated(SerialExecutorRef executor);
 /// implementation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor);
+
+/// Invoke an executor's `isIsolatingCurrentContext` implementation;
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+int8_t swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
+
+/// Invoke a Swift executor's `isIsolatingCurrentContext` implementation; returns
+/// `true` if it invoked the Swift implementation, `false` otherwise.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+int8_t swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
@@ -984,6 +1013,7 @@ bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 /// this could be a pointer to a different enum instance if we need it to be.
 enum swift_task_is_current_executor_flag : uint64_t {
   /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode.
   None = 0x0,
 
   /// This is not used today, but is just future ABI reservation.
@@ -1007,6 +1037,10 @@ enum swift_task_is_current_executor_flag : uint64_t {
 
   /// The routine should assert on failure.
   Assert = 0x8,
+
+  /// The routine MUST NOT assert on failure.
+  /// Even at the cost of not calling 'checkIsolated' if it is available.
+  MustNotAssert = 0x10,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -1023,7 +1057,13 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+const char *swift_task_getCurrentTaskName(void);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_startSynchronously(AsyncTask* job, SerialExecutorRef targetExecutor);
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative

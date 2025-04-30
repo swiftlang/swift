@@ -195,9 +195,10 @@ namespace swift {
   /* We are creating this separate function for the override case, */          \
   /* to prevent a stack frame from being created for the default case. */      \
   SWIFT_NOINLINE                                                               \
-  static ret swift_##name##Slow(COMPATIBILITY_UNPAREN_WITH_COMMA(typedArgs)    \
-                                    std::atomic<uintptr_t> &Override,          \
-                                uintptr_t fn, Original_##name defaultImpl) {   \
+  ccAttrs static ret swift_##name##Slow(                                       \
+      COMPATIBILITY_UNPAREN_WITH_COMMA(typedArgs)                              \
+          std::atomic<uintptr_t> &Override,                                    \
+      uintptr_t fn, Original_##name defaultImpl) {                             \
     constexpr uintptr_t DEFAULT_IMPL_SENTINEL = 0x1;                           \
     if (SWIFT_UNLIKELY(fn == 0x0)) {                                           \
       fn = (uintptr_t)getOverride_##name();                                    \

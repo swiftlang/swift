@@ -33,6 +33,7 @@ set(BACKTRACING_COMPILE_FLAGS
 set(BACKTRACING_SOURCES
   main.swift
   AnsiColor.swift
+  JSON.swift
   TargetMacOS.swift
   TargetLinux.swift
   Themes.swift

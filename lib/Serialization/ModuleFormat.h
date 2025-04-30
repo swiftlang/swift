@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 922; // function type isolation - caller
+const uint16_t SWIFTMODULE_VERSION_MINOR = 945; // generic parameter weight
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -414,6 +414,7 @@ enum class SILParameterInfoFlags : uint8_t {
   Isolated = 0x2,
   Sending = 0x4,
   ImplicitLeading = 0x8,
+  Const = 0x10,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -758,6 +759,18 @@ using GenericParamKindField = BCFixed<2>;
       X##_HasSubminor = Y.getSubminor().has_value();\
     }
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class AvailabilityDomainKind : uint8_t {
+  Universal = 0,
+  SwiftLanguage,
+  PackageDescription,
+  Embedded,
+  Platform,
+  Custom,
+};
+using AvailabilityDomainKindField = BCFixed<3>;
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -973,7 +986,7 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY,
+    STRICT_MEMORY_SAFETY
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1227,6 +1240,8 @@ namespace decls_block {
 /// with a linker error.
 #define TYPE_LAYOUT(LAYOUT, ...) TYPE_LAYOUT_IMPL(LAYOUT, __VA_ARGS__)
 
+  // clang-format off
+
   using ClangTypeLayout = BCRecordLayout<
     CLANG_TYPE,
     BCArray<BCVBR<6>>
@@ -1275,7 +1290,8 @@ namespace decls_block {
     GenericParamKindField, // param kind
     BCFixed<1>,            // has decl?
     BCFixed<15>,           // depth
-    BCFixed<16>,           // index
+    BCFixed<1>,            // weight
+    BCFixed<15>,           // index
     DeclIDField,           // generic type parameter decl or identifier
     TypeIDField            // value type (if param kind == Value)
   );
@@ -1329,7 +1345,8 @@ namespace decls_block {
                      ParamDeclSpecifierField, // inout, shared or owned?
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
-                     BCFixed<1>,              // compileTimeConst
+                     BCFixed<1>,              // compileTimeLiteral
+                     BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
                      >;
@@ -1352,8 +1369,8 @@ namespace decls_block {
     TypeIDField              // interface type
   );
 
-  TYPE_LAYOUT(OpenedArchetypeTypeLayout,
-    OPENED_ARCHETYPE_TYPE,
+  TYPE_LAYOUT(ExistentialArchetypeTypeLayout,
+    EXISTENTIAL_ARCHETYPE_TYPE,
     TypeIDField,              // the interface type
     GenericEnvironmentIDField // generic environment ID
   );
@@ -1479,6 +1496,12 @@ namespace decls_block {
   SYNTAX_SUGAR_TYPE_LAYOUT(OptionalTypeLayout, OPTIONAL_TYPE);
   SYNTAX_SUGAR_TYPE_LAYOUT(VariadicSequenceTypeLayout, VARIADIC_SEQUENCE_TYPE);
   SYNTAX_SUGAR_TYPE_LAYOUT(ExistentialTypeLayout, EXISTENTIAL_TYPE);
+
+  TYPE_LAYOUT(InlineArrayTypeLayout,
+    INLINE_ARRAY_TYPE,
+    TypeIDField, // count type
+    TypeIDField  // element type
+  );
 
   TYPE_LAYOUT(DictionaryTypeLayout,
     DICTIONARY_TYPE,
@@ -1703,8 +1726,10 @@ namespace decls_block {
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
-    BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isCompileTimeLiteral?
+    BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
+    BCFixed<1>,              // isCallerIsolated?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -2081,6 +2106,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCVBR<5>, // options
+    TypeIDField, // global actor isolation of conformance
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.
@@ -2109,6 +2135,12 @@ namespace decls_block {
     TypeIDField, // the conforming type
     DeclIDField, // the protocol
     BCFixed<2>  // the builtin conformance kind
+  >;
+
+  using AbstractConformanceLayout = BCRecordLayout<
+    ABSTRACT_CONFORMANCE,
+    TypeIDField,                         // conforming type
+    DeclIDField                         // the protocol
   >;
 
   using PackConformanceLayout = BCRecordLayout<
@@ -2202,7 +2234,8 @@ namespace decls_block {
   using CDeclDeclAttrLayout = BCRecordLayout<
     CDecl_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCBlob      // _silgen_name
+    BCFixed<1>, // underscored flag
+    BCBlob      // cname
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<
@@ -2358,33 +2391,27 @@ namespace decls_block {
     BCFixed<2>  // exclusivity mode
   >;
 
-  using ExecutionDeclAttrLayout = BCRecordLayout<
-    Execution_DECL_ATTR,
-    BCFixed<1>  // execution behavior kind
-  >;
-
   using ABIDeclAttrLayout = BCRecordLayout<
     ABI_DECL_ATTR,
     BCFixed<1>, // implicit flag
     DeclIDField // ABI decl
   >;
 
-  using AvailableDeclAttrLayout = BCRecordLayout<
-    Available_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCFixed<1>, // is unconditionally unavailable?
-    BCFixed<1>, // is unconditionally deprecated?
-    BCFixed<1>, // is unavailable from async?
-    BCFixed<1>, // is this PackageDescription version-specific kind?
-    BCFixed<1>, // is SPI?
-    BCFixed<1>, // is for Embedded
-    BC_AVAIL_TUPLE, // Introduced
-    BC_AVAIL_TUPLE, // Deprecated
-    BC_AVAIL_TUPLE, // Obsoleted
-    BCVBR<5>,    // platform
-    BCVBR<5>,    // number of bytes in message string
-    BCVBR<5>,    // number of bytes in rename string
-    BCBlob       // message, followed by rename
+  using AvailableDeclAttrLayout = BCRecordLayout<Available_DECL_ATTR,
+    BCFixed<1>,                   // implicit flag
+    BCFixed<1>,                   // is unconditionally unavailable?
+    BCFixed<1>,                   // is unconditionally deprecated?
+    BCFixed<1>,                   // is unavailable from async?
+    BCFixed<1>,                   // is SPI?
+    AvailabilityDomainKindField,  // kind of availability domain
+    BCVBR<5>,                     // platform kind of domain
+    DeclIDField,                  // the decl representing a custom domain
+    BC_AVAIL_TUPLE,               // introduced version
+    BC_AVAIL_TUPLE,               // deprecated version
+    BC_AVAIL_TUPLE,               // obsoleted version
+    BCVBR<5>,                     // number of bytes in message string
+    BCVBR<5>,                     // number of bytes in rename string
+    BCBlob                        // message, followed by rename
   >;
 
   using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
@@ -2522,7 +2549,7 @@ namespace decls_block {
 
   using NonisolatedDeclAttrLayout =
       BCRecordLayout<Nonisolated_DECL_ATTR,
-                     BCFixed<1>, // is the argument (unsafe)
+                     BCFixed<2>, // the modifier (unsafe, nonsending)
                      BCFixed<1>  // implicit flag
                      >;
 
@@ -2549,6 +2576,8 @@ namespace decls_block {
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
+
+  // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
 #undef TYPE_LAYOUT
@@ -2636,6 +2665,7 @@ namespace index_block {
     GENERIC_SIGNATURE_OFFSETS,
     GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
+    ABSTRACT_CONFORMANCE_OFFSETS,
     PACK_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

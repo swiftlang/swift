@@ -104,24 +104,43 @@ extension MyClass {
         let _: privEnumFlag
 
         // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-        // let _ = publEnum.publEnumValue1
-        // let _ = privEnum.privEnumValue1
+        // let _ = variantPublEnum
+        // let _ = variantPrivEnum
         //
-        // let _ = publEnumClass.publEnumClassValue1
-        // let _ = privEnumClass.privEnumClassValue1
-        //
-        // let _ = publEnumAnonValue1
-        // let _ = privEnumAnonValue1
-        //
-        // let _ = publEnumClosed.Value1
-        // let _ = privEnumClosed.Value1
-        //
-        // let _ = publEnumOpen.Value1
-        // let _ = privEnumOpen.Value1
+        // let _ = publEnumAnonVariant
+        // let _ = privEnumAnonVariant
+
+        let _ = publEnumClass.variantPublEnumClass
+        let _ = privEnumClass.variantPrivEnumClass
+
+        let _ = publEnumClosed.variantPublEnumClosed
+        let _ = privEnumClosed.variantPrivEnumClosed
+
+        let _ = publEnumOpen.variantPublEnumOpen
+        let _ = privEnumOpen.variantPrivEnumOpen
     }
 
-    func fcutd(_ _: publTypedef) { }
-    private func fcitd(_ _: privTypedef) { }
+    // Make sure these types are usable in type signatures too
+    func publTypedefFunc(_ _: publTypedef) { }
+    private func privTypedefFunc(_ _: privTypedef) { }
+
+    func publStructFunc(_ _: publStruct) { }
+    private func privStructFunc(_ _: privStruct) { }
+
+    func publEnumFunc(_ _: publEnum) { }
+    private func privEnumFunc(_ _: privEnum) { }
+
+    func publEnumClassFunc(_ _: publEnumClass) { }
+    private func privEnumClassFunc(_ _: privEnumClass) { }
+
+    func publEnumClosedFunc(_ _: publEnumClosed) { }
+    private func privEnumClosedFunc(_ _: privEnumClosed) { }
+
+    func publEnumOpenFunc(_ _: publEnumOpen) { }
+    private func privEnumOpenFunc(_ _: privEnumOpen) { }
+
+    func publEnumFlagFunc(_ _: publEnumFlag) { }
+    private func privEnumFlagFunc(_ _: privEnumFlag) { }
 }
 
 func notExt(_ c: inout MyClass) {
@@ -162,20 +181,21 @@ func notExt(_ c: inout MyClass) {
     let _: MyClass.privEnumFlag // expected-error {{'privEnumFlag' is inaccessible due to 'private' protection level}}
 
     // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-    // let _ = MyClass.publEnum.publEnumValue1
-    // let _ = MyClass.privEnum.privEnumValue1
     //
-    // let _ = MyClass.publEnumClass.publEnumClassValue1
-    // let _ = MyClass.privEnumClass.privEnumClassValue1
+    // let _ = MyClass.variantPublEnum
+    // let _ = MyClass.variantPrivEnum // TODO-error {{'variantPrivEnum' is inaccessible due to 'private' protection level}}
     //
-    // let _ = MyClass.publEnumAnonValue1
-    // let _ = MyClass.privEnumAnonValue1
-    //
-    // let _ = MyClass.publEnumClosed.Value1
-    // let _ = MyClass.privEnumClosed.Value1
-    //
-    // let _ = MyClass.publEnumOpen.Value1
-    // let _ = MyClass.privEnumOpen.Value1
+    // let _ = MyClass.publEnumAnonVariant
+    // let _ = MyClass.privEnumAnonVariant // TODO-error {{'privEnumAnonVariant' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClass.variantPublEnumClass
+    let _ = MyClass.privEnumClass.variantPrivEnumClass // expected-error {{'privEnumClass' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClosed.variantPublEnumClosed
+    let _ = MyClass.privEnumClosed.variantPrivEnumClosed // expected-error {{'privEnumClosed' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumOpen.variantPublEnumOpen
+    let _ = MyClass.privEnumOpen.variantPrivEnumOpen // expected-error {{'privEnumOpen' is inaccessible due to 'private' protection level}}
 }
 
 //--- cursed.swift
@@ -228,20 +248,20 @@ extension MyClass {
         let _: privEnumFlag // expected-error {{'privEnumFlag' is inaccessible due to 'private' protection level}}
 
         // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-        // let _ = publEnum.publEnumValue1
-        // let _ = privEnum.privEnumValue1
+        // let _ = variantPublEnum
+        // let _ = variantPrivEnum // TODO-error {{'variantPrivEnum' is inaccessible due to 'private' protection level}}
         //
-        // let _ = publEnumClass.publEnumClassValue1
-        // let _ = privEnumClass.privEnumClassValue1
-        //
-        // let _ = publEnumAnonValue1
-        // let _ = privEnumAnonValue1
-        //
-        // let _ = publEnumClosed.Value1
-        // let _ = privEnumClosed.Value1
-        //
-        // let _ = publEnumOpen.Value1
-        // let _ = privEnumOpen.Value1
+        // let _ = publEnumAnonVariant
+        // let _ = privEnumAnonVariant // TODO-error {{'privEnumAnonVariant' is inaccessible due to 'private' protection level}}
+
+        let _ = publEnumClass.variantPublEnumClass
+        let _ = privEnumClass.variantPrivEnumClass// expected-error {{'privEnumClass' is inaccessible due to 'private' protection level}}
+
+        let _ = publEnumClosed.variantPublEnumClosed
+        let _ = privEnumClosed.variantPrivEnumClosed // expected-error {{'privEnumClosed' is inaccessible due to 'private' protection level}}
+
+        let _ = publEnumOpen.variantPublEnumOpen
+        let _ = privEnumOpen.variantPrivEnumOpen // expected-error {{'privEnumOpen' is inaccessible due to 'private' protection level}}
     }
 }
 
@@ -283,18 +303,18 @@ func notExt(_ c: inout MyClass) {
     let _: MyClass.privEnumFlag // expected-error {{'privEnumFlag' is inaccessible due to 'private' protection level}}
 
     // TODO: Enum variants are not being correctly imported. Test the following when that is fixed:
-    // let _ = MyClass.publEnum.publEnumValue1
-    // let _ = MyClass.privEnum.privEnumValue1
+    // let _ = MyClass.variantPublEnum
+    // let _ = MyClass.variantPrivEnum // TODO-error {{'variantPrivEnum' is inaccessible due to 'private' protection level}}
     //
-    // let _ = MyClass.publEnumClass.publEnumClassValue1
-    // let _ = MyClass.privEnumClass.privEnumClassValue1
-    //
-    // let _ = MyClass.publEnumAnonValue1
-    // let _ = MyClass.privEnumAnonValue1
-    //
-    // let _ = MyClass.publEnumClosed.Value1
-    // let _ = MyClass.privEnumClosed.Value1
-    //
-    // let _ = MyClass.publEnumOpen.Value1
-    // let _ = MyClass.privEnumOpen.Value1
+    // let _ = MyClass.publEnumAnonVariant
+    // let _ = MyClass.privEnumAnonVariant // TODO-error {{'privEnumAnonVariant' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClass.variantPublEnumClass
+    let _ = MyClass.privEnumClass.variantPrivEnumClass// expected-error {{'privEnumClass' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumClosed.variantPublEnumClosed
+    let _ = MyClass.privEnumClosed.variantPrivEnumClosed // expected-error {{'privEnumClosed' is inaccessible due to 'private' protection level}}
+
+    let _ = MyClass.publEnumOpen.variantPublEnumOpen
+    let _ = MyClass.privEnumOpen.variantPrivEnumOpen // expected-error {{'privEnumOpen' is inaccessible due to 'private' protection level}}
 }

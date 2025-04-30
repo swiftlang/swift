@@ -5,7 +5,7 @@
 
 #^PLAIN_TOP_LEVEL_1?check=PLAIN_TOP_LEVEL;check=NO_STDLIB_PRIVATE^#
 
-// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Array[#Array#]{{; name=.+$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Array[#Array<Element>#]{{; name=.+$}}
 
 func privateNominalMembers(_ a: String) {
   a.#^PRIVATE_NOMINAL_MEMBERS_1?check=PRIVATE_NOMINAL_MEMBERS_1;check=NO_STDLIB_PRIVATE^#

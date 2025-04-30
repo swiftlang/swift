@@ -24,6 +24,7 @@
 
 namespace swift {
 class ASTContext;
+class AvailabilityDomain;
 class BackDeployedAttr;
 class Decl;
 class SemanticAvailableAttr;
@@ -62,45 +63,36 @@ public:
   /// For the attribute's introduction version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
-  static bool updateIntroducedPlatformForFallback(
-      const SemanticAvailableAttr &attr, const ASTContext &Ctx,
-      llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
+  static bool updateIntroducedAvailabilityDomainForFallback(
+      const SemanticAvailableAttr &attr, const ASTContext &ctx,
+      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
 
   /// For the attribute's deprecation version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
-  static bool updateDeprecatedPlatformForFallback(
-      const SemanticAvailableAttr &attr, const ASTContext &Ctx,
-      llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
+  static bool updateDeprecatedAvailabilityDomainForFallback(
+      const SemanticAvailableAttr &attr, const ASTContext &ctx,
+      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
 
   /// For the attribute's obsoletion version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
-  static bool updateObsoletedPlatformForFallback(
-      const SemanticAvailableAttr &attr, const ASTContext &Ctx,
-      llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
+  static bool updateObsoletedAvailabilityDomainForFallback(
+      const SemanticAvailableAttr &attr, const ASTContext &ctx,
+      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
 
-  static void updatePlatformStringForFallback(const SemanticAvailableAttr &attr,
-                                              const ASTContext &Ctx,
-                                              llvm::StringRef &Platform);
+  static void
+  updateAvailabilityDomainForFallback(const SemanticAvailableAttr &attr,
+                                      const ASTContext &ctx,
+                                      AvailabilityDomain &domain);
 
   /// For the attribute's before version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
-  static bool updateBeforePlatformForFallback(const BackDeployedAttr *attr,
-                                              const ASTContext &Ctx,
-                                              llvm::StringRef &Platform,
-                                              llvm::VersionTuple &PlatformVer);
+  static bool updateBeforeAvailabilityDomainForFallback(
+      const BackDeployedAttr *attr, const ASTContext &ctx,
+      AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
 };
-
-// FIXME: This should become a utility on Decl.
-
-/// Given a declaration upon which an availability attribute would appear in
-/// concrete syntax, return a declaration to which the parser
-/// actually attaches the attribute in the abstract syntax tree. We use this
-/// function to determine whether the concrete syntax already has an
-/// availability attribute.
-const Decl *abstractSyntaxDeclForAvailableAttribute(const Decl *D);
 
 } // end namespace swift
 

@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -549,7 +550,9 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     assert(D);
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!shouldIndex(VD, /*IsRef*/ true))
-        return true;
+        // Let the caller continue while discarding the relation to a symbol
+        // that won't appear in the index.
+        return false;
     }
     auto Match = std::find_if(Info.Relations.begin(), Info.Relations.end(),
                               [D](IndexRelation R) { return R.decl == D; });
@@ -885,6 +888,11 @@ private:
     // Dig back to the original captured variable
     if (isa<VarDecl>(D)) {
       Info.originalDecl = firstDecl(D);
+      // When indexing locals is disabled, the reference to the original decl
+      // would be lost without overwriting the local symbol.
+      if (!IdxConsumer.indexLocals()) {
+        D = Info.originalDecl;
+      }
     }
 
     if (Data.isImplicit)
@@ -910,10 +918,18 @@ private:
     // report an occurrence of `foo` in `_foo` and '$foo').
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1 &&
-               (Range.str().front() == '_' || Range.str().front() == '$'));
-        auto AfterDollar = Loc.getAdvancedLoc(1);
-        reportRef(Wrapped, AfterDollar, Info, std::nullopt);
+        assert(Range.getByteLength() > 1);
+        if (Range.str().front() == '`') {
+          assert(Range.getByteLength() > 3);
+          assert(Range.str().starts_with("`_") ||
+                 Range.str().starts_with("`$"));
+          auto AfterBacktick = Loc.getAdvancedLoc(2);
+          reportRef(Wrapped, AfterBacktick, Info, std::nullopt);
+        } else {
+          assert(Range.str().front() == '_' || Range.str().front() == '$');
+          auto AfterDollar = Loc.getAdvancedLoc(1);
+          reportRef(Wrapped, AfterDollar, Info, std::nullopt);
+        }
       }
     }
 
@@ -2154,14 +2170,20 @@ void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
 }
 
 void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
+  PrettyStackTraceDecl trace("indexing module", module);
+  ASTContext &ctx = module->getASTContext();
   assert(module);
+
   auto mName = module->getRealName().str();
-  if (module->getASTContext().blockListConfig.hasBlockListAction(mName,
+  if (ctx.blockListConfig.hasBlockListAction(mName,
       BlockListKeyKind::ModuleName,
       BlockListAction::SkipIndexingModule)) {
     return;
   }
-  IndexSwiftASTWalker walker(consumer, module->getASTContext());
+
+  llvm::SaveAndRestore<bool> S(ctx.ForceExtendedDeserializationRecovery, true);
+
+  IndexSwiftASTWalker walker(consumer, ctx);
   walker.visitModule(*module);
   consumer.finish();
 }

@@ -45,7 +45,7 @@ public struct UInt128: Sendable {
   @_transparent
   public init(_low: UInt64, _high: UInt64) {
 #if _endian(little)
-    self = unsafeBitCast((_low, _high), to: Self.self)
+    self = unsafe unsafeBitCast((_low, _high), to: Self.self)
 #else
     self = unsafeBitCast((_high, _low), to: Self.self)
 #endif
@@ -532,8 +532,8 @@ extension UInt128.Words: RandomAccessCollection {
 #else
       let index = count - 1 - position
 #endif
-      return _withUnprotectedUnsafePointer(to: &value) {
-        $0.withMemoryRebound(to: UInt.self, capacity: count) { $0[index] }
+      return unsafe _withUnprotectedUnsafePointer(to: &value) {
+        unsafe $0.withMemoryRebound(to: UInt.self, capacity: count) { unsafe $0[index] }
       }
     }
   }

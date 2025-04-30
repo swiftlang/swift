@@ -90,7 +90,21 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     ValueDecl *e = result.getValueDecl();
     assert(e);
 
-    // Skip if the enum element was referenced as an instance member
+    // We only care about enum members, and must either have an EnumElementDecl,
+    // or a VarDecl which could be wrapping an underlying enum element.
+    // FIXME: We check this up-front to avoid kicking InterfaceTypeRequest
+    // below to help workaround https://github.com/swiftlang/swift/issues/80657
+    // for non-enum cases. The proper fix is to move this filtering logic
+    // into the constraint system.
+    if (!e->getDeclContext()->getSelfEnumDecl())
+      continue;
+
+    auto *EED = dyn_cast<EnumElementDecl>(e);
+    auto *VD = dyn_cast<VarDecl>(e);
+    if (!EED && !VD)
+      continue;
+
+    // Skip if referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
           !result.getBaseDecl()->getInterfaceType()->is<MetatypeType>()) {
@@ -98,17 +112,17 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
       }
     }
 
-    if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
+    if (EED) {
       // Note that there could be multiple elements with the same
       // name, such results in a re-declaration error, so let's
       // just always pick the last element, just like in `foundConstant`
       // case.
-      foundElement = oe;
+      foundElement = EED;
       continue;
     }
 
-    if (auto *var = dyn_cast<VarDecl>(e)) {
-      foundConstant = var;
+    if (VD) {
+      foundConstant = VD;
       continue;
     }
   }
@@ -645,7 +659,7 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
 
     // "if let" implicitly looks inside of an optional, so wrap it in an
     // OptionalSome pattern.
-    P = OptionalSomePattern::createImplicit(Context, P, P->getEndLoc());
+    P = OptionalSomePattern::createImplicit(Context, P);
   }
 
   return P;
@@ -1011,24 +1025,39 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
   }
 }
 
+/// Try to simplify an `ExprPattern` with a Boolean literal sub-expression
+/// to a `BoolPattern`, recursively unwrapping optional types if necessary.
+static NullablePtr<Pattern> simplifyToBoolPattern(ASTContext &Ctx,
+                                                  const ExprPattern *EP,
+                                                  const BooleanLiteralExpr *BLE,
+                                                  Type patternTy) {
+  // If the type is Bool, return a BoolPattern.
+  if (patternTy->isBool()) {
+    auto *BP = new (Ctx) BoolPattern(BLE->getLoc(), BLE->getValue());
+    BP->setType(patternTy);
+    return BP;
+  }
+  // If the pattern type is optional, attempt to simplify the wrapped type.
+  // `true` and `false` are treated as if they had `?` appended
+  // for each level of optionality.
+  if (auto wrappedType = patternTy->getOptionalObjectType()) {
+    if (auto P =
+            simplifyToBoolPattern(Ctx, EP, BLE, wrappedType).getPtrOrNull()) {
+      auto OP = OptionalSomePattern::createImplicit(Ctx, P);
+      OP->setType(patternTy);
+      return OP;
+    }
+  }
+  return nullptr;
+}
+
 NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
                                                          Type patternTy) {
   auto *subExpr = EP->getSubExpr();
   auto &ctx = EP->getDeclContext()->getASTContext();
 
-  if (patternTy->isBool()) {
-    // The type is Bool.
-    // Check if the pattern is a Bool literal
-    auto *semanticSubExpr = subExpr->getSemanticsProvidingExpr();
-    if (auto *BLE = dyn_cast<BooleanLiteralExpr>(semanticSubExpr)) {
-      auto *BP = new (ctx) BoolPattern(BLE->getLoc(), BLE->getValue());
-      BP->setType(patternTy);
-      return BP;
-    }
-  }
-
   // case nil is equivalent to .none when switching on Optionals.
-  if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+  if (auto *NLE = dyn_cast<NilLiteralExpr>(subExpr)) {
     if (patternTy->getOptionalObjectType()) {
       auto *NoneEnumElement = ctx.getOptionalNoneDecl();
       return EnumElementPattern::createImplicit(
@@ -1045,7 +1074,13 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
         return nullptr;
     }
   }
-  return nullptr;
+
+  const auto *BLE =
+      dyn_cast<BooleanLiteralExpr>(subExpr->getSemanticsProvidingExpr());
+  if (!BLE)
+    return nullptr;
+
+  return simplifyToBoolPattern(ctx, EP, BLE, patternTy);
 }
 
 /// Perform top-down type coercion on the given pattern.
@@ -1454,8 +1489,7 @@ Pattern *TypeChecker::coercePatternToType(
             if (lookupEnumMemberElement(dc,
                                         baseType->lookThroughAllOptionalTypes(),
                                         EEP->getName(), EEP->getLoc())) {
-              P = OptionalSomePattern::createImplicit(Context, EEP,
-                                                      EEP->getEndLoc());
+              P = OptionalSomePattern::createImplicit(Context, EEP);
               return coercePatternToType(
                   pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                   options, tryRewritePattern);

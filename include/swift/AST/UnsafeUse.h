@@ -14,6 +14,7 @@
 #define SWIFT_AST_UNSAFEUSE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
@@ -52,8 +53,13 @@ public:
     ReferenceToUnsafeThroughTypealias,
     /// A call to an unsafe declaration.
     CallToUnsafe,
+    /// An unsafe argument in a call.
+    CallArgument,
     /// A @preconcurrency import.
     PreconcurrencyImport,
+    /// A use of withoutActuallyEscaping that lacks enforcement that the
+    /// value didn't actually escape.
+    TemporarilyEscaping,
   };
 
 private:
@@ -84,6 +90,17 @@ private:
       TypeBase *type;
       const void *location;
     } entity;
+
+    MakeTemporarilyEscapableExpr *temporarilyEscaping;
+
+    struct {
+      Expr *call;
+      const Decl *calleeDecl;
+      TypeBase *paramType;
+      const void *argumentName;
+      unsigned argumentIndex;
+      Expr *argument;
+    } callArgument;
 
     const ImportDecl *importDecl;
   } storage;
@@ -195,6 +212,25 @@ public:
                         decl, type, location);
   }
 
+  static UnsafeUse forCallArgument(
+      Expr *call, const Decl *calleeDecl, Type paramType,
+      Identifier argumentName, unsigned argumentIndex, Expr *argument) {
+    UnsafeUse result(CallArgument);
+    result.storage.callArgument.call = call;
+    result.storage.callArgument.calleeDecl = calleeDecl;
+    result.storage.callArgument.paramType = paramType.getPointer();
+    result.storage.callArgument.argumentName = argumentName.getAsOpaquePointer();
+    result.storage.callArgument.argumentIndex = argumentIndex;
+    result.storage.callArgument.argument = argument;
+    return result;
+  }
+
+  static UnsafeUse forTemporarilyEscaping(MakeTemporarilyEscapableExpr *expr) {
+    UnsafeUse result(TemporarilyEscaping);
+    result.storage.temporarilyEscaping = expr;
+    return result;
+  }
+
   static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
     UnsafeUse result(PreconcurrencyImport);
     result.storage.importDecl = importDecl;
@@ -230,6 +266,12 @@ public:
       return SourceLoc(
           llvm::SMLoc::getFromPointer((const char *)storage.entity.location));
 
+    case CallArgument:
+      return storage.callArgument.call->getLoc();
+
+    case TemporarilyEscaping:
+      return storage.temporarilyEscaping->getLoc();
+
     case PreconcurrencyImport:
       return storage.importDecl->getLoc();
     }
@@ -240,7 +282,9 @@ public:
     switch (getKind()) {
     case Override:
     case Witness:
+    case TemporarilyEscaping:
     case PreconcurrencyImport:
+    case CallArgument:
       // Cannot replace location.
       return;
 
@@ -282,7 +326,11 @@ public:
     case CallToUnsafe:
       return storage.entity.decl;
 
+    case CallArgument:
+      return storage.callArgument.calleeDecl;
+
     case UnsafeConformance:
+    case TemporarilyEscaping:
       return nullptr;
 
     case PreconcurrencyImport:
@@ -313,8 +361,10 @@ public:
     case ReferenceToUnsafeThroughTypealias:
     case ReferenceToUnsafeStorage:
     case CallToUnsafe:
+    case CallArgument:
     case UnsafeConformance:
     case PreconcurrencyImport:
+    case TemporarilyEscaping:
       return nullptr;
     }
   }
@@ -341,6 +391,12 @@ public:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.type;
+
+    case CallArgument:
+      return storage.callArgument.paramType;
+
+    case TemporarilyEscaping:
+      return storage.temporarilyEscaping->getOpaqueValue()->getType();
     }
   }
 
@@ -365,9 +421,23 @@ public:
     case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
+    case CallArgument:
+    case TemporarilyEscaping:
     case PreconcurrencyImport:
       return ProtocolConformanceRef::forInvalid();
     }
+  }
+
+  /// Get information about the call argument.
+  ///
+  /// Produces the argument name, argument index, and argument expression for
+  /// a unsafe use describing a call argument.
+  std::tuple<Identifier, unsigned, Expr *> getCallArgument() const {
+    assert(getKind() == CallArgument);
+    return std::make_tuple(
+        Identifier::getFromOpaquePointer(storage.callArgument.argumentName),
+        storage.callArgument.argumentIndex,
+        storage.callArgument.argument);
   }
 };
 

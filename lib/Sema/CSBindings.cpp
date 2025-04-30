@@ -51,6 +51,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
 
   for (auto *constraint : info.Constraints) {
     switch (constraint->getKind()) {
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::ConformsTo:
       if (constraint->getSecondType()->is<ProtocolType>())
         Protocols.push_back(constraint);
@@ -128,9 +129,22 @@ bool BindingSet::isDelayed() const {
       if (Bindings.empty())
         return true;
 
+      if (Bindings[0].BindingType->is<ProtocolType>()) {
+        auto *bindingLoc = Bindings[0].getLocator();
+        // This set shouldn't be delayed because there won't be any
+        // other inference sources when the protocol binding got
+        // inferred from a contextual type and the leading-dot chain
+        // this type variable is a base of, is connected directly to it.
 
-      if (Bindings[0].BindingType->is<ProtocolType>())
-        return true;
+        if (!bindingLoc->findLast<LocatorPathElt::ContextualType>())
+          return true;
+
+        auto *chainResult =
+            getAsExpr<UnresolvedMemberChainResultExpr>(bindingLoc->getAnchor());
+        if (!chainResult || CS.getParentExpr(chainResult) ||
+            chainResult->getChainBase() != getAsExpr(locator->getAnchor()))
+          return true;
+      }
     }
 
     // Since force unwrap preserves l-valueness, resulting
@@ -256,7 +270,8 @@ bool BindingSet::isPotentiallyIncomplete() const {
     // that's done as a last resort effort at resolving first member.
     if (auto *constraint = binding.getSource()) {
       if (binding.BindingType->is<ProtocolType>() &&
-          constraint->getKind() == ConstraintKind::ConformsTo)
+          (constraint->getKind() == ConstraintKind::ConformsTo ||
+           constraint->getKind() == ConstraintKind::NonisolatedConformsTo))
         return true;
     }
   }
@@ -1941,6 +1956,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::Defaultable:

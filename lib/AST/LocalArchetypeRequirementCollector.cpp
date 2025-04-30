@@ -189,7 +189,11 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
 }
 
 Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
-  auto *archetypeTy = cast<ArchetypeType>(type);
+  // Local archetypes can appear in interface types alongside generic param
+  // types, ignore them here.
+  auto *archetypeTy = dyn_cast<ArchetypeType>(type);
+  if (!archetypeTy)
+    return type;
 
   // Primary archetypes just map out of context.
   if (isa<PrimaryArchetypeType>(archetypeTy) ||

@@ -79,10 +79,10 @@ import F
 // MOD-HASH-NEXT:   "swift": {
 // MOD-HASH-NEXT:   "moduleInterfacePath": "{{.*}}{{/|\\}}F.swiftinterface",
 // MOD-HASH:   "commandLine": [
-// MOD-HASH:     "-o",
-// MOD-HASH-NEXT:     "{{.*}}{{/|\\}}F-[[FHASH:.*]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-[[SHASH:.*]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-[[SOSHASH:.*]].swiftmodule",
+// MOD-HASH:     "-o",
+// MOD-HASH-NEXT:     "{{.*}}{{/|\\}}F-[[FHASH:.*]].swiftmodule"
 // MOD-HASH:     ],
 // MOD-HASH: "mainModuleName": "deps1",
 // MOD-HASH: "linkLibraries": [],
@@ -90,10 +90,10 @@ import F
 // MOD-HASH-NEXT:   "swift": {
 // MOD-HASH-NEXT:   "moduleInterfacePath": "{{.*}}{{/|\\}}F.swiftinterface",
 // MOD-HASH:   "commandLine": [
-// MOD-HASH:     "-o",
-// MOD-HASH-NEXT:     "{{.*}}{{/|\\}}F-[[FHASH]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-[[SHASH]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-[[SOSHASH]].swiftmodule",
+// MOD-HASH:     "-o",
+// MOD-HASH-NEXT:     "{{.*}}{{/|\\}}F-[[FHASH]].swiftmodule"
 // MOD-HASH:     ],
 // MOD-HASH: "mainModuleName": "deps2",
 // MOD-HASH: "linkLibraries": [],
@@ -101,8 +101,8 @@ import F
 // MOD-HASH-NEXT:   "swift": {
 // MOD-HASH-NEXT:   "moduleInterfacePath": "{{.*}}{{/|\\}}F.swiftinterface",
 // MOD-HASH:   "commandLine": [
-// MOD-HASH:     "-o",
-// MOD-HASH-NEXT:     "{{.*}}{{/|\\}}F-[[FHASH]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-[[SHASH]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-[[SOSHASH]].swiftmodule",
+// MOD-HASH:     "-o",
+// MOD-HASH-NEXT:     "{{.*}}{{/|\\}}F-[[FHASH]].swiftmodule"
 // MOD-HASH:     ],

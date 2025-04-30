@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,12 +16,12 @@
 
 #include "CodeSynthesis.h"
 
+#include "DerivedConformance/DerivedConformance.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "DerivedConformances.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -403,15 +403,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                   decl->getDeclaredType(), existingIsolation, isolation)
                 .warnUntilSwiftVersion(6);
               if (previousVar) {
-                previousVar->diagnose(
-                    diag::property_requires_actor,
-                    previousVar->getDescriptiveKind(),
-                    previousVar->getName(), existingIsolation);
+                previousVar->diagnose(diag::property_requires_actor,
+                                      previousVar, existingIsolation);
               }
-              var->diagnose(
-                  diag::property_requires_actor,
-                  var->getDescriptiveKind(),
-                  var->getName(), isolation);
+              var->diagnose(diag::property_requires_actor, var, isolation);
               hasError = true;
               return false;
             }
@@ -642,8 +637,8 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   std::optional<ForeignAsyncConvention> asyncConvention;
   std::optional<ForeignErrorConvention> errorConvention;
   if (superclassCtor->isObjC() &&
-      !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
-                             asyncConvention, errorConvention))
+      !isRepresentableInLanguage(ctor, ObjCReason::MemberOfObjCSubclass,
+                                 asyncConvention, errorConvention))
     ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
@@ -666,7 +661,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
       .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
+  auto type = superclassCtor->getInitializerInterfaceType();
+  if (auto *genericFnType = type->getAs<GenericFunctionType>())
+    type = genericFnType->substGenericArgs(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);
@@ -1741,8 +1738,7 @@ bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,
     return false;
 
   ASTContext &ctx = nominal->getASTContext();
-  value->getAttrs().add(
-      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  value->getAttrs().add(NonisolatedAttr::createImplicit(ctx));
   return true;
 }
 

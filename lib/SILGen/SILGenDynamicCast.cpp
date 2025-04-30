@@ -17,6 +17,8 @@
 #include "Scope.h"
 #include "ExitableFullExpr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -36,13 +38,15 @@ namespace {
       Scalar,
     };
     CastStrategy Strategy;
+    CastingIsolatedConformances IsolatedConformances;
 
   public:
     CheckedCastEmitter(SILGenFunction &SGF, SILLocation loc,
                        Type sourceType, Type targetType)
       : SGF(SGF), Loc(loc), SourceType(sourceType->getCanonicalType()),
         TargetType(targetType->getCanonicalType()),
-        Strategy(computeStrategy()) {
+        Strategy(computeStrategy()),
+        IsolatedConformances(computedIsolatedConformances()) {
     }
 
     bool isOperandIndirect() const {
@@ -90,7 +94,7 @@ namespace {
       if (Strategy == CastStrategy::Address) {
         SILValue resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createUnconditionalCheckedCastAddr(Loc,
+        SGF.B.createUnconditionalCheckedCastAddr(Loc, IsolatedConformances,
                                              operand.forward(SGF), SourceType,
                                              resultBuffer, TargetType);
         return RValue(SGF, Loc, TargetType,
@@ -99,7 +103,8 @@ namespace {
       }
 
       ManagedValue result =
-        SGF.B.createUnconditionalCheckedCast(Loc, operand,
+        SGF.B.createUnconditionalCheckedCast(Loc, IsolatedConformances,
+                                             operand,
                                              origTargetTL.getLoweredType(),
                                              TargetType);
       return RValue(SGF, Loc, TargetType,
@@ -110,7 +115,8 @@ namespace {
 
     /// Emit a conditional cast.
     void emitConditional(
-        ManagedValue operand, CastConsumptionKind consumption, SGFContext ctx,
+        ManagedValue operand,
+        CastConsumptionKind consumption, SGFContext ctx,
         llvm::function_ref<void(ManagedValue)> handleTrue,
         llvm::function_ref<void(std::optional<ManagedValue>)> handleFalse,
         ProfileCounter TrueCount = ProfileCounter(),
@@ -135,8 +141,9 @@ namespace {
         resultBuffer =
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createCheckedCastAddrBranch(
-            Loc, consumption, operand.forward(SGF), SourceType, resultBuffer,
-            TargetType, trueBB, falseBB, TrueCount, FalseCount);
+            Loc, IsolatedConformances, consumption, operand.forward(SGF),
+            SourceType, resultBuffer, TargetType, trueBB, falseBB,
+            TrueCount, FalseCount);
       } else {
         // Tolerate being passed an address here.  It comes up during switch
         // emission.
@@ -150,7 +157,8 @@ namespace {
         if (!shouldDestroyOnFailure(consumption)) {
           operandValue = operandValue.borrow(SGF, Loc);
         }
-        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
+        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false,
+                                      IsolatedConformances, operandValue,
                                       SourceType, origTargetTL.getLoweredType(),
                                       TargetType, trueBB, falseBB, TrueCount,
                                       FalseCount);
@@ -293,6 +301,36 @@ namespace {
                                                  TargetType))
         return CastStrategy::Scalar;
       return CastStrategy::Address;
+    }
+
+    CastingIsolatedConformances computedIsolatedConformances() const {
+      // Non-existential types don't carry conformances, so we always allow
+      // isolated conformances.
+      if (!TargetType->isAnyExistentialType())
+        return CastingIsolatedConformances::Allow;
+
+      // If there is a conformance to SendableMetatype, then this existential
+      // can leave the current isolation domain.
+      ASTContext &ctx = TargetType->getASTContext();
+      Type checkType;
+      if (auto existentialMetatype = TargetType->getAs<ExistentialMetatypeType>())
+        checkType = existentialMetatype->getInstanceType();
+      else
+        checkType = TargetType;
+
+      // If there are no non-marker protocols in the existential, there's no
+      // need to prohibit isolated conformances.
+      auto layout = checkType->getExistentialLayout();
+      if (!layout.containsNonMarkerProtocols())
+        return CastingIsolatedConformances::Allow;
+
+      // If the type conforms to SendableMetatype, prohibit isolated
+      // conformances.
+      auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+      if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
+        return CastingIsolatedConformances::Prohibit;
+
+      return CastingIsolatedConformances::Allow;
     }
   };
 } // end anonymous namespace

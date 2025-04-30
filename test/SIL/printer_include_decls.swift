@@ -51,3 +51,9 @@ extension Foo.E {
   func e(x: Foo.E) {}
 // CHECK: func e(x: Foo.E)
 }
+
+func `foo space`() { }
+// CHECK: func `foo space`()
+
+var `x space`: Int
+// CHECK: var `x space`: Int

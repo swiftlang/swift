@@ -74,7 +74,7 @@ bool CodeCompletionDiagnostics::getDiagnostics(
     typename swift::detail::PassArgument<ArgTypes>::type... VArgs) {
   DiagID id = ID.ID;
   std::vector<DiagnosticArgument> DiagArgs{std::move(VArgs)...};
-  auto format = Engine.diagnosticStringFor(id);
+  auto format = Engine.getFormatStringForDiagnostic(id);
   DiagnosticEngine::formatDiagnosticText(Out, format, DiagArgs);
   severity = getSeverity(Engine.declaredDiagnosticKindFor(id));
 
@@ -87,58 +87,51 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   // FIXME: Code completion doesn't offer accessors. It only emits 'VarDecl's.
   // So getter/setter specific availability doesn't work in code completion.
 
-  StringRef Platform = Attr.getDomain().getNameForDiagnostics();
-  llvm::VersionTuple DeprecatedVersion;
-  if (Attr.getDeprecated())
-    DeprecatedVersion = Attr.getDeprecated().value();
-
-  llvm::VersionTuple RemappedDeprecatedVersion;
-  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          Attr, Ctx, Platform, RemappedDeprecatedVersion))
-    DeprecatedVersion = RemappedDeprecatedVersion;
-
+  auto Domain = Attr.getDomain();
+  auto DeprecatedRange = Attr.getDeprecatedRange(Ctx).value();
   auto Message = Attr.getMessage();
   auto NewName = Attr.getRename();
   if (!isSoftDeprecated) {
     if (Message.empty() && NewName.empty()) {
       getDiagnostics(severity, Out, diag::availability_deprecated, D,
-                     Attr.isPlatformSpecific(), Platform,
-                     Attr.getDeprecated().has_value(), DeprecatedVersion,
+                     Attr.isPlatformSpecific(), Domain,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                      /*message*/ StringRef());
     } else if (!Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Message);
       getDiagnostics(severity, Out, diag::availability_deprecated, D,
-                     Attr.isPlatformSpecific(), Platform,
-                     Attr.getDeprecated().has_value(), DeprecatedVersion,
+                     Attr.isPlatformSpecific(), Domain,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                      EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out, diag::availability_deprecated_rename, D,
-                     Attr.isPlatformSpecific(), Platform,
-                     Attr.getDeprecated().has_value(), DeprecatedVersion, false,
+                     Attr.isPlatformSpecific(), Domain,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
+                     false,
                      /*ReplaceKind*/ 0, NewName);
     }
   } else {
     // '100000' is used as a version number in API that will be deprecated in an
     // upcoming release. This number is to match the 'API_TO_BE_DEPRECATED'
     // macro defined in Darwin platforms.
-    static llvm::VersionTuple DISTANT_FUTURE_VESION(100000);
-    bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VESION;
+    bool isDistantFuture = DeprecatedRange.isContainedIn(
+        AvailabilityRange(llvm::VersionTuple(100000)));
 
     if (Message.empty() && NewName.empty()) {
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
-                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
-                     DeprecatedVersion,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
+                     DeprecatedRange,
                      /*message*/ StringRef());
     } else if (!Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Message);
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
-                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
-                     DeprecatedVersion, EncodedMessage.Message);
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
+                     DeprecatedRange, EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out,
                      diag::ide_availability_softdeprecated_rename, D,
-                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
-                     DeprecatedVersion, NewName);
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
+                     DeprecatedRange, NewName);
     }
   }
   return false;

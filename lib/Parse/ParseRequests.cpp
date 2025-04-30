@@ -248,7 +248,7 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
   case GeneratedSourceInfo::Kind::DefaultArgument:
     return BridgedGeneratedSourceFileKindDefaultArgument;
   case GeneratedSourceInfo::AttributeFromClang:
-    return BridgedGeneratedSourceFileKindAttribute;
+    return BridgedGeneratedSourceFileKindAttributeFromClang;
   }
 }
 
@@ -353,6 +353,11 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   if (genInfo && genInfo->declContext) {
     declContext = genInfo->declContext;
   }
+  Decl *attachedDecl = nullptr;
+  if (genInfo && genInfo->astNode) {
+    attachedDecl =
+        ASTNode::getFromOpaqueValue(genInfo->astNode).dyn_cast<Decl *>();
+  }
 
   // Parse the file.
   auto *exportedSourceFile = SF.getExportedSourceFile();
@@ -385,7 +390,7 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // Generate AST nodes.
   SmallVector<ASTNode, 128> items;
   swift_ASTGen_buildTopLevelASTNodes(
-      &Diags, exportedSourceFile, declContext, Ctx,
+      &Diags, exportedSourceFile, declContext, attachedDecl, Ctx,
       static_cast<SmallVectorImpl<ASTNode> *>(&items),
       appendToVector<BridgedASTNode, ASTNode>);
 

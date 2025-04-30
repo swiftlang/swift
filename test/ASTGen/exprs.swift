@@ -1,16 +1,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature OldOwnershipOperatorSpellings \
 // RUN:   | %sanitize-address > %t/astgen.ast
 // RUN: %target-swift-frontend-dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only \
+// RUN:   -enable-experimental-feature OldOwnershipOperatorSpellings \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature OldOwnershipOperatorSpellings -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_OldOwnershipOperatorSpellings
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -84,6 +87,11 @@ func testUnaryExprs() async throws {
   let foo = try await asyncFunc(_borrow str)
   let bar = copy foo
   let baz = consume foo
+}
+func throwsFunc() throws -> Int { 1 }
+func testOptionalTry() {
+  let _ = try! 1 + throwsFunc()
+  let _ = try? throwsFunc() + throwsFunc()
 }
 
 func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {

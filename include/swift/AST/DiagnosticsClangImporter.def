@@ -174,6 +174,10 @@ NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "does this type have reference "
                                                 "semantics?",
      (StringRef, StringRef))
+NOTE(record_unsupported_default_args, none,
+     "copy constructors and move constructors with more than one parameter are "
+     "unavailable in Swift",
+     ())
 
 NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
                                           "of type '%1' is unavailable",
@@ -278,7 +282,8 @@ ERROR(conforms_to_ambiguous,none,
       "ambiguous reference to protocol '%0' in specified protocol conformance; module '%1' contains multiple protocols named '%0'", (StringRef, StringRef))
 
 ERROR(conforms_to_not_protocol,none,
-      "%0 %1 referenced in protocol conformance '%2' is not a protocol", (DescriptiveDeclKind, ValueDecl *, StringRef))
+      "%kind0 referenced in protocol conformance '%1' is not a protocol",
+      (const ValueDecl *, StringRef))
 
 ERROR(failed_base_method_call_synthesis,none,
       "failed to synthesize call to the base method %0 of type %0",
@@ -288,6 +293,9 @@ ERROR(both_returns_retained_returns_unretained, none,
       "%0 cannot be annotated with both SWIFT_RETURNS_RETAINED and "
       "SWIFT_RETURNS_UNRETAINED",
       (const clang::NamedDecl *))
+
+ERROR(redundant_conformance_protocol,none,
+     "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
 
 ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "%0 cannot be annotated with either SWIFT_RETURNS_RETAINED or "
@@ -364,6 +372,14 @@ NOTE(bridged_pointer_type_not_found,none,
      "UnsafeMutablePointer|UnsafePointer|AutoreleasingUnsafeMutablePointer}0' "
      "for bridging; module 'Swift' may be broken",
      (unsigned))
+
+NOTE(ptr_to_nonescapable,none,
+     "pointer to non-escapable type %0 cannot be imported",
+     (const clang::Type*))
+
+NOTE(nonescapable_field_of_escapable, none,
+     "escapable record %0 cannot have non-escapable field '%1'",
+     (const clang::NamedDecl *, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

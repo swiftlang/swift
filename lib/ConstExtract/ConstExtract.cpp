@@ -92,6 +92,7 @@ std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
   Options.FullyQualifiedTypes = true;
   Options.PreferTypeRepr = true;
   Options.AlwaysDesugarArraySliceTypes = true;
+  Options.AlwaysDesugarInlineArrayTypes = true;
   Options.AlwaysDesugarDictionaryTypes = true;
   Options.AlwaysDesugarOptionalTypes = true;
   Options.PrintTypeAliasUnderlyingType = true;
@@ -1052,11 +1053,12 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt,
   }
   for (auto elt : ifStmt->getCond()) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
-      for (auto *Q : elt.getAvailability()->getQueries()) {
-        if (Q->getPlatform() != PlatformKind::none) {
-          auto spec = BuilderValue::ConditionalMember::AvailabilitySpec(
-              *Q->getDomain(), Q->getVersion());
-          AvailabilitySpecs.push_back(spec);
+      for (auto spec :
+           elt.getAvailability()->getSemanticAvailabilitySpecs(declContext)) {
+        if (spec.getDomain().isPlatform()) {
+          AvailabilitySpecs.push_back(
+              BuilderValue::ConditionalMember::AvailabilitySpec(
+                  spec.getDomain(), spec.getVersion()));
         }
       }
       memberKind = BuilderValue::LimitedAvailability;
@@ -1390,6 +1392,7 @@ void writeProperties(llvm::json::OStream &JSON,
     for (const auto &PropertyInfo : TypeInfo.Properties) {
       JSON.object([&] {
         const auto *decl = PropertyInfo.VarDecl;
+        std::shared_ptr<CompileTimeValue> value = PropertyInfo.Value;
         JSON.attribute("label", decl->getName().str().str());
         JSON.attribute("type", toFullyQualifiedTypeNameString(
             decl->getInterfaceType()));
@@ -1398,12 +1401,17 @@ void writeProperties(llvm::json::OStream &JSON,
         JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
         writeLocationInformation(JSON, decl->getLoc(),
                                  decl->getDeclContext()->getASTContext());
-        if (auto builderValue =
-                extractBuilderValueIfExists(&NomTypeDecl, decl)) {
-          writeValue(JSON, builderValue.value());
-        } else {
-          writeValue(JSON, PropertyInfo.Value);
+
+        if (value.get()->getKind() == CompileTimeValue::ValueKind::Runtime) {
+          // Extract result builder information only if the variable has not
+          // used a different kind of initializer
+          if (auto builderValue =
+                  extractBuilderValueIfExists(&NomTypeDecl, decl)) {
+            value = builderValue.value();
+          }
         }
+
+        writeValue(JSON, value);
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
                                        decl->getASTContext());
         writeAvailabilityAttributes(JSON, *decl);

@@ -24,6 +24,7 @@ add_swift_unittest(SwiftBasicTests
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
   OptionSetTest.cpp
+  Options.cpp
   OwnedStringTest.cpp
   MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
@@ -48,8 +49,10 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 target_link_libraries(SwiftBasicTests
   PRIVATE
   swiftBasic
+  swiftOption
   swiftThreading
   clangBasic
+  LLVMOption
   LLVMTestingSupport
   )
 

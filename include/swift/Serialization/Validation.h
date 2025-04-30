@@ -151,6 +151,7 @@ class ExtendedValidationInfo {
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
   } Bits;
+
 public:
   ExtendedValidationInfo() : Bits() {}
 

@@ -377,9 +377,6 @@ void DiagnosticHelper::Implementation::beginMessage() {
   if (invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
 
-  PDC.setPrintEducationalNotes(
-      invocation.getDiagnosticOptions().PrintEducationalNotes);
-
   PDC.setFormattingStyle(
       invocation.getDiagnosticOptions().PrintedFormattingStyle);
 

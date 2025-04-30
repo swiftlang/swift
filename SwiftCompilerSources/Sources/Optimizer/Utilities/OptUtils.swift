@@ -185,6 +185,24 @@ extension Value {
     }
     return true
   }
+
+  /// Performs a simple dominance check without using the dominator tree.
+  /// Returns true if `instruction` is in the same block as this value, but "after" this value,
+  /// or if this value is a function argument.
+  func triviallyDominates(_ instruction: Instruction) -> Bool {
+    switch self {
+    case is FunctionArgument:
+      return true
+    case let arg as Argument:
+      return arg.parentBlock == instruction.parentBlock
+    case let svi as SingleValueInstruction:
+      return svi.dominatesInSameBlock(instruction)
+    case let mvi as MultipleValueInstructionResult:
+      return mvi.parentInstruction.dominatesInSameBlock(instruction)
+    default:
+      return false
+    }
+  }
 }
 
 extension FullApplySite {
@@ -436,6 +454,54 @@ extension Instruction {
     default:
       return false
     }
+  }
+
+  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction.
+  /// To be used as simple dominance check if both instructions are most likely located in the same block
+  /// and no DominatorTree is available (like in instruction simplification).
+  func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {
+    if parentBlock != otherInst.parentBlock {
+      return false
+    }
+    // Walk in both directions. This is most efficient if both instructions are located nearby but it's not clear
+    // which one comes first in the block's instruction list.
+    var forwardIter = self
+    var backwardIter = self
+    while let f = forwardIter.next {
+      if f == otherInst {
+        return true
+      }
+      forwardIter = f
+      if let b = backwardIter.previous {
+        if b == otherInst {
+          return false
+        }
+        backwardIter = b
+      }
+    }
+    return false
+  }
+
+  /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
+  /// returns the concrete type if it is known.
+  var concreteTypeOfDependentExistentialArchetype: CanonicalType? {
+    // For simplicity only support a single type dependent operand, which is true in most of the cases anyway.
+    if let openArchetypeOp = typeDependentOperands.singleElement,
+       // Match the sequence
+       //   %1 = metatype $T
+       //   %2 = init_existential_metatype %1, any P.Type
+       //   %3 = open_existential_metatype %2 to $@opened(...)
+       //   this_instruction_which_uses $@opened(...)  // type-defs: %3
+       let oemt = openArchetypeOp.value as? OpenExistentialMetatypeInst,
+       let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
+       let mt = iemt.metatype as? MetatypeInst
+    {
+      return mt.type.canonicalType.instanceTypeOfMetatype
+    }
+    // TODO: also handle open_existential_addr and open_existential_ref.
+    // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
+    // Eventually we want to replace the SILCombine implementation with this one.
+    return nil
   }
 }
 
@@ -760,7 +826,7 @@ extension GlobalVariable {
 
 extension InstructionRange {
   /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
-  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+  mutating func insert(borrowScopeOf borrow: BeginBorrowInstruction, _ context: some Context) {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -851,7 +917,9 @@ func getGlobalInitialization(
   return nil
 }
 
-func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
+                        in function: Function, sourceTypeIsExact: Bool
+) -> Bool? {
   switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
     case .willSucceed: return true
     case .maySucceed:  return nil
@@ -873,27 +941,74 @@ extension CheckedCastAddrBranchInst {
 
 extension CopyAddrInst {
   @discardableResult
-  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
-    let loadOwnership: LoadInst.LoadOwnership
-    let storeOwnership: StoreInst.StoreOwnership
-    if parentFunction.hasOwnership {
-      if source.type.isTrivial(in: parentFunction) {
-        loadOwnership = .trivial
-        storeOwnership = .trivial
-      } else {
-        loadOwnership = isTakeOfSrc ? .take : .copy
-        storeOwnership = isInitializationOfDest ? .initialize : .assign
-      }
-    } else {
-      loadOwnership = .unqualified
-      storeOwnership = .unqualified
-    }
-    
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     let builder = Builder(before: self, context)
-    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
-    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    if source.type.isStruct {
+      if (source.type.nominal as! StructDecl).hasUnreferenceableStorage {
+        return false
+      }
+      guard let fields = source.type.getNominalFields(in: parentFunction) else {
+        return false
+      }
+      for idx in 0..<fields.count {
+        let srcFieldAddr = builder.createStructElementAddr(structAddress: source, fieldIndex: idx)
+        let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
+        builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+      }
+      context.erase(instruction: self)
+      return true
+    } else if source.type.isTuple {
+      let builder = Builder(before: self, context)
+      for idx in 0..<source.type.tupleElements.count {
+        let srcFieldAddr = builder.createTupleElementAddr(tupleAddress: source, elementIndex: idx)
+        let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
+        builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+      }
+      context.erase(instruction: self)
+      return true
+    }
+    return false
+  }
+
+  private func isTake(for fieldValue: Value) -> Bool {
+    return isTakeOfSrc && !fieldValue.type.objectType.isTrivial(in: parentFunction)
+  }
+
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> (load: LoadInst, store: StoreInst) {
+    let builder = Builder(before: self, context)
+    let load = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: load, destination: destination, ownership: storeOwnership)
     context.erase(instruction: self)
-    return store
+    return (load, store)
+  }
+
+  var loadOwnership: LoadInst.LoadOwnership {
+    if !parentFunction.hasOwnership {
+      return .unqualified
+    }
+    if type.isTrivial(in: parentFunction) {
+      return .trivial
+    }
+    if isTakeOfSrc {
+      return .take
+    }
+    return .copy
+  }
+
+  var storeOwnership: StoreInst.StoreOwnership {
+    if !parentFunction.hasOwnership {
+      return .unqualified
+    }
+    if type.isTrivial(in: parentFunction) {
+      return .trivial
+    }
+    if isInitializationOfDest {
+      return .initialize
+    }
+    return .assign
   }
 }
 

@@ -297,6 +297,17 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
   if (DT->dominates(SelfBB, InsertBefore->getParent()))
     return true;
 
+  // If the self value does not dominate the new insertion point,
+  // we have to clone the self value as well.
+  // If we have a semantics call that does not consume the self value, then
+  // there will be consuming users within the loop, since we don't have support
+  // for creating the consume for the self value in the new insertion point,
+  // bailout hoisiting in this case.
+  if (SemanticsCall->getFunction()->hasOwnership() &&
+      Convention == ParameterConvention::Direct_Guaranteed) {
+    return false;
+  }
+
   if (auto *Copy = dyn_cast<CopyValueInst>(SelfVal)) {
     // look through one level
     SelfVal = Copy->getOperand();

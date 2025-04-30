@@ -64,8 +64,10 @@ private func registerForSILCombine<InstType: SILCombineSimplifiable>(
 private func registerSwiftPasses() {
   // Module passes
   registerPass(mandatoryPerformanceOptimizations, { mandatoryPerformanceOptimizations.run($0) })
+  registerPass(diagnoseUnknownConstValues, { diagnoseUnknownConstValues.run($0)})
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
+  registerPass(embeddedSwiftDiagnostics, { embeddedSwiftDiagnostics.run($0) })
 
   // Function passes
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
@@ -74,6 +76,7 @@ private func registerSwiftPasses() {
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
+  registerPass(diagnoseInfiniteRecursion, { diagnoseInfiniteRecursion.run($0) })
   registerPass(destroyHoisting, { destroyHoisting.run($0) })
   registerPass(initializeStaticGlobalsPass, { initializeStaticGlobalsPass.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
@@ -112,6 +115,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(LoadInst.self,             { run(LoadInst.self, $0) })
   registerForSILCombine(LoadBorrowInst.self,       { run(LoadBorrowInst.self, $0) })
   registerForSILCombine(CopyValueInst.self,        { run(CopyValueInst.self, $0) })
+  registerForSILCombine(CopyBlockInst.self,        { run(CopyBlockInst.self, $0) })
   registerForSILCombine(DestroyValueInst.self,     { run(DestroyValueInst.self, $0) })
   registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
@@ -119,6 +123,11 @@ private func registerSwiftPasses() {
   registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
+  registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
+  registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })
+  registerForSILCombine(AllocStackInst.self,        { run(AllocStackInst.self, $0) })
+  registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
+  registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })

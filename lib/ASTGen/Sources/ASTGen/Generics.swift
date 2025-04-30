@@ -111,25 +111,41 @@ extension ASTGenVisitor {
 
   func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
     let requirements  = node.requirements.lazy.map { elem -> BridgedRequirementRepr in
+
+      // Unwrap 'repeat T' to  (isRequirementExpansion: true, type: T)
+      func generateIsExpansionPattern<Node: SyntaxProtocol>(type node: Node) -> (isExpansionPattern: Bool, type: Node) {
+        if let expansion = node.as(PackExpansionTypeSyntax.self) {
+          // Force unwrapping is safe because both 'TypeSyntax' and 'SameTypeRequirementSyntax.LeftType' accept 'TypeSyntax'.
+          return (true, Node(expansion.repetitionPattern)!)
+        }
+        return (false, node)
+      }
+
       switch elem.requirement {
       case .conformanceRequirement(let conformance):
+        let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: conformance.leftType)
         return .createTypeConstraint(
-          subject: self.generate(type: conformance.leftType),
+          subject: self.generate(type: leftType),
           colonLoc: self.generateSourceLoc(conformance.colon),
-          constraint: self.generate(type: conformance.rightType)
+          constraint: self.generate(type: conformance.rightType),
+          isExpansionPattern: isExpansionPattern
         )
       case .sameTypeRequirement(let sameType):
+        let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: sameType.leftType)
         return .createSameType(
-          firstType: self.generate(sameTypeLeftType: sameType.leftType),
+          firstType: self.generate(sameTypeLeftType: leftType),
           equalLoc: self.generateSourceLoc(sameType.equal),
-          secondType: self.generate(sameTypeRightType: sameType.rightType)
+          secondType: self.generate(sameTypeRightType: sameType.rightType),
+          isExpansionPattern: isExpansionPattern
         )
       case .layoutRequirement(let layout):
+        let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: layout.type)
         return .createLayoutConstraint(
-          subject: self.generate(type: layout.type),
+          subject: self.generate(type: leftType),
           colonLoc: self.generateSourceLoc(layout.colon),
           layout: self.generate(layoutRequirement: layout),
-          layoutLoc: self.generateSourceLoc(layout.layoutSpecifier)
+          layoutLoc: self.generateSourceLoc(layout.layoutSpecifier),
+          isExpansionPattern: isExpansionPattern
         )
       }
     }

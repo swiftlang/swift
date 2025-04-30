@@ -175,9 +175,6 @@ protected:
 
     if (auto *decl = element.dyn_cast<Decl *>()) {
       switch (decl->getKind()) {
-        // Skip #warning/#error; we'll handle them when applying
-        // the builder.
-      case DeclKind::PoundDiagnostic:
       case DeclKind::PatternBinding:
       case DeclKind::Var:
       case DeclKind::Param:
@@ -261,7 +258,8 @@ protected:
   }
 
   std::pair<NullablePtr<Expr>, std::optional<UnsupportedElt>>
-  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
+  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody,
+            bool isolateBuildBlock = false) {
     SmallVector<Expr *, 4> buildBlockArguments;
 
     auto failTransform = [&](UnsupportedElt unsupported) {
@@ -326,6 +324,14 @@ protected:
       auto *buildBlock = builder.buildCall(
           braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
           /*argLabels=*/{});
+
+      if (isolateBuildBlock) {
+        auto *buildBlockVar = captureExpr(buildBlock, newBody);
+        return std::make_pair(
+            builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()),
+            std::nullopt);
+      }
+
       return std::make_pair(buildBlock, std::nullopt);
     }
   }
@@ -502,7 +508,8 @@ protected:
 
       auto *ifBraceStmt = cast<BraceStmt>(ifStmt->getThenStmt());
 
-      std::tie(thenVarRef, unsupported) = transform(ifBraceStmt, thenBody);
+      std::tie(thenVarRef, unsupported) =
+          transform(ifBraceStmt, thenBody, /*isolateBuildBlock=*/true);
       if (unsupported) {
         recordUnsupported(*unsupported);
         return nullptr;
@@ -537,7 +544,8 @@ protected:
         auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
         SmallVector<ASTNode> elseBody;
 
-        std::tie(elseVarRef, unsupported) = transform(elseBraceStmt, elseBody);
+        std::tie(elseVarRef, unsupported) = transform(
+            elseBraceStmt, elseBody, /*isolateBuildBlock=*/true);
         if (unsupported) {
           recordUnsupported(*unsupported);
           return nullptr;
@@ -577,7 +585,7 @@ protected:
     // type-checked first.
     SmallVector<ASTNode, 4> doBody;
 
-    SmallVector<ASTNode, 4> cases;
+    SmallVector<CaseStmt *, 4> cases;
     SmallVector<Expr *, 4> caseVarRefs;
 
     for (auto *caseStmt : switchStmt->getCases()) {
@@ -634,7 +642,8 @@ protected:
     std::optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
 
-    std::tie(caseVarRef, unsupported) = transform(body, newBody);
+    std::tie(caseVarRef, unsupported) =
+        transform(body, newBody, /*isolateBuildBlock=*/true);
 
     if (unsupported) {
       recordUnsupported(*unsupported);
@@ -726,6 +735,7 @@ protected:
     auto *newForEach = new (ctx)
         ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
                     forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
+                    forEachStmt->getUnsafeLoc(),
                     forEachStmt->getPattern(), forEachStmt->getInLoc(),
                     forEachStmt->getParsedSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
@@ -949,6 +959,9 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     return nullptr;
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (debugConstraintSolverForTarget(ctx, target))
+    options |= ConstraintSystemFlags::DebugConstraints;
+
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 
@@ -1316,7 +1329,8 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
       builderType->getAnyNominal()->getLoc(),
-      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+      NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreMissingImports,
+      foundDecls);
   for (auto decl : foundDecls) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       // Function must be static.

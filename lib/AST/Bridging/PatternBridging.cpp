@@ -42,6 +42,10 @@ BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) AnyPattern(cLoc.unbridged());
 }
 
+BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext) {
+  return AnyPattern::createImplicit(cContext.unbridged());
+}
+
 BridgedBindingPattern
 BridgedBindingPattern_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cKeywordLoc, bool isLet,

@@ -172,6 +172,27 @@ func test_varArgs6() {
 }
 test_varArgs6()
 
+func test_varArgs7() {
+#if canImport(Darwin) && arch(arm64)
+  let canTest = if #available(SwiftStdlib 6.2, *) { true } else { false }
+#else
+  // va_list is more complicated on other targets so that behavior is not the
+  // same, skip the test by doing a fake print of the expected output. Also
+  // skip the test if we're testing against an older runtime without the fix.
+  let canTest = false
+#endif
+
+  if canTest {
+    // Test a workaround for format specifiers and no arguments. We supply eight
+    // words of zeroed memory to give this predictable behavior.
+    my_printf("No parameters: %ld %ld %ld %ld %ld %ld %ld %ld\n")
+  } else {
+    my_printf("No parameters: 0 0 0 0 0 0 0 0\n")
+  }
+  // CHECK: No parameters: 0 0 0 0 0 0 0 0
+}
+test_varArgs7()
+
 
 // CHECK: done.
 my_printf("done.")

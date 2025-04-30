@@ -1741,6 +1741,9 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through borrows.
         for (auto value : nextUse->getUser()->getResults()) {
           for (auto *use : value->getUses()) {
+            if (use->get()->getType().isTrivial(*use->getFunction())) {
+              continue;
+            }
             useWorklist.push_back(use);
           }
         }
@@ -1853,8 +1856,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   if (feature &&
       !fn->getModule().getASTContext().LangOpts.hasFeature(*feature) &&
       !isa<DropDeinitInst>(user)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "    " << getFeatureName(*feature) << " disabled!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    " << feature->getName() << " disabled!\n");
     // If the types equal, just bail early.
     // Emit the error.
     return {PartialMutationError::featureDisabled(iterType, kind)};
@@ -1893,7 +1895,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // Otherwise, walk one level towards our child type. We unconditionally
     // unwrap since we should never fail here due to earlier checking.
     std::tie(iterPair, iterType) =
-        *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
+        *pair.walkOneLevelTowardsChild(iterPair, iterType, targetType, fn);
   }
 
   return {};
@@ -3425,6 +3427,10 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
       auto accessPath = AccessPathWithBase::computeInScope(copy->getSrc());
       if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
+      if (auto *oeai =
+              dyn_cast_or_null<OpenExistentialAddrInst>(copy->getSrc())) {
+        oeai->setAccessKind(OpenedExistentialAccess::Mutable);
+      }
       copy->setIsTakeOfSrc(IsTake);
       continue;
     }
@@ -3827,6 +3833,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 
     CopiedLoadBorrowEliminationState state(markedAddress->getFunction());
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
+    // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
+    // PointerEscape.
     if (AddressUseKind::Unknown ==
         std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
@@ -3869,6 +3877,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     RAIILLVMDebug l("main use gathering visitor");
 
     visitor.reset(markedAddress);
+    // FIXME: should check walkResult != AddressUseKind::NonEscaping to handle
+    // PointerEscape.
     if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed access path visit: " << *markedAddress);

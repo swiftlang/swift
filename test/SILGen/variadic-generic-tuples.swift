@@ -423,3 +423,13 @@ func testTupleExpansionInEnumConstructor<each T>(
 // CHECK-NEXT:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
 // CHECK-NEXT:    copy_addr [[VAR]] to [init] [[PAYLOAD_ADDR]] : $*(repeat each T)
 // CHECK-NEXT:    inject_enum_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
+
+// rdar://145478336
+
+func convertVoidPayloads() {
+  convertPayloads(as: Void.self)
+}
+
+func convertPayloads<each Value>(as valueTypes: repeat (each Value).Type) -> (repeat each Value) {
+  fatalError()
+}

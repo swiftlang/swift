@@ -194,7 +194,7 @@ namespace {
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (isa<VarDecl>(DRE->getDecl())) {
           if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
@@ -400,8 +400,8 @@ namespace {
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
     if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
-      auto constraints = CS.getConstraintGraph().gatherConstraints(
-          argTypeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+      auto constraints = CS.getConstraintGraph().gatherNearbyConstraints(
+          argTypeVar,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::LiteralConformsTo;
           });
@@ -902,10 +902,10 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
   }
 
   if (auto *packElement = getAsExpr<PackElementExpr>(expr)) {
-    // If environment hasn't been established yet, it means that pack expansion
+    // If expansion hasn't been established yet, it means that pack expansion
     // appears inside of this closure.
-    if (auto *outerEnvironment = CS.getPackEnvironment(packElement))
-      inferTypeVars(outerEnvironment);
+    if (auto *outerExpansion = CS.getPackElementExpansion(packElement))
+      inferTypeVars(outerExpansion);
   }
 
   return Action::Continue(expr);
@@ -972,8 +972,8 @@ namespace {
           ty = ty->getInOutObjectType();
           flags = flags.withInOut(true);
         }
-        if (arg.isConst()) {
-          flags = flags.withCompileTimeConst(true);
+        if (arg.isCompileTimeLiteral()) {
+          flags = flags.withCompileTimeLiteral(true);
         }
         result.emplace_back(ty, arg.getLabel(), flags);
       }
@@ -1173,6 +1173,48 @@ namespace {
       return outputTy;
     }
 
+    /// Add constraints for argument resolution for `UnresolvedApply` key path
+    /// component kind.
+    Type addApplyConstraints(
+        Expr *anchor, Type memberTy, ArgumentList *argList,
+        ConstraintLocator *memberComponentLoc,
+        ConstraintLocator *applyComponentLoc,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
+      // Locators used in this expression.
+      assert(applyComponentLoc != nullptr && "applyComponentLoc should not be null");
+
+      auto fnLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::ApplyFunction);
+
+      auto fnResultLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::FunctionResult);
+
+      CS.associateArgumentList(applyComponentLoc, argList);
+
+      Type outputTy = CS.createTypeVariable(
+          fnResultLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
+
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      SourceLoc loc =
+          CurDC->getAsDecl() ? CurDC->getAsDecl()->getLoc() : SourceLoc();
+      for (auto index : indices(params)) {
+        const auto &param = params[index];
+        CS.verifyThatArgumentIsHashable(index, param.getParameterType(),
+                                        memberComponentLoc, loc);
+      }
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
+                                  /*trailingClosureMatching=*/std::nullopt,
+                                  CurDC, fnLocator);
+      return outputTy;
+    }
+
     Type openPackElement(Type packType, ConstraintLocator *locator,
                          PackExpansionExpr *packElementEnvironment) {
       if (!packElementEnvironment) {
@@ -1214,9 +1256,8 @@ namespace {
       SmallVector<ASTNode, 2> expandedPacks;
       collectExpandedPacks(expr, expandedPacks);
       for (auto pack : expandedPacks) {
-        if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
-          CS.addPackEnvironment(elementExpr, expr);
-        }
+        if (auto *elementExpr = getAsExpr<PackElementExpr>(pack))
+          CS.recordPackElementExpansion(elementExpr, expr);
       }
 
       auto *patternLoc = CS.getConstraintLocator(
@@ -1682,18 +1723,7 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto locator = CS.getConstraintLocator(E);
-      auto type = resolveTypeReferenceInExpression(E->getParamTypeRepr(),
-                                              TypeResolverContext::InExpression,
-                                                  locator);
-
-      if (!type || type->hasError()) {
-        return Type();
-      }
-
-      auto archetype = type->castTo<ArchetypeType>();
-      E->setParamType(archetype);
-      return archetype->getValueType();
+      return E->getParamDecl()->getValueType();
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -2551,6 +2581,10 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
+        if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+          return FunctionTypeIsolation::forNonIsolated();
+        }
+
         return FunctionTypeIsolation::forNonIsolated();
       }();
       extInfo = extInfo.withIsolation(isolation);
@@ -3239,15 +3273,15 @@ namespace {
 
     Type visitPackElementExpr(PackElementExpr *expr) {
       auto packType = CS.getType(expr->getPackRefExpr());
-      auto *packEnvironment = CS.getPackEnvironment(expr);
+      auto *packExpansion = CS.getPackElementExpansion(expr);
       auto elementType = openPackElement(
-          packType, CS.getConstraintLocator(expr), packEnvironment);
-      if (packEnvironment) {
+          packType, CS.getConstraintLocator(expr), packExpansion);
+      if (packExpansion) {
         auto expansionType =
-            CS.getType(packEnvironment)->castTo<PackExpansionType>();
+            CS.getType(packExpansion)->castTo<PackExpansionType>();
         CS.addConstraint(ConstraintKind::ShapeOf, expansionType->getCountType(),
                          packType,
-                         CS.getConstraintLocator(packEnvironment,
+                         CS.getConstraintLocator(packExpansion,
                                                  ConstraintLocator::PackShape));
       } else {
         CS.recordFix(AllowInvalidPackReference::create(
@@ -3765,30 +3799,34 @@ namespace {
               resultLocator,
               TVO_CanBindToLValue | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           break;
-        case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        case KeyPathExpr::Component::Kind::UnresolvedMember:
         // This should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
-        case KeyPathExpr::Component::Kind::Property: {
+        case KeyPathExpr::Component::Kind::Member: {
           auto memberTy = CS.createTypeVariable(resultLocator,
                                                 TVO_CanBindToLValue |
                                                 TVO_CanBindToNoEscape);
           componentTypeVars.push_back(memberTy);
-          auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
-            ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
-            : component.getDeclRef().getDecl()->createNameRef();
+          auto lookupName =
+              kind == KeyPathExpr::Component::Kind::UnresolvedMember
+                  ? DeclNameRef(
+                        component.getUnresolvedDeclName()) // FIXME: type change
+                                                           // needed
+                  : component.getDeclRef().getDecl()->createNameRef();
 
+          auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
-                                      FunctionRefInfo::unapplied(lookupName),
+                                      refKind,
                                       /*outerAlternatives=*/{}, memberLocator);
           base = memberTy;
           break;
         }
-          
+
         case KeyPathExpr::Component::Kind::UnresolvedSubscript:
         // Subscript should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
-          auto *args = component.getSubscriptArgs();
+          auto *args = component.getArgs();
           base = addSubscriptConstraints(E, base, /*decl*/ nullptr, args,
                                          memberLocator, &componentTypeVars);
 
@@ -3808,6 +3846,16 @@ namespace {
             componentTypeVars.append(referencedVars.begin(),
                                      referencedVars.end());
           }
+          break;
+        }
+
+        case KeyPathExpr::Component::Kind::UnresolvedApply:
+        case KeyPathExpr::Component::Kind::Apply: {
+          auto prevMemberLocator = CS.getConstraintLocator(
+              locator, LocatorPathElt::KeyPathComponent(i - 1));
+          base = addApplyConstraints(E, base, component.getArgs(),
+                                     prevMemberLocator, memberLocator,
+                                     &componentTypeVars);
           break;
         }
 
@@ -4534,8 +4582,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // non-`Sendable` state across the isolation boundary. `next()` should
   // inherit the isolation of the caller, but for now, use the opt out.
   if (isAsync) {
-    auto *nonisolated = new (ctx)
-        NonisolatedAttr(/*unsafe=*/true, /*implicit=*/true);
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
     makeIteratorVar->getAttrs().add(nonisolated);
   }
 
@@ -4545,8 +4593,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
 
-    auto *makeIteratorRef = UnresolvedDotExpr::createImplicit(
-        ctx, sequenceExpr, makeIterator->getName());
+    auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
+        sequenceExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     Expr *makeIteratorCall =
@@ -4609,11 +4658,13 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
-    auto *nextRef = UnresolvedDotExpr::createImplicit(
-        ctx,
+    auto *makeIteratorVarRef =
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                              /*Implicit=*/true),
-        nextId, labels);
+                              /*Implicit=*/true);
+    auto *nextRef = new (ctx)
+        UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
+                          DeclNameRef(DeclName(ctx, nextId, labels)),
+                          DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     ArgumentList *nextArgs;
@@ -4633,10 +4684,11 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
           AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
     }
 
-    // Wrap the 'next' call in 'unsafe', if there is one.
-    if (unsafeExpr) {
-      nextCall = new (ctx) UnsafeExpr(unsafeExpr->getLoc(), nextCall, Type(),
-                                      /*implicit=*/true);
+    // Wrap the 'next' call in 'unsafe', if the for..in loop has that
+    // effect.
+    if (stmt->getUnsafeLoc().isValid()) {
+      nextCall = new (ctx) UnsafeExpr(
+          stmt->getUnsafeLoc(), nextCall, Type(), /*implicit=*/true);
     }
 
     // The iterator type must conform to IteratorProtocol.
@@ -4673,7 +4725,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // Add a conversion constraint between the element type of the sequence
   // and the type of the element pattern.
   auto *elementTypeLoc = cs.getConstraintLocator(
-      elementLocator, ConstraintLocator::OptionalPayload);
+      elementLocator, ConstraintLocator::OptionalInjection);
   auto elementType = cs.createTypeVariable(elementTypeLoc,
                                            /*flags=*/0);
   {
@@ -4936,13 +4988,6 @@ bool ConstraintSystem::generateConstraints(
   }
 
   case SyntacticElementTarget::Kind::forEachPreamble: {
-
-    // Cache the outer generic environment, if it exists.
-    if (target.getPackElementEnv()) {
-      PackElementGenericEnvironments.push_back(target.getPackElementEnv());
-      ASSERT(!solverState && "Need to record a change");
-    }
-
     // For a for-each statement, generate constraints for the pattern, where
     // clause, and sequence traversal.
     auto resultTarget = generateForEachPreambleConstraints(*this, target);

@@ -46,9 +46,9 @@ import Swift
 /// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
-/// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
+/// If you call `addTask(name:priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
-/// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
+/// Alternatively, you can call `addTaskUnlessCancelled(name:priority:operation:)`,
 /// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
@@ -159,9 +159,9 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
-/// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
+/// If you call `addTask(name:priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
-/// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
+/// Alternatively, you can call `addTaskUnlessCancelled(name:priority:operation:)`,
 /// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
@@ -307,8 +307,8 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 ///
 /// A cancelled task group can still keep adding tasks, however they will start
 /// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
-/// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
+/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
+/// rather than the plain ``addTask(name:priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `TaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -331,167 +331,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     self._group = group
   }
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  /// Adds a child task to the group.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
-  ) {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
-    )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
-#endif
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    _ = Builtin.createTask(flags: flags,
-                           initialSerialExecutor: builtinSerialExecutor,
-                           taskGroup: _group,
-                           operation: operation)
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-#endif
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    _ = Builtin.createTask(flags: flags,
-                           initialSerialExecutor: builtinSerialExecutor,
-                           taskGroup: _group,
-                           operation: operation)
-
-    return true
-  }
-
-#else // if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(SwiftStdlib 5.7, *)
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
-  ) {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-
-  /// Adds a child task to the group.
-  ///
-  /// - Parameters:
-  ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
-  ) {
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    _ = Builtin.createTask(flags: flags,
-                           initialSerialExecutor: builtinSerialExecutor,
-                           taskGroup: _group,
-                           operation: operation)
-  }
-
-  @available(SwiftStdlib 5.7, *)
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async -> ChildTaskResult
-  ) -> Bool {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// - Parameters:
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    _ = Builtin.createTask(flags: flags,
-                           initialSerialExecutor: builtinSerialExecutor,
-                           taskGroup: _group,
-                           operation: operation)
-
-    return true
-  }
-#endif
-
-  /// Wait for the next child task to complete,
-  /// and return the value it returned.
+  /// Waits for the next child task to complete,
+  /// and returns the value it returned.
   ///
   /// The values returned by successive calls to this method
   /// appear in the order that the tasks *completed*,
@@ -776,151 +617,6 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       throw firstError
     }
   }
-
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  /// Adds a child task to the group.
-  ///
-  /// This method doesn't throw an error, even if the child task does.
-  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
-  ) {
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
-    )
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    _ = Builtin.createTask(flags: flags,
-                           initialSerialExecutor: builtinSerialExecutor,
-                           taskGroup: _group,
-                           operation: operation)
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// This method doesn't throw an error, even if the child task does.
-  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    _ = Builtin.createTask(flags: flags,
-                           initialSerialExecutor: builtinSerialExecutor,
-                           taskGroup: _group,
-                           operation: operation)
-
-    return true
-  }
-#else
-  @available(SwiftStdlib 5.7, *)
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async throws -> ChildTaskResult
-  ) {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-
-  /// Adds a child task to the group.
-  ///
-  /// This method doesn't throw an error, even if the child task does.
-  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
-  ///
-  /// - Parameters:
-  ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    operation: sending @escaping () async throws -> ChildTaskResult
-  ) {
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-  }
-
-  @available(SwiftStdlib 5.7, *)
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping () async throws -> ChildTaskResult
-  ) -> Bool {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// This method doesn't throw an error, even if the child task does.
-  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
-  ///
-  /// - Parameters:
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    operation: sending @escaping () async throws -> ChildTaskResult
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-
-    return true
-  }
-#endif
 
   /// Wait for the next child task to complete,
   /// and return the value it returned or rethrow the error it threw.

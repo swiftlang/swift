@@ -315,6 +315,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "enable-destroy-hoisting=">,
     HelpText<"Whether to enable destroy hoisting">,
     MetaVarName<"true|false">;
+  def formal_cxx_interoperability_mode :
+    Joined<["-"], "formal-cxx-interoperability-mode=">,
+    HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
+    MetaVarName<"<cxx-interop-version>|off">;
 }
 
 // Flags that are saved into module interfaces
@@ -592,6 +596,12 @@ def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llv
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
+def enable_llvm_verify_each : Flag<["-"], "enable-llvm-verify-each">,
+  HelpText<"Run the LLVM IR verifier after every pass.">;
+
+def disable_llvm_verify_each : Flag<["-"], "disable-llvm-verify-each">,
+  HelpText<"Don't run the LLVM IR verifier after every pass.">;
+
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
 
@@ -614,6 +624,9 @@ def reflection_metadata_for_debugger_only : Flag<["-"], "reflection-metadata-for
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
+
+def disable_llvm_merge_functions_pass : Flag<["-"], "disable-llvm-merge-functions-pass">,
+  HelpText<"Disable the MergeFunctionPass LLVM IR pass">;
 
 def function_sections: Flag<["-"], "function-sections">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -1113,6 +1126,10 @@ def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata
    HelpText<"Statically specialize metadata for generic types at types that "
             "are known to be used in source.">;
 
+def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-pointer">,
+   HelpText<"Emit a pointer to the corresponding type metadata into non-public "
+            "non-generic type descriptors.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -1145,6 +1162,30 @@ def enable_large_loadable_types_reg2mem : Flag<["-"], "enable-large-loadable-typ
 
 def disable_large_loadable_types_reg2mem : Flag<["-"], "disable-large-loadable-types-reg2mem">,
   HelpText<"Disable large loadable types register to memory pass">;
+
+def enable_x86_64_corocc : Flag<["-"], "enable-x86_64-corocc">,
+  HelpText<"Use swiftcorocc for yield_once_2 routines on x86_64.">;
+
+def disable_x86_64_corocc : Flag<["-"], "disable-x86_64-corocc">,
+  HelpText<"Don't use swiftcorocc for yield_once_2 routines on x86_64.">;
+
+def enable_arm64_corocc : Flag<["-"], "enable-arm64-corocc">,
+  HelpText<"Use swiftcorocc for yield_once_2 routines on arm64 variants.">;
+
+def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
+  HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
+
+def enable_callee_allocated_coro_abi : Flag<["-"], "enable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and use yield_once_2.">;
+
+def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and don't use yield_once_2.">;
+
+def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
+  HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
+
+def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
+  HelpText<"Disable cond_fail message annotation.">;
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
@@ -1345,6 +1386,13 @@ def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
 
+def enable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "enable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Enable emitting typed malloc for coroutine frame allocation">;
+def disable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "disable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Disable emitting typed malloc for coroutine frame allocation">;
+
 def enable_async_frame_pointer_all :
   Flag<["-"], "enable-async-frame-pointer-all">,
   HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
@@ -1358,6 +1406,10 @@ def enable_split_cold_code :
 def disable_split_cold_code :
   Flag<["-"], "disable-split-cold-code">,
   HelpText<"Disable splitting of cold code when optimizing">;
+
+def mergeable_traps :
+  Flag<["-"], "mergeable-traps">,
+  HelpText<"Emit mergeable traps even in optimized builds">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
@@ -1389,9 +1441,6 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
-def enable_deterministic_check :
-  Flag<["-"], "enable-deterministic-check">,
-  HelpText<"Check compiler output determinism by running it twice">;
 def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;
@@ -1442,7 +1491,7 @@ def platform_c_calling_convention_EQ :
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
-  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
+  HelpText<"Disable sending args and results when region-based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def scanner_module_validation: Flag<["-"], "scanner-module-validation">,
@@ -1462,6 +1511,12 @@ def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
 def platform_availability_inheritance_map_path
   : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
     HelpText<"Path of the platform inheritance platform map">;
+
+def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
+  HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
+
+def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
+  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 

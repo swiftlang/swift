@@ -349,3 +349,25 @@ func callSmallErrorLargerResult() {
     }
   }
 }
+
+struct SomeStruct {
+    let x: Int
+    let y: UInt32
+    let z: UInt32
+}
+
+func someFunc() async throws(SmallError) -> SomeStruct {
+    SomeStruct(x: 42, y: 23, z: 25)
+}
+
+// Used to crash the compiler -- https://github.com/swiftlang/swift/issues/80732
+protocol PAssoc<T>: AnyObject {
+    associatedtype T
+    func foo() async throws(SmallError) -> (any PAssoc<T>)
+}
+
+class MyProtocolImpl<T>: PAssoc {
+    func foo() async throws(SmallError) -> (any PAssoc<T>) {
+        fatalError()
+    }
+}

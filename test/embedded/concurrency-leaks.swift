@@ -23,11 +23,10 @@ struct Main {
         }
         _ = await x.value
     }
-    // There should be exactly 5 allocations involved:
+    // There should be exactly 4 allocations involved:
     // - 2x 32 bytes ... closure context for swift_task_create, closure object to pass to Task.init
     // - 1x 320 bytes ... malloc(amountToAllocate) in swift_task_create_common for the Task heap object itself
     // - 1x 1016 bytes ... the initial StackAllocator slab in the task-specific allocator
-    // - 1x 40 bytes ... task status record
     // Check that they are all accounted for and free'd.
 
     // CHECK: malloc({{[0-9]+}})-> [[M1:0x[0-9a-f]+]]
@@ -36,8 +35,6 @@ struct Main {
     // CHECK: malloc({{[0-9]+}})-> [[M4:0x[0-9a-f]+]]
     // CHECK: free([[M1]])
     // CHECK: free([[M2]])
-    // CHECK: malloc({{[0-9]+}})-> [[M5:0x[0-9a-f]+]]
-    // CHECK: free([[M5]])
     // CHECK: free([[M4]])
     // CHECK: free([[M3]])
 

@@ -125,6 +125,9 @@ bool IDEInspectionSecondPassRequest::evaluate(
   auto state = parserState->takeIDEInspectionDelayedDeclState();
   auto &Ctx = SF->getASTContext();
 
+  auto inspectionLoc = Ctx.SourceMgr.getIDEInspectionTargetLoc();
+  PrettyStackTraceLocation stackTrace(Ctx, "IDE inspecting", inspectionLoc);
+
   auto BufferID = Ctx.SourceMgr.getIDEInspectionTargetBufferID();
   Parser TheParser(BufferID, *SF, nullptr, parserState);
 
@@ -1054,11 +1057,18 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
       return ParseListItemResult::Finished;
   }
   if (consumeIf(tok::comma)) {
-    if (Tok.isNot(RightK))
+    if (Tok.isNot(RightK) && !tokIsStringInterpolationEOF(Tok, RightK))
       return ParseListItemResult::Continue;
     if (!AllowSepAfterLast) {
       diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(PreviousLoc);
     }
+    
+    // Enable trailing comma in string literal interpolation
+    if (tokIsStringInterpolationEOF(Tok, RightK)) {
+      RightLoc = Tok.getLoc();
+      return ParseListItemResult::FinishedInStringInterpolation;
+    }
+    
     return ParseListItemResult::Finished;
   }
   // If we're in a comma-separated list, the next token is at the

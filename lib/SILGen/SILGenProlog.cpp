@@ -75,7 +75,7 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
     selfValue = addr;
   }
 
-  VarLocs[selfDecl] = VarLoc::get(selfValue);
+  VarLocs[selfDecl] = VarLoc(selfValue, SILAccessEnforcement::Unknown);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
   B.emitDebugDescription(PrologueLoc, selfValue, dv);
@@ -697,12 +697,6 @@ public:
 
     if (FormalParamTypes) FormalParamTypes->finish();
     loweredParams.finish();
-    
-    for (auto addressableParam : AddressableParams) {
-      assert(SGF.VarLocs.contains(addressableParam));
-      SGF.VarLocs[addressableParam].addressable = true;
-    }
-
     return ArgNo;
   }
 
@@ -772,7 +766,8 @@ private:
     };
     auto completeUpdate = [&](ManagedValue value) -> void {
       SGF.B.emitDebugDescription(loc, value.getValue(), varinfo);
-      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value.getValue());
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc(value.getValue(),
+                                               SILAccessEnforcement::Unknown);
       calledCompletedUpdate = true;
     };
 
@@ -829,7 +824,10 @@ private:
         // We manually set calledCompletedUpdate to true since we want to use
         // the debug info from the box rather than insert a custom debug_value.
         calledCompletedUpdate = true;
-        SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(destAddr, box);
+        SGF.VarLocs[pd] = SILGenFunction::VarLoc(destAddr,
+           pd->isImmutableInFunctionBody() ? SILAccessEnforcement::Unknown
+                                           : SILAccessEnforcement::Dynamic,
+           box);
         return;
       }
 
@@ -914,6 +912,7 @@ private:
       argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
       return;
     }
+    
     // If the variable is immutable, we can bind the value as is.
     // Leave the cleanup on the argument, if any, in place to consume the
     // argument if we're responsible for it.
@@ -921,6 +920,7 @@ private:
     if (!argrv.getType().isAddress()) {
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, varinfo);
+      SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
 
@@ -929,9 +929,12 @@ private:
       allocStack->setIsFromVarDecl();
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
               SGF.getModule()) &&
-          SGF.F.getLifetime(pd, allocStack->getType()).isLexical())
+          SGF.F.getLifetime(pd, allocStack->getType()).isLexical()) {
         allocStack->setIsLexical();
-      SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(allocStack);
+      }
+      SGF.VarLocs[pd] = SILGenFunction::VarLoc(allocStack,
+        SILAccessEnforcement::Unknown);
+      SGF.enterLocalVariableAddressableBufferScope(pd);
       return;
     }
 
@@ -1036,7 +1039,22 @@ private:
         debugInst->moveBefore(valueInst);
       }
     }
-    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
+    
+    SILAccessEnforcement access;
+    switch (pd->getValueOwnership()) {
+    case ValueOwnership::Shared:
+    case ValueOwnership::Owned:
+    case ValueOwnership::Default:
+      access = SILAccessEnforcement::Unknown;
+      break;
+    
+    case ValueOwnership::InOut:
+      access = SILAccessEnforcement::Static;
+      break;
+    }
+    
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc(argrv.getValue(), access);
+    SGF.enterLocalVariableAddressableBufferScope(pd);
   }
 
   void emitParam(ParamDecl *PD) {
@@ -1224,6 +1242,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 
   auto expansion = SGF.getTypeExpansionContext();
   auto captureKind = SGF.SGM.Types.getDeclCaptureKind(capture, expansion);
+  SILAccessEnforcement enforcement;
   switch (captureKind) {
   case CaptureKind::Constant: {
     assert(!isPack);
@@ -1270,6 +1289,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     }
 
     arg = val.getValue();
+    enforcement = SILAccessEnforcement::Unknown;
     break;
   }
 
@@ -1293,6 +1313,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
       arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
     }
+    enforcement = isMutable
+      ? SILAccessEnforcement::Dynamic
+      : SILAccessEnforcement::Unknown;
     break;
   }
   case CaptureKind::StorageAddress:
@@ -1355,6 +1378,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
               ConsumableAndAssignable);
     }
+    enforcement = isInOut
+      ? SILAccessEnforcement::Static
+      : SILAccessEnforcement::Unknown;
     break;
   }
   }
@@ -1379,7 +1405,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     arg = packValue;
   }
 
-  SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg, box);
+  SGF.VarLocs[VD] = SILGenFunction::VarLoc(arg, enforcement, box);
   SILDebugVariable DbgVar(VD->isLet(), ArgNo);
   if (auto *AllocStack = dyn_cast<AllocStackInst>(arg)) {
     AllocStack->setArgNo(ArgNo);

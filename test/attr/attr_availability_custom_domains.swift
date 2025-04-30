@@ -8,20 +8,48 @@
 
 // REQUIRES: swift_feature_CustomAvailability
 
+// FIXME: [availability] Test custom domains in availability macros
+
+func alwaysAvailable() { }
+
 @available(EnabledDomain)
 func availableInEnabledDomain() { }
 
-@available(EnabledDomain, introduced: 1.0) // expected-warning {{unexpected version number in '@available' attribute for 'EnabledDomain'}}
+@available(EnabledDomain, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
+// expected-error@-1 {{expected declaration}}
+func availableInEnabledDomainWithWildcard() { }
+
+@available(EnabledDomain, introduced: 1.0) // expected-error {{unexpected version number for EnabledDomain}}
 func introducedInEnabledDomain() { }
 
-@available(EnabledDomain, deprecated: 1.0) // expected-warning {{unexpected version number in '@available' attribute for 'EnabledDomain'}}
+@available(EnabledDomain 1.0) // expected-error {{unexpected version number for EnabledDomain}}
+func introducedInEnabledDomainShort() { }
+
+@available(EnabledDomain 1.0, *) // expected-error {{unexpected version number for EnabledDomain}}
+func introducedInEnabledDomainShortWithWildcard() { }
+
+@available(macOS 10.10, EnabledDomain, *) // expected-error {{EnabledDomain availability must be specified alone}}
+func introducedInMacOSAndAvailableInEnabledDomain() { }
+
+@available(EnabledDomain, macOS 10.10, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
+// expected-error@-1 {{expected declaration}}
+func availableInEnabledDomainAndIntroducedInMacOS() { }
+
+@available(EnabledDomain, DisabledDomain) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
+func availableInMultipleCustomDomainsShort() { }
+
+@available(EnabledDomain, DisabledDomain, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
+// expected-error@-1 {{expected declaration}}
+func availableInMultipleCustomDomainsShortWithWildcard() { }
+
+@available(EnabledDomain, deprecated: 1.0) // expected-error {{unexpected version number for EnabledDomain}}
 func deprecatedInEnabledDomain() { }
 
-@available(EnabledDomain, obsoleted: 1.0) // expected-warning {{unexpected version number in '@available' attribute for 'EnabledDomain'}}
+@available(EnabledDomain, obsoleted: 1.0) // expected-error {{unexpected version number for EnabledDomain}}
 func obsoletedInEnabledDomain() { }
 
 @available(DisabledDomain, unavailable)
-func unavailableInDisabledDomain() { } // expected-note {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInDisabledDomain() { }
 
 @available(RedefinedDomain, deprecated, message: "Use something else")
 func deprecatedInRedefinedDomain() { }
@@ -29,13 +57,5 @@ func deprecatedInRedefinedDomain() { }
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-warning {{unknown platform 'UnknownDomain' for attribute 'available'}}
+@available(UnknownDomain) // expected-warning {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
-
-func test() {
-  availableInEnabledDomain() // FIXME: [availability] should be diagnosed
-  unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
-  deprecatedInRedefinedDomain() // expected-warning {{'deprecatedInRedefinedDomain()' is deprecated: Use something else}}
-  availableInDynamicDomain() // FIXME: [availability] should be diagnosed
-  availableInUnknownDomain() // Ok
-}

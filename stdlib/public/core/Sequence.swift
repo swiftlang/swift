@@ -445,6 +445,7 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @safe
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -1224,7 +1225,7 @@ extension Sequence {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _copySequenceContents(initializing: buffer)
+    return unsafe _copySequenceContents(initializing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -1237,13 +1238,14 @@ extension Sequence {
       guard let x = it.next() else {
         return (it, idx)
       }
-      ptr.initialize(to: x)
-      ptr += 1
+      unsafe ptr.initialize(to: x)
+      unsafe ptr += 1
     }
     return (it, buffer.endIndex)
   }
     
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

@@ -18,6 +18,12 @@
 // but it should be hidden for a similar reason
 // CHECK-NOT: "precise": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::c:@E@MyErrorCode"
 
+// MyError
+// CHECK-DAG: "precise": "s:SC11MyErrorCodeLeV"
+
+// MyError.errFirst
+// CHECK-DAG: "precise": "s:SC11MyErrorCodeLeV8errFirstSoAAVvpZ"
+
 // MyErrorCode.Code
 // CHECK-DAG: "precise": "c:@E@MyErrorCode"
 

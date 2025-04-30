@@ -218,7 +218,7 @@ struct Clock {
 @MainActor func testGlobalAndGlobalIsolatedPartialApplyMatch() {
   let ns = mainActorIsolatedGlobal
 
-  // This is not a transfer since ns is already main actor isolated.
+  // This is not a transfer since ns is already MainActor isolated.
   let _ = { @MainActor in
     print(ns)
   }
@@ -230,7 +230,7 @@ struct Clock {
   var ns = (NonSendableKlass(), NonSendableKlass())
   ns.0 = mainActorIsolatedGlobal
 
-  // This is not a transfer since ns is already main actor isolated.
+  // This is not a transfer since ns is already MainActor isolated.
   let _ = { @MainActor in
     print(ns)
   }
@@ -245,7 +245,7 @@ struct Clock {
     print(ns)
   }
 
-  // Since useValue is running in an actor isolated context, it is ok to use the
+  // Since useValue is running in an actor-isolated context, it is ok to use the
   // transferred value 'ns' here.
   useValue(ns)
 }
@@ -328,4 +328,15 @@ struct Clock {
   // expected-tns-note @-1 {{sending main actor-isolated 'closure' to global actor 'CustomActor'-isolated global function 'transferToCustomActor' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+@MainActor
+func localCaptureDataRace5() {
+  var x = 0
+  _ = x
+
+  Task.detached { @CustomActor in x = 1 } // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{'x' is captured by a global actor 'CustomActor'-isolated closure. global actor 'CustomActor'-isolated uses in closure may race against later main actor-isolated uses}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
 }

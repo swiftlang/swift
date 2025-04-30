@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
@@ -35,22 +36,25 @@ using namespace swift;
 LangOptions::LangOptions() {
   // Add all promoted language features
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  Features.insert(Feature::FeatureName);
+  enableFeature(Feature::FeatureName);
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
 
   // Special case: remove macro support if the compiler wasn't built with a
   // host Swift.
 #if !SWIFT_BUILD_SWIFT_SYNTAX
-  Features.removeAll({Feature::Macros, Feature::FreestandingExpressionMacros,
-                      Feature::AttachedMacros, Feature::ExtensionMacros});
+  disableFeature(Feature::Macros);
+  disableFeature(Feature::FreestandingExpressionMacros);
+  disableFeature(Feature::AttachedMacros);
+  disableFeature(Feature::ExtensionMacros);
 #endif
 
   // Note: Introduce default-on language options here.
-  Features.insert(Feature::NoncopyableGenerics);
-  Features.insert(Feature::BorrowingSwitch);
-  Features.insert(Feature::MoveOnlyPartialConsumption);
+  enableFeature(Feature::NoncopyableGenerics);
+  enableFeature(Feature::BorrowingSwitch);
+  enableFeature(Feature::MoveOnlyPartialConsumption);
 
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
@@ -290,11 +294,52 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
       != CustomConditionalCompilationFlags.end();
 }
 
+bool LangOptions::FeatureState::isEnabled() const {
+  return state == FeatureState::Kind::Enabled;
+}
+
+bool LangOptions::FeatureState::isEnabledForMigration() const {
+  ASSERT(feature.isMigratable() && "You forgot to make the feature migratable!");
+
+  return state == FeatureState::Kind::EnabledForMigration;
+}
+
+LangOptions::FeatureStateStorage::FeatureStateStorage()
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
+
+void LangOptions::FeatureStateStorage::setState(Feature feature,
+                                                FeatureState::Kind state) {
+  auto index = size_t(feature);
+
+  states[index] = state;
+}
+
+LangOptions::FeatureState
+LangOptions::FeatureStateStorage::getState(Feature feature) const {
+  auto index = size_t(feature);
+
+  return FeatureState(feature, states[index]);
+}
+
+LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
+    return state;
+
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version)) {
+      return FeatureState(feature, FeatureState::Kind::Enabled);
+    }
+  }
+
+  return state;
+}
+
 bool LangOptions::hasFeature(Feature feature) const {
-  if (Features.contains(feature))
+  if (featureStates.getState(feature).isEnabled())
     return true;
 
-  if (auto version = getFeatureLanguageVersion(feature))
+  if (auto version = feature.getLanguageVersion())
     return isSwiftVersionAtLeast(*version);
 
   return false;
@@ -310,6 +355,20 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
     return hasFeature(*feature);
 
   return false;
+}
+
+void LangOptions::enableFeature(Feature feature, bool forMigration) {
+  if (forMigration) {
+    ASSERT(feature.isMigratable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForMigration);
+    return;
+  }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
+}
+
+void LangOptions::disableFeature(Feature feature) {
+  featureStates.setState(feature, FeatureState::Kind::Off);
 }
 
 void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
@@ -617,69 +676,6 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // in the common case.
 
   return { false, false };
-}
-
-llvm::StringRef swift::getFeatureName(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return #FeatureName;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-bool swift::isFeatureAvailableInProduction(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return true;
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
-  case Feature::FeatureName: return AvailableInProd;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<std::optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-      .Default(std::nullopt);
-}
-
-std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<std::optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-      .Default(std::nullopt);
-}
-
-std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-  case Feature::FeatureName: return Version;
-#include "swift/Basic/Features.def"
-  default:
-    return std::nullopt;
-  }
-}
-
-bool swift::includeInModuleInterface(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return true;
-#define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
-  case Feature::FeatureName: return false;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
 }
 
 llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {

@@ -13,7 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 // MARK: - TypeDecl
 
@@ -50,8 +50,8 @@ extension ASTGenVisitor {
       return self.generate(macroDecl: node)?.asDecl
     case .macroExpansionDecl(let node):
       return self.generate(macroExpansionDecl: node).asDecl
-    case .missingDecl:
-      fatalError("unimplemented")
+    case .missingDecl(let node):
+      return self.generate(missingDecl: node)?.asDecl
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
     case .poundSourceLocation:
@@ -70,11 +70,6 @@ extension ASTGenVisitor {
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
     }
-  }
-
-  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
-    // TODO: Set semicolon loc.
-    generate(decl: node.decl)
   }
 
   func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc)? {
@@ -378,7 +373,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  private func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
+  func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -398,6 +393,12 @@ extension ASTGenVisitor {
       return .modify
     case .`init`:
       return .`init`
+    case .read:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .read2
+    case .modify:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .modify2
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
@@ -483,7 +484,7 @@ extension ASTGenVisitor {
         let brace = BridgedBraceStmt.createParsed(
           self.ctx,
           lBraceLoc: leftBrace,
-          elements: self.generate(codeBlockItemList: codeBlock),
+          elements: self.generate(codeBlockItemList: codeBlock).lazy.bridgedArray(in: self),
           rBraceLoc: rightBrace
         )
         accessor.setParsedBody(brace)
@@ -630,7 +631,8 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.parameterClause, for: .subscript),
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
-      returnType: self.generate(type: node.returnClause.type)
+      returnType: self.generate(type: node.returnClause.type),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     subscriptDecl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -639,6 +641,24 @@ extension ASTGenVisitor {
       storage.setAccessors(generate(accessorBlock: accessors, for: storage))
     }
     return subscriptDecl
+  }
+
+  func generate(accessorBlockFile node: AccessorBlockFileSyntax, for storage: BridgedAbstractStorageDecl) -> [BridgedAccessorDecl] {
+    var accessors: [BridgedAccessorDecl] = []
+    for elem in node.accessors {
+      if let accessor = self.generate(accessorDecl: elem, for: storage) {
+        accessors.append(accessor)
+      }
+    }
+    // NOTE: Do not set brace locations even if exist. AST doesn't expect that.
+    let record = BridgedAccessorRecord(
+      lBraceLoc: nil,
+      accessors: accessors.lazy.bridgedArray(in: self),
+      rBraceLoc: nil
+    )
+    // FIXME: The caller should setAccessors() after ASTGen just return parsed accessors.
+    storage.setAccessors(record)
+    return accessors
   }
 }
 
@@ -780,6 +800,14 @@ extension ASTGenVisitor {
 
     return decl
   }
+
+  func generate(missingDecl node: MissingDeclSyntax) -> BridgedMissingDecl? {
+    // Generate the attributes for diagnostics, but discard the result.
+    // There's no use of the attributes in AST at this point.
+    // FIXME:  We probably should place 'swift::MissingDecl' with the attributes attached in AST for better IDE experience in custom attributes.
+    _ = self.generateDeclAttributes(node, allowStatic: true)
+    return nil
+  }
 }
 
 extension ASTGenVisitor {
@@ -798,9 +826,11 @@ extension ASTGenVisitor {
       paramList: self.generate(functionParameterClause: node.signature.parameterClause, for: .macro),
       arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
       resultType: self.generate(type: node.signature.returnClause?.type),
-      definition: self.generate(expr: node.definition?.value)
+      definition: self.generate(expr: node.definition?.value),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+
     return decl;
   }
 }
@@ -809,9 +839,16 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   func generate(macroExpansionDecl node: MacroExpansionDeclSyntax) -> BridgedMacroExpansionDecl {
+    switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+    case .generated(_):
+      fatalError("(compiler bug) builtin pound keywords should be handled elsewhere")
+    case .ignored:
+      // Fallback to MacroExpansionDecl.
+      break
+    }
+
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let info = self.generate(freestandingMacroExpansion: node)
-
     let decl = BridgedMacroExpansionDecl.createParsed(
       self.declContext,
       poundLoc: info.poundLoc,
@@ -826,6 +863,21 @@ extension ASTGenVisitor {
 
     return decl
   }
+
+  func generateMacroExpansionDecl(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionDecl {
+    let info = self.generate(freestandingMacroExpansion: node)
+    return .createParsed(
+      self.declContext,
+      poundLoc: info.poundLoc,
+      macroNameRef: info.macroNameRef,
+      macroNameLoc: info.macroNameLoc,
+      leftAngleLoc: info.leftAngleLoc,
+      genericArgs: info.genericArgs,
+      rightAngleLoc: info.rightAngleLoc,
+      args: info.arguments
+    )
+  }
+
 }
 
 // MARK: - OperatorDecl
@@ -1032,6 +1084,29 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
+  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
+    if let node = node.decl.as(MacroExpansionDeclSyntax.self) {
+      switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+      case .generated(let generated?):
+        switch generated.kind {
+        case .decl:
+          // Actually unreachable as no builtin pound emits a declaration.
+          return generated.castToDecl()
+        case .stmt, .expr:
+          // TODO: Diagnose
+          fatalError("builtin pound keyword in declaration member block")
+          //return nil
+        }
+      case .generated(nil):
+        return nil
+      case .ignored:
+        // Fallback to normal macro expansion.
+        break
+      }
+    }
+    return self.generate(decl: node.decl)
+  }
+
   @inline(__always)
   func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> [BridgedDecl] {
     var allMembers: [BridgedDecl] = []
@@ -1041,8 +1116,8 @@ extension ASTGenVisitor {
       }
 
       return .underlying(element)
-    } body: { member in
-      guard let member = self.generate(decl: member.decl) else {
+    } body: { node in
+      guard let member = self.generate(memberBlockItem: node) else {
         return
       }
       // TODO: Set semicolon loc.

@@ -43,7 +43,10 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include <fstream>
+#include <set>
 
 using namespace swift;
 
@@ -610,8 +613,7 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
   passesRegistered = true;
 }
 
-#define SWIFT_SILCOMBINE_PASS(INST) \
-SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+#define _RUN_SWIFT_SIMPLIFICATON(INST) \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
   static bool passDisabled = false;                                        \
   if (!runFunction) {                                                      \
@@ -633,11 +635,25 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   }                                                                        \
   runSwiftInstructionPass(inst, runFunction);                              \
   return nullptr;                                                          \
+
+#define INSTRUCTION_SIMPLIFICATION(INST) \
+SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+  _RUN_SWIFT_SIMPLIFICATON(INST)                                           \
 }                                                                          \
 
-#define PASS(ID, TAG, DESCRIPTION)
+#define INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(INST) \
+SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+  if (auto *result = legacyVisit##INST(inst))                              \
+    return result;                                                         \
+  if (!inst->isDeleted()) {                                                \
+    _RUN_SWIFT_SIMPLIFICATON(INST)                                         \
+  }                                                                        \
+  return nullptr;                                                          \
+}                                                                          \
 
-#include "swift/SILOptimizer/PassManager/Passes.def"
+#include "Simplifications.def"
+
+#undef _RUN_SWIFT_SIMPLIFICATON
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points
@@ -689,4 +705,64 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
       inst->eraseFromParent();
     }
   }
+}
+
+// cond_fail removal based on cond_fail message and containing function name.
+//
+// The standard library uses _precondition calls which have a message argument.
+//
+// Allow disabling the generated cond_fail by these message arguments.
+//
+// For example:
+//
+//  _precondition(source >= (0 as T), "Negative value is not representable")
+// results in a cond_fail "Negative value is not representable".
+//
+// This commit allows for specifying a file that contains these messages on each
+// line.
+//
+// /path/to/disable_cond_fails:
+//
+// ```
+// Negative value is not representable
+// Array index is out of range
+// ```
+//
+// The optimizer will remove these cond_fails if the swift frontend is invoked
+// with -Xllvm -cond-fail-config-file=/path/to/disable_cond_fails.
+//
+// Additionally, also interpret the lines as function names and check whether
+// the current cond_fail is contained in a listed function when considering
+// whether to remove it.
+static llvm::cl::opt<std::string> CondFailConfigFile(
+    "cond-fail-config-file", llvm::cl::init(""),
+    llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
+
+static std::set<std::string> CondFailsToRemove;
+
+bool SILCombiner::shouldRemoveCondFail(CondFailInst &CFI) {
+  if (CondFailConfigFile.empty())
+    return false;
+
+  std::fstream fs(CondFailConfigFile);
+  if (!fs) {
+    llvm::errs() << "cannot cond_fail disablement config file\n";
+    exit(1);
+  }
+  if (CondFailsToRemove.empty()) {
+    std::string line;
+    while (std::getline(fs, line)) {
+      CondFailsToRemove.insert(line);
+    }
+    fs.close();
+  }
+  // Check whether the cond_fail's containing function was listed in the config
+  // file.
+  if (CondFailsToRemove.find(CFI.getFunction()->getName().str()) !=
+      CondFailsToRemove.end())
+    return true;
+
+  // Check whether the cond_fail's message was listed in the config file.
+  auto message = CFI.getMessage();
+  return CondFailsToRemove.find(message.str()) != CondFailsToRemove.end();
 }

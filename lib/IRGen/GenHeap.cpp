@@ -1585,9 +1585,9 @@ public:
       astType =
           astType
               .transformRec([](Type t) -> std::optional<Type> {
-                if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+                if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
                   auto &ctx = openedExistential->getASTContext();
-                  return GenericTypeParamType::getType(0, 0, ctx);
+                  return ctx.TheSelfType;
                 }
                 return std::nullopt;
               })
@@ -2139,7 +2139,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
     return getIsaEncodingForType(
-        IGM, OpenedArchetypeType::getAny(type)->getCanonicalType());
+        IGM, ExistentialArchetypeType::getAny(type)->getCanonicalType());
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {

@@ -363,7 +363,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
         while (!subReqs.empty()) {
           auto req = subReqs.pop_back_val();
-          switch (req.checkRequirement(subReqs)) {
+          switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
           case CheckRequirementResult::Success:
           case CheckRequirementResult::PackRequirement:
           case CheckRequirementResult::ConditionalConformance:

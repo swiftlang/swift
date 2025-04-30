@@ -17,11 +17,11 @@ public struct BufferView : ~Escapable {
   public init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
     self.ptr = ptr
   }
-  @lifetime(a)
+  @lifetime(copy a)
   public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) {
     self.ptr = ptr
   }
-  @lifetime(a, borrow b)
+  @lifetime(copy a, borrow b)
   public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView, _ b: borrowing Array<Int>) {
     self.ptr = ptr
   }
@@ -48,12 +48,12 @@ public func borrowAndCreate(_ view: borrowing BufferView) -> BufferView {
   return BufferView(view.ptr)
 }
 
-@lifetime(view)
+@lifetime(copy view)
 public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
   return BufferView(view.ptr)
 }
 
-@lifetime(borrow this, that)
+@lifetime(borrow this, copy that)
 public func deriveThisOrThat(_ this: borrowing BufferView, _ that: borrowing BufferView) -> BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(this.ptr)
@@ -63,13 +63,16 @@ public func deriveThisOrThat(_ this: borrowing BufferView, _ that: borrowing Buf
 
 public struct Wrapper : ~Escapable {
   var _view: BufferView
+  @lifetime(copy view)
   public init(_ view: consuming BufferView) {
     self._view = view
   }
   public var view: BufferView {
+    @lifetime(copy self)
     _read {
       yield _view
     }
+    @lifetime(&self)
     _modify {
       yield &_view
     }

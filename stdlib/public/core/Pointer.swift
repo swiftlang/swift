@@ -50,7 +50,7 @@ extension _Pointer {
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
   public init(_ from: OpaquePointer) {
-    self.init(from._rawValue)
+    unsafe self.init(from._rawValue)
   }
 
   /// Creates a new typed pointer from the given opaque pointer.
@@ -59,8 +59,8 @@ extension _Pointer {
   ///   `from` is `nil`, the result of this initializer is `nil`.
   @_transparent
   public init?(_ from: OpaquePointer?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
+    guard let unwrapped = unsafe from else { return nil }
+    unsafe self.init(unwrapped)
   }
 
   /// Creates a new pointer from the given address, specified as a bit
@@ -304,12 +304,12 @@ extension _Pointer /*: Strideable*/ {
 
 extension _Pointer /*: Hashable */ {
   @inlinable
-  public func hash(into hasher: inout Hasher) {
+  @safe public func hash(into hasher: inout Hasher) {
     hasher.combine(UInt(bitPattern: self))
   }
 
   @inlinable
-  public func _rawHashValue(seed: Int) -> Int {
+  @safe public func _rawHashValue(seed: Int) -> Int {
     return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
 }
@@ -317,14 +317,14 @@ extension _Pointer /*: Hashable */ {
 @_unavailableInEmbedded
 extension _Pointer /*: CustomDebugStringConvertible */ {
   /// A textual representation of the pointer, suitable for debugging.
-  public var debugDescription: String {
+  @safe public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 #if SWIFT_ENABLE_REFLECTION
 extension _Pointer /*: CustomReflectable */ {
-  public var customMirror: Mirror {
+  @safe public var customMirror: Mirror {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
@@ -340,6 +340,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
+  @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
@@ -358,6 +359,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
+  @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
@@ -435,11 +437,11 @@ func _convertConstArrayToPointerArgument<
   let (owner, opaquePointer) = arr._cPointerArgs()
 
   let validPointer: ToPointer
-  if let addr = opaquePointer {
+  if let addr = unsafe opaquePointer {
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = unsafe UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
@@ -454,11 +456,11 @@ func _convertConstArrayToPointerArgument<
   let (owner, opaquePointer) = arr._cPointerArgs()
 
   let validPointer: ToPointer
-  if let addr = opaquePointer {
+  if let addr = unsafe opaquePointer {
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = unsafe UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
@@ -480,7 +482,7 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+  unsafe _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return _convertConstArrayToPointerArgument(a)
 }
@@ -496,7 +498,7 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+  _debugPrecondition(unsafe a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return _convertConstArrayToPointerArgument(a)
 }

@@ -643,9 +643,15 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
-                                                bool allowTaskDealloc) {
+                                                bool allowTaskDealloc,
+                                                bool useTaskDeallocThrough) {
   // Async function use taskDealloc.
   if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
+    if (useTaskDeallocThrough) {
+      emitTaskDeallocThrough(
+          Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
+      return;
+    }
     emitTaskDealloc(
         Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
     return;

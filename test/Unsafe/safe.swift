@@ -1,7 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// The feature flag should be enabled.
+#if !hasFeature(StrictMemorySafety)
+#error("Strict memory safety is not enabled!")
+#endif
+
 
 @unsafe
 func unsafeFunction() { }
@@ -65,17 +68,17 @@ func acceptP(_: some P) { }
 
 func testConformance(i: Int) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  acceptP(i) // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  acceptP(i) // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsOpaqueP() -> some P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsExistentialP() -> any P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 // FIXME: Should work even if the IteratorProtocol conformance is safe
@@ -88,9 +91,35 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
-  // expected-note@-1{{reference}}
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
-  for _ in unsafe uas { } // okay
+  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
+
+  for unsafe _ in unsafe uas { } // okay
+}
+
+func testForInUnsafeAmbiguity(_ integers: [Int]) {
+  for unsafe in integers {
+    _ = unsafe
+  }
+  for unsafe: Int in integers {
+    _ = unsafe
+  }
+}
+
+struct UnsafeIterator: @unsafe IteratorProtocol {
+  @unsafe mutating func next() -> Int? { nil }
+}
+
+struct SequenceWithUnsafeIterator: Sequence {
+  func makeIterator() -> UnsafeIterator { UnsafeIterator() }
+}
+
+func testUnsafeIteratorForEach() {
+  let swui = SequenceWithUnsafeIterator()
+
+  for _ in swui { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  for unsafe _ in swui { } // okay, it's only the iterator that's unsafe
 }
 
 class MyRange {
@@ -113,7 +142,7 @@ func casting(value: Any, i: Int) {
   _ = unsafe value as! UnsafeType
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  _ = i as any P // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  _ = i as any P // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func metatypes() {
@@ -146,6 +175,49 @@ func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
 }
 
+enum Color {
+case red
+}
+
+func acceptBools(_: Bool, _: Bool) { }
+
+func acceptBoolsUnsafeLabel(unsafe _: Bool, _: Bool) { }
+
+func unsafe(_: Int) { }
+
+func unsafeFun() {
+  var unsafe = true
+  unsafe = false
+  unsafe.toggle()
+  _ = [unsafe]
+  _ = { unsafe }
+  acceptBools(unsafe, unsafe)
+  acceptBoolsUnsafeLabel(unsafe: unsafe, unsafe)
+
+  let color: Color
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}{{11-18=}}
+  color = unsafe .red
+  _ = color
+
+  if unsafe { }
+}
+
+func moreUnsafeFunc(unsafe: [Int]) {
+  let _: [Int] = unsafe []
+  // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+
+  _ = unsafe[1]
+
+  _ = "\(unsafe)"
+}
+
+func yetMoreUnsafeFunc(unsafe: () -> Void) {
+  unsafe()
+
+  _ = unsafe ()
+  // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+}
+
 // @safe suppresses unsafe-type-related diagnostics on an entity
 struct MyArray<Element> {
   @safe func withUnsafeBufferPointer<R, E>(
@@ -156,7 +228,8 @@ struct MyArray<Element> {
 }
 
 extension UnsafeBufferPointer {
-  @safe var safeCount: Int { unsafe count }
+  @unsafe var unsafeCount: Int { 17 }
+  @safe var safeCount: Int { unsafe unsafeCount }
 }
 
 func testMyArray(ints: MyArray<Int>) {
@@ -165,6 +238,73 @@ func testMyArray(ints: MyArray<Int>) {
     _ = unsafe bufferCopy
 
     print(buffer.safeCount)
-    unsafe print(buffer.baseAddress!)
+    unsafe print(buffer.unsafeCount)
+  }
+}
+
+func testUnsafeLHS() {
+  @unsafe var value: Int = 0
+  unsafe value = switch unsafe value {
+  case 0: 1
+  default: 0
+  }
+}
+
+@safe
+struct UnsafeWrapTest {
+  var pointer: UnsafeMutablePointer<Int>?
+
+  func test() {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to property 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>'}}
+      _ = unsafe pointer
+    }
+  }
+
+  func otherTest(pointer: UnsafeMutablePointer<Int>?) {
+    if let pointer { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{19-19= = unsafe pointer}}
+      // expected-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeMutablePointer<Int>}}
+      _ = unsafe pointer
+    }
+  }
+}
+
+@safe @unsafe
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both '@safe' and '@unsafe'}}
+
+@unsafe
+struct UnsafeContainingUnspecified {
+  typealias A = Int
+
+  func getA() -> A { 0 }
+
+  @safe
+  struct Y {
+    var value: Int
+  }
+
+  func f() {
+    _ = Y(value: 5)
+  }
+}
+
+
+@unsafe func f(x: UnsafeContainingUnspecified) {
+  let a = unsafe x.getA()
+  _ = a
+}
+
+extension Slice {
+  // Make sure we aren't diagnosing the 'defer' as unsafe.
+  public func withContiguousMutableStorageIfAvailable<R, Element>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
+    try unsafe base.withContiguousStorageIfAvailable { buffer in
+      let start = unsafe base.baseAddress?.advanced(by: startIndex)
+      var slice = unsafe UnsafeMutableBufferPointer(start: start, count: count)
+      defer {
+      }
+      return try unsafe body(&slice)
+    }
   }
 }

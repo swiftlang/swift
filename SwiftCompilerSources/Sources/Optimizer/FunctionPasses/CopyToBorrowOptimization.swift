@@ -124,10 +124,6 @@ private struct Uses {
   // E.g. the none-case of a switch_enum of an Optional.
   private(set) var nonDestroyingLiverangeExits: Stack<Instruction>
 
-  var allLifetimeEndingInstructions: [Instruction] {
-    Array(destroys.lazy.map { $0 }) + Array(nonDestroyingLiverangeExits)
-  }
-
   private(set) var usersInDeadEndBlocks: Stack<Instruction>
 
   init(_ context: FunctionPassContext) {
@@ -323,7 +319,16 @@ private func createEndBorrows(for beginBorrow: Value, atEndOf liverange: Instruc
   //   destroy_value %2
   //   destroy_value %3  // The final destroy. Here we need to create the `end_borrow`(s)
   //
-  for endInst in collectedUses.allLifetimeEndingInstructions {
+
+  var allLifetimeEndingInstructions = InstructionWorklist(context)
+  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.destroys.lazy.map { $0 })
+  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.nonDestroyingLiverangeExits)
+
+  defer {
+    allLifetimeEndingInstructions.deinitialize()
+  }
+
+  while let endInst = allLifetimeEndingInstructions.pop() {
     if !liverange.contains(endInst) {
       let builder = Builder(before: endInst, context)
       builder.createEndBorrow(of: beginBorrow)
@@ -355,6 +360,13 @@ private extension Value {
   }
 
   var lookThroughForwardingInstructions: Value {
+    if let bfi = definingInstruction as? BorrowedFromInst,
+       !bfi.borrowedPhi.isReborrow,
+       bfi.enclosingValues.count == 1
+    {
+      // Return the single forwarded enclosingValue
+      return bfi.enclosingValues[0]
+    }
     if let fi = definingInstruction as? ForwardingInstruction,
        let forwardedOp = fi.singleForwardedOperand
     {

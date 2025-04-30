@@ -899,10 +899,16 @@ static SILValue tryRewriteToPartialApplyStack(
 
     OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(
         closureLiveness, origIsUnmodifiedDuringClosureLifetime);
-    auto walkResult = std::move(origUseWalker).walk(orig);
-
-    if (walkResult == AddressUseKind::Unknown ||
-        !origIsUnmodifiedDuringClosureLifetime) {
+    switch (origUseWalker.walk(orig)) {
+    case AddressUseKind::NonEscaping:
+    case AddressUseKind::Dependent:
+      // Dependent uses are ignored because they cannot modify the original.
+      break;
+    case AddressUseKind::PointerEscape:
+    case AddressUseKind::Unknown:
+      continue;
+    }
+    if (!origIsUnmodifiedDuringClosureLifetime) {
       continue;
     }
 
@@ -1057,6 +1063,11 @@ static bool tryExtendLifetimeToLastUse(
             deadEndBlocks->isDeadEnd(builder.getInsertionPoint()->getParent()));
         builder.createDestroyValue(loc, closureCopy, DontPoisonRefs, isDeadEnd);
       });
+
+  // Closure User may not be post-dominating the previously created copy_value.
+  // Create destroy_value at leaking blocks.
+
+  endLifetimeAtLeakingBlocks(closureCopy, {singleUser->getParent()}, deadEndBlocks);
   /*
   llvm::errs() << "after lifetime extension of\n";
   escapingClosure->dump();

@@ -104,6 +104,11 @@ enum class Symbolication {
   Full = 2,
 };
 
+enum class OutputFormat {
+  Text = 0,
+  JSON = 1
+};
+
 struct BacktraceSettings {
   UnwindAlgorithm  algorithm;
   OnOffTty         enabled;
@@ -121,6 +126,8 @@ struct BacktraceSettings {
   bool             cache;
   OutputTo         outputTo;
   Symbolication    symbolicate;
+  bool             suppressWarnings;
+  OutputFormat     format;
   const char      *swiftBacktracePath;
   const char      *outputPath;
 };

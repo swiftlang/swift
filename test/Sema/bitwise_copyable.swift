@@ -1,12 +1,12 @@
 // RUN: %target-typecheck-verify-swift                       \
 // RUN:     -disable-availability-checking                   \
-// RUN:     -enable-experimental-feature ValueGenerics       \
 // RUN:     -enable-experimental-feature Sensitive           \
+// RUN:     -enable-experimental-feature LifetimeDependence  \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
-// REQUIRES: swift_feature_ValueGenerics
 // REQUIRES: swift_feature_Sensitive
+// REQUIRES: swift_feature_LifetimeDependence
 
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(BEGIN)===================={{
@@ -97,7 +97,7 @@ struct S_Explicit_With_Metatype_Optional_AnyObject : BitwiseCopyable {
 }
 
 @sensitive
-struct S_Explicit_Sensitive : BitwiseCopyable { // expected-error {{a @sensitive type cannot conform to 'BitwiseCopyable'}}
+struct S_Explicit_Sensitive : BitwiseCopyable { // expected-error {{a '@sensitive' type cannot conform to 'BitwiseCopyable'}}
 }
 
 @sensitive
@@ -214,9 +214,7 @@ struct S_Explicit_With_2BitwiseCopyable_Generic_Optional<T : BitwiseCopyable> : 
   var o2: T?
 }
 
-// TODO: When the standard library is built with NonescapableTypes, this should
-//       be uncommented.
-//struct S_Explicit_Nonescapable : ~Escapable, BitwiseCopyable {}
+struct S_Explicit_Nonescapable : ~Escapable, BitwiseCopyable {}
 
 struct S_Explicit_Noncopyable : ~Copyable, BitwiseCopyable {} // expected-error{{type_does_not_conform}}
 

@@ -395,6 +395,15 @@ public:
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
 
+  // Returns true if the given string is a raw identifier that must always
+  // be escaped by backticks when printing it back in source form or writing
+  // its name into runtime metadata.
+  static bool identifierMustAlwaysBeEscaped(StringRef str);
+
+  /// Determines if the given string is a valid non-operator
+  /// identifier if it were surrounded by backticks.
+  static bool isValidAsEscapedIdentifier(StringRef identifier);
+
   /// Determine the token kind of the string, given that it is a valid
   /// non-operator identifier. Return tok::identifier if the string is not a
   /// reserved word.

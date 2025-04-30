@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct Sub: Hashable {
   static func ==(_: Sub, _: Sub) -> Bool { return true }
@@ -31,6 +32,8 @@ struct A: Hashable {
   let optLetProperty: Prop?
 
   subscript(sub: Sub) -> A { get { return self } set { } }
+  func foo(_ b: NonHashableSub) {}
+  static func foo(_ b: Sub) {}
 
   static func ==(_: A, _: A) -> Bool { fatalError() }
   func hash(into hasher: inout Hasher) { fatalError() }
@@ -115,6 +118,11 @@ func testKeyPath(sub: Sub, optSub: OptSub,
 
   var l = \C<A>.value
   expect(&l, toHaveType: Exactly<WritableKeyPath<C<A>, A>>.self)
+  
+  var hashableCapture = \A.Type.foo(Sub())
+  expect(&hashableCapture, toHaveType: Exactly<WritableKeyPath<A.Type, ()>>.self)
+  // expected-error@+1 {{method argument of type 'NonHashableSub' in a key path must be Hashable}}
+  _ = \A.foo(NonHashableSub())
 
   // expected-error@+1{{generic parameter 'T' could not be inferred}}
   _ = \C.value
@@ -486,6 +494,7 @@ class CC {
 func testKeyPathOptional() {
   _ = \AA.c?.i
   _ = \AA.c!.i
+  _ = \AA.c?.i.hashValue
 
   // https://github.com/apple/swift/issues/48750
   let path: KeyPath<CC,Int>! = \CC.i
@@ -819,18 +828,90 @@ func test_keypath_with_mutating_getter() {
 }
 
 func test_keypath_with_method_refs() {
+  enum ValidationError: Error {
+      case invalidYear
+  }
+  
   struct S {
-    func foo() -> Int { return 42 }
-    static func bar() -> Int { return 0 }
+    static let millenium = 3
+    var year = 2024
+    init() {}
+    init(val value: Int = 2024) { year = value }
+    
+    var add: (Int, Int) -> Int { return { $0 + $1 } }
+    func add(this: Int) -> Int { this + this}
+    func add(that: Int) -> Int { that + that }
+    static func subtract(_ val: Int) -> Int { return millenium - val }
+    nonisolated func nonisolatedNextYear() -> Int { return year + 1 }
+    consuming func consume() { print(year) }
+    func validateYear() throws {
+      if year < 0 { throw ValidationError.invalidYear }
+    }
+    func doubleValue(_ value: inout Int) { value *= 2 }
+    mutating func updateYear(to newYear: Int) { self.year = newYear }
+    func calculateFutureYear(after seconds: UInt64) async -> Int {
+      try? await Task.sleep(nanoseconds: seconds)
+      return year + 10
+    }
+    func validateAndCalculateFutureYear(after seconds: UInt64) async throws -> Int {
+      try validateYear()
+      try await Task.sleep(nanoseconds: seconds)
+      return year + 10
+    }
+    subscript(index: Int) -> Int { return year + index }
   }
 
-  let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
-  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
-  let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static method 'bar()'}}
-  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
-  let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
+  let _: KeyPath<S, (Int, Int) -> Int> = \.add
+  let _: KeyPath<S, (Int, Int) -> Int> = \.add()
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, Int>' to type 'KeyPath<S, (Int, Int) -> Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and '(Int, Int) -> Int') are expected to be equal}}
+  let _: KeyPath<S, Int> = \.add() // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<S, (Int) -> Int> = \.add(this:)
+  let _: KeyPath<S, Int> = \.add(that: 1)
+  let _: KeyPath<S, (Int) -> Int> = \.subtract // expected-error {{static member 'subtract' cannot be used on instance of type 'S'}}
+  let _ = \S.Type.subtract(1)
+  let _: KeyPath<S, () -> Int> = \S.nonisolatedNextYear
+  let _: KeyPath<S, Int> = \S.nonisolatedNextYear()
+  do {
+      try S()[keyPath: \S.validateYear]() // expected-error {{cannot form key path to instance method with 'throws' or 'async'}}
+  } catch {
+      print("Validation failed: \(error)")
+  }
+  var value = 2025
+  let _ = \S.doubleValue(&value) // expected-error {{cannot pass an inout argument to a keypath method}}
+  let _: KeyPath<S, ()> = \S.updateYear(to: 2025) // expected-error {{key path cannot refer to mutating method 'updateYear(to:)}}
+  let _: KeyPath<S, Int> = \S.calculateFutureYear(after: 5) // expected-error {{cannot form key path to instance method with 'throws' or 'async'}}
+  let _: KeyPath<S, Int> = \S.validateAndCalculateFutureYear(after: 5) // expected-error {{cannot form key path to instance method with 'throws' or 'async'}}
+  let _: KeyPath<S, () -> S> = \.init // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
+  let _: KeyPath<S, (Int) -> S> = \.init(val:) // expected-error {{static member 'init(val:)' cannot be used on instance of type 'S'}}
+  let _: KeyPath<S, S> = \.init(val: 2025) // expected-error {{static member 'init(val:)' cannot be used on instance of type 'S'}}
+  let _: KeyPath<S.Type, () -> S> = \S.Type.init
+  let _: KeyPath<S.Type, (Int) -> S> = \S.Type.init(val:)
+  let _: KeyPath<S.Type, S> = \S.Type.init(val: 2025)
+  let _: KeyPath<S.Type, Int> = \.init(val:2025).year
+  let _ = \S.Type.init(val: 2025).nonisolatedNextYear()
+  let _ = \S.Type.init()[0]
+  let _ = \S.Type.init(val: 2025).nonisolatedNextYear().signum()
+  let _ = \S.Type.init(val: 2025).nonisolatedNextYear().description
+  let _: KeyPath<S, ()> = \S.consume()
+  let _: AnyKeyPath = \S.add(this:)
+  let _: PartialKeyPath = \S.add
+  
+  class E: Hashable {
+    static func == (lhs: E, rhs: E) -> Bool { return lhs === rhs }
+    func hash(into hasher: inout Hasher) { hasher.combine(ObjectIdentifier(self)) }
+    private var storedClosure: (() -> Void)?
+    func saveClosure(_ closure: @escaping () -> Void) { storedClosure = closure }
+  }
+  class NonhashableE {}
+  struct BaseType {
+    func foo(_ e: E) {}
+    func foo(_ e: NonhashableE) {}
+  }
+  let hashableInstance = E()
+  let nonhashableInstance = NonhashableE()
+  let _ = \BaseType.foo(hashableInstance)
+  let _ = \BaseType.foo(nonhashableInstance) // expected-error {{method argument of type 'NonhashableE' in a key path must be Hashable}}
 
   struct A {
     func foo() -> B { return B() }
@@ -839,24 +920,32 @@ func test_keypath_with_method_refs() {
 
   struct B {
     var bar: Int = 42
+    func baz() -> Int { return 42 }
+    subscript(index: Int) -> Int { return index }
   }
 
-  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
-  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
-  let _ = \A.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
-  let _ = \A.Type.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
+  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{static member 'faz()' cannot be used on instance of type 'A'}}
+  let _ = \A.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _ = \A.Type.faz.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<A, Int> = \.foo().bar
+  let _: KeyPath<A.Type, Int> = \.faz().bar
+  let _ = \A.foo().bar
+  let _ = \A.Type.faz().bar
+  let _: KeyPath<A.Type, Int> = \.faz().bar
+  let _: KeyPath<A, Int> = \.foo().baz()
+  let _: KeyPath<A, Int> = \.foo().baz()
+  let _: KeyPath<A.Type, Int> = \A.Type.faz()[0]
 }
 
 // https://github.com/apple/swift/issues/54961
-// Compiler crash on invalid method reference in key path.
-
 protocol Zonk {
   func wargle()
 }
 typealias Blatz = (gloop: String, zoop: Zonk?)
 
 func f_54961(fleep: [Blatz]) {
-  fleep.compactMap(\.zoop?.wargle) // expected-error {{key path cannot refer to instance method 'wargle()'}}
+  let _ = fleep.compactMap(\.zoop?.wargle)
 }
 
 // https://github.com/apple/swift/issues/52867
@@ -945,7 +1034,9 @@ func testKeyPathHole() {
 
   func f(_ i: Int) {}
   f(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to expected argument type 'Int'}}
   f(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to expected argument type 'Int'}}
 
 func provideValueButNotRoot<T>(_ fn: (T) -> String) {} // expected-note 2 {{in call to function 'provideValueButNotRoot'}}
   provideValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
@@ -1091,8 +1182,8 @@ func testSyntaxErrors() {
 
 // https://github.com/apple/swift/issues/56996
 func f_56996() {
-  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
-  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+  _ = \Int.byteSwapped.signum()
+  _ = \Int.byteSwapped.init() // expected-error {{static member 'init()' cannot be used on instance of type 'Int'}}
   _ = \Int // expected-error {{key path must have at least one component}}
   _ = \Int? // expected-error {{key path must have at least one component}}
   _ = \Int. // expected-error {{invalid component of Swift key path}}

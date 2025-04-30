@@ -93,7 +93,7 @@ extension Mutex where Value: ~Copyable {
       handle._unlock()
     }
 
-    return try body(&value._address.pointee)
+    return try unsafe body(&value._address.pointee)
   }
 
   /// Attempts to acquire the lock and then calls the given closure if
@@ -142,7 +142,7 @@ extension Mutex where Value: ~Copyable {
       handle._unlock()
     }
 
-    return try body(&value._address.pointee)
+    return unsafe try body(&value._address.pointee)
   }
 }
 

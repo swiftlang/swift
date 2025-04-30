@@ -24,16 +24,16 @@
 import lifetime_dependence
 // CHECK: @lifetime(borrow a)
 // CHECK-NEXT: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: borrowing Swift.Array<Swift.Int>) {
-// CHECK: @lifetime(a)
+// CHECK: @lifetime(copy a)
 // CHECK-NEXT: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: consuming lifetime_dependence.AnotherView) {
 
-// CHECK: @lifetime(x)
+// CHECK: @lifetime(copy x)
 // CHECK-NEXT: @inlinable public func derive(_ x: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
 
-// CHECK: @lifetime(view)
+// CHECK: @lifetime(copy view)
 // CHECK-NEXT: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
 
-// CHECK: @lifetime(this, that)
+// CHECK: @lifetime(copy this, copy that)
 // CHECK-NEXT: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
 
 // Check that an implicitly dependent variable accessor is guarded by LifetimeDependence.

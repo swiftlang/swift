@@ -1154,13 +1154,16 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
+        bool shouldDowngradeToWarning = true;
         if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+          auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
-              theEnum->getParentModule()->isSystemModule();
+              enumModule->isSystemModule() ||
+              theEnum->getAttrs().hasAttribute<ExtensibleAttr>();
         }
         DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                     subjectType, shouldIncludeFutureVersionComment)
-          .warnUntilSwiftVersion(6);
+          .warnUntilSwiftVersionIf(shouldDowngradeToWarning, 6);
         mainDiagType = std::nullopt;
       }
         break;

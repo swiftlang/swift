@@ -662,7 +662,7 @@ also work as a generic type constraint.
 Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
-For more details, see [](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [SE-0302](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
@@ -733,7 +733,7 @@ func baz() {
 Additionally, if they are of a tuple or struct type, their stored members
 without observers may also be passed inout as non-ephemeral pointers.
 
-For more details, see the educational note on
+For more details, see the diagnostic group 
 [temporary pointer usage](/userdocs/diagnostics/temporary-pointers.md).
 
 ## `@_nonoverride`

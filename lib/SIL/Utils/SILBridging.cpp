@@ -163,14 +163,6 @@ BridgedFunction BridgedTestArguments::takeFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                SILType
-//===----------------------------------------------------------------------===//
-
-static_assert((int)BridgedType::MetatypeRepresentation::Thin == (int)swift::MetatypeRepresentation::Thin);
-static_assert((int)BridgedType::MetatypeRepresentation::Thick == (int)swift::MetatypeRepresentation::Thick);
-static_assert((int)BridgedType::MetatypeRepresentation::ObjC == (int)swift::MetatypeRepresentation::ObjC);
-
-//===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
@@ -205,15 +197,44 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
-BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const {
+BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubstitutions,
+                                                               BridgedCanType selfType) const {
   swift::SILFunction *f = getFunction();
   swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
 
   if (!genericSig || genericSig->areAllParamsConcrete())
     return swift::SubstitutionMap();
 
+  SubstitutionMap contextSubs = contextSubstitutions.unbridged();
+  if (selfType.unbridged() &&
+      contextSubs.getGenericSignature().getGenericParams().size() + 1 == genericSig.getGenericParams().size()) {
+
+    // If this is a default witness methods (`selfType` != nil) it has generic self type. In this case
+    // the generic self parameter is at depth 0 and the actual generic parameters of the substitution map
+    // are at depth + 1, e.g:
+    // ```
+    //     @convention(witness_method: P) <τ_0_0><τ_1_0 where τ_0_0 : GenClass<τ_1_0>.T>
+    //                                       ^      ^
+    //                                    self      params of substitution map at depth + 1
+    // ```
+    return swift::SubstitutionMap::get(genericSig,
+      [&](SubstitutableType *type) -> Type {
+        GenericTypeParamType *genericParam = cast<GenericTypeParamType>(type);
+        // The self type is τ_0_0
+        if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+          return selfType.unbridged();
+
+        // Lookup the substitution map types at depth - 1.
+        auto *depthMinus1Param = GenericTypeParamType::getType(genericParam->getDepth() - 1,
+                                                               genericParam->getIndex(),
+                                                               genericParam->getASTContext());
+        return swift::QuerySubstitutionMap{contextSubs}(depthMinus1Param);
+      },
+      swift::LookUpConformanceInModule());
+
+  }
   return swift::SubstitutionMap::get(genericSig,
-                                     swift::QuerySubstitutionMap{contextSubs.unbridged()},
+                                     swift::QuerySubstitutionMap{contextSubs},
                                      swift::LookUpConformanceInModule());
 }
 
@@ -335,6 +356,13 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
 bool BridgedGlobalVar::mustBeInitializedStatically() const {
   SILGlobalVariable *global = getGlobal();
   return global->mustBeInitializedStatically();
+}
+
+bool BridgedGlobalVar::isConstValue() const {
+  SILGlobalVariable *global = getGlobal();
+  if (const auto &decl = global->getDecl())
+    return decl->isConstValue();
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

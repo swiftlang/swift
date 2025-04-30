@@ -101,21 +101,22 @@ public:
     addLinkEntity(LinkEntity::forClassMetadataBaseOffset(CD));
   }
 
+  void addCoroFunctionPointer(SILDeclRef declRef) override {
+    addLinkEntity(LinkEntity::forCoroFunctionPointer(declRef),
+                  /*ignoreVisibility=*/true);
+  }
+
   void addDispatchThunk(SILDeclRef declRef) override {
     auto entity = LinkEntity::forDispatchThunk(declRef);
-
-    // TODO: explain why
-    if (declRef.isDistributedThunk()) {
-      auto afd = declRef.getAbstractFunctionDecl();
-      if (afd && isa<ProtocolDecl>(afd->getDeclContext())) {
-        return;
-      }
-    }
-
     addLinkEntity(entity);
 
     if (declRef.getAbstractFunctionDecl()->hasAsync())
       addLinkEntity(LinkEntity::forAsyncFunctionPointer(entity));
+
+    auto *accessor = dyn_cast<AccessorDecl>(declRef.getAbstractFunctionDecl());
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+      addLinkEntity(LinkEntity::forCoroFunctionPointer(entity));
   }
 
   void addDynamicFunction(AbstractFunctionDecl *AFD,
@@ -156,14 +157,6 @@ public:
   }
 
   void addMethodDescriptor(SILDeclRef declRef) override {
-    if (declRef.isDistributedThunk()) {
-      auto afd = declRef.getAbstractFunctionDecl();
-      auto DC = afd->getDeclContext();
-      if (isa<ProtocolDecl>(DC)) {
-        return;
-      }
-    }
-
     addLinkEntity(LinkEntity::forMethodDescriptor(declRef));
   }
 

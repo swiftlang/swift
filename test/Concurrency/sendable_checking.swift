@@ -54,7 +54,7 @@ func testCV(
   acceptCV(fn) // expected-complete-and-tns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
   // expected-complete-and-tns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
-  acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
+  acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a '@Sendable' closure}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -71,7 +71,7 @@ func testCV(
   acceptCV(ns4) // expected-warning{{type 'NS4' does not conform to the 'Sendable' protocol}}
   acceptCV(fn) // expected-warning{{type '() -> Void' does not conform to the 'Sendable' protocol}}
   // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
+  acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a '@Sendable' closure}}
 }
 
 // rdar://83942484 - spurious Sendable diagnostics
@@ -131,7 +131,10 @@ protocol P {
   func foo2<T : Sendable>(x : T) async -> ()
 
   func bar2<T>(x : T) async -> ()
-  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{14-14=: Sendable}}
+
+  func bar3<T: Equatable>(x : T) async -> ()
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{25-25= & Sendable}}
 }
 
 // Make sure conformance to protocols checks sendability of
@@ -147,6 +150,9 @@ protocol P {
 
   func bar2<T>(x : T) -> () {}
   // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar2(x:)' into actor-isolated implementation}}
+
+  func bar3<T: Equatable>(x : T) -> () {}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar3(x:)' into actor-isolated implementation}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -163,7 +169,11 @@ class Super {
 
   @MainActor
   func bar2<T>(x: T) async {}
-  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{14-14=: Sendable}}
+
+  @MainActor
+  func bar3<T: Equatable>(x: T) async {}
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{25-25= & Sendable}}
 }
 
 // Make sure isolation crossing overrides check sendability
@@ -179,6 +189,9 @@ class Sub : Super {
 
   override nonisolated func bar2<T>(x: T) async {}
   // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
+
+  override nonisolated func bar3<T>(x: T) async {}
+  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar3(x:)' into nonisolated override}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -283,7 +296,7 @@ final class NonSendable {
   var z: Int { 0 }
 }
 
-// This is not an error since t.update and t.x are both main actor isolated. We
+// This is not an error since t.update and t.x are both MainActor isolated. We
 // still get the returning main actor-isolated property 'x' error though.
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
@@ -494,3 +507,23 @@ func checkOpaqueType() -> some Sendable {
 class MainActorSub: MainActorSuper<MainActorSub.Nested> {
   struct Nested {}  // no cycle
 }
+
+@available(SwiftStdlib 5.9, *)
+struct SendablePack<each Element: Sendable>: Sendable {
+  let elements: (repeat each Element)
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+func sendablePacks<each Element: Sendable>(
+    _ element: repeat each Element
+) async {
+  { @Sendable in
+    repeat _ = each element
+  }()
+
+  await sendPack(repeat each element)
+}
+
+@available(SwiftStdlib 5.1, *)
+func sendPack<each Element>(_: repeat each Element) async {}

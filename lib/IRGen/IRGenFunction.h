@@ -45,11 +45,12 @@ namespace swift {
   class SILType;
   class SourceLoc;
   enum class MetadataState : size_t;
+  enum class CoroAllocatorKind : uint8_t;
 
-namespace Lowering {
+  namespace Lowering {
   class TypeConverter;
-}
-  
+  }
+
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
@@ -142,6 +143,8 @@ public:
   Address getCalleeTypedErrorResultSlot(SILType errorType);
   void setCalleeTypedErrorResultSlot(Address addr);
 
+  llvm::ConstantInt* getMallocTypeId();
+
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
     return CoroutineHandle != nullptr;
@@ -150,12 +153,25 @@ public:
     assert(isCoroutine());
     return CoroutineHandle;
   }
+  bool isCalleeAllocatedCoroutine() { return CoroutineAllocator != nullptr; }
+  llvm::Value *getCoroutineAllocator() {
+    assert(isCoroutine());
+    return CoroutineAllocator;
+  }
 
   void setCoroutineHandle(llvm::Value *handle) {
     assert(CoroutineHandle == nullptr && "already set handle");
     assert(handle != nullptr && "setting a null handle");
     CoroutineHandle = handle;
   }
+
+  void setCoroutineAllocator(llvm::Value *allocator) {
+    assert(CoroutineAllocator == nullptr && "already set allocator");
+    assert(allocator != nullptr && "setting a null allocator");
+    CoroutineAllocator = allocator;
+  }
+
+  std::optional<CoroAllocatorKind> getDefaultCoroutineAllocatorKind();
 
   llvm::BasicBlock *getCoroutineExitBlock() const {
     return CoroutineExitBlock;
@@ -180,6 +196,7 @@ public:
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
   llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *popAsyncContext(llvm::Value *calleeContext);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -226,6 +243,7 @@ private:
   Address CallerTypedErrorResultSlot;
   Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
+  llvm::Value *CoroutineAllocator = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
@@ -285,7 +303,8 @@ public:
                                  Alignment align, bool allowTaskAlloc = true,
                                  const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
-                                   bool allowTaskDealloc = true);
+                                   bool allowTaskDealloc = true,
+                                   bool useTaskDeallocThrough = false);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -631,6 +650,7 @@ public:
   Address emitTaskAlloc(llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(Address address);
+  void emitTaskDeallocThrough(Address address);
 
   llvm::Value *alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val);
 

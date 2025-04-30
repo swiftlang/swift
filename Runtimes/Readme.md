@@ -20,6 +20,11 @@ Once the migration is completed, we will be deleting this script. It
 is a temporary workaround to avoid trying to keep multiple sets of files in
 sync.
 
+> [!NOTE]
+> This script does not add new files to any CMakeLists.txt. Any new files
+> that are copied over will need to be added manually to ensure that
+> they will be built by CMake.
+
 ## Layering
 
 ```

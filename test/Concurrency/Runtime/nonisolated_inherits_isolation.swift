@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext )
+// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-upcoming-feature NonisolatedNonsendingByDefault )
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,7 +6,7 @@
 // REQUIRES: libdispatch
 // REQUIRES: asserts
 
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // UNSUPPORTED: freestanding
 
@@ -33,13 +33,13 @@ struct CustomActor {
   }
 }
 
-@execution(caller)
+nonisolated(nonsending)
 func executionCallerIsolation() async {
   checkIfOnMainQueue()
 }
 
 // Expected to always crash
-@execution(concurrent)
+@concurrent
 func executionConcurrentIsolation() async {
   checkIfOnMainQueue()
 }

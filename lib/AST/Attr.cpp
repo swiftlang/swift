@@ -34,47 +34,48 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-#define DECL_ATTR(_, Id, ...) \
-  static_assert(DeclAttrKind::Id <= DeclAttrKind::Last_DeclAttr); \
-  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
-                "Attrs are BumpPtrAllocated; the destructor is never called");
-#include "swift/AST/DeclAttr.def"
 static_assert(IsTriviallyDestructible<DeclAttributes>::value,
               "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
 
-#define DECL_ATTR(Name, Id, ...)                                                                     \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToAdd),     \
-              #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd");
-#include "swift/AST/DeclAttr.def"
-
-#define DECL_ATTR(Name, Id, ...)                                                                        \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToRemove) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToRemove),     \
-              #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove");
-#include "swift/AST/DeclAttr.def"
-
-#define DECL_ATTR(Name, Id, ...)                                                                     \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToAdd) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToAdd),     \
-              #Name " needs to specify either APIBreakingToAdd or APIStableToAdd");
-#include "swift/AST/DeclAttr.def"
-
-#define DECL_ATTR(Name, Id, ...)                                                                        \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToRemove) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
-              #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
+#define DECL_ATTR(Name, Id, ...) \
+  static_assert(DeclAttrKind::Id <= DeclAttrKind::Last_DeclAttr); \
+  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
+                "Attrs are BumpPtrAllocated; the destructor is never called"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::ABIBreakingToAdd | DeclAttribute::ABIStableToAdd), \
+                #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::ABIBreakingToRemove | DeclAttribute::ABIStableToRemove), \
+                #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::APIBreakingToAdd | DeclAttribute::APIStableToAdd),\
+                #Name " needs to specify either APIBreakingToAdd or APIStableToAdd"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::APIBreakingToRemove | DeclAttribute::APIStableToRemove), \
+                #Name " needs to specify either APIBreakingToRemove or APIStableToRemove"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id(DeclAttribute::InABIAttrMask), \
+                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, or UnreachableInABIAttr");
 #include "swift/AST/DeclAttr.def"
 
 #define TYPE_ATTR(_, Id)                                                       \
   static_assert(TypeAttrKind::Id <= TypeAttrKind::Last_TypeAttr);
 #include "swift/AST/TypeAttr.def"
+
+LLVM_ATTRIBUTE_USED StringRef swift::getDeclAttrKindID(DeclAttrKind kind) {
+    switch (kind) {
+#define DECL_ATTR(_, CLASS, ...)                               \
+  case DeclAttrKind::CLASS:                                    \
+    return #CLASS;
+#include "swift/AST/DeclAttr.def"
+  }
+}
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   switch (value) {
@@ -303,23 +304,6 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
-void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
-                                  const PrintOptions &options) const {
-  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  printer.printAttrName("@execution");
-  printer << "(";
-  switch (getBehavior()) {
-  case ExecutionKind::Concurrent:
-    printer << "concurrent";
-    break;
-  case ExecutionKind::Caller:
-    printer << "caller";
-    break;
-  }
-  printer << ")";
-  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-}
-
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -358,15 +342,15 @@ DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
 
 /// Returns true if this attribute can appear on the specified decl.
 bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
-  if ((getOptions(DK) & OnAnyClangDecl) && D->hasClangNode())
+  if ((getRequirements(DK) & OnAnyClangDecl) && D->hasClangNode())
     return true;
   return canAttributeAppearOnDeclKind(DK, D->getKind());
 }
 
 bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) {
-  auto Options = getOptions(DAK);
+  auto Reqs = getRequirements(DAK);
   switch (DK) {
-#define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
+#define DECL(Id, Parent) case DeclKind::Id: return (Reqs & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
   }
   llvm_unreachable("bad DeclKind");
@@ -400,6 +384,27 @@ bool DeclAttribute::canClone() const {
   }
 }
 
+// Ensure that every DeclAttribute subclass implements its own isEquivalent().
+static void checkDeclAttributeIsEquivalents() {
+#define DECL_ATTR(_,CLASS,...) \
+  bool(CLASS##Attr::*ptr##CLASS)(const CLASS##Attr *, Decl *) const = &CLASS##Attr::isEquivalent; \
+  (void)ptr##CLASS;
+#include "swift/AST/DeclAttr.def"
+}
+
+bool DeclAttribute::isEquivalent(const DeclAttribute *other, Decl *attachedTo) const {
+  (void)checkDeclAttributeIsEquivalents;
+  if (getKind() != other->getKind())
+    return false;
+  switch (getKind()) {
+#define DECL_ATTR(_,CLASS, ...) \
+  case DeclAttrKind::CLASS:\
+    return static_cast<const CLASS##Attr *>(this)->isEquivalent(\
+                static_cast<const CLASS##Attr *>(other), attachedTo);
+#include "swift/AST/DeclAttr.def"
+  }
+}
+
 const BackDeployedAttr *
 DeclAttributes::getBackDeployed(const ASTContext &ctx,
                                 bool forTargetVariant) const {
@@ -425,7 +430,7 @@ DeclAttributes::getBackDeployed(const ASTContext &ctx,
   return bestAttr;
 }
 
-void DeclAttributes::dump(const Decl *D) const {
+void DeclAttributes::print(const Decl *D) const {
   StreamPrinter P(llvm::errs());
   PrintOptions PO = PrintOptions::printDeclarations();
   print(P, PO, D);
@@ -1086,6 +1091,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+  case DeclAttrKind::OriginallyDefinedIn: {
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    auto Name = D->getDeclContext()->getParentModule()->getName().str();
+    if (Options.IsForSwiftInterface && Attr->ManglingModuleName == Name)
+      return false;
+    break;
+  }
   default:
     break;
   }
@@ -1183,8 +1195,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_originallyDefinedIn");
     Printer << "(module: ";
     auto Attr = cast<OriginallyDefinedInAttr>(this);
-    Printer << "\"" << Attr->OriginalModuleName << "\", ";
-    Printer << platformString(Attr->Platform) << " " <<
+    Printer << "\"" << Attr->ManglingModuleName;
+    ASSERT(!Attr->ManglingModuleName.empty());
+    ASSERT(!Attr->LinkerModuleName.empty());
+    if (Attr->LinkerModuleName != Attr->ManglingModuleName)
+      Printer << ";" << Attr->LinkerModuleName;
+    Printer << "\", " << platformString(Attr->Platform) << " " <<
       Attr->MovedVersion.getAsString();
     Printer << ")";
     break;
@@ -1502,8 +1518,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Nonisolated: {
     Printer.printAttrName("nonisolated");
-    if (cast<NonisolatedAttr>(this)->isUnsafe()) {
+    switch (cast<NonisolatedAttr>(this)->getModifier()) {
+    case NonIsolatedModifier::None:
+      break;
+    case NonIsolatedModifier::Unsafe:
       Printer << "(unsafe)";
+      break;
+    case NonIsolatedModifier::NonSending:
+      Printer << "(nonsending)";
+      break;
     }
     break;
   }
@@ -1550,7 +1573,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
               StringRef nameText = name.getName().getString(buffer);
               bool shouldEscape =
                   !name.getName().isSpecial() &&
-                  (escapeKeywordInContext(nameText, PrintNameContext::Normal) ||
+                  (escapeIdentifierInContext(name.getName().getBaseIdentifier(),
+                                             PrintNameContext::Normal) ||
                    nameText == "$");
               Printer << "(";
               if (shouldEscape)
@@ -1660,23 +1684,28 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       abiDecl = cast<PatternBindingDecl>(abiDecl)
                     ->getVarAtSimilarStructuralPosition(
                                       const_cast<VarDecl *>(cast<VarDecl>(D)));
-    if (abiDecl)
-      abiDecl->print(Printer, Options);
+    if (abiDecl) {
+      auto optionsCopy = Options;
+
+      // Don't print any attributes marked with `ForbiddenInABIAttr`.
+      // (Reminder: There is manual logic in `PrintAST::printAttributes()`
+      // to handle non-ABI attributes when `PrintImplicitAttrs` is set.)
+      for (auto rawAttrKind : range(0, unsigned(DeclAttrKind::Last_DeclAttr))) {
+        DeclAttrKind attrKind{rawAttrKind}; 
+        if (!(DeclAttribute::getBehaviors(attrKind)
+                & DeclAttribute::ForbiddenInABIAttr))
+          continue;
+
+        if (attrKind == DeclAttrKind::AccessControl)
+          optionsCopy.PrintAccess = false;
+        else
+          optionsCopy.ExcludeAttrList.push_back(attrKind);
+      }
+
+      abiDecl->print(Printer, optionsCopy);
+    }
     Printer << ")";
 
-    break;
-  }
-
-  case DeclAttrKind::Execution: {
-    auto *attr = cast<ExecutionAttr>(this);
-    switch (attr->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      Printer << "@execution(concurrent)";
-      break;
-    case ExecutionKind::Caller:
-      Printer << "@execution(caller)";
-      break;
-    }
     break;
   }
 
@@ -1709,14 +1738,24 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
   print(P, PrintOptions(), D);
 }
 
-uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
+uint64_t DeclAttribute::getRequirements(DeclAttrKind DK) {
   switch (DK) {
-#define DECL_ATTR(_, CLASS, OPTIONS, ...)                                      \
+#define DECL_ATTR(_, CLASS, REQUIREMENTS, BEHAVIORS, ...)                      \
   case DeclAttrKind::CLASS:                                                    \
-    return OPTIONS;
+    return REQUIREMENTS;
 #include "swift/AST/DeclAttr.def"
   }
   llvm_unreachable("bad DeclAttrKind");
+}
+
+uint64_t DeclAttribute::getBehaviors(DeclAttrKind DK) {
+  switch (DK) {
+#define DECL_ATTR(_, CLASS, REQUIREMENTS, BEHAVIORS, ...)                      \
+  case DeclAttrKind::CLASS:                                                    \
+    return BEHAVIORS;
+#include "swift/AST/DeclAttr.def"
+  }
+  return 0;
 }
 
 std::optional<Feature> DeclAttribute::getRequiredFeature(DeclAttrKind DK) {
@@ -1744,7 +1783,9 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Alignment:
     return "_alignment";
   case DeclAttrKind::CDecl:
-    return "_cdecl";
+    if (cast<CDeclAttr>(this)->Underscored)
+      return "_cdecl";
+    return "cdecl";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:
@@ -1866,10 +1907,13 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Documentation:
     return "_documentation";
   case DeclAttrKind::Nonisolated:
-    if (cast<NonisolatedAttr>(this)->isUnsafe()) {
-        return "nonisolated(unsafe)";
-    } else {
-        return "nonisolated";
+    switch (cast<NonisolatedAttr>(this)->getModifier()) {
+    case NonIsolatedModifier::None:
+      return "nonisolated";
+    case NonIsolatedModifier::Unsafe:
+      return "nonisolated(unsafe)";
+    case NonIsolatedModifier::NonSending:
+      return "nonisolated(nonsending)";
     }
   case DeclAttrKind::MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
@@ -1891,15 +1935,6 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DeclAttrKind::Lifetime:
     return "lifetime";
-  case DeclAttrKind::Execution: {
-    switch (cast<ExecutionAttr>(this)->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      return "execution(concurrent)";
-    case ExecutionKind::Caller:
-      return "execution(caller)";
-    }
-    llvm_unreachable("Invalid execution kind");
-  }
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2107,6 +2142,26 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
                            ErrorType::get(ctx));
 }
 
+static bool eqTypes(Type first, Type second) {
+  if (first.isNull() || second.isNull())
+    return false;
+  return first->getCanonicalType() == second->getCanonicalType();
+}
+
+bool TypeEraserAttr::isEquivalent(const TypeEraserAttr *other,
+                                  Decl *attachedTo) const {
+  // Only makes sense when attached to a protocol.
+  auto proto = dyn_cast<ProtocolDecl>(attachedTo);
+  if (!proto)
+    return true;
+
+  Type thisType = getResolvedType(proto),
+       otherType = other->getResolvedType(proto);
+  if (thisType.isNull() || otherType.isNull())
+    return false;
+  return thisType->getCanonicalType() == otherType->getCanonicalType();
+}
+
 Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {
   auto &ctx = sd->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -2125,6 +2180,34 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                            ErrorType::get(ctx));
 }
 
+bool RawLayoutAttr::isEquivalent(const RawLayoutAttr *other,
+                                 Decl *attachedTo) const {
+  if (shouldMoveAsLikeType() != other->shouldMoveAsLikeType())
+    return false;
+
+  if (auto thisSizeAndAlignment = getSizeAndAlignment())
+    return thisSizeAndAlignment == other->getSizeAndAlignment();
+
+  auto SD = dyn_cast<StructDecl>(attachedTo);
+  if (!SD)
+    return true;
+
+  if (auto thisScalarLikeType = getResolvedScalarLikeType(SD)) {
+    auto otherScalarLikeType = other->getResolvedScalarLikeType(SD);
+    return otherScalarLikeType && eqTypes(*thisScalarLikeType,
+                                          *otherScalarLikeType);
+  }
+
+  if (auto thisArrayLikeTypes = getResolvedArrayLikeTypeAndCount(SD)) {
+    auto otherArrayLikeTypes = other->getResolvedArrayLikeTypeAndCount(SD);
+    return otherArrayLikeTypes
+            && eqTypes(thisArrayLikeTypes->first, otherArrayLikeTypes->first)
+            && eqTypes(thisArrayLikeTypes->second, otherArrayLikeTypes->second);
+  }
+
+  llvm_unreachable("unknown variant of RawLayoutAttr");
+}
+
 AvailableAttr::AvailableAttr(
     SourceLoc AtLoc, SourceRange Range,
     AvailabilityDomainOrIdentifier DomainOrIdentifier, SourceLoc DomainLoc,
@@ -2141,8 +2224,9 @@ AvailableAttr::AvailableAttr(
       ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
   Bits.AvailableAttr.IsSPI = IsSPI;
-  Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr = false;
-  Bits.AvailableAttr.IsFollowedByWildcard = false;
+  Bits.AvailableAttr.IsGroupMember = false;
+  Bits.AvailableAttr.IsGroupTerminator = false;
+  Bits.AvailableAttr.IsGroupedWithWildcard = false;
 }
 
 AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
@@ -2204,6 +2288,19 @@ AvailableAttr *AvailableAttr::createPlatformVersioned(
       /*SPI=*/false);
 }
 
+AvailableAttr *AvailableAttr::createUnavailableInEmbedded(ASTContext &C,
+                                                          SourceLoc AtLoc,
+                                                          SourceRange Range) {
+  return new (C) AvailableAttr(
+      AtLoc, Range, AvailabilityDomain::forEmbedded(), SourceLoc(),
+      AvailableAttr::Kind::Unavailable, "unavailable in embedded Swift",
+      /*Rename=*/StringRef(),
+      /*Introduced=*/llvm::VersionTuple(), /*IntroducedRange=*/{},
+      /*Deprecated=*/llvm::VersionTuple(), /*DeprecatedRange=*/{},
+      /*Obsoleted=*/llvm::VersionTuple(), /*ObsoletedRange=*/{},
+      /*Implicit=*/false, /*IsSPI=*/false);
+}
+
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
                                         bool forTargetVariant) const {
   return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);
@@ -2218,12 +2315,52 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
 }
 
+bool AvailableAttr::isEquivalent(const AvailableAttr *other,
+                                 Decl *attachedTo) const {
+  return getRawIntroduced() == other->getRawIntroduced()
+          && getRawDeprecated() == other->getRawDeprecated()
+          && getRawObsoleted() == other->getRawObsoleted()
+          && getMessage() == other->getMessage()
+          && getRename() == other->getRename()
+          && isSPI() == other->isSPI()
+          && getKind() == other->getKind()
+          && attachedTo->getSemanticAvailableAttr(this)->getDomain()
+                ==  attachedTo->getSemanticAvailableAttr(other)->getDomain();
+}
+
+static StringRef getManglingModuleName(StringRef OriginalModuleName) {
+  auto index = OriginalModuleName.find(";");
+  return index == StringRef::npos
+      ? OriginalModuleName
+      : OriginalModuleName.slice(0, index);
+}
+
+static StringRef getLinkerModuleName(StringRef OriginalModuleName) {
+  auto index = OriginalModuleName.find(";");
+  return index == StringRef::npos
+      ? OriginalModuleName
+      : OriginalModuleName.slice(index + 1, OriginalModuleName.size());
+}
+
+OriginallyDefinedInAttr::OriginallyDefinedInAttr(
+    SourceLoc AtLoc, SourceRange Range,
+    StringRef OriginalModuleName,
+    PlatformKind Platform,
+    const llvm::VersionTuple MovedVersion, bool Implicit)
+  : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
+                  Implicit),
+    ManglingModuleName(getManglingModuleName(OriginalModuleName)),
+    LinkerModuleName(getLinkerModuleName(OriginalModuleName)),
+    Platform(Platform),
+    MovedVersion(MovedVersion) {}
+
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
   Result.Version = MovedVersion;
-  Result.ModuleName = OriginalModuleName;
+  Result.ManglingModuleName = ManglingModuleName;
+  Result.LinkerModuleName = LinkerModuleName;
   if (isPlatformActive(Platform, ctx.LangOpts, /*TargetVariant*/false)) {
     return Result;
   }
@@ -2243,7 +2380,7 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
                                                         bool implicit) const {
   return new (C) OriginallyDefinedInAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
-      OriginalModuleName, Platform, MovedVersion, implicit);
+      ManglingModuleName, LinkerModuleName, Platform, MovedVersion, implicit);
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {
@@ -2283,17 +2420,6 @@ bool AvailableAttr::isNoAsync() const {
   }
 
   llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
-}
-
-llvm::VersionTuple
-SemanticAvailableAttr::getActiveVersion(const ASTContext &ctx) const {
-  if (isSwiftLanguageModeSpecific()) {
-    return ctx.LangOpts.EffectiveLanguageVersion;
-  } else if (isPackageDescriptionVersionSpecific()) {
-    return ctx.LangOpts.PackageDescriptionVersion;
-  } else {
-    return ctx.LangOpts.getMinPlatformVersion();
-  }
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
@@ -2404,6 +2530,69 @@ GenericSignature SpecializeAttr::getSpecializedSignature(
                            nullptr);
 }
 
+/// Checks whether \p first and \p second have the same elements according to
+/// \p eq , ignoring the order those elements are in but considering the number
+/// of repetitions.
+template<typename Element, typename Eq>
+bool sameElements(ArrayRef<Element> first, ArrayRef<Element> second, Eq eq) {
+  if (first.size() != second.size())
+    return false;
+
+  llvm::SmallSet<unsigned, 8> claimedSecondIndices;
+
+  for (auto firstElem : first) {
+    bool found = false;
+    for (auto i : indices(second)) {
+      if (!eq(firstElem, second[i]) || claimedSecondIndices.count(i))
+        continue;
+
+      found = true;
+      claimedSecondIndices.insert(i);
+      break;
+    }
+
+    if (!found)
+      return false;
+  }
+
+  return true;
+}
+
+/// Checks whether \p first and \p second have the same elements, ignoring the
+/// order those elements are in but considering the number of repetitions.
+template<typename Element>
+bool sameElements(ArrayRef<Element> first, ArrayRef<Element> second) {
+  return sameElements(first, second, std::equal_to<Element>());
+}
+
+bool SpecializeAttr::isEquivalent(const SpecializeAttr *other,
+                                  Decl *attachedTo) const {
+  if (isExported() != other->isExported() ||
+      getSpecializationKind() != other->getSpecializationKind() ||
+      getTargetFunctionName() != other->getTargetFunctionName() ||
+      specializedSignature.getCanonicalSignature() !=
+        other->specializedSignature.getCanonicalSignature())
+    return false;
+
+  if (!sameElements(getSPIGroups(), other->getSPIGroups()))
+    return false;
+
+  SmallVector<CanType, 8> thisTypeErasedParams, otherTypeErasedParams;
+  for (auto ty : getTypeErasedParams())
+    thisTypeErasedParams.push_back(ty->getCanonicalType());
+  for (auto ty : other->getTypeErasedParams())
+    otherTypeErasedParams.push_back(ty->getCanonicalType());
+
+  if (!sameElements(ArrayRef(thisTypeErasedParams),
+                    ArrayRef(otherTypeErasedParams)))
+    return false;
+
+  return sameElements(getAvailableAttrs(), other->getAvailableAttrs(),
+                      [=](AvailableAttr *thisAttr, AvailableAttr *otherAttr) {
+    return thisAttr->isEquivalent(otherAttr, attachedTo);
+  });
+}
+
 SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
                                            ArrayRef<Identifier> spiGroups)
     : DeclAttribute(DeclAttrKind::SPIAccessControl, atLoc, range,
@@ -2430,6 +2619,11 @@ SPIAccessControlAttr *SPIAccessControlAttr::clone(ASTContext &C,
       getSPIGroups());
   attr->setImplicit(implicit);
   return attr;
+}
+
+bool SPIAccessControlAttr::isEquivalent(const SPIAccessControlAttr *other,
+                                        Decl *attachedTo) const {
+  return sameElements(getSPIGroups(), other->getSPIGroups());
 }
 
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
@@ -2668,11 +2862,18 @@ StorageRestrictionsAttr::create(
                                            /*implicit=*/false);
 }
 
-ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeRepr *TyR, DeclName MemberName,
-                               DeclNameLoc MemberNameLoc)
+bool StorageRestrictionsAttr::
+isEquivalent(const StorageRestrictionsAttr *other, Decl *attachedTo) const {
+  return sameElements(getAccessesNames(), other->getAccessesNames())
+           && sameElements(getInitializesNames(), other->getInitializesNames());
+}
+
+ImplementsAttr::
+ImplementsAttr(SourceLoc atLoc, SourceRange range,
+               llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC,
+               DeclName MemberName, DeclNameLoc MemberNameLoc)
     : DeclAttribute(DeclAttrKind::Implements, atLoc, range, /*Implicit=*/false),
-      TyR(TyR), MemberName(MemberName), MemberNameLoc(MemberNameLoc) {}
+      TyROrDC(TyROrDC), MemberName(MemberName), MemberNameLoc(MemberNameLoc) {}
 
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
@@ -2689,9 +2890,8 @@ ImplementsAttr *ImplementsAttr::create(DeclContext *DC,
                                        DeclName MemberName) {
   auto &ctx = DC->getASTContext();
   void *mem = ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
-  auto *attr = new (mem) ImplementsAttr(
-      SourceLoc(), SourceRange(), nullptr,
-      MemberName, DeclNameLoc());
+  auto *attr = new (mem) ImplementsAttr(SourceLoc(), SourceRange(), DC,
+                                        MemberName, DeclNameLoc());
   ctx.evaluator.cacheOutput(ImplementsAttrProtocolRequest{attr, DC},
                             std::move(Proto));
   return attr;
@@ -2708,6 +2908,13 @@ ImplementsAttr::getCachedProtocol(DeclContext *dc) const {
   if (dc->getASTContext().evaluator.hasCachedResult(request))
     return getProtocol(dc);
   return std::nullopt;
+}
+
+bool ImplementsAttr::isEquivalent(const ImplementsAttr *other,
+                                  Decl *attachedTo) const {
+  auto DC = attachedTo->getDeclContext();
+  return getMemberName() == other->getMemberName()
+          && getProtocol(DC) == other->getProtocol(DC);
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
@@ -2776,6 +2983,14 @@ bool CustomAttr::isArgUnsafe() const {
   }
 
   return isArgUnsafeBit;
+}
+
+bool CustomAttr::isEquivalent(const CustomAttr *other, Decl *attachedTo) const {
+  // For the sake of both @abi checking and implementability, we're going to
+  // ignore expressions in the arguments and initializer.
+
+  return isArgUnsafe() == other->isArgUnsafe() && eqTypes(getType(),
+                                                          other->getType());
 }
 
 MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
@@ -2905,10 +3120,25 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
       AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
 }
 
+bool AllowFeatureSuppressionAttr::
+isEquivalent(const AllowFeatureSuppressionAttr *other, Decl *attachedTo) const {
+  if (getInverted() != other->getInverted())
+    return false;
+
+  return sameElements(getSuppressedFeatures(), other->getSuppressedFeatures());
+}
+
 LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
                                    LifetimeEntry *entry) {
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
+}
+
+bool LifetimeAttr::isEquivalent(const LifetimeAttr *other,
+                                Decl *attachedTo) const {
+  // FIXME: This is kind of cheesy.
+  return getLifetimeEntry()->getString()
+      == other->getLifetimeEntry()->getString();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

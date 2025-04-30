@@ -10,7 +10,7 @@ internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escap
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(source)
+@lifetime(copy source)
 internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   _ dependent: consuming T, copying source: borrowing U) -> T {
   dependent
@@ -43,7 +43,7 @@ public struct BufferView : ~Escapable {
     self = _overrideLifetime(bv, borrowing: a)
   }
   @inlinable
-  @lifetime(a)
+  @lifetime(copy a)
   internal init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) {
     let bv = BufferView(ptr, a._count)
     self = _overrideLifetime(bv, copying: a)
@@ -51,7 +51,7 @@ public struct BufferView : ~Escapable {
 }
 
 @inlinable
-@lifetime(x)
+@lifetime(copy x)
 public func derive(_ x: consuming BufferView) -> BufferView {
   let pointer = x._ptr
   let bv = BufferView(pointer, x._count)
@@ -62,7 +62,7 @@ public func derive(_ x: consuming BufferView) -> BufferView {
 public func use(_ x: consuming BufferView) {}
 
 @inlinable
-@lifetime(view)
+@lifetime(copy view)
 public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
   let pointer = view._ptr
   let bv = BufferView(pointer, view._count)
@@ -70,7 +70,7 @@ public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
 }
 
 @inlinable
-@lifetime(this, that)
+@lifetime(copy this, copy that)
 public func deriveThisOrThat(_ this: consuming BufferView, _ that: consuming BufferView) -> BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(this._ptr, this._count)

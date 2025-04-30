@@ -92,7 +92,6 @@ namespace clang {
 namespace swift {
   class GenericSignature;
   class AssociatedConformance;
-  class AssociatedType;
   class ASTContext;
   class BaseConformance;
   class BraceStmt;
@@ -112,6 +111,7 @@ namespace swift {
   class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
+  class SILDefaultOverrideTable;
   class SILProperty;
   class SILType;
   class SILVTable;
@@ -464,6 +464,8 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  void ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot);
+
   llvm::SmallVector<std::pair<CanType, TypeMetadataCanonicality>, 4>
   metadataPrespecializationsForType(NominalTypeDecl *type) {
     return MetadataPrespecializationsForGenericTypes.lookup(type);
@@ -789,6 +791,7 @@ public:
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
+  llvm::StructType *MethodDefaultOverrideDescriptorStructTy; /// %swift.method_default_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
@@ -829,6 +832,7 @@ public:
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorUnownedPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskNameTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
@@ -842,10 +846,24 @@ public:
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::PointerType *CoroFunctionPointerPtrTy;
+  llvm::PointerType *CoroAllocationTy;
+  llvm::FunctionType *CoroAllocateFnTy;
+  llvm::FunctionType *CoroDeallocateFnTy;
+  llvm::IntegerType *CoroAllocatorFlagsTy;
+  llvm::StructType *CoroAllocatorTy;
+  llvm::PointerType *CoroAllocatorPtrTy;
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
+
+  llvm::StructType *
+  createTransientStructType(StringRef name,
+                            std::initializer_list<llvm::Type *> types,
+                            bool packed = false);
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -867,6 +885,7 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+  llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -889,6 +908,7 @@ public:
     return getPointerAlignment();
   }
   Alignment getAsyncContextAlignment() const;
+  Alignment getCoroStaticFrameAlignment() const;
 
   /// Return the offset, relative to the address point, of the start of the
   /// type-specific members of an enum metadata.
@@ -1102,6 +1122,7 @@ public:
   clang::CodeGen::CodeGenModule &getClangCGM() const;
   
   CanType getRuntimeReifiedType(CanType type);
+  Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
   SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
   std::pair<CanType, ProtocolConformanceRef>
@@ -1163,6 +1184,9 @@ public:
                                         bool willBeRelativelyAddressed = false,
                                         bool useOSLogSection = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
+  llvm::Constant *
+  getAddrOfGlobalIdentifierString(StringRef utf8,
+                                  bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
   std::string getObjCSelectorName(SILDeclRef method);
@@ -1216,14 +1240,15 @@ public:
                                            const PointerAuthEntity &entity,
                                            llvm::Constant *storageAddress);
 
-  llvm::Constant *getOrCreateHelperFunction(StringRef name,
-                                            llvm::Type *resultType,
-                                            ArrayRef<llvm::Type*> paramTypes,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline = false,
-                        bool forPrologue = false,
-                        bool isPerformanceConstraint = false,
-                        IRLinkage *optionalLinkage = nullptr);
+  llvm::Constant *getOrCreateHelperFunction(
+      StringRef name, llvm::Type *resultType, ArrayRef<llvm::Type *> paramTypes,
+      llvm::function_ref<void(IRGenFunction &IGF)> generate,
+      bool setIsNoInline = false, bool forPrologue = false,
+      bool isPerformanceConstraint = false,
+      IRLinkage *optionalLinkage = nullptr,
+      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt,
+      std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+          transformAttrs = std::nullopt);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1277,6 +1302,7 @@ private:
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
+  llvm::DenseMap<LinkEntity, llvm::Constant *> IndirectCoroFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
@@ -1510,6 +1536,8 @@ public:
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
+  llvm::Constant *
+  getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1643,6 +1671,15 @@ public:
   llvm::Constant *defineAsyncFunctionPointer(LinkEntity entity,
                                              ConstantInit init);
   SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
+
+  llvm::Constant *getAddrOfCoroFunctionPointer(LinkEntity entity);
+  llvm::Constant *getAddrOfCoroFunctionPointer(SILFunction *function);
+  llvm::Constant *defineCoroFunctionPointer(LinkEntity entity,
+                                            ConstantInit init);
+  SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
+
+  llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
@@ -1916,6 +1953,8 @@ public:
 
   /// Add the swiftself attribute.
   void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
+
+  void addSwiftCoroAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   void addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                       unsigned argIndex);

@@ -5,7 +5,9 @@
 /// var types = SwiftTypePair(typeOf: expr, type2: SwiftType<Int>.self)
 /// types.assertTypesAreEqual()
 /// ```
-struct SwiftType<T> {}
+struct SwiftType<T> {
+  init(_: T) {}
+}
 struct SwiftTypePair<T1, T2> {
   init(typeOf: T1, type2: SwiftType<T2>.Type) {}
 
@@ -165,4 +167,29 @@ do {
   // of the error type here for Self.A, despite the broken conformance?
   let exist: any CompositionBrokenClassConformance_b & BadConformanceClass
   exist.method(false) // expected-error {{type of expression is ambiguous without a type annotation}}
+}
+
+// https://github.com/swiftlang/swift/issues/65533
+do {
+  protocol P<A> {
+    associatedtype A
+
+    func item() -> A
+  }
+
+  class Class {}
+
+  func test<GP, ClassGP: Class>(
+    existGP: any P<GP>,
+    existClassGP: any P<ClassGP>
+  ) {
+    do {
+      let result = SwiftType(existGP.item())
+      let _: SwiftType<GP> = result
+    }
+    do {
+      let result = SwiftType(existClassGP.item())
+      let _: SwiftType<ClassGP> = result
+    }
+  }
 }

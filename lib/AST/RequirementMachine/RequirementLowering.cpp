@@ -300,7 +300,7 @@ static void desugarSuperclassRequirement(
 
   SmallVector<Requirement, 2> subReqs;
 
-  switch (req.checkRequirement(subReqs)) {
+  switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
     break;
@@ -333,7 +333,7 @@ static void desugarLayoutRequirement(
 
   SmallVector<Requirement, 2> subReqs;
 
-  switch (req.checkRequirement(subReqs)) {
+  switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
     break;
@@ -665,7 +665,7 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto conformance = lookupConformance(firstType, differentiableProtocol);
-          auto secondType = conformance.getTypeWitness(firstType, assocType);
+          auto secondType = conformance.getTypeWitness(assocType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});
@@ -1267,9 +1267,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           inheritedType->getDeclContext()->getSelfNominalTypeDecl();
       ctx.Diags.diagnose(assocTypeDecl,
                          diag::associated_type_override_typealias,
-                         assocTypeDecl->getName(),
-                         inheritedOwningDecl->getDescriptiveKind(),
-                         inheritedOwningDecl->getDeclaredInterfaceType());
+                         assocTypeDecl->getName(), inheritedOwningDecl);
 
       recordInheritedTypeRequirement(assocTypeDecl, inheritedType);
     }

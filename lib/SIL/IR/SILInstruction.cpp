@@ -301,6 +301,14 @@ Operand *BeginBorrowInst::getSingleNonEndingUse() const {
   return singleUse;
 }
 
+bool BorrowedFromInst::isReborrow() const {
+  // The forwarded operand is either a phi or undef.
+  if (auto *phi = dyn_cast<SILPhiArgument>(getBorrowedValue())) {
+    return phi->isReborrow();
+  }
+  return false;
+}
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {
@@ -862,6 +870,10 @@ namespace {
        return true;
     }
 
+    bool visitMarkDependenceAddrInst(const MarkDependenceAddrInst *RHS) {
+       return true;
+    }
+
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
       return true;
     }
@@ -1084,8 +1096,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
-  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
-    if (mdi->getBase()->getType().isAddress())
+  if (auto mdi = MarkDependenceInstruction(this)) {
+    if (mdi.getBase()->getType().isAddress())
       return MemoryBehavior::MayRead;
     return MemoryBehavior::None;
   }
@@ -1440,11 +1452,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
     return !PA->isOnStack();
   }
-  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
-  // borrow scope. We currently assume that a set of dominated scope-ending uses
-  // can be found.
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
   if (auto *MD = dyn_cast<MarkDependenceInst>(this)) {
-    return !MD->isNonEscaping();
+    return !MD->isNonEscaping() || MD->getType().isAddress();
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
@@ -2014,10 +2026,13 @@ visitRecursivelyLifetimeEndingUses(
 // the dependent value.
 bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitScopeEnd,
-  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
   assert(getType().isObject() && "lifetime ends only exist for values");
+  assert(getOwnershipKind() == OwnershipKind::Owned
+         && getType().isEscapable(*getFunction())
+         && "only correct for owned escapable values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {

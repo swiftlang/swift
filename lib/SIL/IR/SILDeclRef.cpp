@@ -451,6 +451,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   using Kind = SILDeclRef::Kind;
 
   auto *d = constant.getDecl();
+  ASSERT(ABIRoleInfo(d).providesAPI() && "getLinkageLimit() for ABI decl?");
 
   // Back deployment thunks and fallbacks are emitted into the client.
   if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
@@ -882,6 +883,9 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
 
   auto *d = getDecl();
 
+  ASSERT(ABIRoleInfo(d).providesAPI()
+            && "should not get serialization info from ABI-only decl");
+
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
   if (isDefaultArgGenerator() || (isPropertyWrapperBackingInitializer() &&
@@ -1020,6 +1024,9 @@ bool SILDeclRef::isNoinline() const {
     return false;
 
   auto *decl = getDecl();
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
   if (auto *attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Never)
       return true;
@@ -1050,6 +1057,9 @@ bool SILDeclRef::isAlwaysInline() const {
     return false;
   }
 
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
   if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Always)
       return true;
@@ -1069,6 +1079,10 @@ bool SILDeclRef::isBackDeployed() const {
     return false;
 
   auto *decl = getDecl();
+
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get backDeployed from ABI-only decl");
+
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
     return afd->isBackDeployed(getASTContext());
 
@@ -1197,6 +1211,9 @@ static std::string mangleClangDecl(Decl *decl, bool isForeign) {
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  ASSERT(!hasDecl() || ABIRoleInfo(getDecl()).providesAPI()
+            && "SILDeclRef mangling ABI decl directly?");
+
   using namespace Mangle;
   ASTMangler mangler(getASTContext());
 
@@ -1841,4 +1858,18 @@ bool SILDeclRef::hasAsync() const {
     return false;
   }
   return getAbstractClosureExpr()->isBodyAsync();
+}
+
+bool SILDeclRef::isCalleeAllocatedCoroutine() const {
+  if (!hasDecl())
+    return false;
+
+  auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+  if (!accessor)
+    return false;
+
+  if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+    return false;
+
+  return getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2;
 }

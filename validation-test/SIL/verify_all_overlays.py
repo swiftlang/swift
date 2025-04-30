@@ -5,7 +5,6 @@
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \
 # RUN:       %xcode-extra-frameworks-search-path
 
-# REQUIRES: rdar143050566
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
@@ -44,6 +43,9 @@ for module_file in os.listdir(sdk_overlay_dir):
                                          "public", "RuntimeModule", "modules"),
                       "-I", os.path.join(source_dir, "include"),
                       "--enable-experimental-cxx-interop"]
+        # TODO: Fix SIL verification error (probably due to a deserialization bug
+        # in sil-opt) rdar://143050566
+        continue
     # _Concurrency needs its own additional modules in the module path
     if module_name == "_Concurrency":
         extra_args = ["-I", os.path.join(source_dir, "stdlib",

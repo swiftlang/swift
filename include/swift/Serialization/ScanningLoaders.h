@@ -39,8 +39,10 @@ private:
 
   InterfaceSubContextDelegate &astDelegate;
 
-  /// Location where pre-built moduels are to be built into.
+  /// Location where pre-built modules are to be built into.
   std::string moduleOutputPath;
+  /// Location where pre-built SDK modules are to be built into.
+  std::string sdkModuleOutputPath;
 
 public:
   std::optional<ModuleDependencyInfo> dependencies;
@@ -48,11 +50,13 @@ public:
   SwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
                      Identifier moduleName,
                      InterfaceSubContextDelegate &astDelegate,
-                     StringRef moduleOutputPath, ScannerKind kind = MDS_plain)
+                     StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
+                     ScannerKind kind = MDS_plain)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         kind(kind), moduleName(moduleName), astDelegate(astDelegate),
-        moduleOutputPath(moduleOutputPath) {}
+        moduleOutputPath(moduleOutputPath),
+        sdkModuleOutputPath(sdkModuleOutputPath) {}
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -93,9 +97,11 @@ public:
                                 Identifier moduleName,
                                 StringRef PlaceholderDependencyModuleMap,
                                 InterfaceSubContextDelegate &astDelegate,
-                                StringRef moduleOutputPath)
+                                StringRef moduleOutputPath,
+                                StringRef sdkModuleOutputPath)
       : SwiftModuleScanner(ctx, LoadMode, moduleName, astDelegate,
-                           moduleOutputPath, MDS_placeholder) {
+                           moduleOutputPath, sdkModuleOutputPath,
+                           MDS_placeholder) {
 
     // FIXME: Find a better place for this map to live, to avoid
     // doing the parsing on every module.

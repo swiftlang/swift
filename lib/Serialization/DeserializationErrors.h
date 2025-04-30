@@ -677,6 +677,54 @@ public:
   }
 };
 
+// Cross-reference to a conformance was not found where it was expected.
+class ConformanceXRefError : public llvm::ErrorInfo<ConformanceXRefError,
+                                                    DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  DeclName protoName;
+  const ModuleDecl *expectedModule;
+
+public:
+  ConformanceXRefError(Identifier name, Identifier protoName,
+                       const ModuleDecl *expectedModule):
+                     protoName(protoName), expectedModule(expectedModule) {
+    this->name = name;
+  }
+
+  void diagnose(const ModuleFile *MF,
+                DiagnosticBehavior limit = DiagnosticBehavior::Fatal) const;
+
+  void log(raw_ostream &OS) const override {
+    OS << "Conformance of '" << name << "' to '" << protoName
+       << "' not found in module '" << expectedModule->getName() << "'";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+class InavalidAvailabilityDomainError
+    : public llvm::ErrorInfo<InavalidAvailabilityDomainError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  InavalidAvailabilityDomainError() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Invalid availability domain";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;
   const ModuleFile &MF;

@@ -185,6 +185,10 @@ private:
                     SourceRange SrcRange, const AvailabilityContext Info);
 
 public:
+  /// Constructs the root availability scope for the given file and builds out
+  /// the scope tree for the top level contents of the file.
+  static AvailabilityScope *getOrBuildForSourceFile(SourceFile &SF);
+
   /// Create the root availability scope for the given SourceFile.
   static AvailabilityScope *createForSourceFile(SourceFile *SF,
                                                 const AvailabilityContext Info);
@@ -264,10 +268,8 @@ public:
   /// condition that introduced the availability scope for a given platform
   /// version; if zero or multiple such responsible attributes or statements
   /// exist, returns an invalid SourceRange.
-  SourceRange
-  getAvailabilityConditionVersionSourceRange(
-      PlatformKind Platform,
-      const llvm::VersionTuple &Version) const;
+  SourceRange getAvailabilityConditionVersionSourceRange(
+      AvailabilityDomain Domain, const llvm::VersionTuple &Version) const;
 
   /// Returns the availability version range that was explicitly written in
   /// source, if applicable. Otherwise, returns null.

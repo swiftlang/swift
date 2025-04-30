@@ -167,12 +167,13 @@ public:
           bridgingHeaderBuildCmd.push_back(clangDep->moduleCacheKey);
         }
       }
+      addDeterministicCheckFlags(bridgingHeaderBuildCmd);
     }
 
     SwiftInterfaceModuleOutputPathResolution::ResultTy swiftInterfaceOutputPath;
     if (resolvingDepInfo.isSwiftInterfaceModule()) {
       pruneUnusedVFSOverlay(swiftInterfaceOutputPath);
-      updateSwiftInterfaceModuleOutputPath(swiftInterfaceOutputPath);
+      addSwiftInterfaceModuleOutputPathToCommandLine(swiftInterfaceOutputPath);
     }
 
     // Update the dependency in the cache with the modified command-line.
@@ -183,6 +184,7 @@ public:
             remapPathsFromCommandLine(commandline, [&](StringRef path) {
               return cache.getScanService().remapPath(path);
             });
+      addDeterministicCheckFlags(commandline);
     }
 
     auto dependencyInfoCopy = resolvingDepInfo;
@@ -212,9 +214,23 @@ private:
       depInfo.addMacroDependency(macro.first(), macro.second.LibraryPath,
                                  macro.second.ExecutablePath);
 
+    bool needPathRemapping = instance.getInvocation()
+                                 .getSearchPathOptions()
+                                 .ResolvedPluginVerification &&
+                             cache.getScanService().hasPathMapping();
+    auto mapPath = [&](StringRef path) {
+      if (!needPathRemapping)
+        return path.str();
+
+      return cache.getScanService().remapPath(path);
+    };
+    if (needPathRemapping)
+      commandline.push_back("-resolved-plugin-verification");
+
     for (auto &macro : depInfo.getMacroDependencies()) {
-      std::string arg = macro.second.LibraryPath + "#" +
-                        macro.second.ExecutablePath + "#" + macro.first;
+      std::string arg = mapPath(macro.second.LibraryPath) + "#" +
+                        mapPath(macro.second.ExecutablePath) + "#" +
+                        macro.first;
       commandline.push_back("-load-resolved-plugin");
       commandline.push_back(arg);
     }
@@ -455,19 +471,12 @@ private:
     return;
   }
 
-  void updateSwiftInterfaceModuleOutputPath(
+  void addSwiftInterfaceModuleOutputPathToCommandLine(
       const SwiftInterfaceModuleOutputPathResolution::ResultTy &outputPath) {
     StringRef outputName = outputPath.outputPath.str();
 
-    bool isOutputPath = false;
-    for (auto &A : commandline) {
-      if (isOutputPath) {
-        A = outputName.str();
-        break;
-      } else if (A == "-o") {
-        isOutputPath = true;
-      }
-    }
+    commandline.push_back("-o");
+    commandline.push_back(outputName.str());
 
     return;
   }
@@ -485,9 +494,10 @@ private:
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(sourceDep->macroDependencies, [this](const auto &entry) {
-        tracker->trackFile(entry.second.LibraryPath);
-      });
+      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
+                     [this](const auto &entry) {
+                       tracker->trackFile(entry.second.LibraryPath);
+                     });
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return root.takeError();
@@ -501,7 +511,7 @@ private:
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(textualDep->macroDependencies,
+      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
                      [this](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });
@@ -588,6 +598,17 @@ private:
             instance.getActionCache().put(CAS.getID(**Ref), CAS.getID(*Result)))
       return E;
     return llvm::Error::success();
+  }
+
+  void addDeterministicCheckFlags(std::vector<std::string> &cmd) {
+    // Propagate the deterministic check to explicit built module command.
+    if (!instance.getInvocation().getFrontendOptions().DeterministicCheck)
+      return;
+    cmd.push_back("-enable-deterministic-check");
+    cmd.push_back("-always-compile-output-files");
+    // disable cache replay because that defeat the purpose of the check.
+    if (instance.getInvocation().getCASOptions().EnableCaching)
+      cmd.push_back("-cache-disable-replay");
   }
 
 private:
@@ -1162,6 +1183,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
   ModuleDependenciesCache cache(
       *service, CI.getMainModule()->getNameStr().str(),
       CI.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      CI.getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       CI.getInvocation().getModuleScanningHash());
 
   if (service->setupCachingDependencyScanningService(CI))
@@ -1197,6 +1219,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   ModuleDependenciesCache cache(
       *singleUseService, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      instance.getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
 
   // Execute import prescan, and write JSON output to the output stream

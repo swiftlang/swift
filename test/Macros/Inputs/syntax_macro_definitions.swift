@@ -1628,6 +1628,20 @@ public struct FooExtensionMacro: ExtensionMacro {
   }
 }
 
+public struct BadExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    // Note this is purposefully not using `providingExtensionsOf`.
+    let unqualifiedName = declaration.as(StructDeclSyntax.self)!.name.trimmed
+    return [try ExtensionDeclSyntax("extension \(unqualifiedName) {}")]
+  }
+}
+
 public struct ConformanceViaExtensionMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2116,6 +2130,20 @@ public struct VarValueMacro: DeclarationMacro, PeerMacro {
   ) throws -> [DeclSyntax] {
     return [
       "var value: Int { 1 }"
+    ]
+  }
+}
+
+struct StoredPropertyMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let argument = node.arguments.first?.expression else {
+      fatalError("boom")
+    }
+    return [
+      "var storedProperty = \(argument)"
     ]
   }
 }
@@ -2652,6 +2680,16 @@ public struct BodyMacroWithControlFlow: BodyMacro {
       "guard .random() else { return }",
       "_ = try throwingFn()"
     ]
+  }
+}
+
+struct ThrowCancellationMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    ["throw CancellationError()"]
   }
 }
 

@@ -119,8 +119,10 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *bi) {
     if (auto operand = BorrowingOperand(use)) {
       if (operand.isReborrow())
         return nullptr;
-      auto bv = operand.getBorrowIntroducingUserResult();
-      accumulatedBorrowedValues.push_back(bv);
+      auto result = operand.getBorrowIntroducingUserResult();
+      if (auto bv = BorrowedValue(result)) {
+        accumulatedBorrowedValues.push_back(bv);
+      }
       continue;
     }
 

@@ -94,6 +94,11 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
 
+#include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/LLVMRemarkStreamer.h"
+#include "llvm/Support/ToolOutputFile.h"
+
 #include <thread>
 
 #if HAVE_UNISTD_H
@@ -275,7 +280,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PTO.LoopInterleaving = true;
     PTO.LoopVectorization = true;
     PTO.SLPVectorization = true;
-    PTO.MergeFunctions = true;
+    PTO.MergeFunctions = !Opts.DisableLLVMMergeFunctions;
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
     level = llvm::OptimizationLevel::Os;
@@ -294,7 +299,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   PrintPassOpts.Indent = DebugPassStructure;
   PrintPassOpts.SkipAnalyses = DebugPassStructure;
   StandardInstrumentations SI(Module->getContext(), DebugPassStructure,
-                              /*VerifyEach*/ false, PrintPassOpts);
+                              Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
   PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
@@ -388,7 +393,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                         allowlistFiles, ignorelistFiles));
     });
   }
-  if (RunSwiftSpecificLLVMOptzns) {
+
+  if (RunSwiftSpecificLLVMOptzns && !Opts.DisableLLVMMergeFunctions) {
     PB.registerOptimizerLastEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel Level) {
           if (Level != OptimizationLevel::O0) {
@@ -597,6 +603,38 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
   }
 }
 
+namespace {
+  class SwiftDiagnosticHandler final : public llvm::DiagnosticHandler {
+
+  public:
+    SwiftDiagnosticHandler(const IRGenOptions &Opts) : IRGenOpts(Opts) {}
+
+    bool handleDiagnostics(const llvm::DiagnosticInfo &DI) override {
+      return true;
+    }
+
+    bool isAnalysisRemarkEnabled(StringRef PassName) const override {
+      return IRGenOpts.AnnotateCondFailMessage &&
+        PassName == "annotation-remarks";
+    }
+    bool isMissedOptRemarkEnabled(StringRef PassName) const override {
+      return IRGenOpts.AnnotateCondFailMessage &&
+        PassName == "annotation-remarks";
+    }
+    bool isPassedOptRemarkEnabled(StringRef PassName) const override {
+      return IRGenOpts.AnnotateCondFailMessage &&
+        PassName == "annotation-remarks";
+    }
+
+    bool isAnyRemarkEnabled() const override {
+      return IRGenOpts.AnnotateCondFailMessage;
+    }
+
+  private:
+    const IRGenOptions &IRGenOpts;
+  };
+}
+
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
 bool swift::performLLVM(const IRGenOptions &Opts,
@@ -665,6 +703,32 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
+  std::string OptRemarksRecordFile;
+  if (Opts.AnnotateCondFailMessage && !OutputFilename.empty()) {
+    OptRemarksRecordFile = std::string(OutputFilename);
+    OptRemarksRecordFile.append(".opt.yaml");
+  }
+
+  auto &Ctxt = Module->getContext();
+  std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
+          Ctxt.getDiagnosticHandler();
+  Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
+
+  llvm::Expected<std::unique_ptr<llvm::ToolOutputFile>> OptRecordFileOrErr =
+    setupLLVMOptimizationRemarks(Ctxt, OptRemarksRecordFile.c_str(), "annotation-remarks", "yaml",
+                                 false/*RemarksWithHotness*/,
+                                 0/*RemarksHotnessThreshold*/);
+
+  if (Error E = OptRecordFileOrErr.takeError()) {
+    diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
+                 StringRef(OptRemarksRecordFile.c_str()),
+                 toString(std::move(E)));
+    return true;
+  }
+
+  std::unique_ptr<llvm::ToolOutputFile> OptRecordFile =
+    std::move(*OptRecordFileOrErr);
+
   performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine,
                            OutputFile ? &OutputFile->getOS() : nullptr);
 
@@ -694,9 +758,15 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     }
   }
 
-  return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
+  auto res = compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
                              *OutputFile, DiagMutex,
                              CASIDFile ? CASIDFile.get() : nullptr);
+  if (OptRecordFile)
+    OptRecordFile->keep();
+
+  Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
+
+  return res;
 }
 
 bool swift::compileAndWriteLLVM(
@@ -922,6 +992,24 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     opts.RelativeProtocolWitnessTable = PointerAuthSchema(
         dataKey, /*address*/ false, Discrimination::Constant,
         SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+
+  opts.CoroSwiftFunctionPointers =
+      PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Type);
+
+  opts.CoroSwiftClassMethods =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroProtocolWitnesses =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroSwiftClassMethodPointers =
+      PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.CoroSwiftDynamicReplacements =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroPartialApplyCapture =
+      PointerAuthSchema(nonABIDataKey, /*address*/ true, Discrimination::Decl);
 }
 
 std::unique_ptr<llvm::TargetMachine>
@@ -1578,7 +1666,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       llvm::Module *M = IGM->getModule();
       auto collectReference = [&](llvm::GlobalValue &G) {
         if (G.isDeclaration()
-            && (G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
+            && (G.getLinkage() == GlobalValue::WeakODRLinkage ||
+                G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
                 G.getLinkage() == GlobalValue::ExternalLinkage)) {
           referencedGlobals.insert(G.getName());
           G.setLinkage(GlobalValue::ExternalLinkage);
@@ -1605,7 +1694,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
       // definition (if it's not referenced in the same file).
       auto updateLinkage = [&](llvm::GlobalValue &G) {
         if (!G.isDeclaration()
-            && G.getLinkage() == GlobalValue::LinkOnceODRLinkage
+            && (G.getLinkage() == GlobalValue::WeakODRLinkage ||
+                G.getLinkage() == GlobalValue::LinkOnceODRLinkage)
             && referencedGlobals.count(G.getName()) != 0) {
           G.setLinkage(GlobalValue::WeakODRLinkage);
         }

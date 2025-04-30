@@ -503,7 +503,7 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
     }
   }
 
-  if (IGM.IRGen.Opts.shouldOptimize()) {
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
     // will merge these blocks back together again. We emit an empty asm
@@ -900,4 +900,3 @@ void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   Builder.CreateCall(IGM.getClearSensitiveFunctionPointer(),
                          {address.getAddress(), size});
 }
-

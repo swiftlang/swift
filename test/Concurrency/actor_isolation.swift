@@ -1264,11 +1264,11 @@ func testGlobalActorInheritance() {
 protocol GloballyIsolatedProto {
 }
 
-// rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
+// rdar://75849035 - trying to conform an actor to a global-actor-isolated protocol should result in an error
 func test_conforming_actor_to_global_actor_protocol() {
   @available(SwiftStdlib 5.1, *)
   actor MyValue : GloballyIsolatedProto {}
-  // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
+  // expected-error@-1 {{actor 'MyValue' cannot conform to global-actor-isolated protocol 'GloballyIsolatedProto'}}
 }
 
 func test_nonisolated_variable() {
@@ -1504,15 +1504,18 @@ class MA {
 @SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
 
 protocol SGA_Proto {
-  @SomeGlobalActor func method() // expected-note {{mark the protocol requirement 'method()' 'async' to allow actor-isolated conformances}}
+  @SomeGlobalActor func method()
 }
 
 // try to override a MA method with inferred isolation from a protocol requirement
+// expected-warning@+1{{conformance of 'SGA_MA' to protocol 'SGA_Proto' involves isolation mismatches and can cause data races}}
 class SGA_MA: MA, SGA_Proto {
+  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
+  
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated requirement from protocol 'SGA_Proto'}}
+  // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
-  // expected-note@-1{{add 'nonisolated' to 'method()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {
@@ -1614,13 +1617,14 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 class NonSendable {}
 
 protocol NonisolatedProtocol {
-  var ns: NonSendable { get } // expected-note {{requirement 'ns' declared here}}
+  var ns: NonSendable { get }
 }
 
+// expected-warning@+1{{conformance of 'ActorWithNonSendableLet' to protocol 'NonisolatedProtocol' crosses into actor-isolated code and can cause data races}}
 actor ActorWithNonSendableLet: NonisolatedProtocol {
-  // expected-note@-1{{add '@preconcurrency' to the 'NonisolatedProtocol' conformance to defer isolation checking to run time}}{{32-32=@preconcurrency }}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{32-32=@preconcurrency }}
 
-  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated requirement from protocol 'NonisolatedProtocol'; this is an error in the Swift 6 language mode}}
+  // expected-note@+1 {{actor-isolated property 'ns' cannot satisfy nonisolated requirement}}
   let ns = NonSendable()
 }
 
@@ -1717,5 +1721,46 @@ class InferIsolationViaOverride: SuperWithIsolatedMethod {
   nonisolated func callIsolated() {
     isolatedMethod()
     // expected-error@-1 {{call to main actor-isolated instance method 'isolatedMethod()' in a synchronous nonisolated context}}
+  }
+}
+
+struct ReferenceSelfDotMethods {
+  @MainActor
+  func mainActorAffinedFunction() {}
+
+  nonisolated
+  private func testCurry() -> (Self) -> (@MainActor () -> Void) {
+    let functionRef = Self.mainActorAffinedFunction
+    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
+    return functionRef // expected-warning {{converting non-sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+  }
+
+  @MainActor
+  private func callOnMainActorOk() {
+    let mainActorAffinedClosure = testCurry()(self)
+    mainActorAffinedClosure()
+  }
+
+  nonisolated
+  private func nonisolatedCallErrors() {
+    let mainActorAffinedClosure = testCurry()(self)
+    // expected-note@-1 {{calls to let 'mainActorAffinedClosure' from outside of its actor context are implicitly asynchronous}}
+    mainActorAffinedClosure()
+    // expected-error@-1 {{call to main actor-isolated let 'mainActorAffinedClosure' in a synchronous nonisolated context}}
+  }
+}
+
+actor UserDefinedActorSelfDotMethod {
+  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+
+  // Unfortunately we can't express the desired isolation of this returned closure statically to
+  // be able to call it on the desired actor. This may be possible with the acceptance of
+  // https://forums.swift.org/t/closure-isolation-control/70378 but I think we need more expressivity
+  // in the type system to express this sort of curry.
+  nonisolated
+  private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
+    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
+    // error message changes with InferSendabaleFromCaptures - see actor_isolation_swift6.swift
+    return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
   }
 }

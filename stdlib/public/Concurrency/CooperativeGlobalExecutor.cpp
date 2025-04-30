@@ -154,6 +154,11 @@ void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
   swift_executor_invokeSwiftCheckIsolated(executor);
 }
 
+SWIFT_CC(swift)
+int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+  return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
+}
+
 /// Insert a job into the cooperative global queue with a delay.
 SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,

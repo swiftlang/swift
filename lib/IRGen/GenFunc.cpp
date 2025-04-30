@@ -862,6 +862,40 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
   llvm_unreachable("unhandled convention");
 }
 
+llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
+  return IGM.getOrCreateHelperFunction(
+    "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
+    {IGM.SizeTy, IGM.Int64Ty},
+    [&](IRGenFunction &IGF) {
+      auto parameters = IGF.collectParameters();
+      auto *size = parameters.claimNext();
+      auto coroAllocPtr = IGF.IGM.getCoroFrameAllocFn();
+      auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
+      coroAllocFn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+      auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
+      auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
+        llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
+        llvm::ConstantPointerNull::get(
+            cast<llvm::PointerType>(coroFrameAllocFn->getType())));
+      auto *coroFrameAllocReturn = IGF.createBasicBlock("return-coroFrameAlloc");
+      auto *mallocReturn = IGF.createBasicBlock("return-malloc");
+      IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn, mallocReturn);
+
+      IGF.Builder.emitBlock(coroFrameAllocReturn);
+      auto *mallocTypeId = parameters.claimNext();
+      auto *coroFrameAllocCall = IGF.Builder.CreateCall(IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
+      IGF.Builder.CreateRet(coroFrameAllocCall);
+
+      IGF.Builder.emitBlock(mallocReturn);
+      auto *mallocCall = IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
+      IGF.Builder.CreateRet(mallocCall);
+    },
+    /*setIsNoInline=*/false,
+    /*forPrologue=*/false,
+    /*isPerformanceConstraint=*/false,
+    /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+}
+
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
                                       const LoadableTypeInfo &isolationTI) {
   auto offset = IGM.RefCountedStructSize;
@@ -1300,9 +1334,8 @@ public:
   }
   void mapAsyncParameters(FunctionPointer fnPtr) override {
     llvm::Value *dynamicContextSize32;
-    std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        subIGF, origType->getRepresentation(), fnPtr, nullptr,
-        std::make_pair(true, true));
+    std::tie(calleeFunction, dynamicContextSize32) =
+        getAsyncFunctionAndSize(subIGF, fnPtr, std::make_pair(true, true));
     auto *dynamicContextSize =
         subIGF.Builder.CreateZExt(dynamicContextSize32, subIGF.IGM.SizeTy);
     calleeContextBuffer =
@@ -1459,13 +1492,30 @@ public:
         cast<SILFunctionType>(
           unsubstType->mapTypeOutOfContext()->getCanonicalType())));
 
-    // Use malloc and free as our allocator.
-    auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());
+    
+    // Use free as our allocator.
     auto deallocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getFreeFn());
 
     // Call the right 'llvm.coro.id.retcon' variant.
     llvm::Value *buffer = origParams.claimNext();
-    llvm::Value *id = subIGF.Builder.CreateIntrinsicCall(
+    llvm::Value *id;
+    if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame) {
+      // Use swift_coroFrameAllocStub to emit our allocator.
+      auto coroAllocFn = subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
+      auto mallocTypeId = subIGF.getMallocTypeId();
+      id = subIGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::coro_id_retcon_once,
+        {llvm::ConstantInt::get(
+             subIGF.IGM.Int32Ty,
+             getYieldOnceCoroutineBufferSize(subIGF.IGM).getValue()),
+         llvm::ConstantInt::get(
+             subIGF.IGM.Int32Ty,
+             getYieldOnceCoroutineBufferAlignment(subIGF.IGM).getValue()),
+         buffer, prototype, coroAllocFn, deallocFn, mallocTypeId});
+    } else {
+      // Use malloc as our allocator.
+      auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());
+      id = subIGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::coro_id_retcon_once,
         {llvm::ConstantInt::get(
              subIGF.IGM.Int32Ty,
@@ -1474,6 +1524,7 @@ public:
              subIGF.IGM.Int32Ty,
              getYieldOnceCoroutineBufferAlignment(subIGF.IGM).getValue()),
          buffer, prototype, allocFn, deallocFn});
+    }
 
     // Call 'llvm.coro.begin', just for consistency with the normal pattern.
     // This serves as a handle that we can pass around to other intrinsics.
@@ -2131,6 +2182,8 @@ static llvm::Value *emitPartialApplicationForwarder(
         subIGF,
         origType->isAsync()
             ? IGM.getOptions().PointerAuth.AsyncPartialApplyCapture
+        : origType->isCalleeAllocatedCoroutine()
+            ? IGM.getOptions().PointerAuth.CoroPartialApplyCapture
             : IGM.getOptions().PointerAuth.PartialApplyCapture,
         lastCapturedFieldPtr, PointerAuthEntity::Special::PartialApplyCapture);
 
@@ -2141,10 +2194,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer::createSigned(
-        origType->isAsync() ? FunctionPointer::Kind::AsyncFunctionPointer
-                            : FunctionPointer::Kind::Function,
-        fnPtr, authInfo, origSig);
+    return FunctionPointer::createSigned(origType, fnPtr, authInfo, origSig);
   }();
 
   if (origType->isAsync())
@@ -2548,6 +2598,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         if (auto &schema =
                 origType->isAsync()
                     ? IGF.getOptions().PointerAuth.AsyncPartialApplyCapture
+                : origType->isCalleeAllocatedCoroutine()
+                    ? IGF.getOptions().PointerAuth.CoroPartialApplyCapture
                     : IGF.getOptions().PointerAuth.PartialApplyCapture) {
           auto schemaAuthInfo = PointerAuthInfo::emit(
               IGF, schema, fieldAddr.getAddress(),
@@ -2790,8 +2842,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
 
-llvm::Value *
-IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+llvm::Value *IRGenFunction::popAsyncContext(llvm::Value *calleeContext) {
   auto addr = Builder.CreateBitOrPointerCast(calleeContext, IGM.Int8PtrPtrTy);
   Address callerContextAddr(addr, IGM.Int8PtrTy, IGM.getPointerAlignment());
   llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
@@ -2800,6 +2851,13 @@ IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
         PointerAuthInfo::emit(*this, schema, addr, PointerAuthEntity());
     callerContext = emitPointerAuthAuth(*this, callerContext, authInfo);
   }
+  return callerContext;
+}
+
+llvm::Value *
+IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+  auto  callerContext = popAsyncContext(calleeContext);
+
   // TODO: remove this once all platforms support lowering the intrinsic.
   // At the time of this writing only arm64 supports it.
   if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {

@@ -45,7 +45,7 @@ public struct Int128: Sendable {
   @_transparent
   public init(_low: UInt64, _high: Int64) {
 #if _endian(little)
-    self = unsafeBitCast((_low, _high), to: Self.self)
+    self = unsafe unsafeBitCast((_low, _high), to: Self.self)
 #else
     self = unsafeBitCast((_high, _low), to: Self.self)
 #endif

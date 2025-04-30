@@ -91,6 +91,11 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
+llvm::StructType *IRGenModule::createTransientStructType(
+    StringRef name, std::initializer_list<llvm::Type *> types, bool packed) {
+  return createStructType(*this, name, types, packed);
+}
+
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                       llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -187,9 +192,8 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
   auto &schema = IGM.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions;
   if (!schema.isEnabled()) return;
 
-  auto decl = dyn_cast_or_null<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
-  assert(decl && "decl not found");
-  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, AssociatedType(decl));
+  auto decl = cast<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, decl);
   assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
 }
 
@@ -207,6 +211,24 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
   checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_conditionallyBridgeFromObjectiveC" }, SpecialPointerAuthDiscriminators::conditionallyBridgeFromObjectiveCDiscriminator);
 }
 #endif
+
+static bool getIsCoroCCSupported(const clang::TargetInfo &targetInfo,
+                                 const IRGenOptions &IRGenOpts) {
+  // TODO: CoroutineAccessors: The one caller of this function should just be
+  //                           rewritten as follows (once clang::CC_CoroAsync is
+  //                           defined).
+  //
+  // clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_CoroAsync)
+  if (targetInfo.getTriple().isAArch64() && IRGenOpts.UseCoroCCArm64) {
+    return true;
+  }
+  if (targetInfo.getTriple().getArch() == llvm::Triple::x86_64 &&
+      IRGenOpts.UseCoroCCX8664) {
+    return true;
+  }
+
+  return false;
+}
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
@@ -484,6 +506,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       RelativeAddressTy
     });
 
+  MethodDefaultOverrideDescriptorStructTy = createStructType(
+      *this, "swift.method_default_override_descriptor",
+      {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy});
+
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy
@@ -602,6 +628,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AsyncTailCallKind = llvm::CallInst::TCK_Tail;
   }
 
+  bool isCoroCCSupported =
+      getIsCoroCCSupported(clangASTContext.getTargetInfo(), opts);
+  if (isCoroCCSupported) {
+    SwiftCoroCC = llvm::CallingConv::SwiftCoro;
+  } else {
+    SwiftCoroCC = SwiftCC;
+  }
+
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
@@ -675,7 +709,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
-    IntPtrTy              // Task.Status
   });
 
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
@@ -723,6 +756,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       createStructType(*this, "swift.task_executor_owned_task_option", {
     SwiftTaskOptionRecordTy, // Base option record
     SwiftExecutorTy,         // Executor
+  });
+  SwiftInitialTaskNameTaskOptionRecordTy =
+      createStructType(*this, "swift.task_name_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    Int8PtrTy,               // Task name string (char*)
   });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
@@ -783,6 +821,24 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
+
+  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
+                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerPtrTy = CoroFunctionPointerTy->getPointerTo();
+  CoroAllocationTy = PtrTy;
+  CoroAllocateFnTy =
+      llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
+  CoroDeallocateFnTy =
+      llvm::FunctionType::get(VoidTy, CoroAllocationTy, /*isVarArg*/ false);
+  CoroAllocatorFlagsTy = Int32Ty;
+  // swift/ABI/Coro.h : CoroAllocator
+  CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
+                                     {
+                                         Int32Ty, // CoroAllocator.Flags
+                                         CoroAllocateFnTy->getPointerTo(),
+                                         CoroDeallocateFnTy->getPointerTo(),
+                                     });
+  CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }
 
 IRGenModule::~IRGenModule() {
@@ -1012,6 +1068,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getCoroutineAccessorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -1166,6 +1230,14 @@ llvm::Constant *swift::getRuntimeFn(
 llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
+}
+
+llvm::Constant *IRGenModule::
+    getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+             LinkEntity::forKnownCoroFunctionPointer(
+                 "swift_deletedCalleeAllocatedCoroutineMethodError"))
+      .getValue();
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
@@ -1363,14 +1435,9 @@ llvm::Module *IRGenModule::getModule() const {
 }
 
 bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
-  static const CanType kStructural[] = {
-    Context.TheEmptyTupleType, Context.TheNativeObjectType,
-    Context.TheBridgeObjectType, Context.TheRawPointerType,
-    Context.getAnyObjectType()
-  };
-
-  if (std::any_of(std::begin(kStructural), std::end(kStructural),
-                  [T](const CanType &ST) { return T == ST; }))
+  if (T == Context.TheEmptyTupleType || T == Context.TheNativeObjectType ||
+      T == Context.TheBridgeObjectType || T == Context.TheRawPointerType ||
+      T == Context.getAnyObjectType())
     return true;
 
   if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {

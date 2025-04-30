@@ -1802,7 +1802,7 @@ static void forEachProtocolWitnessTable(
          "mismatched protocol conformances");
 
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    assert(protocols[i] == witnessConformances[i].getRequirement());
+    assert(protocols[i] == witnessConformances[i].getProtocol());
     auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
                                      witnessConformances[i]);
     body(i, table);
@@ -1877,7 +1877,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
   const ProtocolDecl *proto = destTI.getStoredProtocols()[0];
   (void) proto;
-  assert(proto == conformances[0].getRequirement());
+  assert(proto == conformances[0].getProtocol());
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
                                      conformances[0]);
   
@@ -1895,7 +1895,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
 
   auto archetype =
-      OpenedArchetypeType::get(destType.getASTType());
+      ExistentialArchetypeType::get(destType.getASTType());
   auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
                                             formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,
@@ -1965,7 +1965,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
 static size_t numProtocolsWithWitnessTables(
     ArrayRef<ProtocolConformanceRef> conformances) {
   return llvm::count_if(conformances, [](ProtocolConformanceRef conformance) {
-    auto proto = conformance.getRequirement();
+    auto proto = conformance.getProtocol();
     return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
   });
 }

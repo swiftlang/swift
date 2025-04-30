@@ -17,7 +17,7 @@ struct BV : ~Escapable {
   }
 }
 
-@lifetime(bv)
+@lifetime(copy bv)
 func bv_copy(_ bv: borrowing BV) -> BV {
   copy bv
 }
@@ -30,17 +30,17 @@ public struct NEInt: ~Escapable {
   var i: Int
 
   // Test yielding an address.
-  // CHECK-LABEL: sil hidden @$s4test5NEIntV5ipropSivM : $@yield_once @convention(method) (@inout NEInt) -> @yields @inout Int {
+  // CHECK-LABEL: sil hidden @$s4test5NEIntV5iprop{{.*}}vM : $@yield_once @convention(method) (@inout NEInt) -> @lifetime(borrow 0) @yields @inout NEInt
   // CHECK: bb0(%0 : $*NEInt):
   // CHECK: [[A:%.*]] = begin_access [modify] [static] %0 : $*NEInt
-  // CHECK: [[E:%.*]] = struct_element_addr [[A]] : $*NEInt, #NEInt.i
-  // CHECK: yield [[E]] : $*Int, resume bb1, unwind bb2
+  // CHECK: yield [[A]] : $*NEInt, resume bb1, unwind bb2
   // CHECK: end_access [[A]] : $*NEInt
   // CHECK: end_access [[A]] : $*NEInt
-  // CHECK-LABEL: } // end sil function '$s4test5NEIntV5ipropSivM'
-  var iprop: Int {
-    _read { yield i }
-    _modify { yield &i }
+  var iprop: NEInt {
+    @lifetime(copy self)
+    _read { yield self }
+    @lifetime(&self)
+    _modify { yield &self }
   }
 
   @lifetime(borrow owner)
@@ -56,6 +56,7 @@ public enum NEOptional<Wrapped: ~Escapable>: ~Escapable {
 
 extension NEOptional where Wrapped: ~Escapable {
   // Test that enum initialization passes diagnostics.
+  @lifetime(copy some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 

@@ -375,12 +375,14 @@ static bool modResultType(SILFunction *F, irgen::IRGenModule &Mod,
 static bool shouldTransformYields(GenericEnvironment *genEnv,
                                   CanSILFunctionType loweredTy,
                                   irgen::IRGenModule &Mod,
-                                  LargeSILTypeMapper &Mapper) {
+                                  LargeSILTypeMapper &Mapper,
+                                  TypeExpansionContext expansion) {
   if (!modifiableFunction(loweredTy)) {
     return false;
   }
   for (auto &yield : loweredTy->getYields()) {
-    auto yieldStorageType = yield.getSILStorageInterfaceType();
+    auto yieldStorageType = yield.getSILStorageType(Mod.getSILModule(),
+                                                    loweredTy, expansion);
     auto newYieldStorageType =
         Mapper.getNewSILType(genEnv, yieldStorageType, Mod);
     if (yieldStorageType != newYieldStorageType)
@@ -394,7 +396,8 @@ static bool modYieldType(SILFunction *F, irgen::IRGenModule &Mod,
   GenericEnvironment *genEnv = getSubstGenericEnvironment(F);
   auto loweredTy = F->getLoweredFunctionType();
 
-  return shouldTransformYields(genEnv, loweredTy, Mod, Mapper);
+  return shouldTransformYields(genEnv, loweredTy, Mod, Mapper,
+                               F->getTypeExpansionContext());
 }
 
 SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
@@ -1883,7 +1886,14 @@ void LoadableStorageAllocation::replaceLoad(LoadInst *load) {
 
 static void allocateAndSet(StructLoweringState &pass,
                            LoadableStorageAllocation &allocator,
-                           SILValue operand, SILInstruction *user) {
+                           SILValue operand, SILInstruction *user,
+                           Operand &opd) {
+  if (isa<SILUndef>(operand)) {
+    auto alloc = allocate(pass, operand->getType());
+    opd.set(alloc);
+    return;
+  }
+
   auto inst = operand->getDefiningInstruction();
   if (!inst) {
     allocateAndSetForArgument(pass, cast<SILArgument>(operand), user);
@@ -1909,7 +1919,7 @@ static void allocateAndSetAll(StructLoweringState &pass,
     SILType silType = value->getType();
     if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
                                  silType)) {
-      allocateAndSet(pass, allocator, value, user);
+      allocateAndSet(pass, allocator, value, user, operand);
     }
   }
 }
@@ -3093,10 +3103,15 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case SILInstructionKind::BranchInst:
               case SILInstructionKind::StructInst:
               case SILInstructionKind::DebugValueInst:
                 break;
               default:
+#ifndef NDEBUG
+                currInstr->dump();
+                currInstr->getFunction()->dump();
+#endif
                 llvm_unreachable("Unhandled use of FunctionRefInst");
               }
             }
@@ -3562,6 +3577,7 @@ void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
   for (auto *BB : po.getPostOrder()) {
     for (auto &I : llvm::reverse(*BB)) {
       switch (I.getKind()) {
+      case SILInstructionKind::UncheckedBitwiseCastInst:
       case SILInstructionKind::TupleExtractInst:
       case SILInstructionKind::StructExtractInst: {
         auto &proj = cast<SingleValueInstruction>(I);
@@ -4153,9 +4169,9 @@ protected:
         BuiltinValueKind::ZeroInitializer) {
       auto build = assignment.getBuilder(++bi->getIterator());
       auto newAddr = assignment.createAllocStack(bi->getType());
+      build.createZeroInitAddr(bi->getLoc(), newAddr);
       assignment.mapValueToAddress(origValue, newAddr);
-      build.createStore(bi->getLoc(), origValue, newAddr,
-                        StoreOwnershipQualifier::Unqualified);
+      assignment.markForDeletion(bi);
     } else {
       singleValueInstructionFallback(bi);
     }

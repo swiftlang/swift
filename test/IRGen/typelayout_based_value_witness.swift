@@ -127,6 +127,11 @@ public enum ForwardEnum<T> {
 // OPT:   ret void
 // CHECK: }
 
+// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias nocapture writeonly %value, i32 %tag, ptr nocapture readonly %"E3<T>")
+// OPT:  [[IS_EMPTY:%.*]] = icmp eq i32 {{%.*}}, 0
+// OPT:  br i1 [[IS_EMPTY]], label %empty-payload, label %non-empty-payload
+// OPT: }
+
 // Let's not crash on the following example.
 public protocol P {}
 
@@ -144,4 +149,10 @@ public struct S<T: P> {
 public enum E2<T: P> {
     case first(Ref<T>)
     case second(String)
+}
+
+public enum E3<T> {
+  case empty
+  case first(T)
+  case second(T)
 }

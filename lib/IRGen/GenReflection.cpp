@@ -22,8 +22,10 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/SIL/SILModule.h"
@@ -600,7 +602,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
-            conformance = conformance.subst(origType,
+            conformance = conformance.subst(
                 genericEnv->getForwardingSubstitutionMap());
           }
           auto ret = emitWitnessTableRef(IGF, type, conformance);
@@ -1672,7 +1674,13 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
   if (entry.second)
     return entry.second;
 
-  entry = createStringConstant(Name, /*willBeRelativelyAddressed*/ true,
+  llvm::SmallString<256> ReflName;
+  if (Lexer::identifierMustAlwaysBeEscaped(Name)) {
+    Mangle::Mangler::appendRawIdentifierForRuntime(Name.str(), ReflName);
+  } else {
+    ReflName = Name;
+  }
+  entry = createStringConstant(ReflName, /*willBeRelativelyAddressed*/ true,
                                getReflectionStringsSectionName());
   disableAddressSanitizer(*this, entry.first);
   return entry.second;

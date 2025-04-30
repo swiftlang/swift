@@ -222,6 +222,10 @@ public:
     SearchPathOpts.VFSOverlayFiles = Overlays;
   }
 
+  void setSysRoot(StringRef SysRoot) {
+    SearchPathOpts.setSysRoot(SysRoot);
+  }
+
   void setExtraClangArgs(const std::vector<std::string> &Args) {
     ClangImporterOpts.ExtraArgs = Args;
   }

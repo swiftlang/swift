@@ -244,7 +244,7 @@ private func sllConsumedResults(
 
   return results.flatMap { result in
     switch result {
-    case .lookInMembers(let syntax):
+    case .lookForMembers(let syntax):
       return [
         ConsumedLookupResult(
           rawName: "",
@@ -252,7 +252,7 @@ private func sllConsumedResults(
           flags: .shouldLookInMembers
         )
       ]
-    case .lookInGenericParametersOfExtendedType(let extensionDecl):
+    case .lookForGenericParameters(let extensionDecl):
       return [
         ConsumedLookupResult(
           rawName: "",
@@ -260,7 +260,7 @@ private func sllConsumedResults(
           flags: .ignoreNextFromHere
         )
       ]
-    case .mightIntroduceDollarIdentifiers(let closure):
+    case .lookForImplicitClosureParameters(let closure):
       return [
         ConsumedLookupResult(
           rawName: "",

@@ -277,10 +277,23 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // If our scoped operand is not also a borrow introducer, then we know that
     // we do not need to consider guaranteed phis and thus can just add the
-    // initial end scope instructions without any further work.
-    //
-    // Maybe: Is borrow scope non-local?
-    initialScopedOperand.getImplicitUses(nonLifetimeEndingUsers);
+    // initial end scope instructions without any further work. This avoids
+    // cubic complexity in the verifier.
+    auto addLeafUse = [&](Operand *endOp) {
+      nonLifetimeEndingUsers.push_back(endOp);
+      return true;
+    };
+    auto addUnknownUse = [&](Operand *endOp) {
+      // FIXME: This ignores mark_dependence base uses and borrowed_from base
+      // uses. Instead, recursively call gatherUsers.
+      // Note: we may have op == endOp.
+      nonLifetimeEndingUsers.push_back(endOp);
+      return true;
+    };
+    // FIXME: This ignores dead-end blocks. Instead, recursively call
+    // gatherUsers.
+    initialScopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
+
     if (initialScopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
       guaranteedPhiVerifier.verifyReborrows(
           cast<BeginBorrowInst>(op->getUser()));
@@ -391,7 +404,21 @@ bool SILValueOwnershipChecker::gatherUsers(
       if (auto scopedOperand = BorrowingOperand(op)) {
         assert(!scopedOperand.isReborrow());
 
-        scopedOperand.getImplicitUses(nonLifetimeEndingUsers);
+        auto addLeafUse = [&](Operand *endOp) {
+          nonLifetimeEndingUsers.push_back(endOp);
+          return true;
+        };
+        auto addUnknownUse = [&](Operand *endOp) {
+          // FIXME: This ignores mark_dependence base uses and borrowed_from
+          // base uses. Instead, recursively call gatherUsers.  Note: we may
+          // have op == endOp.
+          nonLifetimeEndingUsers.push_back(endOp);
+          return true;
+        };
+        // FIXME: This ignores dead-end blocks. Instead, recursively call
+        // gatherUsers.
+        scopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
+
         if (scopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
           guaranteedPhiVerifier.verifyReborrows(
               cast<BeginBorrowInst>(op->getUser()));

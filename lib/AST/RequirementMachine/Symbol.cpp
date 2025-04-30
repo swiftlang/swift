@@ -686,6 +686,15 @@ Symbol Symbol::transformConcreteSubstitutions(
   return withConcreteSubstitutions(substitutions, ctx);
 }
 
+bool Symbol::containsNameSymbols() const {
+  for (auto t : getSubstitutions()) {
+    if (t.containsNameSymbols())
+      return true;
+  }
+
+  return false;
+}
+
 /// Print the symbol using our mnemonic representation.
 void Symbol::dump(llvm::raw_ostream &out) const {
   llvm::DenseMap<CanType, Identifier> substitutionNames;

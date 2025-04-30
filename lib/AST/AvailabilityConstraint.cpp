@@ -18,19 +18,15 @@
 
 using namespace swift;
 
-PlatformKind AvailabilityConstraint::getPlatform() const {
-  return getAttr().getPlatform();
-}
-
 std::optional<AvailabilityRange>
-AvailabilityConstraint::getRequiredNewerAvailabilityRange(
+AvailabilityConstraint::getPotentiallyUnavailableRange(
     const ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::UnconditionallyUnavailable:
   case Reason::Obsoleted:
-  case Reason::IntroducedInLaterVersion:
+  case Reason::UnavailableForDeployment:
     return std::nullopt;
-  case Reason::IntroducedInLaterDynamicVersion:
+  case Reason::PotentiallyUnavailable:
     return getAttr().getIntroducedRange(ctx);
   }
 }
@@ -60,12 +56,12 @@ static bool constraintIsStronger(const AvailabilityConstraint &lhs,
     return false;
 
   case AvailabilityConstraint::Reason::Obsoleted:
-    // Pick the earliest obsoleted version.
+    // Pick the larger obsoleted range.
     return *lhs.getAttr().getObsoleted() < *rhs.getAttr().getObsoleted();
 
-  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
-  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
-    // Pick the latest introduced version.
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    // Pick the smaller introduced range.
     return *lhs.getAttr().getIntroduced() > *rhs.getAttr().getIntroduced();
   }
 }
@@ -117,25 +113,59 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
   return result;
 }
 
+static bool canIgnoreConstraintInUnavailableContexts(
+    const Decl *decl, const AvailabilityConstraint &constraint) {
+  auto domain = constraint.getDomain();
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    // Always reject uses of universally unavailable declarations, regardless
+    // of context, since there are no possible compilation configurations in
+    // which they are available. However, make an exception for types and
+    // conformances, which can sometimes be awkward to avoid references to.
+    if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
+      if (domain.isUniversal() || domain.isSwiftLanguage())
+        return false;
+    }
+    return true;
+
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    switch (domain.getKind()) {
+    case AvailabilityDomain::Kind::Universal:
+    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::PackageDescription:
+    case AvailabilityDomain::Kind::Embedded:
+    case AvailabilityDomain::Kind::Custom:
+      return false;
+    case AvailabilityDomain::Kind::Platform:
+      // Platform availability only applies to the target triple that the
+      // binary is being compiled for. Since the same declaration can be
+      // potentially unavailable from a given context when compiling for one
+      // platform, but available from that context when compiling for a
+      // different platform, it is overly strict to enforce potential platform
+      // unavailability constraints in contexts that are unavailable to that
+      // platform.
+      return true;
+    }
+    return constraint.getDomain().isPlatform();
+
+  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    return false;
+  }
+}
+
 static bool
-isInsideCompatibleUnavailableDeclaration(const Decl *decl,
-                                         const SemanticAvailableAttr &attr,
-                                         const AvailabilityContext &context) {
+shouldIgnoreConstraintInContext(const Decl *decl,
+                                const AvailabilityConstraint &constraint,
+                                const AvailabilityContext &context) {
   if (!context.isUnavailable())
     return false;
 
-  if (!attr.isUnconditionallyUnavailable())
+  if (!canIgnoreConstraintInUnavailableContexts(decl, constraint))
     return false;
 
-  // Refuse calling universally unavailable functions from unavailable code,
-  // but allow the use of types.
-  auto domain = attr.getDomain();
-  if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
-    if (domain.isUniversal() || domain.isSwiftLanguage())
-      return false;
-  }
-
-  return context.containsUnavailableDomain(domain);
+  return context.containsUnavailableDomain(constraint.getDomain());
 }
 
 /// Returns the `AvailabilityConstraint` that describes how \p attr restricts
@@ -144,36 +174,36 @@ static std::optional<AvailabilityConstraint>
 getAvailabilityConstraintForAttr(const Decl *decl,
                                  const SemanticAvailableAttr &attr,
                                  const AvailabilityContext &context) {
+  // Is the decl unconditionally unavailable?
   if (attr.isUnconditionallyUnavailable())
     return AvailabilityConstraint::unconditionallyUnavailable(attr);
 
   auto &ctx = decl->getASTContext();
-  auto deploymentVersion = attr.getActiveVersion(ctx);
-  auto deploymentRange =
-      AvailabilityRange(VersionRange::allGTE(deploymentVersion));
-  std::optional<llvm::VersionTuple> obsoletedVersion = attr.getObsoleted();
+  auto domain = attr.getDomain();
+  auto deploymentRange = domain.getDeploymentRange(ctx);
 
-  {
-    StringRef obsoletedPlatform;
-    llvm::VersionTuple remappedObsoletedVersion;
-    if (AvailabilityInference::updateObsoletedPlatformForFallback(
-            attr, ctx, obsoletedPlatform, remappedObsoletedVersion))
-      obsoletedVersion = remappedObsoletedVersion;
+  // Is the decl obsoleted in the deployment context?
+  if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
+    if (deploymentRange && deploymentRange->isContainedIn(*obsoletedRange))
+      return AvailabilityConstraint::obsoleted(attr);
   }
 
-  if (obsoletedVersion && *obsoletedVersion <= deploymentVersion)
-    return AvailabilityConstraint::obsoleted(attr);
+  // Is the decl not yet introduced in the local context?
+  if (auto introducedRange = attr.getIntroducedRange(ctx)) {
+    if (domain.supportsContextRefinement()) {
+      auto availableRange = context.getAvailabilityRange(domain, ctx);
+      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+        return AvailabilityConstraint::potentiallyUnavailable(attr);
 
-  AvailabilityRange introducedRange = attr.getIntroducedRange(ctx);
+      return std::nullopt;
+    }
 
-  // FIXME: [availability] Expand this to cover custom versioned domains
-  if (attr.isPlatformSpecific()) {
-    if (!context.getPlatformRange().isContainedIn(introducedRange))
-      return AvailabilityConstraint::introducedInLaterDynamicVersion(attr);
-  } else if (!deploymentRange.isContainedIn(introducedRange)) {
-    return AvailabilityConstraint::introducedInLaterVersion(attr);
+    // Is the decl not yet introduced in the deployment context?
+    if (deploymentRange && !deploymentRange->isContainedIn(*introducedRange))
+      return AvailabilityConstraint::unavailableForDeployment(attr);
   }
 
+  // FIXME: [availability] Model deprecation as an availability constraint.
   return std::nullopt;
 }
 
@@ -202,14 +232,15 @@ activePlatformDomainForDecl(const Decl *decl) {
 
 static void getAvailabilityConstraintsForDecl(
     llvm::SmallVector<AvailabilityConstraint, 4> &constraints, const Decl *decl,
-    const AvailabilityContext &context) {
+    const AvailabilityContext &context, AvailabilityConstraintFlags flags) {
   auto &ctx = decl->getASTContext();
   auto activePlatformDomain = activePlatformDomainForDecl(decl);
+  bool includeAllDomains =
+      flags.contains(AvailabilityConstraintFlag::IncludeAllDomains);
 
-  for (auto attr :
-       decl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+  for (auto attr : decl->getSemanticAvailableAttrs(includeAllDomains)) {
     auto domain = attr.getDomain();
-    if (domain.isPlatform() && activePlatformDomain &&
+    if (!includeAllDomains && domain.isPlatform() && activePlatformDomain &&
         !activePlatformDomain->contains(domain))
       continue;
 
@@ -221,8 +252,7 @@ static void getAvailabilityConstraintsForDecl(
   // declaration is unconditionally unavailable in a domain for which
   // the context is already unavailable.
   llvm::erase_if(constraints, [&](const AvailabilityConstraint &constraint) {
-    return isInsideCompatibleUnavailableDeclaration(decl, constraint.getAttr(),
-                                                    context);
+    return shouldIgnoreConstraintInContext(decl, constraint, context);
   });
 }
 
@@ -236,9 +266,9 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   if (isa<GenericTypeParamDecl>(decl))
     return DeclAvailabilityConstraints();
 
-  decl = abstractSyntaxDeclForAvailableAttribute(decl);
+  decl = decl->getAbstractSyntaxDeclForAttributes();
 
-  getAvailabilityConstraintsForDecl(constraints, decl, context);
+  getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
 
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
     return constraints;
@@ -255,7 +285,7 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   auto parent = AvailabilityInference::parentDeclForInferredAvailability(decl);
   if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
-    getAvailabilityConstraintsForDecl(constraints, extension, context);
+    getAvailabilityConstraintsForDecl(constraints, extension, context, flags);
 
   return constraints;
 }

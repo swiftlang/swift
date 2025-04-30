@@ -11,11 +11,29 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+import AST
 
+/// A key for referencing an AST declaration in SIL.
+///
+/// In addition to the AST reference, there are discriminators for referencing different
+/// implementation-level entities associated with a single language-level declaration,
+/// such as the allocating and initializing entry points of a constructor, etc.
 public struct DeclRef: CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedDeclRef
 
   public var location: Location { Location(bridged: bridged.getLocation()) }
 
   public var description: String { String(taking: bridged.getDebugDescription()) }
+
+  public var decl: Decl { bridged.getDecl().decl }
+
+  public static func ==(lhs: DeclRef, rhs: DeclRef) -> Bool {
+    lhs.bridged.isEqualTo(rhs.bridged)
+  }
+}
+
+extension DeclRef: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(bridged.asDiagnosticArgument())
+  }
 }

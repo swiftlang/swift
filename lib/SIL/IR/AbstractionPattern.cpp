@@ -1650,8 +1650,7 @@ AbstractionPattern::getFunctionParamFlags(unsigned index) const {
 }
 
 bool
-AbstractionPattern::isFunctionParamAddressable(TypeConverter &TC,
-                                               unsigned index) const {
+AbstractionPattern::isFunctionParamAddressable(unsigned index) const {
   switch (getKind()) {
   case Kind::Invalid:
   case Kind::Tuple:
@@ -1661,7 +1660,7 @@ AbstractionPattern::isFunctionParamAddressable(TypeConverter &TC,
   case Kind::OpaqueDerivativeFunction:
     // If the function abstraction pattern is completely opaque, assume we
     // may need to preserve the address for dependencies.
-    return true;
+    return false;
 
   case Kind::ClangType:
   case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1679,37 +1678,53 @@ AbstractionPattern::isFunctionParamAddressable(TypeConverter &TC,
     auto type = getType();
     
     if (type->isTypeParameter() || type->is<ArchetypeType>()) {
-      // If the function abstraction pattern is completely opaque, assume we
-      // may need to preserve the address for dependencies.
-      return true;    
+      return false;
     }
   
     auto fnTy = cast<AnyFunctionType>(getType());
   
     // The parameter might directly be marked addressable.
-    if (fnTy.getParams()[index].getParameterFlags().isAddressable()) {
-      return true;
-    }
+    return fnTy.getParams()[index].getParameterFlags().isAddressable();
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
+ArrayRef<LifetimeDependenceInfo>
+AbstractionPattern::getLifetimeDependencies() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+  case Kind::Tuple:
+    llvm_unreachable("not any kind of function!");
+  case Kind::Opaque:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    // If the function abstraction pattern is completely opaque, assume we
+    // may need to preserve the address for dependencies.
+    return {};
+
+  case Kind::ClangType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Type:
+  case Kind::Discard: {
+    auto type = getType();
     
-    // The parameter could be of a type that is addressable for dependencies,
-    // in which case it becomes addressable when a return has a scoped
-    // dependency on it.
-    for (auto &dep : fnTy->getLifetimeDependencies()) {
-      auto scoped = dep.getScopeIndices();
-      if (!scoped) {
-        continue;
-      }
-      
-      if (scoped->contains(index)) {
-        auto paramTy = getFunctionParamType(index);
-        
-        return TC.getTypeLowering(paramTy, paramTy.getType(),
-                                  TypeExpansionContext::minimal())
-          .getRecursiveProperties().isAddressableForDependencies();
-      }
+    if (type->isTypeParameter() || type->is<ArchetypeType>()) {
+      return {};
     }
-    
-    return false;
+  
+    auto fnTy = cast<AnyFunctionType>(getType());
+  
+    return fnTy->getExtInfo().getLifetimeDependencies();
   }
   }
   llvm_unreachable("bad kind");
@@ -2408,7 +2423,8 @@ public:
       paramKind = GenericTypeParamKind::Pack;
     }
 
-    auto gp = GenericTypeParamType::get(paramKind, 0, paramIndex, Type(),
+    auto gp = GenericTypeParamType::get(paramKind, /*depth=*/0, paramIndex,
+                                        /*weight=*/0, /*valueType=*/Type(),
                                         TC.Context);
     substGenericParams.push_back(gp);
 

@@ -140,6 +140,31 @@ extension Value {
     }
   }
 
+  /// Return true if the object type conforms to Escapable.
+  ///
+  /// Note: noescape function types conform to Escapable, use mayEscape instead to exclude them.
+  public var isEscapable: Bool {
+    type.objectType.isEscapable(in: parentFunction)
+  }
+
+  /// Return true only if this value's lifetime is unconstrained by an outer lifetime. Requires all of the following:
+  /// - the object type conforms to Escapable
+  /// - the type is not a noescape function
+  /// - the value is not the direct result of a partial_apply with a noescape (inout_aliasable) capture.
+  public var mayEscape: Bool {
+    if !type.objectType.mayEscape(in: parentFunction) {
+      return false
+    }
+    // A noescape partial_apply has an escaping function type if it has not been promoted to on_stack, but it's value
+    // still cannot "escape" its captures.
+    //
+    // TODO: This would be much more robust if pai.hasNoescapeCapture simply implied !pai.type.isEscapable
+    if let pai = self as? PartialApplyInst {
+      return pai.mayEscape
+    }
+    return true
+  }
+
   public var definingInstructionOrTerminator: Instruction? {
     if let def = definingInstruction {
       return def

@@ -39,11 +39,6 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let lifetimeDependenceDiagnosticsPass = FunctionPass(
   name: "lifetime-dependence-diagnostics")
 { (function: Function, context: FunctionPassContext) in
-#if os(Windows)
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-#endif
   log(prefix: false, "\n--- Diagnosing lifetime dependence in \(function.name)")
   log("\(function)")
   log("\(function.convention)")
@@ -58,7 +53,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     }
   }
   for instruction in function.instructions {
-    if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
+    if let markDep = instruction as? MarkDependenceInstruction, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         if analyze(dependence: lifetimeDep, context) {
           // Note: This promotes the mark_dependence flag but does not invalidate analyses; preserving analyses is good,
@@ -123,7 +118,7 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
-  let result = walker.walkDown(root: dependence.dependentValue)
+  let result = walker.walkDown(dependence: dependence)
   // The walk may abort without a diagnostic error.
   assert(!error || result == .abortWalk)
   return result == .continueWalk
@@ -140,7 +135,7 @@ private struct DiagnoseDependence {
 
   func diagnose(_ position: SourceLoc?, _ id: DiagID,
                 _ args: DiagnosticArgument...) {
-    context.diagnosticEngine.diagnose(position, id, args)
+    context.diagnosticEngine.diagnose(id, args, at: position)
   }
 
   /// Check that this use is inside the dependence scope.
@@ -207,12 +202,29 @@ private struct DiagnoseDependence {
     // Check that the parameter dependence for this result is the same
     // as the current dependence scope.
     if let arg = dependence.scope.parentValue as? FunctionArgument,
-       function.argumentConventions[resultDependsOn: arg.index] != nil {
-      // The returned value depends on a lifetime that is inherited or
-      // borrowed in the caller. The lifetime of the argument value
-      // itself is irrelevant here.
-      log("  has dependent function result")
-      return .continueWalk
+       let argDep = function.argumentConventions[resultDependsOn: arg.index] {
+      switch argDep {
+      case .inherit:
+        if dependence.markDepInst != nil {
+          // A mark_dependence represents a "borrow" scope. A local borrow scope cannot inherit the caller's dependence
+          // because the borrow scope depends on the argument value itself, while the caller allows the result to depend
+          // on a value that the argument was copied from.
+          break
+        }
+        fallthrough
+      case .scope:
+        // The returned value depends on a lifetime that is inherited or
+        // borrowed in the caller. The lifetime of the argument value
+        // itself is irrelevant here.
+        log("  has dependent function result")
+        return .continueWalk
+      }
+      // Briefly (April 2025), RawSpan._extracting, Span._extracting, and UTF8Span.span returned a borrowed value that
+      // depended on a copied argument. Continue to support those interfaces. The implementations were correct but
+      // needed an explicit _overrideLifetime.
+      if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
+        return .continueWalk
+      }
     }
     return .abortWalk
   }
@@ -297,7 +309,7 @@ private struct LifetimeVariable {
       return .abortWalk
     }
     defer { useDefVisitor.deinitialize() }
-    _ = useDefVisitor.walkUp(valueOrAddress: value)
+    _ = useDefVisitor.walkUp(newLifetime: value)
     return introducer
   }
 
@@ -354,7 +366,7 @@ private struct LifetimeVariable {
 }
 
 /// Walk up an address into which a dependent value has been stored. If any address in the use-def chain is a
-/// mark_dependence, follow the depenedence base rather than the forwarded value. If any of the dependence bases in
+/// mark_dependence, follow the dependence base rather than the forwarded value. If any of the dependence bases in
 /// within the current scope is with (either local checkInoutResult), then storing a value into that address is
 /// nonescaping.
 ///

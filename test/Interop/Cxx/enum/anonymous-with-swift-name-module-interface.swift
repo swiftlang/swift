@@ -27,8 +27,7 @@
 // CHECK:   static var All: SOColorMask { get }
 // CHECK: }
 
-// CHECK: @available(*, unavailable, message: "Not available in Swift")
-// CHECK: typealias CFColorMask = UInt32
+// CHECK-NOT: typealias CFColorMask = UInt32
 
 // CHECK: struct CFColorMask : OptionSet {
 // CHECK:   init(rawValue: UInt32)

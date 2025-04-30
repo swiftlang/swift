@@ -187,6 +187,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getBaseType());
   }
 
+  bool visitInlineArrayType(InlineArrayType *ty) {
+    return doIt(ty->getCountType()) || doIt(ty->getElementType());
+  }
+
   bool visitDictionaryType(DictionaryType *ty) {
     return doIt(ty->getKeyType()) || doIt(ty->getValueType());
   }
@@ -258,7 +262,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitOpenedArchetypeType(OpenedArchetypeType *opened) {
+  bool visitExistentialArchetypeType(ExistentialArchetypeType *opened) {
     auto *env = opened->getGenericEnvironment();
     for (auto arg : env->getOuterSubstitutions().getReplacementTypes()) {
       if (doIt(arg)) {

@@ -1,0 +1,59 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=copy_block | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import SwiftShims
+import Builtin
+
+// CHECK-LABEL: sil [ossa] @remove_copy_block :
+// CHECK-NOT:     copy_block
+// CHECK:         apply %0
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy_block'
+sil [ossa] @remove_copy_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = begin_borrow [lexical] %2
+  %4 = apply %3() : $@convention(block) @noescape () -> ()
+  end_borrow %3
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copied_block :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_copied_block'
+sil [ossa] @dont_remove_copied_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = begin_borrow [lexical] %2
+  %4 = apply %3() : $@convention(block) @noescape () -> ()
+  %5 = copy_value %3
+  fix_lifetime %5
+  destroy_value %5
+  end_borrow %3
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @use_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_remove_escaping_block :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_escaping_block'
+sil [ossa] @dont_remove_escaping_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = begin_borrow [lexical] %2
+  %4 = function_ref @use_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+  end_borrow %3
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}

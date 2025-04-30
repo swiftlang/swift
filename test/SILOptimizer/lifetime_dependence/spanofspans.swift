@@ -11,7 +11,7 @@
 
 // TODO: uncomment the @lifetime annotations when we have component lifetimes.
 
-// @lifetime(elements)
+// @lifetime(copy elements)
 struct Span<T: ~Escapable>: ~Escapable {
   // Pretend that 'element' is in separate storage.
   var element: T
@@ -22,7 +22,7 @@ struct Span<T: ~Escapable>: ~Escapable {
   }
 }
 
-// @lifetime(elements)
+// @lifetime(copy elements)
 extension Array {
   // @lifetime(span: borrow self)
   // @lifetime(span.elements: copy self.elements)
@@ -34,7 +34,7 @@ extension Array {
 }
 
 // use 'scalars' instead of 'elements' to avoid confusion from nesting
-// @lifetime(scalars)
+// @lifetime(copy scalars)
 struct Vec<T: ~Escapable>: ~Escapable {
   // Pretend that 't' is in separate storage.
   var scalar: T

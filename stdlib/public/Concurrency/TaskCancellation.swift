@@ -78,7 +78,7 @@ public func withTaskCancellationHandler<T>(
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
   let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -99,7 +99,7 @@ public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
   let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -126,8 +126,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
-     withUnsafeCurrentTask { task in
-       task?.isCancelled ?? false
+     unsafe withUnsafeCurrentTask { task in
+       unsafe task?.isCancelled ?? false
      }
   }
 }

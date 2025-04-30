@@ -217,7 +217,13 @@ namespace {
     /// Holds the list of DefaultWitnessTables.
     std::vector<BitOffset> DefaultWitnessTableOffset;
     uint32_t /*DeclID*/ NextDefaultWitnessTableID = 1;
-    
+
+    /// Maps default witness table identifier to an ID.
+    Table DefaultOverrideTableList;
+    /// Holds the list of DefaultOverrideTables.
+    std::vector<BitOffset> DefaultOverrideTableOffset;
+    uint32_t /*DeclID*/ NextDefaultOverrideTableID = 1;
+
     /// Holds the list of Properties.
     std::vector<BitOffset> PropertyOffset;
 
@@ -294,6 +300,10 @@ namespace {
     void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry,
                                    SerializedKind_t serializedKind);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
+    void writeSILDefaultOverrideTableEntry(
+        const SILDefaultOverrideTable::Entry &entry,
+        SerializedKind_t serializedKind);
+    void writeSILDefaultOverrideTable(const SILDefaultOverrideTable &ot);
     void
     writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw);
     void writeSILProperty(const SILProperty &prop);
@@ -486,7 +496,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericSignatureID genericSigID = 0;
-  if (!NoBody || OnlyReferencedByDebugInfo)
+  // Generic environment information is needed while serializing debug scopes.
+  // Otherwise, the generic specializer fails to remap references to functions
+  // in debug scopes to their specialized versions which breaks IRGen.
+  // TODO: add an assertion in IRGen when the specializer fails to remap.
+  if (!NoBody || SerializeDebugInfoSIL)
     if (auto *genericEnv = F.getGenericEnvironment())
       genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
@@ -515,8 +529,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
-  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
-                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+  bool serializeDerivedEffects =
+    // We must not serialize computed effects if library evolution is turned on,
+    // because the copy of the function, which is emitted into the current module,
+    // might have different effects in different versions of the library.
+    (resilience != ResilienceStrategy::Resilient ||
+    // But we can serialize computed effects for @alwaysEmitIntoClient functions,
+    // even when library evolution is enabled, because no copy of the function is
+    // emitted in the original module.
+    F.getLinkage() == SILLinkage::PublicNonABI) &&
+    !F.hasSemanticsAttr("optimize.no.crossmodule");
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
@@ -694,7 +716,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   unsigned abbrCode = SILAbbrCodes[SILBasicBlockLayout::Code];
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
 
-  const SILDebugScope *Prev = BB.getParent()->getDebugScope();
+  const SILDebugScope *Prev = nullptr;
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
     if (SerializeDebugInfoSIL) {
@@ -880,8 +902,8 @@ SILSerializer::writeKeyPathPatternComponent(
       ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
       ListOfValues.push_back(
         S.addSubstitutionMapRef(component.getExternalSubstitutions()));
-  
-      auto indices = component.getSubscriptIndices();
+
+      auto indices = component.getArguments();
       ListOfValues.push_back(indices.size());
       for (auto &index : indices) {
         ListOfValues.push_back(index.Operand);
@@ -892,14 +914,15 @@ SILSerializer::writeKeyPathPatternComponent(
         ListOfValues.push_back(S.addConformanceRef(index.Hashable));
       }
       if (!indices.empty()) {
-        ListOfValues.push_back(
-          addSILFunctionRef(component.getSubscriptIndexEquals()));
-        ListOfValues.push_back(
-          addSILFunctionRef(component.getSubscriptIndexHash()));
+        ListOfValues.push_back(addSILFunctionRef(component.getIndexEquals()));
+        ListOfValues.push_back(addSILFunctionRef(component.getIndexHash()));
       }
     };
 
   switch (component.getKind()) {
+  case KeyPathPatternComponent::Kind::Method:
+    printf("SerializeSIL:writeKeyPathPatternComponent");
+    break;
   case KeyPathPatternComponent::Kind::StoredProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::StoredProperty);
     ListOfValues.push_back(S.addDeclRef(component.getStoredPropertyDecl()));
@@ -908,16 +931,16 @@ SILSerializer::writeKeyPathPatternComponent(
     handleComponentCommon(KeyPathComponentKindEncoding::GettableProperty);
     handleComputedId(component.getComputedPropertyId());
     ListOfValues.push_back(
-                  addSILFunctionRef(component.getComputedPropertyGetter()));
+        addSILFunctionRef(component.getComputedPropertyForGettable()));
     handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::SettableProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
     handleComputedId(component.getComputedPropertyId());
     ListOfValues.push_back(
-                  addSILFunctionRef(component.getComputedPropertyGetter()));
+        addSILFunctionRef(component.getComputedPropertyForGettable()));
     ListOfValues.push_back(
-                  addSILFunctionRef(component.getComputedPropertySetter()));
+        addSILFunctionRef(component.getComputedPropertyForSettable()));
     handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::OptionalChain:
@@ -974,7 +997,111 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
 
-  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueInst: {
+    if (!SerializeDebugInfoSIL)
+     return;
+    auto DVI = cast<DebugValueInst>(&SI);
+    unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
+    attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
+    attrs |= unsigned(DVI->hasTrace()) << 2;
+
+    auto Operand = DVI->getOperand();
+    auto Type = Operand->getType();
+
+    unsigned DebugVarTypeCategory = 0;
+    auto DebugVar = DVI->getVarInfo();
+    const SILDebugScope *ScopeToWrite = nullptr;
+
+    auto &SM = SI.getFunction()->getModule().getSourceManager();
+
+    SmallVector<uint64_t, 8> ListOfValues;
+    ListOfValues.push_back(addValueRef(Operand));
+    ListOfValues.push_back(S.addTypeRef(Type.getRawASTType()));
+
+    if (DebugVar) {
+      // Is a DebugVariable being serialized.
+      attrs |= 1 << 3;
+      attrs |= DebugVar->isLet() << 4;
+
+      // isDenseMapSingleton needs two bits.
+      attrs |= DebugVar->isDenseMapSingleton << 5;
+
+      ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
+      ListOfValues.push_back(DebugVar->ArgNo);
+
+      if (DebugVar->Type.has_value()) {
+        attrs |= 1 << 7;
+        ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
+        DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
+      }
+
+      if (DebugVar->Scope) {
+        attrs |= 1 << 8;
+        ScopeToWrite = DebugVar->Scope;
+      }
+
+      if (DebugVar->Loc) {
+        auto RawLoc = DebugVar->Loc.value();
+        SourceLoc Loc = RawLoc.getSourceLoc();
+        if (Loc.isValid()) {
+          attrs |= 1 << 9;
+          auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
+          auto FName = SM.getDisplayNameForLoc(Loc);
+          auto FNameID = S.addUniquedStringRef(FName);
+
+          ListOfValues.push_back(LC.first);
+          ListOfValues.push_back(LC.second);
+          ListOfValues.push_back(FNameID);
+        } else if (RawLoc.isFilenameAndLocation()) {
+          // getSourceLoc produces an empty SourceLoc for FilenameAndLocation,
+          // so this needs to be handled separately. rdar://25225083.
+          attrs |= 1 << 9;
+          auto FNameLoc = RawLoc.getFilenameAndLocation();
+          ListOfValues.push_back(FNameLoc->line);
+          ListOfValues.push_back(FNameLoc->column);
+          ListOfValues.push_back(S.addUniquedStringRef(FNameLoc->filename));
+        }
+      }
+
+      for (auto &Expr : DebugVar->DIExpr.elements()) {
+        attrs |= 1 << 10;
+        ListOfValues.push_back(Expr.getKind());
+        switch (Expr.getKind()) {
+        case SILDIExprElement::Kind::OperatorKind:
+          ListOfValues.push_back((unsigned)Expr.getAsOperator());
+          break;
+        case SILDIExprElement::Kind::DeclKind:
+          ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
+          break;
+        case SILDIExprElement::Kind::ConstIntKind: {
+          llvm::SmallString<10> Str;
+          APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
+          ListOfValues.push_back(S.addUniquedStringRef(Str));
+          break;
+        }
+        case SILDIExprElement::Kind::TypeKind:
+          ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
+        }
+      }
+    }
+    SILDebugValueLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
+        (unsigned)Type.getCategory(), DebugVarTypeCategory, attrs,
+    ListOfValues);
+
+    if (ScopeToWrite) {
+      assert(DebugVar->Scope->getInlinedFunction() == DVI->getDebugScope()->getInlinedFunction());
+      writeDebugScopes(ScopeToWrite, SM);
+      // Add a delimiter record since debug scope records are read by the
+      // deserializer in a loop until the first non debug scope record is
+      // found. As a result, the deserializer might read debug scopes of
+      // subsequent instructions while deserializing scopes for the current
+      // DebugValue instruction.
+      // TODO: Maybe add a bit to the debug scope layout to mark the ending.
+      DebugValueDelimiterLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[DebugValueDelimiterLayout::Code]);
+    }
+    break;
+  }
   case SILInstructionKind::DebugStepInst:
     // Currently we don't serialize debug info, so it doesn't make
     // sense to write those instructions at all.
@@ -1735,6 +1862,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::IndexRawPointerInst: {
     SILValue operand, operand2;
@@ -1758,6 +1886,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (SI.getKind() == SILInstructionKind::MarkDependenceInst) {
       const MarkDependenceInst *MDI = cast<MarkDependenceInst>(&SI);
       operand = MDI->getValue();
+      operand2 = MDI->getBase();
+      Attr = unsigned(MDI->dependenceKind());
+    } else if (SI.getKind() == SILInstructionKind::MarkDependenceAddrInst) {
+      const MarkDependenceAddrInst *MDI = cast<MarkDependenceAddrInst>(&SI);
+      operand = MDI->getAddress();
       operand2 = MDI->getBase();
       Attr = unsigned(MDI->dependenceKind());
     } else {
@@ -2101,11 +2234,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
+    unsigned flags = 0;
+    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x01;
     ValueID listOfValues[] = {
       addValueRef(CI->getOperand()),
       S.addTypeRef(CI->getSourceLoweredType().getRawASTType()),
       (unsigned)CI->getSourceLoweredType().getCategory(),
-      S.addTypeRef(CI->getTargetFormalType())
+      S.addTypeRef(CI->getTargetFormalType()),
+      flags
     };
 
     SILOneTypeValuesLayout::emitRecord(
@@ -2118,13 +2255,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
+    unsigned flags = 0;
+    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x01;
     ValueID listOfValues[] = {
       S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
       S.addTypeRef(CI->getSourceLoweredType().getRawASTType()),
       (unsigned)CI->getSourceLoweredType().getCategory(),
       S.addTypeRef(CI->getTargetFormalType()),
-      addValueRef(CI->getDest())
+      addValueRef(CI->getDest()),
+      flags
     };
     SILOneTypeValuesLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
@@ -2634,8 +2775,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::CheckedCastBranchInst: {
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
+    unsigned flags = 0;
+    if (CBI->isExact())
+      flags |= 0x01;
+    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x02;
     ValueID listOfValues[] = {
-      CBI->isExact(),
+      flags,
       S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getOperand()),
       S.addTypeRef(CBI->getSourceLoweredType().getRawASTType()),
@@ -2656,8 +2802,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
+    unsigned flags =
+      toStableCastConsumptionKind(CBI->getConsumptionKind()) << 1;
+    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
+      flags |= 0x01;
     ValueID listOfValues[] = {
-      toStableCastConsumptionKind(CBI->getConsumptionKind()),
+      flags,
       S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getSrc()),
       S.addTypeRef(CBI->getSourceLoweredType().getRawASTType()),
@@ -2874,9 +3024,10 @@ static void writeIndexTable(Serializer &S,
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
           kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+          kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES ||
           kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) &&
-         "SIL function table, global, vtable, (default) witness table, and "
-         "differentiability witness table are supported");
+         "SIL function table, global, vtable, (default) witness table, default "
+         "override table and differentiability witness table are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
@@ -2937,6 +3088,14 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord,
                 sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
                 DefaultWitnessTableOffset);
+  }
+
+  if (!DefaultOverrideTableList.empty()) {
+    writeIndexTable(S, List, sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES,
+                    DefaultOverrideTableList);
+    Offset.emit(ScratchRecord,
+                sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS,
+                DefaultOverrideTableOffset);
   }
 
   if (!PropertyOffset.empty()) {
@@ -3185,7 +3344,8 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
     FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   } else if (Scope->Loc.isFilenameAndLocation()) {
-    // TODO: this is a workaround until rdar://problem/25225083 is implemented.
+    // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
+    // this needs to be handled separately. rdar://25225083.
     auto FNameLoc = Scope->Loc.getFilenameAndLocation();
     Row = FNameLoc->line;
     Column = FNameLoc->column;
@@ -3210,6 +3370,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
+    unsigned(wt.isSpecialized()),
     unsigned(wt.getSerializedKind()),
     conformanceID);
 
@@ -3222,12 +3383,11 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   }
 
   for (auto conditional : wt.getConditionalConformances()) {
-    auto requirementID = S.addTypeRef(conditional.Requirement);
-    auto conformanceID = S.addConformanceRef(conditional.Conformance);
+    auto conformanceID = S.addConformanceRef(conditional);
     WitnessConditionalConformanceLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[WitnessConditionalConformanceLayout::Code],
-        requirementID, conformanceID);
+        conformanceID);
   }
 }
 
@@ -3250,13 +3410,12 @@ void SILSerializer::writeSILWitnessTableEntry(
     auto &assoc = entry.getAssociatedConformanceWitness();
 
     auto requirementID = S.addTypeRef(assoc.Requirement);
-    auto protocolID = S.addDeclRef(assoc.Protocol);
     auto conformanceID = S.addConformanceRef(assoc.Witness);
 
     WitnessAssocProtocolLayout::emitRecord(
       Out, ScratchRecord,
       SILAbbrCodes[WitnessAssocProtocolLayout::Code],
-      requirementID, protocolID, conformanceID);
+      requirementID, conformanceID);
     return;
   }
 
@@ -3314,6 +3473,47 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
     // argument is passed here to call hasValidLinkageForFragileRef
     // to keep the behavior consistent with or without any optimizations.
     writeSILWitnessTableEntry(entry, IsSerialized);
+  }
+}
+
+void SILSerializer::writeSILDefaultOverrideTableEntry(
+    const SILDefaultOverrideTable::Entry &entry,
+    SerializedKind_t serializedKind) {
+  SmallVector<uint64_t, 8> ListOfValues;
+  handleSILDeclRef(S, entry.method, ListOfValues);
+  handleSILDeclRef(S, entry.original, ListOfValues);
+
+  IdentifierID implID = 0;
+  SILFunction *impl = entry.impl;
+  if (impl && serializedKind != IsNotSerialized &&
+      impl->hasValidLinkageForFragileRef(serializedKind)) {
+    addReferencedSILFunction(impl, true);
+    implID = S.addUniquedStringRef(impl->getName());
+  }
+  DefaultOverrideTableEntryLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DefaultOverrideTableEntryLayout::Code],
+      // SILFunction name
+      implID, ListOfValues);
+}
+
+void SILSerializer::writeSILDefaultOverrideTable(
+    const SILDefaultOverrideTable &ot) {
+  if (ot.isDeclaration())
+    return;
+
+  StringRef name = S.addUniquedString(ot.getUniqueName()).first;
+  DefaultOverrideTableList[name] = NextDefaultOverrideTableID++;
+  DefaultOverrideTableOffset.push_back(Out.GetCurrentBitNo());
+
+  DefaultOverrideTableLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DefaultOverrideTableLayout::Code],
+      S.addDeclRef(ot.getClass()), toStableSILLinkage(ot.getLinkage()));
+
+  for (auto &entry : ot.getEntries()) {
+    // Default override table is not serialized. The IsSerialized
+    // argument is passed here to call hasValidLinkageForFragileRef
+    // to keep the behavior consistent with or without any optimizations.
+    writeSILDefaultOverrideTableEntry(entry, IsSerialized);
   }
 }
 
@@ -3441,12 +3641,16 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<WitnessConditionalConformanceLayout>();
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
+  registerSILAbbr<DefaultOverrideTableLayout>();
+  registerSILAbbr<DefaultOverrideTableEntryLayout>();
   registerSILAbbr<PropertyLayout>();
   registerSILAbbr<DifferentiabilityWitnessLayout>();
+  registerSILAbbr<SILDebugValueLayout>();
   registerSILAbbr<SILDebugScopeLayout>();
   registerSILAbbr<SILDebugScopeRefLayout>();
   registerSILAbbr<SourceLocLayout>();
   registerSILAbbr<SourceLocRefLayout>();
+  registerSILAbbr<DebugValueDelimiterLayout>();
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).
@@ -3489,6 +3693,13 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     if (SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                                               wt.getProtocol()))
       writeSILDefaultWitnessTable(wt);
+  }
+
+  for (const SILDefaultOverrideTable &ot : SILMod->getDefaultOverrideTables()) {
+    if (!SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+            ot.getClass()))
+      continue;
+    writeSILDefaultOverrideTable(ot);
   }
 
   // Add global variables that must be emitted to the list.

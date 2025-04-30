@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/existential-bitwise-borrowability.swift
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -enable-experimental-feature ValueGenerics -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/existential-bitwise-borrowability.swift | %FileCheck %t/existential-bitwise-borrowability.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/existential-bitwise-borrowability.swift | %FileCheck %t/existential-bitwise-borrowability.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: swift_feature_RawLayout
-// REQUIRES: swift_feature_ValueGenerics
 
 // Copyable existentials are bitwise-borrowable (because copyable types are
 // always bitwise-borrowable if they're bitwise-takable, and only bitwise-takable

@@ -1,14 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature AllowUnsafeAttribute
+// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature WarnUnsafe -enable-experimental-feature StrictConcurrency -enable-experimental-feature AllowUnsafeAttribute -I %t
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -enable-experimental-feature StrictConcurrency -I %t
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_StrictConcurrency
-// REQUIRES: swift_feature_WarnUnsafe
-// REQUIRES: swift_feature_AllowUnsafeAttribute
 
-@preconcurrency import unsafe_swift_decls // expected-warning{{@preconcurrency import is not memory-safe because it can silently introduce data races}}
+@preconcurrency import unsafe_swift_decls // expected-warning{{'@preconcurrency' import is not memory-safe because it can silently introduce data races}}
 
 class C: @unchecked Sendable {
   var counter: Int = 0
@@ -44,4 +42,16 @@ typealias WeirdC = RequiresSendable<C> // okay
 final class MyExecutor: SerialExecutor {
   func enqueue(_ job: consuming ExecutorJob) { fatalError("boom") }
   @unsafe func asUnownedSerialExecutor() -> UnownedSerialExecutor { fatalError("boom") }
+}
+
+// Ensure that this does not cause a reference cycle.
+public struct TokenSyntax { }
+public struct Syntax { }
+
+open class SyntaxVisitor {
+  open func visit(_ token: TokenSyntax) { }
+}
+
+open class SyntaxAnyVisitor: SyntaxVisitor {
+  override open func visit(_ token: TokenSyntax) { }
 }

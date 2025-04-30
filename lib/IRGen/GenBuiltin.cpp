@@ -1327,18 +1327,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
-    // Build a zero initializer of the result type.
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
-    
     if (args.size() > 0) {
+      auto valueType = argTypes[0];
+      auto &valueTI = IGF.IGM.getTypeInfo(valueType);
+
       // `memset` the memory addressed by the argument.
       auto address = args.claimNext();
-      IGF.Builder.CreateMemSet(valueTy.second.getAddressForPointer(address),
+      IGF.Builder.CreateMemSet(valueTI.getAddressForPointer(address),
                                llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
-                               valueTy.second.getSize(IGF, argTypes[0]));
+                               valueTI.getSize(IGF, valueType));
     } else {
-      auto schema = valueTy.second.getSchema();
+      auto &resultTI = cast<LoadableTypeInfo>(IGF.IGM.getTypeInfo(resultType));
+      auto schema = resultTI.getSchema();
       for (auto &elt : schema) {
         out.add(llvm::Constant::getNullValue(elt.getScalarType()));
       }

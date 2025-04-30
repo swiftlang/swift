@@ -7,7 +7,8 @@
 
 // RUN: %batch-code-completion -filecheck-additional-suffix _DISABLED
 // RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED \
-// RUN:        -enable-experimental-feature ABIAttribute
+// RUN:        -enable-experimental-feature ABIAttribute \
+// RUN:        -enable-experimental-feature ExtensibleAttribute
 
 // NOTE: Please do not include the ", N items" after "Begin completions". The
 // item count creates needless merge conflicts given that an "End completions"
@@ -34,6 +35,8 @@
 // KEYWORD4:              Begin completions
 // KEYWORD4_ENABLED-NOT:  Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // KEYWORD4_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
+// KEYWORD4_ENABLED-DAG:  Keyword/None:              extensible[#{{.*}} Attribute#]; name=extensible
+// KEYWORD4_DISABLED-NOT: Keyword/None:              extensible[#{{.*}} Attribute#]; name=extensible
 // KEYWORD4:              End completions
 
 @#^KEYWORD5^# struct S{}
@@ -60,6 +63,12 @@ struct _S {
 // ON_PROPERTY_ENABLED-DAG:  Keyword/None:              abi[#Var Attribute#]; name=abi
 // ON_PROPERTY_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // ON_PROPERTY:              End completions
+
+  @#^ON_SUBSCR^# subscript
+// ON_SUBSCR:              Begin completions
+// ON_SUBSCR_ENABLED-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
+// ON_SUBSCR_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
+// ON_SUBSCR:              End completions
 
   @#^ON_METHOD^# private
   func foo()

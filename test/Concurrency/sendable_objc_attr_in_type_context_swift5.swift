@@ -64,6 +64,28 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
 @end
 
+@interface SwiftImpl : NSObject
+-(id)initWithCallback:  (void (^ SWIFT_SENDABLE)(void)) callback;
+-(void)computeWithCompletionHandler: (void (^)(void)) handler;
+@end
+
+@interface Shadowing : NSObject
+-(void)computeWithCompletion: (void (^)(void)) completion;
+-(void)updateWithCompletionHandler: (void (^_Nullable)(void)) handler;
+@end
+
+@protocol TestWitnesses
+-(void)willSendDataWithCompletion: (void (^)(void)) completion;
+@end
+
+@interface DataHandler : NSObject
++(void)sendDataWithCompletion: (void (^)(MyValue *)) completion;
+@end
+
+@interface TestDR : NSObject
+-(void) testWithCompletion: (void (^)(void)) completion;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
@@ -144,4 +166,48 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
 
   func test(withCallback name: String, handler: @escaping @MainActor ([String : any Sendable], (any Error)?) -> Void) { // Ok
   }
+}
+
+@objc @implementation extension SwiftImpl {
+  @objc public required init(callback: @escaping () -> Void) {}
+  // expected-error@-1 {{initializer 'init(callback:)' should not be 'required' to match initializer declared by the header}}
+  
+  @objc func compute(completionHandler: @escaping () -> Void) {} // Ok (no warnings with minimal checking)
+}
+
+// Methods deliberately has no `@Sendable` to make sure that
+// shadowing rules are preserved when SendableCompletionHandlers feature is enabled.
+@objc extension Shadowing {
+  @objc func compute(completion: @escaping () -> Void) {}
+
+  @objc func update(completionHandler: (() -> Void)? = nil) {}
+
+  func testCompute() {
+    self.compute { } // Ok - no ambiguity
+    self.update { }  // Ok - no ambiguity
+  }
+}
+
+@objc
+class ImplicitShadowing : NSObject, TestWitnesses {
+  func willSendData(completion: @escaping () -> Void) {}
+
+  func test() {
+    (self as AnyObject).willSendData { } // Ok
+  }
+}
+
+protocol CompletionWithoutSendable {
+  associatedtype T
+  static func sendData(completion: @escaping (T) -> Void) // expected-note {{expected sendability to match requirement here}}
+}
+
+extension DataHandler : CompletionWithoutSendable {
+  // expected-warning@-1 {{sendability of function types in class method 'sendData(completion:)' does not match requirement in protocol 'CompletionWithoutSendable'}}
+  // It should be possible to infer `T` from method that mismatches on @Sendable in Swift 5 mode
+}
+
+extension TestDR {
+  @_dynamicReplacement(for: test(completion:))
+  func __replaceObjCFunc(_: @escaping () -> Void) {} // Ok
 }

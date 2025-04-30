@@ -100,7 +100,8 @@ swift::swift_task_enqueueGlobalWithDeadline(
 
 SWIFT_CC(swift) static void
 swift_task_checkIsolatedOrig(SerialExecutorRef executor) {
-  swift_task_checkIsolatedImpl(*reinterpret_cast<SwiftExecutorRef *>(&executor));}
+  swift_task_checkIsolatedImpl(*reinterpret_cast<SwiftExecutorRef *>(&executor));
+}
 
 void
 swift::swift_task_checkIsolated(SerialExecutorRef executor) {
@@ -108,6 +109,22 @@ swift::swift_task_checkIsolated(SerialExecutorRef executor) {
     swift_task_checkIsolated_hook(executor, swift_task_checkIsolatedOrig);
   else
     swift_task_checkIsolatedOrig(executor);
+}
+
+SWIFT_CC(swift) static int8_t
+swift_task_isIsolatingCurrentContextOrig(SerialExecutorRef executor) {
+  return swift_task_isIsolatingCurrentContextImpl(
+      *reinterpret_cast<SwiftExecutorRef *>(&executor));
+}
+
+int8_t
+swift::swift_task_isIsolatingCurrentContext(SerialExecutorRef executor) {
+  if (SWIFT_UNLIKELY(swift_task_isIsolatingCurrentContext_hook)) {
+    return swift_task_isIsolatingCurrentContext_hook(
+        executor, swift_task_isIsolatingCurrentContextOrig);
+  } else {
+    return swift_task_isIsolatingCurrentContextOrig(executor);
+  }
 }
 
 // Implemented in Swift because we need to obtain the user-defined flags on the executor ref.

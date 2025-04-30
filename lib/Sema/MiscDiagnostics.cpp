@@ -23,6 +23,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -342,8 +343,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
             if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
-                                 diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind());
+                                 diag::effectful_keypath_component, asd,
+                                 /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
@@ -805,9 +806,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         declParent = VD->getDeclContext()->getParentModule();
       }
 
-      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                         VD->getBaseIdentifier(),
-                         VD->getDescriptiveKind(),
+      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access, VD,
                          declParent);
       Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD);
 
@@ -845,14 +844,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
       for (const ModuleValuePair &pair : sortedResults) {
-        DescriptiveDeclKind k = pair.second->getDescriptiveKind();
-
         SmallString<32> namePlusDot = pair.first->getName().str();
         namePlusDot.push_back('.');
 
-        Ctx.Diags.diagnose(DRE->getLoc(), topLevelDiag,
-                           namePlusDot, k, pair.first->getName())
-          .fixItInsert(DRE->getStartLoc(), namePlusDot);
+        Ctx.Diags
+            .diagnose(DRE->getLoc(), topLevelDiag, namePlusDot, pair.second,
+                      pair.first)
+            .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
     
@@ -1506,11 +1504,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy =
-          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
-                                module, ResilienceExpansion::Minimal,
-                                /*useOldABI=*/false);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),
@@ -2242,11 +2239,12 @@ public:
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
-    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
-    // compatibility with the Swift 6 diagnostic behavior where we previously
-    // skipped diagnosing.
-    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
-      warnUntilVersion.emplace(7);
+    // Prior to the next language mode, downgrade to a warning if we're in a
+    // macro to preserve compatibility with the Swift 6 diagnostic behavior
+    // where we previously skipped diagnosing.
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+      warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
@@ -3654,9 +3652,18 @@ public:
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
+
+        // Type checking did not set a range for this query (it may be invalid).
+        // Treat the condition as if it were always true.
+        if (!availabilityRange.has_value()) {
+          alwaysAvailableCount++;
+          continue;
+        }
+
         // If there is no lower endpoint it means that the condition has no
         // OS version specification that matches the target platform.
-        if (!availabilityRange.hasLowerEndpoint()) {
+        // FIXME: [availability] Handle empty ranges (never available).
+        if (!availabilityRange->hasLowerEndpoint()) {
           // An inactive #unavailable condition trivially evaluates to false.
           if (condition->isUnavailability()) {
             neverAvailableCount++;
@@ -3669,7 +3676,7 @@ public:
         }
 
         conditions.push_back(
-            {availabilityRange, condition->isUnavailability()});
+            {*availabilityRange, condition->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this
@@ -5123,31 +5130,86 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 /// was emitted.
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                                           DeclContext *DC) {
-  auto &diags = DC->getASTContext().Diags;
+  if (info->isInvalid())
+    return false;
 
+  auto &diags = DC->getASTContext().Diags;
+  StringRef queryName =
+      info->isUnavailability() ? "#unavailable" : "#available";
+
+  bool hasValidSpecs = false;
+  bool allValidSpecsArePlatform = true;
+  std::optional<SourceLoc> wildcardLoc;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
-  for (auto spec : info->getQueries()) {
-    auto domain = spec->getDomain();
-    if (!domain) {
+  for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
+    auto parsedSpec = spec.getParsedSpec();
+    if (spec.isWildcard()) {
+      wildcardLoc = parsedSpec->getStartLoc();
       continue;
     }
 
-    if (!domain->isPlatform()) {
-      diags.diagnose(
-          spec->getStartLoc(),
-          domain->isSwiftLanguage()
-              ? diag::availability_query_swift_not_allowed
-              : diag::availability_query_package_description_not_allowed,
-          info->isUnavailability() ? "#unavailable" : "#available");
+    auto domain = spec.getDomain();
+    auto loc = parsedSpec->getStartLoc();
+    bool hasVersion = !spec.getVersion().empty();
+
+    if (!domain.supportsQueries()) {
+      diags.diagnose(loc, diag::availability_query_not_allowed, domain,
+                     hasVersion, queryName);
       return true;
     }
 
-    // Diagnose duplicate platforms.
-    if (!seenDomains.insert(*domain).second) {
-      diags.diagnose(spec->getStartLoc(),
-                     diag::availability_query_repeated_platform,
-                     domain->getNameForAttributePrinting());
+    if (!domain.isPlatform() && info->getQueries().size() > 1) {
+      diags.diagnose(loc, diag::availability_must_occur_alone, domain,
+                     hasVersion);
       return true;
+    }
+
+    if (hasVersion) {
+      auto rawVersion = parsedSpec->getRawVersion();
+      if (!VersionRange::isValidVersion(rawVersion)) {
+        diags
+            .diagnose(loc, diag::availability_unsupported_version_number,
+                      rawVersion)
+            .highlight(parsedSpec->getVersionSrcRange());
+        return true;
+      }
+    }
+
+    if (domain.isVersioned()) {
+      if (!hasVersion) {
+        diags.diagnose(loc, diag::avail_query_expected_version_number);
+        return true;
+      }
+    } else if (hasVersion) {
+      diags.diagnose(loc, diag::availability_unexpected_version, domain)
+          .highlight(parsedSpec->getVersionSrcRange());
+      return true;
+    }
+
+    // Diagnose duplicate domains.
+    if (!seenDomains.insert(domain).second) {
+      diags.diagnose(loc, diag::availability_query_already_specified,
+                     domain.isVersioned(), domain);
+      return true;
+    }
+
+    hasValidSpecs = true;
+    if (!domain.isPlatform())
+      allValidSpecsArePlatform = false;
+  }
+
+  if (info->isUnavailability()) {
+    if (wildcardLoc) {
+      diags
+          .diagnose(*wildcardLoc,
+                    diag::unavailability_query_wildcard_not_required)
+          .fixItRemove(*wildcardLoc);
+    }
+  } else if (!wildcardLoc && hasValidSpecs && allValidSpecsArePlatform) {
+    if (info->getQueries().size() > 0) {
+      auto insertLoc = info->getQueries().back()->getSourceRange().End;
+      diags.diagnose(insertLoc, diag::availability_query_wildcard_required)
+          .fixItInsertAfter(insertLoc, ", *");
     }
   }
 
@@ -5257,7 +5319,8 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();
-      (void)diagnoseAvailabilityCondition(info, DC);
+      if (diagnoseAvailabilityCondition(info, DC))
+        info->setInvalid();
       break;
     }
     case StmtConditionElement::CK_HasSymbol: {
@@ -5684,7 +5747,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
         assert(keyPathExpr->getComponents().size() > 0);
         auto &component = keyPathExpr->getComponents().back();
-        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+        if (component.getKind() == KeyPathExpr::Component::Kind::Member) {
           auto *storage =
             cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
           if (!storage->isSettable(nullptr) ||
@@ -5760,7 +5823,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
       for (auto *keyPathArg : keyPathArgs) {
         auto lastComponent = keyPathArg->getComponents().back();
-        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Member)
           continue;
         auto property = lastComponent.getDeclRef().getDecl();
         if (!property)

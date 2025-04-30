@@ -18,8 +18,8 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/DiagnosticArgument.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
@@ -34,33 +34,20 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/VersionTuple.h"
 
 namespace clang {
 class NamedDecl;
+class Type;
 }
 
 namespace swift {
-  class ConstructorDecl;
+  class ClosureExpr;
   class Decl;
   class DeclAttribute;
   class DiagnosticEngine;
   class FuncDecl;
-  class GeneratedSourceInfo;
   class SourceManager;
-  class TypeAliasDecl;
-  class ValueDecl;
   class SourceFile;
-
-  enum class CXXStdlibKind : uint8_t;
-  enum class DescriptivePatternKind : uint8_t;
-  enum class DiagGroupID : uint16_t;
-  enum class SelfAccessKind : uint8_t;
-  enum class ReferenceOwnership : uint8_t;
-  enum class StaticSpellingKind : uint8_t;
-  enum class DescriptiveDeclKind : uint8_t;
-  enum class DeclAttrKind : unsigned;
-  enum class StmtKind;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -98,338 +85,9 @@ namespace swift {
   using DiagArgTuple =
     std::tuple<typename detail::PassArgument<ArgTypes>::type...>;
 
-  /// A family of wrapper types for compiler data types that forces its
-  /// underlying data to be formatted with full qualification.
-  ///
-  /// So far, this is only useful for \c Type, hence the SFINAE'ing.
-  template <typename T, typename = void> struct FullyQualified {};
-
-  template <typename T>
-  struct FullyQualified<
-      T, typename std::enable_if<std::is_convertible<T, Type>::value>::type> {
-    Type t;
-
-  public:
-    FullyQualified(T t) : t(t){};
-
-    Type getType() const { return t; }
-  };
-
-  struct WitnessType {
-    Type t;
-
-    WitnessType(Type t) : t(t) {}
-
-    Type getType() { return t; }
-  };
-
-  /// Describes the kind of diagnostic argument we're storing.
-  ///
-  enum class DiagnosticArgumentKind {
-    String,
-    Integer,
-    Unsigned,
-    Identifier,
-    ObjCSelector,
-    Decl,
-    Type,
-    TypeRepr,
-    FullyQualifiedType,
-    WitnessType,
-    DescriptivePatternKind,
-    SelfAccessKind,
-    ReferenceOwnership,
-    StaticSpellingKind,
-    DescriptiveDeclKind,
-    DescriptiveStmtKind,
-    DeclAttribute,
-    VersionTuple,
-    LayoutConstraint,
-    ActorIsolation,
-    IsolationSource,
-    Diagnostic,
-    ClangDecl
-  };
-
   namespace diag {
     enum class RequirementKind : uint8_t;
   }
-
-  /// Variant type that holds a single diagnostic argument of a known
-  /// type.
-  ///
-  /// All diagnostic arguments are converted to an instance of this class.
-  class DiagnosticArgument {
-    DiagnosticArgumentKind Kind;
-    union {
-      int IntegerVal;
-      unsigned UnsignedVal;
-      StringRef StringVal;
-      DeclNameRef IdentifierVal;
-      ObjCSelector ObjCSelectorVal;
-      const Decl *TheDecl;
-      Type TypeVal;
-      TypeRepr *TyR;
-      FullyQualified<Type> FullyQualifiedTypeVal;
-      WitnessType WitnessTypeVal;
-      DescriptivePatternKind DescriptivePatternKindVal;
-      SelfAccessKind SelfAccessKindVal;
-      ReferenceOwnership ReferenceOwnershipVal;
-      StaticSpellingKind StaticSpellingKindVal;
-      DescriptiveDeclKind DescriptiveDeclKindVal;
-      StmtKind DescriptiveStmtKindVal;
-      const DeclAttribute *DeclAttributeVal;
-      llvm::VersionTuple VersionVal;
-      LayoutConstraint LayoutConstraintVal;
-      ActorIsolation ActorIsolationVal;
-      IsolationSource IsolationSourceVal;
-      DiagnosticInfo *DiagnosticVal;
-      const clang::NamedDecl *ClangDecl;
-    };
-    
-  public:
-    DiagnosticArgument(StringRef S)
-      : Kind(DiagnosticArgumentKind::String), StringVal(S) {
-    }
-
-    DiagnosticArgument(int I) 
-      : Kind(DiagnosticArgumentKind::Integer), IntegerVal(I) {
-    }
-
-    DiagnosticArgument(unsigned I) 
-      : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
-    }
-
-    DiagnosticArgument(DeclNameRef R)
-        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(R) {}
-
-    DiagnosticArgument(DeclName D)
-        : Kind(DiagnosticArgumentKind::Identifier),
-          IdentifierVal(DeclNameRef(D)) {}
-
-    DiagnosticArgument(DeclBaseName D)
-        : Kind(DiagnosticArgumentKind::Identifier),
-          IdentifierVal(DeclNameRef(D)) {}
-
-    DiagnosticArgument(Identifier I)
-      : Kind(DiagnosticArgumentKind::Identifier),
-        IdentifierVal(DeclNameRef(I)) {
-    }
-
-    DiagnosticArgument(ObjCSelector S)
-      : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
-    }
-
-    DiagnosticArgument(const Decl *VD)
-      : Kind(DiagnosticArgumentKind::Decl), TheDecl(VD) {
-    }
-
-    DiagnosticArgument(Type T)
-      : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
-    }
-
-    DiagnosticArgument(TypeRepr *T)
-      : Kind(DiagnosticArgumentKind::TypeRepr), TyR(T) {
-    }
-
-    DiagnosticArgument(FullyQualified<Type> FQT)
-        : Kind(DiagnosticArgumentKind::FullyQualifiedType),
-          FullyQualifiedTypeVal(FQT) {}
-
-    DiagnosticArgument(WitnessType WT)
-        : Kind(DiagnosticArgumentKind::WitnessType),
-          WitnessTypeVal(WT) {}
-
-    DiagnosticArgument(const TypeLoc &TL) {
-      if (TypeRepr *tyR = TL.getTypeRepr()) {
-        Kind = DiagnosticArgumentKind::TypeRepr;
-        TyR = tyR;
-      } else {
-        Kind = DiagnosticArgumentKind::Type;
-        TypeVal = TL.getType();
-      }
-    }
-
-    DiagnosticArgument(DescriptivePatternKind DPK)
-        : Kind(DiagnosticArgumentKind::DescriptivePatternKind),
-          DescriptivePatternKindVal(DPK) {}
-
-    DiagnosticArgument(ReferenceOwnership RO)
-        : Kind(DiagnosticArgumentKind::ReferenceOwnership),
-          ReferenceOwnershipVal(RO) {}
-
-    DiagnosticArgument(SelfAccessKind SAK)
-        : Kind(DiagnosticArgumentKind::SelfAccessKind),
-          SelfAccessKindVal(SAK) {}
-
-    DiagnosticArgument(StaticSpellingKind SSK)
-        : Kind(DiagnosticArgumentKind::StaticSpellingKind),
-          StaticSpellingKindVal(SSK) {}
-
-    DiagnosticArgument(DescriptiveDeclKind DDK)
-        : Kind(DiagnosticArgumentKind::DescriptiveDeclKind),
-          DescriptiveDeclKindVal(DDK) {}
-
-    DiagnosticArgument(StmtKind SK)
-        : Kind(DiagnosticArgumentKind::DescriptiveStmtKind),
-          DescriptiveStmtKindVal(SK) {}
-
-    DiagnosticArgument(const DeclAttribute *attr)
-        : Kind(DiagnosticArgumentKind::DeclAttribute),
-          DeclAttributeVal(attr) {}
-
-    DiagnosticArgument(llvm::VersionTuple version)
-      : Kind(DiagnosticArgumentKind::VersionTuple),
-        VersionVal(version) { }
-
-    DiagnosticArgument(LayoutConstraint L)
-      : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
-    }
-
-    DiagnosticArgument(ActorIsolation AI)
-      : Kind(DiagnosticArgumentKind::ActorIsolation),
-        ActorIsolationVal(AI) {
-    }
-
-    DiagnosticArgument(IsolationSource IS)
-      : Kind(DiagnosticArgumentKind::IsolationSource),
-        IsolationSourceVal(IS){
-    }
-
-    DiagnosticArgument(DiagnosticInfo *D)
-      : Kind(DiagnosticArgumentKind::Diagnostic),
-        DiagnosticVal(D) {
-    }
-
-    DiagnosticArgument(const clang::NamedDecl *ND)
-        : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {}
-
-    /// Initializes a diagnostic argument using the underlying type of the
-    /// given enum.
-    template<
-        typename EnumType,
-        typename std::enable_if<std::is_enum<EnumType>::value>::type* = nullptr>
-    DiagnosticArgument(EnumType value)
-      : DiagnosticArgument(
-          static_cast<typename std::underlying_type<EnumType>::type>(value)) {}
-
-    DiagnosticArgumentKind getKind() const { return Kind; }
-
-    StringRef getAsString() const {
-      assert(Kind == DiagnosticArgumentKind::String);
-      return StringVal;
-    }
-
-    int getAsInteger() const {
-      assert(Kind == DiagnosticArgumentKind::Integer);
-      return IntegerVal;
-    }
-
-    unsigned getAsUnsigned() const {
-      assert(Kind == DiagnosticArgumentKind::Unsigned);
-      return UnsignedVal;
-    }
-
-    DeclNameRef getAsIdentifier() const {
-      assert(Kind == DiagnosticArgumentKind::Identifier);
-      return IdentifierVal;
-    }
-
-    ObjCSelector getAsObjCSelector() const {
-      assert(Kind == DiagnosticArgumentKind::ObjCSelector);
-      return ObjCSelectorVal;
-    }
-
-    const Decl *getAsDecl() const {
-      assert(Kind == DiagnosticArgumentKind::Decl);
-      return TheDecl;
-    }
-
-    Type getAsType() const {
-      assert(Kind == DiagnosticArgumentKind::Type);
-      return TypeVal;
-    }
-
-    TypeRepr *getAsTypeRepr() const {
-      assert(Kind == DiagnosticArgumentKind::TypeRepr);
-      return TyR;
-    }
-
-    FullyQualified<Type> getAsFullyQualifiedType() const {
-      assert(Kind == DiagnosticArgumentKind::FullyQualifiedType);
-      return FullyQualifiedTypeVal;
-    }
-
-    WitnessType getAsWitnessType() const {
-      assert(Kind == DiagnosticArgumentKind::WitnessType);
-      return WitnessTypeVal;
-    }
-
-    DescriptivePatternKind getAsDescriptivePatternKind() const {
-      assert(Kind == DiagnosticArgumentKind::DescriptivePatternKind);
-      return DescriptivePatternKindVal;
-    }
-
-    ReferenceOwnership getAsReferenceOwnership() const {
-      assert(Kind == DiagnosticArgumentKind::ReferenceOwnership);
-      return ReferenceOwnershipVal;
-    }
-
-    SelfAccessKind getAsSelfAccessKind() const {
-      assert(Kind == DiagnosticArgumentKind::SelfAccessKind);
-      return SelfAccessKindVal;
-    }
-
-    StaticSpellingKind getAsStaticSpellingKind() const {
-      assert(Kind == DiagnosticArgumentKind::StaticSpellingKind);
-      return StaticSpellingKindVal;
-    }
-
-    DescriptiveDeclKind getAsDescriptiveDeclKind() const {
-      assert(Kind == DiagnosticArgumentKind::DescriptiveDeclKind);
-      return DescriptiveDeclKindVal;
-    }
-
-    StmtKind getAsDescriptiveStmtKind() const {
-      assert(Kind == DiagnosticArgumentKind::DescriptiveStmtKind);
-      return DescriptiveStmtKindVal;
-    }
-
-    const DeclAttribute *getAsDeclAttribute() const {
-      assert(Kind == DiagnosticArgumentKind::DeclAttribute);
-      return DeclAttributeVal;
-    }
-
-    llvm::VersionTuple getAsVersionTuple() const {
-      assert(Kind == DiagnosticArgumentKind::VersionTuple);
-      return VersionVal;
-    }
-
-    LayoutConstraint getAsLayoutConstraint() const {
-      assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
-      return LayoutConstraintVal;
-    }
-
-    ActorIsolation getAsActorIsolation() const {
-      assert(Kind == DiagnosticArgumentKind::ActorIsolation);
-      return ActorIsolationVal;
-    }
-
-    IsolationSource getAsIsolationSource() const {
-      assert(Kind == DiagnosticArgumentKind::IsolationSource);
-      return IsolationSourceVal;
-    }
-
-    DiagnosticInfo *getAsDiagnostic() const {
-      assert(Kind == DiagnosticArgumentKind::Diagnostic);
-      return DiagnosticVal;
-    }
-
-    const clang::NamedDecl *getAsClangDecl() const {
-      assert(Kind == DiagnosticArgumentKind::ClangDecl);
-      return ClangDecl;
-    }
-  };
 
   /// Describes the current behavior to take with a diagnostic.
   /// Ordered from most severe to least.
@@ -564,6 +222,9 @@ namespace swift {
     void setDecl(const class Decl *decl) { Decl = decl; }
     void setBehaviorLimit(DiagnosticBehavior limit){ BehaviorLimit = limit; }
 
+    /// Returns the wrapped diagnostic, if any.
+    std::optional<const DiagnosticInfo *> getWrappedDiagnostic() const;
+
     /// Returns true if this object represents a particular diagnostic.
     ///
     /// \code
@@ -667,6 +328,10 @@ namespace swift {
     /// Flush the active diagnostic to the diagnostic output engine.
     void flush();
 
+    /// Returns the \c SourceManager associated with \c SourceLoc s for this
+    /// diagnostic.
+    SourceManager &getSourceManager();
+
     /// Prevent the diagnostic from behaving more severely than \p limit. For
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
@@ -724,6 +389,17 @@ namespace swift {
 
       return limitBehaviorUntilSwiftVersion(limit, languageMode);
     }
+
+    /// Limit the diagnostic behavior to warning until the next future
+    /// language mode.
+    ///
+    /// This should be preferred over passing the next major version to
+    /// `warnUntilSwiftVersion` to make it easier to find and update clients
+    /// when a new language mode is introduced.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &warnUntilFutureSwiftVersion();
 
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
@@ -866,7 +542,17 @@ namespace swift {
     InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef Str) {
       return fixItInsertAfter(L, "%0", {Str});
     }
-    
+
+    /// Add a fix-it suggesting to insert the given attribute at the given
+    /// location.
+    InFlightDiagnostic &fixItInsertAttribute(SourceLoc L,
+                                             const DeclAttribute *Attr);
+
+    /// Add a fix-it suggesting to add the given attribute to the given
+    /// closure.
+    InFlightDiagnostic &fixItAddAttribute(const DeclAttribute *Attr,
+                                          const ClosureExpr *E);
+
     /// Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R);
@@ -1485,16 +1171,17 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    /// Get a localized format string for a given `DiagID`. If no localization
-    /// available returns the default string for that `DiagID`.
-    llvm::StringRef diagnosticStringFor(DiagID id);
+    /// Get a localized format string for the given `DiagID`. If no localization
+    /// is available, returns the default string.
+    llvm::StringRef getFormatStringForDiagnostic(DiagID id);
 
-    /// Get a localized format string with an optional diagnostic name appended
-    /// to it. The diagnostic name type is defined by
-    /// `PrintDiagnosticNamesMode`.
-    llvm::StringRef diagnosticStringWithNameFor(
-        DiagID id, DiagGroupID groupID,
-        PrintDiagnosticNamesMode printDiagnosticNamesMode);
+    /// Get a localized format string for the given diagnostic. If no
+    /// localization is available, returns the default string.
+    ///
+    /// \param includeDiagnosticName Whether to at all consider embedding the
+    /// name of the diagnostic identifier or group, per the setting.
+    llvm::StringRef getFormatStringForDiagnostic(const Diagnostic &diagnostic,
+                                                 bool includeDiagnosticName);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 
@@ -1514,6 +1201,10 @@ namespace swift {
       return getBestAddImportFixItLoc(Member, nullptr);
     }
   };
+
+  inline SourceManager &InFlightDiagnostic::getSourceManager() {
+    return Engine->SourceMgr;
+  }
 
   /// Remember details about the state of a diagnostic engine and restore them
   /// when the object is destroyed.
@@ -1784,6 +1475,7 @@ namespace swift {
   }
 
   void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
+  void printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os);
 
   /// Temporary on-stack storage and unescaping for encoded diagnostic
   /// messages.

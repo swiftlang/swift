@@ -90,3 +90,33 @@ tuplify {
     value.a
   }
 }
+
+tuplify { _ in
+  switch true {
+  // CHECK: (case_stmt {{.*}}
+  // CHECK:   (pattern_named implicit type="Int" "$__builder2")
+  // CHECK:   (declref_expr implicit type="(TupleBuilder.Type) -> (Int) -> Int" location={{.*}} range={{.*}} decl="{{.*}}buildBlock@{{.*}}" function_ref=single apply)
+
+  // CHECK: (call_expr implicit type="Either<Int, Int>" {{.*}}
+  // CHECK-NEXT: (dot_syntax_call_expr implicit type="(Int) -> Either<Int, Int>" {{.*}}
+  // CHECK-NEXT: (declref_expr implicit type="(TupleBuilder.Type) -> (Int) -> Either<Int, Int>" location={{.*}} range={{.*}} decl="{{.*}}buildEither(first:)@{{.*}}" function_ref=single apply)
+  // CHECK:   (argument_list implicit labels="first:"
+  // CHECK-NEXT: (argument label="first"
+  // CHECK-NEXT:   (load_expr implicit type="Int" {{.*}}
+  // CHECK-NEXT:     (declref_expr implicit type="@lvalue Int" location={{.*}} range={{.*}} decl="{{.*}}.$__builder2@{{.*}}" function_ref=unapplied))))))))
+  case true: 0
+
+  // CHECK: (case_stmt {{.*}}
+  // CHECK:   (pattern_named implicit type="Int" "$__builder4")
+  // CHECK:   (declref_expr implicit type="(TupleBuilder.Type) -> (Int) -> Int" location={{.*}} range={{.*}} decl="{{.*}}buildBlock@{{.*}}" function_ref=single apply)
+
+  // CHECK: (call_expr implicit type="Either<Int, Int>" {{.*}}
+  // CHECK-NEXT: (dot_syntax_call_expr implicit type="(Int) -> Either<Int, Int>" {{.*}}
+  // CHECK-NEXT: (declref_expr implicit type="(TupleBuilder.Type) -> (Int) -> Either<Int, Int>" location={{.*}} range={{.*}} decl="{{.*}}buildEither(second:)@{{.*}}" function_ref=single apply)
+  // CHECK:   (argument_list implicit labels="second:"
+  // CHECK-NEXT: (argument label="second"
+  // CHECK-NEXT:   (load_expr implicit type="Int" {{.*}}
+  // CHECK-NEXT:     (declref_expr implicit type="@lvalue Int" location={{.*}} range={{.*}} decl="{{.*}}.$__builder4@{{.*}}" function_ref=unapplied))))))))
+  case false: 1
+  }
+}

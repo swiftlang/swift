@@ -253,7 +253,7 @@ struct AliasAnalysis {
     case let storeBorrow as StoreBorrowInst:
       return memLoc.mayAlias(with: storeBorrow.destination, self) ? .init(write: true) : .noEffects
 
-    case let mdi as MarkDependenceInst:
+    case let mdi as MarkDependenceInstruction:
       if mdi.base.type.isAddress && memLoc.mayAlias(with: mdi.base, self) {
         return .init(read: true)
       }
@@ -275,10 +275,23 @@ struct AliasAnalysis {
       return getPartialApplyEffect(of: partialApply, on: memLoc)
 
     case let endApply as EndApplyInst:
-      return getApplyEffect(of: endApply.beginApply, on: memLoc)
+      let beginApply = endApply.beginApply
+      if case .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
+        // The lifetime of yielded values always end at the end_apply. This is required because a yielded
+        // address is non-aliasing inside the begin/end_apply scope, but might be aliasing after the end_apply.
+        // For example, if the callee yields an `ref_element_addr` (which is encapsulated in a begin/end_access).
+        // Therefore, even if the callee does not write anything, the effects must be "read" and "write".
+        return .worstEffects
+      }
+      return getApplyEffect(of: beginApply, on: memLoc)
 
     case let abortApply as AbortApplyInst:
-      return getApplyEffect(of: abortApply.beginApply, on: memLoc)
+      let beginApply = abortApply.beginApply
+      if case .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
+        // See the comment for `end_apply` above.
+        return .worstEffects
+      }
+      return getApplyEffect(of: beginApply, on: memLoc)
 
     case let builtin as BuiltinInst:
       return getBuiltinEffect(of: builtin, on: memLoc)
@@ -345,7 +358,7 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
       // Check if the memLoc is "derived" from the begin_borrow, i.e. is an interior pointer.
-      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BorrowIntroducingInstruction)
+      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
   }
@@ -691,7 +704,7 @@ private enum ImmutableScope {
 }
 
 private struct FindBeginBorrowWalker : ValueUseDefWalker {
-  let beginBorrow: BorrowIntroducingInstruction
+  let beginBorrow: BeginBorrowInstruction
   var walkUpCache = WalkerCache<Path>()
 
   mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {

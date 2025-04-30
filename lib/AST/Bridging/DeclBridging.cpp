@@ -111,7 +111,7 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
 
-static AccessorKind unbridged(BridgedAccessorKind kind) {
+AccessorKind unbridged(BridgedAccessorKind kind) {
   return static_cast<AccessorKind>(kind);
 }
 
@@ -290,15 +290,18 @@ BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
-    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition) {
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
   auto *params = cParams.unbridged();
   DeclName fullName = DeclName(context, cName.unbridged(), params);
-  return new (context)
+  auto *decl = new (context)
       MacroDecl(cMacroLoc.unbridged(), fullName, cNameLoc.unbridged(),
                 cGenericParams.unbridged(), params, cArrowLoc.unbridged(),
                 cResultType.unbridged(), cDefinition.unbridged(),
                 cDeclContext.unbridged());
+  decl->setTrailingWhereClause(genericWhereClause.unbridged());
+  return decl;
 }
 
 BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
@@ -519,6 +522,13 @@ BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
       cRightAngleLoc.unbridged(), cArgList.unbridged());
 }
 
+BridgedMissingDecl BridgedMissingDecl_create(BridgedASTContext cContext,
+                                             BridgedDeclContext cDeclContext,
+                                             BridgedSourceLoc cLoc) {
+  return MissingDecl::create(cContext.unbridged(), cDeclContext.unbridged(),
+                             cLoc.unbridged());
+}
+
 BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedOperatorFixity cFixity, BridgedSourceLoc cOperatorKeywordLoc,
@@ -615,12 +625,15 @@ BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
     BridgedSourceLoc cSubscriptKeywordLoc,
     BridgedNullableGenericParamList cGenericParamList,
     BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
-    BridgedTypeRepr returnType) {
-  return SubscriptDecl::createParsed(
+    BridgedTypeRepr returnType,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
+  auto *decl = SubscriptDecl::createParsed(
       cContext.unbridged(), cStaticLoc.unbridged(), unbridged(cStaticSpelling),
       cSubscriptKeywordLoc.unbridged(), cParamList.unbridged(),
       cArrowLoc.unbridged(), returnType.unbridged(), cDeclContext.unbridged(),
       cGenericParamList.unbridged());
+  decl->setTrailingWhereClause(genericWhereClause.unbridged());
+  return decl;
 }
 
 BridgedTopLevelCodeDecl

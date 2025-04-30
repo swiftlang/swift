@@ -32,6 +32,8 @@ target_link_libraries(swiftSwiftOnoneSupport
     swiftCore)
 
 install(TARGETS swiftSwiftOnoneSupport
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime
     ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

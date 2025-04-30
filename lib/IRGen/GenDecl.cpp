@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
@@ -1192,6 +1193,9 @@ void IRGenerator::emitGlobalTopLevel(
     CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
     ensureRelativeSymbolCollocation(wt);
   }
+  for (auto &ot : PrimaryIGM->getSILModule().getDefaultOverrideTableList()) {
+    ensureRelativeSymbolCollocation(ot);
+  }
   for (auto &directive: linkerDirectives) {
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
@@ -1823,9 +1827,15 @@ static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
         IGM.DynamicReplacementLinkEntryTy, linkEntry, indices);
     bool isAsyncFunction =
         entity.hasSILFunction() && entity.getSILFunction()->isAsync();
+    bool isCalleeAllocatedCoroutine =
+        entity.hasSILFunction() && entity.getSILFunction()
+                                       ->getLoweredFunctionType()
+                                       ->isCalleeAllocatedCoroutine();
     auto &schema =
         isAsyncFunction
             ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+        : isCalleeAllocatedCoroutine
+            ? IGM.getOptions().PointerAuth.CoroSwiftDynamicReplacements
             : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
     assert(entity.hasSILFunction() || entity.isOpaqueTypeDescriptorAccessor());
     auto authEntity = entity.hasSILFunction()
@@ -1917,6 +1927,11 @@ void IRGenerator::emitDynamicReplacements() {
       replacement.addRelativeAddress(llvm::ConstantExpr::getBitCast(
           IGM.getAddrOfAsyncFunctionPointer(
               LinkEntity::forSILFunction(newFunc)),
+          IGM.Int8PtrTy));
+    } else if (newFunc->getLoweredFunctionType()
+                   ->isCalleeAllocatedCoroutine()) {
+      replacement.addRelativeAddress(llvm::ConstantExpr::getBitCast(
+          IGM.getAddrOfCoroFunctionPointer(LinkEntity::forSILFunction(newFunc)),
           IGM.Int8PtrTy));
     } else {
       replacement.addCompactFunctionReference(IGM.getAddrOfSILFunction(
@@ -2148,6 +2163,15 @@ void IRGenModule::emitVTableStubs() {
       auto entity = LinkEntity::forSILFunction(const_cast<SILFunction *>(&F));
       auto *fnPtr = emitAsyncFunctionPointer(*this, stub, entity, asyncLayout.getSize());
       alias = fnPtr;
+    } else if (F.getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+      // TODO: We cannot directly create a pointer to
+      // `swift_deletedCalleeAllocatedCoroutineMethodError` to workaround a
+      // linker crash. Instead use the stub, which calls
+      // swift_deletedMethodError. This works because swift_deletedMethodError
+      // takes no parameters and simply aborts the program.
+      auto entity = LinkEntity::forSILFunction(const_cast<SILFunction *>(&F));
+      auto *cfp = emitCoroFunctionPointer(*this, stub, entity);
+      alias = cfp;
     } else {
       alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
                                         F.getName(), stub);
@@ -2253,7 +2277,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
     if (info.MergeableSymbols)
-      linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+      linkage = llvm::GlobalValue::WeakODRLinkage;
 
     return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
@@ -2271,7 +2295,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   case SILLinkage::Hidden:
     if (info.MergeableSymbols)
-      return RESULT(LinkOnceODR, Hidden, Default);
+      return RESULT(WeakODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);
 
@@ -2377,6 +2401,11 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
     // types to be referenced directly.
     if (const auto *MD = entity.getSILFunction()->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+  } else if (entity.isTypeMetadataAccessFunction()) {
+    if (NominalTypeDecl *NTD = entity.getType()->getAnyNominal()) {
+      const ModuleDecl *MD = NTD->getDeclContext()->getParentModule();
+      isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+    }
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
@@ -2586,7 +2615,6 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Macro:
     return;
 
@@ -2750,9 +2778,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       }
 
       DebugTypeInfo DbgTy =
-          inFixedBuffer ? DebugTypeInfo::getGlobalFixedBuffer(var, fixedSize,
-                                                              fixedAlignment)
-                        : DebugTypeInfo::getGlobal(var, *this);
+          inFixedBuffer
+              ? DebugTypeInfo::getGlobalFixedBuffer(var, fixedAlignment, *this)
+              : DebugTypeInfo::getGlobal(var, *this);
 
       gvar = createVariable(*this, link, globalTy, fixedAlignment, DbgTy, loc, name);
     }
@@ -2931,8 +2959,14 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
   B.addRelativeAddress(linkEntry);
   bool isAsyncFunction =
       keyEntity.hasSILFunction() && keyEntity.getSILFunction()->isAsync();
+  bool isCalleeAllocatedCoroutine =
+      keyEntity.hasSILFunction() && keyEntity.getSILFunction()
+                                        ->getLoweredFunctionType()
+                                        ->isCalleeAllocatedCoroutine();
   auto schema = isAsyncFunction
                     ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                : isCalleeAllocatedCoroutine
+                    ? IGM.getOptions().PointerAuth.CoroSwiftDynamicReplacements
                     : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
   if (schema) {
     assert(keyEntity.hasSILFunction() ||
@@ -2943,7 +2977,9 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
     B.addInt32((uint32_t)PointerAuthInfo::getOtherDiscriminator(IGM, schema,
                                                                 authEntity)
                    ->getZExtValue() |
-               ((uint32_t)isAsyncFunction ? 0x10000 : 0x0));
+               ((uint32_t)isAsyncFunction    ? 0x10000
+                : isCalleeAllocatedCoroutine ? 0x20000
+                                             : 0x0));
   } else
     B.addInt32(0);
   B.finishAndSetAsInitializer(key);
@@ -2970,6 +3006,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *funPtr =
       f->isAsync()
           ? IGF.IGM.getAddrOfAsyncFunctionPointer(LinkEntity::forSILFunction(f))
+      : f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()
+          ? IGF.IGM.getAddrOfCoroFunctionPointer(LinkEntity::forSILFunction(f))
           : IGF.CurFn;
   auto linkEntry =
       getChainEntryForDynamicReplacement(*this, varEntity, funPtr);
@@ -2993,6 +3031,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
 
   auto &schema = f->isAsync()
                      ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                 : f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()
+                     ? getOptions().PointerAuth.CoroSwiftDynamicReplacements
                      : getOptions().PointerAuth.SwiftDynamicReplacements;
   llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
@@ -3046,9 +3086,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
         f->getForwardingSubstitutionMap());
     llvm::Value *dynamicContextSize32;
     llvm::Value *calleeFunction;
-    std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        IGF, silFunctionType->getRepresentation(), asyncFnPtr, nullptr,
-        std::make_pair(false, true));
+    std::tie(calleeFunction, dynamicContextSize32) =
+        getAsyncFunctionAndSize(IGF, asyncFnPtr, std::make_pair(false, true));
     auto *dynamicContextSize =
         Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
     auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
@@ -3141,6 +3180,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
 
     emitDeallocAsyncContext(IGF, calleeContextBuffer);
     forwardAsyncCallResult(IGF, silFunctionType, layout, suspend);
+  } else if (f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+    // TODO: CoroutineAccessors: Implement replaceable function prologs.
+    llvm::report_fatal_error("unimplemented");
   } else {
     // Call the replacement function.
     SmallVector<llvm::Value *, 16> forwardedArgs;
@@ -3209,9 +3251,15 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     forwardedArgs.push_back(&arg);
   bool isAsyncFunction =
       keyEntity.hasSILFunction() && keyEntity.getSILFunction()->isAsync();
+  bool isCalleeAllocatedCoroutine =
+      keyEntity.hasSILFunction() && keyEntity.getSILFunction()
+                                        ->getLoweredFunctionType()
+                                        ->isCalleeAllocatedCoroutine();
   auto &schema =
       isAsyncFunction
           ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+      : isCalleeAllocatedCoroutine
+          ? IGM.getOptions().PointerAuth.CoroSwiftDynamicReplacements
           : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
   assert(keyEntity.hasSILFunction() ||
          keyEntity.isOpaqueTypeDescriptorAccessor());
@@ -3338,6 +3386,8 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
 
   auto &schema = f->isAsync()
                      ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                 : f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()
+                     ? getOptions().PointerAuth.CoroSwiftDynamicReplacements
                      : getOptions().PointerAuth.SwiftDynamicReplacements;
   auto authInfo = PointerAuthInfo::emit(
       IGF, schema, fnPtrAddr,
@@ -3864,8 +3914,11 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   // Clang may have defined the variable already.
-  if (auto existing = Module.getNamedGlobal(link.getName()))
-    return getElementBitCast(existing, defaultType);
+  if (auto existing = Module.getNamedGlobal(link.getName())) {
+    auto var = getElementBitCast(existing, defaultType);
+    GlobalVars[entity] = var;
+    return var;
+  }
 
   const LazyConstantInitializer *lazyInitializer = nullptr;
   std::optional<ConstantInitBuilder> lazyBuilder;
@@ -4004,6 +4057,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   auto entry = GlobalVars[entity];
+  assert(entry);
   
   /// Returns a direct reference.
   auto direct = [&]() -> ConstantReference {
@@ -4410,6 +4464,8 @@ AccessibleFunction AccessibleFunction::forSILFunction(IRGenModule &IGM,
   llvm::Constant *funcAddr = nullptr;
   if (func->isAsync()) {
     funcAddr = IGM.getAddrOfAsyncFunctionPointer(func);
+  } else if (func->getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+    funcAddr = IGM.getAddrOfCoroFunctionPointer(func);
   } else {
     funcAddr = IGM.getAddrOfSILFunction(func, NotForDefinition);
   }
@@ -5745,7 +5801,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Missing:
       llvm_unreachable("missing decl in IRGen");
 
-    case DeclKind::PoundDiagnostic:
     case DeclKind::Macro:
       continue;
 
@@ -5929,6 +5984,17 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
   entry = createStringConstant(data, willBeRelativelyAddressed,
                                sectionName, name);
   return entry.second;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfGlobalIdentifierString(StringRef data,
+                                             bool willBeRelativelyAddressed) {
+  if (Lexer::identifierMustAlwaysBeEscaped(data)) {
+    llvm::SmallString<256> name;
+    Mangle::Mangler::appendRawIdentifierForRuntime(data, name);
+    return getAddrOfGlobalString(name, willBeRelativelyAddressed);
+  }
+  return getAddrOfGlobalString(data, willBeRelativelyAddressed);
 }
 
 /// Get or create a global UTF-16 string constant.
@@ -6217,10 +6283,11 @@ IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
 }
 
 /// Should we be defining the given helper function?
-static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
-                                          llvm::Constant *fn,
-                                          bool setIsNoInline,
-                                          IRLinkage *linkage) {
+static llvm::Function *shouldDefineHelper(
+    IRGenModule &IGM, llvm::Constant *fn, bool setIsNoInline,
+    IRLinkage *linkage, std::optional<llvm::CallingConv::ID> specialCallingConv,
+    std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+        transformAttrs) {
   auto *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
@@ -6232,9 +6299,15 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
     ApplyIRLinkage(*linkage).to(def);
 
   def->setDoesNotThrow();
-  def->setCallingConv(IGM.DefaultCC);
+  def->setCallingConv(specialCallingConv.value_or(IGM.DefaultCC));
   if (setIsNoInline)
     def->addFnAttr(llvm::Attribute::NoInline);
+
+  if (transformAttrs) {
+    auto attrs = def->getAttributes();
+    (*transformAttrs)(attrs);
+    def->setAttributes(attrs);
+  }
   return def;
 }
 
@@ -6246,14 +6319,14 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
 /// does not collide with any other helper function.  In general, it should
 /// be a Swift-specific C reserved name; that is, it should start with
 //  "__swift".
-llvm::Constant *
-IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
-                                       ArrayRef<llvm::Type*> paramTys,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline,
-                        bool forPrologue,
-                        bool isPerformanceConstraint,
-                        IRLinkage *optionalLinkageOverride) {
+llvm::Constant *IRGenModule::getOrCreateHelperFunction(
+    StringRef fnName, llvm::Type *resultTy, ArrayRef<llvm::Type *> paramTys,
+    llvm::function_ref<void(IRGenFunction &IGF)> generate, bool setIsNoInline,
+    bool forPrologue, bool isPerformanceConstraint,
+    IRLinkage *optionalLinkageOverride,
+    std::optional<llvm::CallingConv::ID> specialCallingConv,
+    std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+        transformAttrs) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
@@ -6261,8 +6334,9 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
       cast<llvm::Constant>(
           Module.getOrInsertFunction(fnName, fnTy).getCallee());
 
-  if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline,
-                                               optionalLinkageOverride)) {
+  if (llvm::Function *def =
+          shouldDefineHelper(*this, fn, setIsNoInline, optionalLinkageOverride,
+                             specialCallingConv, transformAttrs)) {
     IRGenFunction IGF(*this, def, isPerformanceConstraint);
     if (DebugInfo && !forPrologue)
       DebugInfo->emitArtificialFunction(IGF, def);

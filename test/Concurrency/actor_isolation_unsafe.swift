@@ -23,7 +23,7 @@ actor SomeGlobalActor {
 // ----------------------------------------------------------------------
 protocol P1 {
   // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
-  @MainActor(unsafe) func onMainActor() // expected-note 2{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
+  @MainActor(unsafe) func onMainActor()
 }
 
 struct S1_P1: P1 {
@@ -38,14 +38,20 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
+// expected-warning@+1{{conformance of 'S4_P1_not_quietly' to protocol 'P1' involves isolation mismatches and can cause data races}}
 struct S4_P1_not_quietly: P1 {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
   @SomeGlobalActor func onMainActor() { }
-  // expected-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
+  // expected-note @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot satisfy main actor-isolated requirement}}
 }
 
+// expected-warning@+2{{conformance of 'S4_P1' to protocol 'P1' involves isolation mismatches and can cause data races}}
 @SomeGlobalActor
 struct S4_P1: P1 {
-  @SomeGlobalActor func onMainActor() { } // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
+  @SomeGlobalActor func onMainActor() { } // expected-note{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot satisfy main actor-isolated requirement}}
 }
 
 // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
@@ -132,8 +138,8 @@ class C7: C2 {
 protocol GloballyIsolatedProto {
 }
 
-// rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
+// rdar://75849035 - trying to conform an actor to a global-actor-isolated protocol should result in an error
 func test_conforming_actor_to_global_actor_protocol() {
   actor MyValue : GloballyIsolatedProto {}
-  // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
+  // expected-error@-1 {{actor 'MyValue' cannot conform to global-actor-isolated protocol 'GloballyIsolatedProto'}}
 }

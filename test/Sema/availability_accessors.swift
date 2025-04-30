@@ -555,19 +555,18 @@ struct TestPatternBindingInitExprs {
 
 struct BadAccessorAvailability<T> {
   var alwaysUnavailableObservers: T  {
-    @available(*, unavailable) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    @available(*, unavailable) // expected-error {{willSet observer cannot be marked unavailable with '@available'}}
     willSet { }
 
-    @available(*, unavailable) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    @available(*, unavailable) // expected-error {{didSet observer cannot be marked unavailable with '@available'}}
     didSet { }
   }
 
   var observersUnavailableBeforeSwift99: T  {
-    @available(swift, introduced: 99) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    @available(swift, introduced: 99) // expected-error {{willSet observer cannot be marked unavailable with '@available'}}
     willSet { }
 
-    @available(swift, introduced: 99) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    @available(swift, introduced: 99) // expected-error {{didSet observer cannot be marked unavailable with '@available'}}
     didSet { }
   }
-
 }

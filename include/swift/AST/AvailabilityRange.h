@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_RANGE_H
 #define SWIFT_AST_AVAILABILITY_RANGE_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/VersionTuple.h"
@@ -36,36 +37,39 @@ class VersionRange {
   //    All: all versions
   //    x.y.x: all versions greater than or equal to x.y.z
 
-  enum class ExtremalRange { Empty, All };
+  /// The sentinel version tuple representing a range containing all versions.
+  constexpr static llvm::VersionTuple getAllTuple() {
+    return llvm::VersionTuple(0x7FFFFFFE);
+  }
+
+  /// The sentinel version tuple representing an empty range.
+  constexpr static llvm::VersionTuple getEmptyTuple() {
+    return llvm::VersionTuple(0x7FFFFFFF);
+  }
 
   // A version range is either an extremal value (Empty, All) or
   // a single version tuple value representing the lower end point x.y.z of a
   // range [x.y.z, +Inf).
-  union {
-    llvm::VersionTuple LowerEndpoint;
-    ExtremalRange ExtremalValue;
-  };
-
-  unsigned HasLowerEndpoint : 1;
+  llvm::VersionTuple LowerEndpoint;
 
 public:
   /// Returns true if the range of versions is empty, or false otherwise.
   bool isEmpty() const {
-    return !HasLowerEndpoint && ExtremalValue == ExtremalRange::Empty;
+    return !hasLowerEndpoint() && LowerEndpoint == getEmptyTuple();
   }
 
   /// Returns true if the range includes all versions, or false otherwise.
   bool isAll() const {
-    return !HasLowerEndpoint && ExtremalValue == ExtremalRange::All;
+    return !hasLowerEndpoint() && LowerEndpoint == getAllTuple();
   }
 
   /// Returns true if the range has a lower end point; that is, if it is of
   /// the form [X, +Inf).
-  bool hasLowerEndpoint() const { return HasLowerEndpoint; }
+  bool hasLowerEndpoint() const { return isValidVersion(LowerEndpoint); }
 
   /// Returns the range's lower endpoint.
   const llvm::VersionTuple &getLowerEndpoint() const {
-    assert(HasLowerEndpoint);
+    assert(hasLowerEndpoint());
     return LowerEndpoint;
   }
 
@@ -124,7 +128,7 @@ public:
     const llvm::VersionTuple maxVersion =
         std::max(this->getLowerEndpoint(), Other.getLowerEndpoint());
 
-    setLowerEndpoint(maxVersion);
+    LowerEndpoint = maxVersion;
   }
 
   /// Mutates this range to be the union of itself and Other. This is the
@@ -145,7 +149,7 @@ public:
     const llvm::VersionTuple minVersion =
         std::min(this->getLowerEndpoint(), Other.getLowerEndpoint());
 
-    setLowerEndpoint(minVersion);
+    LowerEndpoint = minVersion;
   }
 
   /// Mutates this range to be a best effort over-approximation of the
@@ -160,37 +164,29 @@ public:
   }
 
   /// Returns a version range representing all versions.
-  static VersionRange all() { return VersionRange(ExtremalRange::All); }
+  static VersionRange all() { return VersionRange(getAllTuple()); }
 
   /// Returns a version range representing no versions.
-  static VersionRange empty() { return VersionRange(ExtremalRange::Empty); }
+  static VersionRange empty() { return VersionRange(getEmptyTuple()); }
+
+  /// Returns false if the given version tuple cannot be used as a lower
+  /// endpoint for `VersionRange`.
+  static bool isValidVersion(const llvm::VersionTuple &EndPoint) {
+    return EndPoint != getAllTuple() && EndPoint != getEmptyTuple();
+  }
 
   /// Returns a version range representing all versions greater than or equal
   /// to the passed-in version.
   static VersionRange allGTE(const llvm::VersionTuple &EndPoint) {
+    ASSERT(isValidVersion(EndPoint));
     return VersionRange(EndPoint);
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const;
 
 private:
-  VersionRange(const llvm::VersionTuple &LowerEndpoint) {
-    setLowerEndpoint(LowerEndpoint);
-  }
-
-  VersionRange(ExtremalRange ExtremalValue) {
-    setExtremalRange(ExtremalValue);
-  }
-
-  void setExtremalRange(ExtremalRange Version) {
-    HasLowerEndpoint = 0;
-    ExtremalValue = Version;
-  }
-
-  void setLowerEndpoint(const llvm::VersionTuple &Version) {
-    HasLowerEndpoint = 1;
-    LowerEndpoint = Version;
-  }
+  VersionRange(const llvm::VersionTuple &LowerEndpoint)
+      : LowerEndpoint(LowerEndpoint) {}
 };
 
 /// Represents a version range in which something is available.
@@ -208,6 +204,8 @@ class AvailabilityRange {
   VersionRange Range;
 
 public:
+  explicit AvailabilityRange(llvm::VersionTuple LowerEndpoint)
+      : Range(VersionRange::allGTE(LowerEndpoint)) {}
   explicit AvailabilityRange(VersionRange Range) : Range(Range) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
@@ -325,7 +323,7 @@ public:
   /// Returns a representation of the raw version range as a string for
   /// debugging purposes.
   std::string getVersionString() const {
-    assert(Range.hasLowerEndpoint());
+    ASSERT(Range.hasLowerEndpoint());
     return Range.getLowerEndpoint().getAsString();
   }
 };

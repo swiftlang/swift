@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// RUN: not %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s -check-prefix=CHECK-NO-LIFETIMES
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
 
@@ -109,6 +109,12 @@ struct SWIFT_NONESCAPABLE AggregateView {
     const int *member;
 };
 
+namespace NS {
+    View getView(const Owner& owner [[clang::lifetimebound]]) {
+        return View(&owner.data);
+    }
+}
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
@@ -123,22 +129,7 @@ struct SWIFT_NONESCAPABLE AggregateView {
 // CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned CaptureView
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
-
-// CHECK-NO-LIFETIMES: nonescapable.h:35:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:39:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:45:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:52:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:22:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:26:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:4:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:5:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:13:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:12:27: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:67:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:90:13: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:94:27: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:94:27: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES-NOT: error
+// CHECK: sil [clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 
 //--- test.swift
 
@@ -160,6 +151,7 @@ public func test() {
     var cv = getCaptureView(o)
     cv.captureView(v1)
     cv.handOut(&v1)
+    var _ = NS.getView(o)
 }
 
 public func test2(_ x: AggregateView) {

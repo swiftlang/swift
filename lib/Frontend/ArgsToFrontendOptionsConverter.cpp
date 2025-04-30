@@ -81,6 +81,11 @@ bool ArgsToFrontendOptionsConverter::convert(
     clang::driver::Driver::getDefaultModuleCachePath(defaultPath);
     Opts.ExplicitModulesOutputPath = defaultPath.str().str();
   }
+  if (const Arg *A = Args.getLastArg(OPT_sdk_module_cache_path)) {
+    Opts.ExplicitSDKModulesOutputPath = A->getValue();
+  } else {
+    Opts.ExplicitSDKModulesOutputPath = Opts.ExplicitModulesOutputPath;
+  }
   if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
     Opts.BackupModuleInterfaceDir = A->getValue();
   }
@@ -199,6 +204,10 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (Args.hasArg(OPT_print_target_info)) {
     Opts.PrintTargetInfo = true;
+  }
+
+  if (Args.hasArg(OPT_print_supported_features)) {
+    Opts.PrintSupportedFeatures = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
@@ -673,8 +682,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::CompileModuleFromInterface;
   if (Opt.matches(OPT_typecheck_module_from_interface))
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
-  if (Opt.matches(OPT_emit_supported_features))
-    return FrontendOptions::ActionType::PrintFeature;
+  if (Opt.matches(OPT_emit_supported_arguments))
+    return FrontendOptions::ActionType::PrintArguments;
   llvm_unreachable("Unhandled mode option");
 }
 
@@ -936,9 +945,12 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     // it should be called only once
     options.ModuleAliasMap.clear();
 
-    auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
-    {
-      if (!allowModuleName) {
+    // validatingModuleName should be true if validating the alias target (an
+    // actual module name), or true if validating the alias name (which can be
+    // an escaped identifier).
+    auto validate = [&options, &diags](StringRef value,
+                                       bool validatingModuleName) -> bool {
+      if (!validatingModuleName) {
         if (value == options.ModuleName ||
             value == options.ModuleABIName ||
             value == options.ModuleLinkName ||
@@ -947,7 +959,8 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
           return false;
         }
       }
-      if (!Lexer::isIdentifier(value)) {
+      if ((validatingModuleName && !Lexer::isIdentifier(value)) ||
+          !Lexer::isValidAsEscapedIdentifier(value)) {
         diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);
         return false;
       }

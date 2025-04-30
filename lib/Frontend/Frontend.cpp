@@ -246,6 +246,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions.push_back("--target=" +
                                                   LangOpts.ClangTarget->str());
   }
+  if (LangOpts.ClangTargetVariant &&
+      !getClangImporterOptions().DirectClangCC1ModuleBuild) {
+    serializationOpts.ExtraClangOptions.push_back("-darwin-target-variant");
+    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTargetVariant->str());
+  }
   if (LangOpts.EnableAppExtensionRestrictions) {
     serializationOpts.ExtraClangOptions.push_back("-fapplication-extension");
   }
@@ -861,7 +866,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         std::make_unique<PlaceholderSwiftModuleScanner>(
             *Context, MLM, mainModuleName,
             Context->SearchPathOpts.PlaceholderDependencyModuleMap, ASTDelegate,
-            getInvocation().getFrontendOptions().ExplicitModulesOutputPath);
+            getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+            getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath);
     Context->addModuleLoader(std::move(PSMS));
   }
 
@@ -872,6 +878,7 @@ bool CompilerInstance::setUpPluginLoader() {
   /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
   auto loader = std::make_unique<PluginLoader>(
       *Context, getDependencyTracker(),
+      Invocation.getFrontendOptions().CacheReplayPrefixMap,
       Invocation.getFrontendOptions().DisableSandbox);
   Context->setPluginLoader(std::move(loader));
   return false;
@@ -892,21 +899,31 @@ std::optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
 }
 
 SourceFile *CompilerInstance::getIDEInspectionFile() const {
+  ASSERT(SourceMgr.hasIDEInspectionTargetBuffer() &&
+         "Not in IDE inspection mode?");
+
   auto *mod = getMainModule();
-  auto &eval = mod->getASTContext().evaluator;
-  return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
+  auto bufferID = SourceMgr.getIDEInspectionTargetBufferID();
+  for (auto *SF : SourceMgr.getSourceFilesForBufferID(bufferID)) {
+    if (SF->getParentModule() == mod)
+      return SF;
+  }
+  llvm_unreachable("Couldn't find IDE inspection file?");
 }
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (opts.ImplicitObjCPCHPath.empty())
+  if (!opts.ModuleHasBridgingHeader)
+    return std::string();
+
+  if (!opts.ImplicitObjCHeaderPath.empty())
     return opts.ImplicitObjCHeaderPath;
 
   auto clangImporter =
       static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
 
   // No clang importer created. Report error?
-  if (!clangImporter)
+  if (!clangImporter || opts.ImplicitObjCPCHPath.empty())
     return std::string();
 
   return clangImporter->getOriginalSourceFile(opts.ImplicitObjCPCHPath);
@@ -1390,11 +1407,11 @@ bool CompilerInstance::createFilesForMainModule(
 static void configureAvailabilityDomains(const ASTContext &ctx,
                                          const FrontendOptions &opts,
                                          ModuleDecl *mainModule) {
-  llvm::SmallDenseMap<Identifier, CustomAvailabilityDomain *> domainMap;
+  llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::create(
-        ctx, name, mainModule, CustomAvailabilityDomain::Kind::Enabled);
+    auto *domain =
+        CustomAvailabilityDomain::get(name, kind, mainModule, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };
@@ -1455,7 +1472,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
-    if (Invocation.getLangOptions().hasFeature(Feature::WarnUnsafe))
+    if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
 
     configureAvailabilityDomains(getASTContext(),

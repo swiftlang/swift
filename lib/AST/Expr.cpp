@@ -18,6 +18,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
@@ -1753,6 +1754,13 @@ Expr *CallExpr::getDirectCallee() const {
       continue;
     }
 
+    // Explicit specializations are currently invalid for function calls, but
+    // look through them for better recovery.
+    if (auto *spec = dyn_cast<UnresolvedSpecializeExpr>(fn)) {
+      fn = spec->getSubExpr();
+      continue;
+    }
+
     return fn;
   }
 }
@@ -2009,6 +2017,29 @@ BraceStmt * AbstractClosureExpr::getBody() const {
   llvm_unreachable("Unknown closure expression");
 }
 
+BraceStmt *ClosureExpr::getExpandedBody() {
+  auto &ctx = getASTContext();
+
+  // Expand a body macro, if there is one.
+  BraceStmt *macroExpandedBody = nullptr;
+  if (auto bufferID = evaluateOrDefault(
+          ctx.evaluator,
+          ExpandBodyMacroRequest{this},
+          std::nullopt)) {
+    CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+    auto bufferStart = bufferRange.getStart();
+    auto module = getParentModule();
+    auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
+
+    if (macroSourceFile->getTopLevelItems().size() == 1) {
+      auto stmt = macroSourceFile->getTopLevelItems()[0].dyn_cast<Stmt *>();
+      macroExpandedBody = dyn_cast<BraceStmt>(stmt);
+    }
+  }
+
+  return macroExpandedBody;
+}
+
 bool AbstractClosureExpr::bodyHasExplicitReturnStmt() const {
   return AnyFunctionRef(const_cast<AbstractClosureExpr *>(this))
       .bodyHasExplicitReturnStmt();
@@ -2166,6 +2197,17 @@ void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
+}
+
+MacroDecl *
+ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
+  auto &ctx = getASTContext();
+  auto declRef = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveMacroRequest{customAttr, this},
+      ConcreteDeclRef());
+
+  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -2399,20 +2441,29 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
-                                            DeclContext *DC) {
-  ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid());
-  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
-  Repr->setValue(Decl, DC);
-  return new (C) TypeValueExpr(Repr);
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, TypeDecl *decl,
+                                            DeclContext *dc) {
+  auto &ctx = decl->getASTContext();
+  ASSERT(loc.isValid());
+  auto repr = UnqualifiedIdentTypeRepr::create(ctx, loc, decl->createNameRef());
+  repr->setValue(decl, dc);
+  return new (ctx) TypeValueExpr(repr);
 }
 
-OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
+GenericTypeParamDecl *TypeValueExpr::getParamDecl() const {
+  auto declRefRepr = cast<DeclRefTypeRepr>(getRepr());
+  return cast<GenericTypeParamDecl>(declRefRepr->getBoundDecl());
+}
+
+SourceRange TypeValueExpr::getSourceRange() const {
+  return getRepr()->getSourceRange();
+}
+
+ExistentialArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
-  return type->castTo<OpenedArchetypeType>();
+  return type->castTo<ExistentialArchetypeType>();
 }
 
 KeyPathExpr::KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot,
@@ -2494,7 +2545,7 @@ KeyPathExpr::setComponents(ASTContext &C,
 
 std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   for (auto idx : indices(getComponents())) {
-    if (auto *args = getComponents()[idx].getSubscriptArgs()) {
+    if (auto *args = getComponents()[idx].getArgs()) {
       if (args->findArgumentExpr(arg))
         return idx;
     }
@@ -2549,13 +2600,14 @@ KeyPathExpr::Component::Component(
     DeclNameOrRef decl, ArgumentList *argList,
     ArrayRef<ProtocolConformanceRef> indexHashables, Kind kind, Type type,
     SourceLoc loc)
-    : Decl(decl), SubscriptArgList(argList), KindValue(kind),
-      ComponentType(type), Loc(loc) {
-  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript);
+    : Decl(decl), ArgList(argList), KindValue(kind), ComponentType(type),
+      Loc(loc) {
+  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript ||
+         kind == Kind::UnresolvedApply || kind == Kind::Apply);
   assert(argList);
   assert(argList->size() == indexHashables.size() || indexHashables.empty());
-  SubscriptHashableConformancesData = indexHashables.empty()
-    ? nullptr : indexHashables.data();
+  HashableConformancesData =
+      indexHashables.empty() ? nullptr : indexHashables.data();
 }
 
 SingleValueStmtExpr *SingleValueStmtExpr::create(ASTContext &ctx, Stmt *S,
@@ -2974,6 +3026,17 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
+}
+
+Expr *Expr::getAlwaysLeftFoldedSubExpr() const {
+  if (auto *ATE = dyn_cast<AnyTryExpr>(this))
+    return ATE->getSubExpr();
+  if (auto *AE = dyn_cast<AwaitExpr>(this))
+    return AE->getSubExpr();
+  if (auto *UE = dyn_cast<UnsafeExpr>(this))
+    return UE->getSubExpr();
+
+  return nullptr;
 }
 
 const Expr *Expr::findOriginalValue() const {

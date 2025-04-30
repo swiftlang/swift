@@ -164,10 +164,6 @@ public:
 
   AvailabilityContext getAvailability() const { return Availability; }
 
-  AvailabilityRange getAvailabilityRange() const {
-    return Availability.getPlatformRange();
-  }
-
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
 
@@ -188,10 +184,6 @@ public:
   /// or declarations from `@_implementationOnly` imports.
   bool isExported() const { return Exported; }
 
-  /// If true, the context is part of a deprecated declaration and can
-  /// reference other deprecated declarations without warning.
-  bool isDeprecated() const { return Availability.isDeprecated(); }
-
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
   /// because it is the function body context of an inlinable function.
@@ -201,12 +193,6 @@ public:
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
 };
-
-/// Check if a declaration is exported as part of a module's external interface.
-/// This includes public and @usableFromInline decls.
-bool isExported(const ValueDecl *VD);
-bool isExported(const ExtensionDecl *ED);
-bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);

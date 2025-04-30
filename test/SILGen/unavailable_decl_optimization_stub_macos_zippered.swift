@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s
+// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-EXTENSION
+// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-EXTENSION
 
 // REQUIRES: OS=macosx
 
@@ -34,6 +35,27 @@ public func unavailableOnMacCatalystFunc() {}
 @available(macOS, unavailable)
 @available(iOS, unavailable)
 public func unavailableOnMacOSAndiOSFunc() {}
+
+// CHECK-LABEL:             sil{{.*}}@$s4Test33availableOnMacOSExtensionOnlyFuncyyF
+// CHECK-NO-EXTENSION:        [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
+// CHECK-NO-EXTENSION-NEXT:   [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK-EXTENSION-NOT:       _diagnoseUnavailableCodeReached
+// CHECK:                   } // end sil function '$s4Test33availableOnMacOSExtensionOnlyFuncyyF'
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(macOSApplicationExtension, introduced: 10.9)
+public func availableOnMacOSExtensionOnlyFunc() {}
+
+// CHECK-LABEL:             sil{{.*}}@$s4Test31availableOniOSExtensionOnlyFuncyyF
+// CHECK-NO-EXTENSION:        [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
+// CHECK-NO-EXTENSION-NEXT:   [[APPLY:%.*]] = apply [[FNREF]]()
+// FIXME: [availability] This should not diagnose when building with -application-extension
+// CHECK-EXTENSION:           _diagnoseUnavailableCodeReached
+// CHECK:                   } // end sil function '$s4Test31availableOniOSExtensionOnlyFuncyyF'
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(iOSApplicationExtension, introduced: 9.0)
+public func availableOniOSExtensionOnlyFunc() {}
 
 @available(iOS, unavailable)
 public struct UnavailableOniOS {

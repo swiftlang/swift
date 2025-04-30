@@ -1292,48 +1292,18 @@ static void
 validateAvailabilitySpecList(Parser &P,
                              const SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
-  std::optional<SourceLoc> WildcardSpecLoc = std::nullopt;
+  if (Source != Parser::AvailabilitySpecSource::Macro)
+    return;
 
-  if (Specs.size() == 1) {
-    // @available(swift N) and @available(_PackageDescription N) are allowed
-    // only in isolation; they cannot be combined with other availability specs
-    // in a single list.
-    auto domain = Specs[0]->getDomain();
-    if (domain && !domain->isPlatform())
-      return;
-  }
-
+  std::optional<SourceLoc> WildcardSpecLoc;
   for (auto *Spec : Specs) {
     if (Spec->isWildcard()) {
       WildcardSpecLoc = Spec->getStartLoc();
     }
   }
 
-  switch (Source) {
-  case Parser::AvailabilitySpecSource::Available: {
-    if (WildcardSpecLoc == std::nullopt) {
-      SourceLoc InsertWildcardLoc = P.PreviousLoc;
-      P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
-        .fixItInsertAfter(InsertWildcardLoc, ", *");
-    }
-    break;
-  }
-  case Parser::AvailabilitySpecSource::Unavailable: {
-    if (WildcardSpecLoc != std::nullopt) {
-      SourceLoc Loc = WildcardSpecLoc.value();
-      P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
-        .fixItRemove(Loc);
-    }
-    break;
-  }
-  case Parser::AvailabilitySpecSource::Macro: {
-    if (WildcardSpecLoc != std::nullopt) {
-      SourceLoc Loc = WildcardSpecLoc.value();
-      P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
-    }
-    break;
-  }
-  }
+  if (WildcardSpecLoc)
+    P.diagnose(*WildcardSpecLoc, diag::attr_availability_wildcard_in_macro);
 }
 
 // #available(...)
@@ -1387,6 +1357,9 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
   auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
                                             RParenLoc, isUnavailability);
+  if (Status.isError())
+    result->setInvalid();
+
   return makeParserResult(Status, result);
 }
 
@@ -1508,7 +1481,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
-
+          consumeToken();
           Status.setIsParseError();
           break;
         }
@@ -2395,6 +2368,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   auto StartOfControl = Tok.getLoc();
   SourceLoc AwaitLoc;
   SourceLoc TryLoc;
+  SourceLoc UnsafeLoc;
 
   if (Tok.isContextualKeyword("await")) {
     AwaitLoc = consumeToken();
@@ -2405,10 +2379,15 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
+  if (Tok.isContextualKeyword("unsafe") &&
+      !peekToken().isAny(tok::colon, tok::kw_in)) {
+    UnsafeLoc = consumeToken();
+  }
+  
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeForEachPatternBeginning(
-          TryLoc.isValid(), AwaitLoc.isValid());
+          TryLoc.isValid(), AwaitLoc.isValid(), UnsafeLoc.isValid());
     }
     consumeToken(tok::code_complete);
     // Since 'completeForeachPatternBeginning' is a keyword only completion,
@@ -2522,7 +2501,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, pattern.get(), InLoc,
+      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
+                                pattern.get(), InLoc,
                                 Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }
@@ -2549,7 +2529,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
 
   SourceLoc lBraceLoc;
   SourceLoc rBraceLoc;
-  SmallVector<ASTNode, 8> cases;
+  SmallVector<CaseStmt *, 8> cases;
 
   if (Status.isErrorOrHasCompletion()) {
     return makeParserResult(
@@ -2571,9 +2551,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   // We cannot have additional cases after a default clause. Complain on
   // the first offender.
   bool hasDefault = false;
-  for (auto Element : cases) {
-    if (!Element.is<Stmt*>()) continue;
-    auto *CS = cast<CaseStmt>(Element.get<Stmt*>());
+  for (auto *CS : cases) {
     if (hasDefault) {
       diagnose(CS->getLoc(), diag::case_after_default);
       break;
@@ -2592,8 +2570,8 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
                                  /*EndLoc=*/rBraceLoc, Context));
 }
 
-ParserStatus
-Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
+ParserStatus Parser::parseStmtCases(SmallVectorImpl<CaseStmt *> &cases,
+                                    bool IsActive) {
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
@@ -2606,22 +2584,17 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
       // '#if' in 'case' position can enclose one or more 'case' or 'default'
       // clauses.
       auto IfConfigResult =
-          parseIfConfig(IfConfigContext::SwitchStmt,
-                        [&](bool IsActive) {
-                          SmallVector<ASTNode, 16> elements;
-                          parseStmtCases(elements, IsActive);
+          parseIfConfig(IfConfigContext::SwitchStmt, [&](bool IsActive) {
+            SmallVector<CaseStmt *, 16> elements;
+            parseStmtCases(elements, IsActive);
 
-                          if (IsActive) {
-                            cases.append(elements);
-                          }
-                        });
+            if (IsActive) {
+              cases.append(elements);
+            }
+          });
       Status |= IfConfigResult;
     } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
-      auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
-      Status |= PoundDiagnosticResult;
-      if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
-        cases.emplace_back(PDD);
-      }
+      Status |= parseDeclPoundDiagnostic();
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeCaseStmtKeyword();
@@ -2747,7 +2720,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       assert(peekToken().is(tok::identifier) && "isAtStartOfSwitchCase() lied");
 
       consumeToken(tok::at_sign);
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      diagnose(Tok, diag::unknown_attr_name, Tok.getText());
       consumeToken(tok::identifier);
 
       if (Tok.is(tok::l_paren))

@@ -359,11 +359,15 @@ private enum InactiveCodeChecker {
       // match.
       switch self {
       case .name(let name):
-        guard let identifier = token.identifier, identifier.name == name else {
-          continue
+        if let identifier = token.identifier, identifier.name == name {
+          break
         }
 
-        break
+        if case .keyword = token.tokenKind, token.text == name {
+          break
+        }
+
+        continue
 
       case .tryOrThrow:
         guard let keywordKind = token.keywordKind,
@@ -546,7 +550,13 @@ public func extractInlinableText(
 /// a syntax tree.
 fileprivate class RemoveUnsafeExprSyntaxRewriter: SyntaxRewriter {
   override func visit(_ node: UnsafeExprSyntax) -> ExprSyntax {
-    return node.expression.with(\.leadingTrivia, node.leadingTrivia)
+    let rewritten = super.visit(node).cast(UnsafeExprSyntax.self)
+    return rewritten.expression.with(\.leadingTrivia, node.leadingTrivia)
+  }
+
+  override func visit(_ node: ForStmtSyntax) -> StmtSyntax {
+    let rewritten = super.visit(node).cast(ForStmtSyntax.self)
+    return StmtSyntax(rewritten.with(\.unsafeKeyword, nil))
   }
 }
 

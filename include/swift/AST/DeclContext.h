@@ -20,6 +20,7 @@
 #define SWIFT_DECLCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -666,6 +667,12 @@ public:
   void lookupAllObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
+
+  /// Look up the custom availability domains matching the given identifier that
+  /// are visible from this context.
+  void
+  lookupAvailabilityDomains(Identifier identifier,
+                            SmallVectorImpl<AvailabilityDomain> &results) const;
 
   /// Looks up an infix operator with a given \p name.
   ///

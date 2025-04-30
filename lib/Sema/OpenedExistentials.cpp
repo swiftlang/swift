@@ -823,10 +823,11 @@ Type swift::typeEraseOpenedExistentialReference(
 
   auto applyOuterSubstitutions = [&](Type t) -> Type {
     if (t->hasTypeParameter()) {
-      auto outerSubs = existentialSig.Generalization;
-      unsigned depth = existentialSig.OpenedSig->getMaxDepth();
-      OuterSubstitutions replacer{outerSubs, depth};
-      return t.subst(replacer, replacer);
+      if (auto outerSubs = existentialSig.Generalization) {
+        unsigned depth = existentialSig.OpenedSig->getMaxDepth();
+        OuterSubstitutions replacer{outerSubs, depth};
+        return t.subst(replacer, replacer);
+      }
     }
 
     return t;
@@ -913,10 +914,10 @@ Type swift::typeEraseOpenedArchetypesFromEnvironment(
         return t->hasOpenedExistential();
       },
       /*predicateFn=*/[](Type t) {
-        return t->is<OpenedArchetypeType>();
+        return t->is<ExistentialArchetypeType>();
       },
       /*eraseFn=*/[&](Type t, TypePosition currPos) {
-        auto *openedTy = t->castTo<OpenedArchetypeType>();
+        auto *openedTy = t->castTo<ExistentialArchetypeType>();
         if (openedTy->getGenericEnvironment() == env)
           return openedTy->getExistentialType();
 

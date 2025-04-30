@@ -29,11 +29,13 @@
 #   -- Will need shadow invocations to generate swiftmodules for Swift parts
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
 
-cmake_minimum_required(VERSION 3.26...3.29)
+cmake_minimum_required(VERSION 3.29)
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
@@ -112,6 +114,7 @@ defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve ab
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
+defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
 option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context descriptor lookups based on well-known short manglings." ON)
 option(SwiftCore_ENABLE_FILESYSTEM_SUPPORT "Build for systems that have a filesystem" ON)
@@ -126,6 +129,7 @@ defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata pre
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 option(SwiftCore_ENABLE_INTERNAL_CHECKS "" OFF)
+set(SwiftCore_OPTIMIZATION_REMARKS OFF CACHE STRING "Set opt-remark format")
 
 defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
 defaulted_set(SwiftCore_THREADING_PACKAGE STRING "Threading Package: C11 Linux PThreads Win32")
@@ -143,7 +147,6 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP>
   $<$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>:-DSWIFT_LIBRARY_EVOLUTION>
   $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:-DSWIFT_HAVE_CRASHREPORTERCLIENT>
-  $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
   $<$<BOOL:${SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS}>:-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS>
   $<$<BOOL:${SwiftCore_ENABLE_STDIN}>:-DSWIFT_STDLIB_HAS_STDIN> # core + stubs
@@ -156,7 +159,7 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_HAS_DARWIN_LIBMALLOC}>:-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC> # Anything that includes include/swift/Runtime/Config.h
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_THREADING_${SwiftCore_THREADING_PACKAGE}>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
-  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
+  $<$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
@@ -173,28 +176,14 @@ add_compile_options(
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 
 add_compile_options(
+  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   "$<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature TypedThrows>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature FreestandingMacros>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BitwiseCopyable>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature ValueGenerics>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
-  # TODO: we should reevaluate if it still makes sense to restrict this
-  # to Darwin, https://github.com/swiftlang/swift/issues/79279
-  "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=bitstream>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-strict-memory-safety>"
+  "$<$<AND:$<BOOL:${SwiftCore_OPTIMIZATION_REMARKS}>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=${SwiftCore_OPTIMIZATION_REMARKS}>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
@@ -208,6 +197,8 @@ add_compile_options(
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+include(ExperimentalFeatures)
 
 include_directories(include)
 
@@ -225,3 +216,22 @@ endif()
 if(SwiftCore_ENABLE_CONCURRENCY)
   add_subdirectory(Concurrency)
 endif()
+
+# Inter-project install info
+export(EXPORT SwiftCoreTargets
+  FILE "cmake/SwiftCore/SwiftCoreTargets.cmake")
+install(EXPORT SwiftCoreTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore"
+  FILE "SwiftCoreTargets.cmake"
+  COMPONENT SwiftCore_cmake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftCoreConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCore/SwiftCoreConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore")

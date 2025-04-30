@@ -163,6 +163,11 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     self.swiftCore =
         CSSymbolicatorGetSymbolOwnerWithNameAtTime(self.symbolicator,
                                                    "libswiftCore.dylib", kCSNow)
+    if CSIsNull(self.swiftCore) {
+      print("pid \(processId) does not have libswiftCore.dylib loaded")
+      return nil
+    }
+
     self.swiftConcurrency = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
       symbolicator, "libswift_Concurrency.dylib", kCSNow)
     _ = task_start_peeking(self.task)

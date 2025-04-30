@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness
@@ -723,6 +723,19 @@ func test33() -> Bool {
     return cast33(A())
 }
 
+func castArray<T>(from: [T]) -> [Int]? {
+  return from as? [Int]
+}
+
+// CHECK-LABEL: sil @$s12cast_folding13callCastArray1aSaySiGSgAD_tF :
+// CHECK-NOT:     apply
+// CHECK:         [[E:%.*]] = enum $Optional<Array<Int>>, #Optional.some!enumelt, %0
+// CHECK-NOT:     apply
+// CHECK:         return [[E]]
+// CHECK:       } // end sil function '$s12cast_folding13callCastArray1aSaySiGSgAD_tF'
+public func callCastArray(a: [Int]) -> [Int]? {
+  return castArray(from: a)
+}
 
 protocol PP {
   func foo() -> Int

@@ -142,7 +142,8 @@ enum Birb {
 // CHECK-LABEL:  sil hidden [ossa] @$s12initializers7makeCatyyYaF : $@convention(thin) @async () -> () {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-// CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:          hop_to_executor [[BORROWED_EXECUTOR:%[0-9]+]]
+// CHECK:          end_borrow [[BORROWED_EXECUTOR]]
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat
 // CHECK:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers7makeCatyyYaF'
@@ -153,7 +154,8 @@ func makeCat() async {
 // CHECK-LABEL:  sil hidden [ossa] @$s12initializers7makeDogyyYaF : $@convention(thin) @async () -> () {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-// CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:          hop_to_executor [[BORROWED_EXEC:%.*]] :
+// CHECK-NEXT:     end_borrow [[BORROWED_EXEC]]
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Dog.Type) -> Dog
 // CHECK:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers7makeDogyyYaF'
@@ -164,7 +166,8 @@ func makeDog() async {
 // CHECK-LABEL:  sil hidden [ossa] @$s12initializers8makeBirbyyYaF : $@convention(thin) @async () -> () {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-// CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:          hop_to_executor [[BORROWED_EXEC:%.*]] : $MainActor
+// CHECK-NEXT:     end_borrow [[BORROWED_EXEC]]
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Birb.Type) -> Birb
 // CHECK:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers8makeBirbyyYaF'

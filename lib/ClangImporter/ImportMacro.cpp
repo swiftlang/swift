@@ -779,10 +779,11 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   PrettyStackTraceStringAction stackRAII{"importing macro", name.str()};
 
   // Look for macros imported with the same name.
-  auto known = ImportedMacros.find(name);
-  if (known == ImportedMacros.end()) {
+  auto [known, inserted] = ImportedMacros.try_emplace(
+      name, SmallVector<std::pair<const clang::MacroInfo *, ValueDecl *>, 2>{});
+  if (inserted) {
     // Push in a placeholder to break circularity.
-    ImportedMacros[name].push_back({macro, nullptr});
+    known->getSecond().push_back({macro, nullptr});
   } else {
     // Check whether this macro has already been imported.
     for (const auto &entry : known->second) {

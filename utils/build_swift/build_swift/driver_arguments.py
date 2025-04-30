@@ -703,6 +703,9 @@ def create_argument_parser():
     option('--swift-freestanding-is-darwin', toggle_true,
            help='True if the freestanding platform is a Darwin one.')
 
+    option('--enable-new-runtime-build', toggle_true,
+           help='True to enable the new runtime build.')
+
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 
@@ -787,9 +790,6 @@ def create_argument_parser():
            help='set to validate that RawSyntax layout nodes contain children of ' +
                 'the expected types and that RawSyntax tokens have the expected ' +
                 'token kinds')
-    option('--swiftsyntax-lint',
-           toggle_true('swiftsyntax_lint'),
-           help='verify that swift-syntax Source code is formatted correctly')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-swiftformat'], toggle_true('install_swiftformat'),
@@ -852,7 +852,7 @@ def create_argument_parser():
            help='install playground support')
 
     option('--build-ninja', toggle_true,
-           help='build the Ninja tool')
+           help='build the Ninja tool [deprecated: Ninja is built when necessary]')
 
     option(['--build-lld'], toggle_true('build_lld'), default=True,
            help='build lld as part of llvm')
@@ -1403,6 +1403,11 @@ def create_argument_parser():
            help='CMake options used for llvm in the form of comma '
                 'separated options "-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp". Can '
                 'be called multiple times to add multiple such options.')
+
+    option('--llvm-build-compiler-rt-with-use-runtimes', toggle_true,
+           help='Switch to LLVM_ENABLE_RUNTIMES as the mechanism to build compiler-rt'
+                'It will become the default with LLVM 21, this flag is '
+                'meant to stage its introduction and account for edge cases')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')

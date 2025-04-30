@@ -42,6 +42,7 @@ extension ASTGenVisitor {
       // Simple type attributes.
       case .autoclosure,
         .addressable,
+        .concurrent,
         .escaping,
         .noEscape,
         .noDerivative,
@@ -53,6 +54,7 @@ extension ASTGenVisitor {
         .preconcurrency,
         .local,
         .noMetadata,
+        .nonisolated,
         .packGuaranteed,
         .packInout,
         .packOut,
@@ -72,9 +74,7 @@ extension ASTGenVisitor {
         return (self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .differentiable:
-        fatalError("unimplemented")
-      case .execution:
-        return (self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute)
+        return (self.generateDifferentiableTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .opaqueReturnTypeOf:
         return (self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute)
@@ -140,65 +140,101 @@ extension ASTGenVisitor {
       nameLoc: self.generateSourceLoc(node.attributeName)
     )
   }
-  
+
+  /// E.g.
+  ///   ```
+  ///   @convention(c)
+  ///   @convention(c, cType: "int (*)(int)")
+  ///   ```
   func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
-    // FIXME: This doesn't need custom attribute arguments syntax.
-    // FIXME: Support 'witness_method' argument.
-    guard let args = node.arguments?.as(ConventionAttributeArgumentsSyntax.self) else {
-      // TODO: Diangose.
-      return nil
-    }
-    
-    let cTypeName: BridgedStringRef?
-    let cTypeNameLoc: BridgedSourceLoc?
-    if let ctypeString = args.cTypeString {
-      cTypeName = self.generateStringLiteralTextIfNotInterpolated(expr: ctypeString)
-      cTypeNameLoc = cTypeName != nil ? self.generateSourceLoc(ctypeString) : nil
-    } else {
-      cTypeName = nil
-      cTypeNameLoc = nil
-    }
-    
-    let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
-    
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      name: ctx.allocateCopy(string: args.conventionLabel.rawText.bridged),
-      nameLoc: self.generateSourceLoc(args.conventionLabel),
-      witnessMethodProtocol: witnessMethodProtocol,
-      clangType: cTypeName ?? BridgedStringRef(),
-      clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
-    )
-  }
-  
-  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
-    let behaviorLoc = self.generateSourceLoc(node.arguments)
-    let behavior: BridgedExecutionTypeAttrExecutionKind? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "concurrent": return .concurrent
-        case "caller": return .caller
-        default:
-          // TODO: Diagnose.
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let nameAndLoc: (name: _, loc: _)? =  self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        (ctx.allocateCopy(string: $0.rawText.bridged), self.generateSourceLoc($0))
+      }
+      guard let nameAndLoc else {
+        return nil
+      }
+
+      let cTypeNameLoc: BridgedSourceLoc?
+      let cTypeName: BridgedStringRef?
+      if !args.isEmpty {
+        cTypeNameLoc = self.generateSourceLoc(args.first?.expression)
+        cTypeName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "cType")
+        guard cTypeName != nil else {
           return nil
         }
+      } else {
+        cTypeNameLoc = nil
+        cTypeName = nil
       }
-    )
-    guard let behavior else {
-      return nil
+
+      // `@convention(witness_method: <protocol-name>)` is for SIL only.
+      let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        nameLoc: self.generateSourceLoc(node.attributeName),
+        parensRange: self.generateAttrParensRange(attribute: node),
+        name: nameAndLoc.name,
+        nameLoc: nameAndLoc.loc,
+        witnessMethodProtocol: witnessMethodProtocol,
+        clangType: cTypeName ?? BridgedStringRef(),
+        clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
+      )
     }
-      
+  }
+
+  func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
+    let differentiability: BridgedDifferentiabilityKind
+    let differentiabilityLoc: BridgedSourceLoc
+    if let args = node.arguments {
+      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
+        fatalError("(compiler bug) invalid arguments for @differentiable attribute")
+      }
+
+      if let kindSpecifier = args.kindSpecifier {
+        differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
+        differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
+
+        guard differentiability != .nonDifferentiable else {
+          // TODO: Diagnose
+          fatalError("invalid kind for @differentiable type attribute")
+        }
+
+        guard kindSpecifier.nextToken(viewMode: .fixedUp) == node.rightParen else {
+          // TODO: Diagnose
+          fatalError("only expeceted 'reverse' in @differentiable type attribute")
+        }
+      } else {
+        // TODO: Diagnose
+        fatalError("expected @differentiable(reverse)")
+      }
+    } else {
+      differentiability = .normal
+      differentiabilityLoc = nil
+    }
+
+    // Only 'reverse' is formally supported today. '_linear' works for testing
+    // purposes. '_forward' is rejected.
+    switch differentiability {
+    case .normal, .nonDifferentiable:
+      // TODO: Diagnose
+      fatalError("Only @differentiable(reverse) is supported")
+    case .forward:
+      // TODO: Diagnose
+      fatalError("Only @differentiable(reverse) is supported")
+    case .reverse, .linear:
+      break
+    }
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       parensRange: self.generateAttrParensRange(attribute: node),
-      behavior: behavior,
-      behaviorLoc: behaviorLoc
+      kind: differentiability,
+      kindLoc: differentiabilityLoc
     )
   }
   
@@ -229,35 +265,43 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.
+  ///   ```
+  ///   @_opaqueReturnTypeOf("$sMangledName", 4)
+  ///   ```
   func generateOpaqueReturnTypeOfTypeAttr(attribute node: AttributeSyntax) -> BridgedOpaqueReturnTypeOfTypeAttr? {
-    // FIXME: This doesn't need custom attribute arguments syntax.
-    guard let args = node.arguments?.as(OpaqueReturnTypeOfAttributeArgumentsSyntax.self) else {
-      // TODO: Diagnose
-      fatalError("expected arguments for @_opaqueReturnTypeOfType type attribute")
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let mangledLoc = self.generateSourceLoc(args.first?.expression)
+      let mangledName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+      guard let mangledName else {
+        return nil
+      }
+
+      let indexLoc = self.generateSourceLoc(args.first?.expression)
+      let index: Int? = self.generateConsumingAttrOption(args: &args, label: nil) { expr in
+        guard let intExpr = expr.as(IntegerLiteralExprSyntax.self) else {
+          // TODO: Diagnostics.
+          fatalError("expected integer literal")
+          // return nil
+        }
+        return intExpr.representedLiteralValue
+      }
+      guard let index else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        nameLoc: self.generateSourceLoc(node.attributeName),
+        parensRange: self.generateAttrParensRange(attribute: node),
+        mangled: mangledName,
+        mangledLoc: mangledLoc,
+        index: index,
+        indexLoc: indexLoc
+      )
     }
 
-    let mangledLoc = self.generateSourceLoc(args.mangledName)
-    guard let mangled = self.generateStringLiteralTextIfNotInterpolated(expr: args.mangledName) else {
-      // TODO: Diagnose
-      fatalError("expected string literal for @_opaqueReturnTypeOfType type attribute")
-    }
-    
-    let indexLoc = self.generateSourceLoc(args.ordinal)
-    let index =  Int(args.ordinal.text, radix: 10)
-    guard let index else {
-      // TODO: Diagnose
-      fatalError("expected integer literal for @_opaqueReturnTypeOfType type attribute")
-    }
-
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      mangled: mangled,
-      mangledLoc: mangledLoc,
-      index: index, indexLoc: indexLoc
-    )
   }
   
   func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {

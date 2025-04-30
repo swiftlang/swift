@@ -193,13 +193,6 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
   return target;
 }
 
-SyntacticElementTarget
-SyntacticElementTarget::forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                                           GenericEnvironment *packElementEnv) {
-  SyntacticElementTarget target(stmt, dc, packElementEnv);
-  return target;
-}
-
 SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SyntacticElementTarget target(initializer, dc, CTP_Initialization,

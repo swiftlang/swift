@@ -303,10 +303,9 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     // above as the array would be passed indirectly.
     if (isFixLifetimeUseOfArray(user, arrayValue))
       continue;
-    if (auto *MDI = dyn_cast<MarkDependenceInst>(user)) {
-      if (MDI->getBase() == arrayValue) {
+    if (auto mdi = MarkDependenceInstruction(user)) {
+      if (mdi.getBase() == arrayValue)
         continue;
-      }
     }
     // Check if this is a forEach call on the array.
     if (TryApplyInst *forEachCall = isForEachUseOfArray(user, arrayValue)) {

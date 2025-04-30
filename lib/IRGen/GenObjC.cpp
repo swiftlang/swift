@@ -908,7 +908,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                            MANGLE_AS_STRING(OBJC_PARTIAL_APPLY_THUNK_SYM),
                            &IGM.Module);
   fwd->setCallingConv(expandCallingConv(
-      IGM, SILFunctionTypeRepresentation::Thick, false/*isAsync*/));
+      IGM, SILFunctionTypeRepresentation::Thick, false /*isAsync*/,
+      false /*isCalleeAllocatedCoroutine*/));
 
   fwd->setAttributes(attrs);
   // Merge initial attributes with attrs.

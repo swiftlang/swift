@@ -23,6 +23,7 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
@@ -49,11 +50,16 @@ class SILModule::SerializationCallback final
 
   void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
     updateLinkage(var);
-    
-    // For globals we currently do not support available_externally.
-    // In the interpreter it would result in two instances for a single global:
-    // one in the imported module and one in the main module.
-    var->setDeclaration(true);
+
+    if (!M->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // For globals we currently do not support available_externally.
+      // In the interpreter it would result in two instances for a single
+      // global: one in the imported module and one in the main module.
+      //
+      // We avoid that in Embedded Swift where we do actually link globals from
+      // other modules into the client module.
+      var->setDeclaration(true);
+    }
   }
 
   void didDeserialize(ModuleDecl *M, SILVTable *vtable) override {
@@ -234,21 +240,35 @@ void SILModule::flushDeletedInsts() {
 
 SILWitnessTable *
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
+  // First try to lookup a specialized witness table for that conformance.
+  if (auto *wt = lookUpWitnessTable(C, /*isSpecialized=*/true)) {
+    return wt;
+  }
+  return lookUpWitnessTable(C, /*isSpecialized=*/false);
+}
+
+SILWitnessTable *
+SILModule::lookUpWitnessTable(const ProtocolConformance *C, bool isSpecialized) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
-  // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableMap.find(C);
-  if (found == WitnessTableMap.end())
-    return nullptr;
-
-  return found->second;
+  if (isSpecialized) {
+    // First try to lookup a specialized witness table for that conformance.
+    auto foundSpec = specializedWitnessTableMap.find(C);
+    if (foundSpec != specializedWitnessTableMap.end())
+      return foundSpec->second;
+  } else if (auto *rootConf = dyn_cast<RootProtocolConformance>(C)) {
+    auto found = WitnessTableMap.find(rootConf);
+    if (found != WitnessTableMap.end())
+      return found->second;
+  }
+  return nullptr;
 }
 
 SILDefaultWitnessTable *
 SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
                                      bool deserializeLazily) {
   // Note: we only ever look up default witness tables in the translation unit
-  // that is currently being compiled, since they SILGen generates them when it
+  // that is currently being compiled, since SILGen generates them when it
   // visits the protocol declaration, and IRGen emits them when emitting the
   // protocol descriptor metadata for the protocol.
 
@@ -281,8 +301,42 @@ void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   auto Conf = Wt->getConformance();
   assert(lookUpWitnessTable(Conf) == Wt);
   getSILLoader()->invalidateWitnessTable(Wt);
-  WitnessTableMap.erase(Conf);
+  specializedWitnessTableMap.erase(Conf);
+  if (auto *rootConf = dyn_cast<RootProtocolConformance>(Conf))
+    WitnessTableMap.erase(rootConf);
   witnessTables.erase(Wt);
+}
+
+SILDefaultOverrideTable *SILModule::createDefaultOverrideTableDefinition(
+    const ClassDecl *decl, SILLinkage linkage,
+    ArrayRef<SILDefaultOverrideTable::Entry> entries) {
+  return SILDefaultOverrideTable::define(*this, linkage, decl, entries);
+}
+
+SILDefaultOverrideTable *
+SILModule::lookUpDefaultOverrideTable(const ClassDecl *decl,
+                                      bool deserializeLazily) {
+  // Note: we only ever look up default override tables in the translation unit
+  // that is currently being compiled, since SILGen generates them when it
+  // visits the class declaration, and IRGen emits them when emitting the
+  // class descriptor metadata for the class.
+
+  auto found = DefaultOverrideTableMap.find(decl);
+  if (found == DefaultOverrideTableMap.end()) {
+    if (deserializeLazily) {
+      SILLinkage linkage = getSILLinkage(getDeclLinkage(decl), ForDefinition);
+      SILDefaultOverrideTable *otable =
+          SILDefaultOverrideTable::declare(*this, linkage, decl);
+      otable = getSILLoader()->lookupDefaultOverrideTable(otable);
+      if (otable)
+        DefaultOverrideTableMap[decl] = otable;
+      return otable;
+    }
+
+    return nullptr;
+  }
+
+  return found->second;
 }
 
 const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
@@ -541,14 +595,23 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     linker.processConformance(C);
   }
   ProtocolConformance *conf = C.getConcrete();
-  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf))
-    conf = inheritedC->getInheritedConformance();
+  SILWitnessTable *wt = nullptr;
 
-  if (!isa<SpecializedProtocolConformance>(conf) || !lookupInSpecializedWitnessTable) {
-    conf = conf->getRootConformance();
+  if (lookupInSpecializedWitnessTable) {
+    wt = lookUpWitnessTable(conf);
+    if (!wt) {
+      if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf)) {
+        conf = inheritedC->getInheritedConformance();
+        wt = lookUpWitnessTable(conf);
+      }
+      if (!wt && !isa<SpecializedProtocolConformance>(conf)) {
+        conf = conf->getRootConformance();
+        wt = lookUpWitnessTable(conf);
+      }
+    }
+  } else {
+    wt = lookUpWitnessTable(conf->getRootConformance());
   }
-
-  SILWitnessTable *wt = lookUpWitnessTable(conf);
 
   if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
@@ -766,7 +829,8 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
     }
     ++idx;
   }
-  llvm_unreachable("enum element not found in enum decl");
+  ASSERT(false && "enum element not found in enum decl, broken AST?");
+  return 0;
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {

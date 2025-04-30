@@ -150,6 +150,7 @@ public:
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
       PackExpansionType *TheExpansion;
+      PackExpansionExpr *TheExpansionExpr;
       PackElementExpr *TheElement;
       Expr *TheExpr;
       Stmt *TheStmt;
@@ -213,7 +214,11 @@ public:
 
     /// Create a change that recorded a mapping from a pack element expression
     /// to its parent expansion expression.
-    static Change RecordedPackEnvironment(PackElementExpr *packElement);
+    static Change RecordedPackElementExpansion(PackElementExpr *packElement);
+
+    /// Create a change that records the GenericEnvironment for a given
+    /// PackExpansionExpr.
+    static Change RecordedPackExpansionEnvironment(PackExpansionExpr *expr);
 
     /// Create a change that recorded an assignment of a type to an AST node.
     static Change RecordedNodeType(ASTNode node, Type oldType);

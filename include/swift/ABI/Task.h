@@ -29,6 +29,17 @@
 #include "bitset"
 #include "queue" // TODO: remove and replace with our own mpsc
 
+// Does the runtime provide priority escalation support?
+#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
+    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
+    (defined(__arm64__) || defined(__x86_64__))
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
+#else
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
+#endif
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
+
 namespace swift {
 class AsyncTask;
 class AsyncContext;
@@ -229,7 +240,7 @@ struct ResultTypeInfo {
   void (*initializeWithCopy)(OpaqueValue *result, OpaqueValue *src) = nullptr;
   void (*storeEnumTagSinglePayload)(OpaqueValue *v, unsigned whichCase,
                                     unsigned emptyCases) = nullptr;
-  void (*destroy)(OpaqueValue *) = nullptr;
+  void (*destroy)(OpaqueValue *, void *) = nullptr;
 
   bool isNull() {
     return initializeWithCopy == nullptr;
@@ -248,7 +259,7 @@ struct ResultTypeInfo {
     storeEnumTagSinglePayload(v, whichCase, emptyCases);
   }
   void vw_destroy(OpaqueValue *v) {
-    destroy(v);
+    destroy(v, nullptr);
   }
 #endif
 };
@@ -298,7 +309,19 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[14];
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
+    static constexpr size_t ActiveTaskStatusSize = 4 * sizeof(void *);
+#else
+    static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
+#endif
+
+    // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
+    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
+    static constexpr size_t PrivateStorageSize =
+      6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      + sizeof(RecursiveMutex);
+
+    char Storage[PrivateStorageSize];
 
     /// Initialize this storage during the creation of a task.
     void initialize(JobPriority basePri);
@@ -420,6 +443,28 @@ public:
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const;
+
+  // ==== INITIAL TASK RECORDS =================================================
+  // A task may have a number of "initial" records set, they MUST be set in the
+  // following order to make the task-local allocation/deallocation's stack
+  // discipline easy to work out at the tasks destruction:
+  //
+  // - Initial TaskName
+  // - Initial ExecutorPreference
+
+  // ==== Task Naming ----------------------------------------------------------
+
+  /// At task creation a task may be assigned a name.
+  void pushInitialTaskName(const char* taskName);
+  void dropInitialTaskNameRecord();
+
+  /// Get the initial task name that was given to this task during creation,
+  /// or nullptr if the task has no name
+  const char* getTaskName();
+
+  bool hasInitialTaskNameRecord() const {
+    return Flags.task_hasInitialTaskName();
+  }
 
   // ==== Task Executor Preference ---------------------------------------------
 
@@ -733,8 +778,6 @@ private:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
-              "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 #pragma clang diagnostic push

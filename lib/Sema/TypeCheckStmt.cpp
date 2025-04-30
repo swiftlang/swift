@@ -1022,8 +1022,6 @@ public:
 
   StmtChecker(DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) { }
 
-  llvm::SmallVector<GenericEnvironment *, 4> genericSigStack;
-
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
@@ -1236,8 +1234,8 @@ public:
     if (!fn) {
       // Then we're not in some type's member function; emit diagnostics.
       if (auto decl = outerDC->getAsDecl()) {
-        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
-                           decl->getDescriptiveKind());
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_wrong_context_decl, decl);
       } else if (isa<AbstractClosureExpr>(outerDC)) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_closure);
@@ -1254,8 +1252,8 @@ public:
 
       if (fn->isStatic() || isa<DestructorDecl>(fn)
           || isa<ConstructorDecl>(fn)) {
-        ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
-                           fn->getDescriptiveKind());
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           diag::discard_wrong_context_decl, fn);
         diagnosed = true;
       }
     }
@@ -1269,8 +1267,7 @@ public:
       // must be noncopyable
       if (!nominalType->isNoncopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
-                           diag::discard_wrong_context_copyable,
-                           fn->getDescriptiveKind());
+                           diag::discard_wrong_context_copyable);
         diagnosed = true;
 
       // has to have a deinit or else it's pointless.
@@ -1345,7 +1342,7 @@ public:
         case SelfAccessKind::Mutating:
           ctx.Diags.diagnose(DS->getDiscardLoc(),
                              diag::discard_wrong_context_nonconsuming,
-                             fn->getDescriptiveKind());
+                             funcDecl);
           diagnosed = true;
           break;
         }
@@ -1436,10 +1433,7 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    GenericEnvironment *genericSignature =
-        genericSigStack.empty() ? nullptr : genericSigStack.back();
-
-    if (TypeChecker::typeCheckForEachPreamble(DC, S, genericSignature))
+    if (TypeChecker::typeCheckForEachPreamble(DC, S))
       return nullptr;
 
     // Type-check the body of the loop.
@@ -1447,16 +1441,8 @@ public:
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
     BraceStmt *Body = S->getBody();
-
-    if (auto packExpansion =
-            dyn_cast<PackExpansionExpr>(S->getParsedSequence()))
-      genericSigStack.push_back(packExpansion->getGenericEnvironment());
-
     typeCheckStmt(Body);
     S->setBody(Body);
-
-    if (isa<PackExpansionExpr>(S->getParsedSequence()))
-      genericSigStack.pop_back();
 
     return S;
   }
@@ -1656,14 +1642,6 @@ public:
     // Type-check the case blocks.
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, switchStmt);
-
-    // Preemptively visit all Decls (#if/#warning/#error) that still exist in
-    // the list of raw cases.
-    for (auto &node : switchStmt->getRawCases()) {
-      if (!node.is<Decl *>())
-        continue;
-      TypeChecker::typeCheckDecl(node.get<Decl *>());
-    }
 
     auto cases = switchStmt->getCases();
     checkSiblingCaseStmts(cases.begin(), cases.end(), CaseParentKind::Switch,
@@ -3320,7 +3298,8 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
   // We can only call next(isolation:) if we are in an availability context
   // that supports typed throws.
-  auto availability = overApproximateAvailabilityAtLocation(loc, dc);
+  auto availability =
+      AvailabilityContext::forLocation(loc, dc).getPlatformRange();
   if (availability.isContainedIn(ctx.getTypedThrowsAvailability()))
     return nextElement;
 

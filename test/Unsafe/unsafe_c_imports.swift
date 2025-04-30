@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %S/Inputs
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -I %S/Inputs
 
 import unsafe_decls
 
@@ -22,4 +19,9 @@ struct StoreAllTheThings {
   let ln: ListNode // expected-note{{property 'ln' involves unsafe type 'ListNode'}}
 
   let sc: SomeColor
-};
+}
+
+func readFromUnion(npu: NoPointersUnion) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = npu.x // expected-note{{reference to unsafe property 'x'}}
+}

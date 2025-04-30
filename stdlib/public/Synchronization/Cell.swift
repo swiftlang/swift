@@ -14,14 +14,13 @@ import Builtin
 
 @available(SwiftStdlib 6.0, *)
 @frozen
-@usableFromInline
 @_rawLayout(like: Value, movesAsLike)
-internal struct _Cell<Value: ~Copyable>: ~Copyable {
+public struct _Cell<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  internal var _address: UnsafeMutablePointer<Value> {
-    UnsafeMutablePointer<Value>(_rawAddress)
+  public var _address: UnsafeMutablePointer<Value> {
+    unsafe UnsafeMutablePointer<Value>(_rawAddress)
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -34,14 +33,14 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  internal init(_ initialValue: consuming Value) {
-    _address.initialize(to: initialValue)
+  public init(_ initialValue: consuming Value) {
+    unsafe _address.initialize(to: initialValue)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   deinit {
-    _address.deinitialize(count: 1)
+    unsafe _address.deinitialize(count: 1)
   }
 }

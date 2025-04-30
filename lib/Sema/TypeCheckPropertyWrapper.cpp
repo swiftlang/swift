@@ -73,8 +73,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     nominal->diagnose(diag::property_wrapper_ambiguous_value_property,
                       nominal->getDeclaredType(), name);
     for (auto var : vars) {
-      var->diagnose(diag::kind_declname_declared_here,
-                    var->getDescriptiveKind(), var->getName());
+      var->diagnose(diag::decl_declared_here_with_kind, var);
     }
     return nullptr;
   }
@@ -109,7 +108,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property may not have any effects right now.
   if (auto getter = var->getEffectfulGetAccessor()) {
-    getter->diagnose(diag::property_wrapper_effectful, getter->getDescriptiveKind());
+    getter->diagnose(diag::property_wrapper_effectful, getter);
     return nullptr;
   }
 
@@ -310,9 +309,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
     nominal->diagnose(diag::property_wrapper_ambiguous_enclosing_self_subscript,
                       nominal->getDeclaredType(), subscriptName);
     for (auto subscript : subscripts) {
-      subscript->diagnose(diag::kind_declname_declared_here,
-                          subscript->getDescriptiveKind(),
-                          subscript->getName());
+      subscript->diagnose(diag::decl_declared_here_with_kind, subscript);
     }
     return nullptr;
 
@@ -484,11 +481,15 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    auto abiRole = ABIRoleInfo(var);
+    bool hasOrIsABI = !abiRole.providesAPI() || !abiRole.providesABI();
+
     // Note: Getting the semantic attrs here would trigger a request cycle.
     auto attachedAttrs = var->getAttrs();
 
     // Check for conflicting attributes.
-    if (attachedAttrs.hasAttribute<LazyAttr>() ||
+    if (hasOrIsABI ||
+        attachedAttrs.hasAttribute<LazyAttr>() ||
         attachedAttrs.hasAttribute<NSCopyingAttr>() ||
         attachedAttrs.hasAttribute<NSManagedAttr>() ||
         (attachedAttrs.hasAttribute<ReferenceOwnershipAttr>() &&
@@ -501,9 +502,11 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 1;
       else if (attachedAttrs.hasAttribute<NSManagedAttr>())
         whichKind = 2;
+      else if (hasOrIsABI)
+        whichKind = 3;
       else {
         auto attr = attachedAttrs.getAttribute<ReferenceOwnershipAttr>();
-        whichKind = 2 + static_cast<unsigned>(attr->get());
+        whichKind = 3 + static_cast<unsigned>(attr->get());
       }
       var->diagnose(diag::property_with_wrapper_conflict_attribute,
                     var->getName(), whichKind);

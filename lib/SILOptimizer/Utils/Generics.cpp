@@ -370,6 +370,8 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
     LLVM_DEBUG(llvm::dbgs() << "Scan caller's specialization history\n");
   }
 
+  llvm::SmallSet<const GenericSpecializationInformation *, 8> visited;
+
   while (CurSpecializationInfo) {
     LLVM_DEBUG(llvm::dbgs() << "Current caller is a specialization:\n"
                             << "Caller: "
@@ -384,6 +386,10 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                        .getReplacementTypes()) {
                  Replacement->dump(llvm::dbgs());
                });
+
+    if (!visited.insert(CurSpecializationInfo).second) {
+      return true;
+    }
 
     if (CurSpecializationInfo->getParent() == GenericFunc) {
       LLVM_DEBUG(llvm::dbgs() << "Found a call graph loop, checking "
@@ -444,6 +450,82 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
 
   if (Subs.hasAnySubstitutableParams() &&
       Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
+    return true;
+
+  return false;
+}
+
+// Addressable parameters cannot be dropped because the address may
+// escape. They also can't be promoted to direct convention, so there
+// is no danger in preserving them.
+static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
+                          SILFunction *caller) {
+  return !substType->isAddressable(paramIdx, caller);
+}
+
+// If there is no read from an indirect argument, this argument has to be
+// dropped. At the call site the store to the argument's memory location could
+// have been removed (based on the callee's memory effects).  Therefore,
+// converting such an unused indirect argument to a direct argument, would load
+// an uninitialized value at the call site.  This would lead to verifier errors
+// and in worst case to a miscompile because IRGen can implicitly use dead
+// arguments, e.g. for getting the type of a class reference.
+static bool canDropUnusedArg(ApplySite apply, SILFunction *callee,
+                             CanSILFunctionType substType,
+                             unsigned paramIdx) {
+  FullApplySite fas = apply.asFullApplySite();
+  if (!fas) {
+    return false;
+  }
+  Operand &op = fas.getOperandsWithoutIndirectResults()[paramIdx];
+  return !callee->argumentMayRead(&op, op.get());
+}
+
+static bool isUsedAsDynamicSelf(SILArgument *arg) {
+  for (Operand *use : arg->getUses()) {
+    if (use->isTypeDependent())
+      return true;
+  }
+  return false;
+}
+
+static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
+                               unsigned paramIdx) {
+  if (!callee->isDefinition())
+    return false;
+
+  unsigned calleeArgIdx =
+    apply.getSubstCalleeConv().getSILArgIndexOfFirstParam() + paramIdx;
+  SILArgument *calleeArg = callee->getArguments()[calleeArgIdx];
+
+  if (isUsedAsDynamicSelf(calleeArg))
+    return false;
+
+  if (calleeArg->getType().getASTType()->hasDynamicSelfType())
+    return false;
+
+  // We don't drop metatype arguments of not applied arguments (in case of
+  // `partial_apply`).
+  unsigned firstAppliedArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
+  if (firstAppliedArgIdx > calleeArgIdx)
+      return false;
+
+  auto mt = calleeArg->getType().castTo<MetatypeType>();
+  if (mt->hasRepresentation()
+      && mt->getRepresentation() == MetatypeRepresentation::Thin) {
+    return true;
+  }
+  // If the passed thick metatype value is not a `metatype` instruction
+  // we don't know the real metatype at runtime. It's not necessarily the
+  // same as the declared metatype. It could e.g. be an upcast of a class
+  // metatype.
+  SILValue callerArg = apply.getArguments()[calleeArgIdx - firstAppliedArgIdx];
+  if (isa<MetatypeInst>(callerArg))
+    return true;
+
+  // But: if the metatype is not used in the callee we don't have to care
+  // what metatype value is passed. We can just remove it.
+  if (onlyHaveDebugUses(calleeArg))
     return true;
 
   return false;
@@ -519,7 +601,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
-    auto Replacement = Type(GP).subst(CalleeParamSubMap);
+    auto Replacement = Type(GP).subst(CalleeParamSubMap)->getCanonicalType();
     if (!Replacement->is<ArchetypeType>())
       HasNonArchetypeGenericParams = true;
 
@@ -765,7 +847,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
     auto IdxToInsert = IdxForParam;
     ++IdxForParam;
-    unsigned argIdx = i++;
+    unsigned paramIdx = i++;
 
     SILFunctionConventions substConv(SubstitutedType, getModule());
     TypeCategory tc = getParamTypeCategory(PI, substConv, getResilienceExpansion());
@@ -776,22 +858,14 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed: {
-      if (Callee && Apply && dropUnusedArguments) {
-        // If there is no read from an indirect argument, this argument has to
-        // be dropped. At the call site the store to the argument's memory location
-        // could have been removed (based on the callee's memory effects).
-        // Therefore, converting such an unused indirect argument to a direct
-        // argument, would load an uninitialized value at the call site.
-        // This would lead to verifier errors and in worst case to a miscompile
-        // because IRGen can implicitly use dead arguments, e.g. for getting the
-        // type of a class reference.
-        if (FullApplySite fas = Apply.asFullApplySite()) {
-          Operand &op = fas.getOperandsWithoutIndirectResults()[argIdx];
-          if (!Callee->argumentMayRead(&op, op.get())) {
-            droppedArguments.set(IdxToInsert);
-            break;
-          }
-        }
+      if (Apply && !canConvertArg(SubstitutedType, paramIdx,
+                                  Apply.getFunction())) {
+        continue;
+      }
+      if (Callee && Apply && dropUnusedArguments
+          && canDropUnusedArg(Apply, Callee, SubstitutedType, paramIdx)) {
+        droppedArguments.set(IdxToInsert);
+        break;
       }
       Conversions.set(IdxToInsert);
       if (tc == LoadableAndTrivial)
@@ -816,8 +890,10 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed: {
       CanType ty = PI.getInterfaceType();
-      if (dropUnusedArguments && isa<MetatypeType>(ty) && !ty->hasArchetype())
+      if (dropUnusedArguments && isa<MetatypeType>(ty) && !ty->hasArchetype()
+          && Apply && Callee && canDropMetatypeArg(Apply, Callee, paramIdx)) {
         droppedArguments.set(IdxToInsert);
+      }
       break;
     }
     }
@@ -2369,7 +2445,7 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   SILModule &m = f->getModule();
 
   CanType astType = wm->getLookupType();
-  if (!isa<OpenedArchetypeType>(astType))
+  if (!isa<ExistentialArchetypeType>(astType))
     return false;
 
   if (wm->isSpecialized())
@@ -2910,7 +2986,8 @@ static bool createPrespecialized(StringRef UnspecializedName,
   ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), ApplySite(),
                            UnspecFunc, Apply.getSubstitutionMap(),
                            IsNotSerialized,
-                           /*ConvertIndirectToDirect= */true, /*dropMetatypeArgs=*/ false);
+                           /*ConvertIndirectToDirect= */true,
+                           /*dropUnusedArguments=*/ false);
 
   if (!ReInfo.canBeSpecialized())
     return false;
@@ -2999,7 +3076,7 @@ static bool usePrespecialized(
                                       funcBuilder.getModule().isWholeModule(), apply, refF,
                                       apply.getSubstitutionMap(), IsNotSerialized,
                                       /*ConvertIndirectToDirect=*/ true,
-                                      /*dropMetatypeArgs=*/ false);
+                                      /*dropUnusedArguments=*/ false);
 
   for (auto *SA : refF->getSpecializeAttrs()) {
     if (!SA->isExported())
@@ -3143,7 +3220,8 @@ static bool usePrespecialized(
           funcBuilder.getModule().getSwiftModule(),
           funcBuilder.getModule().isWholeModule(), apply, refF, newSubstMap,
           apply.getFunction()->getSerializedKind(),
-          /*ConvertIndirectToDirect=*/ true, /*dropMetatypeArgs=*/ false, nullptr);
+          /*ConvertIndirectToDirect=*/ true,
+          /*dropUnusedArguments=*/ false, nullptr);
 
       if (layoutReInfo.getSpecializedType() == reInfo.getSpecializedType()) {
         layoutMatches.push_back(
@@ -3203,57 +3281,6 @@ static bool usePrespecialized(
   return false;
 }
 
-static bool isUsedAsDynamicSelf(SILArgument *arg) {
-  for (Operand *use : arg->getUses()) {
-    if (use->isTypeDependent())
-      return true;
-  }
-  return false;
-}
-
-static bool canDropMetatypeArgs(ApplySite apply, SILFunction *callee) {
-  if (!callee->isDefinition())
-    return false;
-
-  auto calleeArgs = callee->getArguments();
-  unsigned firstAppliedArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
-  for (unsigned calleeArgIdx = 0; calleeArgIdx < calleeArgs.size(); ++calleeArgIdx) {
-    SILArgument *calleeArg = calleeArgs[calleeArgIdx];
-    auto mt = calleeArg->getType().getAs<MetatypeType>();
-    if (!mt)
-      continue;
-
-    if (isUsedAsDynamicSelf(calleeArg))
-      return false;
-
-    if (calleeArg->getType().getASTType()->hasDynamicSelfType())
-      return false;
-
-    // We don't drop metatype arguments of not applied arguments (in case of `partial_apply`).
-    if (firstAppliedArgIdx > calleeArgIdx)
-      return false;
-
-    if (mt->hasRepresentation() && mt->getRepresentation() == MetatypeRepresentation::Thin)
-      continue;
-
-    // If the passed thick metatype value is not a `metatype` instruction
-    // we don't know the real metatype at runtime. It's not necessarily the
-    // same as the declared metatype. It could e.g. be an upcast of a class
-    // metatype.
-    SILValue callerArg = apply.getArguments()[calleeArgIdx - firstAppliedArgIdx];
-    if (isa<MetatypeInst>(callerArg))
-      continue;
-
-    // But: if the metatype is not used in the callee we don't have to care
-    // what metatype value is passed. We can just remove it.
-    if (callee->isDefinition() && onlyHaveDebugUses(calleeArg))
-      continue;
-
-    return false;
-  }
-  return true;
-}
-
 void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
@@ -3306,7 +3333,7 @@ void swift::trySpecializeApplyOfGeneric(
                            FuncBuilder.getModule().isWholeModule(), Apply, RefF,
                            Apply.getSubstitutionMap(), serializedKind,
                            /*ConvertIndirectToDirect=*/ true,
-                           /*dropMetatypeArgs=*/ canDropMetatypeArgs(Apply, RefF),
+                           /*dropUnusedArguments=*/ true,
                            &ORE);
   if (!ReInfo.canBeSpecialized())
     return;

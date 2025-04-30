@@ -171,6 +171,10 @@ func testPrivateVar() {
   print(getRandom())
 }
 
+func testKeyPathAccess() -> KeyPath<StructWithInternal, Int> {
+  return getKP()
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -182,4 +186,4 @@ testMisc()
 testGlobal()
 testImplementationOnly()
 testPrivateVar()
-
+testKeyPathAccess()

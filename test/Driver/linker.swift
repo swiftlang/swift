@@ -344,7 +344,6 @@
 
 // LINUX_DYNLIB-x86_64: clang{{(\.exe)?"? }}
 // LINUX_DYNLIB-x86_64-DAG: -shared
-// LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
 // LINUX_DYNLIB-x86_64-NOT: -pie
 // LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
 // LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]{{/|\\\\}}x86_64{{/|\\\\}}swiftrt.o

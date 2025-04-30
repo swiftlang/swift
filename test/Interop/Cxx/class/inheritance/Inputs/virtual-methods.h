@@ -50,6 +50,10 @@ struct DerivedFromCallsPureMethod : CallsPureMethod {
 
 struct DerivedFromDerivedFromCallsPureMethod : DerivedFromCallsPureMethod {};
 
+struct HasDestructor {
+  ~HasDestructor() {}
+};
+
 // MARK: Reference Types:
 
 #define IMMORTAL_FRT                                                           \
@@ -74,6 +78,11 @@ struct IMMORTAL_FRT Immortal : public ImmortalBase {
 
 struct IMMORTAL_FRT DerivedFromImmortal : public Immortal {
   static DerivedFromImmortal *_Nonnull create() { return new DerivedFromImmortal(); }
+};
+
+struct IMMORTAL_FRT Immortal2 {
+public:
+  virtual void virtualMethod(HasDestructor) = 0;
 };
 
 inline const ImmortalBase *_Nonnull castToImmortalBase(

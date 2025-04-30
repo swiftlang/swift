@@ -4,7 +4,7 @@
 
 func baz(y: [Int], z: Int) -> Int {
   switch z {
-  case y[let z]: // expected-error {{'let' binding pattern cannot appear in an expression}}
+  case y[let z]: // expected-error 2{{'let' binding pattern cannot appear in an expression}}
     z
   default:
     z

@@ -262,6 +262,9 @@ private:
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
 
+  /// Abstract conformances referenced by this module.
+  MutableArrayRef<Serialized<AbstractConformance *>> AbstractConformances;
+
   /// Pack conformances referenced by this module.
   MutableArrayRef<Serialized<PackConformance *>> PackConformances;
 
@@ -507,7 +510,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+  llvm::Expected<GenericParamList *> maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
@@ -690,6 +693,10 @@ public:
   /// Whether currently allowing modules with compiler errors (ie.
   /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
   bool allowCompilerErrors() const;
+
+  /// Allow recovering from errors that could be unsafe when compiling
+  /// the binary. Useful for the debugger and IDE support tools.
+  bool enableExtendedDeserializationRecovery() const;
 
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }

@@ -154,6 +154,10 @@ public:
   /// or return an invalid source location if there is no such attribute.
   SourceLoc findAttrLoc(TypeAttrKind kind) const;
 
+  /// Find a custom attribute within this type, or return NULL if there is
+  /// no such attribute.
+  CustomAttr *findCustomAttr() const;
+
   /// Is this type grammatically a type-simple?
   inline bool isSimple() const; // bottom of this file
 
@@ -637,6 +641,35 @@ private:
   friend class TypeRepr;
 };
 
+/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayTypeRepr : public TypeRepr {
+  TypeRepr *Count;
+  TypeRepr *Element;
+  SourceRange Brackets;
+
+  InlineArrayTypeRepr(TypeRepr *count, TypeRepr *element, SourceRange brackets)
+      : TypeRepr(TypeReprKind::InlineArray), Count(count), Element(element),
+        Brackets(brackets) {}
+
+public:
+  static InlineArrayTypeRepr *create(ASTContext &ctx, TypeRepr *count,
+                                     TypeRepr *element, SourceRange brackets);
+
+  TypeRepr *getCount() const { return Count; }
+  TypeRepr *getElement() const { return Element; }
+  SourceRange getBrackets() const { return Brackets; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InlineArray;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A dictionary type.
 /// \code
 ///   [K : V]
@@ -1112,7 +1145,8 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
-           T->getKind() == TypeReprKind::CompileTimeConst ||
+           T->getKind() == TypeReprKind::CompileTimeLiteral ||
+           T->getKind() == TypeReprKind::ConstValue ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
            T->getKind() == TypeReprKind::Sending;
   }
@@ -1174,15 +1208,30 @@ public:
 /// \code
 ///   x : _const Int
 /// \endcode
-class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+class CompileTimeLiteralTypeRepr : public SpecifierTypeRepr {
 public:
-  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+  CompileTimeLiteralTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeLiteral, Base, InOutLoc) {}
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CompileTimeConst;
+    return T->getKind() == TypeReprKind::CompileTimeLiteral;
   }
-  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+  static bool classof(const CompileTimeLiteralTypeRepr *T) { return true; }
+};
+
+/// An '@const' type.
+/// \code
+///   x : @const Int
+/// \endcode
+class ConstValueTypeRepr : public SpecifierTypeRepr {
+public:
+  ConstValueTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::ConstValue, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ConstValue;
+  }
+  static bool classof(const ConstValueTypeRepr *T) { return true; }
 };
 
 /// A sending type.
@@ -1198,6 +1247,35 @@ public:
     return T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SendingTypeRepr *T) { return true; }
+};
+
+/// A 'nonisolated(nonsending)' function type.
+/// \code
+///   x : nonisolated(nonsending) () async -> Int
+/// \endcode
+class CallerIsolatedTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc Loc;
+
+public:
+  CallerIsolatedTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : TypeRepr(TypeReprKind::CallerIsolated), Base(Base), Loc(Loc) {
+    assert(Base);
+  }
+
+  TypeRepr *getBase() const { return Base; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CallerIsolated;
+  }
+  static bool classof(const CallerIsolatedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
+  SourceLoc getLocImpl() const { return Base->getLoc(); }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1622,13 +1700,16 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Fixed:
   case TypeReprKind::Self:
   case TypeReprKind::Array:
+  case TypeReprKind::InlineArray:
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Integer:
+  case TypeReprKind::CallerIsolated:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

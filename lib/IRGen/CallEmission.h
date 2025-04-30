@@ -72,6 +72,10 @@ protected:
   /// Whether this is a coroutine invocation.
   bool IsCoroutine;
 
+  /// Whether this is a invocation for a coroutine that dynamically allocates
+  /// in the callee.
+  bool IsCalleeAllocatedCoroutine;
+
   /// Whether we've emitted the call for the current callee yet.  This
   /// is just for debugging purposes --- e.g. the destructor asserts
   /// that it's true --- but is otherwise derivable from
@@ -177,6 +181,9 @@ public:
 
   virtual llvm::Value *getResumeFunctionPointer() = 0;
   virtual llvm::Value *getAsyncContext() = 0;
+
+  virtual StackAddress getCoroStaticFrame() = 0;
+  virtual llvm::Value *getCoroAllocator() = 0;
 
   void setIndirectTypedErrorResultSlot(llvm::Value *addr) {
     Args[IndirectTypedErrorArgIdx] = addr;

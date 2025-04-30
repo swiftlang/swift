@@ -46,3 +46,22 @@ public protocol ProtocolTypealias {
 
 // CHECK: public func dependentExistential<T>(value: (T) -> any main.P) where T : main.ProtocolTypealias
 public func dependentExistential<T: ProtocolTypealias>(value: (T) -> T.A) {}
+
+public protocol Yescopyable {}
+public protocol Noncopyable: ~Copyable {}
+
+// CHECK: public func existentialMetatype1(_: any (main.Noncopyable & ~Copyable).Type)
+// CHECK: public func existentialMetatype2(_: any (main.Noncopyable & main.Yescopyable).Type)
+// CHECK: public func existentialMetatype3(_: any ~Copyable.Type)
+
+public func existentialMetatype1(_: any (Noncopyable & ~Copyable).Type) {}
+public func existentialMetatype2(_: any (Yescopyable & Noncopyable).Type) {}
+public func existentialMetatype3(_: any ~Copyable.Type) {}
+
+// CHECK: public func metatypeExistential1(_: (any main.Noncopyable & ~Copyable).Type)
+// CHECK: public func metatypeExistential2(_: (any main.Noncopyable & main.Yescopyable).Type)
+// CHECK: public func metatypeExistential3(_: (any ~Copyable).Type)
+
+public func metatypeExistential1(_: (any Noncopyable & ~Copyable).Type) {}
+public func metatypeExistential2(_: (any Yescopyable & Noncopyable).Type) {}
+public func metatypeExistential3(_: (any ~Copyable).Type) {}

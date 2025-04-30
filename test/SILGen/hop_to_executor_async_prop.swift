@@ -122,8 +122,8 @@ func accessSweaterOfSweater(cat : Cat) async -> Sweater {
 // CHECK:    [[GLOBAL_CAT:%[0-9]+]] = begin_borrow [[GLOBAL_CAT_REF]] : $Cat
 
 // CHECK:    hop_to_executor [[GLOBAL_CAT]] : $Cat
-// CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    end_borrow [[GLOBAL_CAT]] : $Cat
+// CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    destroy_value [[GLOBAL_CAT_REF]] : $Cat
 // CHECK:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK:    return [[THE_STRING]] : $String

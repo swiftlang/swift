@@ -103,6 +103,10 @@ public:
   /// dependency scanning.
   std::string ExplicitModulesOutputPath;
 
+  /// The path to output explicitly-built SDK module dependencies. Only relevant during
+  /// dependency scanning.
+  std::string ExplicitSDKModulesOutputPath;
+
   /// The path to look in to find backup .swiftinterface files if those found
   /// from SDKs are failing.
   std::string BackupModuleInterfaceDir;
@@ -197,7 +201,7 @@ public:
 
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
-    PrintFeature,     ///< Print supported feature of this compiler
+    PrintArguments,   ///< Print supported arguments of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -309,6 +313,10 @@ public:
   /// Indicates that the frontend should print the target triple and then
   /// exit.
   bool PrintTargetInfo = false;
+
+  /// Indicates that the frontend should print the supported features and then
+  /// exit.
+  bool PrintSupportedFeatures = false;
 
   /// See the \ref SILOptions.EmitVerboseSIL flag.
   bool EmitVerboseSIL = false;

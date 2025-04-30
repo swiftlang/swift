@@ -20,6 +20,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/LifetimeDependence.h"
 
 namespace swift {
 
@@ -154,7 +155,7 @@ case TypeKind::Id:
         return *result;
 
       auto subMap = opaque->getSubstitutions();
-      auto newSubMap = asDerived().transformSubMap(subMap);
+      auto newSubMap = asDerived().transformSubstitutionMap(subMap);
       if (newSubMap == subMap)
         return t;
       if (!newSubMap)
@@ -165,7 +166,7 @@ case TypeKind::Id:
                                           newSubMap);
     }
 
-    case TypeKind::OpenedArchetype: {
+    case TypeKind::ExistentialArchetype: {
       auto *local = cast<LocalArchetypeType>(base);
       if (auto result = asDerived().transformLocalArchetypeType(local, pos))
         return *result;
@@ -177,7 +178,7 @@ case TypeKind::Id:
       auto subMap = env->getOuterSubstitutions();
       auto uuid = env->getOpenedExistentialUUID();
 
-      auto newSubMap = asDerived().transformSubMap(subMap);
+      auto newSubMap = asDerived().transformSubstitutionMap(subMap);
       if (newSubMap == subMap)
         return t;
       if (!newSubMap)
@@ -259,7 +260,7 @@ case TypeKind::Id:
       }
 
       auto oldSubMap = boxTy->getSubstitutions();
-      auto newSubMap = asDerived().transformSubMap(oldSubMap);
+      auto newSubMap = asDerived().transformSubstitutionMap(oldSubMap);
       if (oldSubMap && !newSubMap)
         return Type();
       changed |= (oldSubMap != newSubMap);
@@ -281,7 +282,7 @@ case TypeKind::Id:
         return fnTy;
 
       auto updateSubs = [&](SubstitutionMap &subs) -> bool {
-        auto newSubs = asDerived().transformSubMap(subs);
+        auto newSubs = asDerived().transformSubstitutionMap(subs);
         if (subs && !newSubs)
           return false;
         if (subs == newSubs)
@@ -333,11 +334,37 @@ case TypeKind::Id:
         transErrorResult = result;
       }
 
-      if (!changed) return t;
+      if (!changed) {
+        return t;
+      }
+      
+      // Lifetime dependencies get eliminated if their target type was
+      // substituted with an escapable type.
+      auto extInfo = fnTy->getExtInfo();
+      if (!extInfo.getLifetimeDependencies().empty()) {
+        SmallVector<LifetimeDependenceInfo, 2> substDependenceInfos;
+        bool didRemoveLifetimeDependencies
+          = filterEscapableLifetimeDependencies(GenericSignature(),
+                                              extInfo.getLifetimeDependencies(),
+                                              substDependenceInfos,
+                                              [&](unsigned targetIndex) {
+            if (targetIndex >= transInterfaceParams.size()) {
+              // Target is a return type.
+              return transInterfaceResults[targetIndex - transInterfaceParams.size()]
+                .getInterfaceType();
+            } else {
+              // Target is a parameter.
+              return transInterfaceParams[targetIndex].getInterfaceType();
+            }
+          });
+        if (didRemoveLifetimeDependencies) {
+          extInfo = extInfo.withLifetimeDependencies(substDependenceInfos);
+        }
+      }
 
       return SILFunctionType::get(
           fnTy->getInvocationGenericSignature(),
-          fnTy->getExtInfo(),
+          extInfo,
           fnTy->getCoroutineKind(),
           fnTy->getCalleeConvention(),
           transInterfaceParams,
@@ -809,7 +836,7 @@ case TypeKind::Id:
       }
 
       // Transform result type.
-      auto resultTy = doIt(function->getResult(), pos);
+      Type resultTy = doIt(function->getResult(), pos);
       if (!resultTy)
         return Type();
 
@@ -876,8 +903,45 @@ case TypeKind::Id:
         return GenericFunctionType::get(
             genericSig, substParams, resultTy, extInfo);
       }
+      
+      if (isUnchanged) {
+        return t;
+      }
 
-      if (isUnchanged) return t;
+      // Substitution may have replaced parameter or return types that had
+      // lifetime dependencies with Escapable types, which render those
+      // dependencies inactive.
+      if (extInfo && !extInfo->getLifetimeDependencies().empty()) {
+        SmallVector<LifetimeDependenceInfo, 2> substDependenceInfos;
+        bool didRemoveLifetimeDependencies
+          = filterEscapableLifetimeDependencies(GenericSignature(),
+                                                extInfo->getLifetimeDependencies(),
+                                                substDependenceInfos,
+                                                [&](unsigned targetIndex) {
+            // Traverse potentially-curried function types.
+            ArrayRef<AnyFunctionType::Param> params = substParams;
+            auto result = resultTy;
+            while (targetIndex >= params.size()) {
+              if (auto curriedTy = result->getAs<AnyFunctionType>()) {
+                targetIndex -= params.size();
+                params = curriedTy->getParams();
+                result = curriedTy->getResult();
+                continue;
+              } else {
+                // The last lifetime dependency targets the result at the end
+                // of the curried chain.
+                ASSERT(targetIndex == params.size()
+                       && "invalid lifetime dependence target");
+                return result;
+              }
+            }
+            return params[targetIndex].getParameterType();
+          });
+
+        if (didRemoveLifetimeDependencies) {
+          extInfo = extInfo->withLifetimeDependencies(substDependenceInfos);
+        }
+      }
 
       return FunctionType::get(substParams, resultTy, extInfo);
     }
@@ -892,6 +956,25 @@ case TypeKind::Id:
         return t;
 
       return ArraySliceType::get(baseTy);
+    }
+
+    case TypeKind::InlineArray: {
+      auto ty = cast<InlineArrayType>(base);
+      auto countTy = doIt(ty->getCountType(), TypePosition::Invariant);
+      if (!countTy)
+        return Type();
+
+      // Currently the element type is invariant for InlineArray.
+      // FIXME: Should we allow covariance?
+      auto eltTy = doIt(ty->getElementType(), TypePosition::Invariant);
+      if (!eltTy)
+        return Type();
+
+      if (countTy.getPointer() == ty->getCountType().getPointer() &&
+          eltTy.getPointer() == ty->getElementType().getPointer())
+        return t;
+
+      return InlineArrayType::get(countTy, eltTy);
     }
 
     case TypeKind::Optional: {
@@ -1033,7 +1116,7 @@ case TypeKind::Id:
 
   // If original was non-empty and transformed is empty, we're
   // signaling failure, that is, a Type() return from doIt().
-  SubstitutionMap transformSubMap(SubstitutionMap subs) {
+  SubstitutionMap transformSubstitutionMap(SubstitutionMap subs) {
     if (subs.empty())
       return subs;
 

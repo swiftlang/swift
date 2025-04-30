@@ -805,3 +805,18 @@ func testMatchingNonErrorConformingTypeInClosure(_ x: any Error) {
     }
   }
 }
+
+// rdar://131819800 - crash in `transformWithPosition` while trying to emit diagnostics for `AllowFunctionTypeMismatch` fix
+do {
+  enum E {
+  case test(kind: Int, defaultsToEmpty: Bool = false)
+  }
+
+  func test(e: E) {
+    if case .test(kind: _, // expected-error {{tuple pattern has the wrong length for tuple type '(Int, Bool)'}}
+                  name: let name?,
+                  defaultsToEmpty: _,
+                  deprecateName: let deprecatedName?) = e {
+    }
+  }
+}

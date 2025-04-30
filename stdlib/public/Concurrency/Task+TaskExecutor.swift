@@ -112,7 +112,7 @@ import Swift
 ///
 ///           // child tasks execute on default executor (same as case 0):
 ///           async let x = ...
-///           await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///           await withTaskGroup(of: Int.self) { group in group.addTask { 7 } }
 ///         }
 ///       }
 ///     }
@@ -146,11 +146,11 @@ public func withTaskExecutorPreference<T, Failure>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
+    taskExecutor.asUnownedTaskExecutor().executor
 
   let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
-    _popTaskExecutorPreference(record: record)
+    unsafe _popTaskExecutorPreference(record: record)
   }
 
   // No need to manually hop to the target executor, because as we execute
@@ -181,7 +181,7 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
 
   let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
-    _popTaskExecutorPreference(record: record)
+    unsafe _popTaskExecutorPreference(record: record)
   }
 
   return try await operation()
@@ -240,7 +240,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -303,7 +303,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -364,7 +364,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -425,7 +425,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     let (task, _) = Builtin.createTask(
@@ -457,8 +457,8 @@ extension UnsafeCurrentTask {
   /// means to guarantee the executor remains alive while it is in use.
   @available(SwiftStdlib 6.0, *)
   public var unownedTaskExecutor: UnownedTaskExecutor? {
-    let ref = _getPreferredTaskExecutor()
-    return UnownedTaskExecutor(ref)
+    let ref = _getPreferredUnownedTaskExecutor()
+    return unsafe UnownedTaskExecutor(ref)
   }
 }
 
@@ -466,7 +466,7 @@ extension UnsafeCurrentTask {
 
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
-internal func _getPreferredTaskExecutor() -> Builtin.Executor
+internal func _getPreferredUnownedTaskExecutor() -> Builtin.Executor
 
 typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 
@@ -496,7 +496,7 @@ internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
   // Rather than call into the runtime to return the
   // `TaskExecutorRef::undefined()`` we this information to bitcast
   // and return it directly.
-  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+  unsafe unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

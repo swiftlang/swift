@@ -41,7 +41,7 @@ constexpr const auto DiagGroupsCount = [] {
 struct DiagGroupInfo {
   DiagGroupID id;
   std::string_view name;
-  std::string_view version;
+  std::string_view documentationFile;
   llvm::ArrayRef<DiagGroupID> supergroups;
   llvm::ArrayRef<DiagGroupID> subgroups;
   llvm::ArrayRef<DiagID> diagnostics;

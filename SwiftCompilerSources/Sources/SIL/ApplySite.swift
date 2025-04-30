@@ -229,6 +229,13 @@ extension ApplySite {
     functionConvention.resultDependencies != nil
   }
 
+  public func isAddressable(operand: Operand) -> Bool {
+    if let dep = resultDependence(on: operand) {
+      return dep.isAddressable(for: operand.value)
+    }
+    return false
+  }
+
   public var hasLifetimeDependence: Bool {
     functionConvention.hasLifetimeDependencies()
   }
@@ -296,6 +303,7 @@ extension ApplySite {
 
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+  var singleDirectErrorResult: Value? { get }
 }
 
 extension FullApplySite {

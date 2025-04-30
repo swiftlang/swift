@@ -93,13 +93,13 @@ public:
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                    SILFunctionTypeIsolation::Unknown);
+                                      SILFunctionTypeIsolation::forUnknown());
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                    SILFunctionTypeIsolation::Unknown) {
+                                      SILFunctionTypeIsolation::forUnknown()) {
     return createPartialApply(loc, fn.getValue(), subs, args,
                               calleeConvention, resultIsolation);
   }
@@ -307,13 +307,16 @@ public:
                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCast;
-  ManagedValue createUnconditionalCheckedCast(SILLocation loc,
-                                              ManagedValue op,
-                                              SILType destLoweredTy,
-                                              CanType destFormalTy);
+  ManagedValue createUnconditionalCheckedCast(
+      SILLocation loc,
+      CastingIsolatedConformances isolatedConformances,
+      ManagedValue op,
+      SILType destLoweredTy,
+      CanType destFormalTy);
 
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
+                               CastingIsolatedConformances isolatedConformances,
                                ManagedValue op,
                                CanType sourceFormalTy,
                                SILType destLoweredTy,
@@ -477,6 +480,10 @@ public:
                                     ManagedValue base,
                                     MarkDependenceKind dependencekind);
 
+  SILValue emitBeginAccess(SILLocation loc, SILValue address,
+                           SILAccessKind kind,
+                           SILAccessEnforcement enforcement);
+
   ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
                                              ManagedValue address);
   ManagedValue createOpaqueConsumeBeginAccess(SILLocation loc,
@@ -544,11 +551,6 @@ public:
 
     createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
-
-  using SILBuilder::createHopToMainActorIfNeededThunk;
-  ManagedValue
-  createHopToMainActorIfNeededThunk(SILLocation loc, ManagedValue op,
-                                    SubstitutionMap substitutionMap = {});
 };
 
 } // namespace Lowering

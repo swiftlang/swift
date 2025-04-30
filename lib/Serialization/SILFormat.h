@@ -102,19 +102,21 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_DEFAULT_OVERRIDE_TABLE_NAMES,
+    SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCVBR<16>,  // table offset within the blob
     BCBlob      // map from identifier strings to IDs.
   >;
 
   using OffsetLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCArray<BitOffsetField>
   >;
 
@@ -155,6 +157,8 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
     SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -179,7 +183,9 @@ namespace sil_block {
     SIL_DEBUG_SCOPE,
     SIL_DEBUG_SCOPE_REF,
     SIL_SOURCE_LOC,
-    SIL_SOURCE_LOC_REF
+    SIL_SOURCE_LOC_REF,
+    SIL_DEBUG_VALUE_DELIMITER,
+    SIL_DEBUG_VALUE,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -223,6 +229,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
+    BCFixed<1>,          // Is this a specialized witness table.
     BCFixed<2>,          // SerializedKind.
     ProtocolConformanceIDField   // conformance
     // Witness table entries will be serialized after.
@@ -242,8 +249,7 @@ namespace sil_block {
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
-    TypeIDField, // ID of associated type
-    DeclIDField, // ID of ProtocolDecl
+    TypeIDField, // ID of requirement subject type
     ProtocolConformanceIDField
   >;
 
@@ -255,7 +261,6 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField, // ID of associated type
     ProtocolConformanceIDField // ID of conformance
   >;
 
@@ -268,6 +273,19 @@ namespace sil_block {
 
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
+  >;
+
+  using DefaultOverrideTableLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    DeclIDField,  // ID of ClassDecl
+    SILLinkageField  // Linkage
+    // Default override table entries will be serialized after.
+  >;
+
+  using DefaultOverrideTableEntryLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef(method) + SILDeclRef(original)
   >;
 
   using SILGlobalVarLayout = BCRecordLayout<
@@ -311,6 +329,22 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField 
   >;
+
+  using SILDebugValueLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE,
+
+    SILTypeCategoryField, /// operand type category
+    SILTypeCategoryField, /// debug var type category
+    BCFixed<11>,          /// poison, movableValueDebuginfo, trace,
+                          /// hasDebugVar, isLet, isDenseMapSingleton(two
+                          /// bits), hasSource, hasLoc, hasExpr
+    BCArray<ValueIDField> /// operand info: operand, type, debug var info:
+                          /// name, argno, optional stuff: typeid
+  >;
+
+  using DebugValueDelimiterLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE_DELIMITER
+    >;
 
   using SourceLocLayout = BCRecordLayout<
     SIL_SOURCE_LOC,

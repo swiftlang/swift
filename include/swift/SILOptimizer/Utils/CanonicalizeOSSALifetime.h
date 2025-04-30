@@ -237,6 +237,8 @@ private:
   /// copies.
   const MaximizeLifetime_t maximizeLifetime;
 
+  SILFunction *function;
+
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
   // before such an access scope is fine regardless.)
@@ -259,7 +261,7 @@ private:
   SILValue currentDef;
 
   /// Instructions beyond which liveness is not extended by destroy uses.
-  ArrayRef<SILInstruction *> currentLexicalLifetimeEnds;
+  ArrayRef<SILInstruction *> explicitLifetimeEnds;
 
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed.  Each block either contains a consuming instruction (e.g.
@@ -354,7 +356,7 @@ public:
       DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
       BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis),
+        function(function), accessBlockAnalysis(accessBlockAnalysis),
         deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
@@ -366,11 +368,9 @@ public:
     clear();
 
     currentDef = def;
-    currentLexicalLifetimeEnds = lexicalLifetimeEnds;
+    explicitLifetimeEnds = lexicalLifetimeEnds;
 
-    if (maximizeLifetime || respectsDeinitBarriers()) {
-      liveness->initializeDiscoveredBlocks(&discoveredBlocks);
-    }
+    liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     liveness->initializeDef(getCurrentDef());
   }
 
@@ -465,6 +465,16 @@ public:
   UserRange getUsers() const { return liveness->getAllUsers(); }
 
 private:
+  bool endingLifetimeAtExplicitEnds() const {
+    return explicitLifetimeEnds.size() > 0;
+  }
+
+  bool respectsDeadEnds() const {
+    // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+    //                               this method.
+    return !endingLifetimeAtExplicitEnds();
+  }
+
   bool respectsDeinitBarriers() const {
     if (!currentDef->isLexical())
       return false;
@@ -499,6 +509,7 @@ private:
                             PrunedLivenessBoundary &boundary);
 
   void extendLivenessToDeadEnds();
+  void extendLexicalLivenessToDeadEnds();
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);

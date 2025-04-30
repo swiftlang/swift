@@ -72,6 +72,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
   class BoundGenericType;
@@ -278,6 +279,14 @@ public:
   struct Implementation;
   Implementation &getImpl() const;
 
+  struct GlobalCache;
+
+  /// Retrieve a reference to the global cache within this ASTContext,
+  /// which is a place where we can stash side tables without having to
+  /// recompile the world every time we add a side table. See
+  /// "swift/AST/ASTContextGlobalCache.h"
+  GlobalCache &getGlobalCache() const;
+
   friend ConstraintCheckerArenaRAII;
 
   void operator delete(void *Data) throw();
@@ -379,6 +388,11 @@ public:
   /// Should we globally ignore swiftmodule files adjacent to swiftinterface
   /// files?
   bool IgnoreAdjacentModules = false;
+
+  /// Accept recovering from more issues at deserialization, even if it can
+  /// lead to an inconsistent state. This is enabled for index-while-building
+  /// as it runs last and it can afford to read an AST with inconsistencies.
+  bool ForceExtendedDeserializationRecovery = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -608,6 +622,10 @@ public:
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
+  /// Adds a given alias to the map of Identifiers between module aliases and
+  /// their actual names.
+  void addModuleAlias(StringRef moduleAlias, StringRef realName);
+
   /// Look up option used in \c getRealModuleName when module aliasing is applied.
   enum class ModuleAliasLookupOption {
     alwaysRealName,
@@ -663,6 +681,11 @@ public:
 
   /// Retrieve the type Swift.Any as an existential type.
   CanType getAnyExistentialType() const;
+
+  /// Retrieve the existential type 'any ~Copyable & ~Escapable'.
+  ///
+  /// This is the most permissive existential type.
+  CanType getUnconstrainedAnyExistentialType() const;
 
   /// Retrieve the type Swift.AnyObject as a constraint.
   CanType getAnyObjectConstraint() const;
@@ -1025,6 +1048,12 @@ public:
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
+  const CanType TheUnconstrainedAnyType;  /// This is 'any ~Copyable & ~Escapable',
+                                          /// the empty protocol composition
+                                          /// without any implicit constraints.
+  const CanGenericTypeParamType TheSelfType; /// The protocol 'Self' type;
+                                             /// a generic parameter with
+                                             /// depth 0 index 0
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
 #include "swift/AST/TypeNodes.def"
@@ -1166,12 +1195,14 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList,
-                           llvm::VersionTuple &foundVersion) const;
+                           bool isSourceCanImport,
+                           llvm::VersionTuple &foundVersion,
+                           llvm::VersionTuple &foundUnderlyingClangVersion) const;
 
   /// Add successful canImport modules.
-  void addSucceededCanImportModule(StringRef moduleName, bool underlyingVersion,
-                                   const llvm::VersionTuple &versionInfo);
+  void addSucceededCanImportModule(StringRef moduleName,
+                                   const llvm::VersionTuple &versionInfo,
+                                   const llvm::VersionTuple &underlyingVersionInfo);
 
 public:
   namelookup::ImportCache &getImportCache() const;
@@ -1596,9 +1627,10 @@ private:
 public:
   clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 
-  /// Returns the string to use in diagnostics when printing the platform being
-  /// targetted.
-  StringRef getTargetPlatformStringForDiagnostics() const;
+  /// Returns the availability domain corresponding to the target triple. If
+  /// there isn't a `PlatformKind` associated with the current target triple,
+  /// then this returns the universal domain (`*`).
+  AvailabilityDomain getTargetAvailabilityDomain() const;
 };
 
 } // end namespace swift

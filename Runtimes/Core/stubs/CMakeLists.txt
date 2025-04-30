@@ -58,3 +58,9 @@ if(APPLE)
                APPEND_STRING
                PROPERTY COMPILE_FLAGS "-fobjc-arc")
 endif()
+
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftStdlibStubs
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
+endif()

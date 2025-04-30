@@ -65,6 +65,9 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
   "IsolatedAny"
   )
 
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-strict-memory-safety")
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowUnsafeAttribute")
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -77,6 +80,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorBridge.cpp
   ExecutorChecks.cpp
   Setup.cpp
   Task.cpp
@@ -90,33 +94,13 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   linker-support/magic-symbols-for-install-name.c
 )
 
-if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    DispatchGlobalExecutor.cpp
-  )
-elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    CooperativeGlobalExecutor.cpp
-  )
-elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked" OR
-    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    NonDispatchGlobalExecutor.cpp
-  )
-endif()
-
-set(LLVM_OPTIONAL_SOURCES
-  CooperativeGlobalExecutor.cpp
-  DispatchGlobalExecutor.cpp
-  NonDispatchGlobalExecutor.cpp
-)
-
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
   AsyncLet.swift
   CheckedContinuation.swift
   Errors.swift
   Executor.swift
+  ExecutorBridge.swift
   ExecutorAssertions.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -134,17 +118,18 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  PartialAsyncTask.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
-  PartialAsyncTask.swift
+  PriorityQueue.swift
   SourceCompatibilityShims.swift
   Task.swift
   Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+TaskExecutor.swift
+  TaskGroup+Embedded.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
@@ -174,12 +159,62 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
+  DummyExecutor.swift
+  CooperativeExecutor.swift
+  PlatformExecutorDarwin.swift
+  PlatformExecutorLinux.swift
+  PlatformExecutorWindows.swift
+  PlatformExecutorOpenBSD.swift
+)
+
+set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
+  ExecutorImpl.cpp
+)
+
+set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
+set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES)
+
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    DispatchGlobalExecutor.cpp
+  )
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    DispatchExecutor.swift
+    CFExecutor.swift
+    ExecutorImpl.swift
+  )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorCooperative.swift
+    )
+else()
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorNone.swift
+  )
+endif()
+
+set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+  PlatformExecutorNone.swift
+  )
+
+set(LLVM_OPTIONAL_SOURCES
+  DispatchGlobalExecutor.cpp
+  CooperativeGlobalExecutor.cpp
+  DispatchGlobalExecutor.cpp
 )
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
+  ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+  ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES}
+
+  GYB_SOURCES
+    TaskGroup+addTask.swift.gyb
+    Task+startSynchronously.swift.gyb
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
@@ -231,6 +266,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
   set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
   set(SWIFT_STDLIB_HAS_ASL FALSE)
+  list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -238,29 +274,30 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     list(GET list 1 mod)
     list(GET list 2 triple)
 
+    set(extra_c_compile_flags)
+    set(extra_swift_compile_flags)
+
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       if(NOT "${mod}" MATCHES "-linux-gnu$")
         continue()
       endif()
-      set(extra_c_compile_flags)
-      set(extra_swift_compile_flags)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      if(NOT "${mod}" MATCHES "-macos$")
+      if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv7|armv7m|armv7em")
         continue()
       endif()
-      if("${mod}" MATCHES "riscv")
-        continue()
+
+      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho" OR "${arch}" STREQUAL "armv7m" OR "${arch}" STREQUAL "armv7em")
+        # Host is macOS with a macOS SDK. To be able to build the C++ Concurrency runtime for non-Darwin targets using the macOS SDK,
+        # we need to pass some extra flags and search paths.
+        set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
       endif()
-      if("${mod}" MATCHES "armv6m")
-        continue()
-      endif()
-      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding -stdlib=libc++)
-      set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
 
     # lib/swift/embedded/_Concurrency.swiftmodule
@@ -273,6 +310,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
@@ -281,9 +319,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
+        -ffunction-sections -fdata-sections -fno-exceptions -fno-cxx-exceptions -fno-unwind-tables
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
-      ARCHITECTURE "${mod}"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
@@ -298,7 +338,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       COMPONENT "stdlib"
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
-    set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    if(NOT "${arch}" MATCHES "wasm32")
+      set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+    endif()
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
@@ -352,4 +395,3 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
   add_dependencies(embedded-concurrency "copy_executor_impl_header")
 endif()
-

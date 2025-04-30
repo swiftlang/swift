@@ -102,6 +102,14 @@ void LinearLiveness::compute() {
   LinearLivenessVisitor(*this).visitLifetimeEndingUses(ownershipDef);
 }
 
+/// Override OwnershipUseVisitor to callback to handleInnerScopeCallback for
+/// nested borrow scopes. This supports lifetime completion from the inside-out.
+///
+/// By default, handleOwnedPhi and handleOuterReborrow are already treated like
+/// a normal lifetime-ending use.
+///
+/// By default, handleGuaranteedForwardingPhi is already treated like a normal
+/// non-lifetime-ending use.
 struct InteriorLivenessVisitor :
   public OwnershipUseVisitor<InteriorLivenessVisitor> {
 
@@ -142,14 +150,10 @@ struct InteriorLivenessVisitor :
 
   bool handlePointerEscape(Operand *use) {
     interiorLiveness.addressUseKind = AddressUseKind::PointerEscape;
-    return true;
-  }
+    interiorLiveness.escapingUse = use;
+    if (!handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding))
+      return false;
 
-  // handleOwnedPhi and handleOuterReborrow ends the linear lifetime.
-  // By default, they are treated like a normal lifetime-ending use.
-
-  bool handleGuaranteedForwardingPhi(Operand *use) {
-    recursivelyVisitInnerGuaranteedPhi(PhiOperand(use), /*reborrow*/false);
     return true;
   }
 
@@ -159,23 +163,10 @@ struct InteriorLivenessVisitor :
   /// Handles begin_borrow, load_borrow, store_borrow, begin_apply.
   bool handleInnerBorrow(BorrowingOperand borrowingOperand) {
     if (handleInnerScopeCallback) {
-      auto value = borrowingOperand.getScopeIntroducingUserResult();
-      if (value) {
+      if (auto value = borrowingOperand.getScopeIntroducingUserResult()) {
         handleInnerScopeCallback(value);
       }
     }
-    return true;
-  }
-
-  bool handleInnerAdjacentReborrow(SILArgument *reborrow) {
-    if (handleInnerScopeCallback) {
-      handleInnerScopeCallback(reborrow);
-    }
-    return true;
-  }
-
-  bool handleInnerReborrow(Operand *phiOper) {
-    recursivelyVisitInnerGuaranteedPhi(PhiOperand(phiOper), /*reborrow*/true);
     return true;
   }
 
@@ -189,87 +180,7 @@ struct InteriorLivenessVisitor :
     }
     return true;
   }
-
-  void recursivelyVisitInnerGuaranteedPhi(PhiOperand phiOper, bool isReborrow);
 };
-
-// Dominating ownershipDef example: handleReborrow must continue visiting phi
-// uses:
-//
-// bb0:
-//  d1 = ...
-//  cond_br bb1, bb2
-// bb1:
-//   b1 = borrow d1
-//   br bb3(b1)
-// bb2:
-//   b2 = borrow d1
-//   br bb3(b2)
-// bb3(reborrow):
-//   u1 = d1
-//   u2 = reborrow
-//   // can't move destroy above u2
-//   destroy_value d1
-//
-// Dominating ownershipDef example: handleGuaranteedForwardingPhi must continue
-// visiting phi uses:
-//
-// bb0:
-//  b1 = borrow d1
-//  cond_br bb1, bb2
-// bb1:
-//   p1 = projection b1
-//   br bb3(p1)
-// bb2:
-//   p1 = projection b1
-//   br bb3(p2)
-// bb3(forwardingPhi):
-//   u1 = b1
-//   u2 = forwardingPhi
-//   // can't move end_borrow above u2
-//   end_borrow b1
-//
-// TODO: when phi's have a reborrow flag, remove \p isReborrow.
-void InteriorLivenessVisitor::
-recursivelyVisitInnerGuaranteedPhi(PhiOperand phiOper, bool isReborrow) {
-  SILValue phiValue = phiOper.getValue();
-  if (!visited.insert(phiValue))
-    return;
-
-  if (!visitEnclosingDefs(phiValue, [this](SILValue enclosingDef){
-    // If the enclosing def is \p ownershipDef, return false to check
-    // dominance.
-    if (enclosingDef == interiorLiveness.ownershipDef)
-      return false;
-
-    // Otherwise, phiValue is enclosed by an outer adjacent phi, so its scope
-    // does not contribute to the outer liveness. This phi will be recorded as a
-    // regular use by the visitor, and this enclosing def will be visited as
-    // separate lifetime-ending-use use. Return true to continue checking if any
-    // other enclosing defs do not have an outer adjacent reborrow.
-    return true;
-  })) {
-    // TODO: instead of relying on Dominance, we can reformulate this algorithm
-    // to detect redundant phis, similar to the SSAUpdater.
-    //
-    // At least one enclosing def is ownershipDef. If ownershipDef dominates
-    // phiValue, then this is consistent with a well-formed linear lifetime, and
-    // the phi's uses directly contribute to ownershipDef's liveness.
-    if (domInfo &&
-        domInfo->dominates(interiorLiveness.ownershipDef->getParentBlock(),
-                           phiValue->getParentBlock())) {
-      if (isReborrow) {
-        visitInnerBorrow(phiOper.getOperand());
-      } else {
-        visitInteriorUses(phiValue);
-      }
-      return;
-    }
-    // ownershipDef does not dominate this phi. Record it so the liveness
-    // client can use this information to insert the missing outer adjacent phi.
-    interiorLiveness.unenclosedPhis.push_back(phiValue);
-  }
-}
 
 void InteriorLiveness::compute(const DominanceInfo *domInfo, InnerScopeHandlerRef handleInnerScope) {
   liveness.initializeDef(ownershipDef);
@@ -288,15 +199,13 @@ void InteriorLiveness::print(llvm::raw_ostream &OS) const {
   case AddressUseKind::PointerEscape:
     OS << "Incomplete liveness: Escaping address\n";
     break;
+  case AddressUseKind::Dependent:
+    OS << "Incomplete liveness: Dependent value\n";
+    break;
   case AddressUseKind::Unknown:
     OS << "Incomplete liveness: Unknown address use\n";
     break;
   }
-  OS << "Unenclosed phis {\n";
-  for (SILValue phi : getUnenclosedPhis()) {
-    OS << "  " << phi;
-  }
-  OS << "}\n";
 }
 
 void InteriorLiveness::dump() const { print(llvm::dbgs()); }

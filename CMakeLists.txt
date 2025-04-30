@@ -352,17 +352,24 @@ option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
     debugging Swift)"
     FALSE)
 
-set(BOOTSTRAPPING_MODE HOSTTOOLS CACHE STRING [=[
-How to build the swift compiler modules. Possible values are
-    HOSTTOOLS:     build with a pre-installed toolchain
-    BOOTSTRAPPING: build with a 2-stage bootstrapping process
-    BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
-                   but the compiler links against the host system swift libs (macOS only)
-    CROSSCOMPILE:  cross-compiledwith a native host compiler, provided in
-                   `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
-    CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
-                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
-]=])
+option(SWIFT_ENABLE_SWIFT_IN_SWIFT "Enable Swift sources in Swift compiler" ON)
+
+if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  set(BOOTSTRAPPING_MODE HOSTTOOLS CACHE STRING [=[
+  How to build the swift compiler modules. Possible values are
+      HOSTTOOLS:     build with a pre-installed toolchain
+      BOOTSTRAPPING: build with a 2-stage bootstrapping process
+      BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
+                     but the compiler links against the host system swift libs (macOS only)
+      CROSSCOMPILE:  cross-compiledwith a native host compiler, provided in
+                     `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
+      CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
+                                     compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
+  ]=])
+else()
+  set(BOOTSTRAPPING_MODE OFF)
+  set(SWIFT_BUILD_SWIFT_SYNTAX OFF)
+endif()
 
 option(BRIDGING_MODE [=[
 How swift-C++ bridging code is compiled:
@@ -480,6 +487,9 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
    "Path to the directory that contains Swift tools that are executable on the build machine")
 
+set(SWIFT_WASI_SYSROOT_PATH "" CACHE PATH
+  "Path to the directory that contains WASI Sysroot")
+
 option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
@@ -564,6 +574,17 @@ set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
 
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "/usr/lib/swift" CACHE STRING
     "The directory of the install_name for standard library dylibs")
+
+#
+# User-configurable OpenBSD-specific options.
+#
+
+option(SWIFT_OPENBSD_BTCFI
+  "Emit branch target identification instructions and sign return addresses when available"
+  FALSE)
+if(SWIFT_OPENBSD_BTCFI)
+  add_definitions("-DSWIFT_OPENBSD_BTCFI")
+endif()
 
 # We don't want to use the same install_name_dir as the standard library which
 # will be installed in /usr/lib/swift. These private libraries should continue
@@ -939,41 +960,44 @@ set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
 set(SWIFT_SHIMS_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/stdlib/public/SwiftShims")
 set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 
-if (NOT BOOTSTRAPPING_MODE)
+if (NOT BOOTSTRAPPING_MODE AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
   message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
 endif()
 
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
-if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
-  # This is the normal case. We are not cross-compiling.
-  set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
-  if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
-    message(WARNING "BOOTSTRAPPING set to OFF because no Swift compiler is defined")
-    set(BOOTSTRAPPING_MODE "OFF")
+
+if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  if(NOT SWIFT_NATIVE_SWIFT_TOOLS_PATH)
+    # This is the normal case. We are not cross-compiling.
+    set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+    set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
+    if(NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
+      message(WARNING "BOOTSTRAPPING set to OFF because no Swift compiler is defined")
+      set(BOOTSTRAPPING_MODE "OFF")
+    endif()
+  elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+    # If cross-compiling, we don't have to bootstrap. We can just use the previously
+    # built native swiftc to build the swift compiler modules.
+    message(STATUS "Building swift modules with previously built tools instead of bootstrapping")
+    set(SWIFT_EXEC_FOR_SWIFT_MODULES "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+    if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      set(BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
+    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+      set(BOOTSTRAPPING_MODE "CROSSCOMPILE")
+    else()
+      set(BOOTSTRAPPING_MODE "HOSTTOOLS")
+    endif()
+  elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_BUILD_SWIFT_SYNTAX)
+    # We are building using a pre-installed host toolchain but not bootstrapping
+    # the Swift modules. This happens when building using 'build-tooling-libs'
+    # where we haven't built a new Swift compiler. Use the Swift compiler from the
+    # pre-installed host toolchain to build the Swift modules.
+    set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
   endif()
-elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
-  # If cross-compiling, we don't have to bootstrap. We can just use the previously
-  # built native swiftc to build the swift compiler modules.
-  message(STATUS "Building swift modules with previously built tools instead of bootstrapping")
-  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
-  if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    set(BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
-  elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
-    set(BOOTSTRAPPING_MODE "CROSSCOMPILE")
-  else()
-    set(BOOTSTRAPPING_MODE "HOSTTOOLS")
-  endif()
-elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_BUILD_SWIFT_SYNTAX)
-  # We are building using a pre-installed host toolchain but not bootstrapping
-  # the Swift modules. This happens when building using 'build-tooling-libs'
-  # where we haven't built a new Swift compiler. Use the Swift compiler from the
-  # pre-installed host toolchain to build the Swift modules.
-  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 endif()
 
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX)
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -1530,14 +1554,16 @@ if(SWIFT_INCLUDE_TOOLS)
   # https://github.com/apple/swift/issues/48534
   add_subdirectory(tools)
 
-  # Localization targets are configured in a way that assume the swift
-  # frontend is being built, so trying to include them for other builds
-  # (like stdlib) fail!
-  #
-  # Diagnostics information is only useful for the frontend compiler
-  # anyway, so let's only include it if the compiler is being built,
-  # which at the moment seems like if SWIFT_INCLUDE_TOOLS is defined.
-  add_subdirectory(localization)
+  if(SWIFT_NATIVE_SWIFT_TOOLS_PATH)
+    # Localization targets are configured in a way that assume the swift
+    # frontend is being built, so trying to include them for other builds
+    # (like stdlib) fail!
+    #
+    # Diagnostics information is only useful for the frontend compiler
+    # anyway, so let's only include it if the compiler is being built,
+    # which at the moment seems like if SWIFT_INCLUDE_TOOLS is defined.
+    add_subdirectory(localization)
+  endif()
 endif()
 
 add_subdirectory(utils)
@@ -1615,7 +1641,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
         DEPENDS PopulateRuntimeSourceDir
         CMAKE_ARGS
-          -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}
+          -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib
           # Compiler will see mismatched swift modules and fail initial checks
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DBUILD_SHARED_LIBS:BOOLEAN=YES # TODO: Make this configurable
@@ -1631,11 +1657,33 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-          -DSwiftCore_PLATFORM_SUBDIR=${SWIFT_SDK_${sdk}_LIB_SUBDIR}
-          -DSwiftCore_ARCH_SUBDIR=${arch})
+          -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
+          -DSwiftCore_ENABLE_CONCURRENCY=YES)
       if(NOT ${CMAKE_CROSSCOMPILING})
-        add_dependencies("${stdlib_target}" swift-frontend)
+        add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
+
+      ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
+
+      ExternalProject_Add("${stdlib_target}-StringProcessing"
+        SOURCE_DIR
+          "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental/StringProcessing"
+        DEPENDS "${stdlib_target}-core"
+        INSTALL_DIR "${INSTALL_DIR}"
+        INSTALL_COMMAND "" # No install story set up yet
+        CMAKE_ARGS
+          -DBUILD_SHARED_LIBS=YES
+          -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
+          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+          -DCMAKE_INSTALL_PREFIX:FILEPATH=${INSTALL_DIR}
+          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+          -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM})
     endforeach()
   endforeach()
 endif()

@@ -23,8 +23,7 @@ static llvm::VersionTuple getPlatformIntro(const AvailabilityContext &context) {
 }
 
 static AvailabilityRange getAvailabilityRange(unsigned major, unsigned minor) {
-  return AvailabilityRange(
-      VersionRange::allGTE(llvm::VersionTuple(major, minor)));
+  return AvailabilityRange(llvm::VersionTuple(major, minor));
 }
 
 class AvailabilityContextTest : public ::testing::Test {
@@ -41,7 +40,7 @@ public:
   } domains;
 };
 
-TEST_F(AvailabilityContextTest, PlatformIntroduction) {
+TEST_F(AvailabilityContextTest, PlatformRange) {
   auto &ctx = defaultTestContext.Ctx;
 
   auto macOS10_9 = AvailabilityContext::forDeploymentTarget(ctx);

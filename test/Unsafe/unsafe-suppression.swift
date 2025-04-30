@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
 @unsafe
 func iAmUnsafe() { }
@@ -14,7 +11,9 @@ func iAmImpliedUnsafe() -> UnsafeType? { nil }
 @unsafe
 func labeledUnsafe(_: UnsafeType) {
   unsafe iAmUnsafe()
-  let _ = unsafe iAmImpliedUnsafe()
+  let _ = iAmImpliedUnsafe() // okay, since the unsafety is captured in the result type
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = iAmImpliedUnsafe // expected-note{{reference to global function 'iAmImpliedUnsafe()' involves unsafe type 'UnsafeType'}}
 }
 
 
@@ -22,9 +21,9 @@ class C {
   func method() { } // expected-note{{overridden declaration is here}}
 }
 
-class D1: C { // expected-note{{make class 'D1' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
+class D1: C { // expected-note{{make class 'D1' '@unsafe' to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
   @unsafe
-  override func method() { } // expected-warning{{override of safe instance method with unsafe instance method [Unsafe]}}
+  override func method() { } // expected-warning{{override of safe instance method with unsafe instance method}}{{documentation-file=strict-memory-safety}}
 }
 
 @unsafe class D2: C {
@@ -37,7 +36,7 @@ protocol P {
 }
 
 struct S1: P {
-  // expected-warning@-1{{conformance of 'S1' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{12-12=@unsafe }}
+  // expected-warning@-1{{conformance of 'S1' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{documentation-file=strict-memory-safety}}{{12-12=@unsafe }}
   @unsafe
   func protoMethod() { } // expected-note{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
 }
@@ -51,7 +50,7 @@ struct S2: P {
 struct S3 { }
 
 extension S3: P {
-  // expected-warning@-1{{conformance of 'S3' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{15-15=@unsafe }}
+  // expected-warning@-1{{conformance of 'S3' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{documentation-file=strict-memory-safety}}{{15-15=@unsafe }}
   @unsafe
   func protoMethod() { } // expected-note{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
 }
@@ -119,12 +118,12 @@ extension UnsafeOuter {
 var yieldUnsafe: Int {
   _read {
     @unsafe let x = 5
-    yield x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    yield x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
     // expected-note@-1{{reference to unsafe let 'x'}}
   }
   _modify {
     @unsafe var x = 5
-    yield &x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    yield &x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
     // expected-note@-1{{reference to unsafe var 'x'}}
   }
 }
@@ -145,9 +144,9 @@ struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
 }
 
 func forEachLoop(us: UnsafeSequence) {
-  for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{12-12=unsafe }}
-  // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
-  // expected-note@-2{{reference to unsafe instance method 'next()'}}
-
+  for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{12-12=unsafe }}
+  // expected-note@-1{{'@unsafe' conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
+  // expected-warning@-2{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
   for _ in unsafe us { }
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
 }

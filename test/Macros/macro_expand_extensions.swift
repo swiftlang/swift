@@ -115,6 +115,12 @@ func testLocal() {
   @DelegatedConformance
   struct Local<Element> {}
   // expected-error@-1{{local type cannot have attached extension macro}}
+
+  struct S {
+    @DelegatedConformance
+    struct Local<Element> {}
+    // expected-error@-1{{local type cannot have attached extension macro}}
+  }
 }
 
 @DelegatedConformance
@@ -160,6 +166,17 @@ struct TestUndocumentedEncodable {}
 // expected-note@-2 {{in expansion of macro 'UndocumentedEncodable' on struct 'TestUndocumentedEncodable' here}}
 
 // CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedEncodable'
+
+@attached(extension)
+macro BadExtension() = #externalMacro(module: "MacroDefinition", type: "BadExtensionMacro")
+
+// Make sure 'extension Foo' is rejected here as it needs to
+// be a qualified reference.
+struct HasSomeNestedType {
+  @BadExtension // expected-note {{in expansion of macro 'BadExtension' on struct 'SomeNestedType' here}}
+  struct SomeNestedType {}
+}
+// CHECK-DIAGS: error: cannot find type 'SomeNestedType' in scope
 
 #endif
 

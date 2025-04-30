@@ -984,7 +984,7 @@ public:
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs);
 
   /// Parse a #error or #warning diagnostic.
-  ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
+  ParserStatus parseDeclPoundDiagnostic();
 
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
@@ -1169,6 +1169,8 @@ public:
         Tok.isContextualKeyword("isolated") ||
         Tok.isContextualKeyword("_const"))
       return true;
+    if (isCallerIsolatedSpecifier())
+      return true;
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
@@ -1185,6 +1187,12 @@ public:
   bool isSILLifetimeDependenceToken() {
     return isInSILMode() && Tok.is(tok::at_sign) &&
            (peekToken().isContextualKeyword("lifetime"));
+  }
+
+  bool isCallerIsolatedSpecifier() {
+    if (!Tok.isContextualKeyword("nonisolated"))
+      return false;
+    return peekToken().isFollowingLParen();
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {
@@ -1421,6 +1429,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
+    SourceLoc CallerIsolatedLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     LifetimeEntry *lifetimeEntry = nullptr;
 
@@ -1457,6 +1466,14 @@ public:
   
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
+
+  /// Whether the parser is at the start of an InlineArray type body.
+  bool isStartOfInlineArrayTypeBody();
+
+  /// Parse an InlineArray type '[' integer 'x' type ']'.
+  ///
+  /// NOTE: 'isStartOfInlineArrayTypeBody' must be true.
+  ParserResult<TypeRepr> parseTypeInlineArray(SourceLoc lSquare);
 
   /// Parse a collection type.
   ///   type-simple:
@@ -1691,7 +1708,13 @@ public:
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
 
+  bool canParseTypeSimple();
+  bool canParseTypeSimpleOrComposition();
+  bool canParseTypeScalar();
   bool canParseType();
+
+  bool canParseStartOfInlineArrayType();
+  bool canParseCollectionType();
 
   /// Returns true if a simple type identifier can be parsed.
   ///
@@ -1708,6 +1731,10 @@ public:
 
   /// Returns true if a qualified declaration name base type can be parsed.
   bool canParseBaseTypeForQualifiedDeclName();
+
+  /// Returns true if `nonisolated` contextual keyword could be parsed
+  /// as part of the type a the current location.
+  bool canParseNonisolatedAsTypeModifier();
 
   /// Returns true if the current token is '->' or effects specifiers followed
   /// by '->'.
@@ -1969,7 +1996,8 @@ public:
   ParserResult<CaseStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
-  ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
+  ParserStatus parseStmtCases(SmallVectorImpl<CaseStmt *> &cases,
+                              bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);
   ParserResult<Stmt> parseStmtPoundAssert();
 
@@ -2035,8 +2063,6 @@ public:
                                    SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<AvailabilitySpec> parsePlatformVersionConstraintSpec();
-  ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

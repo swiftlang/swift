@@ -298,6 +298,11 @@ namespace irgen {
                                               LinkEntity entity,
                                               Size size);
 
+  llvm::GlobalValue *emitCoroFunctionPointer(IRGenModule &IGM,
+                                             llvm::Function *function,
+                                             LinkEntity entity,
+                                             Size size = Size(0));
+
   /// Determine whether the given opaque type requires a witness table for the
   /// given requirement.
   ///

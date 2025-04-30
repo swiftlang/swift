@@ -77,6 +77,28 @@ static bool seemsUseful(SILInstruction *I) {
     return true;
   }
 
+  // Instructions which end the lifetimes of values which escape can only be
+  // deleted if compensating lifetime ends are added.  Compensating lifetime
+  // ends are added by OSSACompleteLifetime when the def block of the value
+  // is different from the parent block of the instruction.  But
+  // OSSACompleteLifetime requires that liveness be complete--that there are no
+  // pointer escapes.  So we can't delete instructions which end the lifetime
+  // of values which escape to a pointer and whose parent blocks are different.
+  if (llvm::any_of(I->getAllOperands(), [I](Operand &operand) {
+        if (!operand.isLifetimeEnding())
+          return false;
+        auto value = operand.get();
+        if (isa<SILUndef>(value))
+          return false;
+        auto *insertionPoint = value->getDefiningInsertionPoint();
+        ASSERT(insertionPoint);
+        if (insertionPoint->getParent() == I->getParent())
+          return false;
+        return findPointerEscape(value);
+      })) {
+    return true;
+  }
+
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     // Although the onFastPath builtin has no side-effects we don't want to
     // remove it.

@@ -193,6 +193,19 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocolCommon, const WitnessTable *, , ,
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocolWithExecutionContext,
+                             const WitnessTable *, , , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol,
+                              ConformanceExecutionContext *context),
+                             (type, protocol, context))
+
+OVERRIDE_PROTOCOLCONFORMANCE(isInConformanceExecutionContext,
+                             bool, , , swift::,
+                             (const Metadata * const type,
+                              const ConformanceExecutionContext *context),
+                             (type, context))
+
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))

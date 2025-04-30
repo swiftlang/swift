@@ -341,12 +341,13 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
   }
 
   if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
-    if (SAE->getFn()->getStartLoc() == LocToResolve) {
+    auto *fn = SAE->getFn();
+    if (!fn->isImplicit() && fn->getStartLoc() == LocToResolve) {
       ContainerType = SAE->getBase()->getType();
     }
   } else if (auto ME = dyn_cast<MemberRefExpr>(E)) {
     SourceLoc MemberLoc = ME->getNameLoc().getBaseNameLoc();
-    if (MemberLoc.isValid() && MemberLoc == LocToResolve) {
+    if (!ME->isImplicit() && MemberLoc.isValid() && MemberLoc == LocToResolve) {
       ContainerType = ME->getBase()->getType();
     }
   }

@@ -12,33 +12,46 @@
 import Builtin
 
 @usableFromInline
-internal func unsafeBitCast<T: ~Escapable, U>(
-   _ x: T, to type: U.Type
+internal func unsafeBitCast<T: ~Escapable & ~Copyable, U>(
+   _ x: consuming T, to type: U.Type
 ) -> U {
   Builtin.reinterpretCast(x)
-}
-
-/// Used by SwiftifyImport to work around a compiler diagnostic. It should be removed once the
-/// workaround is no longer needed.
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-public func _unsafeRemoveLifetime<T: ~Copyable & ~Escapable>(_ dependent: consuming T) -> T {
-  dependent
 }
 
 /// Unsafely discard any lifetime dependency on the `dependent` argument. Return
 /// a value identical to `dependent` with a lifetime dependency on the caller's
 /// borrow scope of the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
 @lifetime(borrow source)
-internal func _overrideLifetime<
+public func _cxxOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
   _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(copy source)
+public func _cxxOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
 ) -> T {
   // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
   // should be expressed by a builtin that is hidden within the function body.
@@ -63,41 +76,58 @@ extension CxxSpan {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @inlinable
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
-    precondition(unsafeBufferPointer.baseAddress != nil, 
+    unsafe precondition(unsafeBufferPointer.baseAddress != nil, 
                   "UnsafeBufferPointer should not point to nil")
-    self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
+    unsafe self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
   }
 
   @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
-    self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @inlinable
   @unsafe
   public init(_ span: Span<Element>) {
-    let (p, c) = unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
-    precondition(p != nil, "Span should not point to nil")
-    let binding = p!.bindMemory(to: Element.self, capacity: c)
-    self.init(binding, Size(c))
+    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
+    unsafe precondition(p != nil, "Span should not point to nil")
+    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
+    unsafe self.init(binding, Size(c))
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Span {
   @_alwaysEmitIntoClient
   @unsafe
   @_unsafeNonescapableResult
+  @lifetime(borrow span)
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
-    let buffer = UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
-    let newSpan = Span(_unsafeElements: buffer)
+    let buffer = unsafe UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let newSpan = unsafe Span(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
-    self = _overrideLifetime(newSpan, borrowing: span)
+    self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension MutableSpan {
+  @_alwaysEmitIntoClient
+  @unsafe
+  @_unsafeNonescapableResult
+  @lifetime(borrow span)
+  public init<T: CxxMutableSpan<Element>>(
+    _unsafeCxxSpan span: borrowing T,
+  ) {
+    let buffer = unsafe UnsafeMutableBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let newSpan = unsafe MutableSpan(_unsafeElements: buffer)
+    // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
+    self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
   }
 }
 
@@ -107,14 +137,27 @@ public protocol CxxMutableSpan<Element> {
 
   init()
   init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+
+  func size() -> Size
+  func __dataUnsafe() -> UnsafeMutablePointer<Element>?
 }
 
 extension CxxMutableSpan {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
-    self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  @inlinable
+  @unsafe
+  public init(_ span: consuming MutableSpan<Element>) {
+    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeMutableRawPointer?, Int).self)
+    unsafe precondition(p != nil, "Span should not point to nil")
+    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
+    unsafe self.init(binding, Size(c))
   }
 }

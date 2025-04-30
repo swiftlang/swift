@@ -316,6 +316,8 @@ func takesThrowingAutoclosure(_: @autoclosure () throws(MyError) -> Int) {}
 func takesNonThrowingAutoclosure(_: @autoclosure () throws(Never) -> Int) {}
 
 func getInt() throws -> Int { 0 }
+func getIntAsync() async throws -> Int { 0 }
+func getBool() throws -> Bool { true }
 
 func throwingAutoclosures() {
   takesThrowingAutoclosure(try getInt())
@@ -336,4 +338,83 @@ func noThrow() throws(Never) {
     throw MyError.epicFailed
     // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
   } catch {}
+}
+
+precedencegroup LowerThanAssignment {
+  lowerThan: AssignmentPrecedence
+}
+infix operator ~~~ : LowerThanAssignment
+func ~~~ <T, U> (lhs: T, rhs: U) {}
+
+func testSequenceExpr() async throws(Never) {
+  // Make sure the `try` here covers both calls in the ASTScope tree.
+  try! getInt() + getInt() // expected-warning {{result of operator '+' is unused}}
+  try! _ = getInt() + getInt()
+  _ = try! getInt() + getInt()
+  _ = try! getInt() + (getInt(), 0).0
+
+  _ = try try! getInt() + getInt()
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+
+  _ = await try! getIntAsync() + getIntAsync()
+  // expected-warning@-1 {{'try' must precede 'await'}}
+
+  _ = unsafe await try! getIntAsync() + getIntAsync()
+  // expected-warning@-1 {{'try' must precede 'await'}}
+  // expected-warning@-2{{no unsafe operations occur within 'unsafe' expression}}
+  _ = try unsafe await try! getIntAsync() + getIntAsync()
+  // expected-warning@-1 {{'try' must precede 'await'}}
+  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-3{{no unsafe operations occur within 'unsafe' expression}}
+  try _ = (try! getInt()) + getInt()
+  // expected-error@-1:29 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
+
+  // `try` on the condition covers both branches.
+  _ = try! getBool() ? getInt() : getInt()
+
+  // `try` on "then" branch doesn't cover else.
+  try _ = getBool() ? try! getInt() : getInt()
+  // expected-error@-1:11 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
+  // expected-error@-2:39 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
+
+  // The `try` here covers everything, even if unassignable.
+  try! getBool() ? getInt() : getInt() = getInt()
+  // expected-error@-1 {{result of conditional operator '? :' is never mutable}}
+
+  // Same here.
+  try! getBool() ? getInt() : getInt() ~~~ getInt()
+
+  try _ = getInt() + try! getInt()
+  // expected-error@-1 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
+  // expected-error@-2 {{'try!' cannot appear to the right of a non-assignment operator}}
+
+  // The ASTScope for `try` here covers both, but isn't covered in the folded
+  // expression. This is illegal anyway.
+  _ = 0 + try! getInt() + getInt()
+  // expected-error@-1 {{'try!' cannot appear to the right of a non-assignment operator}}
+  // expected-error@-2:27 {{call can throw but is not marked with 'try'}}
+  // expected-note@-3:27 3{{did you mean}}
+
+  try _ = 0 + try! getInt() + getInt()
+  // expected-error@-1 {{'try!' cannot appear to the right of a non-assignment operator}}
+
+  // The ASTScope for `try` here covers both, but isn't covered in the folded
+  // expression due `~~~` having a lower precedence than assignment. This is
+  // illegal anyway.
+  _ = try! getInt() ~~~ getInt()
+  // expected-error@-1 {{'try!' following assignment operator does not cover everything to its right}}
+  // expected-error@-2:25 {{call can throw but is not marked with 'try'}}
+  // expected-note@-3:25 3{{did you mean}}
+
+  try _ = try! getInt() ~~~ getInt()
+  // expected-error@-1 {{'try!' following assignment operator does not cover everything to its right}}
+
+  // Same here.
+  true ? 0 : try! getInt() ~~~ getInt()
+  // expected-error@-1 {{'try!' following conditional operator does not cover everything to its right}}
+  // expected-error@-2:32 {{call can throw but is not marked with 'try'}}
+  // expected-note@-3:32 3{{did you mean}}
+
+  try true ? 0 : try! getInt() ~~~ getInt()
+  // expected-error@-1 {{'try!' following conditional operator does not cover everything to its right}}
 }

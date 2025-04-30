@@ -1554,20 +1554,19 @@ public:
   llvm::DenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// The opened existential type for a given locator.
-  llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
+  llvm::DenseMap<ConstraintLocator *, ExistentialArchetypeType *>
     OpenedExistentialTypes;
 
   llvm::DenseMap<PackExpansionType *, TypeVariableType *>
       OpenedPackExpansionTypes;
 
-  /// The pack expansion environment that can open pack elements for
-  /// a given locator.
-  llvm::DenseMap<ConstraintLocator *, std::pair<UUID, Type>>
+  /// The generic environment that can open pack elements for a given
+  /// pack expansion.
+  llvm::DenseMap<PackExpansionExpr *, GenericEnvironment *>
       PackExpansionEnvironments;
 
-  /// The pack expansion environment that can open a given pack element.
-  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *>
-      PackEnvironments;
+  /// The pack expansion expression for a given pack element.
+  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *> PackElementExpansions;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
@@ -1798,18 +1797,37 @@ public:
   /// "resolved" concrete type.
   Type getResolvedType(ASTNode node) const;
 
-  Type getContextualType(ASTNode anchor) const {
+  std::optional<ContextualTypeInfo>
+  getContextualTypeInfo(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
-      if (entry.first == anchor) {
-        // The contextual information record could contain the purpose
-        // without a type i.e. when the context is an optional-some or
-        // an invalid pattern binding.
-        if (auto contextualTy = entry.second.getType())
+      if (entry.first == anchor)
+        return entry.second;
+    }
+    return std::nullopt;
+  }
+
+  Type getContextualType(ASTNode anchor) const {
+    if (auto info = getContextualTypeInfo(anchor)) {
+      // The contextual information record could contain the purpose
+      // without a type i.e. when the context is an optional-some or
+      // an invalid pattern binding.
+      if (auto contextualTy = info->getType())
           return simplifyType(contextualTy);
-      }
     }
     return Type();
   }
+
+  ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
+    if (auto info = getContextualTypeInfo(anchor)) {
+      return info->purpose;
+    }
+    return CTP_Unused;
+  }
+
+  /// Retrieve the generic environment for the opened element of a given pack
+  /// expansion, or \c nullptr if no environment was recorded.
+  GenericEnvironment *
+  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -2402,19 +2420,17 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *, 4>
+  llvm::SmallDenseMap<ConstraintLocator *, ExistentialArchetypeType *, 4>
       OpenedExistentialTypes;
 
   llvm::SmallDenseMap<PackExpansionType *, TypeVariableType *, 4>
       OpenedPackExpansionTypes;
 
-  llvm::SmallDenseMap<ConstraintLocator *, std::pair<UUID, Type>, 4>
+  llvm::SmallDenseMap<PackExpansionExpr *, GenericEnvironment *, 4>
       PackExpansionEnvironments;
 
   llvm::SmallDenseMap<PackElementExpr *, PackExpansionExpr *, 2>
-      PackEnvironments;
-
-  llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
+      PackElementExpansions;
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
@@ -3346,6 +3362,10 @@ public:
   /// Undo the above change.
   void removePotentialThrowSite(CatchNode catchNode);
 
+  /// Retrieve the explicit caught error type for the given catch node, without
+  /// attempting any inference.
+  Type getExplicitCaughtErrorType(CatchNode catchNode);
+
   /// Determine the caught error type for the given catch node.
   Type getCaughtErrorType(CatchNode node);
 
@@ -3364,32 +3384,46 @@ public:
   /// Open the given existential type or existential metatype, recording the
   /// opened archetype in the constraint system and returning both the opened
   /// type and opened archetype.
-  std::pair<Type, OpenedArchetypeType *>
+  std::pair<Type, ExistentialArchetypeType *>
   openAnyExistentialType(Type type, ConstraintLocator *locator);
 
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,
-                                   OpenedArchetypeType *opened);
+                                   ExistentialArchetypeType *opened);
 
-  /// Get the opened element generic environment for the given locator.
-  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
-                                                CanType shapeClass);
+  /// Retrieve the generic environment for the opened element of a given pack
+  /// expansion, or \c nullptr if no environment was recorded yet.
+  GenericEnvironment *
+  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
+
+  /// Create a new opened element generic environment for the given pack
+  /// expansion.
+  GenericEnvironment *
+  createPackExpansionEnvironment(PackExpansionExpr *expr,
+                                 CanGenericTypeParamType shapeParam);
 
   /// Update PackExpansionEnvironments and record a change in the trail.
-  void recordPackExpansionEnvironment(ConstraintLocator *locator,
-                                      std::pair<UUID, Type> uuidAndShape);
-
-  /// Get the opened element generic environment for the given pack element.
-  PackExpansionExpr *getPackEnvironment(PackElementExpr *packElement) const;
-
-  /// Associate an opened element generic environment to a pack element,
-  /// and record a change in the trail.
-  void addPackEnvironment(PackElementExpr *packElement,
-                          PackExpansionExpr *packExpansion);
+  void recordPackExpansionEnvironment(PackExpansionExpr *expr,
+                                      GenericEnvironment *env);
 
   /// Undo the above change.
-  void removePackEnvironment(PackElementExpr *packElement) {
-    bool erased = PackEnvironments.erase(packElement);
+  void removePackExpansionEnvironment(PackExpansionExpr *expr) {
+    bool erased = PackExpansionEnvironments.erase(expr);
+    ASSERT(erased);
+  }
+
+  /// Get the pack expansion expr for the given pack element.
+  PackExpansionExpr *
+  getPackElementExpansion(PackElementExpr *packElement) const;
+
+  /// Associate a pack element with a given pack expansion, and record the
+  /// change in the trail.
+  void recordPackElementExpansion(PackElementExpr *packElement,
+                                  PackExpansionExpr *packExpansion);
+
+  /// Undo the above change.
+  void removePackElementExpansion(PackElementExpr *packElement) {
+    bool erased = PackElementExpansions.erase(packElement);
     ASSERT(erased);
   }
 
@@ -3597,16 +3631,6 @@ public:
         });
   }
 
-  bool
-  hasConversionRestriction(Type type1, Type type2,
-                           ConversionRestrictionKind restrictionKind) const {
-    auto restriction =
-        ConstraintRestrictions.find({type1.getPointer(), type2.getPointer()});
-    return restriction == ConstraintRestrictions.end()
-               ? false
-               : restriction->second == restrictionKind;
-  }
-
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
   ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
@@ -3636,7 +3660,8 @@ public:
 
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
-                     bool isFavored = false);
+                     bool isFavored,
+                     bool prohibitNonisolatedConformance);
 
   void addApplicationConstraint(
       FunctionType *appliedFn, Type calleeType,
@@ -4155,6 +4180,21 @@ public:
   bool resolveTapBody(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
+  /// Bind key path expression to the given contextual type and generate
+  /// constraints for its requirements.
+  ///
+  /// \param typeVar The type variable representing the key path expression.
+  /// \param contextualType The contextual type this key path expression
+  /// would be bound to.
+  /// \param flags The flags associated with this assignment.
+  /// \param locator The locator associated with contextual type.
+  ///
+  /// \returns `true` if it was possible to generate constraints for
+  /// the requirements and assign fixed type to the key path expression,
+  /// `false` otherwise.
+  bool resolveKeyPath(TypeVariableType *typeVar, Type contextualType,
+                      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+
   /// Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
@@ -4333,6 +4373,7 @@ public:
 
   // Record the given requirement in the constraint system.
   void openGenericRequirement(DeclContext *outerDC,
+                              GenericSignature signature,
                               unsigned index,
                               const Requirement &requirement,
                               bool skipProtocolSelfConstraint,
@@ -4427,11 +4468,8 @@ public:
 
 private:
   /// Add the constraints needed to bind an overload's type variable.
-  void bindOverloadType(
-      const SelectedOverload &overload, Type boundType,
-      ConstraintLocator *locator, DeclContext *useDC,
-      llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
-          verifyThatArgumentIsHashable);
+  void bindOverloadType(const SelectedOverload &overload, Type boundType,
+                        ConstraintLocator *locator, DeclContext *useDC);
 
   /// Describes a direction of optional wrapping, either increasing optionality
   /// or decreasing optionality.
@@ -4908,6 +4946,12 @@ public:
   Expr *buildTypeErasedExpr(Expr *expr, DeclContext *dc, Type contextualType,
                             ContextualTypePurpose purpose);
 
+  /// Ensures that the given argument type conforms to the `Hashable` protocol
+  /// and adds a conformance constraint if it does not. This is required for
+  /// arguments used as key path components, as they serve as lookup keys.
+  void verifyThatArgumentIsHashable(unsigned index, Type argType,
+                                    ConstraintLocator *locator, SourceLoc loc);
+
 private:
   /// Determines whether or not a given conversion at a given locator requires
   /// the creation of a temporary value that's only valid for a limited scope.
@@ -5023,6 +5067,11 @@ private:
   simplifyBindTupleOfFunctionParamsConstraint(Type first, Type second,
                                               TypeMatchOptions flags,
                                               ConstraintLocatorBuilder locator);
+
+  /// Attempt to match a pack element type with the fully resolved pattern type
+  /// for the pack expansion.
+  SolutionKind matchPackElementType(Type elementType, Type patternType,
+                                    ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify a PackElementOf constraint.
   ///
@@ -6473,6 +6522,9 @@ bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 unsigned getNumApplications(bool hasAppliedSelf,
                             FunctionRefInfo functionRefInfo);
 
+/// Determine whether the debug output is enabled for the given target.
+bool debugConstraintSolverForTarget(ASTContext &C,
+                                    SyntacticElementTarget target);
 } // end namespace constraints
 
 template<typename ...Args>

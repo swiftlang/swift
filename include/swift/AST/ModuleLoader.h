@@ -209,6 +209,7 @@ struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubContext(StringRef moduleName,
                                           StringRef interfacePath,
                                           StringRef sdkPath,
+                                          std::optional<StringRef> sysroot,
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
@@ -217,6 +218,7 @@ struct InterfaceSubContextDelegate {
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
                                                    StringRef sdkPath,
+                                                   std::optional<StringRef> sysroot,
                                                    StringRef outputPath,
                                                    SourceLoc diagLoc,
                                                    bool silenceErrors,
@@ -370,7 +372,7 @@ public:
   /// if no such module exists.
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName,
-                        StringRef moduleOutputPath,
+                        StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,

@@ -13,6 +13,7 @@
 // This file implements support for generics.
 //
 //===----------------------------------------------------------------------===//
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -141,7 +142,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
       auto *currentRepr = opaqueReprs[i];
 
-      if( auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
+      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)) {
         // Usually, we resolve the opaque constraint and bail if it isn't a class
         // or existential type (see below). However, in this case we know we will
         // fail, so we can bail early and provide a better diagnostic.
@@ -162,13 +163,13 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      auto *paramType = GenericTypeParamType::getType(opaqueSignatureDepth, i,
-                                                      ctx);
+      auto *paramType = GenericTypeParamType::getOpaqueResultType(
+          opaqueSignatureDepth, i, ctx);
       genericParamTypes.push_back(paramType);
     
       TypeRepr *constraint = currentRepr;
       
-      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)){
+      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)) {
         constraint = opaqueReturn->getConstraint();
       }
       // Try to resolve the constraint repr in the parent decl context. It
@@ -713,10 +714,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                         /*unboundTyOpener*/ nullptr,
                                         /*placeholderHandler*/ nullptr,
                                         /*packElementOpener*/ nullptr);
-      auto params = func ? func->getParameters()
-                      : subscr ? subscr->getIndices()
-                      : macro->parameterList;
-      for (auto param : *params) {
+
+      for (auto param : *VD->getParameterList()) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
             continue;
@@ -905,7 +904,7 @@ void TypeChecker::diagnoseRequirementFailure(
   const auto &req = reqFailureInfo.Req;
   const auto &substReq = reqFailureInfo.SubstReq;
 
-  Diag<Type, Type, Type> diagnostic;
+  std::optional<Diag<Type, Type, Type>> diagnostic;
   Diag<Type, Type, StringRef> diagnosticNote;
 
   const auto reqKind = req.getKind();
@@ -923,6 +922,28 @@ void TypeChecker::diagnoseRequirementFailure(
     break;
 
   case RequirementKind::Conformance: {
+    // If this was a failure due to isolated conformances conflicting with
+    // a Sendable or MetatypeSendable requirement, diagnose that.
+    if (reqFailureInfo.IsolatedConformanceProto) {
+      ASTContext &ctx =
+          reqFailureInfo.IsolatedConformanceProto->getASTContext();
+      auto isolatedConformanceRef = reqFailureInfo.IsolatedConformances.front();
+      if (isolatedConformanceRef.isConcrete()) {
+        auto isolatedConformance = isolatedConformanceRef.getConcrete();
+        ctx.Diags.diagnose(
+            errorLoc, diag::isolated_conformance_with_sendable,
+            isolatedConformance->getType(),
+            isolatedConformance->getProtocol()->getName(),
+            reqFailureInfo
+              .IsolatedConformanceProto->isSpecificProtocol(
+                KnownProtocolKind::SendableMetatype),
+            req.getFirstType(),
+            isolatedConformance->getIsolation());
+        diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+        break;
+      }
+    }
+
     diagnoseConformanceFailure(substReq.getFirstType(),
                                substReq.getProtocolDecl(), nullptr, errorLoc);
 
@@ -951,9 +972,12 @@ void TypeChecker::diagnoseRequirementFailure(
   }
 
   ASTContext &ctx = targetTy->getASTContext();
-  // FIXME: Poor source-location information.
-  ctx.Diags.diagnose(errorLoc, diagnostic, targetTy, substReq.getFirstType(),
-                     substSecondTy);
+
+  if (diagnostic) {
+    // FIXME: Poor source-location information.
+    ctx.Diags.diagnose(errorLoc, *diagnostic, targetTy, substReq.getFirstType(),
+                       substSecondTy);
+  }
 
   const auto genericParamBindingsText = gatherGenericParamBindingsText(
       {req.getFirstType(), secondTy}, genericParams, substitutions);
@@ -966,6 +990,7 @@ void TypeChecker::diagnoseRequirementFailure(
 }
 
 CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
+    GenericSignature signature,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions) {
   using ParentConditionalConformances =
@@ -1004,7 +1029,9 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
+    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
+                                      &isolatedConformances)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1035,6 +1062,22 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
       break;
+    }
+
+    if (!isolatedConformances.empty() && signature) {
+      // Dig out the original type parameter for the requirement.
+      // FIXME: req might not be the right pre-substituted requirement,
+      // if this came from a conditional requirement.
+      for (const auto &isolatedConformance : isolatedConformances) {
+        (void)isolatedConformance;
+        if (auto failed =
+                signature->prohibitsIsolatedConformance(req.getFirstType())) {
+            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
+              req, substReq,
+              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
+              failed->second);
+        }
+      }
     }
   }
 

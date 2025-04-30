@@ -52,7 +52,7 @@ struct NCInt: ~Copyable {
 struct NEInt: ~Escapable {
   let value: Builtin.Int64
 
-  @lifetime(o)
+  @lifetime(copy o)
   init<O: ~Copyable & ~Escapable>(v: Builtin.Int64, o: borrowing O) {
     self.value = v
   }
@@ -64,17 +64,17 @@ struct NEInt: ~Escapable {
   }
 }
 
-@lifetime(ne)
+@lifetime(copy ne)
 public func consume_indirect<NE: ~Escapable>(ne: consuming NE) -> NE {
   return ne
 }
 
-@lifetime(ne)
+@lifetime(copy ne)
 public func copy_indirect<NE: ~Escapable>(ne: borrowing NE) -> NE {
   return copy ne
 }
 
-@lifetime(ne)
+@lifetime(copy ne)
 public func copy_inout<NE: ~Escapable>(ne: inout NE) -> NE {
   return copy ne
 }

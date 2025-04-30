@@ -1052,6 +1052,7 @@ private:
   Operand **Back = nullptr;
 
   /// The owner of this operand.
+  /// If null, the Owner was deleted (but not freed, yet).
   /// FIXME: this could be space-compressed.
   SILInstruction *Owner;
 
@@ -1104,9 +1105,12 @@ public:
   void drop() {
     removeFromCurrent();
     TheValue = SILValue();
-    NextUse = nullptr;
     Back = nullptr;
     Owner = nullptr;
+    // Note: we are _not_ clearing the `NextUse` pointer to be able to delete
+    // users while iterating over the use list.
+    // In such a case, the iterator can detect that the Owner is null and skip
+    // to the next (non-deleted) use by following the non-null `NextUse` pointer.
   }
 
   ~Operand() {

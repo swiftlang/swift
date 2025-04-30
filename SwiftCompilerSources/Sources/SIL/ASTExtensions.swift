@@ -13,10 +13,15 @@
 import AST
 import SILBridging
 
-extension AST.`Type` {
-  // See `CanonicalType.loweredType(in:)`.
+extension TypeProperties {
+  // Lowers the AST type to a SIL type - in a specific function.
+  // In contrast to `silType` this always succeeds. Still, it's not allowed to do this for certain AST types
+  // which are not present in SIL, like an `InOut` or LValue types.
+  //
+  // If `maximallyAbstracted` is true, the lowering is done with a completely opaque abstraction pattern
+  // (see AbstractionPattern for details).
   public func loweredType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
-    function.bridged.getLoweredType(bridged, maximallyAbstracted).type.objectType
+    function.bridged.getLoweredType(rawType.bridged, maximallyAbstracted).type.objectType
   }
 }
 
@@ -25,16 +30,6 @@ extension CanonicalType {
   // For example, if the AST type is a `AnyFunctionType` for which the lowered type would be a `SILFunctionType`.
   public var silType: Type? {
     BridgedType.createSILType(bridged).typeOrNil
-  }
-
-  // Lowers the AST type to a SIL type - in a specific function.
-  // In contrast to `silType` this always succeeds. Still, it's not allowed to do this for certain AST types
-  // which are not present in SIL, like an `InOut` or LValue types.
-  //
-  // If `maximallyAbstracted` is true, the lowering is done with a completely opaque abstraction pattern
-  // (see AbstractionPattern for details).
-  public func loweredType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
-    type.loweredType(in: function, maximallyAbstracted: maximallyAbstracted)
   }
 }
 
@@ -55,7 +50,42 @@ extension ClassDecl {
 }
 
 extension SubstitutionMap {
-  public func getMethodSubstitutions(for method: Function) -> SubstitutionMap {
-    return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged))
+  /// Returns the substitutions to specialize a method.
+  ///
+  /// If this is a default witness methods (`selfType` != nil) it has generic self type. In this case
+  /// the generic self parameter is at depth 0 and the actual generic parameters of the substitution map
+  /// are at depth + 1, e.g:
+  /// ```
+  ///     @convention(witness_method: P) <τ_0_0><τ_1_0 where τ_0_0 : GenClass<τ_1_0>.T>
+  ///                                       ^      ^
+  ///                                    self      params of substitution map at depth + 1
+  /// ```
+  public func getMethodSubstitutions(for method: Function, selfType: CanonicalType? = nil) -> SubstitutionMap {
+    return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged,
+                                                                          selfType?.bridged ?? BridgedCanType()))
+  }
+}
+
+extension Conformance {
+  /// Returns true if the conformance is not isolated or if its isolation matches
+  /// the isolation in `function`.
+  public func matchesActorIsolation(in function: Function) -> Bool {
+    return function.bridged.conformanceMatchesActorIsolation(bridged)
+  }
+}
+
+extension DiagnosticEngine {
+  public func diagnose(_ id: DiagID, _ args: DiagnosticArgument..., at location: Location) {
+    diagnose(id, args, at: location.sourceLoc)
+  }
+
+  public func diagnose(_ id: DiagID, _ args: [DiagnosticArgument], at location: Location) {
+    diagnose(id, args, at: location.sourceLoc)
+  }
+}
+
+extension Diagnostic {
+  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: Location) {
+    self.init(id, arguments, at: location.sourceLoc)
   }
 }

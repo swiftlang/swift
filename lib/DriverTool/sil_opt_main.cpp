@@ -223,7 +223,7 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
+      "disable-sil-ownership-verifier",
       llvm::cl::desc(
           "Do not verify SIL ownership invariants during SIL verification"));
 
@@ -592,6 +592,24 @@ struct SILOptOptions {
       "swift-version",
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
+
+  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
+      "enable-address-dependencies",
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+
+  llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "enable-callee-allocated-coro-abi",
+      llvm::cl::desc("Override per-platform settings and use yield_once_2."),
+      llvm::cl::init(false));
+  llvm::cl::opt<bool> DisableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "disable-callee-allocated-coro-abi",
+      llvm::cl::desc(
+          "Override per-platform settings and don't use yield_once_2."),
+      llvm::cl::init(false));
+
+  llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
+      "mergeable-traps",
+      llvm::cl::desc("Enable cond_fail merging."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -745,14 +763,14 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   for (auto &featureName : options.UpcomingFeatures) {
-    auto feature = getUpcomingFeature(featureName);
+    auto feature = Feature::getUpcomingFeature(featureName);
     if (!feature) {
       llvm::errs() << "error: unknown upcoming feature "
                    << QuotedString(featureName) << "\n";
       exit(-1);
     }
 
-    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+    if (auto firstVersion = feature->getLanguageVersion()) {
       if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
                      << " is already enabled as of Swift version "
@@ -764,7 +782,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   for (auto &featureName : options.ExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureName)) {
+    if (auto feature = Feature::getExperimentalFeature(featureName)) {
       Invocation.getLangOptions().enableFeature(*feature);
     } else {
       llvm::errs() << "error: unknown experimental feature "
@@ -813,7 +831,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   // If we have strict concurrency set as a feature and were told to turn off
-  // region based isolation... do so now.
+  // region-based isolation... do so now.
   if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
@@ -908,6 +926,13 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
+
+  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.EnableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
+  if (options.DisableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = false;
+  SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)

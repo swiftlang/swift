@@ -52,6 +52,7 @@ add_swift_host_library(swiftBasic STATIC
   Edit.cpp
   EditorPlaceholder.cpp
   ExponentialGrowthAppendingBinaryByteStream.cpp
+  Feature.cpp
   FileSystem.cpp
   FileTypes.cpp
   Fingerprint.cpp
@@ -74,6 +75,7 @@ add_swift_host_library(swiftBasic STATIC
   StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
+  SupportedFeatures.cpp
   TargetInfo.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp

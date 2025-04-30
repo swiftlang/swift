@@ -154,12 +154,14 @@ struct ScannerImportStatementInfo {
     uint32_t columnNumber;
   };
 
-  ScannerImportStatementInfo(std::string importIdentifier)
-      : importLocations(), importIdentifier(importIdentifier) {}
+  ScannerImportStatementInfo(std::string importIdentifier, bool isExported)
+      : importLocations(), importIdentifier(importIdentifier),
+        isExported(isExported) {}
 
-  ScannerImportStatementInfo(std::string importIdentifier,
+  ScannerImportStatementInfo(std::string importIdentifier, bool isExported,
                              ImportDiagnosticLocationInfo location)
-      : importLocations({location}), importIdentifier(importIdentifier) {}
+      : importLocations({location}), importIdentifier(importIdentifier),
+        isExported(isExported) {}
 
   void addImportLocation(ImportDiagnosticLocationInfo location) {
     importLocations.push_back(location);
@@ -169,6 +171,8 @@ struct ScannerImportStatementInfo {
   SmallVector<ImportDiagnosticLocationInfo, 4> importLocations;
   /// Imported module string. e.g. "Foo.Bar" in 'import Foo.Bar'
   std::string importIdentifier;
+  /// Is this an @_exported import
+  bool isExported;
 };
 
 /// Base class for the variant storage of ModuleDependencyInfo.
@@ -927,7 +931,7 @@ public:
 
   /// Add a dependency on the given module, if it was not already in the set.
   void
-  addOptionalModuleImport(StringRef module,
+  addOptionalModuleImport(StringRef module, bool isExported,
                           llvm::StringSet<> *alreadyAddedModules = nullptr);
 
   /// Add all of the module imports in the given source
@@ -937,13 +941,13 @@ public:
                         const SourceManager *sourceManager);
 
   /// Add a dependency on the given module, if it was not already in the set.
-  void addModuleImport(ImportPath::Module module,
+  void addModuleImport(ImportPath::Module module, bool isExported,
                        llvm::StringSet<> *alreadyAddedModules = nullptr,
                        const SourceManager *sourceManager = nullptr,
                        SourceLoc sourceLocation = SourceLoc());
 
   /// Add a dependency on the given module, if it was not already in the set.
-  void addModuleImport(StringRef module,
+  void addModuleImport(StringRef module, bool isExported,
                        llvm::StringSet<> *alreadyAddedModules = nullptr,
                        const SourceManager *sourceManager = nullptr,
                        SourceLoc sourceLocation = SourceLoc());
@@ -986,7 +990,7 @@ public:
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
   collectCrossImportOverlayNames(
       ASTContext &ctx, StringRef moduleName,
-      std::vector<std::pair<std::string, std::string>> &overlayFiles) const;
+      std::set<std::pair<std::string, std::string>> &overlayFiles) const;
 };
 
 using ModuleDependencyVector =
@@ -1145,8 +1149,10 @@ private:
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
   std::string scannerContextHash;
-  /// The location of where the built modules will be output to
+  /// The location of where the explicitly-built modules will be output to
   std::string moduleOutputPath;
+  /// The location of where the explicitly-built SDK modules will be output to
+  std::string sdkModuleOutputPath;
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
@@ -1160,9 +1166,10 @@ private:
 
 public:
   ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
-                          std::string mainScanModuleName,
-                          std::string moduleOutputPath,
-                          std::string scanningContextHash);
+                          const std::string &mainScanModuleName,
+                          const std::string &moduleOutputPath,
+                          const std::string &sdkModuleOutputPath,
+                          const std::string &scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
 
@@ -1195,7 +1202,8 @@ public:
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  std::string getModuleOutputPath() const { return moduleOutputPath; }
+  StringRef getModuleOutputPath() const { return moduleOutputPath; }
+  StringRef getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
 
   /// Query all dependencies
   ModuleDependencyIDSetVector

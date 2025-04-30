@@ -22,7 +22,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   var _address: UnsafeMutablePointer<Value.AtomicRepresentation> {
-    UnsafeMutablePointer<Value.AtomicRepresentation>(_rawAddress)
+    unsafe UnsafeMutablePointer<Value.AtomicRepresentation>(_rawAddress)
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -39,7 +39,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
-    _address.initialize(to: Value.encodeAtomicRepresentation(initialValue))
+    unsafe _address.initialize(to: Value.encodeAtomicRepresentation(initialValue))
   }
 
   // Deinit's can't be marked @_transparent. Do these things need all of these
@@ -48,10 +48,10 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   @_alwaysEmitIntoClient
   @inlinable
   deinit {
-    let oldValue = Value.decodeAtomicRepresentation(_address.pointee)
+    let oldValue = unsafe Value.decodeAtomicRepresentation(_address.pointee)
     _ = consume oldValue
 
-    _address.deinitialize(count: 1)
+    unsafe _address.deinitialize(count: 1)
   }
 }
 

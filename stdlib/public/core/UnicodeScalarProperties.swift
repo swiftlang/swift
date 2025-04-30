@@ -756,19 +756,19 @@ extension Unicode.Scalar.Properties {
     // more than 1 scalar.
     var specialMappingLength = 0
 
-    let specialMappingPtr = _swift_stdlib_getSpecialMapping(
+    let specialMappingPtr = unsafe _swift_stdlib_getSpecialMapping(
       _scalar.value,
       mapping.rawValue,
       &specialMappingLength
     )
 
-    if let specialMapping = specialMappingPtr, specialMappingLength != 0 {
-      let buffer = UnsafeBufferPointer<UInt8>(
+    if let specialMapping = unsafe specialMappingPtr, specialMappingLength != 0 {
+      let buffer = unsafe UnsafeBufferPointer<UInt8>(
         start: specialMapping,
         count: specialMappingLength
       )
 
-      return String._uncheckedFromUTF8(buffer, isASCII: false)
+      return unsafe String._uncheckedFromUTF8(buffer, isASCII: false)
     }
 
     // If we did not have a special mapping, check if we have a direct scalar
@@ -1252,8 +1252,8 @@ extension Unicode.Scalar.Properties {
     // The longest name that Unicode defines is 88 characters long.
     let largestCount = Int(SWIFT_STDLIB_LARGEST_NAME_COUNT)
 
-    let name = String(_uninitializedCapacity: largestCount) { buffer in
-      _swift_stdlib_getScalarName(
+    let name = unsafe String(_uninitializedCapacity: largestCount) { buffer in
+      unsafe _swift_stdlib_getScalarName(
         _scalar.value,
         buffer.baseAddress,
         buffer.count
@@ -1281,7 +1281,7 @@ extension Unicode.Scalar.Properties {
       return nil
     }
 
-    return String(cString: nameAliasPtr)
+    return unsafe String(cString: nameAliasPtr)
   }
 }
 

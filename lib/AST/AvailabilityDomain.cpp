@@ -13,27 +13,63 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
-std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
-    return std::nullopt;
+CustomAvailabilityDomain::Kind
+getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
+  switch (featureAvailKind) {
+  case clang::FeatureAvailKind::None:
+    llvm_unreachable("unexpected kind");
+  case clang::FeatureAvailKind::Available:
+    return CustomAvailabilityDomain::Kind::Enabled;
+  case clang::FeatureAvailKind::Unavailable:
+    return CustomAvailabilityDomain::Kind::Disabled;
+  case clang::FeatureAvailKind::Dynamic:
+    return CustomAvailabilityDomain::Kind::Dynamic;
+  }
+}
 
-  return forPlatform(platform);
+static const CustomAvailabilityDomain *
+customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
+  auto *clangDecl = decl->getClangDecl();
+  ASSERT(clangDecl);
+
+  auto featureInfo = clangDecl->getASTContext().getFeatureAvailInfo(
+      const_cast<clang::Decl *>(clangDecl));
+
+  // Ensure the decl actually represents an availability domain.
+  if (featureInfo.first.empty())
+    return nullptr;
+
+  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+    return nullptr;
+
+  return CustomAvailabilityDomain::get(
+      featureInfo.first, getCustomDomainKind(featureInfo.second.Kind),
+      decl->getModuleContext(), decl, ctx);
 }
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetVariantPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetVariantPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
+AvailabilityDomain::forCustom(Decl *decl, const ASTContext &ctx) {
+  if (!decl)
     return std::nullopt;
 
-  return forPlatform(platform);
+  if (decl->hasClangNode()) {
+    if (auto *customDomain = customDomainForClangDecl(decl, ctx))
+      return AvailabilityDomain::forCustom(customDomain);
+  } else {
+    // FIXME: [availability] Handle Swift availability domains decls.
+  }
+
+  return std::nullopt;
 }
 
 std::optional<AvailabilityDomain>
@@ -73,6 +109,32 @@ bool AvailabilityDomain::isVersioned() const {
   }
 }
 
+bool AvailabilityDomain::supportsContextRefinement() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return false;
+  case Kind::Platform:
+  case Kind::Custom:
+    return true;
+  }
+}
+
+bool AvailabilityDomain::supportsQueries() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return false;
+  case Kind::Platform:
+  case Kind::Custom:
+    return true;
+  }
+}
+
 bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
@@ -89,10 +151,42 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+  if (!isPlatform())
+    return false;
+
+  return isActive(ctx);
+}
+
+static std::optional<llvm::VersionTuple>
+getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+    return std::nullopt;
+  case AvailabilityDomain::Kind::SwiftLanguage:
+    return ctx.LangOpts.EffectiveLanguageVersion;
+  case AvailabilityDomain::Kind::PackageDescription:
+    return ctx.LangOpts.PackageDescriptionVersion;
+  case AvailabilityDomain::Kind::Platform:
+    if (domain.isActive(ctx))
+      return ctx.LangOpts.getMinPlatformVersion();
+    return std::nullopt;
+  }
+}
+
+std::optional<AvailabilityRange>
+AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
+  if (auto version = getDeploymentVersion(*this, ctx))
+    return AvailabilityRange{*version};
+  return std::nullopt;
+}
+
 llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   switch (getKind()) {
   case Kind::Universal:
-    return "";
+    return "*";
   case Kind::SwiftLanguage:
     return "Swift";
   case Kind::PackageDescription:
@@ -123,6 +217,13 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   }
 }
 
+Decl *AvailabilityDomain::getDecl() const {
+  if (auto *customDomain = getCustomDomain())
+    return customDomain->getDecl();
+
+  return nullptr;
+}
+
 ModuleDecl *AvailabilityDomain::getModule() const {
   if (auto customDomain = getCustomDomain())
     return customDomain->getModule();
@@ -131,52 +232,167 @@ ModuleDecl *AvailabilityDomain::getModule() const {
 }
 
 bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
-  // FIXME: [availability] This currently implements something closer to a
-  // total ordering instead of the more flexible partial ordering that it
-  // would ideally represent. Until AvailabilityContext supports tracking
-  // multiple unavailable domains simultaneously, a stricter ordering is
-  // necessary to support source compatibility.
   switch (getKind()) {
   case Kind::Universal:
     return true;
   case Kind::SwiftLanguage:
-    return !other.isUniversal();
   case Kind::PackageDescription:
   case Kind::Embedded:
-    return !other.isUniversal() && !other.isSwiftLanguage();
+  case Kind::Custom:
+    return other == *this;
   case Kind::Platform:
     if (getPlatformKind() == other.getPlatformKind())
       return true;
     return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
                                             getPlatformKind());
-  case Kind::Custom:
-    return getCustomDomain() == other.getCustomDomain();
   }
 }
 
-AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
+bool AvailabilityDomain::isRoot() const {
+  switch (getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::Platform:
+    return getRootDomain() == *this;
+  case AvailabilityDomain::Kind::Custom:
+    // For now, all custom domains are their own root.
+    return true;
+  }
+}
+
+AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   if (!isPlatform())
     return *this;
 
+  // iOS specifically contains a few other platforms.
   auto iOSDomain = AvailabilityDomain::forPlatform(PlatformKind::iOS);
   if (iOSDomain.contains(*this))
     return iOSDomain;
 
+  // App Extension domains are contained by their base platform domain.
   if (auto basePlatform = basePlatformForExtensionPlatform(getPlatformKind()))
     return AvailabilityDomain::forPlatform(*basePlatform);
 
   return *this;
 }
 
-CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
-                                                   ModuleDecl *mod, Kind kind)
-    : name(name), kind(kind), mod(mod) {
+void AvailabilityDomain::print(llvm::raw_ostream &os) const {
+  os << getNameForAttributePrinting();
+}
+
+AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+  case Kind::Embedded:
+  case Kind::Platform:
+    // These domain kinds aren't ASTContext dependent.
+    return *this;
+  case Kind::Custom:
+    // To support this, the CustomAvailabilityDomain content would need to
+    // be copied to the other context, allocating new storage if necessary.
+    llvm::report_fatal_error("unsupported");
+  }
+}
+
+bool StableAvailabilityDomainComparator::operator()(
+    const AvailabilityDomain &lhs, const AvailabilityDomain &rhs) const {
+  auto lhsKind = lhs.getKind();
+  auto rhsKind = rhs.getKind();
+  if (lhsKind != rhsKind)
+    return lhsKind < rhsKind;
+
+  switch (lhsKind) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    return false;
+  case AvailabilityDomain::Kind::Platform:
+    return lhs.getPlatformKind() < rhs.getPlatformKind();
+  case AvailabilityDomain::Kind::Custom: {
+    auto lhsMod = lhs.getModule();
+    auto rhsMod = rhs.getModule();
+    if (lhsMod != rhsMod)
+      return lhsMod->getName() < rhsMod->getName();
+
+    return lhs.getNameForAttributePrinting() <
+           rhs.getNameForAttributePrinting();
+  }
+  }
+}
+
+CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
+                                                   ModuleDecl *mod, Decl *decl)
+    : name(name), kind(kind), mod(mod), decl(decl) {
   ASSERT(!name.empty());
   ASSERT(mod);
 }
 
-CustomAvailabilityDomain *
-CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
-                                 ModuleDecl *mod, Kind kind) {
-  return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
+void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
+                                       Identifier name, ModuleDecl *mod) {
+  ID.AddPointer(name.getAsOpaquePointer());
+  ID.AddPointer(mod);
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomainOrIdentifier::lookUpInDeclContext(
+    SourceLoc loc, const DeclContext *declContext) const {
+  DEBUG_ASSERT(isIdentifier());
+
+  auto &ctx = declContext->getASTContext();
+  auto &diags = ctx.Diags;
+  std::optional<AvailabilityDomain> domain;
+  auto identifier = getAsIdentifier().value();
+
+  llvm::SmallVector<AvailabilityDomain> results;
+  declContext->lookupAvailabilityDomains(identifier, results);
+  if (results.size() > 0) {
+    // FIXME: [availability] Diagnose ambiguity if necessary.
+    domain = results.front();
+  }
+
+  if (!domain) {
+    auto domainString = identifier.str();
+    if (auto suggestion = closestCorrectedPlatformString(domainString)) {
+      diags
+          .diagnose(loc, diag::availability_suggest_platform_name, identifier,
+                    *suggestion)
+          .fixItReplace(SourceRange(loc), *suggestion);
+    } else {
+      diags.diagnose(loc, diag::availability_unrecognized_platform_name,
+                     identifier);
+    }
+    return std::nullopt;
+  }
+
+  if (domain->isCustom() &&
+      !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+      !declContext->isInSwiftinterface()) {
+    diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
+                   *domain);
+    return std::nullopt;
+  }
+
+  return domain;
+}
+
+AvailabilityDomainOrIdentifier
+AvailabilityDomainOrIdentifier::copy(ASTContext &ctx) const {
+  if (auto identifier = getAsIdentifier())
+    return ctx.getIdentifier(identifier->str());
+
+  DEBUG_ASSERT(isDomain());
+  return getAsDomain()->copy(ctx);
+}
+
+void AvailabilityDomainOrIdentifier::print(llvm::raw_ostream &os) const {
+  if (auto identifier = getAsIdentifier())
+    os << identifier->str();
+  else
+    getAsDomain()->print(os);
 }

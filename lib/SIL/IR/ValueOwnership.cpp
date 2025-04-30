@@ -183,6 +183,27 @@ CONSTANT_OWNERSHIP_INST(None, TypeValue)
 
 #undef CONSTANT_OWNERSHIP_INST
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitStructExtractInst(StructExtractInst *sei) {
+  if (sei->getType().isTrivial(*sei->getFunction()) ||
+      // A struct value can have "none" ownership even if its type is not trivial.
+      // This happens when the struct/tuple contains a non-trivial enum, but it's initialized with
+      // a trivial enum case (e.g. with `Optional.none`).
+      sei->getOperand()->getOwnershipKind() == OwnershipKind::None) {
+    return OwnershipKind::None;
+  }
+  return OwnershipKind::Guaranteed;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitTupleExtractInst(TupleExtractInst *tei) {
+  if (tei->getType().isTrivial(*tei->getFunction()) ||
+      // A tuple value can have "none" ownership even if its type is not trivial.
+      // This happens when the struct/tuple contains a non-trivial enum, but it's initialized with
+      // a trivial enum case (e.g. with `Optional.none`).
+      tei->getOperand()->getOwnershipKind() == OwnershipKind::None)
+    return OwnershipKind::None;
+  return OwnershipKind::Guaranteed;
+}
+
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
@@ -192,8 +213,6 @@ CONSTANT_OWNERSHIP_INST(None, TypeValue)
     }                                                                          \
     return OwnershipKind::OWNERSHIP;                                           \
   }
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TuplePackExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)

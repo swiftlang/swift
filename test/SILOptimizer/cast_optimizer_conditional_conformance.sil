@@ -399,7 +399,7 @@ sil_witness_table hidden <T where T == UInt8> S1<T>: HasFoo module tot {
 
 sil_witness_table hidden <T where T : P> S2<T>: HasFoo module tot {
   method #HasFoo.foo: <Self where Self : HasFoo> (Self) -> () -> () : @witnessS2
-  conditional_conformance (T: P): dependent
+  conditional_conformance (T: P): dependent T
 }
 
 sil_witness_table hidden IsP: P module tot {
