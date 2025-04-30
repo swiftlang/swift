@@ -54,4 +54,18 @@ FieldsTestSuite.test("Typedef'd optional field padding reused") {
   expectEqual(s2.get_c(), 6)
 }
 
+FieldsTestSuite.test("Non-standard-layout field padding reused") {
+  var s = ReuseNonStandardLayoutFieldPadding()
+  s.c = 5
+  expectEqual(Int(s.offset()),  MemoryLayout<ReuseNonStandardLayoutFieldPadding>.offset(of: \.c)!)
+  expectEqual(s.c, 5)
+  expectEqual(s.get_c(), 5)
+  s.set_c(6)
+  expectEqual(s.c, 6)
+  expectEqual(s.get_c(), 6)
+  let s2 = s
+  expectEqual(s2.c, 6)
+  expectEqual(s2.get_c(), 6)
+}
+
 runAllTests()
