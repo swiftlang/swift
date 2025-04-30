@@ -174,14 +174,12 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (const auto &req : genericSig.getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance) continue;
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
 
-    Type depTy = req.getFirstType();
-    auto replacement = depTy.subst(IFS);
-    auto *proto = req.getProtocolDecl();
-    auto conformance = IFS.lookupConformance(
-        depTy->getCanonicalType(), replacement, proto, /*level=*/0);
-    conformances.push_back(conformance);
+    conformances.push_back(
+      IFS.lookupConformance(
+        req.getFirstType(), req.getProtocolDecl(), /*level=*/0));
   }
 
   return SubstitutionMap(genericSig, types, conformances);
@@ -649,14 +647,14 @@ bool SubstitutionMap::isIdentity() const {
   return !hasNonIdentityReplacement;
 }
 
-SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
-    TypeExpansionContext context) const {
+SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
+    SubstitutionMap subs, TypeExpansionContext context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return this->subst(replacer, replacer,
-                     SubstFlags::SubstituteOpaqueArchetypes |
-                     SubstFlags::PreservePackExpansionLevel);
+  return subs.subst(replacer, replacer,
+                    SubstFlags::SubstituteOpaqueArchetypes |
+                    SubstFlags::PreservePackExpansionLevel);
 }
 
 bool OuterSubstitutions::isUnsubstitutedTypeParameter(Type type) const {

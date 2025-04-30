@@ -96,7 +96,7 @@ RequirementEnvironment::RequirementEnvironment(
       // type.
       if (type->isEqual(selfType)) {
         if (covariantSelf)
-          return GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
+          return ctx.TheSelfType;
         return substConcreteType;
       }
       // Other requirement generic parameters map 1:1 with their depth
@@ -169,8 +169,7 @@ RequirementEnvironment::RequirementEnvironment(
   // If the conforming type is a class, add a class-constrained 'Self'
   // parameter.
   if (covariantSelf) {
-    auto paramTy = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
-    genericParamTypes.push_back(paramTy);
+    genericParamTypes.push_back(ctx.TheSelfType);
   }
 
   // Now, add all generic parameters from the conforming type.
@@ -184,8 +183,7 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add requirements.
   SmallVector<Requirement, 2> requirements;
   if (covariantSelf) {
-    auto paramTy = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
-    Requirement reqt(RequirementKind::Superclass, paramTy, substConcreteType);
+    Requirement reqt(RequirementKind::Superclass, ctx.TheSelfType, substConcreteType);
     requirements.push_back(reqt);
   }
 

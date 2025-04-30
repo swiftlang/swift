@@ -590,7 +590,7 @@ protected:
           !context.shouldLookThroughOpaqueTypeArchetypes())
         return Subs;
 
-      return Subs.mapIntoTypeExpansionContext(context);
+      return substOpaqueTypesWithUnderlyingTypes(Subs, context);
     }
 
     return Subs;
