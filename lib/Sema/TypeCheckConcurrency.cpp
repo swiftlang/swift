@@ -4951,10 +4951,11 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // return caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
-          func && func->hasAsync() &&
-          func->getModuleContext() == decl->getASTContext().MainModule) {
-        return ActorIsolation::forCallerIsolationInheriting();
+      if (auto *value = dyn_cast<ValueDecl>(decl)) {
+        if (value->isAsync() &&
+            value->getModuleContext() == decl->getASTContext().MainModule) {
+          return ActorIsolation::forCallerIsolationInheriting();
+        }
       }
     }
 
@@ -5815,11 +5816,9 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         return *result;
   }
 
-  // If we have an async function... by default we inherit isolation.
+  // If we have an async function or storage... by default we inherit isolation.
   if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-        func && func->hasAsync() &&
-        func->getModuleContext() == ctx.MainModule) {
+    if (value->isAsync() && value->getModuleContext() == ctx.MainModule) {
       return {
           {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
     }
@@ -6232,11 +6231,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (selfTypeIsolation.isolation) {
         auto isolation = selfTypeIsolation.isolation;
 
-        if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-            ctx.LangOpts.hasFeature(
-                Feature::NonisolatedNonsendingByDefault) &&
-            func && func->hasAsync() &&
-            func->getModuleContext() == ctx.MainModule &&
+        if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+            value->isAsync() && value->getModuleContext() == ctx.MainModule &&
             isolation.isNonisolated()) {
           isolation = ActorIsolation::forCallerIsolationInheriting();
         }

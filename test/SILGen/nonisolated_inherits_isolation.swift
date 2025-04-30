@@ -151,3 +151,21 @@ class MainActorKlass {
     await unspecifiedAsyncUse(n)
   }
 }
+
+struct TestVarUse {
+  var test: Int {
+    // CHECK-LABEL: sil hidden [ossa] @$s30nonisolated_inherits_isolation10TestVarUseV4testSivg : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, TestVarUse) -> Int
+    get async {
+      42
+    }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30nonisolated_inherits_isolation12testUseOfVar1tyAA04TestgE0V_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, TestVarUse) -> ()
+// CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Optional<any Actor>, [[BASE:%.*]] : $TestVarUse)
+// CHECK:   [[GETTER:%.*]] = function_ref @$s30nonisolated_inherits_isolation10TestVarUseV4testSivg : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, TestVarUse) -> Int
+// CHECK:   {{.*}} = apply [[GETTER]]([[ISOLATION]], [[BASE]])
+// CHECK: } // end sil function '$s30nonisolated_inherits_isolation12testUseOfVar1tyAA04TestgE0V_tYaF'
+func testUseOfVar(t: TestVarUse) async {
+  _ = await t.test
+}
