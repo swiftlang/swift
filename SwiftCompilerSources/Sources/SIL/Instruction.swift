@@ -452,7 +452,7 @@ public enum VariableScopeInstruction {
 
   // TODO: with SIL verification, we might be able to make varDecl non-Optional.
   public var varDecl: VarDecl? {
-    if let debugVarDecl = instruction.debugVarDecl {
+    if let debugVarDecl = instruction.debugResultDecl {
       return debugVarDecl
     }
     // SILGen may produce double var_decl instructions for the same variable:
@@ -474,15 +474,31 @@ extension Instruction {
     if let varScopeInst = VariableScopeInstruction(self) {
       return varScopeInst.varDecl
     }
-    return debugVarDecl
+    return debugResultDecl
   }
 
-  var debugVarDecl: VarDecl? {
+  var debugResultDecl: VarDecl? {
     for result in results {
-      for use in result.uses {
-        if let debugVal = use.instruction as? DebugValueInst {
-          return debugVal.varDecl
-        }
+      if let varDecl = result.debugUserDecl {
+        return varDecl
+      }
+    }
+    return nil
+  }
+}
+
+extension Value {
+  var debugValDecl: VarDecl? {
+    if let arg = self as? Argument {
+      return arg.varDecl
+    }
+    return debugUserDecl
+  }
+
+  var debugUserDecl: VarDecl? {
+    for use in uses {
+      if let debugVal = use.instruction as? DebugValueInst {
+        return debugVal.varDecl
       }
     }
     return nil
