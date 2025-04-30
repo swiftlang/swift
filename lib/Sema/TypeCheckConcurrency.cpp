@@ -3040,7 +3040,7 @@ namespace {
           // If the local function is generic and this is one of its generic
           // parameters, ignore it.
           if (genericSig.getNextDepth() > 0 &&
-              genericDepth < genericSig.getNextDepth() - 1)
+              genericDepth >= genericSig.getNextDepth())
             continue;
 
           if (type->isTypeParameter() && innermostGenericDC)
