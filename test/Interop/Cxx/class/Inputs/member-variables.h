@@ -27,23 +27,23 @@ struct HasZeroSizedField {
   void set_c(short c) { this->c = c; }
 };
 
-struct ReuseFieldPadding {
+struct ReuseOptionalFieldPadding {
   [[no_unique_address]] std::optional<int> a = {2};
   char c;
   char get_c() const { return c; }
   void set_c(char c) { this->c = c; }
-  int offset() const { return offsetof(ReuseFieldPadding, c); }
+  int offset() const { return offsetof(ReuseOptionalFieldPadding, c); }
   std::optional<int> getOptional() { return a; }
 };
 
 using OptInt = std::optional<int>;
 
-struct ReuseFieldPaddingWithTypedef {
+struct ReuseOptionalFieldPaddingWithTypedef {
   [[no_unique_address]] OptInt a;
   char c;
   char get_c() const { return c; }
   void set_c(char c) { this->c = c; }
-  int offset() const { return offsetof(ReuseFieldPadding, c); }
+  int offset() const { return offsetof(ReuseOptionalFieldPadding, c); }
 };
 
 
