@@ -2132,19 +2132,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     subInvocation.setSysRoot(sysroot.value());
   }
 
-  // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
-  // of a CF_OPTIONS bug (rdar://142762174).
-  if (moduleName == "CoreGraphics") {
-    subInvocation.getLangOptions().EnableCXXInterop = false;
-    subInvocation.getLangOptions().cxxInteropCompatVersion = {};
-    BuildArgs.erase(llvm::remove_if(BuildArgs,
-                                    [](StringRef arg) -> bool {
-                                      return arg.starts_with(
-                                          "-cxx-interoperability-mode=");
-                                    }),
-                    BuildArgs.end());
-  }
-
   // Calculate output path of the module.
   SwiftInterfaceModuleOutputPathResolution::ResultTy resolvedOutputPath;
   getCachedOutputPath(resolvedOutputPath, moduleName, interfacePath, sdkPath);
