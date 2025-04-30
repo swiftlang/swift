@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 5 -enable-upcoming-feature NonisolatedNonsendingByDefault:adoption
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault:adoption
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 5 -enable-upcoming-feature NonisolatedNonsendingByDefault:migrate
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault:migrate
 
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
