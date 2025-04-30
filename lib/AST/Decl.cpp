@@ -8919,6 +8919,21 @@ ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::cloneAccessor(const ASTContext &Ctx,
+                                    ParamDecl const *subscriptParam,
+                                    DeclContext *Parent) {
+  auto *param = new (Ctx) ParamDecl(
+      subscriptParam->getSpecifierLoc(), subscriptParam->getArgumentNameLoc(),
+      subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
+      subscriptParam->getName(), /*declContext*/ Parent);
+  param->setOptions(subscriptParam->getOptions());
+
+  // The cloned parameter is implicit.
+  param->setImplicit();
+
+  return param;
+}
+
 ParamDecl *
 ParamDecl::createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                           SourceLoc argumentNameLoc, Identifier argumentName,
@@ -11138,23 +11153,7 @@ AccessorDecl *AccessorDecl::createParsed(
       paramsEnd = indices->getEndLoc();
     }
     for (auto *subscriptParam : *indices) {
-      // Clone the parameter.
-      auto *param = new (ctx) ParamDecl(
-          subscriptParam->getSpecifierLoc(),
-          subscriptParam->getArgumentNameLoc(),
-          subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
-          subscriptParam->getName(), /*declContext*/ accessor);
-
-      // The cloned parameter is implicit.
-      param->setImplicit();
-
-      // TODO: Check why IsVariadic is not copied.
-      param->setAutoClosure(subscriptParam->isAutoClosure());
-      param->setIsolated(subscriptParam->isIsolated());
-      // TODO: Check why IsAddressable is not copied.
-      param->setSending(subscriptParam->isSending());
-      param->setCallerIsolated(subscriptParam->isCallerIsolated());
-
+      auto param = ParamDecl::cloneAccessor(ctx, subscriptParam, accessor);
       newParams.push_back(param);
     }
 
