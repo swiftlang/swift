@@ -1613,7 +1613,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // ExtendedExistentialTypeShapes consider existential metatypes to
       // be part of the existential, so if we're symbolically referencing
       // shapes, we need to handle that at this level.
-      if (EMT->hasParameterizedExistential()) {
+      if (EMT->getExistentialLayout().needsExtendedShape()) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(EMT);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
@@ -1693,7 +1693,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
-      if (ET->hasParameterizedExistential()) {
+      if (ET->getExistentialLayout().needsExtendedShape()) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(ET);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, ET, sig, forDecl);
