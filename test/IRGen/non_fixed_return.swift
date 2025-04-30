@@ -55,14 +55,14 @@ func create<T>(_ t: T) -> C<T> {
 // We use opaque storage types because LLVM performs type based analysis based
 // on the sret storage type which goes wrong with non fixed types.
 
-// CHECK-LABEL: define hidden swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque) %0
+// CHECK-LABEL: define hidden swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque){{.*}} %0
 
 // CHECK-LABEL: define hidden swiftcc void @"$s16non_fixed_return6createyAA1CVyxGxlF"(ptr noalias sret(%swift.opaque) %0, ptr noalias %1, ptr %T)
 // CHECK:  call swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque) %0
 // CHECK:  ret void
 
 // Make sure we don't loose the stores for the optional UInt32? in optimize mode.
-// OPT-LABEL: define hidden swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque) %0
+// OPT-LABEL: define hidden swiftcc void @"$s16non_fixed_return1CVACyxGycfC"(ptr noalias sret(%swift.opaque){{.*}} %0
 // OPT:  store i32 0, ptr [[BASE:%[0-9]+]]
 // OPT:  [[ADDR2:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[BASE]], i64 4
 // OPT:  store i8 1, ptr [[ADDR2]]
