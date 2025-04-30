@@ -2699,6 +2699,7 @@ diagnoseDeclUnsafe(ConcreteDeclRef declRef, SourceRange R,
 
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   enumerateUnsafeUses(declRef, diagLoc, call != nullptr,
+                      /*skipTypeCheck=*/false,
                       [&](UnsafeUse unsafeUse) {
     unsafeUses->push_back(unsafeUse);
     return false;
