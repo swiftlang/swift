@@ -422,9 +422,6 @@ extension ScopeExtension {
   mutating func gatherYieldExtension(_ beginApply: BeginApplyInst) {
     // Create a separate ScopeExtension for each operand that the yielded value depends on.
     for operand in beginApply.parameterOperands {
-      guard let dep = beginApply.resultDependence(on: operand), dep.isScoped else {
-        continue
-      }
       gatherExtensions(valueOrAddress: operand.value)
     }
   }
