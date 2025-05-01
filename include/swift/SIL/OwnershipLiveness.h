@@ -240,7 +240,7 @@ class InteriorLiveness : public OSSALiveness {
 
 public:
   // Summarize address uses
-  AddressUseKind addressUseKind = AddressUseKind::Unknown;
+  AddressUseKind addressUseKind = AddressUseKind::PointerEscape;
   Operand *escapingUse = nullptr;
 
 public:

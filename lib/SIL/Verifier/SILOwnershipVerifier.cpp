@@ -437,18 +437,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       // interior pointer, we need to add all of its address uses as "implicit
       // regular users" of our consumed value.
       if (auto interiorPointerOperand = InteriorPointerOperand::get(op)) {
-        std::function<void(Operand *)> onError = [&](Operand *op) {
-          errorBuilder.handleMalformedSIL([&] {
-            llvm::errs() << "Could not recognize address user of interior "
-                            "pointer operand!\n"
-                         << "Interior Pointer Operand: "
-                         << *interiorPointerOperand.operand->getUser()
-                         << "Address User: " << *op->getUser();
-          });
-        };
-        foundError |= (interiorPointerOperand.findTransitiveUses(
-                           &nonLifetimeEndingUsers, &onError)
-                       == AddressUseKind::Unknown);
+        interiorPointerOperand.findTransitiveUses(&nonLifetimeEndingUsers);
       }
 
       // Finally add the op to the non lifetime ending user list.
