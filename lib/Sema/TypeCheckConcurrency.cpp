@@ -4681,6 +4681,10 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
           attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
         return ActorIsolation::forNonisolated(attr->isUnsafe());
       }
+
+      if (explicitClosure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+        return ActorIsolation::forNonisolated(/*unsafe=*/false);
+      }
     }
 
     // `nonisolated(nonsending)` inferred from the context makes
