@@ -224,7 +224,7 @@ class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
             storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned);
 
   void (*__ptrauth_swift_value_witness_function_pointer(
-      SpecialPointerAuthDiscriminators::Destroy) destroy)(OpaqueValue *);
+      SpecialPointerAuthDiscriminators::Destroy) destroy)(OpaqueValue *, void *);
 
   static bool classof(const TaskOptionRecord *record) {
     return record->getKind() == TaskOptionRecordKind::ResultTypeInfo;
