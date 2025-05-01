@@ -183,8 +183,6 @@ entry(%b : $*MOStruct):
 
 // CHECK-LABEL: define{{.*}}@destroy_enum_value(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    trunc
-// CHECK-NEXT:    zext
 // CHECK-NEXT:    call{{.*}}@destroy_enum(
 // CHECK-NEXT:    ret void
 sil @destroy_enum_value : $@convention(thin) (@owned MOEnum) -> () {
@@ -198,7 +196,6 @@ entry(%b : $MOEnum):
 // CHECK-NEXT:    load
 // CHECK-NEXT:    getelementptr
 // CHECK-NEXT:    load
-// CHECK-NEXT:    zext
 // CHECK-NEXT:    call{{.*}}@destroy_enum(
 // CHECK-NEXT:    ret void
 sil @destroy_enum_value_indirect : $@convention(thin) (@in MOEnum) -> () {
