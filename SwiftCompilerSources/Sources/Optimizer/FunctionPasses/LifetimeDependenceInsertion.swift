@@ -247,16 +247,19 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
     insertMarkDependencies(value: dependentValue, initializer: nil, bases: sources.bases, builder: builder, context)
   }
   for resultOper in apply.applySite.indirectResultOperands {
-    let accessBase = resultOper.value.accessBase
-    guard case let .store(initializingStore, initialAddress) = accessBase.findSingleInitializer(context) else {
-      continue
+    guard let initialAddress = resultOper.value.accessBase.address else {
+      diagnoseUnknownDependenceSource(sourceLoc: apply.applySite.location.sourceLoc, context)
+      return
     }
-    assert(initializingStore == resultOper.instruction, "an indirect result is a store")
     Builder.insert(after: apply.applySite, context) { builder in
-      insertMarkDependencies(value: initialAddress, initializer: initializingStore, bases: sources.bases,
+      insertMarkDependencies(value: initialAddress, initializer: resultOper.instruction, bases: sources.bases,
                              builder: builder, context)
     }
   }
+}
+
+private func diagnoseUnknownDependenceSource(sourceLoc: SourceLoc?, _ context: FunctionPassContext) {
+  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, [], at: sourceLoc)
 }
 
 private func insertParameterDependencies(apply: LifetimeDependentApply, target: Operand,
