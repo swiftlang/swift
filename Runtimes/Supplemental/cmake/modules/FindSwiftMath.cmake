@@ -1,5 +1,5 @@
 #[=======================================================================[.rst:
-Findmath
+FindSwiftMath
 ------------
 
 Find the Swift `_math` module interface, deferring to mathConfig.cmake when
@@ -23,35 +23,32 @@ Hint Variables
    This only affects Linux and Windows builds.
    Apple builds always use the library provided by the SDK.
 
- ``math_STATIC``
-   Look for the libmath static archive instead of the dynamic library.
-
 Result Variables
 ^^^^^^^^^^^^^^^^
 
-The module may set the following variables if `math_DIR` is not set.
+The module may set the following variables if `SwiftMath_DIR` is not set.
 
- ``math_FOUND``
+ ``SwiftMath_FOUND``
    true if the `_math` module interface (and required library) were found.
 
- ``math_INCLUDE_DIR``
+ ``SwiftMath_INCLUDE_DIR``
    The directory containing the `_math.swiftinterface` file
 
- ``math_LIBRARIES`` OR ``math_IMPLIB``
+ ``SwiftMath_LIBRARIES`` OR ``SwiftMath_IMPLIB``
    the libraries to be linked
 
 #]=======================================================================]
 
 # If the math_DIR is specified, look there instead. The cmake-generated
 # config file is more accurate, but requires that the SDK has one available.
-if(math_DIR)
-  if(math_FIND_REQUIRED)
+if(SwiftMath_DIR)
+  if(SwiftMath_FIND_REQUIRED)
     list(APPEND args REQUIRED)
   endif()
-  if(math_FIND_QUIETLY)
+  if(SwiftMath_FIND_QUIETLY)
     list(APPEND args QUIET)
   endif()
-  find_package(math NO_MODULE ${args})
+  find_package(SwiftMath NO_MODULE ${args})
   return()
 endif()
 
@@ -59,37 +56,30 @@ include(FindPackageHandleStandardArgs)
 include(PlatformInfo)
 
 if(APPLE)
-  find_path(math_INCLUDE_DIR
+  find_path(SwiftMath_INCLUDE_DIR
     NAMES _math.swiftmodule
     PATHS ${CMAKE_OSX_SYSROOT}/usr/lib/swift)
-  find_path(math_IMPLIB
+  find_path(SwiftMath_IMPLIB
     NAMES libm.tbd
     PATHS usr/lib)
-  add_library(math SHARED IMPORTED GLOBAL)
-  set_target_properties(math PROPERTIES
-    IMPORTED_IMPLIB ${math_IMPLIB}
-    INTERFACE_INCLUDE_DIRECTORIES ${math_INCLUDE_DIR})
-  find_package_handle_standard_args(math DEFAULT_MSG
-    math_IMPLIB math_INCLUDE_DIR)
+  add_library(SwiftMath SHARED IMPORTED GLOBAL)
+  set_target_properties(SwiftMath PROPERTIES
+    IMPORTED_IMPLIB ${SwiftMath_IMPLIB}
+    INTERFACE_INCLUDE_DIRECTORIES ${SwiftMath_INCLUDE_DIR})
+  find_package_handle_standard_args(SwiftMath DEFAULT_MSG
+    SwiftMath_IMPLIB SwiftMath_INCLUDE_DIR)
 elseif(LINUX)
-  find_path(math_INCLUDE_DIR
+  find_path(SwiftMath_INCLUDE_DIR
     glibc.modulemap
     PATHS ${Swift_SDKROOT}/usr/lib/swift/linux/${SwiftSupplemental_ARCH_SUBDIR})
-  find_path(math_GLIBC_DIR
+  find_path(SwiftMath_GLIBC_DIR
     Glibc.swiftmodule
     PATHS ${Swift_SDKROOT}/usr/lib/swift/linux)
-  find_library(math_LIBRARY NAMES m)
-  if(math_STATIC)
-    add_library(math STATIC IMPORTED GLOBAL)
-  else()
-    add_library(math SHARED IMPORTED GLOBAL)
-  endif()
-  set_target_properties(math PROPERTIES
-    IMPORTED_LOCATION ${math_LIBRARY}
-    INTERFACE_INCLUDE_DIRECTORIES ${math_INCLUDE_DIR} ${math_GLIBC_DIR})
-  find_package_handle_standard_args(math DEFAULT_MSG
-    math_LIBRARY math_INCLUDE_DIR)
+  add_library(SwiftMath INTERFACE IMPORTED GLOBAL)
+  set_target_properties(SwiftMath PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES ${SwiftMath_INCLUDE_DIR} ${SwiftMath_GLIBC_DIR})
+  find_package_handle_standard_args(SwiftMath DEFAULT_MSG SwiftMath_INCLUDE_DIR)
 else()
   # TODO: Windows
-  message(FATAL_ERROR "Findmath.cmake module search not implemented for targeted platform\n")
+  message(FATAL_ERROR "FindSwiftMath.cmake module search not implemented for targeted platform\n")
 endif()
