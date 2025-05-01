@@ -1811,8 +1811,9 @@ swift_task_addPriorityEscalationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
+  auto unsigned_handler = swift_auth_code(handler, 11839);
   auto *record = ::new (allocation)
-      EscalationNotificationStatusRecord(handler, context);
+      EscalationNotificationStatusRecord(unsigned_handler, context);
 
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;
