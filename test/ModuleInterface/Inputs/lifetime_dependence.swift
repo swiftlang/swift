@@ -1,21 +1,3 @@
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(borrow source)
-internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  _ dependent: consuming T, borrowing source: borrowing U) -> T {
-  dependent
-}
-
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(copy source)
-internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  _ dependent: consuming T, copying source: borrowing U) -> T {
-  dependent
-}
-
 public struct AnotherView : ~Escapable {
   @usableFromInline let _ptr: UnsafeRawBufferPointer
   @usableFromInline let _count: Int
