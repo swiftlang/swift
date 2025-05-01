@@ -424,6 +424,9 @@ void writeJSON(llvm::raw_ostream &out,
       bool hasOverlayDependencies =
           swiftTextualDeps->swift_overlay_module_dependencies &&
           swiftTextualDeps->swift_overlay_module_dependencies->count > 0;
+      bool hasSourceImportedDependencies =
+          swiftTextualDeps->source_import_module_dependencies &&
+          swiftTextualDeps->source_import_module_dependencies->count > 0;
       bool commaAfterBridgingHeaderPath = hasOverlayDependencies;
       bool commaAfterFramework =
           hasBridgingHeader || commaAfterBridgingHeaderPath;
@@ -448,6 +451,11 @@ void writeJSON(llvm::raw_ostream &out,
                            /*trailingComma=*/true);
       writeMacroDependencies(out, swiftTextualDeps->macro_dependencies, 5,
                              /*trailingComma=*/true);
+      if (hasSourceImportedDependencies) {
+        writeDependencies(out, swiftTextualDeps->source_import_module_dependencies,
+                          "sourceImportedDependencies", 5,
+                          /*trailingComma=*/true);
+      }
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
                            5, commaAfterFramework);
       /// Bridging header and its source file dependencies, if any.
