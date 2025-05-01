@@ -1130,3 +1130,5 @@ Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7Ra
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
 
+// Duration.nanoseconds(_:)
+Added: _$ss8DurationV11nanosecondsyABSdFZ
