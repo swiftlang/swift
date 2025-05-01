@@ -21,11 +21,15 @@ set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
 find_package(SwiftCore)
+find_package(math)
 
 include(gyb)
 
 option(SwiftDifferentiation_ENABLE_VECTOR_TYPES "Enable vector support"
   ${SwiftCore_ENABLE_VECTOR_TYPES})
+
+option(SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION "Enable library evolution"
+  ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -39,7 +43,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
+  $<$<AND:$<BOOL:${SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>)
 
 if(SwiftDifferentiation_ENABLE_VECTOR_TYPES)
   gyb_expand(SIMDDifferentiation.swift.gyb SIMDDifferentiation.swift)
@@ -64,4 +69,4 @@ set_target_properties(swift_Differentiation PROPERTIES
   Swift_MODULE_NAME _Differentiation
   Swift_COMPILATION_MODE wholemodule)
 
-  target_link_libraries(swift_Differentiation PRIVATE swiftCore)
+target_link_libraries(swift_Differentiation PRIVATE swiftCore math)
