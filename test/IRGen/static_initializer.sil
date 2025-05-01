@@ -95,7 +95,7 @@ sil_global @static_optional_int_vector : $Optional<Int32> = {
   %8 = enum $Optional<Int32>, #Optional.some!enumelt, %5 : $Int32
   %initval = vector (%6 : $Optional<Int32>, %7 : $Optional<Int32>, %8 : $Optional<Int32>)
 }
-// CHECK: @static_optional_int_vector = {{(dllexport )?}}{{(protected )?}}global [3 x <{ i32, i1, i8, i8, i8 }>] [<{ i32, i1, i8, i8, i8 }> <{ i32 2, i1 false, i8 undef, i8 undef, i8 undef }>, <{ i32, i1, i8, i8, i8 }> <{ i32 10, i1 false, i8 undef, i8 undef, i8 undef }>, <{ i32, i1, i8, i8, i8 }> <{ i32 20, i1 false, i8 undef, i8 undef, i8 undef }>], align 4
+// CHECK: @static_optional_int_vector = {{(dllexport )?}}{{(protected )?}}global [3 x <{ i32, i8, i8, i8, i8 }>] [<{ i32, i8, i8, i8, i8 }> <{ i32 2, i8 0, i8 undef, i8 undef, i8 undef }>, <{ i32, i8, i8, i8, i8 }> <{ i32 10, i8 0, i8 undef, i8 undef, i8 undef }>, <{ i32, i8, i8, i8, i8 }> <{ i32 20, i8 0, i8 undef, i8 undef, i8 undef }>], align 4
 
 sil_global @static_aligned_array : $TestArrayStorage = {
   %0 = integer_literal $Builtin.Int32, 2

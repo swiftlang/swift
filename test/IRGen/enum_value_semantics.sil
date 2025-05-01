@@ -357,8 +357,8 @@ bb0(%0 : $SinglePayloadNontrivial):
 //   -- The payload has no spare bits and there are no empty cases, so the tag
 //      is entirely contained in the extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %T20enum_value_semantics24MultiPayloadNoEmptyCasesO, ptr %value, i32 0, i32 1
-// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i1, ptr [[EXTRA_TAG_ADDR_TMP]], align 8
-// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i1 [[EXTRA_TAG_TMP]] to i32
+// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i8, ptr [[EXTRA_TAG_ADDR_TMP]], align 8
+// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i8 [[EXTRA_TAG_TMP]] to i32
 // CHECK-NEXT: ret i32 [[EXTRA_TAG]]
 
 // -- MultiPayloadNoEmptyCases destructiveProjectEnumData
@@ -368,11 +368,11 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 // -- MultiPayloadNoEmptyCases destructiveInjectEnumTag
 // CHECK-LABEL: define internal void @"$s20enum_value_semantics24MultiPayloadNoEmptyCasesOwui"
-// CHECK: [[TAG:%.*]] = trunc i32 %tag to i1
+// CHECK: [[TAG:%.*]] = trunc i32 %tag to i8
 
 //   -- Store the tag in the extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %T20enum_value_semantics24MultiPayloadNoEmptyCasesO, ptr %value, i32 0, i32 1
-// CHECK-NEXT: store i1 [[TAG]], ptr [[EXTRA_TAG_ADDR_TMP]], align 8
+// CHECK-NEXT: store i8 [[TAG]], ptr [[EXTRA_TAG_ADDR_TMP]], align 8
 // CHECK-NEXT: ret void
 
 
@@ -564,13 +564,12 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 //   -- Load the load bits of the tag from the extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %T20enum_value_semantics029MultiPayloadSpareBitsAndExtraG0O, ptr %value, i32 0, i32 1
-// CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = load i1, ptr [[EXTRA_TAG_ADDR_TMP]], align 8
+// CHECK-NEXT: [[EXTRA_TAG:%.*]] = load i8, ptr [[EXTRA_TAG_ADDR_TMP]], align 8
 
 //   -- Load the high bits of the tag from the spare bits area
 // CHECK-NEXT: [[SPARE_BITS_TMP2:%.*]] = lshr i64 [[PAYLOAD]], 63
 // CHECK-NEXT: [[SPARE_BITS_TMP:%.*]] = trunc i64 [[SPARE_BITS_TMP2]] to i8
 // CHECK-NEXT: [[SPARE_BITS:%.*]] = and i8 [[SPARE_BITS_TMP]], 1
-// CHECK-NEXT: [[EXTRA_TAG:%.*]] = zext i1 [[EXTRA_TAG_TMP]] to i8
 
 //   -- Combine high bits and low bits to form tag
 // CHECK-NEXT: [[TAG_TMP:%.*]] = shl i8 [[EXTRA_TAG]], 1
@@ -609,7 +608,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 //   -- Store high bits of tag in extra tag area
 // CHECK-NEXT: [[EXTRA_TAG_TMP:%.*]] = lshr i32 %tag, 1
-// CHECK-NEXT: [[EXTRA_TAG:%.*]] = trunc i32 [[EXTRA_TAG_TMP]] to i1
+// CHECK-NEXT: [[EXTRA_TAG:%.*]] = trunc i32 [[EXTRA_TAG_TMP]] to i8
 // CHECK-NEXT: [[EXTRA_TAG_ADDR_TMP:%.*]] = getelementptr inbounds %T20enum_value_semantics029MultiPayloadSpareBitsAndExtraG0O, ptr %value, i32 0, i32 1
-// CHECK-NEXT: store i1 [[EXTRA_TAG]], ptr [[EXTRA_TAG_ADDR_TMP]], align 8
+// CHECK-NEXT: store i8 [[EXTRA_TAG]], ptr [[EXTRA_TAG_ADDR_TMP]], align 8
 // CHECK-NEXT: ret void
