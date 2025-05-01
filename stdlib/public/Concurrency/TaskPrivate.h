@@ -831,11 +831,6 @@ struct AsyncTask::PrivateStorage {
     while (true) {
       assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
-
-      // Don't assert !isStatusRecordLocked(). It can be legitimately true here,
-      // for example if another thread is canceling this task right as it
-      // completes.
-
       assert(oldStatus.isRunning());
 
       // Remove drainer, enqueued and override bit if any
