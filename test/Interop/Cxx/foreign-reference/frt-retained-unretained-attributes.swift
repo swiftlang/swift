@@ -249,23 +249,23 @@ func testVirtualMethods(base: Base, derived: Derived) {
 }
 
 func testDefaultOwnershipAnnotation() {
-  let _ = DefaultOwnershipConventionOnCXXForegnRefType.returnRefTypeDefaultRetained()
-  // CHECK: function_ref {{.*}}returnRefTypeDefaultRetained{{.*}} : $@convention(c) () -> @owned DefaultOwnershipConventionOnCXXForegnRefType.RefTypeDefaultRetained
+  let _ = DefaultOwnershipConventionOnCXXForeignRefType.returnRefTyDefRetained()
+  // CHECK: function_ref {{.*}}returnRefTyDefRetained{{.*}} : $@convention(c) () -> @owned DefaultOwnershipConventionOnCXXForeignRefType.RefTyDefRetained
 
-  let _ = DefaultOwnershipConventionOnCXXForegnRefType.returnRefTypeDefaultUnretained()
-  // CHECK: function_ref {{.*}}returnRefTypeDefaultUnretained{{.*}} : $@convention(c) () -> DefaultOwnershipConventionOnCXXForegnRefType.RefTypeDefaultUnretained
+  let _ = DefaultOwnershipConventionOnCXXForeignRefType.returnRefTyDefUnretained()
+  // CHECK: function_ref {{.*}}returnRefTyDefUnretained{{.*}} : $@convention(c) () -> DefaultOwnershipConventionOnCXXForeignRefType.RefTyDefUnretained
 
-  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultUnRetained()
-  // CHECK: function_ref {{.*}}returnRefTypeDefaultUnRetained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTypeDefaultUnRetained
+  let _ = FunctionAnnotationHasPrecedence.returnRefTyDefUnretained()
+  // CHECK: function_ref {{.*}}returnRefTyDefUnretained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTyDefUnretained
 
-  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultUnRetainedAnnotatedRetained()
-  // CHECK: function_ref {{.*}}returnRefTypeDefaultUnRetainedAnnotatedRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTypeDefaultUnRetained
+  let _ = FunctionAnnotationHasPrecedence.returnRefTyDefUnretainedAnnotatedRetained()
+  // CHECK: function_ref {{.*}}returnRefTyDefUnretainedAnnotatedRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTyDefUnretained
 
-  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultRetained()
-  // CHECK: function_ref {{.*}}returnRefTypeDefaultRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTypeDefaultRetained
+  let _ = FunctionAnnotationHasPrecedence.returnRefTyDefRetained()
+  // CHECK: function_ref {{.*}}returnRefTyDefRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTyDefRetained
 
-  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultRetainedAnnotatedUnRetained()
-  // CHECK: function_ref {{.*}}returnRefTypeDefaultRetainedAnnotatedUnRetained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTypeDefaultRetained
+  let _ = FunctionAnnotationHasPrecedence.returnRefTyDefRetainedAnnotatedUnRetained()
+  // CHECK: function_ref {{.*}}returnRefTyDefRetainedAnnotatedUnRetained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTyDefRetained
 
   let _ = DefaultOwnershipInheritance.returnBaseType()
   // CHECK: function_ref {{.*}}returnBaseType{{.*}} : $@convention(c) () -> @owned DefaultOwnershipInheritance.BaseType

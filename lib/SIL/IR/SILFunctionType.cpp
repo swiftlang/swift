@@ -1373,12 +1373,13 @@ public:
 
     if (const auto *ptrType =
             llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
-      if (clang::RecordDecl *clangRecordDecl =
+      if (const clang::RecordDecl *clangRecordDecl =
               ptrType->getPointeeType()->getAsRecordDecl())
         return importer::matchSwiftAttrConsideringInheritance<ResultConvention>(
             clangRecordDecl,
-            {{"returns_unretained_by_default", ResultConvention::Unowned},
-             {"returns_retained_by_default", ResultConvention::Owned}});
+            {{"returned_as_unretained_by_convention",
+              ResultConvention::Unowned},
+             {"returned_as_retained_by_convention", ResultConvention::Owned}});
     }
     return std::nullopt;
   }

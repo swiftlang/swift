@@ -3667,11 +3667,11 @@ namespace {
           if (const auto *returnPtrTy = retType->getAs<clang::PointerType>()) {
             if (clang::RecordDecl *returnRecordDecl =
                     returnPtrTy->getPointeeType()->getAsRecordDecl()) {
-              if (auto match = importer::matchSwiftAttrConsideringInheritance<bool>(
+              if (importer::matchSwiftAttrConsideringInheritance<bool>(
                       returnRecordDecl,
                       {
-                          {"returns_retained_by_default", true},
-                          {"returns_unretained_by_default", true},
+                          {"returned_as_retained_by_convention", true},
+                          {"returned_as_unretained_by_convention", true},
                       }))
                 unannotatedAPIWarningNeeded = false;
             }
