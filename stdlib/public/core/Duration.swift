@@ -250,6 +250,17 @@ extension Duration {
     let highScaled = high * 1_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
+  
+  /// Construct a `Duration` given a number of seconds nanoseconds as a
+  /// `Double` by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .nanoseconds(382.9)
+  ///
+  /// - Returns: A `Duration` representing a given number of nanoseconds.
+  @available(SwiftStdlib 6.2, *)
+  public static func nanoseconds(_ nanoseconds: Double) -> Duration {
+    Duration(nanoseconds, scale: 1_000_000_000)
+  }
 }
 
 @available(SwiftStdlib 5.7, *)
