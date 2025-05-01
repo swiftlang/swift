@@ -788,6 +788,11 @@ bool declIsCxxOnly(const Decl *decl);
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
 
+/// Match a `[[swift_attr("...")]]` annotation on the given Clang decl.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The value for the first matching attribute, or `std::nullopt`.
 template <typename T>
 std::optional<T>
 matchSwiftAttr(const clang::Decl *decl,
@@ -806,6 +811,11 @@ matchSwiftAttr(const clang::Decl *decl,
   return std::nullopt;
 }
 
+/// Like `matchSwiftAttr`, but also searches C++ base classes.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The matched value from this decl or its bases, or `std::nullopt`.
 template <typename T>
 std::optional<T> matchSwiftAttrConsideringInheritance(
     const clang::Decl *decl,
