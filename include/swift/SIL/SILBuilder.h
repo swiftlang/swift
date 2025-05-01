@@ -2383,6 +2383,11 @@ public:
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
+  EndCOWMutationAddrInst *createEndCOWMutationAddr(SILLocation Loc,
+                                                   SILValue operand) {
+    return insert(new (getModule()) EndCOWMutationAddrInst(
+        getSILDebugLocation(Loc), operand));
+  }
   DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
