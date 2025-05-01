@@ -120,8 +120,9 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   }
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement,
+      [&](InFlightSubstitution &IFS, Type original,
           ProtocolDecl *protoType) -> ProtocolConformanceRef {
+    auto replacement = original.subst(IFS);
     assert(!replacement->is<GenericTypeParamType>());
 
     if (replacement->hasError() ||
@@ -2647,18 +2648,8 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
-
       auto subMap = SubstitutionMap::get(
-          genericSig,
-          [&](SubstitutableType *type) -> Type {
-            assert(type->isEqual(genericSig.getGenericParams()[0]));
-            return valueType;
-          },
-          [&](CanType origType, Type replacementType,
-              ProtocolDecl *protoType) -> ProtocolConformanceRef {
-            assert(bridgedToObjectiveCConformance);
-            return bridgedToObjectiveCConformance;
-          });
+          genericSig, valueType, bridgedToObjectiveCConformance);
 
       ConcreteDeclRef fnSpecRef(fn, subMap);
 

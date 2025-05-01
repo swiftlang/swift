@@ -294,9 +294,9 @@ public:
   explicit LookUpConformanceInSubstitutionMap(SubstitutionMap Subs)
     : Subs(Subs) {}
 
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 struct OverrideSubsInfo {
@@ -326,8 +326,8 @@ struct LookUpConformanceInOverrideSubs {
   explicit LookUpConformanceInOverrideSubs(const OverrideSubsInfo &info)
     : info(info) {}
 
-  ProtocolConformanceRef operator()(CanType type,
-                                    Type substType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
                                     ProtocolDecl *proto) const;
 };
 
@@ -338,9 +338,9 @@ struct OuterSubstitutions {
   unsigned depth;
 
   Type operator()(SubstitutableType *type) const;
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 } // end namespace swift
