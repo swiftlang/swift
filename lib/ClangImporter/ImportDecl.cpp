@@ -4480,11 +4480,17 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
-      if (decl->hasAttr<clang::NoUniqueAddressAttr>()) {
+      if (!Impl.importSymbolicCXXDecls &&
+          decl->hasAttr<clang::NoUniqueAddressAttr>()) {
         if (const auto *rd = decl->getType()->getAsRecordDecl()) {
           // Clang can store the next field in the padding of this one. Swift
           // does not support this yet so let's not import the field and
           // represent it with an opaque blob in codegen.
+          //
+          // This check is not relevant when importing the decl symbolically
+          // (since that isn't used for codegen). In fact, we need to avoid this
+          // check because symbolic imports can expose us to dependent types
+          // whose ASTRecordLayout cannot be queried.
           const auto &fieldLayout =
               decl->getASTContext().getASTRecordLayout(rd);
           auto &clangCtx = decl->getASTContext();

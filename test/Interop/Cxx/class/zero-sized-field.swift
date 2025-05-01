@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
+// RUN: %empty-directory(%t/index)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xfrontend -index-store-path -Xfrontend %t/index)
 //
 // REQUIRES: executable_test
 
@@ -58,6 +59,20 @@ FieldsTestSuite.test("Non-standard-layout field padding reused") {
   var s = ReuseNonStandardLayoutFieldPadding()
   s.c = 5
   expectEqual(Int(s.offset()),  MemoryLayout<ReuseNonStandardLayoutFieldPadding>.offset(of: \.c)!)
+  expectEqual(s.c, 5)
+  expectEqual(s.get_c(), 5)
+  s.set_c(6)
+  expectEqual(s.c, 6)
+  expectEqual(s.get_c(), 6)
+  let s2 = s
+  expectEqual(s2.c, 6)
+  expectEqual(s2.get_c(), 6)
+}
+
+FieldsTestSuite.test("Non-standard-layout field padding in templated class reused") {
+  var s = ReuseDependentFieldPaddingInt()
+  s.c = 5
+  expectEqual(Int(s.offset()),  MemoryLayout<ReuseDependentFieldPaddingInt>.offset(of: \.c)!)
   expectEqual(s.c, 5)
   expectEqual(s.get_c(), 5)
   s.set_c(6)
