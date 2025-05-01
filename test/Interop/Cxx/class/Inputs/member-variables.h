@@ -67,6 +67,18 @@ struct ReuseNonStandardLayoutFieldPadding {
   int offset() const { return (char *) &this->c - (char *) this; }
 };
 
+template<typename T>
+struct ReuseDependentFieldPadding {
+  [[no_unique_address]] struct { private: T x; public: char pad_me; } a;
+  char c;
+  char get_c() const { return c; }
+  void set_c(char c) { this->c = c; }
+  // C-style implementation of offsetof() to avoid non-standard-layout warning
+  int offset() const { return (char *) &this->c - (char *) this; }
+};
+
+typedef ReuseDependentFieldPadding<int> ReuseDependentFieldPaddingInt;
+
 inline int takesZeroSizedInCpp(HasZeroSizedField x) {
   return x.a;
 }
