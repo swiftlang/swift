@@ -35,12 +35,20 @@ internal func checkIsolated<E>(executor: E) where E: SerialExecutor {
   executor.checkIsolated()
 }
 
+/// Invokes the swift function isIsolatingCurrentContext on the given executor,
+/// and converts between the `Optional<Bool>` into:
+///     -1: unknown
+///      0: not isolated
+///      1: isolated
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("_swift_task_isIsolatingCurrentContextSwift")
-internal func isIsolatingCurrentContext<E>(executor: E) -> Bool
-  where E: SerialExecutor
-{
-  return executor.isIsolatingCurrentContext()
+internal func isIsolatingCurrentContext<E>(executor: E) -> Int8
+  where E: SerialExecutor {
+  switch executor.isIsolatingCurrentContext() {
+  case nil: -1 // unknown
+  case .some(false): 0 // not isolated
+  case .some(true): 1 // isolated!
+  }
 }
 
 @available(SwiftStdlib 6.2, *)

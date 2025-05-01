@@ -401,12 +401,13 @@ Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4
 
 Added: _swift_task_startSynchronously
 
+// isIsolatingCurrentContext
 Added: _swift_task_invokeSwiftIsIsolatingCurrentContext
 Added: _swift_task_isIsolatingCurrentContext
 Added: _swift_task_isIsolatingCurrentContext_hook
-Added: _$sScf25isIsolatingCurrentContextSbyFTj
-Added: _$sScf25isIsolatingCurrentContextSbyFTq
-Added: _$sScfsE25isIsolatingCurrentContextSbyF
+Added: _$sScfsE25isIsolatingCurrentContextSbSgyF
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTj
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through

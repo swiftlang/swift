@@ -37,6 +37,41 @@ final class IsIsolatingExecutor: SerialExecutor {
 }
 
 @available(SwiftStdlib 6.2, *)
+final class UnknownIfIsIsolatingExecutor: SerialExecutor {
+  init() {}
+
+  func enqueue(_ job: consuming ExecutorJob) {
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
+  }
+
+  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+
+  func checkIsolated() {
+    print("called: checkIsolated")
+  }
+
+  func isIsolatingCurrentContext() -> Bool? {
+    print("called: isIsolatingCurrentContext; return nil")
+    return nil
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+final class NoChecksImplementedExecutor: SerialExecutor {
+  init() {}
+
+  func enqueue(_ job: consuming ExecutorJob) {
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
+  }
+
+  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
 final class JustCheckIsolatedExecutor: SerialExecutor {
   init() {}
 
@@ -65,37 +100,31 @@ actor ActorOnIsCheckImplementingExecutor<Ex: SerialExecutor> {
     self.executor.asUnownedSerialExecutor()
   }
 
-  nonisolated func checkPreconditionIsolated() async {
-    print("Before preconditionIsolated")
-    self.preconditionIsolated()
-    print("After preconditionIsolated")
-
-    print("Before assumeIsolated")
-    self.assumeIsolated { iso in
-      print("Inside assumeIsolated")
-    }
-    print("After assumeIsolated")
+  func checkIsIsolatingCurrentContext() async -> Bool? {
+    executor.isIsolatingCurrentContext()
   }
 }
 
 @main struct Main {
   static func main() async {
     let hasIsIsolatingCurrentContextExecutor = IsIsolatingExecutor()
-    let justCheckIsolatedExecutor = JustCheckIsolatedExecutor()
+    let hasIsCheckActor = ActorOnIsCheckImplementingExecutor(on: hasIsIsolatingCurrentContextExecutor)
+    let unknownIsIsolatingActor = ActorOnIsCheckImplementingExecutor(on: UnknownIfIsIsolatingExecutor())
 
-    print("do checkIsolated with executor which does NOT implement isIsolatingCurrentContext")
-    let checkIsolatedActor = ActorOnIsCheckImplementingExecutor(on: justCheckIsolatedExecutor)
-    await checkIsolatedActor.checkPreconditionIsolated()
-    // CHECK: Before preconditionIsolated
-    // CHECK-NOT: called: isIsolatingCurrentContext
-    // CHECK: called: checkIsolated
-    // CHECK-NOT: called: isIsolatingCurrentContext
-    // CHECK: After preconditionIsolated
+    let anyActor: any Actor = hasIsCheckActor
 
-    // CHECK: Before assumeIsolated
-    // CHECK-NOT: called: isIsolatingCurrentContext
+    anyActor._withSerialExecutor { se in
+      let outside = se.isIsolatingCurrentContext()
+      assert(outside == true) // This is just a mock executor impl that always returns "true" (it is lying)
+      // CHECK: called: isIsolatingCurrentContext
+    }
+
+    let inside = await hasIsCheckActor.checkIsIsolatingCurrentContext()
+    assert(inside == true)
+    // CHECK: called: isIsolatingCurrentContext
+
+    _ = unknownIsIsolatingActor.preconditionIsolated()
+    // CHECK: called: isIsolatingCurrentContext; return nil
     // CHECK: called: checkIsolated
-    // CHECK-NOT: called: isIsolatingCurrentContext
-    // CHECK: After assumeIsolated
   }
 }

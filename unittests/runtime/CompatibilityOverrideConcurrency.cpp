@@ -92,11 +92,11 @@ swift_task_checkIsolated_override(SerialExecutorRef executor,
 }
 
 SWIFT_CC(swift)
-static bool
+static int8_t
 swift_task_isIsolatingCurrentContext_override(SerialExecutorRef executor,
                                       swift_task_isIsolatingCurrentContext_original original) {
   Ran = true;
-  return true;
+  return 0;
 }
 
 SWIFT_CC(swift)
