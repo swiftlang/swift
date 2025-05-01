@@ -18,6 +18,7 @@
 
 #include "Error.h"
 #include "ExecutorBridge.h"
+#include "TaskPrivate.h"
 
 using namespace swift;
 
@@ -73,6 +74,15 @@ extern "C" SWIFT_CC(swift)
 void swift_dispatchAssertMainQueue() {
   dispatch_assert_queue(dispatch_get_main_queue());
 }
-#endif // SWIFT_CONCURRENCY_ENABLE_DISPATCH
+
+extern "C" SWIFT_CC(swift)
+void *swift_getDispatchQueueForExecutor(SerialExecutorRef executor) {
+  if (executor.getRawImplementation() == (uintptr_t)_swift_task_getDispatchQueueSerialExecutorWitnessTable()) {
+    return executor.getIdentity();
+  }
+  return nullptr;
+}
+
+#endif // SWIFT_CONCURRENCY_USES_DISPATCH
 
 #pragma clang diagnostic pop
