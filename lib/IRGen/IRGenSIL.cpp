@@ -1438,6 +1438,7 @@ public:
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i);
   void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
@@ -6364,6 +6365,10 @@ void IRGenSILFunction::visitBeginCOWMutationInst(BeginCOWMutationInst *i) {
 void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
   Explosion v = getLoweredExplosion(i->getOperand());
   setLoweredExplosion(i, v);
+}
+
+void IRGenSILFunction::visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i) {
+  // end_cow_mutation_addr is purely for SIL.
 }
 
 void IRGenSILFunction::visitDestroyNotEscapedClosureInst(

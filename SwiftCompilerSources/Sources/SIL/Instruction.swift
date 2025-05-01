@@ -1242,6 +1242,10 @@ final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction
   public var doKeepUnique: Bool { bridged.EndCOWMutationInst_doKeepUnique() }
 }
 
+final public class EndCOWMutationAddrInst : Instruction, UnaryInstruction {
+  public var address: Value { operand.value }
+}
+
 final public
 class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
