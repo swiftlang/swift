@@ -1059,7 +1059,7 @@ getWitnessMethodSubstitutions(
         paramType = paramType->withDepth(depth);
         return Type(paramType).subst(origSubMap);
       },
-      [&](CanType type, Type substType, ProtocolDecl *proto) {
+      [&](InFlightSubstitution &IFS, Type type, ProtocolDecl *proto) {
         auto *paramType = type->getRootGenericParam();
         unsigned depth = paramType->getDepth();
 
@@ -1082,7 +1082,7 @@ getWitnessMethodSubstitutions(
             return std::nullopt;
           }));
 
-          return baseSubMap.lookupConformance(type, proto);
+          return baseSubMap.lookupConformance(type->getCanonicalType(), proto);
         }
 
         depth = depth - baseDepth + 1;
@@ -1095,7 +1095,7 @@ getWitnessMethodSubstitutions(
           return std::nullopt;
         }));
 
-        return origSubMap.lookupConformance(type, proto);
+        return origSubMap.lookupConformance(type->getCanonicalType(), proto);
       });
 }
 
