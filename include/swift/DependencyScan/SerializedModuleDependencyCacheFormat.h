@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 9;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 1;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 2;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
