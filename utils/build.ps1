@@ -1175,6 +1175,16 @@ function Get-SwiftSDK {
   return ([IO.Path]::Combine((Get-PlatformRoot $OS), "Developer", "SDKs", "$Identifier.sdk"))
 }
 
+function Add-PythonDefines([hashtable] $Defines, [Hashtable] $Platform) {
+    $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
+    $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+
+    Add-KeyValueIfNew $Defines Python3_EXECUTABLE (Get-PythonExecutable);
+    Add-KeyValueIfNew $Defines Python3_INCLUDE_DIR "$PythonRoot\include";
+    Add-KeyValueIfNew $Defines Python3_LIBRARY "$PythonRoot\libs\$PythonLibName.lib";
+    Add-KeyValueIfNew $Defines Python3_ROOT_DIR $PythonRoot;
+}
+
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1217,7 +1227,7 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
 
-    Add-KeyValueIfNew $Defines Python3_EXECUTABLE (Get-PythonExecutable);
+    Add-PythonDefines $Defines $Platform
 
     if (($Platform.OS -ne [OS]::Windows) -or ($Platform.Architecture.CMakeName -ne $BuildPlatform.Architecture.CMakeName)) {
       Add-KeyValueIfNew $Defines CMAKE_SYSTEM_NAME $Platform.OS.ToString()
@@ -1763,9 +1773,6 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     LLVM_NATIVE_TOOL_DIR = $BuildTools;
     LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
     LLVM_USE_HOST_TOOLS = "NO";
-    Python3_INCLUDE_DIR = "$PythonRoot\include";
-    Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
-    Python3_ROOT_DIR = $PythonRoot;
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
