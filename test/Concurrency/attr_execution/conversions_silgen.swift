@@ -456,3 +456,15 @@ func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) asy
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   fn = { @concurrent _ in }
 }
+
+@MainActor
+func testNoIsolationTransfer() {
+  // CHECK: // Isolation: global_actor. type: MainActor
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen23testNoIsolationTransferyyF0D7ErasureL_yyyyYaYAcF : $@convention(thin) (@guaranteed @isolated(any) @async @callee_guaranteed () -> ()) -> ()
+  func testErasure(@_inheritActorContext _: @escaping @isolated(any) () async -> Void) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen23testNoIsolationTransferyyFyyYacfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> ()
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
+  testErasure { @concurrent in }
+}
