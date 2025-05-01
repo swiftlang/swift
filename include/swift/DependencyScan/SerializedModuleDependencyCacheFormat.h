@@ -80,7 +80,6 @@ using LinkLibrariesArrayIDField = IdentifierIDField;
 using MacroDependenciesArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
-using AuxiliaryFilesArrayIDField = IdentifierIDField;
 using SourceLocationIDArrayIDField = IdentifierIDField;
 
 /// The ID of the top-level block containing the dependency graph
@@ -204,8 +203,7 @@ using ModuleInfoLayout =
                    DependencyIDArrayIDField,       // importedClangModules
                    DependencyIDArrayIDField,       // crossImportOverlayModules
                    DependencyIDArrayIDField,       // swiftOverlayDependencies
-                   ModuleCacheKeyIDField,          // moduleCacheKey
-                   AuxiliaryFilesArrayIDField      // auxiliaryFiles
+                   ModuleCacheKeyIDField           // moduleCacheKey
                    >;
 
 using SwiftInterfaceModuleDetailsLayout =
