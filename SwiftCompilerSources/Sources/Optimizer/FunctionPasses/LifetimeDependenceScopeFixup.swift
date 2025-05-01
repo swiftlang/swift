@@ -124,8 +124,99 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     }
     let args = scopeExtension.findArgumentDependencies()
 
+    // If the scope cannot be extended to the caller, this must be the outermost dependency level.
+    // Insert end_cow_mutation_addr if needed.
+    if args.isEmpty {
+      createEndCOWMutationIfNeeded(lifetimeDep: newLifetimeDep, context)
+    }
+
     // Redirect the dependence base to the function arguments. This may create additional mark_dependence instructions.
     markDep.redirectFunctionReturn(to: args, context)
+  }
+}
+
+private extension Type {
+  func mayHaveMutableSpan(in function: Function, _ context: FunctionPassContext) -> Bool {
+    if hasArchetype {
+      return true
+    }
+    if isBuiltinType {
+      return false
+    }
+    // Only result types that are nominal can have a MutableSpan derived from an inout array access.
+    if nominal == nil {
+      return false
+    }
+    if nominal == context.swiftMutableSpan {
+      return true
+    }
+    if isStruct {
+      guard let fields = getNominalFields(in: function) else {
+        return false
+      }
+      return fields.contains { $0.mayHaveMutableSpan(in: function, context) }
+    }
+    if isTuple {
+      return tupleElements.contains { $0.mayHaveMutableSpan(in: function, context) }
+    }
+    if isEnum {
+      guard let cases = getEnumCases(in: function) else {
+        return true
+      }
+      return cases.contains { $0.payload?.mayHaveMutableSpan(in: function, context) ?? false }
+    }
+    // Classes cannot be ~Escapable, therefore cannot hold a MutableSpan.
+    if isClass {
+      return false
+    }
+    return false
+  }
+}
+
+/// Insert end_cow_mutation_addr for lifetime dependent values that maybe of type MutableSpan and depend on a mutable address.
+private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ context: FunctionPassContext) {
+  var scoped : ScopedInstruction
+
+  // Handle cases which generate mutable addresses: begin_access [modify] and yield &
+  switch lifetimeDep.scope {
+    case let .access(beginAccess):
+      if beginAccess.accessKind != .modify {
+        return
+      }
+      scoped = beginAccess
+    case let .yield(value):
+      let beginApply = value.definingInstruction as! BeginApplyInst
+      if value == beginApply.token {
+        return
+      }
+      if beginApply.convention(of: value as! MultipleValueInstructionResult) != .indirectInout {
+        return
+      }
+      scoped = beginApply
+    // None of the below cases can generate a mutable address.
+    case let .owned:
+      fallthrough
+    case let .borrowed:
+      fallthrough
+    case let .local:
+      fallthrough
+    case let .initialized:
+      fallthrough
+    case let .caller:
+      fallthrough
+    case let .global:
+      fallthrough
+    case let .unknown:
+      return
+  }
+
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) else {
+    return
+  }
+
+  for endInstruction in scoped.endInstructions {
+    let builder = Builder(before: endInstruction, context)
+    builder.createEndCOWMutationAddr(address: lifetimeDep.parentValue)
   }
 }
 
@@ -194,7 +285,7 @@ private extension MarkDependenceAddrInst {
   }
 }
 
-/// A scope extension is a set of nested scopes and their owners. The owner is a value that represents ownerhip of
+/// A scope extension is a set of nested scopes and their owners. The owner is a value that represents ownership of
 /// the outermost scopes, which cannot be extended; it limits how far the nested scopes can be extended.
 private struct ScopeExtension {
   let context: FunctionPassContext

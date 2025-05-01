@@ -9594,6 +9594,14 @@ public:
     sharedUInt8().EndCOWMutationInst.keepUnique = keepUnique;
   }
 };
+class EndCOWMutationAddrInst
+    : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationAddrInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  EndCOWMutationAddrInst(SILDebugLocation debugLoc, SILValue address)
+      : UnaryInstructionBase(debugLoc, address) {}
+};
 
 /// Given an escaping closure return true iff it has a non-nil context and the
 /// context has a strong reference count greater than 1.

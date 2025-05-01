@@ -215,6 +215,7 @@ public func registerSILClasses() {
   register(MoveValueInst.self)
   register(DropDeinitInst.self)
   register(EndCOWMutationInst.self)
+  register(EndCOWMutationAddrInst.self)
   register(ClassifyBridgeObjectInst.self)
   register(PartialApplyInst.self)
   register(ApplyInst.self)
