@@ -7069,8 +7069,8 @@ public:
   Type operator()(SubstitutableType *maybeOpaqueType) const;
 
   /// LookupConformanceFn
-  ProtocolConformanceRef operator()(CanType maybeOpaqueType,
-                                    Type replacementType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type maybeOpaqueType,
                                     ProtocolDecl *protocol) const;
 
   OpaqueSubstitutionKind
@@ -7108,8 +7108,8 @@ public:
   Type operator()(SubstitutableType *type) const;
 
   /// LookupConformanceFn
-  ProtocolConformanceRef operator()(CanType origType,
-                                    Type substType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type origType,
                                     ProtocolDecl *protocol) const;
 
 };

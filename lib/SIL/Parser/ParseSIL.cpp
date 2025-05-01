@@ -1876,9 +1876,10 @@ SubstitutionMap getApplySubstitutionsFromParsed(
         // Provide the replacement type.
         return parses[index].replacement;
       },
-      [&](CanType dependentType, Type replacementType,
+      [&](InFlightSubstitution &IFS, Type dependentType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
-        replacementType = replacementType->getReferenceStorageReferent();
+        auto replacementType = dependentType.subst(IFS)
+            ->getReferenceStorageReferent();
         if (auto conformance = lookupConformance(replacementType, proto))
           return conformance;
 

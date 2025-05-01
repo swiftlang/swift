@@ -85,16 +85,13 @@ RequirementEnvironment::RequirementEnvironment(
   // parameters of the requirement into a combined context that provides the
   // type parameters of the conformance context and the parameters of the
   // requirement.
-  auto selfType = cast<GenericTypeParamType>(
-      proto->getSelfInterfaceType()->getCanonicalType());
-
   reqToWitnessThunkSigMap = SubstitutionMap::get(reqSig,
-    [selfType, substConcreteType, depth, covariantSelf, &ctx]
+    [substConcreteType, depth, covariantSelf, &ctx]
     (SubstitutableType *type) -> Type {
       // If the conforming type is a class, the protocol 'Self' maps to
       // the class-constrained 'Self'. Otherwise, it maps to the concrete
       // type.
-      if (type->isEqual(selfType)) {
+      if (type->isEqual(ctx.TheSelfType)) {
         if (covariantSelf)
           return ctx.TheSelfType;
         return substConcreteType;
@@ -114,11 +111,12 @@ RequirementEnvironment::RequirementEnvironment(
       }
       return substGenericParam;
     },
-    [selfType, substConcreteType, conformance, conformanceDC, covariantSelf, &ctx](
-        CanType type, Type replacement, ProtocolDecl *proto)
+    [substConcreteType, conformance, conformanceDC, covariantSelf, &ctx](
+        InFlightSubstitution &IFS, Type type, ProtocolDecl *proto)
           -> ProtocolConformanceRef {
       // The protocol 'Self' conforms concretely to the conforming type.
-      if (type->isEqual(selfType)) {
+      if (type->isEqual(ctx.TheSelfType)) {
+        auto replacement = type.subst(IFS);
         ASSERT(covariantSelf || replacement->isEqual(substConcreteType));
 
         if (conformance) {
@@ -148,7 +146,7 @@ RequirementEnvironment::RequirementEnvironment(
 
       // All other generic parameters come from the requirement itself
       // and conform abstractly.
-      return MakeAbstractConformanceForGenericType()(type, replacement, proto);
+      return MakeAbstractConformanceForGenericType()(IFS, type, proto);
     });
 
   // If the requirement itself is non-generic, the witness thunk signature
