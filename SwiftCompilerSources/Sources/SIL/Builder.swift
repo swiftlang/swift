@@ -575,6 +575,11 @@ public struct Builder {
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 
+  public func createEndCOWMutationAddr(address: Value) -> EndCOWMutationAddrInst {
+    let endMutation = bridged.createEndCOWMutationAddr(address.bridged)
+    return notifyNew(endMutation.getAs(EndCOWMutationAddrInst.self))
+  }
+
   public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceInst {
     let markDependence = bridged.createMarkDependence(value.bridged, base.bridged,
                                                       BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)

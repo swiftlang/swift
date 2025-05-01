@@ -1026,6 +1026,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
     return InlineCost::Free;
 
   // Turning the task reference into a continuation should be basically free.

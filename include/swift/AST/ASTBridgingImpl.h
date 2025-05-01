@@ -556,6 +556,10 @@ bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
 }
 
+bool BridgedASTType::isBuiltinType() const {
+  return unbridged()->isBuiltinType();
+}
+
 OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
   return {unbridged()->getNominalOrBoundGenericNominal()};
 }

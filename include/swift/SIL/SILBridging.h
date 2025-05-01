@@ -1283,6 +1283,7 @@ struct BridgedBuilder{
                                           BridgedASTType::MetatypeRepresentation representation) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutation(BridgedValue instance,
                                                                              bool keepUnique) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;                                                                             
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
 
