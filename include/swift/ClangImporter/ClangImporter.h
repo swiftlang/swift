@@ -786,6 +786,22 @@ bool declIsCxxOnly(const Decl *decl);
 
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
+
+/// For some \a templatedClass that inherits from \a base, whether they are
+/// derived from the same class template.
+///
+/// This kind of circular inheritance can happen when a templated class inherits
+/// from a specialization of itself, e.g.:
+///
+///     template <typename T> class C;
+///     template <> class C<void> { /* ... */ };
+///     template <typename T> class C<T> : C<void> { /* ... */ };
+///
+/// Checking for this kind of scenario is necessary for avoiding infinite
+/// recursion during symbolic imports (importSymbolicCXXDecls), where
+/// specialized class templates are instead imported as unspecialized.
+bool isSymbolicCircularBase(const clang::CXXRecordDecl *templatedClass,
+                            const clang::RecordDecl *base);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
