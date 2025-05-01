@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.29)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
-
 if($ENV{BUILD_NUMBER})
   math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
   set(BUILD_NUMBER ".${BUILD_NUMBER}")
@@ -11,6 +7,11 @@ endif()
 project(SwiftDifferentiation
   LANGUAGES Swift C
   VERSION 6.1.0${BUILD_NUMBER})
+
+set(CMAKE_POSITION_INDEPENDENT_CODE YES)
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Differentiation must build as a standalone project")
@@ -24,11 +25,13 @@ find_package(SwiftCore)
 find_package(math)
 
 include(gyb)
+include(AvailabilityMacros)
+include(CatalystSupport)
 
-option(SwiftDifferentiation_ENABLE_VECTOR_TYPES "Enable vector support"
+option(${PROJECT_NAME}_ENABLE_VECTOR_TYPES "Enable vector support"
   ${SwiftCore_ENABLE_VECTOR_TYPES})
 
-option(SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION "Enable library evolution"
+option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Enable library evolution"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 
 add_compile_options(
@@ -66,7 +69,26 @@ add_library(swift_Differentiation
   linker-support/magic-symbols-for-install-name.c)
 
 set_target_properties(swift_Differentiation PROPERTIES
-  Swift_MODULE_NAME _Differentiation
-  Swift_COMPILATION_MODE wholemodule)
+  Swift_MODULE_NAME _Differentiation)
+
+if(APPLE AND BUILD_SHARED_LIBS)
+  target_link_options(swift_Differentiation PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
+endif()
 
 target_link_libraries(swift_Differentiation PRIVATE swiftCore math)
+
+set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}/${Supplemental_ARCH_SUBDIR}>" CACHE STRING "")
+set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}>" CACHE STRING "")
+
+install(TARGETS swift_Differentiation
+  EXPORT SwiftSupplementalTargets
+  COMPONENT SwiftCore_runtime
+  ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+emit_swift_interface(swift_Differentiation)
+install_swift_interface(swift_Differentiation)
+
+# Configure plist creation for Darwin platforms.
+generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
+embed_manifest(swift_Differentation)
