@@ -113,7 +113,7 @@ actor ActorOnIsCheckImplementingExecutor<Ex: SerialExecutor> {
 
     let anyActor: any Actor = hasIsCheckActor
 
-    anyActor.withSerialExecutor { se in
+    anyActor._withSerialExecutor { se in
       let outside = se.isIsolatingCurrentContext()
       assert(outside == true) // This is just a mock executor impl that always returns "true" (it is lying)
       // CHECK: called: isIsolatingCurrentContext
