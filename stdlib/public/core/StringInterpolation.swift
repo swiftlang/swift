@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Represents a string literal with interpolations while it is being built up.
-/// 
-/// Do not create an instance of this type directly. It is used by the compiler
-/// when you create a string using string interpolation. Instead, use string
-/// interpolation to create a new string by including values, literals,
+/// Represents a string literal with interpolations while it's being built up.
+///
+/// You don't need to create an instance of this type directly. It's used by the
+/// compiler when you create a string using string interpolation. Instead, use
+/// string interpolation to create a new string by including values, literals,
 /// variables, or expressions enclosed in parentheses, prefixed by a
 /// backslash (`\(`...`)`).
 ///
@@ -68,8 +68,8 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   /// Creates a string interpolation with storage pre-sized for a literal
   /// with the indicated attributes.
   /// 
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// interpreting string interpolations.
+  /// You don't need to call this initializer directly. It's used by the
+  /// compiler when interpreting string interpolations.
   @inlinable
   public init(literalCapacity: Int, interpolationCount: Int) {
     let capacityPerInterpolation = 2
@@ -80,8 +80,8 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   
   /// Appends a literal segment of a string interpolation.
   /// 
-  /// Do not call this method directly. It is used by the compiler when
-  /// interpreting string interpolations.
+  /// You don't need to call this method directly. It's used by the compiler
+  /// when interpreting string interpolations.
   @inlinable
   public mutating func appendLiteral(_ literal: String) {
     literal.write(to: &self)
@@ -90,7 +90,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
   /// variables, or expressions enclosed in parentheses, prefixed by a
@@ -114,7 +114,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
   /// variables, or expressions enclosed in parentheses, prefixed by a
@@ -136,7 +136,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
   /// variables, or expressions enclosed in parentheses, prefixed by a
@@ -160,7 +160,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
   /// variables, or expressions enclosed in parentheses, prefixed by a
@@ -201,9 +201,10 @@ extension DefaultStringInterpolation {
   /// Interpolates the given optional value's textual representation, or the
   /// specified default string, into the string literal being created.
   ///
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations where you provide a `default`
-  /// parameter.
+  /// parameter. For example, the following code implicitly calls this method,
+  /// using the value of the `default` parameter when `value` is `nil`:
   ///
   ///     var age: Int? = 48
   ///     print("Your age is \(age, default: "unknown")")
@@ -231,9 +232,10 @@ extension DefaultStringInterpolation {
   /// Interpolates the given optional value's textual representation, or the
   /// specified default string, into the string literal being created.
   ///
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations where you provide a `default`
-  /// parameter.
+  /// parameter. For example, the following code implicitly calls this method,
+  /// using the value of the `default` parameter when `value` is `nil`:
   ///
   ///     var age: Int? = 48
   ///     print("Your age is \(age, default: "unknown")")
@@ -261,9 +263,10 @@ extension DefaultStringInterpolation {
   /// Interpolates the given optional value's textual representation, or the
   /// specified default string, into the string literal being created.
   ///
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations where you provide a `default`
-  /// parameter.
+  /// parameter. For example, the following code implicitly calls this method,
+  /// using the value of the `default` parameter when `value` is `nil`:
   ///
   ///     var age: Int? = 48
   ///     print("Your age is \(age, default: "unknown")")
@@ -291,9 +294,10 @@ extension DefaultStringInterpolation {
   /// Interpolates the given optional value's textual representation, or the
   /// specified default string, into the string literal being created.
   ///
-  /// You don't need to call this method directly. It is used by the compiler
+  /// You don't need to call this method directly. It's used by the compiler
   /// when interpreting string interpolations where you provide a `default`
-  /// parameter.
+  /// parameter. For example, the following code implicitly calls this method,
+  /// using the value of the `default` parameter when `value` is `nil`:
   ///
   ///     var age: Int? = 48
   ///     print("Your age is \(age, default: "unknown")")
@@ -342,9 +346,9 @@ extension DefaultStringInterpolation: TextOutputStream {
 extension String {
   /// Creates a new instance from an interpolated string literal.
   /// 
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you create a string using string interpolation. Instead, use string
-  /// interpolation to create a new string by including values, literals,
+  /// You don't need to call this initializer directly. It's used by the
+  /// compiler when you create a string using string interpolation. Instead, use
+  /// string interpolation to create a new string by including values, literals,
   /// variables, or expressions enclosed in parentheses, prefixed by a
   /// backslash (`\(`...`)`).
   ///
@@ -366,9 +370,9 @@ extension String {
 extension Substring {
   /// Creates a new instance from an interpolated string literal.
   /// 
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you create a string using string interpolation. Instead, use string
-  /// interpolation to create a new string by including values, literals,
+  /// You don't need to call this initializer directly. It's used by the
+  /// compiler when you create a string using string interpolation. Instead, use
+  /// string interpolation to create a new string by including values, literals,
   /// variables, or expressions enclosed in parentheses, prefixed by a
   /// backslash (`\(`...`)`).
   ///
