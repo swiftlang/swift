@@ -334,14 +334,14 @@ namespace DefaultOwnershipConventionOnCXXForeignRefType {
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:defRetain1")))
 __attribute__((swift_attr("release:defRelease1"))) 
-__attribute__((swift_attr("returned_as_retained_by_convention"))) RefTyDefRetained {};
+__attribute__((swift_attr("returned_as_retained_by_default"))) RefTyDefRetained {};
 
 RefTyDefRetained *returnRefTyDefRetained() { return new RefTyDefRetained(); }
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:defRetain2")))
 __attribute__((swift_attr("release:defRelease2"))) 
-__attribute__((swift_attr("returned_as_unretained_by_convention"))) RefTyDefUnretained {};
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
 
 RefTyDefUnretained *returnRefTyDefUnretained() {
   return new RefTyDefUnretained();
@@ -362,7 +362,7 @@ namespace FunctionAnnotationHasPrecedence {
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:defaultRetain1")))
 __attribute__((swift_attr("release:defaultRelease1")))
-__attribute__((swift_attr("returned_as_unretained_by_convention"))) RefTyDefUnretained {};
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
 
 RefTyDefUnretained *returnRefTyDefUnretained() {
   return new RefTyDefUnretained();
@@ -375,7 +375,7 @@ RefTyDefUnretained *returnRefTyDefUnretainedAnnotatedRetained()
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:defaultRetain2")))
 __attribute__((swift_attr("release:defaultRelease2"))) 
-__attribute__((swift_attr("returned_as_retained_by_convention"))) RefTyDefRetained {};
+__attribute__((swift_attr("returned_as_retained_by_default"))) RefTyDefRetained {};
 
 RefTyDefRetained *returnRefTyDefRetained() { return new RefTyDefRetained(); }
 RefTyDefRetained *returnRefTyDefRetainedAnnotatedUnRetained()
@@ -402,7 +402,7 @@ RefType *returnRefType() { return new RefType(); } // expected-warning {{'return
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:dretain")))
 __attribute__((swift_attr("release:drelease"))) 
-__attribute__((swift_attr("returned_as_retained_by_convention"))) RefTyDefRetained {};
+__attribute__((swift_attr("returned_as_retained_by_default"))) RefTyDefRetained {};
 
 RefTyDefRetained *returnRefTyDefRetained() { return new RefTyDefRetained(); }
 
@@ -421,7 +421,7 @@ namespace DefaultOwnershipInheritance {
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:baseRetain")))
 __attribute__((swift_attr("release:baseRelease")))
-__attribute__((swift_attr("returned_as_retained_by_convention"))) BaseType {};
+__attribute__((swift_attr("returned_as_retained_by_default"))) BaseType {};
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:derivedRetain")))
@@ -436,7 +436,7 @@ __attribute__((swift_attr("release:derivedRelease2"))) DerivedType2
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:derivedRetain3")))
 __attribute__((swift_attr("release:derivedRelease3"))) 
-__attribute__((swift_attr("returned_as_unretained_by_convention"))) DerivedOverride
+__attribute__((swift_attr("returned_as_unretained_by_default"))) DerivedOverride
     : public DerivedType {};
 
 BaseType *returnBaseType() { return new BaseType(); }
