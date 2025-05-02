@@ -1356,26 +1356,7 @@ public:
     if (!tl.getLoweredType().isForeignReferenceType())
       return std::nullopt;
 
-    if (auto result = importer::matchSwiftAttr<ResultConvention>(
-            decl, {{"returns_unretained", ResultConvention::Unowned},
-                   {"returns_retained", ResultConvention::Owned}}))
-      return result;
-
-    const clang::Type *returnTy = nullptr;
-    if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(decl))
-      returnTy = func->getReturnType().getTypePtrOrNull();
-    else if (const auto *method = llvm::dyn_cast<clang::ObjCMethodDecl>(decl))
-      returnTy = method->getReturnType().getTypePtrOrNull();
-    if (!returnTy)
-      return std::nullopt;
-    const clang::Type *desugaredReturnTy =
-        returnTy->getUnqualifiedDesugaredType();
-
-    return importer::matchSwiftAttrOnRecordPtr<ResultConvention>(
-        clang::QualType(desugaredReturnTy, 0),
-        {{"returned_as_unretained_by_default", ResultConvention::Unowned},
-         {"returned_as_retained_by_default", ResultConvention::Owned}});
-    return std::nullopt;
+    return importer::getCxxRefConventionWithAttrs(decl);
   }
 };
 

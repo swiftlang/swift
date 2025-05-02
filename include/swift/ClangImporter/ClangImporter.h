@@ -71,6 +71,7 @@ namespace dependencies {
 }
 
 namespace swift {
+enum class ResultConvention : uint8_t;
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
@@ -877,6 +878,14 @@ std::optional<T> matchSwiftAttrOnRecordPtr(
   return std::nullopt;
 }
 
+/// Determines the C++ reference ownership convention for the return value
+/// using `SWIFT_RETURNS_(UN)RETAINED` on the API; falls back to
+/// `SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT` on the pointee record type.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getCxxRefConventionWithAttrs(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
