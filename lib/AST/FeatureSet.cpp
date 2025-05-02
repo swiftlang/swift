@@ -560,6 +560,8 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   }
 }
 
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
+
 static bool usesFeatureCustomAvailability(Decl *decl) {
   for (auto attr : decl->getSemanticAvailableAttrs()) {
     if (attr.getDomain().isCustom())
