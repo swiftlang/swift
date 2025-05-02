@@ -424,6 +424,10 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
     visitedValues.insert(value)
   }
 
+  mutating func needWalk(for address: Value) -> Bool {
+    visitedValues.insert(address)
+  }
+
   mutating func walkUp(newLifetime: Value) -> WalkResult {
     if newLifetime.type.isAddress {
       return walkUp(address: newLifetime)
