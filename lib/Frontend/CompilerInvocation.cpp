@@ -816,7 +816,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       continue;
     }
 
-    // For all other features, the argument format is `<name>[:adoption]`.
+    // For all other features, the argument format is `<name>[:migrate]`.
     StringRef featureName;
     std::optional<StringRef> featureMode;
     std::tie(featureName, featureMode) = argValue.rsplit(':');
@@ -872,21 +872,21 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     if (featureMode) {
       if (isEnableFeatureFlag) {
-        const auto isAdoptable = feature->isAdoptable();
+        const auto isMigratable = feature->isMigratable();
 
         // Diagnose an invalid mode.
-        StringRef validModeName = "adoption";
+        StringRef validModeName = "migrate";
         if (*featureMode != validModeName) {
           Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
                          featureName,
                          /*didYouMean=*/validModeName,
-                         /*showDidYouMean=*/isAdoptable);
+                         /*showDidYouMean=*/isMigratable);
           continue;
         }
 
-        if (!isAdoptable) {
+        if (!isMigratable) {
           Diags.diagnose(SourceLoc(),
-                         diag::feature_does_not_support_adoption_mode,
+                         diag::feature_does_not_support_migration_mode,
                          featureName);
           continue;
         }
@@ -904,7 +904,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
-      Opts.enableFeature(*feature, /*forAdoption=*/featureMode.has_value());
+      Opts.enableFeature(*feature, /*forMigration=*/featureMode.has_value());
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in
@@ -2213,23 +2213,15 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
     Opts.MinimumAccessLevel = AccessLevel::Public;
   }
 
-  if (auto *A = Args.getLastArg(OPT_symbol_graph_allow_availability_platforms)) {
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_allow_availability_platforms,
+        OPT_symbol_graph_block_availability_platforms)) {
     llvm::SmallVector<StringRef> AvailabilityPlatforms;
     StringRef(A->getValue())
         .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
                /*KeepEmpty*/ false);
     Opts.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
         AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
-    Opts.AvailabilityIsBlockList = false;
-  } else if (auto *A = Args.getLastArg(
-                 OPT_symbol_graph_block_availability_platforms)) {
-    llvm::SmallVector<StringRef> AvailabilityPlatforms;
-    StringRef(A->getValue())
-        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
-               /*KeepEmpty*/ false);
-    Opts.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
-        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
-    Opts.AvailabilityIsBlockList = true;
+    Opts.AvailabilityIsBlockList = A->getOption().matches(OPT_symbol_graph_block_availability_platforms);
   }
 
   // default values for generating symbol graphs during a build
@@ -3789,10 +3781,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
                  OPT_disable_async_frame_push_pop_metadata,
                  Opts.EmitAsyncFramePushPopMetadata);
+
+  bool platformSupportsTypedMalloc = !llvm::Triple(Triple).isOSLinux() &&
+    !llvm::Triple(Triple).isOSWindows();
+
   Opts.EmitTypeMallocForCoroFrame =
   Args.hasFlag(OPT_enable_emit_type_malloc_for_coro_frame,
               OPT_disable_emit_type_malloc_for_coro_frame,
-              Opts.EmitTypeMallocForCoroFrame);
+              (Opts.EmitTypeMallocForCoroFrame && platformSupportsTypedMalloc));
+
   Opts.AsyncFramePointerAll = Args.hasFlag(OPT_enable_async_frame_pointer_all,
                                            OPT_disable_async_frame_pointer_all,
                                            Opts.AsyncFramePointerAll);

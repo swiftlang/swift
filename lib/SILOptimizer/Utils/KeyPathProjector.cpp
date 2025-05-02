@@ -674,8 +674,8 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
-  while (auto *upCast = dyn_cast<UpcastInst>(keyPath)) {
-    keyPath = lookThroughOwnershipInsts(upCast->getOperand());
+  while (isa<UpcastInst>(keyPath) || isa<OpenExistentialRefInst>(keyPath)) {
+    keyPath = lookThroughOwnershipInsts(cast<SingleValueInstruction>(keyPath)->getOperand(0));
   }
 
   return dyn_cast<KeyPathInst>(keyPath);

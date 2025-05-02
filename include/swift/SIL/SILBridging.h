@@ -465,6 +465,8 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  BRIDGED_INLINE bool isAccessor() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionTypeInContext() const;
@@ -549,6 +551,7 @@ struct BridgedFunction {
   typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
   typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
   typedef bool (* _Nonnull ArgumentMayReadFn)(BridgedFunction, BridgedOperand, BridgedValue);
+  typedef bool (* _Nonnull IsDeinitBarrierFn)(BridgedFunction);
 
   static void registerBridging(SwiftMetatype metatype,
               RegisterFn initFn, RegisterFn destroyFn,
@@ -556,7 +559,8 @@ struct BridgedFunction {
               CopyEffectsFn copyEffectsFn,
               GetEffectInfoFn effectInfoFn,
               GetMemBehaviorFn memBehaviorFn,
-              ArgumentMayReadFn argumentMayReadFn);
+              ArgumentMayReadFn argumentMayReadFn,
+              IsDeinitBarrierFn isDeinitBarrierFn);
 };
 
 struct OptionalBridgedFunction {
@@ -893,6 +897,7 @@ struct BridgedArgument {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
   BRIDGED_INLINE bool isReborrow() const;
   BRIDGED_INLINE bool FunctionArgument_isLexical() const;
+  BRIDGED_INLINE bool FunctionArgument_isClosureCapture() const;
   BRIDGED_INLINE void setReborrow(bool reborrow) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getVarDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;
@@ -1278,6 +1283,7 @@ struct BridgedBuilder{
                                           BridgedASTType::MetatypeRepresentation representation) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutation(BridgedValue instance,
                                                                              bool keepUnique) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;                                                                             
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
 

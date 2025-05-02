@@ -1705,12 +1705,6 @@ extension BinaryInteger {
   }
 }
 
-#if !$Embedded
-public typealias _LosslessStringConvertibleOrNone = LosslessStringConvertible
-#else
-public protocol _LosslessStringConvertibleOrNone {}
-#endif
-
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -1779,7 +1773,7 @@ public protocol _LosslessStringConvertibleOrNone {}
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
+public protocol FixedWidthInteger: BinaryInteger, LosslessStringConvertible
 where Magnitude: FixedWidthInteger & UnsignedInteger,
       Stride: FixedWidthInteger & SignedInteger {
   /// The number of bits used for the underlying binary representation of
@@ -3042,8 +3036,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned {
@@ -3058,8 +3051,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   }
 
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init?<T: BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source < (0 as T) {
@@ -3257,8 +3249,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth {
@@ -3275,8 +3266,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   }
 
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init?<T: BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth && source < Self.min {

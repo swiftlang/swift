@@ -912,8 +912,7 @@ RequirementMatch swift::matchWitness(
 
     case ThrownErrorSubtyping::Subtype:
       // If there were no type parameters, we're done.
-      if (!reqThrownError->hasTypeVariable() &&
-          !reqThrownError->hasTypeParameter())
+      if (!reqThrownError->hasTypeParameter())
         break;
 
       LLVM_FALLTHROUGH;
@@ -1035,11 +1034,7 @@ findMissingGenericRequirementForSolutionFix(
           return conformance->getType();
 
         ASSERT(gp->getDepth() > 0);
-        gp = GenericTypeParamType::get(gp->getParamKind(),
-                                       gp->getDepth() - 1,
-                                       gp->getIndex(),
-                                       gp->getValueType(),
-                                       ctx);
+        gp = gp->withDepth(gp->getDepth() - 1);
       }
 
       if (!sig)

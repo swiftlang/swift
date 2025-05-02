@@ -790,7 +790,8 @@ protected:
         auto immortalParam =
           std::find_if(afd->getParameters()->begin(),
                        afd->getParameters()->end(), [](ParamDecl *param) {
-                         return strcmp(param->getName().get(), "immortal") == 0;
+                         return param->getName().nonempty()
+                           && strcmp(param->getName().get(), "immortal") == 0;
                        });
         if (immortalParam != afd->getParameters()->end()) {
           diagnose(*immortalParam,
@@ -953,7 +954,7 @@ protected:
       Type paramTypeInContext =
         afd->mapTypeIntoContext(param->getInterfaceType());
       if (paramTypeInContext->hasError()) {
-        continue;
+        return;
       }
       auto kind = inferLifetimeDependenceKind(paramTypeInContext,
                                               param->getValueOwnership());
@@ -961,7 +962,7 @@ protected:
         diagnose(returnLoc,
                  diag::lifetime_dependence_cannot_infer_scope_ownership,
                  param->getParameterName().str(), diagnosticQualifier());
-        continue;
+        return;
       }
       targetDeps = std::move(targetDeps).add(paramIndex, *kind);
     }

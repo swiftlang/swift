@@ -2683,6 +2683,16 @@ public struct BodyMacroWithControlFlow: BodyMacro {
   }
 }
 
+struct ThrowCancellationMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    ["throw CancellationError()"]
+  }
+}
+
 @_spi(ExperimentalLanguageFeature)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(

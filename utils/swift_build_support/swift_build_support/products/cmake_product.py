@@ -133,6 +133,7 @@ class CMakeProduct(product.Product):
 
         llvm_target_arch = None
         cmake_osx_deployment_target = None
+        cmake_os_sysroot = None
         swift_host_triple = None
         swift_host_variant = platform
         swift_host_variant_sdk = platform.upper()
@@ -381,19 +382,6 @@ class CMakeProduct(product.Product):
             # in the compiler checks CMake performs
             swift_cmake_options.define('CMAKE_OSX_ARCHITECTURES', arch)
 
-        # We don't currently support building compiler-rt for cross-compile targets.
-        # It's not clear that's useful anyway.
-        if self.is_cross_compile_target(host_target):
-            llvm_cmake_options.define('LLVM_TOOL_COMPILER_RT_BUILD:BOOL', 'FALSE')
-            llvm_cmake_options.define('LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL', 'FALSE')
-        else:
-            llvm_cmake_options.define('LLVM_TOOL_COMPILER_RT_BUILD:BOOL',
-                                      cmake.CMakeOptions.true_false(
-                                          self.args.build_compiler_rt))
-            llvm_cmake_options.define('LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL',
-                                      cmake.CMakeOptions.true_false(
-                                          self.args.build_compiler_rt))
-
         # If we are asked to not generate test targets for LLVM and or Swift,
         # disable as many LLVM tools as we can. This improves compile time when
         # compiling with LTO.
@@ -428,4 +416,8 @@ class CMakeProduct(product.Product):
 
         llvm_cmake_options.define('COVERAGE_DB', self.args.coverage_db)
 
-        return (llvm_cmake_options, swift_cmake_options)
+        # This provides easier access to certain settings
+        # users may need without having to use CMakeOptions interface
+        relevant_options = {'CMAKE_OSX_SYSROOT': cmake_os_sysroot}
+
+        return (llvm_cmake_options, swift_cmake_options, relevant_options)

@@ -402,7 +402,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
       DeclAttrKind::AllowFeatureSuppression,
-      DeclAttrKind::Extensible,
   };
 
   return result;
@@ -1915,15 +1914,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     if (subMap.empty())
       return param;
 
-    return param.subst(
-      [&](SubstitutableType *type) -> Type {
-        if (cast<GenericTypeParamType>(type)->getDepth() < typeContextDepth)
-          return Type(type).subst(subMap);
-        return type;
-      },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return lookupConformance(substType, proto);
-      });
+    OuterSubstitutions replacer{subMap, typeContextDepth};
+    return param.subst(replacer, replacer,
+                       SubstFlags::PreservePackExpansionLevel);
   };
 
   /// Separate the explicit generic parameters from the implicit, opaque
@@ -2235,8 +2228,11 @@ bool isNonSendableExtension(const Decl *D) {
   if (!ED || !ED->isUnavailable())
     return false;
 
-  auto nonSendable =
-      ED->getExtendedNominal()->getAttrs().getEffectiveSendableAttr();
+  auto *NTD = ED->getExtendedNominal();
+  if (!NTD)
+    return false;
+
+  auto nonSendable = NTD->getAttrs().getEffectiveSendableAttr();
   if (!isa_and_nonnull<NonSendableAttr>(nonSendable))
     return false;
 
@@ -3302,6 +3298,13 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureExtensibleAttribute(PrintOptions &options,
+                                      llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Extensible);
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4325,13 +4328,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (proto && Options.TransformContext) {
         auto BaseType = Options.TransformContext->getBaseType();
         if (BaseType->getClassOrBoundGenericClass()) {
-          ResultTy = ResultTy.subst(
-            [&](Type t) -> Type {
-              if (t->isEqual(proto->getSelfInterfaceType()))
+          ResultTy = ResultTy.transformRec(
+            [&](TypeBase *t) -> std::optional<Type> {
+              if (isa<DependentMemberType>(t))
+                return t;
+              else if (t->isEqual(proto->getSelfInterfaceType()))
                 return DynamicSelfType::get(t, Ctx);
-              return t;
-            },
-            MakeAbstractConformanceForGenericType());
+              return std::nullopt;
+            });
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
         }
       }

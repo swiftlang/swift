@@ -3859,6 +3859,13 @@ bool swift::conflicting(ASTContext &ctx,
   if (sig1.IsFunction != sig2.IsFunction)
     return true;
 
+  // Gracefully handle the case where value generic arguments were introduced
+  // as a conflicting value with static variables of the same name.
+  if (sig1.IsGenericArg != sig2.IsGenericArg) {
+    *wouldConflictInSwift5 = true;
+    return true;
+  }
+
   // Variables always conflict with non-variables with the same signature.
   // (e.g variables with zero argument functions, variables with type
   //  declarations)
@@ -4037,6 +4044,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.IsMacro = isa<MacroDecl>(this);
+  signature.IsGenericArg = isa<GenericTypeParamDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 

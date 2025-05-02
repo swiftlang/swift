@@ -1557,7 +1557,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   }
 }
 
-// Make sure we handle the merge of the actor isolated and disconnected state
+// Make sure we handle the merge of the actor-isolated and disconnected state
 // appropriately.
 //
 // TODO: Since we are accessing the var field, we miss an
@@ -1745,8 +1745,8 @@ func sendableGlobalActorIsolated() {
   print(x) // expected-tns-note {{access can happen concurrently}}
 }
 
-// We do not get an error here since we are transferring x both times to a main
-// actor isolated thing function. We used to emit an error when using region
+// We do not get an error here since we are transferring x both times to a
+// MainActor-isolated thing function. We used to emit an error when using region
 // isolation since we would trip on the store_borrow we used to materialize the
 // value.
 func testIndirectParameterSameIsolationNoError() async {
@@ -1836,7 +1836,7 @@ func testThatGlobalActorTakesPrecedenceOverActorIsolationOnMethods() async {
   let a = MyActor()
   let ns = NonSendableKlass()
 
-  // 'ns' should be main actor isolated since useKlassMainActor is @MainActor
+  // 'ns' should be MainActor isolated since useKlassMainActor is @MainActor
   // isolated. Previously we would let MyActor take precedence here...
   a.useKlassMainActor(ns)
 
@@ -2024,6 +2024,33 @@ func testIsolatedParamInference() {
           self.s = S()
         }
       }
+    }
+  }
+}
+
+// We shouldn't error here since test2 is isolated to B since we are capturing
+// self and funcParam is also exposed to B's isolated since it is a parameter to
+// one of B's methods.
+func sendIsolatedValueToItsOwnIsolationDomain() {
+  class A {
+    func useValue() {}
+  }
+
+  func helper(_ x: @escaping () -> A) {}
+
+  actor B {
+    let field = A()
+
+    private func test(funcParam: A?) async {
+      helper {
+        if let funcParam {
+          return funcParam
+        } else {
+          return self.field
+        }
+      }
+
+      funcParam?.useValue()
     }
   }
 }

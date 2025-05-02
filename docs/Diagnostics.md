@@ -38,8 +38,23 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
 
 - When applicable, phrase diagnostics as rules rather than reporting that the compiler failed to do something. Example:
 
-  - Normal: "cannot call 'super.init' outside of an initializer"
-  - Better: "'super.init' cannot be called outside of an initializer"
+  - Normal: `cannot call 'super.init' outside of an initializer`
+  - Better: `'super.init' cannot be called outside of an initializer`
+
+- Use `'` to quote attributes, symbol names, and any other text that is
+  referred to as code or a token.
+  Some idiomatic Swift tokens, such as `protocol`, by themselves are or appear
+  in Swift terms of art.
+  Terms of art are written in plain text and must not be quoted.
+  If you are not certain whether a Swift token has an associated term of art,
+  consult the [book].
+  For example:
+  - `'mutating' is only valid on methods`, but
+    `cannot call mutating method on immutable value`.
+  - `'@autoclosure' only applies to function types`.
+  - `subscript access can throw but is not marked with 'try'`.
+  - `expected '{' after 'defer'`.
+  - `type 'S' does not conform to protocol 'Sequence'`.
 
 - When referring to attributes by name, use *either* `attribute 'foo'` or 
   `'@foo'`, rather than `attribute '@foo'`.
@@ -53,6 +68,8 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
   - "...here" (for a purely locational note)
 
 - If possible, it is best to include the name of the type or function that has the error, e.g. "non-actor type 'Nope' cannot ..." is better than "non-actor type cannot ...". It helps developers relate the error message to the specific type the error is about, even if the error would highlight the appropriate line / function in other ways. 
+
+[book]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language
 
 ### Locations and Highlights ###
 

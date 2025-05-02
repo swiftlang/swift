@@ -409,7 +409,6 @@ $cmake = Get-CMake
 $ninja = Get-Ninja
 
 $NugetRoot = "$BinaryCache\nuget"
-$LibraryRoot = "$ImageRoot\Library"
 
 ## Select and prepare build tools, platforms, parameters, etc.
 
@@ -673,7 +672,7 @@ function Get-TargetInfo([Hashtable] $Platform) {
   # Cache the result of "swiftc -print-target-info" as $Platform.Cache.TargetInfo
   $CacheKey = "TargetInfo"
   if (-not $Platform.Cache.ContainsKey($CacheKey)) {
-    Invoke-IsolatingEnvVars {
+    [void](Invoke-IsolatingEnvVars {
       $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
       $TargetInfo = & swiftc -target $Platform.Triple -print-target-info
       if ($LastExitCode -ne 0) {
@@ -681,7 +680,7 @@ function Get-TargetInfo([Hashtable] $Platform) {
       }
       $TargetInfo = $TargetInfo | ConvertFrom-JSON
       $Platform.Cache[$CacheKey] = $TargetInfo.target
-    }
+    })
   }
   return $Platform.Cache[$CacheKey]
 }
@@ -868,7 +867,7 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
 }
 
 function Get-Dependencies {
-  Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies ..." -ForegroundColor Cyan
+  Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
   $ProgressPreference = "SilentlyContinue"
 
   $WebClient = New-Object Net.WebClient
@@ -1354,7 +1353,7 @@ function Build-CMakeProject {
       }
       if ($UseBuiltCompilers.Contains("Swift")) {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
-        $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
+        $RuntimeBinaryCache = Get-ProjectBinaryCache $Platform Runtime
         $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
         switch ($Platform.OS) {
@@ -1536,9 +1535,9 @@ function Build-SPMProject {
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   Invoke-IsolatingEnvVars {
-    $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion)
+    $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion)
 
-    $env:Path = "$RuntimeInstallRoot\usr\bin;$($HostPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
+    $env:Path = "$RuntimeInstallRoot\usr\bin;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
     $env:SDKROOT = (Get-SwiftSDK Windows)
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
@@ -1574,7 +1573,7 @@ function Build-SPMProject {
       }
     }
 
-    Invoke-Program "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
+    Invoke-Program "$($BuildPlatform.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
@@ -1632,7 +1631,7 @@ function Build-CMark([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin (Get-CMarkBinaryCache $Platform) `
-    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
     -Platform $Platform `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
@@ -1675,7 +1674,7 @@ function Build-BuildTools([Hashtable] $Platform) {
       SWIFT_INCLUDE_APINOTES = "NO";
       SWIFT_INCLUDE_DOCS = "NO";
       SWIFT_INCLUDE_TESTS = "NO";
-      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
+      "cmark-gfm_DIR" = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\cmake";
     }
 }
 
@@ -1749,7 +1748,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
     CMAKE_Swift_FLAGS = $SwiftFlags;
-    LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\Windows\$($Platform.Architecture.LLVMName)\cmake\libxml2-2.11.5";
+    LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
     LLDB_PYTHON_EXT_SUFFIX = ".pyd";
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
@@ -1791,7 +1790,7 @@ function Build-Compilers([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
     -Bin (Get-ProjectBinaryCache $Platform Compilers) `
-    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C,CXX `
     -UsePinnedCompilers Swift `
@@ -1960,8 +1959,8 @@ function Build-LLVM([Hashtable] $Platform) {
 function Build-Sanitizers([Hashtable] $Platform) {
   $LLVMTargetCache = $(Get-ProjectBinaryCache $Platform LLVM)
   $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
-  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
-    throw "Unexpected version string output from llvm-lit.py"
+  if (-not $ToBatch -and -not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
+    throw "Unexpected version string '$LITVersionStr' output from llvm-lit.py"
   }
   $LLVMVersionMajor = $Matches.1
   $InstallTo = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
@@ -2004,36 +2003,28 @@ function Build-Sanitizers([Hashtable] $Platform) {
 }
 
 function Build-ZLib([Hashtable] $Platform) {
-  $ArchName = $Platform.Architecture.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin "$BinaryCache\$($Platform.Triple)\zlib-1.3.1" `
-    -InstallTo $LibraryRoot\zlib-1.3.1\usr `
+    -Bin "$BinaryCache\$($Platform.Triple)\zlib" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
-      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.3.1\usr\bin\$($Platform.OS.ToString())\$ArchName";
-      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$ArchName";
     }
 }
 
 function Build-XML2([Hashtable] $Platform) {
-  $ArchName = $Platform.Architecture.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
     -Bin "$BinaryCache\$($Platform.Triple)\libxml2-2.11.5" `
-    -InstallTo "$LibraryRoot\libxml2-2.11.5\usr" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C,CXX `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
-      CMAKE_INSTALL_BINDIR = "bin/$($Platform.OS.ToString())/$ArchName";
-      CMAKE_INSTALL_LIBDIR = "lib/$($Platform.OS.ToString())/$ArchName";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       LIBXML2_WITH_ICONV = "NO";
@@ -2075,8 +2066,6 @@ function Build-DS2([Hashtable] $Platform) {
 }
 
 function Build-CURL([Hashtable] $Platform) {
-  $ArchName = $Platform.Architecture.LLVMName
-
   $PlatformDefines = @{}
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
@@ -2086,14 +2075,13 @@ function Build-CURL([Hashtable] $Platform) {
 
   Build-CMakeProject `
     -Src $SourceCache\curl `
-    -Bin "$BinaryCache\$($Platform.Triple)\curl-8.9.1" `
-    -InstallTo "$LibraryRoot\curl-8.9.1\usr" `
+    -Bin "$BinaryCache\$($Platform.Triple)\curl" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
     -Defines ($PlatformDefines + @{
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
-      CMAKE_INSTALL_LIBDIR = "lib/$($Platform.OS.ToString())/$ArchName";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       BUILD_CURL_EXE = "NO";
@@ -2178,8 +2166,8 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_IDN = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LARGE_FILES = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
-      ZLIB_ROOT = "$LibraryRoot\zlib-1.3.1\usr";
-      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$ArchName\zlibstatic.lib";
+      ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
+      ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
     })
 }
 
@@ -2403,14 +2391,14 @@ function Build-Foundation {
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-      CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\cmake\CURL";
-      LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\cmake\libxml2-2.11.5";
+      CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+      LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
       ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\zlibstatic.lib"
+        "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
       } else {
-        "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\libz.a"
+        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
-      ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
+      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
       SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
@@ -2430,11 +2418,11 @@ function Test-Foundation {
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK Windows)/usr/include"
-    $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
-    $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
-    $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
-    $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
-    $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
+    $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include/libxml2"
+    $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:CURL_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:CURL_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include"
     Build-SPMProject `
       -Action Test `
       -Src $SourceCache\swift-corelibs-foundation `
@@ -2600,8 +2588,8 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
 function Build-SQLite([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-toolchain-sqlite `
-    -Bin "$BinaryCache\$($Platform.Triple)\sqlite-3.46.0" `
-    -InstallTo $LibraryRoot\sqlite-3.46.0\usr `
+    -Bin "$BinaryCache\$($Platform.Triple)\sqlite" `
+    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
     -Defines @{
@@ -2643,8 +2631,8 @@ function Build-Build([Hashtable] $Platform) {
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
     } + $ArchSpecificOptions)
 }
 
@@ -2674,8 +2662,8 @@ function Build-LLBuild([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       LLBUILD_SUPPORT_BINDINGS = "Swift";
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
     }
 }
 
@@ -2704,8 +2692,8 @@ function Test-LLBuild {
         FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin", "FileCheck.exe"));
         LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
-        SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
-        SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+        SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
       }
   }
 }
@@ -2739,8 +2727,8 @@ function Build-Driver([Hashtable] $Platform) {
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
       SWIFT_DRIVER_BUILD_TOOLS = "YES";
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform Compilers)\lib\cmake\llvm";
       Clang_DIR = "$(Get-ProjectBinaryCache $Platform Compilers)\lib\cmake\clang";
@@ -2829,13 +2817,14 @@ function Build-PackageManager([Hashtable] $Platform) {
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
+      SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
       SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
       SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
       SwiftCertificates_DIR = (Get-ProjectCMakeModules $Platform Certificates);
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
     }
 }
 
@@ -2953,6 +2942,7 @@ function Build-SourceKitLSP([Hashtable] $Platform) {
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
       SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
+      SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
       SwiftPM_DIR = (Get-ProjectCMakeModules $Platform PackageManager);
       LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
       IndexStoreDB_DIR = (Get-ProjectCMakeModules $Platform IndexStoreDB);
@@ -3130,7 +3120,8 @@ function Test-PackageManager() {
     -Src $SrcDir `
     -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
     -Platform $HostPlatform `
-    -Xcc "-I$LibraryRoot\sqlite-3.46.0\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.46.0\usr\lib"
+    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include" `
+    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib"
 }
 
 function Build-Installer([Hashtable] $Platform) {
@@ -3190,18 +3181,17 @@ try {
 Get-Dependencies
 
 if ($Clean) {
+  Remove-Item -Force -Recurse -Path "$BinaryCache\$($BuildPlatform.Triple)\" -ErrorAction Ignore
   Remove-Item -Force -Recurse -Path "$BinaryCache\$($HostPlatform.Triple)\" -ErrorAction Ignore
-
-  # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
-  Remove-Item -Force -Recurse -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
   foreach ($Platform in $WindowsSDKPlatforms) {
     Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
   }
   foreach ($Platform in $AndroidSDKPlatforms) {
     Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
   }
-
-  Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion)) -ErrorAction Ignore
+  Remove-Item -Force -Recurse -Path "$BinaryCache\1" -ErrorAction Ignore
+  Remove-Item -Force -Recurse -Path "$BinaryCache\5" -ErrorAction Ignore
+  Remove-Item -Force -Recurse -Path (Get-InstallDir $HostPlatform) -ErrorAction Ignore
 }
 
 if (-not $SkipBuild) {

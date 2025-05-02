@@ -131,7 +131,7 @@ extension AddressUseVisitor {
          is DestroyAddrInst, is DeallocStackInst, 
          is DeinitExistentialAddrInst,
          is IsUniqueInst, is MarkFunctionEscapeInst,
-         is PackElementSetInst:
+         is PackElementSetInst, is EndCOWMutationAddrInst:
       return leafAddressUse(of: operand)
 
     case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,

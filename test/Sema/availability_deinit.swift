@@ -49,7 +49,7 @@ class PotentiallyUnavailableDeinit {
 @available(macOS 51, *)
 func funcAvailable51() {}
 
-class AlwaysAvailable { // expected-note {{add @available attribute to enclosing class}}
+class AlwaysAvailable { // expected-note {{add '@available' attribute to enclosing class}}
   deinit {
     funcAvailable51() // expected-error {{'funcAvailable51()' is only available in macOS 51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}

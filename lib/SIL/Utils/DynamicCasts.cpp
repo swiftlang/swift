@@ -741,7 +741,10 @@ swift::classifyDynamicCast(SILFunction *function,
           if (targetClass->isSuperclassOf(sourceClass))
             return DynamicCastFeasibility::WillSucceed;
 
-          return DynamicCastFeasibility::WillFail;
+          // In case of ObjectiveC classes, the runtime type can differ from its
+          // declared type. Therefore a cast between (compile-time) unrelated
+          // classes may succeed at runtime.
+          return DynamicCastFeasibility::MaySucceed;
         }
       }
 
@@ -749,6 +752,12 @@ swift::classifyDynamicCast(SILFunction *function,
       auto hierarchyResult = classifyClassHierarchyCast(source, target);
       if (hierarchyResult != DynamicCastFeasibility::WillFail)
         return hierarchyResult;
+
+      // In case of ObjectiveC classes, the runtime type can differ from its
+      // declared type. Therefore a cast between (compile-time) unrelated
+      // classes may succeed at runtime.
+      if (sourceClass->hasClangNode())
+        return DynamicCastFeasibility::MaySucceed;
 
       // As a backup, consider whether either type is a CF class type
       // with an NS bridged equivalent.

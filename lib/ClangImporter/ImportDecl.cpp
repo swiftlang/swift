@@ -61,6 +61,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -4116,6 +4117,15 @@ namespace {
         if (ctordecl->isCopyConstructor() || ctordecl->isMoveConstructor())
           return nullptr;
 
+        // Don't import the generic ctors of std::span, rely on the ctors that
+        // we instantiate when conforming to the overlay. These generic ctors
+        // can cause crashes in codegen.
+        // FIXME: figure out why.
+        const auto *parent = ctordecl->getParent();
+        if (funcTemplate && parent->isInStdNamespace() &&
+            parent->getIdentifier() && parent->getName() == "span")
+          return nullptr;
+
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
@@ -4204,7 +4214,8 @@ namespace {
         return;
 
       // FIXME: support C functions imported as members.
-      if (result->getImportAsMemberStatus().isImportAsMember() &&
+      if (!isClangNamespace(result->getDeclContext()) &&
+          result->getImportAsMemberStatus().isImportAsMember() &&
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
@@ -4475,6 +4486,34 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+      if (!Impl.importSymbolicCXXDecls &&
+          decl->hasAttr<clang::NoUniqueAddressAttr>()) {
+        if (const auto *rd = decl->getType()->getAsRecordDecl()) {
+          // Clang can store the next field in the padding of this one. Swift
+          // does not support this yet so let's not import the field and
+          // represent it with an opaque blob in codegen.
+          //
+          // This check is not relevant when importing the decl symbolically
+          // (since that isn't used for codegen). In fact, we need to avoid this
+          // check because symbolic imports can expose us to dependent types
+          // whose ASTRecordLayout cannot be queried.
+          const auto &fieldLayout =
+              decl->getASTContext().getASTRecordLayout(rd);
+          auto &clangCtx = decl->getASTContext();
+          if (!decl->isZeroSize(clangCtx) &&
+              fieldLayout.getDataSize() != fieldLayout.getSize()) {
+            const auto *parent = decl->getParent();
+            auto currIdx = decl->getFieldIndex();
+            auto nextIdx = currIdx + 1;
+            const auto &parentLayout = clangCtx.getASTRecordLayout(parent);
+            if (parentLayout.getFieldCount() > nextIdx &&
+                parentLayout.getFieldOffset(nextIdx) <
+                    (parentLayout.getFieldOffset(currIdx) +
+                     clangCtx.toBits(fieldLayout.getSize())))
+              return nullptr;
+          }
+        }
+      }
       // Fields are imported as variables.
       std::optional<ImportedName> correctSwiftName;
       ImportedName importedName;
@@ -4718,7 +4757,7 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto dc = Impl.importDeclContextOf(
           decl, importedName.getEffectiveContext());
-      
+
       SmallVector<GenericTypeParamDecl *, 4> genericParams;
       for (auto &param : *decl->getTemplateParameters()) {
         auto genericParamDecl =
@@ -5501,7 +5540,7 @@ namespace {
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
                                               std::move(objcClass));
-      
+
       Identifier categoryName;
       if (!decl->getName().empty())
         categoryName = Impl.SwiftContext.getIdentifier(decl->getName());
@@ -9128,6 +9167,9 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   if (!ClangDecl)
     return;
 
+  if (ClangDecl->getNumParams() != MappedDecl->getParameters()->size())
+    return;
+
   llvm::SmallString<128> MacroString;
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
@@ -9543,7 +9585,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result = importDecl(UnderlyingDecl, version);
     SkippedOverTypedef = true;
   }
-  
+
   if (!Result) {
     SwiftDeclConverter converter(*this, version);
     Result = converter.Visit(ClangDecl);

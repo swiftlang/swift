@@ -164,6 +164,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
   PlatformExecutorWindows.swift
+  PlatformExecutorOpenBSD.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
@@ -285,7 +286,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         continue()
       endif()
 
-      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho")
+      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho" OR "${arch}" STREQUAL "armv7m" OR "${arch}" STREQUAL "armv7em")
         # Host is macOS with a macOS SDK. To be able to build the C++ Concurrency runtime for non-Darwin targets using the macOS SDK,
         # we need to pass some extra flags and search paths.
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
@@ -293,8 +294,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
 
     # lib/swift/embedded/_Concurrency.swiftmodule
@@ -316,9 +319,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
+        -ffunction-sections -fdata-sections -fno-exceptions -fno-cxx-exceptions -fno-unwind-tables
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
-      ARCHITECTURE "${mod}"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )

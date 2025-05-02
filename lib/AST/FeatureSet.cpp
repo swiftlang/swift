@@ -124,7 +124,7 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(AsyncCallerExecution)
+UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
@@ -560,6 +560,8 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   }
 }
 
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
+
 static bool usesFeatureCustomAvailability(Decl *decl) {
   for (auto attr : decl->getSemanticAvailableAttrs()) {
     if (attr.getDomain().isCustom())
@@ -622,6 +624,10 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
     return true;
 
   return false;
+}
+
+static bool usesFeatureExtensibleAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ExtensibleAttr>();
 }
 
 // ----------------------------------------------------------------------------

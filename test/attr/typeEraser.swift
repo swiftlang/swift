@@ -29,11 +29,11 @@ protocol Collection {
 @_typeEraser // expected-error {{expected '(' in '_typeEraser' attribute}}
 protocol A1 {}
 
-@_typeEraser() // expected-error {{expected a type name in @_typeEraser()}}
+@_typeEraser() // expected-error {{expected a type name in '@_typeEraser()'}}
 protocol A2 {}
 
 @_typeEraser(AnyP // expected-note {{to match this opening '('}}
-protocol A3 {} // expected-error {{expected ')' after type name for @_typeEraser}}
+protocol A3 {} // expected-error {{expected ')' after type name for '@_typeEraser'}}
 
 @_typeEraser(AnyP) // expected-error {{@_typeEraser may only be used on 'protocol' declarations}}
 func notAProtocol() {}

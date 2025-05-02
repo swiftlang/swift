@@ -1,4 +1,4 @@
-//===-- Sema/AsyncCallerExecutionMigration.h --------------------*- C++ -*-===//
+//===-- Sema/NonisolatedNonsendingByDefaultMigration.h ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file provides code migration support for the `AsyncCallerExecution`
-/// feature.
+/// This file provides code migration support for the
+/// `NonisolatedNonsendingByDefault` feature.
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_ASYNCCALLEREXECUTIONMIGRATION_H
-#define SWIFT_SEMA_ASYNCCALLEREXECUTIONMIGRATION_H
+#ifndef SWIFT_SEMA_NONISOLATEDNONSENDINGBYDEFAULTMIGRATION_H
+#define SWIFT_SEMA_NONISOLATEDNONSENDINGBYDEFAULTMIGRATION_H
 
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/ExtInfo.h"
@@ -29,20 +29,20 @@ class ValueDecl;
 class AbstractClosureExpr;
 
 /// Warns that the behavior of nonisolated async functions will change under
-/// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+/// `NonisolatedNonsendingByDefault` and suggests `@concurrent` to preserve the current
 /// behavior.
 void warnAboutNewNonisolatedAsyncExecutionBehavior(
     ASTContext &ctx, FunctionTypeRepr *node, FunctionTypeIsolation isolation);
 
 /// Warns that the behavior of nonisolated async functions will change under
-/// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+/// `NonisolatedNonsendingByDefault` and suggests `@concurrent` to preserve the current
 /// behavior.
 void warnAboutNewNonisolatedAsyncExecutionBehavior(ASTContext &ctx,
                                                    ValueDecl *node,
                                                    ActorIsolation isolation);
 
 /// Warns that the behavior of nonisolated async functions will change under
-/// `AsyncCallerExecution` and suggests `@concurrent` to preserve the current
+/// `NonisolatedNonsendingByDefault` and suggests `@concurrent` to preserve the current
 /// behavior.
 void warnAboutNewNonisolatedAsyncExecutionBehavior(ASTContext &ctx,
                                                    AbstractClosureExpr *node,
@@ -50,4 +50,4 @@ void warnAboutNewNonisolatedAsyncExecutionBehavior(ASTContext &ctx,
 
 } // end namespace swift
 
-#endif /* SWIFT_SEMA_ASYNCCALLEREXECUTIONMIGRATION_H */
+#endif /* SWIFT_SEMA_NONISOLATEDNONSENDINGBYDEFAULTMIGRATION_H */

@@ -1,0 +1,27 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name lifetime_depend_diagnose -enable-experimental-feature LifetimeDependence -swift-version 5 -enable-library-evolution
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+
+#if $LifetimeDependence
+public struct NE : ~Swift.Escapable {
+  @usableFromInline
+  internal let _pointer: Swift.UnsafeRawPointer?
+
+  @lifetime(borrow pointer)
+  public init(pointer: Swift.UnsafeRawPointer?) {
+    self._pointer = pointer
+  }
+}
+
+extension NE {
+  // This is illegal at the source level because NE.init is implicitly @lifetime(borrow),
+  // so we can't return it as dependent on @lifetime(copy self).
+  @lifetime(copy self)
+  @unsafe @_alwaysEmitIntoClient public func forward() -> NE {
+    return NE(pointer: _pointer)
+  }
+}
+#endif

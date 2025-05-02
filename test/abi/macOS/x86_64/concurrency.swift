@@ -404,15 +404,34 @@ Added: _$ss19DiscardingTaskGroupV05startB28SynchronouslyUnlessCancelled4name8pri
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously4name8priority9operationySSSg_ScPSgyyYaKYAcntF
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYaKYAcntF
 
+// isIsolatingCurrentContext
 Added: _swift_task_invokeSwiftIsIsolatingCurrentContext
 Added: _swift_task_isIsolatingCurrentContext
 Added: _swift_task_isIsolatingCurrentContext_hook
-Added: _$sScf25isIsolatingCurrentContextSbyFTj
-Added: _$sScf25isIsolatingCurrentContextSbyFTq
-Added: _$sScfsE25isIsolatingCurrentContextSbyF
+Added: _$sScfsE25isIsolatingCurrentContextSbSgyF
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTj
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
 
 // SwiftSettings
 Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ
+
+// Hashable for (Throwing)AsyncStream
+Added: _$sScS12ContinuationV7storageScS8_StorageCyx_Gvg
+Added: _$sScS12ContinuationV7storageScS8_StorageCyx_GvpMV
+Added: _$sScS8_StorageCMa
+Added: _$sScS8_StorageCMn
+Added: _$sScS8_StorageCMo
+Added: _$sScS8_StorageCMu
+Added: _$sScS8_StorageCfD
+Added: _$sScS8_StorageCfd
+Added: _$sScs12ContinuationV7storageScs8_StorageCyxq__Gvg
+Added: _$sScs12ContinuationV7storageScs8_StorageCyxq__GvpMV
+Added: _$sScs8_StorageCMa
+Added: _$sScs8_StorageCMn
+Added: _$sScs8_StorageCMo
+Added: _$sScs8_StorageCMu
+Added: _$sScs8_StorageCfD
+Added: _$sScs8_StorageCfd

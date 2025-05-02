@@ -107,14 +107,6 @@ nonisolated(nonsending)
 public func testExecutionCaller() async {}
 // CHECK: nonisolated(nonsending) public func testExecutionCaller() async
 
-// CHECK-NOT: @extensible
-// CHECK: public enum TestExtensible
-@extensible
-public enum TestExtensible {
-  case a
-  case b
-}
-
 public struct TestPlacementOfAttrsAndSpecifiers {
   // CHECK: public func test1<T>(_: sending @autoclosure () -> T)
   public func test1<T>(_: sending @autoclosure () -> T) {}

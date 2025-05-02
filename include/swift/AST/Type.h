@@ -88,9 +88,9 @@ struct QueryTypeSubstitutionMap {
 };
 
 /// Function used to resolve conformances.
-using GenericFunction = auto(CanType dependentType,
-                             Type conformingReplacementType,
-                             ProtocolDecl *conformedProtocol)
+using GenericFunction = auto(InFlightSubstitution &IFS,
+                             Type dependentType,
+                             ProtocolDecl *proto)
                             -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
@@ -100,9 +100,9 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule() {}
 
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -110,9 +110,9 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
   
 /// Flags that can be passed when substituting into a type.

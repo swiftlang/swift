@@ -135,7 +135,22 @@ extension _ArrayBuffer {
 #endif
     return isUnique
   }
-  
+
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+   @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutationUnchecked() -> Bool {
+    let isUnique: Bool
+    if !_isClassOrObjCExistential(Element.self) {
+      isUnique = _storage.beginCOWMutationUnflaggedNative()
+    } else if !_storage.beginCOWMutationNative() {
+      return false
+    } else {
+      isUnique = _isNative
+    }
+    return isUnique
+  }
+#endif
+
   /// Puts the buffer in an immutable state.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.

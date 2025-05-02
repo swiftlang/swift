@@ -48,11 +48,11 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
   auto printFeature = [&out](const Feature &feature) {
     out << "      ";
     out << "{ \"name\": \"" << feature.getName() << "\"";
-    if (feature.isAdoptable()) {
+    if (feature.isMigratable()) {
       out << ", \"migratable\": true";
     }
     if (auto version = feature.getLanguageVersion()) {
-      out << ", \"enabled_in\": " << *version;
+      out << ", \"enabled_in\": \"" << *version << "\"";
     }
     out << " }";
   };

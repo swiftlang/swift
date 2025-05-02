@@ -17,8 +17,11 @@ struct RunToolchains: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "run",
     discussion: """
-    Run a toolchain like bisect would. Passed the environment variables:
-    \(environmentVariables)
+      Run and determine success/failure of a script against a specified snapshot
+      like the bisect command would. Used to determine the start/end bisect
+      dates to pass to the bisect command. The script is passed paths into the
+      downloaded snapshot via environment variables and is expected to compile
+      and or run swift programs using the snapshot artifacts.
     """)
 
   @Flag var platform: Platform = .osx
@@ -34,8 +37,8 @@ struct RunToolchains: AsyncParsableCommand {
 
   @Option(
     help: """
-      The script that should be run. The environment variable
-      SWIFT_EXEC is used by the script to know where swift-frontend is
+      The script that should be run. It should run a specific swift compilation and
+      or program. Paths into the snapshots are passed in via the environment variables \(environmentVariables).
       """)
   var script: String
 

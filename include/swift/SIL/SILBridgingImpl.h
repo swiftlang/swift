@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -587,6 +588,11 @@ bool BridgedArgument::FunctionArgument_isLexical() const {
   return llvm::cast<swift::SILFunctionArgument>(getArgument())->getLifetime().isLexical();
 }
 
+bool BridgedArgument::FunctionArgument_isClosureCapture() const {
+  return llvm::cast<swift::SILFunctionArgument>(
+    getArgument())->isClosureCapture();
+}
+
 OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
   return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
 }
@@ -660,6 +666,18 @@ BridgedStringRef BridgedFunction::getName() const {
 
 BridgedLocation BridgedFunction::getLocation() const {
   return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())}; 
+}
+
+bool BridgedFunction::isAccessor() const {
+  if (auto *valDecl = getFunction()->getDeclRef().getDecl()) {
+    return llvm::isa<swift::AccessorDecl>(valDecl);
+  }
+  return false;
+}
+
+BridgedStringRef BridgedFunction::getAccessorName() const {
+  auto *accessorDecl  = llvm::cast<swift::AccessorDecl>(getFunction()->getDeclRef().getDecl());
+  return accessorKindName(accessorDecl->getAccessorKind());
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
@@ -2496,6 +2514,12 @@ BridgedInstruction BridgedBuilder::createMetatype(BridgedCanType instanceType,
 BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, bool keepUnique) const {
   return {unbridged().createEndCOWMutation(regularLoc(), instance.getSILValue(),
                                            keepUnique)};
+}
+
+BridgedInstruction
+BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
+  return {unbridged().createEndCOWMutationAddr(regularLoc(),
+                                               instance.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {

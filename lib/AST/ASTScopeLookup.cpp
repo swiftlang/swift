@@ -703,42 +703,24 @@ lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
   return nullptr;
 }
 
-static std::pair<CatchNode, const BraceStmtScope *>
-getCatchNodeBody(const ASTScopeImpl *scope, CatchNode node) {
-  const auto &children = scope->getChildren();
-  if (children.empty())
-    return { CatchNode(), nullptr };
-
-  auto stmt = dyn_cast<BraceStmtScope>(children[0]);
-  if (!stmt || stmt->getStmt()->empty())
-    return { CatchNode(), nullptr };
-
-  return std::make_pair(node, stmt);
-}
-
 /// Retrieve the catch node associated with this scope, if any.
-static std::pair<CatchNode, const BraceStmtScope *>
-getCatchNode(const ASTScopeImpl *scope) {
+static CatchNode getCatchNode(const ASTScopeImpl *scope) {
   // Closures introduce a catch scope for errors initiated in their body.
   if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
-    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr)) {
-      return getCatchNodeBody(scope, const_cast<ClosureExpr *>(closure));
-    }
+    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr))
+      return closure;
   }
 
   // Functions introduce a catch scope for errors initiated in their body.
-  if (auto function = dyn_cast<FunctionBodyScope>(scope)) {
-    return getCatchNodeBody(
-        scope, const_cast<AbstractFunctionDecl *>(function->decl));
-  }
+  if (auto function = dyn_cast<FunctionBodyScope>(scope))
+    return function->decl;
 
   // Do..catch blocks introduce a catch scope for errors initiated in the `do`
   // body.
-  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope)) {
-    return getCatchNodeBody(scope, const_cast<DoCatchStmt *>(doCatch->stmt));
-  }
+  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope))
+    return doCatch->stmt;
 
-  return { CatchNode(), nullptr };
+  return CatchNode();
 }
 
 /// Check whether the given location precedes the start of the catch location
@@ -767,15 +749,22 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
-  // Look for a body scope that's the
+  // Look for a body scope that's the direct descendent of a catch node.
   const BraceStmtScope *innerBodyScope = nullptr;
   for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
-    auto caught = getCatchNode(scope);
-    if (caught.first && caught.second == innerBodyScope &&
-        !locationIsPriorToStartOfCatchScope(loc, caught.first)) {
-      return caught.first;
+    if (innerBodyScope && innerBodyScope->getParent() == scope) {
+      // For a macro expansion, we may have an intermediate source file scope,
+      // we can look through it.
+      auto catchScope = scope;
+      if (auto *sfScope = dyn_cast<ASTSourceFileScope>(catchScope)) {
+        if (auto parent = sfScope->getParent())
+          catchScope = parent.get();
+      }
+      auto caught = getCatchNode(catchScope);
+      if (caught && !locationIsPriorToStartOfCatchScope(loc, caught))
+          return caught;
     }
 
     // If this is a try scope for a try! or try?, it catches the error.
