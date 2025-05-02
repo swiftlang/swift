@@ -223,6 +223,21 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
+  public var storageIsLexical: Bool {
+    switch self {
+    case .argument(let arg):
+      return arg.isLexical
+    case .stack(let allocStack):
+      return allocStack.isLexical
+    case .global:
+      return true
+    case .box, .class, .tail:
+      return reference!.referenceRoot.isLexical
+    case .yield, .pointer, .index, .storeBorrow, .unidentified:
+      return false
+    }
+  }
+
   /// Returns true if it's guaranteed that this access has the same base address as the `other` access.
   ///
   /// `isEqual` abstracts away the projection instructions that are included as part of the AccessBase:
