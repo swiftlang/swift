@@ -1097,9 +1097,6 @@ public:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
 
-  /// Return a set of all possible filesystem locations where modules can be found.
-  llvm::StringSet<> getAllModuleSearchPathsSet() const;
-
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
