@@ -829,7 +829,9 @@ final public
 class DeinitExistentialValueInst : Instruction {}
 
 final public
-class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var isImmutable: Bool { bridged.OpenExistentialAddr_isImmutable() }
+}
 
 final public
 class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
@@ -1696,6 +1698,9 @@ final public class ThrowAddrInst : TermInst {
 }
 
 final public class YieldInst : TermInst {
+  public func convention(of operand: Operand) -> ArgumentConvention {
+    return bridged.YieldInst_getConvention(operand.bridged).convention
+  }
 }
 
 final public class UnwindInst : TermInst {
