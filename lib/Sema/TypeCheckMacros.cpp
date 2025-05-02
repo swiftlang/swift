@@ -2152,8 +2152,8 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     for (auto i : inheritedTypes.getIndices()) {
       auto constraint =
           TypeResolution::forInterface(
-              extension->getDeclContext(),
-              TypeResolverContext::GenericRequirement,
+              extension,
+              TypeResolverContext::Inherited,
               /*unboundTyOpener*/ nullptr,
               /*placeholderHandler*/ nullptr,
               /*packElementOpener*/ nullptr)
