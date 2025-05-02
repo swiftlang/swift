@@ -74,6 +74,8 @@ void DependencyScanDiagnosticCollector::handleDiagnostic(SourceManager &SM,
 
 void DependencyScanDiagnosticCollector::addDiagnostic(
     SourceManager &SM, const DiagnosticInfo &Info) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
+
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Info.Kind) {
@@ -127,12 +129,6 @@ void DependencyScanDiagnosticCollector::addDiagnostic(
     Diagnostics.push_back(
       ScannerDiagnosticInfo{FormattedMessage, SMKind, std::nullopt});
   }
-}
-
-void LockingDependencyScanDiagnosticCollector::addDiagnostic(
-    SourceManager &SM, const DiagnosticInfo &Info) {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
-  DependencyScanDiagnosticCollector::addDiagnostic(SM, Info);
 }
 
 swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
@@ -272,7 +268,8 @@ DependencyScanningTool::getDependencies(
     StringRef WorkingDirectory) {
   // There may be errors as early as in instance initialization, so we must ensure
   // we can catch those.
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
+  auto ScanDiagnosticConsumer =
+    std::make_shared<DependencyScanDiagnosticCollector>();
 
   // The primary instance used to scan the query Swift source-code
   auto QueryContextOrErr = initCompilerInstanceForScan(Command,

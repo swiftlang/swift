@@ -40,6 +40,7 @@ private:
     std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo> ImportLocation;
   };
   std::vector<ScannerDiagnosticInfo> Diagnostics;
+  llvm::sys::SmartMutex<true> ScanningDiagnosticConsumerStateLock;
 
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
@@ -53,19 +54,6 @@ public:
   const std::vector<ScannerDiagnosticInfo> &getDiagnostics() const {
     return Diagnostics;
   }
-};
-
-/// Locking variant of the above diagnostic collector that guards accesses to
-/// its state with a lock.
-class LockingDependencyScanDiagnosticCollector
-    : public DependencyScanDiagnosticCollector {
-private:
-  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
-  llvm::sys::SmartMutex<true> ScanningDiagnosticConsumerStateLock;
-
-public:
-  friend DependencyScanningTool;
-  LockingDependencyScanDiagnosticCollector() {}
 };
 
 /// Given a set of arguments to a print-target-info frontend tool query, produce the
@@ -118,7 +106,7 @@ private:
   llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
 
   /// A shared consumer that accumulates encountered diagnostics.
-  LockingDependencyScanDiagnosticCollector CDC;
+  DependencyScanDiagnosticCollector CDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };
