@@ -1371,15 +1371,10 @@ public:
     const clang::Type *desugaredReturnTy =
         returnTy->getUnqualifiedDesugaredType();
 
-    if (const auto *ptrType =
-            llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
-      if (const clang::RecordDecl *clangRecordDecl =
-              ptrType->getPointeeType()->getAsRecordDecl())
-        return importer::matchSwiftAttrConsideringInheritance<ResultConvention>(
-            clangRecordDecl,
-            {{"returned_as_unretained_by_default", ResultConvention::Unowned},
-             {"returned_as_retained_by_default", ResultConvention::Owned}});
-    }
+    return importer::matchSwiftAttrOnRecordPtr<ResultConvention>(
+        clang::QualType(desugaredReturnTy, 0),
+        {{"returned_as_unretained_by_default", ResultConvention::Unowned},
+         {"returned_as_retained_by_default", ResultConvention::Owned}});
     return std::nullopt;
   }
 };

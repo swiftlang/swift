@@ -843,6 +843,24 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
   return std::nullopt;
 }
 
+/// Matches a `swift_attr("...")` on the record type pointed to by the given
+/// Clang type, searching base classes if it's a C++ class.
+///
+/// \param type A Clang pointer type.
+/// \param patterns List of attribute name-value pairs to match.
+/// \returns Matched value or std::nullopt.
+template <typename T>
+std::optional<T> matchSwiftAttrOnRecordPtr(
+    const clang::QualType &type,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (const auto *ptrType = type->getAs<clang::PointerType>()) {
+    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
+      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
+    }
+  }
+  return std::nullopt;
+}
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {

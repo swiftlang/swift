@@ -3664,17 +3664,10 @@ namespace {
             unannotatedAPIWarningNeeded = true;
           }
 
-          if (const auto *returnPtrTy = retType->getAs<clang::PointerType>()) {
-            if (clang::RecordDecl *returnRecordDecl =
-                    returnPtrTy->getPointeeType()->getAsRecordDecl()) {
-              if (importer::matchSwiftAttrConsideringInheritance<bool>(
-                      returnRecordDecl,
-                      {
-                          {"returned_as_retained_by_default", true},
-                          {"returned_as_unretained_by_default", true},
-                      }))
-                unannotatedAPIWarningNeeded = false;
-            }
+          if (importer::matchSwiftAttrOnRecordPtr<bool>(
+                  retType, {{"returned_as_retained_by_default", true},
+                            {"returned_as_unretained_by_default", true}})) {
+            unannotatedAPIWarningNeeded = false;
           }
 
           if (unannotatedAPIWarningNeeded) {
