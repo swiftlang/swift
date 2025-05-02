@@ -1348,7 +1348,7 @@ public:
   // Determines the ownership ResultConvention (owned/unowned) of the return
   // value using the SWIFT_RETURNS_(UN)RETAINED annotation on the C++ API; if
   // not explicitly annotated, falls back to the
-  // SWIFT_RETURNS_(UN)RETAINED_BY_DEFAULT annotation on the C++
+  // SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT annotation on the C++
   // SWIFT_SHARED_REFERENCE type.
   std::optional<ResultConvention>
   getCxxRefConventionWithAttrs(const TypeLowering &tl,
@@ -1377,9 +1377,8 @@ public:
               ptrType->getPointeeType()->getAsRecordDecl())
         return importer::matchSwiftAttrConsideringInheritance<ResultConvention>(
             clangRecordDecl,
-            {{"returned_as_unretained_by_convention",
-              ResultConvention::Unowned},
-             {"returned_as_retained_by_convention", ResultConvention::Owned}});
+            {{"returned_as_unretained_by_default", ResultConvention::Unowned},
+             {"returned_as_retained_by_default", ResultConvention::Owned}});
     }
     return std::nullopt;
   }

@@ -3670,8 +3670,8 @@ namespace {
               if (importer::matchSwiftAttrConsideringInheritance<bool>(
                       returnRecordDecl,
                       {
-                          {"returned_as_retained_by_convention", true},
-                          {"returned_as_unretained_by_convention", true},
+                          {"returned_as_retained_by_default", true},
+                          {"returned_as_unretained_by_default", true},
                       }))
                 unannotatedAPIWarningNeeded = false;
             }
