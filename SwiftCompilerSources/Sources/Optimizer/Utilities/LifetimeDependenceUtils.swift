@@ -817,7 +817,10 @@ extension LifetimeDependenceDefUseWalker {
   }
 
   private mutating func walkDownAddressUses(of address: Value) -> WalkResult {
-    address.uses.ignoreTypeDependence.walk {
+    if !needWalk(for: address) {
+      return .continueWalk
+    }
+    return address.uses.ignoreTypeDependence.walk {
       return classifyAddress(operand: $0)
     }
   }
@@ -1199,6 +1202,8 @@ protocol LifetimeDependenceUseDefAddressWalker {
   // ignored.
   var isTrivialScope: Bool { get }
 
+  mutating func needWalk(for address: Value) -> Bool
+
   mutating func addressIntroducer(_ address: Value, access: AccessBaseAndScopes) -> WalkResult
 
   // The 'newLifetime' value is not forwarded to its uses. It may be a non-address or an address.
@@ -1221,6 +1226,9 @@ extension LifetimeDependenceUseDefAddressWalker {
   }
 
   mutating func walkUpDefault(address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    if !needWalk(for: address) {
+      return .continueWalk
+    }
     if let beginAccess = access.innermostAccess {
       // Skip the access scope for unsafe[Mutable]Address. Treat it like a projection of 'self' rather than a separate
       // variable access.
@@ -1331,6 +1339,10 @@ struct LifetimeDependenceRootWalker : LifetimeDependenceUseDefValueWalker, Lifet
 
   mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
     visitedValues.insert(value)
+  }
+
+  mutating func needWalk(for address: Value) -> Bool {
+    visitedValues.insert(address)
   }
 
   mutating func walkUp(newLifetime: Value) -> WalkResult {
