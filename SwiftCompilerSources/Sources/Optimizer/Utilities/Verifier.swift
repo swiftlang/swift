@@ -230,7 +230,7 @@ private extension Operand {
     case let copy as SourceDestAddrInstruction:
       if self == copy.destinationOperand {
         return true
-      } else if self == copy.sourceOperand && copy.isTakeOfSrc {
+      } else if self == copy.sourceOperand && copy.isTakeOfSource {
         return true
       }
       return false
