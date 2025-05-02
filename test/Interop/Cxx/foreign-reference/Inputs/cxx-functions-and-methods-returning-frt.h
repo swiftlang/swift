@@ -1,4 +1,5 @@
 #pragma once
+#include "visibility.h"
 #include <functional>
 
 // FRT or SWIFT_SHARED_REFERENCE type
@@ -326,3 +327,157 @@ public:
   FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned() override
       __attribute__((swift_attr("returns_unretained")));
 };
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+namespace DefaultOwnershipConventionOnCXXForeignRefType {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defRetain1")))
+__attribute__((swift_attr("release:defRelease1"))) 
+__attribute__((swift_attr("returned_as_retained_by_default"))) RefTyDefRetained {};
+
+RefTyDefRetained *returnRefTyDefRetained() { return new RefTyDefRetained(); }
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defRetain2")))
+__attribute__((swift_attr("release:defRelease2"))) 
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
+
+RefTyDefUnretained *returnRefTyDefUnretained() {
+  return new RefTyDefUnretained();
+}
+} // namespace DefaultOwnershipConventionOnCXXForeignRefType
+
+void defRetain1(
+    DefaultOwnershipConventionOnCXXForeignRefType::RefTyDefRetained *v) {};
+void defRelease1(
+    DefaultOwnershipConventionOnCXXForeignRefType::RefTyDefRetained *v) {};
+
+void defRetain2(
+    DefaultOwnershipConventionOnCXXForeignRefType::RefTyDefUnretained *v) {};
+void defRelease2(
+    DefaultOwnershipConventionOnCXXForeignRefType::RefTyDefUnretained *v) {};
+
+namespace FunctionAnnotationHasPrecedence {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defaultRetain1")))
+__attribute__((swift_attr("release:defaultRelease1")))
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
+
+RefTyDefUnretained *returnRefTyDefUnretained() {
+  return new RefTyDefUnretained();
+}
+RefTyDefUnretained *returnRefTyDefUnretainedAnnotatedRetained()
+    __attribute__((swift_attr("returns_retained"))) {
+  return new RefTyDefUnretained();
+}
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defaultRetain2")))
+__attribute__((swift_attr("release:defaultRelease2"))) 
+__attribute__((swift_attr("returned_as_retained_by_default"))) RefTyDefRetained {};
+
+RefTyDefRetained *returnRefTyDefRetained() { return new RefTyDefRetained(); }
+RefTyDefRetained *returnRefTyDefRetainedAnnotatedUnRetained()
+__attribute__((swift_attr("returns_unretained"))) {
+  return new RefTyDefRetained();
+}
+
+} // namespace FunctionAnnotationHasPrecedence
+
+void defaultRetain1(FunctionAnnotationHasPrecedence::RefTyDefUnretained *v) {};
+void defaultRelease1(FunctionAnnotationHasPrecedence::RefTyDefUnretained *v) {};
+
+void defaultRetain2(FunctionAnnotationHasPrecedence::RefTyDefRetained *v) {};
+void defaultRelease2(FunctionAnnotationHasPrecedence::RefTyDefRetained *v) {};
+
+namespace DefaultOwnershipSuppressUnannotatedAPIWarning {
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:rretain")))
+__attribute__((swift_attr("release:rrelease"))) RefType {};
+
+RefType *returnRefType() { return new RefType(); } // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:dretain")))
+__attribute__((swift_attr("release:drelease"))) 
+__attribute__((swift_attr("returned_as_retained_by_default"))) RefTyDefRetained {};
+
+RefTyDefRetained *returnRefTyDefRetained() { return new RefTyDefRetained(); }
+
+} // namespace DefaultOwnershipSuppressUnannotatedAPIWarning
+
+void rretain(DefaultOwnershipSuppressUnannotatedAPIWarning::RefType *v) {};
+void rrelease(DefaultOwnershipSuppressUnannotatedAPIWarning::RefType *v) {};
+
+void dretain(
+    DefaultOwnershipSuppressUnannotatedAPIWarning::RefTyDefRetained *v) {};
+void drelease(
+    DefaultOwnershipSuppressUnannotatedAPIWarning::RefTyDefRetained *v) {};
+
+namespace DefaultOwnershipInheritance {
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:baseRetain")))
+__attribute__((swift_attr("release:baseRelease")))
+__attribute__((swift_attr("returned_as_retained_by_default"))) BaseType {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:derivedRetain")))
+__attribute__((swift_attr("release:derivedRelease"))) DerivedType
+    : public BaseType {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:derivedRetain2")))
+__attribute__((swift_attr("release:derivedRelease2"))) DerivedType2
+    : public DerivedType {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:derivedRetain3")))
+__attribute__((swift_attr("release:derivedRelease3"))) 
+__attribute__((swift_attr("returned_as_unretained_by_default"))) DerivedOverride
+    : public DerivedType {};
+
+BaseType *returnBaseType() { return new BaseType(); }
+DerivedType *returnDerivedType() { return new DerivedType(); }
+DerivedType2 *returnDerivedType2() { return new DerivedType2(); }
+DerivedOverride *returnDerivedOverride() { return new DerivedOverride(); }
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:bRetain")))
+__attribute__((swift_attr("release:bRelease"))) BaseTypeNonDefault {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:dRetain")))
+__attribute__((swift_attr("release:dRelease"))) DerivedTypeNonDefault
+    : public BaseTypeNonDefault {};
+
+BaseTypeNonDefault *returnBaseTypeNonDefault() { // expected-warning {{'returnBaseTypeNonDefault' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  return new BaseTypeNonDefault();
+}
+DerivedTypeNonDefault *returnDerivedTypeNonDefault() { // expected-warning {{'returnDerivedTypeNonDefault' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  return new DerivedTypeNonDefault();
+}
+
+} // namespace DefaultOwnershipInheritance
+
+void baseRetain(DefaultOwnershipInheritance::BaseType *v) {};
+void baseRelease(DefaultOwnershipInheritance::BaseType *v) {};
+
+void derivedRetain(DefaultOwnershipInheritance::DerivedType *v) {};
+void derivedRelease(DefaultOwnershipInheritance::DerivedType *v) {};
+
+void derivedRetain2(DefaultOwnershipInheritance::DerivedType2 *v) {};
+void derivedRelease2(DefaultOwnershipInheritance::DerivedType2 *v) {};
+
+void derivedRetain3(DefaultOwnershipInheritance::DerivedOverride *v) {};
+void derivedRelease3(DefaultOwnershipInheritance::DerivedOverride *v) {};
+
+void bRetain(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};
+void bRelease(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};
+
+void dRetain(DefaultOwnershipInheritance::DerivedTypeNonDefault *v) {};
+void dRelease(DefaultOwnershipInheritance::DerivedTypeNonDefault *v) {};
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
