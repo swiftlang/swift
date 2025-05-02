@@ -47,17 +47,17 @@
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
 // CHECK: ->(plugin:[[#PID1:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
-// CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
+// CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library","infer-nonisolated-conformances"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}CrashOnLoad.{{.*}}","moduleName":"CrashOnLoad"}}
 
 // CHECK-NEXT: ->(plugin:[[#PID2:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
-// CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
+// CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library","infer-nonisolated-conformances"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}EvilMacros{{.*}},"moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"{{.*}}","lexicalContext":{{.*}},"macro":{"moduleName":"EvilMacros","name":"evil","typeName":"CrashingMacro"}{{.*}}
 
 // CHECK-NEXT: ->(plugin:[[#PID3:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
-// CHECK-NEXT: <-(plugin:[[#PID3]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
+// CHECK-NEXT: <-(plugin:[[#PID3]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library","infer-nonisolated-conformances"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: ->(plugin:[[#PID3]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}EvilMacros{{.*}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID3]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID3]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}MacroDefinition{{.*}}","moduleName":"MacroDefinition"}}

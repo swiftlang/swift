@@ -419,6 +419,32 @@ func makeExpansionOutputResult(
   return 0
 }
 
+/// Adjust the expanded source code with any transformations that the compiler
+/// needs to apply.
+///
+/// At present, this is only used to apply transformations that we want the
+/// compiler plugin to perform, but if it doesn't know how, we do it here.
+/// The only transformation in this category is the inference of nonisolated
+/// on protocol conformances.
+fileprivate func adjustExpandedSource(
+  _ expandedSource: String?,
+  plugin: CompilerPlugin
+) -> String? {
+  guard let expandedSource else {
+    return nil
+  }
+
+  // If the plugin can infer nonisolated conformances, we don't have to.
+  if let capability = plugin.capability,
+     capability.features.contains(.inferNonisolatedConformances) {
+    return expandedSource
+  }
+
+  // Infer nonisolated conformances.
+  let sourceFile = Parser.parse(source: expandedSource)
+  return sourceFile.inferNonisolatedConformances().description
+}
+
 @_cdecl("swift_Macros_expandFreestandingMacro")
 @usableFromInline
 func expandFreestandingMacro(
@@ -534,8 +560,8 @@ func expandFreestandingMacroImpl(
       diagEngine.add(exportedSourceFile: sourceFilePtr)
       diagEngine.emit(diagnostics, messageSuffix: " (from macro '\(macroName)')")
     }
-    return expandedSource
 
+    return adjustExpandedSource(expandedSource, plugin: macro.plugin)
   } catch let error {
     let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
     srcMgr.insert(sourceFilePtr)
@@ -767,8 +793,8 @@ func expandAttachedMacroImpl(
       }
       diagEngine.emit(diagnostics, messageSuffix: " (from macro '\(macroName)')")
     }
-    return expandedSource
 
+    return adjustExpandedSource(expandedSource, plugin: macro.plugin)
   } catch let error {
     let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
     srcMgr.insert(customAttrSourceFilePtr)
