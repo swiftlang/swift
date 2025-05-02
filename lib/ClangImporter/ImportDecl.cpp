@@ -3665,6 +3665,12 @@ namespace {
             unannotatedAPIWarningNeeded = true;
           }
 
+          if (importer::matchSwiftAttrOnRecordPtr<bool>(
+                  retType, {{"returned_as_retained_by_default", true},
+                            {"returned_as_unretained_by_default", true}})) {
+            unannotatedAPIWarningNeeded = false;
+          }
+
           if (unannotatedAPIWarningNeeded) {
             HeaderLoc loc(decl->getLocation());
             Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
