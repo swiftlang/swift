@@ -624,5 +624,8 @@ ERROR(ast_format_requires_dump_ast,none,
 ERROR(unknown_dump_ast_format,none,
       "unknown format '%0' requested with '-dump-ast-format'", (StringRef))
 
+ERROR(swift_lang_must_be_five,none,
+      "Swift language mode must be set to '5' to be able to use C++ interoperability.", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
