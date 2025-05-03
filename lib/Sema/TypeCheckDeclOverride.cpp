@@ -1611,6 +1611,7 @@ namespace  {
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(Extensible)
+    UNINTERESTING_ATTR(PreEnumExtensibility)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(NoRuntime)
