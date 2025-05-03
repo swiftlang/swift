@@ -3,6 +3,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_WeakLet
 
 // rdar://102155748
 // UNSUPPORTED: back_deployment_runtime

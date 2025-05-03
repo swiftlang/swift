@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend WeakLet) | %FileCheck %s --check-prefixes=CHECK,CHECK-WEAK-LET
+
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_WeakLet
 
 protocol Protocol : class {
   func noop()

@@ -24,6 +24,7 @@
 // REQUIRES: executable_test
 // REQUIRES: shell
 // REQUIRES: reflection
+// REQUIRES: swift_feature_WeakLet
 
 import StdlibUnittest
 
