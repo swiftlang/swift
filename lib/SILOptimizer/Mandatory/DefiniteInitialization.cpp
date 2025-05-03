@@ -536,7 +536,7 @@ namespace {
     std::string getUninitElementName(const DIMemoryUse &Use);
     void noteUninitializedMembers(const DIMemoryUse &Use);
     void emitUninitializedMembersFixit(const SILInstruction *Inst,
-                                       SILLocation loc, const DIMemoryUse &Use) ;
+                                       SILLocation loc, const DIMemoryUse &Use);
     void diagnoseInitError(const DIMemoryUse &Use,
                            Diag<StringRef, bool> DiagMessage);
     void diagnoseRefElementAddr(RefElementAddrInst *REI);
@@ -2308,16 +2308,18 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
 
 /// Emit fix-its for each uninitialized stored property in a designated
 /// initializer.
-void LifetimeChecker::emitUninitializedMembersFixit(
-    const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use) {
+void LifetimeChecker::emitUninitializedMembersFixit(const SILInstruction *Inst,
+                                                    SILLocation loc,
+                                                    const DIMemoryUse &Use) {
   // to generate the missing variables
   std::string missingVariablesFixIt;
   std::string suggestedInitializerDeclsString;
   std::unordered_map<std::string, bool> handledVariablesMap;
   AvailabilitySet Liveness =
-    getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
+      getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
   Decl *initFunctionDecl = Inst->getFunction()->getDeclContext()->getAsDecl();
-  AbstractFunctionDecl *functionDecl = dyn_cast<AbstractFunctionDecl>(initFunctionDecl);
+  AbstractFunctionDecl *functionDecl =
+      dyn_cast<AbstractFunctionDecl>(initFunctionDecl);
   auto *parameters = functionDecl->getParameters();
   SourceLoc RParenLoc = parameters->getRParenLoc();
   SILLocation initFunctionLocation = SILLocation(functionDecl);
@@ -2327,9 +2329,10 @@ void LifetimeChecker::emitUninitializedMembersFixit(
     handledVariablesMap[paramName] = false;
   }
   for (unsigned i = Use.FirstElement, e = Use.FirstElement + Use.NumElements;
-      i != e; ++i) {
+       i != e; ++i) {
     // if Already initialized, skip the Decl.
-    if (Liveness.get(i) == DIKind::Yes) continue;
+    if (Liveness.get(i) == DIKind::Yes)
+      continue;
 
     // Ignore a failed super.init requirement.
     if (i == TheMemory.getNumElements() - 1 && TheMemory.isDerivedClassSelf())
@@ -2350,51 +2353,55 @@ void LifetimeChecker::emitUninitializedMembersFixit(
       }
 
       auto variable = handledVariablesMap.find(declName);
-      auto variableWasSuggestedOrExistsInCurrentParams = variable != handledVariablesMap.end();
+      auto variableWasSuggestedOrExistsInCurrentParams =
+          variable != handledVariablesMap.end();
       if (variableWasSuggestedOrExistsInCurrentParams && variable->second) {
         continue;
       }
     }
 
     auto variable = handledVariablesMap.find(declName);
-    // if a variable exists, and it's false so it's alreeady passed in the init(..)
+    // if a variable exists, and it's false so it's alreeady passed in the
+    // init(..)
     auto shouldAddDecl = false;
     if (variable != handledVariablesMap.end()) {
       shouldAddDecl = variable->first == declName;
     }
 
     if (!shouldAddDecl) {
-      suggestedInitializerDeclsString += declName + ": " + inferredDeclType + ", ";
+      suggestedInitializerDeclsString +=
+          declName + ": " + inferredDeclType + ", ";
     }
     missingVariablesFixIt += "self." + declName + " = " + declName + "\n";
 
-    // mark variable as handled, which means it's already passed in the init, or going to appear
-    // in the fixit, this's needed for tuples, to avoid generating a decl for each element type defined.
+    // mark variable as handled, which means it's already passed in the init, or
+    // going to appear in the fixit, this's needed for tuples, to avoid
+    // generating a decl for each element type defined.
     handledVariablesMap[declName] = true;
   }
 
-
   // Drop last `, ` from the parameters String
-  auto didGenerateInitializingStoredProperties = suggestedInitializerDeclsString.size() > 0;
+  auto didGenerateInitializingStoredProperties =
+      suggestedInitializerDeclsString.size() > 0;
   if (didGenerateInitializingStoredProperties) {
     suggestedInitializerDeclsString.pop_back();
     suggestedInitializerDeclsString.pop_back();
   }
 
-  // if we have a message,and there is already one parameter at least in the init
-  // then we add a comma to the beginning of the message
+  // if we have a message,and there is already one parameter at least in the
+  // init then we add a comma to the beginning of the message
   if (parameters->size() >= 1 && didGenerateInitializingStoredProperties) {
     suggestedInitializerDeclsString = ", " + suggestedInitializerDeclsString;
   }
 
-  auto diag = diagnose(Module, initFunctionLocation,
-      diag::return_from_init_without_initing_stored_properties);
-  diag
-    .fixItInsert(initFunctionLocation.getEndSourceLoc(), missingVariablesFixIt);
+  auto diag =
+      diagnose(Module, initFunctionLocation,
+               diag::return_from_init_without_initing_stored_properties);
+  diag.fixItInsert(initFunctionLocation.getEndSourceLoc(),
+                   missingVariablesFixIt);
 
   if (suggestedInitializerDeclsString.size() > 0) {
-    diag
-      .fixItInsert(RParenLoc, suggestedInitializerDeclsString);
+    diag.fixItInsert(RParenLoc, suggestedInitializerDeclsString);
   }
 }
 
