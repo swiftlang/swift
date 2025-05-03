@@ -345,7 +345,35 @@ extension Actor {
   @_alwaysEmitIntoClient
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
   @_unavailableInEmbedded
-  public nonisolated func assumeIsolated<T : Sendable>(
+  public nonisolated func assumeIsolated<T : Sendable, E: Error>(
+      _ operation: (isolated Self) throws(E) -> T,
+      file: StaticString = #fileID, line: UInt = #line
+  ) throws(E) -> T {
+    typealias YesActor = (isolated Self) throws(E) -> T
+    typealias NoActor = (Self) throws(E) -> T
+
+    /// This is guaranteed to be fatal if the check fails,
+    /// as this is our "safe" version of this API.
+    let executor: Builtin.Executor = self.unownedExecutor.executor
+    guard _taskIsCurrentExecutor(executor) else {
+      // TODO: offer information which executor we actually got
+      fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
+    }
+
+    // To do the unsafe cast, we have to pretend it's @escaping.
+    return try withoutActuallyEscaping(operation) {
+      (_ fn: @escaping YesActor) throws(E) -> T in
+      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      return try rawFn(self)
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  @_silgen_name("$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF")
+  @_alwaysEmitIntoClient
+  @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
+  @_unavailableInEmbedded
+  nonisolated func __abi__assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
