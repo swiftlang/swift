@@ -5406,6 +5406,17 @@ public:
 
       outerParams = genericParams;
     }
+#ifndef NDEBUG
+    // Use outerParams before it will be moved with std::move(outerParams)
+    unsigned paramCount = 0;
+    if (outerParams) {
+      for (auto *paramList = outerParams;
+           paramList != nullptr;
+           paramList = paramList->getOuterParameters()) {
+        paramCount += paramList->size();
+      }
+    }
+#endif
     ctx.evaluator.cacheOutput(GenericParamListRequest{extension},
                               std::move(outerParams));
 
@@ -5434,12 +5445,6 @@ public:
 
 #ifndef NDEBUG
     if (outerParams) {
-      unsigned paramCount = 0;
-      for (auto *paramList = outerParams;
-           paramList != nullptr;
-           paramList = paramList->getOuterParameters()) {
-        paramCount += paramList->size();
-      }
       assert(paramCount ==
              extension->getGenericSignature().getGenericParams().size());
     }
