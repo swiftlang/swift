@@ -3182,8 +3182,44 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
 
+  // A function with a lifetime dependency in a generic context is equivalent to
+  // one without that lifetime dependency when the substituted type is
+  // Escapable.
+  //
+  // TODO: There should also be a subtype relationship from less-constrained to
+  // more-constrained lifetime dependencies.
   if (func1->getLifetimeDependencies() != func2->getLifetimeDependencies()) {
-    return getTypeMatchFailure(locator);
+    auto escapable = getASTContext().getProtocol(KnownProtocolKind::Escapable)
+      ->getDeclaredType();
+
+    for (auto &fromDep : func1->getLifetimeDependencies()) {
+      auto toDep = func2->getLifetimeDependenceFor(fromDep.getTargetIndex());
+      if (toDep) {
+        // If a dependency is present for the same target in both types, then
+        // the dependency must match.
+        if (fromDep != *toDep) {
+          return getTypeMatchFailure(locator);
+        }
+        
+        continue;
+      }
+      
+      // If the dependency is absent from the destination type, constrain the
+      // corresponding parameter or result in the source type to be Escapable.
+      if (fromDep.getTargetIndex() == func1->getParams().size()) {
+        // Result dependency.
+        addConstraint(ConstraintKind::ConformsTo,
+                      func1->getResult(),
+                      escapable,
+                      locator);
+      } else {
+        // Parameter dependency.
+        addConstraint(ConstraintKind::ConformsTo,
+                    func1->getParams()[fromDep.getTargetIndex()].getPlainType(),
+                    escapable,
+                    locator);
+      }
+    }
   }
 
   // To contextual type increase the score to avoid ambiguity when solver can
@@ -3267,14 +3303,14 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   SmallVector<AnyFunctionType::Param, 8> func2Params;
   func2Params.append(func2->getParams().begin(), func2->getParams().end());
 
-  // Support conversion from `@execution(caller)` to a function type
+  // Support conversion from `nonisolated(nonsending)` to a function type
   // with an isolated parameter.
   if (subKind == ConstraintKind::Subtype &&
       func1->getIsolation().isNonIsolatedCaller() &&
       func2->getIsolation().isParameter()) {
-    // `@execution(caller)` function gets an implicit isolation parameter
-    // introduced during SILGen and thunk is going to forward an isolation
-    // from the caller to it.
+    // `nonisolated(nonsending)` function gets an implicit isolation parameter
+    // introduced during SILGen and thunk is going to forward an isolation from
+    // the caller to it.
     // Let's remove the isolated parameter from consideration, function
     // types have to match on everything else.
     llvm::erase_if(func2Params, [](const AnyFunctionType::Param &param) {
@@ -7489,18 +7525,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
         // T -> Optional<T>
-        if (location.endsWith<LocatorPathElt::OptionalInjection>() ||
-            location.endsWith<LocatorPathElt::GenericArgument>()) {
+        if (location.endsWith<LocatorPathElt::OptionalInjection>()) {
           SmallVector<LocatorPathElt, 4> path;
           auto anchor = location.getLocatorParts(path);
 
-          // Drop all of the applied `value-to-optional` and
-          // `optional-to-optional` conversions.
+          // An attempt at Double/CGFloat conversion through
+          // optional chaining. This is not supported at the
+          // moment because solution application doesn't know
+          // how to map Double to/from CGFloat through optionals.
+          if (isExpr<OptionalEvaluationExpr>(anchor)) {
+            if (!shouldAttemptFixes())
+              return getTypeMatchFailure(locator);
+
+            conversionsOrFixes.push_back(ContextualMismatch::create(
+                *this, nominal1, nominal2, getConstraintLocator(locator)));
+            break;
+          }
+
+          // Drop all of the applied `value-to-optional` promotions.
           path.erase(llvm::remove_if(
                          path,
                          [](const LocatorPathElt &elt) {
-                           return elt.is<LocatorPathElt::OptionalInjection>() ||
-                                  elt.is<LocatorPathElt::GenericArgument>();
+                           return elt.is<LocatorPathElt::OptionalInjection>();
                          }),
                      path.end());
 
@@ -10519,26 +10565,34 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
     auto shouldCheckSendabilityOfBase = [&]() {
       if (!Context.getProtocol(KnownProtocolKind::Sendable))
-        return false;
+        return Type();
 
-      return llvm::any_of(lookup, [&](const auto &result) {
+      for (const auto &result : lookup) {
         auto decl = result.getValueDecl();
         if (!isa_and_nonnull<FuncDecl>(decl))
-          return false;
+          continue;
 
-        if (!decl->isInstanceMember())
-          return false;
+        if (!decl->isInstanceMember() &&
+            !decl->getDeclContext()->getSelfProtocolDecl())
+          continue;
 
         auto hasAppliedSelf = decl->hasCurriedSelf() &&
                               doesMemberRefApplyCurriedSelf(baseObjTy, decl);
         auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-        return numApplies < decl->getNumCurryLevels();
-      });
+        if (numApplies >= decl->getNumCurryLevels())
+          continue;
+
+        return decl->isInstanceMember()
+          ? instanceTy
+          : MetatypeType::get(instanceTy);
+      }
+
+      return Type();
     };
 
-    if (shouldCheckSendabilityOfBase()) {
+    if (Type baseTyToCheck = shouldCheckSendabilityOfBase()) {
       auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = lookupConformance(instanceTy, sendableProtocol);
+      auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
 
       if (llvm::any_of(
               baseConformance.getConditionalRequirements(),
@@ -10547,8 +10601,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                   return false;
 
                 return (req.getFirstType()->hasTypeVariable() &&
-                        req.getProtocolDecl()->isSpecificProtocol(
-                            KnownProtocolKind::Sendable));
+                        (req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::Sendable) ||
+                         req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::SendableMetatype)));
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
@@ -11680,7 +11736,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return formUnsolved();
 
   auto witness =
-      conformance.getWitnessByName(baseObjectType, requirement->getName());
+      conformance.getWitnessByName(requirement->getName());
   if (!witness)
     return fail();
 

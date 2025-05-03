@@ -10,11 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 // A MutableRawSpan represents a span of memory which
 // contains initialized `Element` instances.
 @safe
 @frozen
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 public struct MutableRawSpan: ~Copyable & ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
@@ -35,15 +40,17 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
     _unchecked pointer: UnsafeMutableRawPointer?,
     byteCount: Int
   ) {
-    _pointer = unsafe pointer
+    unsafe _pointer = pointer
     _count = byteCount
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan: @unchecked Sendable {}
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   @unsafe
@@ -102,20 +109,22 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(copy elements)
+  @lifetime(&elements)
   public init<Element: BitwiseCopyable>(
-    _elements elements: consuming MutableSpan<Element>
+    _elements elements: inout MutableSpan<Element>
   ) {
-    let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: elements._pointer,
-      count: elements.count &* MemoryLayout<Element>.stride
+    let (start, count) = unsafe (elements._pointer, elements._count)
+    let span = unsafe MutableRawSpan(
+      _unchecked: start,
+      byteCount: count == 1 ? MemoryLayout<Element>.size
+                 : count &* MemoryLayout<Element>.stride
     )
-    let span = unsafe MutableRawSpan(_unsafeBytes: bytes)
-    self = unsafe _overrideLifetime(span, copying: elements)
+    self = unsafe _overrideLifetime(span, mutating: &elements)
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
   @_alwaysEmitIntoClient
   public var byteCount: Int { _count }
@@ -129,14 +138,15 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, _count > 0 else {
+    guard let pointer = unsafe _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     return try unsafe body(.init(start: pointer, count: _count))
@@ -147,14 +157,15 @@ extension MutableRawSpan {
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, _count > 0 else {
+    guard let pointer = unsafe _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     return try unsafe body(.init(start: pointer, count: _count))
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension RawSpan {
 
   @_alwaysEmitIntoClient
@@ -166,7 +177,8 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   public var bytes: RawSpan {
@@ -190,7 +202,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   public mutating func _unsafeMutableView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> MutableSpan<T> {
@@ -202,7 +214,8 @@ extension MutableRawSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -338,8 +351,13 @@ extension MutableRawSpan {
   }
 }
 
+// FIXME: The functions in this extension crash the SIL optimizer when built inside
+// the stub. But these declarations don't generate a public symbol anyway.
+#if !SPAN_COMPATIBILITY_STUB
+
 //MARK: copyMemory
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
@@ -393,8 +411,8 @@ extension MutableRawSpan {
     fromContentsOf source: Span<Element>
   ) -> Int {
 //    update(from: source.bytes)
-    source.withUnsafeBytes {
-      update(fromContentsOf: $0)
+    unsafe source.withUnsafeBytes {
+      unsafe update(fromContentsOf: $0)
     }
   }
 
@@ -404,8 +422,8 @@ extension MutableRawSpan {
     fromContentsOf source: borrowing MutableSpan<Element>
   ) -> Int {
 //    update(from: source.span.bytes)
-    source.withUnsafeBytes {
-      update(fromContentsOf: $0)
+    unsafe source.withUnsafeBytes {
+      unsafe update(fromContentsOf: $0)
     }
   }
 
@@ -415,7 +433,7 @@ extension MutableRawSpan {
     fromContentsOf source: RawSpan
   ) -> Int {
     if source.byteCount == 0 { return 0 }
-    source.withUnsafeBytes {
+    unsafe source.withUnsafeBytes {
       unsafe _start().copyMemory(from: $0.baseAddress!, byteCount: $0.count)
     }
     return source.byteCount
@@ -429,9 +447,11 @@ extension MutableRawSpan {
     update(fromContentsOf: source.bytes)
   }
 }
+#endif
 
 // MARK: sub-spans
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   /// Constructs a new span over the items within the supplied range of
@@ -448,7 +468,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -475,7 +495,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: bounds.count)
@@ -496,7 +516,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(
     _ bounds: some RangeExpression<Int>
   ) -> Self {
@@ -520,7 +540,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound+1)
@@ -538,7 +558,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(_: UnboundedRange) -> Self {
     let newSpan = unsafe Self(_unchecked: _start(), byteCount: _count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
@@ -546,7 +566,8 @@ extension MutableRawSpan {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
   /// Returns a span containing the initial elements of this span,
@@ -565,7 +586,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
@@ -588,7 +609,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
@@ -613,7 +634,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
@@ -637,7 +658,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @lifetime(&self)
   mutating public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)

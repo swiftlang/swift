@@ -340,7 +340,7 @@ bool replayCachedCompilerOutputs(
         createCompileJobCacheKeyForOutput(CAS, BaseKey, InputIndex);
 
     if (!OutputKey) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
+      Diag.diagnose(SourceLoc(), diag::error_cas, "output cache key creation",
                     toString(OutputKey.takeError()));
       return std::nullopt;
     }
@@ -348,7 +348,7 @@ bool replayCachedCompilerOutputs(
     auto OutID = CAS.getID(*OutputKey);
     auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
     if (!OutputRef) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
+      Diag.diagnose(SourceLoc(), diag::error_cas, "cache key lookup",
                     toString(OutputRef.takeError()));
       return std::nullopt;
     }
@@ -403,20 +403,24 @@ std::unique_ptr<llvm::MemoryBuffer>
 loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
                                     DiagnosticEngine &Diag, StringRef CacheKey,
                                     file_types::ID Kind, StringRef Filename) {
-  auto failure = [&](Error Err) {
-    Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
+  auto failure = [&](StringRef Stage, Error Err) {
+    Diag.diagnose(SourceLoc(), diag::error_cas, Stage,
+                  toString(std::move(Err)));
     return nullptr;
   };
   auto ID = CAS.parseID(CacheKey);
-  if (!ID)
-    return failure(ID.takeError());
+  if (!ID) {
+    Diag.diagnose(SourceLoc(), diag::error_invalid_cas_id, CacheKey,
+                  toString(ID.takeError()));
+    return nullptr;
+  }
   auto Ref = CAS.getReference(*ID);
   if (!Ref)
     return nullptr;
 
   auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
   if (!OutputRef)
-    return failure(OutputRef.takeError());
+    return failure("lookup cache key", OutputRef.takeError());
 
   if (!*OutputRef)
     return nullptr;
@@ -435,7 +439,7 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
             Buffer = Proxy->getMemoryBuffer(Filename);
             return Error::success();
           }))
-    return failure(std::move(Err));
+    return failure("loading cached results", std::move(Err));
 
   return Buffer;
 }

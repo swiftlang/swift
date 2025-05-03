@@ -2324,7 +2324,15 @@ bool Traversal::visitSendingTypeRepr(SendingTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitConstValueTypeRepr(ConstValueTypeRepr *T) {
   return doIt(T->getBase());
 }
 

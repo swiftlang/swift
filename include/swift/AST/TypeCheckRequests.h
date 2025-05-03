@@ -4853,6 +4853,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Check @cdecl-style attributes for compatibility with the foreign language.
+class TypeCheckCDeclAttributeRequest
+    : public SimpleRequest<TypeCheckCDeclAttributeRequest,
+                           evaluator::SideEffect(FuncDecl *FD,
+                                                 CDeclAttr *attr),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
@@ -5132,6 +5151,26 @@ public:
   bool isCached() const { return true; }
   std::optional<CaptureInfo> getCachedResult() const;
   void cacheResult(CaptureInfo value) const;
+};
+
+class PatternBindingCaptureInfoRequest
+    : public SimpleRequest<PatternBindingCaptureInfoRequest,
+                           CaptureInfo(PatternBindingDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  CaptureInfo evaluate(Evaluator &evaluator, PatternBindingDecl *PBD,
+                       unsigned idx) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo info) const;
 };
 
 class SuppressesConformanceRequest

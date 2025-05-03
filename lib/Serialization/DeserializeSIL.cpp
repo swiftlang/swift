@@ -2726,6 +2726,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
+  case SILInstructionKind::EndCOWMutationAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    ResultInst = Builder.createEndCOWMutationAddr(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(MF->getType(TyID),
+                                      (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
+
   case SILInstructionKind::DestructureTupleInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     SILValue Operand = getLocalValue(
@@ -4464,8 +4473,7 @@ void SILDeserializer::getAllProperties() {
 void SILDeserializer::readWitnessTableEntries(
     llvm::BitstreamEntry &entry,
     std::vector<SILWitnessTable::Entry> &witnessEntries,
-    std::vector<SILWitnessTable::ConditionalConformance>
-      &conditionalConformances) {
+    std::vector<ProtocolConformanceRef> &conditionalConformances) {
   SmallVector<uint64_t, 64> scratch;
   llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch);
   if (!maybeKind)
@@ -4489,15 +4497,12 @@ void SILDeserializer::readWitnessTableEntries(
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
       TypeID origTypeId;
-      DeclID substTypeId;
       ProtocolConformanceID conformanceId;
-      WitnessAssocProtocolLayout::readRecord(scratch, origTypeId, substTypeId,
-                                             conformanceId);
+      WitnessAssocProtocolLayout::readRecord(scratch, origTypeId, conformanceId);
       CanType origType = MF->getType(origTypeId)->getCanonicalType();
-      CanType substType = MF->getType(substTypeId)->getCanonicalType();
       auto conformance = MF->getConformance(conformanceId);
       witnessEntries.push_back(SILWitnessTable::AssociatedConformanceWitness{
-        origType, substType, conformance
+        origType, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;
@@ -4525,14 +4530,11 @@ void SILDeserializer::readWitnessTableEntries(
       assert(kind == SIL_WITNESS_CONDITIONAL_CONFORMANCE &&
              "Content of WitnessTable should be in "
              "SIL_WITNESS_CONDITIONAL_CONFORMANCE.");
-      TypeID assocId;
       ProtocolConformanceID conformanceId;
-      WitnessConditionalConformanceLayout::readRecord(scratch, assocId,
+      WitnessConditionalConformanceLayout::readRecord(scratch,
                                                       conformanceId);
-      CanType type = MF->getType(assocId)->getCanonicalType();
       auto conformance = MF->getConformance(conformanceId);
-      conditionalConformances.push_back(
-          SILWitnessTable::ConditionalConformance{type, conformance});
+      conditionalConformances.push_back(conformance);
     }
 
     // Fetch the next record.
@@ -4598,9 +4600,10 @@ llvm::Expected<SILWitnessTable *>
 
   unsigned RawLinkage;
   unsigned IsDeclaration;
+  unsigned IsSpecialized;
   unsigned Serialized;
   ProtocolConformanceID conformance;
-  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
+  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration, IsSpecialized,
                                  Serialized, conformance);
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
@@ -4628,7 +4631,7 @@ llvm::Expected<SILWitnessTable *>
                                     theConformance);
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance);
+    existingWt = SILMod.lookUpWitnessTable(theConformance, IsSpecialized != 0);
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches
@@ -4643,7 +4646,7 @@ llvm::Expected<SILWitnessTable *>
 
   } else {
     // Otherwise, create a new witness table declaration.
-    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
+    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance, IsSpecialized != 0);
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
   }
@@ -4676,7 +4679,7 @@ llvm::Expected<SILWitnessTable *>
     return nullptr;
 
   std::vector<SILWitnessTable::Entry> witnessEntries;
-  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+  std::vector<ProtocolConformanceRef> conditionalConformances;
   readWitnessTableEntries(entry, witnessEntries, conditionalConformances);
 
   // If we've already serialized the module, don't mark the witness table
@@ -4821,7 +4824,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
     return nullptr;
 
   std::vector<SILWitnessTable::Entry> witnessEntries;
-  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+  std::vector<ProtocolConformanceRef> conditionalConformances;
   readWitnessTableEntries(entry, witnessEntries, conditionalConformances);
 
   wT->convertToDefinition(witnessEntries);

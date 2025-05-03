@@ -261,7 +261,7 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.1, *)
 extension Task: Hashable {
   public func hash(into hasher: inout Hasher) {
-    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
@@ -731,7 +731,7 @@ extension Task where Failure == Never {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -807,8 +807,7 @@ extension Task where Failure == Error {
       unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
-                                       initialSerialExecutor:
-                                         builtinSerialExecutor,
+                                       initialSerialExecutor: builtinSerialExecutor,
                                        operation: operation)
 
     self._task = task
@@ -900,7 +899,7 @@ self._task = task
   #if $BuiltinCreateAsyncTaskName
   if let name {
     task =
-      name.utf8CString.withUnsafeBufferPointer { nameBytes in
+      unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
         Builtin.createTask(
           flags: flags,
           initialSerialExecutor: builtinSerialExecutor,
@@ -1041,7 +1040,7 @@ extension Task where Failure == Never {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -1183,7 +1182,7 @@ extension Task where Failure == Error {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -1302,7 +1301,7 @@ extension Task where Success == Never, Failure == Never {
 @available(SwiftStdlib 5.1, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
-    return try unsafe body(nil)
+    return try body(nil)
   }
 
   // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -1316,7 +1315,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 @available(SwiftStdlib 6.0, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
-    return try unsafe await body(nil)
+    return try await body(nil)
   }
 
   // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -1500,21 +1499,28 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
 @usableFromInline
 @preconcurrency
 internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
-  Task.detached {
+  let taskFlags = taskCreateFlags(
+    priority: nil, isChildTask: false, copyTaskLocals: false,
+    inheritContext: false, enqueueJob: false,
+    addPendingGroupTaskUnconditionally: false,
+    isDiscardingTask: false, isSynchronousStart: false)
+
+  let (theTask, _) = Builtin.createAsyncTask(taskFlags) {
     do {
-#if !os(Windows)
-#if compiler(>=5.5) && $BuiltinHopToActor
-      Builtin.hopToActor(MainActor.shared)
-#else
-      fatalError("Swift compiler is incompatible with this SDK version")
-#endif
-#endif
       try await asyncFun()
       exit(0)
     } catch {
       _errorInMain(error)
     }
   }
+
+  let job = Builtin.convertTaskToJob(theTask)
+  if #available(SwiftStdlib 6.2, *) {
+    MainActor.executor.enqueue(ExecutorJob(context: job))
+  } else {
+    Builtin.unreachable()
+  }
+
   _asyncMainDrainQueue()
 }
 #endif
@@ -1595,7 +1601,7 @@ internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
 
 @available(SwiftStdlib 6.2, *)
 internal func _getCurrentTaskNameString() -> String? {
-  if let stringPtr = unsafe _getCurrentTaskName() {
+  if let stringPtr = _getCurrentTaskName() {
     unsafe String(cString: stringPtr)
   } else {
     nil

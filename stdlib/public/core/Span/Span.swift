@@ -24,7 +24,8 @@ import Swift
 /// ensuring spcial safety and avoiding buffer overflow errors.
 @frozen
 @safe
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `Span`.
@@ -55,7 +56,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @inline(__always)
   @lifetime(immortal)
   internal init() {
-    _pointer = nil
+    unsafe _pointer = nil
     _count = 0
   }
 
@@ -80,15 +81,17 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
     _unchecked pointer: UnsafeRawPointer?,
     count: Int
   ) {
-    _pointer = unsafe pointer
+    unsafe _pointer = pointer
     _count = count
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -165,7 +168,8 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span /*where Element: Copyable*/ {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -211,7 +215,8 @@ extension Span /*where Element: Copyable*/ {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -374,7 +379,8 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
@@ -406,7 +412,8 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
   @_semantics("fixed_storage.check_index")
   @inline(__always)
@@ -459,7 +466,8 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
   /// Accesses the element at the specified position in the `Span`.
   ///
@@ -509,7 +517,8 @@ extension Span where Element: BitwiseCopyable {
 }
 
 // MARK: sub-spans
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
@@ -628,7 +637,8 @@ extension Span where Element: ~Copyable {
 }
 
 // MARK: UnsafeBufferPointer access hatch
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable  {
 
   /// Calls a closure with a pointer to the viewed contiguous storage.
@@ -649,7 +659,7 @@ extension Span where Element: ~Copyable  {
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer, _count > 0 else {
+    guard let pointer = unsafe _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     // manual memory rebinding to avoid recalculating the alignment checks
@@ -661,7 +671,8 @@ extension Span where Element: ~Copyable  {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
   /// Calls the given closure with a pointer to the underlying bytes of
@@ -684,7 +695,7 @@ extension Span where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let _pointer, _count > 0 else {
+    guard let _pointer = unsafe _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
     return try unsafe body(
@@ -693,7 +704,8 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
@@ -711,7 +723,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
-    guard let spanStart = other._pointer, _count > 0 else {
+    guard let spanStart = unsafe other._pointer, _count > 0 else {
       return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
     let start = unsafe _start()
@@ -728,7 +740,8 @@ extension Span where Element: ~Copyable {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,
@@ -751,7 +764,8 @@ extension Span where Element: ~Copyable {
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
-    return unsafe Self(_unchecked: _pointer, count: newCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -773,7 +787,8 @@ extension Span where Element: ~Copyable {
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
-    return unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span containing the final elements of the span,

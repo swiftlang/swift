@@ -262,6 +262,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDeadFunctionAndGlobalElimination();
   }
 
+  P.addDiagnoseUnknownConstValues();
+  P.addEmbeddedSwiftDiagnostics();
   P.addPerformanceDiagnostics();
 }
 

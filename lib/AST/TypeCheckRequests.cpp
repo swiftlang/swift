@@ -217,8 +217,7 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -248,10 +247,8 @@ void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const 
 }
 
 void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto requirement = std::get<0>(getStorage());
-  diags.diagnose(requirement, diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::Protocol,
-                 requirement->getName());
+  auto *proto = std::get<0>(getStorage());
+  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
@@ -274,9 +271,8 @@ void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) co
 }
 
 void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto requirement = std::get<0>(getStorage());
-  diags.diagnose(requirement, diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::Protocol, requirement->getName());
+  auto *proto = std::get<0>(getStorage());
+  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
@@ -301,9 +297,8 @@ void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
 
 void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
-  auto requirement = std::get<0>(getStorage());
-  diags.diagnose(requirement, diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::Protocol, requirement->getName());
+  auto *proto = std::get<0>(getStorage());
+  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool>
@@ -1419,8 +1414,7 @@ void HasCircularInheritedProtocolsRequest::diagnoseCycle(
 void HasCircularInheritedProtocolsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1434,8 +1428,7 @@ void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -2027,6 +2020,17 @@ void ActorIsolation::dump() const {
 void ActorIsolation::dumpForDiagnostics() const {
   printForDiagnostics(llvm::dbgs());
   llvm::dbgs() << '\n';
+}
+
+unsigned ActorIsolation::getActorInstanceUnionIndex() const {
+  assert(isActorInstanceIsolated());
+  if (actorInstance.is<NominalTypeDecl *>())
+    return 0;
+  if (actorInstance.is<VarDecl *>())
+    return 1;
+  if (actorInstance.is<Expr *>())
+    return 2;
+  llvm_unreachable("Unhandled");
 }
 
 void swift::simple_display(
@@ -2749,6 +2753,23 @@ ParamCaptureInfoRequest::getCachedResult() const {
 void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultArgumentCaptureInfo(info);
+}
+
+//----------------------------------------------------------------------------//
+// PatternBindingCaptureInfoRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<CaptureInfo>
+PatternBindingCaptureInfoRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  return PBD->getPatternList()[idx].getCachedCaptureInfo();
+}
+
+void PatternBindingCaptureInfoRequest::cacheResult(CaptureInfo info) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setCaptureInfo(info);
 }
 
 //----------------------------------------------------------------------------//

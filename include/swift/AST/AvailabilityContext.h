@@ -75,6 +75,9 @@ public:
   /// of the given declaration.
   static AvailabilityContext forDeclSignature(const Decl *decl);
 
+  /// Returns the unconstrained availability context.
+  static AvailabilityContext forAlwaysAvailable(const ASTContext &ctx);
+
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
   // FIXME: [availability] Remove; superseded by getAvailableRange().
@@ -99,9 +102,9 @@ public:
   void constrainWithContext(const AvailabilityContext &other,
                             const ASTContext &ctx);
 
-  /// Constrain the platform availability range with `platformRange`.
+  /// Constrain the platform version range with `range`.
   // FIXME: [availability] Remove; superseded by constrainWithAvailableRange().
-  void constrainWithPlatformRange(const AvailabilityRange &platformRange,
+  void constrainWithPlatformRange(const AvailabilityRange &range,
                                   const ASTContext &ctx);
 
   /// Constrain the available range for `domain` by `range`.

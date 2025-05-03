@@ -269,9 +269,6 @@ namespace swift {
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
-    /// Emit a remark when \c \@abi infers an attribute or modifier.
-    bool EnableABIInferenceRemarks = false;
-
     ///
     /// Support for alternate usage modes
     ///
@@ -408,10 +405,6 @@ namespace swift {
 
     /// Specifies how strict concurrency checking will be.
     StrictConcurrency StrictConcurrencyLevel = StrictConcurrency::Minimal;
-
-    /// Specifies the name of the executor factory to use to create the
-    /// default executors for Swift Concurrency.
-    std::optional<std::string> ExecutorFactory;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
@@ -837,7 +830,7 @@ namespace swift {
 
     /// A wrapper around the feature state enumeration.
     struct FeatureState {
-      enum class Kind : uint8_t { Off, EnabledForAdoption, Enabled };
+      enum class Kind : uint8_t { Off, EnabledForMigration, Enabled };
 
     private:
       Feature feature;
@@ -850,9 +843,9 @@ namespace swift {
       /// Returns whether the feature is enabled.
       bool isEnabled() const;
 
-      /// Returns whether the feature is enabled in adoption mode. Should only
+      /// Returns whether the feature is enabled in migration mode. Should only
       /// be called if the feature is known to support this mode.
-      bool isEnabledForAdoption() const;
+      bool isEnabledForMigration() const;
 
       operator Kind() const { return state; }
     };
@@ -885,9 +878,9 @@ namespace swift {
     /// `false` if a feature by this name is not known.
     bool hasFeature(llvm::StringRef featureName) const;
 
-    /// Enables the given feature (enables in adoption mode if `forAdoption` is
-    /// `true`).
-    void enableFeature(Feature feature, bool forAdoption = false);
+    /// Enables the given feature (enables in migration mode if `forMigration`
+    /// is `true`).
+    void enableFeature(Feature feature, bool forMigration = false);
 
     /// Disables the given feature.
     void disableFeature(Feature feature);

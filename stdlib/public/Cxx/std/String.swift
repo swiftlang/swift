@@ -45,7 +45,7 @@ extension std.string {
       unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str), .init())
 #endif
     } else {
-      unsafe self.init()
+      self.init()
     }
   }
 }
@@ -58,9 +58,9 @@ extension std.u16string {
   ///   Swift string.
   @_alwaysEmitIntoClient
   public init(_ string: String) {
-    unsafe self.init()
+    self.init()
     for char in string.utf16 {
-      unsafe self.push_back(char)
+      self.push_back(char)
     }
   }
 }
@@ -73,9 +73,9 @@ extension std.u32string {
   ///   Swift string.
   @_alwaysEmitIntoClient
   public init(_ string: String) {
-    unsafe self.init()
+    self.init()
     for char in string.unicodeScalars {
-      unsafe self.push_back(char)
+      self.push_back(char)
     }
   }
 }
@@ -87,7 +87,7 @@ extension std.string: ExpressibleByStringLiteral,
 
   @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
-    unsafe self.init(value)
+    self.init(value)
   }
 }
 
@@ -96,7 +96,7 @@ extension std.u16string: ExpressibleByStringLiteral,
 
   @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
-    unsafe self.init(value)
+    self.init(value)
   }
 }
 
@@ -105,7 +105,7 @@ extension std.u32string: ExpressibleByStringLiteral,
 
   @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
-    unsafe self.init(value)
+    self.init(value)
   }
 }
 
@@ -114,17 +114,17 @@ extension std.u32string: ExpressibleByStringLiteral,
 extension std.string: Equatable, Comparable {
   @_alwaysEmitIntoClient
   public static func ==(lhs: std.string, rhs: std.string) -> Bool {
-    return unsafe lhs.compare(rhs) == 0
+    return lhs.compare(rhs) == 0
   }
 
   @_alwaysEmitIntoClient
   public static func <(lhs: std.string, rhs: std.string) -> Bool {
-    return unsafe lhs.compare(rhs) < 0
+    return lhs.compare(rhs) < 0
   }
 
   @_alwaysEmitIntoClient
   public static func +=(lhs: inout std.string, rhs: std.string) {
-    unsafe lhs.append(rhs)
+    lhs.append(rhs)
   }
 
   @_alwaysEmitIntoClient
@@ -134,26 +134,26 @@ extension std.string: Equatable, Comparable {
 
   @_alwaysEmitIntoClient
   public static func +(lhs: std.string, rhs: std.string) -> std.string {
-    var copy = unsafe lhs
-    unsafe copy += rhs
-    return unsafe copy
+    var copy = lhs
+    copy += rhs
+    return copy
   }
 }
 
 extension std.u16string: Equatable, Comparable {
   @_alwaysEmitIntoClient
   public static func ==(lhs: std.u16string, rhs: std.u16string) -> Bool {
-    return unsafe lhs.compare(rhs) == 0
+    return lhs.compare(rhs) == 0
   }
 
   @_alwaysEmitIntoClient
   public static func <(lhs: std.u16string, rhs: std.u16string) -> Bool {
-    return unsafe lhs.compare(rhs) < 0
+    return lhs.compare(rhs) < 0
   }
 
   @_alwaysEmitIntoClient
   public static func +=(lhs: inout std.u16string, rhs: std.u16string) {
-    unsafe lhs.append(rhs)
+    lhs.append(rhs)
   }
 
   @_alwaysEmitIntoClient
@@ -163,26 +163,26 @@ extension std.u16string: Equatable, Comparable {
 
   @_alwaysEmitIntoClient
   public static func +(lhs: std.u16string, rhs: std.u16string) -> std.u16string {
-    var copy = unsafe lhs
-    unsafe copy += rhs
-    return unsafe copy
+    var copy = lhs
+    copy += rhs
+    return copy
   }
 }
 
 extension std.u32string: Equatable, Comparable {
   @_alwaysEmitIntoClient
   public static func ==(lhs: std.u32string, rhs: std.u32string) -> Bool {
-    return unsafe lhs.compare(rhs) == 0
+    return lhs.compare(rhs) == 0
   }
 
   @_alwaysEmitIntoClient
   public static func <(lhs: std.u32string, rhs: std.u32string) -> Bool {
-    return unsafe lhs.compare(rhs) < 0
+    return lhs.compare(rhs) < 0
   }
 
   @_alwaysEmitIntoClient
   public static func +=(lhs: inout std.u32string, rhs: std.u32string) {
-    unsafe lhs.append(rhs)
+    lhs.append(rhs)
   }
 
   @_alwaysEmitIntoClient
@@ -192,9 +192,9 @@ extension std.u32string: Equatable, Comparable {
 
   @_alwaysEmitIntoClient
   public static func +(lhs: std.u32string, rhs: std.u32string) -> std.u32string {
-    var copy = unsafe lhs
-    unsafe copy += rhs
-    return unsafe copy
+    var copy = lhs
+    copy += rhs
+    return copy
   }
 }
 
@@ -204,7 +204,7 @@ extension std.string: Hashable {
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::string>::operator()
-    let cxxHash = unsafe __swift_interopComputeHashOfString(self)
+    let cxxHash = __swift_interopComputeHashOfString(self)
     hasher.combine(cxxHash)
   }
 }
@@ -213,7 +213,7 @@ extension std.u16string: Hashable {
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::u16string>::operator()
-    let cxxHash = unsafe __swift_interopComputeHashOfU16String(self)
+    let cxxHash = __swift_interopComputeHashOfU16String(self)
     hasher.combine(cxxHash)
   }
 }
@@ -222,7 +222,7 @@ extension std.u32string: Hashable {
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::u32string>::operator()
-    let cxxHash = unsafe __swift_interopComputeHashOfU32String(self)
+    let cxxHash = __swift_interopComputeHashOfU32String(self)
     hasher.combine(cxxHash)
   }
 }
@@ -232,42 +232,42 @@ extension std.u32string: Hashable {
 extension std.string: CustomDebugStringConvertible {
   @_alwaysEmitIntoClient
   public var debugDescription: String {
-    return "std.string(\(unsafe String(self)))"
+    return "std.string(\(String(self)))"
   }
 }
 
 extension std.u16string: CustomDebugStringConvertible {
   @_alwaysEmitIntoClient
   public var debugDescription: String {
-    return "std.u16string(\(unsafe String(self)))"
+    return "std.u16string(\(String(self)))"
   }
 }
 
 extension std.u32string: CustomDebugStringConvertible {
   @_alwaysEmitIntoClient
   public var debugDescription: String {
-    return "std.u32string(\(unsafe String(self)))"
+    return "std.u32string(\(String(self)))"
   }
 }
 
 extension std.string: CustomStringConvertible {
   @_alwaysEmitIntoClient
   public var description: String {
-    return unsafe String(self)
+    return String(self)
   }
 }
 
 extension std.u16string: CustomStringConvertible {
   @_alwaysEmitIntoClient
   public var description: String {
-    return unsafe String(self)
+    return String(self)
   }
 }
 
 extension std.u32string: CustomStringConvertible {
   @_alwaysEmitIntoClient
   public var description: String {
-    return unsafe String(self)
+    return String(self)
   }
 }
 
@@ -289,7 +289,7 @@ extension String {
     self = unsafe buffer.withMemoryRebound(to: UInt8.self) {
       unsafe String(decoding: $0, as: UTF8.self)
     }
-    unsafe withExtendedLifetime(cxxString) {}
+    withExtendedLifetime(cxxString) {}
   }
 
   /// Creates a String having the same content as the given C++ UTF-16 string.
@@ -306,7 +306,7 @@ extension String {
       start: cxxU16String.__dataUnsafe(),
       count: cxxU16String.size())
     self = unsafe String(decoding: buffer, as: UTF16.self)
-    unsafe withExtendedLifetime(cxxU16String) {}
+    withExtendedLifetime(cxxU16String) {}
   }
 
   /// Creates a String having the same content as the given C++ UTF-32 string.
@@ -325,7 +325,7 @@ extension String {
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
       unsafe String(decoding: $0, as: UTF32.self)
     }
-    unsafe withExtendedLifetime(cxxU32String) {}
+    withExtendedLifetime(cxxU32String) {}
   }
 }
 

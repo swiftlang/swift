@@ -2763,6 +2763,9 @@ public:
       *this << "[keep_unique] ";
     *this << getIDAndType(ECMI->getOperand());
   }
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *ECMI) {
+    *this << getIDAndType(ECMI->getOperand());
+  }
   void visitEndInitLetRefInst(EndInitLetRefInst *I) {
     *this << getIDAndType(I->getOperand());
   }
@@ -3359,6 +3362,12 @@ void SILInstruction::dump() const {
   print(llvm::errs());
 }
 
+void SILInstruction::dump(bool DebugInfo) const {
+  SILPrintContext Ctx(llvm::errs(), /*Verbose*/ false, /*SortedSIL*/ false,
+                      DebugInfo, /*PrintFullConvention*/ false);
+  SILPrinter(Ctx).print(this);
+}
+
 void SingleValueInstruction::dump() const {
   SILInstruction::dump();
 }
@@ -3375,6 +3384,13 @@ void NonSingleValueInstruction::dump() const {
 /// Pretty-print the SILBasicBlock to errs.
 void SILBasicBlock::dump() const {
   print(llvm::errs());
+}
+
+/// Pretty-print the SILBasicBlock to errs with Debug Info.
+void SILBasicBlock::dump(bool DebugInfo) const {
+  SILPrintContext Ctx(llvm::errs(), /*Verbose*/ false, /*SortedSIL*/ false,
+                      DebugInfo, /*PrintFullConvention*/ false);
+  SILPrinter(Ctx).print(this);
 }
 
 /// Pretty-print the SILBasicBlock to the designated stream.
@@ -3429,6 +3445,13 @@ void SILFunction::dump(bool Verbose) const {
 // This is out of line so the debugger can find it.
 void SILFunction::dump() const {
   dump(false);
+}
+
+/// Pretty-print the SILFunction to errs.
+void SILFunction::dump(bool Verbose, bool DebugInfo) const {
+  SILPrintContext Ctx(llvm::errs(), Verbose, /*SortedSIL*/ false, DebugInfo,
+                      /*PrintFullConvention*/ false);
+  print(Ctx);
 }
 
 void SILFunction::dump(const char *FileName) const {
@@ -3752,6 +3775,13 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
 /// Pretty-print the SILModule to errs.
 void SILModule::dump(bool Verbose) const {
   SILPrintContext Ctx(llvm::errs(), Verbose);
+  print(Ctx);
+}
+
+/// Pretty-print the SILModule to errs with DebugInfo.
+void SILModule::dump(bool Verbose, bool DebugInfo) const {
+  SILPrintContext Ctx(llvm::errs(), Verbose, /*SortedSIL*/ false, DebugInfo,
+                      /*PrintFullConvention*/ false);
   print(Ctx);
 }
 
@@ -4323,7 +4353,7 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
       conformance.getConcrete()->printName(out, options);
     else {
       out << "dependent ";
-      assocProtoWitness.SubstType->print(out, options);
+      assocProtoWitness.Witness.getType()->print(out, options);
     }
     break;
   }
@@ -4346,6 +4376,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   printSerializedKind(OS, getSerializedKind());
 
+  if (isSpecialized())
+    OS << "[specialized] ";
+
   getConformance()->printName(OS, Options);
   Options.GenericSig =
     getConformance()->getDeclContext()->getGenericSignatureOfContext()
@@ -4365,18 +4398,21 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto conditionalConformance : getConditionalConformances()) {
     // conditional_conformance (TypeName: Protocol):
     // <conformance>
-    if (conditionalConformance.Conformance.isInvalid())
+    if (conditionalConformance.isInvalid()) {
+      OS << "  conditional_conformance invalid";
       continue;
+    }
 
     OS << "  conditional_conformance (";
-    conditionalConformance.Requirement.print(OS, Options);
-    OS << ": " << conditionalConformance.Conformance.getProtocol()->getName()
+    conditionalConformance.getType().print(OS, Options);
+    OS << ": " << conditionalConformance.getProtocol()->getName()
        << "): ";
-    if (conditionalConformance.Conformance.isConcrete())
-      conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
+    if (conditionalConformance.isConcrete())
+      conditionalConformance.getConcrete()->printName(OS, Options);
     else {
+      ASSERT(conditionalConformance.isAbstract() && "Handle pack conformance here");
       OS << "dependent ";
-      conditionalConformance.Requirement->print(OS, Options);
+      conditionalConformance.getType()->print(OS, Options);
     }
 
     OS << '\n';

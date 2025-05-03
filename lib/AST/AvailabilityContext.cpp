@@ -214,6 +214,13 @@ AvailabilityContext AvailabilityContext::forDeclSignature(const Decl *decl) {
   return forLocation(decl->getLoc(), decl->getInnermostDeclContext());
 }
 
+AvailabilityContext
+AvailabilityContext::forAlwaysAvailable(const ASTContext &ctx) {
+  return AvailabilityContext(Storage::get(AvailabilityRange::alwaysAvailable(),
+                                          /*isDeprecated=*/false,
+                                          /*domainInfos=*/{}, ctx));
+}
+
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->platformRange;
 }
@@ -223,7 +230,7 @@ AvailabilityContext::getAvailabilityRange(AvailabilityDomain domain,
                                           const ASTContext &ctx) const {
   DEBUG_ASSERT(domain.supportsContextRefinement());
 
-  if (domain.isActive(ctx) && domain.isPlatform())
+  if (domain.isActivePlatform(ctx))
     return storage->platformRange;
 
   for (auto domainInfo : storage->getDomainInfos()) {
@@ -287,8 +294,9 @@ void AvailabilityContext::constrainWithPlatformRange(
 void AvailabilityContext::constrainWithAvailabilityRange(
     const AvailabilityRange &range, AvailabilityDomain domain,
     const ASTContext &ctx) {
+  DEBUG_ASSERT(domain.supportsContextRefinement());
 
-  if (domain.isActive(ctx) && domain.isPlatform()) {
+  if (domain.isActivePlatform(ctx)) {
     constrainWithPlatformRange(range, ctx);
     return;
   }
@@ -344,7 +352,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       break;
     case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-        if (domain.isActive(ctx) && domain.isPlatform()) {
+        if (domain.isActivePlatform(ctx)) {
           isConstrained |= constrainRange(platformRange, *introducedRange);
         } else {
           declDomainInfos.push_back({domain, *introducedRange});
@@ -403,12 +411,35 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
   os << "version=" << stringForAvailability(getPlatformRange());
 
   auto domainInfos = storage->getDomainInfos();
-  if (domainInfos.size() > 0) {
-    os << " unavailable=";
-    llvm::interleave(
-        domainInfos, os,
-        [&](const DomainInfo &domainInfo) { domainInfo.getDomain().print(os); },
-        ",");
+  if (!domainInfos.empty()) {
+    auto availableInfos = llvm::make_filter_range(
+        domainInfos, [](auto info) { return !info.isUnavailable(); });
+
+    if (!availableInfos.empty()) {
+      os << " available=";
+      llvm::interleave(
+          availableInfos, os,
+          [&](const DomainInfo &domainInfo) {
+            domainInfo.getDomain().print(os);
+            if (domainInfo.getDomain().isVersioned() &&
+                domainInfo.getRange().hasMinimumVersion())
+              os << ">=" << domainInfo.getRange().getAsString();
+          },
+          ",");
+    }
+
+    auto unavailableInfos = llvm::make_filter_range(
+        domainInfos, [](auto info) { return info.isUnavailable(); });
+
+    if (!unavailableInfos.empty()) {
+      os << " unavailable=";
+      llvm::interleave(
+          unavailableInfos, os,
+          [&](const DomainInfo &domainInfo) {
+            domainInfo.getDomain().print(os);
+          },
+          ",");
+    }
   }
 
   if (isDeprecated())

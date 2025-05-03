@@ -26,10 +26,14 @@ public struct FunctionConvention : CustomStringConvertible {
   let functionType: CanonicalType
   let hasLoweredAddresses: Bool
 
-  init(for functionType: CanonicalType, in function: Function) {
+  public init(for functionType: CanonicalType, in function: Function) {
+    self.init(for: functionType, hasLoweredAddresses: function.hasLoweredAddresses)
+  }
+
+  public init(for functionType: CanonicalType, hasLoweredAddresses: Bool) {
     assert(!functionType.hasTypeParameter, "requires contextual type")
     self.functionType = functionType
-    self.hasLoweredAddresses = function.hasLoweredAddresses
+    self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   /// All results including the error.
@@ -163,6 +167,15 @@ public struct ParameterInfo : CustomStringConvertible {
   public let convention: ArgumentConvention
   public let options: UInt8
   public let hasLoweredAddresses: Bool
+  
+  // Must be kept consistent with 'SILParameterInfo::Flag'
+  public enum Flag : UInt8 {
+    case notDifferentiable = 0x1
+    case sending = 0x2
+    case isolated = 0x4
+    case implicitLeading = 0x8
+    case const = 0x10
+  };
 
   public init(type: CanonicalType, convention: ArgumentConvention, options: UInt8, hasLoweredAddresses: Bool) {
     self.type = type
@@ -193,10 +206,14 @@ public struct ParameterInfo : CustomStringConvertible {
   public var description: String {
     "\(convention): \(type)"
   }
+  
+  public func hasOption(_ flag: Flag) -> Bool {
+    return options & flag.rawValue != 0
+  }
 }
 
 extension FunctionConvention {
-  public struct Parameters : Collection {
+  public struct Parameters : RandomAccessCollection {
     let bridged: BridgedParameterInfoArray
     let hasLoweredAddresses: Bool
 

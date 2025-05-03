@@ -911,6 +911,9 @@ public:
   void dump() const;
   void print(raw_ostream &OS) const;
 
+  /// Pretty-print the value with DebugInfo.
+  void dump(bool DebugInfo) const;
+
   /// Pretty-print the value in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
@@ -7818,6 +7821,7 @@ public:
   }
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
+  void setAccessKind(OpenedExistentialAccess kind) { ForAccess = kind; }
 
   CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
@@ -8074,20 +8078,6 @@ class InitExistentialMetatypeInst final
          SILFunction *parent);
 
 public:
-  /// Return the object type which was erased.  That is, if this
-  /// instruction erases Decoder<T>.Type.Type to Printable.Type.Type,
-  /// this method returns Decoder<T>.
-  CanType getFormalErasedObjectType() const {
-    auto exType = getType().getASTType();
-    auto concreteType = getOperand()->getType().getASTType();
-    while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-      exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
-      concreteType = cast<MetatypeType>(concreteType).getInstanceType();
-    }
-    assert(exType.isExistentialType());
-    return concreteType;
-  }
-
   ArrayRef<ProtocolConformanceRef> getConformances() const;
 };
 
@@ -9589,6 +9579,14 @@ public:
   void setKeepUnique(bool keepUnique = true) {
     sharedUInt8().EndCOWMutationInst.keepUnique = keepUnique;
   }
+};
+class EndCOWMutationAddrInst
+    : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationAddrInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  EndCOWMutationAddrInst(SILDebugLocation debugLoc, SILValue address)
+      : UnaryInstructionBase(debugLoc, address) {}
 };
 
 /// Given an escaping closure return true iff it has a non-nil context and the

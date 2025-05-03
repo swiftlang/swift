@@ -120,8 +120,9 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   }
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement,
+      [&](InFlightSubstitution &IFS, Type original,
           ProtocolDecl *protoType) -> ProtocolConformanceRef {
+    auto replacement = original.subst(IFS);
     assert(!replacement->is<GenericTypeParamType>());
 
     if (replacement->hasError() ||
@@ -1631,6 +1632,29 @@ namespace {
       // Build a member reference.
       auto memberRef = resolveConcreteDeclRef(member, memberLocator);
 
+      // If our member reference is a value generic, then the resulting
+      // expression is the type value one to access the underlying parameter's
+      // value.
+      //
+      // This can occur in code that does something like: 'type(of: x).a' where
+      // 'a' is the static value generic member.
+      if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
+        if (gp->isValue()) {
+          auto refType = adjustedOpenedType;
+          auto ref = TypeValueExpr::createForDecl(memberLoc, gp, dc);
+          cs.setType(ref, refType);
+
+          auto gpTy = gp->getDeclaredInterfaceType();
+          auto subs = baseTy->getContextSubstitutionMap();
+          ref->setParamType(gpTy.subst(subs));
+
+          auto result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
+                                                           refType);
+          cs.setType(result, refType);
+          return result;
+        }
+      }
+
       // If we're referring to a member type, it's just a type
       // reference.
       if (auto *TD = dyn_cast<TypeDecl>(member)) {
@@ -1949,7 +1973,7 @@ namespace {
             solution.setExprTypes(base);
             auto capture = new (ctx) VarDecl(/*static*/ false,
                                              VarDecl::Introducer::Let,
-                                             SourceLoc(),
+                                             base->getEndLoc(),
                                              ctx.getIdentifier("$base$"),
                                              dc);
             capture->setImplicit();
@@ -2624,18 +2648,8 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
-
       auto subMap = SubstitutionMap::get(
-          genericSig,
-          [&](SubstitutableType *type) -> Type {
-            assert(type->isEqual(genericSig.getGenericParams()[0]));
-            return valueType;
-          },
-          [&](CanType origType, Type replacementType,
-              ProtocolDecl *protoType) -> ProtocolConformanceRef {
-            assert(bridgedToObjectiveCConformance);
-            return bridgedToObjectiveCConformance;
-          });
+          genericSig, valueType, bridgedToObjectiveCConformance);
 
       ConcreteDeclRef fnSpecRef(fn, subMap);
 
@@ -2970,7 +2984,7 @@ namespace {
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
 
         ConcreteDeclRef witness =
-            conformance.getWitnessByName(type->getRValueType(), constrName);
+            conformance.getWitnessByName(constrName);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         return witness;
@@ -3108,8 +3122,7 @@ namespace {
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
 
-      ConcreteDeclRef witness = conformance.getWitnessByName(
-          conformingType->getRValueType(), constrName);
+      ConcreteDeclRef witness = conformance.getWitnessByName(constrName);
 
       auto selectedOverload = solution.getOverloadChoiceIfAvailable(
           cs.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
@@ -3223,8 +3236,20 @@ namespace {
 
     Expr *visitTypeValueExpr(TypeValueExpr *expr) {
       auto toType = simplifyType(cs.getType(expr));
-      assert(toType->isEqual(expr->getParamDecl()->getValueType()));
+      ASSERT(toType->isEqual(expr->getParamDecl()->getValueType()));
       cs.setType(expr, toType);
+
+      auto declRefRepr = cast<DeclRefTypeRepr>(expr->getRepr());
+      auto resolvedTy =
+          TypeResolution::resolveContextualType(declRefRepr, cs.DC,
+                                             TypeResolverContext::InExpression,
+                                                nullptr, nullptr, nullptr);
+
+      if (!resolvedTy || resolvedTy->hasError())
+        return nullptr;
+
+      expr->setParamType(resolvedTy);
+
       return expr;
     }
 
@@ -3412,9 +3437,8 @@ namespace {
       auto &DE = ctx.Diags;
       DE.diagnose(UDE->getLoc(),
                   diag::warn_deprecated_conditional_conformance_outer_access,
-                  UDE->getName(),
-                  choice->getDescriptiveKind(), choiceParentDecl,
-                  innerChoice->getDescriptiveKind(), innerParentDecl);
+                  UDE->getName(), choice, choiceParentDecl, innerChoice,
+                  innerParentDecl);
 
       auto name = choiceParentDecl->getName().getBaseIdentifier();
       SmallString<32> namePlusDot = name.str();
@@ -3422,7 +3446,7 @@ namespace {
 
       DE.diagnose(UDE->getLoc(),
                   diag::fix_deprecated_conditional_conformance_outer_access,
-                  namePlusDot, choice->getDescriptiveKind())
+                  namePlusDot, choice)
           .fixItInsert(UDE->getStartLoc(), namePlusDot);
     }
 
@@ -3822,7 +3846,7 @@ namespace {
         DeclName name(ctx, DeclBaseName::createConstructor(),
                       {ctx.Id_arrayLiteral});
         ConcreteDeclRef witness =
-            conformance.getWitnessByName(arrayTy->getRValueType(), name);
+            conformance.getWitnessByName(name);
         if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
           return nullptr;
         expr->setInitializer(witness);
@@ -3868,7 +3892,7 @@ namespace {
       DeclName name(ctx, DeclBaseName::createConstructor(),
                     {ctx.Id_dictionaryLiteral});
       ConcreteDeclRef witness =
-          conformance.getWitnessByName(dictionaryTy->getRValueType(), name);
+          conformance.getWitnessByName(name);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
       expr->setInitializer(witness);
@@ -5053,8 +5077,7 @@ namespace {
 
         de.diagnose(E->getLoc(), diag::expr_selector_not_objc, foundDecl)
             .highlight(subExpr->getSourceRange());
-        de.diagnose(foundDecl, diag::make_decl_objc,
-                    foundDecl->getDescriptiveKind())
+        de.diagnose(foundDecl, diag::make_decl_objc, foundDecl)
             .fixItInsert(foundDecl->getAttributeInsertionLoc(false), "@objc ");
         return E;
       }
@@ -5580,6 +5603,18 @@ namespace {
       E->setMacroRef(macroRef);
       E->setType(expandedType);
 
+      auto fnType =
+          simplifyType(overload.adjustedOpenedType)->castTo<FunctionType>();
+
+      auto newArgs = coerceCallArguments(
+          E->getArgs(), fnType, macroRef, /*applyExpr=*/nullptr,
+          cs.getConstraintLocator(E, ConstraintLocator::ApplyArgument),
+          solution.getAppliedPropertyWrappers(E));
+      if (!newArgs)
+        return nullptr;
+
+      E->setArgs(newArgs);
+
       // FIXME: Expansion should be lazy.
       // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
       // 'getRewritten()', and performed on-demand. Unfortunately that requires
@@ -6041,13 +6076,15 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
                                         bool inheritActorContext,
                                         bool isPassedToSendingParameter,
-                                        bool requiresDynamicIsolationChecking) {
+                                        bool requiresDynamicIsolationChecking,
+                                        bool isMacroArg) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
     closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
     closure->setRequiresDynamicIsolationChecking(
         requiresDynamicIsolationChecking);
+    closure->setIsMacroArgument(isMacroArg);
     return;
   }
 
@@ -6055,14 +6092,16 @@ static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
     applyContextualClosureFlags(captureList->getClosureBody(),
                                 implicitSelfCapture, inheritActorContext,
                                 isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking);
+                                requiresDynamicIsolationChecking,
+                                isMacroArg);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
                                 inheritActorContext,
                                 isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking);
+                                requiresDynamicIsolationChecking,
+                                isMacroArg);
   }
 }
 
@@ -6187,7 +6226,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   }();
 
   auto applyFlagsToArgument = [&paramInfo,
-                               &closuresRequireDynamicIsolationChecking](
+                               &closuresRequireDynamicIsolationChecking,
+                               &locator](
                                   unsigned paramIdx, Expr *argument) {
     if (!isClosureLiteralExpr(argument))
       return;
@@ -6195,11 +6235,13 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
+    bool isMacroArg = isExpr<MacroExpansionExpr>(locator.getAnchor());
 
     applyContextualClosureFlags(argument, isImplicitSelfCapture,
                                 inheritsActorContext,
                                 isPassedToSendingParameter,
-                                closuresRequireDynamicIsolationChecking);
+                                closuresRequireDynamicIsolationChecking,
+                                isMacroArg);
   };
 
   // Quickly test if any further fix-ups for the argument types are necessary.
@@ -6482,18 +6524,31 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   return ArgumentList::createTypeChecked(ctx, args, newArgs);
 }
 
+/// Looks through any non-semantic expressions and a capture list
+/// to find out whether the given expression is an explicit closure.
+static ClosureExpr *isExplicitClosureExpr(Expr *expr) {
+  if (auto IE = dyn_cast<IdentityExpr>(expr))
+    return isExplicitClosureExpr(IE->getSubExpr());
+
+  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
+    return isExplicitClosureExpr(CLE->getClosureBody());
+
+  return dyn_cast<ClosureExpr>(expr);
+}
+
 /// Whether the given expression is a closure that should inherit
 /// the actor context from where it was formed.
 static bool closureInheritsActorContext(Expr *expr) {
-  if (auto IE = dyn_cast<IdentityExpr>(expr))
-    return closureInheritsActorContext(IE->getSubExpr());
-
-  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
-    return closureInheritsActorContext(CLE->getClosureBody());
-
-  if (auto CE = dyn_cast<ClosureExpr>(expr))
+  if (auto *CE = isExplicitClosureExpr(expr))
     return CE->inheritsActorContext();
+  return false;
+}
 
+/// Determine whether the given expression is a closure that
+/// is explicitly marked as `@concurrent`.
+static bool isClosureMarkedAsConcurrent(Expr *expr) {
+  if (auto *CE = isExplicitClosureExpr(expr))
+    return CE->getAttrs().hasAttribute<ConcurrentAttr>();
   return false;
 }
 
@@ -7735,6 +7790,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
+    // If we have a ClosureExpr, then we can safely propagate the
+    // 'nonisolated(nonsending)' isolation if it's not explicitly
+    // marked as `@concurrent`.
+    if (toEI.getIsolation().isNonIsolatedCaller() &&
+        (fromEI.getIsolation().isNonIsolated() &&
+         !isClosureMarkedAsConcurrent(expr))) {
+      auto newFromFuncType = fromFunc->withIsolation(
+          FunctionTypeIsolation::forNonIsolatedCaller());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+        // Propagating 'nonisolated(nonsending)' might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
     if (ctx.LangOpts.isDynamicActorIsolationCheckingEnabled()) {
       // Passing a synchronous global actor-isolated function value and
       // parameter that expects a synchronous non-isolated function type could
@@ -8068,7 +8140,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
     Diag<> brokenProtocolDiag, Diag<> brokenBuiltinProtocolDiag) {
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
-  if (type->is<UnresolvedType>()) {
+  if (type->is<UnresolvedType>() || type->is<ErrorType>()) {
     cs.setType(literal, type);
     return literal;
   }
@@ -8081,7 +8153,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
       auto witness = builtinConformance.getWitnessByName(
-          type->getRValueType(), builtinLiteralFuncName);
+          builtinLiteralFuncName);
       if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
 
@@ -8106,7 +8178,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
   if (!literalType.empty()) {
     // Extract the literal type.
     Type builtinLiteralType =
-        conformance.getTypeWitnessByName(type, literalType);
+        conformance.getTypeWitnessByName(literalType);
     if (builtinLiteralType->hasError())
       return nullptr;
 
@@ -8120,7 +8192,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
 
   // Find the witness that we'll use to initialize the literal value.
   auto witness =
-      conformance.getWitnessByName(type->getRValueType(), literalFuncName);
+      conformance.getWitnessByName(literalFuncName);
   if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
     return nullptr;
 
@@ -8222,9 +8294,8 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance = checkConformance(argumentType, dictLitProto);
-    auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
-    auto valueType =
-        conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
+    auto keyType = conformance.getTypeWitnessByName(ctx.Id_Key);
+    auto valueType = conformance.getTypeWitnessByName(ctx.Id_Value);
     SmallVector<Identifier, 4> names;
     SmallVector<Expr *, 4> dictElements;
     for (auto arg : *args) {

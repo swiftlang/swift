@@ -106,6 +106,7 @@ extension InlineArray where Element: ~Copyable {
   /// Converts the given raw pointer, which points at an uninitialized array
   /// instance, to a mutable buffer suitable for initialization.
   @available(SwiftStdlib 6.2, *)
+  @unsafe
   @_alwaysEmitIntoClient
   @_transparent
   internal static func _initializationBuffer(
@@ -147,7 +148,7 @@ extension InlineArray where Element: ~Copyable {
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Self._initializationBuffer(start: rawPtr)
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       for i in 0 ..< count {
         do throws(E) {
@@ -204,7 +205,7 @@ extension InlineArray where Element: ~Copyable {
     var o: Element? = first
 
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Self._initializationBuffer(start: rawPtr)
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       guard Self.count > 0 else {
         return
@@ -246,11 +247,15 @@ extension InlineArray where Element: Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
+#if $ValueGenericsNameLookup
     self = Builtin.emplace {
-      let buffer = Self._initializationBuffer(start: $0)
+      let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
+#else
+    fatalError()
+#endif
   }
 }
 
@@ -271,14 +276,6 @@ extension InlineArray where Element: ~Copyable {
   /// argument.
   @available(SwiftStdlib 6.2, *)
   public typealias Index = Int
-
-  // FIXME: Remove when SE-0452 "Integer Generic Parameters" is implemented.
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public static var count: Int {
-    count
-  }
 
   /// The number of elements in the array.
   ///
@@ -468,7 +465,20 @@ extension InlineArray where Element: ~Copyable {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
-      fatalError("Span over InlineArray is not supported yet.")
+      let pointer = unsafe _address
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(&self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      let pointer = unsafe _mutableAddress
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
 }

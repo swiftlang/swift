@@ -23,6 +23,9 @@ public class Decl: CustomStringConvertible, Hashable {
   /// The module in which this declaration resides.
   public var parentModule: ModuleDecl { bridged.getModuleContext().getAs(ModuleDecl.self) }
 
+  /// The parent DeclContext if it is a Decl.
+  public var parent: Decl? { bridged.getParent().decl }
+
   // True if this declaration is imported from C/C++/ObjC.
   public var hasClangNode: Bool { bridged.hasClangNode() }
 
@@ -69,7 +72,9 @@ final public class ClassDecl: NominalTypeDecl {
   }
 }
 
-final public class ProtocolDecl: NominalTypeDecl {}
+final public class ProtocolDecl: NominalTypeDecl {
+  public var requiresClass: Bool { bridged.ProtocolDecl_requiresClass() }
+}
 
 final public class BuiltinTupleDecl: NominalTypeDecl {}
 
@@ -83,7 +88,9 @@ final public class AssociatedTypeDecl: TypeDecl {}
 
 final public class ModuleDecl: TypeDecl {}
 
-public class AbstractStorageDecl: ValueDecl {}
+public class AbstractStorageDecl: ValueDecl {
+  final public var isConst: Bool { bridged.AbstractStorage_isConst() }
+}
 
 public class VarDecl: AbstractStorageDecl {}
 

@@ -165,15 +165,18 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     if (dependency.isHeader()) {
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
-      if (!dependency.Core.RawPath.empty() &&
-          !M->getASTContext().SearchPathOpts.BridgingHeaderChaining) {
+      if (!dependency.Core.RawPath.empty()) {
+        // If using bridging header chaining, just bind the entire bridging
+        // header pch to the module. Otherwise, import the header.
         bool hadError =
-            clangImporter->importHeader(dependency.Core.RawPath,
-                                        file->getParentModule(),
-                                        Core->importedHeaderInfo.fileSize,
-                                        Core->importedHeaderInfo.fileModTime,
-                                        Core->importedHeaderInfo.contents,
-                                        diagLoc);
+            M->getASTContext().SearchPathOpts.BridgingHeaderChaining
+                ? clangImporter->bindBridgingHeader(file->getParentModule(),
+                                                    diagLoc)
+                : clangImporter->importHeader(
+                      dependency.Core.RawPath, file->getParentModule(),
+                      Core->importedHeaderInfo.fileSize,
+                      Core->importedHeaderInfo.fileModTime,
+                      Core->importedHeaderInfo.contents, diagLoc);
         if (hadError)
           return error(Status::FailedToLoadBridgingHeader);
       }

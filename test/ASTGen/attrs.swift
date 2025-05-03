@@ -2,7 +2,6 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -14,7 +13,6 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -29,7 +27,6 @@
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -42,7 +39,6 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_ABIAttribute
-// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_RawLayout
@@ -195,19 +191,19 @@ struct StorageRestrctionTest {
 @_unavailableFromAsync struct UnavailFromAsyncStruct { } // expected-error {{'@_unavailableFromAsync' attribute cannot be applied to this declaration}}
 @_unavailableFromAsync(message: "foo bar") func UnavailFromAsyncFn() {}
 
-@execution(concurrent) func testGlobal() async { // Ok
+@concurrent func testGlobal() async { // Ok
 }
 
 do {
-  @execution(caller) func testLocal() async {} // Ok
+  nonisolated(nonsending) func testLocal() async {} // Ok
 
   struct Test {
-    @execution(concurrent) func testMember() async {} // Ok
+    @concurrent func testMember() async {} // Ok
   }
 }
 
 typealias testConvention = @convention(c) (Int) -> Int
-typealias testExecution = @execution(concurrent) () async -> Void
+typealias testExecution = @concurrent () async -> Void
 typealias testIsolated = @isolated(any) () -> Void
 
 protocol OpProto {}

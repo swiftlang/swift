@@ -1,11 +1,8 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-
 
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 import Dispatch
 
@@ -27,8 +24,10 @@ func testUnsafeSendableInMainAsync() async {
   var x = 5
   DispatchQueue.main.async {
     x = 17 // expected-warning{{mutation of captured var 'x' in concurrently-executing code}}
+    // expected-tns-warning @-1 {{sending 'x' risks causing data races}}
+    // expected-tns-note @-2 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
-  print(x)
+  print(x) // expected-tns-note {{access can happen concurrently}}
 }
 
 func testUnsafeSendableInAsync(queue: DispatchQueue) async {

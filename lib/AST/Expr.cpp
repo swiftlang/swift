@@ -2441,11 +2441,22 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, 
-                                            GenericTypeParamDecl *paramDecl) {
-  auto &ctx = paramDecl->getASTContext();
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, TypeDecl *decl,
+                                            DeclContext *dc) {
+  auto &ctx = decl->getASTContext();
   ASSERT(loc.isValid());
-  return new (ctx) TypeValueExpr(loc, paramDecl);
+  auto repr = UnqualifiedIdentTypeRepr::create(ctx, loc, decl->createNameRef());
+  repr->setValue(decl, dc);
+  return new (ctx) TypeValueExpr(repr);
+}
+
+GenericTypeParamDecl *TypeValueExpr::getParamDecl() const {
+  auto declRefRepr = cast<DeclRefTypeRepr>(getRepr());
+  return cast<GenericTypeParamDecl>(declRefRepr->getBoundDecl());
+}
+
+SourceRange TypeValueExpr::getSourceRange() const {
+  return getRepr()->getSourceRange();
 }
 
 ExistentialArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
@@ -3015,6 +3026,17 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
+}
+
+Expr *Expr::getAlwaysLeftFoldedSubExpr() const {
+  if (auto *ATE = dyn_cast<AnyTryExpr>(this))
+    return ATE->getSubExpr();
+  if (auto *AE = dyn_cast<AwaitExpr>(this))
+    return AE->getSubExpr();
+  if (auto *UE = dyn_cast<UnsafeExpr>(this))
+    return UE->getSubExpr();
+
+  return nullptr;
 }
 
 const Expr *Expr::findOriginalValue() const {

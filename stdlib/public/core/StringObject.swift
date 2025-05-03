@@ -973,7 +973,7 @@ extension _StringObject {
 #if _runtime(_ObjC)
     if largeFastIsConstantCocoa {
       return unsafe withCocoaObject {
-        unsafe _getNSCFConstantStringContentsPointer($0)
+        _getNSCFConstantStringContentsPointer($0)
       }
     }
     if largeIsCocoa {
@@ -982,14 +982,14 @@ extension _StringObject {
       }
     }
 #endif
-    return unsafe withSharedStorage { $0.start }
+    return unsafe withSharedStorage { unsafe $0.start }
   }
 
   @usableFromInline
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
     @_effects(releasenone) @inline(never) get {
       _internalInvariant(largeFastIsShared)
-      let start = unsafe self.getSharedUTF8Start()
+      let start = self.getSharedUTF8Start()
       return unsafe UnsafeBufferPointer(start: start, count: largeCount)
     }
   }

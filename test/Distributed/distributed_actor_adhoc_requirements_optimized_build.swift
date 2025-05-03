@@ -1,11 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-ir -swift-version 6 -O -I %t %s
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -O -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-6.0-abi-triple -emit-ir -swift-version 6 -O -I %t %s
+// RUN: %target-swift-frontend -target %target-swift-6.0-abi-triple -emit-sil -swift-version 6 -O -I %t %s | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// REQUIRES: OS=macosx || OS=ios
 
 import Distributed
 

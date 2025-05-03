@@ -33,9 +33,15 @@ void swift_destroyDispatchEventC(void *event);
 extern "C" SWIFT_CC(swift)
 void swift_signalDispatchEvent(void *event);
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
- 
+
 extern "C" SWIFT_CC(swift) __attribute__((noreturn))
 void swift_dispatchMain();
+
+extern "C" SWIFT_CC(swift)
+void swift_createDefaultExecutors();
+
+extern "C" SWIFT_CC(swift)
+void swift_createDefaultExecutorsOnce();
 
 #pragma clang diagnostic pop
 

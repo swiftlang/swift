@@ -67,6 +67,12 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_IntegerInline:
     os << "int: " << getIntegerValue() << "\n";
     return;
+  case RK_FloatingPoint: {
+    SmallVector<char, 0> stringFloatRepr;
+    getFloatValue().toString(stringFloatRepr);
+    os << "float: " << stringFloatRepr << "\n";
+    return;
+  }
   case RK_String:
     os << "string: \"" << getStringValue() << "\"\n";
     return;
@@ -182,6 +188,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Integer:
   case RK_IntegerInline:
     return Integer;
+  case RK_FloatingPoint:
+    return FloatingPoint;
   case RK_String:
     return String;
   case RK_DirectAddress:
@@ -208,9 +216,11 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   case RK_Metatype:
   case RK_Function:
     assert(0 && "cloning this representation kind is not supported");
-  case RK_Enum:
+    case RK_Enum:
     // These have trivial inline storage, just return a copy.
     return *this;
+  case RK_FloatingPoint:
+    return SymbolicValue::getFloat(getFloatValue(), allocator);
   case RK_IntegerInline:
   case RK_Integer:
     return SymbolicValue::getInteger(getIntegerValue(), allocator);
@@ -274,6 +284,7 @@ bool SymbolicValue::containsOnlyConstants() const {
   case RK_Enum:
   case RK_IntegerInline:
   case RK_Integer:
+  case RK_FloatingPoint:
   case RK_String:
   case RK_Closure:
     return true;
@@ -351,6 +362,18 @@ SymbolicValue SymbolicValue::getInteger(const APInt &value,
   return result;
 }
 
+SymbolicValue SymbolicValue::getFloat(const APFloat &value,
+                                      SymbolicValueAllocator &allocator) {
+  auto rawMem = allocator.allocate(APFloat::getSizeInBits(value.getSemantics()),
+                                   alignof(APFloat));
+  auto floatVal = ::new (rawMem) APFloat(value);
+
+  SymbolicValue result;
+  result.representationKind = RK_FloatingPoint;
+  result.value.floatingPoint = floatVal;
+  return result;
+}
+
 APInt SymbolicValue::getIntegerValue() const {
   assert(getKind() == Integer);
   if (representationKind == RK_IntegerInline) {
@@ -370,6 +393,12 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
   assert (representationKind == RK_IntegerInline ||
           representationKind == RK_Integer);
   return auxInfo.integerBitwidth;
+}
+
+APFloat SymbolicValue::getFloatValue() const {
+  assert(getKind() == FloatingPoint);
+  assert(representationKind == RK_FloatingPoint);
+  return *(value.floatingPoint);
 }
 
 //===----------------------------------------------------------------------===//

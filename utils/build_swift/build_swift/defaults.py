@@ -122,6 +122,8 @@ def llvm_install_components():
     """Convenience function for getting the default llvm install components for
     platforms.
     """
+    # llvm build product will take care of replacing compiler-rt with
+    # builtins,runtimes if need be
     components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
                   'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO',
                   'lld']

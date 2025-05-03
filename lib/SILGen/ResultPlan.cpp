@@ -81,7 +81,7 @@ public:
     assert(box && "buffer never emitted before activating cleanup?!");
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(theBox)) {
         SGF.B.createEndBorrow(loc, bbi);
         theBox = bbi->getOperand();
       }
@@ -792,10 +792,9 @@ public:
     return std::make_tuple(blockStorage, blockStorageTy, continuationTy);
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
+  ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, ManagedValue self,
+      SILLocation loc) override {
     // Get the current continuation for the task.
     bool throws =
         calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
@@ -845,7 +844,14 @@ public:
     SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
                           impRef, SILType::getPrimitiveObjectType(impFnTy),
                           SGF.getForwardingSubstitutionMap());
-    
+
+    // If our block is Sendable, we have lost the connection in between self and
+    // blockStorage. We need to restore that connection by using a merge
+    // isolation region.
+    if (self && block->getType().isSendable(&SGF.F)) {
+      SGF.B.createMergeIsolationRegion(loc, {self.getValue(), blockStorage});
+    }
+
     // Wrap it in optional if the callee expects it.
     if (handlerIsOptional) {
       block = SGF.B.createOptionalSome(loc, block, impTy);
@@ -1091,11 +1097,11 @@ public:
     subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
-    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
+  ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, ManagedValue self,
+      SILLocation loc) override {
+    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, self,
+                                                      loc);
   }
 
   std::optional<std::pair<ManagedValue, ManagedValue>>

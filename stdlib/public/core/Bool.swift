@@ -197,7 +197,6 @@ extension Bool: Hashable {
   }
 }
 
-@_unavailableInEmbedded
 extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///

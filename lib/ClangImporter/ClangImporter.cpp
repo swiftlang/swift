@@ -821,38 +821,14 @@ importer::addCommonInvocationArguments(
     switch (triple.getArch()) {
     case llvm::Triple::x86:
     case llvm::Triple::x86_64:
-      // `-mcpu` is deprecated and an alias for `-mtune`. We need to pass
-      // `-march` and `-mtune` to behave identically to the `apple-a\d+` cases
-      // below.
+      // For x86, `-mcpu` is deprecated and an alias of `-mtune`. We need to
+      // pass `-march` and `-mtune` to behave like `-mcpu` on other targets.
       invocationArgStrs.push_back("-march=" + importerOpts.TargetCPU);
       invocationArgStrs.push_back("-mtune=" + importerOpts.TargetCPU);
       break;
     default:
       invocationArgStrs.push_back("-mcpu=" + importerOpts.TargetCPU);
       break;
-    }
-  } else if (triple.isOSDarwin()) {
-    // Special case CPU based on known deployments:
-    //   - arm64 deploys to apple-a7
-    //   - arm64 on macOS
-    //   - arm64 for iOS/tvOS/watchOS simulators
-    //   - arm64e deploys to apple-a12
-    // and arm64e (everywhere) and arm64e macOS defaults to the "apple-a12" CPU
-    // for Darwin, but Clang only detects this if we use -arch.
-    if (triple.getArchName() == "arm64e")
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.isAArch64() && triple.isMacOSX())
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
-             (triple.isiOS() || triple.isWatchOS()))
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.isAArch64() && triple.isSimulatorEnvironment() &&
-             triple.isXROS())
-      invocationArgStrs.push_back("-mcpu=apple-a12");
-    else if (triple.getArch() == llvm::Triple::aarch64 ||
-             triple.getArch() == llvm::Triple::aarch64_32 ||
-             triple.getArch() == llvm::Triple::aarch64_be) {
-      invocationArgStrs.push_back("-mcpu=apple-a7");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {
     invocationArgStrs.push_back("-march=z13");
@@ -1869,12 +1845,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
   if (isPCHFilenameExtension(header)) {
-    Impl.ImportedHeaderOwners.push_back(adapter);
-    // We already imported this with -include-pch above, so we should have
-    // collected a bunch of PCH-encoded module imports that we just need to
-    // replay in handleDeferredImports.
-    Impl.handleDeferredImports(diagLoc);
-    return false;
+    return bindBridgingHeader(adapter, diagLoc);
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -1899,6 +1870,15 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   };
   return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
                            std::move(sourceBuffer), implicitImport);
+}
+
+bool ClangImporter::bindBridgingHeader(ModuleDecl *adapter, SourceLoc diagLoc) {
+  Impl.ImportedHeaderOwners.push_back(adapter);
+  // We already imported this with -include-pch above, so we should have
+  // collected a bunch of PCH-encoded module imports that we just need to
+  // replay in handleDeferredImports.
+  Impl.handleDeferredImports(diagLoc);
+  return false;
 }
 
 static llvm::Expected<llvm::cas::ObjectRef>
@@ -4114,35 +4094,29 @@ void ClangModuleUnit::lookupObjCMethods(
 
 void ClangModuleUnit::lookupAvailabilityDomains(
     Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
-  auto lookupTable = owner.findLookupTable(clangModule);
-  if (!lookupTable)
+  auto domainName = identifier.str();
+  auto &ctx = getASTContext();
+  auto &clangASTContext = getClangASTContext();
+
+  auto domainInfo = clangASTContext.getFeatureAvailInfo(domainName);
+  if (domainInfo.Kind == clang::FeatureAvailKind::None)
     return;
 
-  auto varDecl = lookupTable->lookupAvailabilityDomainDecl(identifier.str());
+  auto *varDecl = dyn_cast_or_null<clang::VarDecl>(domainInfo.Decl);
   if (!varDecl)
     return;
 
-  auto featureInfo = getClangASTContext().getFeatureAvailInfo(varDecl);
-  if (featureInfo.first.empty())
+  // The decl that was found may belong to a different Clang module.
+  if (varDecl->getOwningModule() != getClangModule())
     return;
 
-  auto getDomainKind = [](clang::FeatureAvailKind featureAvailKind) {
-    switch (featureAvailKind) {
-    case clang::FeatureAvailKind::None:
-      llvm_unreachable("unexpected kind");
-    case clang::FeatureAvailKind::Available:
-      return CustomAvailabilityDomain::Kind::Enabled;
-    case clang::FeatureAvailKind::Unavailable:
-      return CustomAvailabilityDomain::Kind::Disabled;
-    case clang::FeatureAvailKind::Dynamic:
-      return CustomAvailabilityDomain::Kind::Dynamic;
-    }
-  };
+  auto *imported = ctx.getClangModuleLoader()->importDeclDirectly(varDecl);
+  if (!imported)
+    return;
 
-  auto domain = AvailabilityDomain::forCustom(CustomAvailabilityDomain::get(
-      featureInfo.first, getParentModule(),
-      getDomainKind(featureInfo.second.Kind), getASTContext()));
-  results.push_back(domain);
+  auto customDomain = AvailabilityDomain::forCustom(imported, ctx);
+  ASSERT(customDomain);
+  results.push_back(*customDomain);
 }
 
 void ClangModuleUnit::collectLinkLibraries(
@@ -4748,9 +4722,8 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
     // If CXXInterop is enabled we need to check the modified operator name as
     // well
     if (SwiftContext.LangOpts.EnableCXXInterop) {
-      auto funcBaseName =
-          DeclBaseName(SwiftContext.getIdentifier(getPrivateOperatorName(
-              name.getBaseName().getIdentifier().str().str())));
+      auto funcBaseName = DeclBaseName(
+          getOperatorName(SwiftContext, name.getBaseName().getIdentifier()));
       for (auto entry : table.lookupMemberOperators(funcBaseName)) {
         if (isVisibleClangEntry(entry)) {
           if (auto func = dyn_cast_or_null<FuncDecl>(
@@ -6285,9 +6258,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // to import all non-public members by default; if that is disabled, we only
   // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
   // are the only classes that need non-public members.)
+  auto *cxxRecordDecl =
+      dyn_cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl());
   auto skipIfNonPublic =
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
-      importer::getPrivateFileIDAttrs(inheritingDecl->getClangDecl()).empty();
+      cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
@@ -6389,6 +6364,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
+
+      if (isSymbolicCircularBase(cxxRecord, baseRecord))
+        // Skip circular bases to avoid unbounded recursion
+        continue;
+
       if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
         // If we are looking up the base class, go no further. We will have
         // already found it during the other lookup.
@@ -7813,17 +7793,6 @@ static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
          });
 }
 
-// TODO: Move all these utility functions in a new file ClangImporterUtils.h
-// rdar://138803759
-static bool hasImmortalAtts(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "retain:immortal" ||
-                    swiftAttr->getAttribute() == "release:immortal";
-           return false;
-         });
-}
-
 // Is this a pointer to a foreign reference type.
 bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type) {
   if (!type->isPointerType())
@@ -7835,7 +7804,7 @@ bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType 
     return false;
 
   return hasImportAsRefAttr(pointeeType->getDecl()) &&
-         !hasImmortalAtts(pointeeType->getDecl());
+         !hasImmortalAttrs(pointeeType->getDecl());
 }
 
 static bool hasDiamondInheritanceRefType(const clang::CXXRecordDecl *decl) {
@@ -8769,9 +8738,8 @@ void ClangInheritanceInfo::setUnavailableIfNecessary(
 }
 
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
+importer::getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
-
   constexpr auto prefix = StringRef("private_fileid:");
 
   if (decl->hasAttrs()) {
@@ -8803,4 +8771,60 @@ bool importer::declIsCxxOnly(const Decl *decl) {
         .Default([](auto) { return false; });
   }
   return false;
+}
+
+bool importer::isClangNamespace(const DeclContext *dc) {
+  if (const auto *ed = dc->getSelfEnumDecl())
+    return isa_and_nonnull<clang::NamespaceDecl>(ed->getClangDecl());
+
+  return false;
+}
+
+bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,
+                                      const clang::RecordDecl *base) {
+  auto *classTemplate = symbolicClass->getDescribedClassTemplate();
+  if (!classTemplate)
+    return false;
+
+  auto *specializedBase =
+      dyn_cast<clang::ClassTemplateSpecializationDecl>(base);
+  if (!specializedBase)
+    return false;
+
+  return classTemplate->getCanonicalDecl() ==
+         specializedBase->getSpecializedTemplate()->getCanonicalDecl();
+}
+
+std::optional<ResultConvention>
+swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
+  using RC = ResultConvention;
+
+  if (auto result =
+          matchSwiftAttr<RC>(decl, {{"returns_unretained", RC::Unowned},
+                                    {"returns_retained", RC::Owned}}))
+    return result;
+
+  const clang::Type *returnTy = nullptr;
+  if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(decl))
+    returnTy = func->getReturnType().getTypePtrOrNull();
+  else if (const auto *method = llvm::dyn_cast<clang::ObjCMethodDecl>(decl))
+    returnTy = method->getReturnType().getTypePtrOrNull();
+
+  if (!returnTy)
+    return std::nullopt;
+
+  const clang::Type *desugaredReturnTy =
+      returnTy->getUnqualifiedDesugaredType();
+
+  if (const auto *ptrType =
+          llvm::dyn_cast<clang::PointerType>(desugaredReturnTy)) {
+    if (const clang::RecordDecl *record =
+            ptrType->getPointeeType()->getAsRecordDecl()) {
+      return matchSwiftAttrConsideringInheritance<RC>(
+          record, {{"returned_as_unretained_by_default", RC::Unowned},
+                   {"returned_as_retained_by_default", RC::Owned}});
+    }
+  }
+
+  return std::nullopt;
 }

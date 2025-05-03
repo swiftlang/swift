@@ -1490,13 +1490,26 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   // Do not allow access if the sourceDC is in a different file
   auto *useSF = useDC->getOutermostParentSourceFile();
   if (useSF != sourceDC->getOutermostParentSourceFile()) {
-    // This might be a C++ declaration with a SWIFT_PRIVATE_FILEID
-    // attribute, which asks us to treat it as if it were defined in the file
+    // sourceDC might be a C++ record with a SWIFT_PRIVATE_FILEID attribute,
+    // which asks us to treat it as if it were defined in the file
     // with the specified FileID.
-
     auto clangDecl = sourceNTD->getDecl()->getClangDecl();
-    if (!clangDecl)
+
+    if (isa_and_nonnull<clang::EnumDecl>(clangDecl)) {
+      // Consider:  class C { private: enum class E { M }; };
+      // If sourceDC is a C++ enum (e.g, E), then we are looking at one of its
+      // members (e.g., E.M). If this is the case, then we should consider
+      // the SWIFT_PRIVATE_FILEID of its enclosing class decl (e.g., C), if any.
+      // Doing so allows the nested private enum's members to inherit the access
+      // of the nested enum type itself.
+      clangDecl = dyn_cast<clang::CXXRecordDecl>(clangDecl->getDeclContext());
+      sourceDC = sourceNTD->getDeclContext();
+    }
+
+    if (!isa_and_nonnull<clang::CXXRecordDecl>(clangDecl))
       return false;
+
+    auto recordDecl = cast<clang::CXXRecordDecl>(clangDecl);
 
     // Diagnostics should enforce that there is at most SWIFT_PRIVATE_FILEID,
     // but this handles the case where there is more than anyway (whether that
@@ -1504,7 +1517,7 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     // by any of the SWIFT_PRIVATE_FILEID annotations (i.e., disallow private
     // access if none of them bless useSF).
     if (!llvm::any_of(
-            importer::getPrivateFileIDAttrs(clangDecl), [&](auto &blessed) {
+            importer::getPrivateFileIDAttrs(recordDecl), [&](auto &blessed) {
               auto blessedFileID = SourceFile::FileIDStr::parse(blessed.first);
               return blessedFileID && blessedFileID->matches(useSF);
             })) {

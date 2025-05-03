@@ -453,6 +453,7 @@ private:
     case Node::Kind::Isolated:
     case Node::Kind::Sending:
     case Node::Kind::CompileTimeLiteral:
+    case Node::Kind::ConstValue:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -614,6 +615,7 @@ private:
     case Node::Kind::DependentProtocolConformanceAssociated:
     case Node::Kind::DependentProtocolConformanceInherited:
     case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::DependentProtocolConformanceOpaque:
     case Node::Kind::ProtocolConformanceRefInTypeModule:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
@@ -1264,6 +1266,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
     case FunctionSigSpecializationParamKind::ConstantPropGlobal: {
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1279,6 +1283,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     }
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1286,6 +1292,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropString:
+      if (Idx + 3 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1296,6 +1304,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "]";
       break;
     case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      if (Idx + 4 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1307,6 +1317,8 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << ">]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
+      if (Idx + 2 > End)
+        return;
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
       Printer << " : ";
@@ -1834,6 +1846,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::CompileTimeLiteral:
     Printer << "_const ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ConstValue:
+    Printer << "@const ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::Shared:
@@ -3127,7 +3143,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@isolated(any) ";
     return nullptr;
   case Node::Kind::NonIsolatedCallerFunctionType:
-    Printer << "@execution(caller) ";
+    Printer << "nonisolated(nonsending) ";
     return nullptr;
   case Node::Kind::SendingResultFunctionType:
     Printer << "sending ";
@@ -3268,6 +3284,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     printOptionalIndex(Node->getChild(2));
     print(Node->getChild(0), depth + 1);
     Printer << " to ";
+    print(Node->getChild(1), depth + 1);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceOpaque:
+    Printer << "opaque result conformance ";
+    print(Node->getChild(0), depth + 1);
+    Printer << " of ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:

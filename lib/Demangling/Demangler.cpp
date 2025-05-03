@@ -1005,6 +1005,9 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeLiteral, popTypeAndGetChild()));
+  case 'g':
+    return createType(
+        createWithChild(Node::Kind::ConstValue, popTypeAndGetChild()));
   case 'T':
     return createNode(Node::Kind::SendingResultFunctionType);
   case 'u':
@@ -1039,6 +1042,7 @@ recur:
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
+      case 'O': return demangleDependentProtocolConformanceOpaque();
       case 'P':
         return createWithChild(
             Node::Kind::ProtocolConformanceRefInTypeModule, popProtocol());
@@ -1958,6 +1962,7 @@ NodePointer Demangler::popAnyProtocolConformance() {
     case Node::Kind::DependentProtocolConformanceRoot:
     case Node::Kind::DependentProtocolConformanceInherited:
     case Node::Kind::DependentProtocolConformanceAssociated:
+    case Node::Kind::DependentProtocolConformanceOpaque:
       return true;
 
     default:
@@ -2055,6 +2060,13 @@ NodePointer Demangler::demangleDependentConformanceIndex() {
 
   // Remove the index adjustment.
   return createNode(Node::Kind::Index, unsigned(index) - 2);
+}
+
+NodePointer Demangler::demangleDependentProtocolConformanceOpaque() {
+  NodePointer type = popNode(Node::Kind::Type);
+  NodePointer conformance = popDependentProtocolConformance();
+  return createWithChildren(Node::Kind::DependentProtocolConformanceOpaque,
+                            conformance, type);
 }
 
 NodePointer Demangler::demangleRetroactiveConformance() {

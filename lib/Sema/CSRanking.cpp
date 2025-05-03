@@ -703,11 +703,16 @@ bool CompareDeclSpecializationRequest::evaluate(
            paramIdx != numParams; ++paramIdx) {
         const auto &param = params2[paramIdx];
         auto paramTy = param.getOldType();
+        auto argIndices = matching->parameterBindings[paramIdx];
+        if (argIndices.empty())
+          continue;
 
         if (paramListInfo.isVariadicGenericParameter(paramIdx) &&
-            isPackExpansionType(paramTy)) {
+            isPackExpansionType(paramTy) &&
+            (argIndices.size() > 1 ||
+             !isPackExpansionType(args[argIndices.front()].getOldType()))) {
           SmallVector<Type, 2> argTypes;
-          for (auto argIdx : matching->parameterBindings[paramIdx]) {
+          for (auto argIdx : argIndices) {
             // Don't prefer `T...` over `repeat each T`.
             if (args[argIdx].isVariadic())
               return completeResult(false);
@@ -721,7 +726,7 @@ bool CompareDeclSpecializationRequest::evaluate(
           continue;
         }
 
-        for (auto argIdx : matching->parameterBindings[paramIdx]) {
+        for (auto argIdx : argIndices) {
           const auto &arg = args[argIdx];
           // Always prefer non-variadic version when possible.
           if (arg.isVariadic())

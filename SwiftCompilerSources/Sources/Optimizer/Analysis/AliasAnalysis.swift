@@ -358,7 +358,7 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
       // Check if the memLoc is "derived" from the begin_borrow, i.e. is an interior pointer.
-      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BorrowIntroducingInstruction)
+      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
   }
@@ -704,7 +704,7 @@ private enum ImmutableScope {
 }
 
 private struct FindBeginBorrowWalker : ValueUseDefWalker {
-  let beginBorrow: BorrowIntroducingInstruction
+  let beginBorrow: BeginBorrowInstruction
   var walkUpCache = WalkerCache<Path>()
 
   mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {

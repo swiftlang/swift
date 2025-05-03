@@ -75,6 +75,7 @@ NODE(DependentPseudogenericSignature)
 NODE(DependentProtocolConformanceRoot)
 NODE(DependentProtocolConformanceInherited)
 NODE(DependentProtocolConformanceAssociated)
+NODE(DependentProtocolConformanceOpaque)
 CONTEXT_NODE(Destructor)
 CONTEXT_NODE(DidSet)
 NODE(Directness)
@@ -412,6 +413,7 @@ NODE(NegativeInteger)
 NODE(DependentGenericParamValueMarker)
 NODE(CoroFunctionPointer)
 NODE(DefaultOverride)
+NODE(ConstValue)
 
 #undef CONTEXT_NODE
 #undef NODE

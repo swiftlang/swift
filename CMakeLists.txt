@@ -575,6 +575,17 @@ set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "/usr/lib/swift" CACHE STRING
     "The directory of the install_name for standard library dylibs")
 
+#
+# User-configurable OpenBSD-specific options.
+#
+
+option(SWIFT_OPENBSD_BTCFI
+  "Emit branch target identification instructions and sign return addresses when available"
+  FALSE)
+if(SWIFT_OPENBSD_BTCFI)
+  add_definitions("-DSWIFT_OPENBSD_BTCFI")
+endif()
+
 # We don't want to use the same install_name_dir as the standard library which
 # will be installed in /usr/lib/swift. These private libraries should continue
 # to use @rpath for now.
@@ -1654,13 +1665,14 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
 
-      ExternalProject_Add("${stdlib_target}-StringProcessing"
-        SOURCE_DIR
-          "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental/StringProcessing"
+      ExternalProject_Add("${stdlib_target}-Supplemental"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
         DEPENDS "${stdlib_target}-core"
         INSTALL_DIR "${INSTALL_DIR}"
-        INSTALL_COMMAND "" # No install story set up yet
+        INSTALL_COMMAND ""
+        LIST_SEPARATOR "|"
         CMAKE_ARGS
+          -DSwift_ENABLE_RUNTIMES=StringProcessing
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

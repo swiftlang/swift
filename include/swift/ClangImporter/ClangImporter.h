@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/AST/Attr.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -70,6 +71,7 @@ namespace dependencies {
 }
 
 namespace swift {
+enum class ResultConvention : uint8_t;
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
@@ -428,6 +430,16 @@ public:
                             bool trackParsedSymbols = false,
                             bool implicitImport = false);
 
+  /// Bind the bridging header content to the module.
+  ///
+  /// \param adapter The module that depends on the contents of this header.
+  /// \param diagLoc A location to attach any diagnostics to if import fails.
+  ///
+  /// \returns true if there was an error importing the header.
+  ///
+  /// \sa importBridgingHeader
+  bool bindBridgingHeader(ModuleDecl *adapter, SourceLoc diagLoc);
+
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
   ///
@@ -763,7 +775,7 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
 /// and should be parsed using swift::SourceFile::FileIDStr::parse().
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-getPrivateFileIDAttrs(const clang::Decl *decl);
+getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl);
 
 /// Use some heuristics to determine whether the clang::Decl associated with
 /// \a decl would not exist without C++ interop.
@@ -773,6 +785,107 @@ getPrivateFileIDAttrs(const clang::Decl *decl);
 ///
 /// Returns false if \a decl was not imported by ClangImporter.
 bool declIsCxxOnly(const Decl *decl);
+
+/// Is this DeclContext an `enum` that represents a C++ namespace?
+bool isClangNamespace(const DeclContext *dc);
+
+/// For some \a templatedClass that inherits from \a base, whether they are
+/// derived from the same class template.
+///
+/// This kind of circular inheritance can happen when a templated class inherits
+/// from a specialization of itself, e.g.:
+///
+///     template <typename T> class C;
+///     template <> class C<void> { /* ... */ };
+///     template <typename T> class C<T> : C<void> { /* ... */ };
+///
+/// Checking for this kind of scenario is necessary for avoiding infinite
+/// recursion during symbolic imports (importSymbolicCXXDecls), where
+/// specialized class templates are instead imported as unspecialized.
+bool isSymbolicCircularBase(const clang::CXXRecordDecl *templatedClass,
+                            const clang::RecordDecl *base);
+
+/// Match a `[[swift_attr("...")]]` annotation on the given Clang decl.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The value for the first matching attribute, or `std::nullopt`.
+template <typename T>
+std::optional<T>
+matchSwiftAttr(const clang::Decl *decl,
+               llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl || !decl->hasAttrs())
+    return std::nullopt;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      for (const auto &p : patterns) {
+        if (swiftAttr->getAttribute() == p.first)
+          return p.second;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Like `matchSwiftAttr`, but also searches C++ base classes.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The matched value from this decl or its bases, or `std::nullopt`.
+template <typename T>
+std::optional<T> matchSwiftAttrConsideringInheritance(
+    const clang::Decl *decl,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl)
+    return std::nullopt;
+
+  if (auto match = matchSwiftAttr<T>(decl, patterns))
+    return match;
+
+  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    std::optional<T> result;
+    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+        result = baseMatch;
+        return false;
+      }
+
+      return true;
+    });
+
+    return result;
+  }
+
+  return std::nullopt;
+}
+
+/// Matches a `swift_attr("...")` on the record type pointed to by the given
+/// Clang type, searching base classes if it's a C++ class.
+///
+/// \param type A Clang pointer type.
+/// \param patterns List of attribute name-value pairs to match.
+/// \returns Matched value or std::nullopt.
+template <typename T>
+std::optional<T> matchSwiftAttrOnRecordPtr(
+    const clang::QualType &type,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (const auto *ptrType = type->getAs<clang::PointerType>()) {
+    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
+      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
+    }
+  }
+  return std::nullopt;
+}
+
+/// Determines the C++ reference ownership convention for the return value
+/// using `SWIFT_RETURNS_(UN)RETAINED` on the API; falls back to
+/// `SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT` on the pointee record type.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getCxxRefConventionWithAttrs(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

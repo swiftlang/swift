@@ -456,7 +456,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getCASOptions();
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
     return true;
   }
@@ -466,6 +466,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         "creating base cache key",
                          toString(BaseKey.takeError()));
     return true;
   }
@@ -636,7 +637,7 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
                                     CASOpts.ClangIncludeTrees,
                                     CASOpts.ClangIncludeTreeFileList);
       if (!FS) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
                              toString(FS.takeError()));
         return true;
       }
@@ -878,6 +879,7 @@ bool CompilerInstance::setUpPluginLoader() {
   /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
   auto loader = std::make_unique<PluginLoader>(
       *Context, getDependencyTracker(),
+      Invocation.getFrontendOptions().CacheReplayPrefixMap,
       Invocation.getFrontendOptions().DisableSandbox);
   Context->setPluginLoader(std::move(loader));
   return false;
@@ -912,14 +914,17 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
 
 std::string CompilerInstance::getBridgingHeaderPath() const {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (opts.ImplicitObjCPCHPath.empty())
+  if (!opts.ModuleHasBridgingHeader)
+    return std::string();
+
+  if (!opts.ImplicitObjCHeaderPath.empty())
     return opts.ImplicitObjCHeaderPath;
 
   auto clangImporter =
       static_cast<ClangImporter *>(getASTContext().getClangModuleLoader());
 
   // No clang importer created. Report error?
-  if (!clangImporter)
+  if (!clangImporter || opts.ImplicitObjCPCHPath.empty())
     return std::string();
 
   return clangImporter->getOriginalSourceFile(opts.ImplicitObjCPCHPath);
@@ -1406,7 +1411,8 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::get(name, mainModule, kind, ctx);
+    auto *domain =
+        CustomAvailabilityDomain::get(name, kind, mainModule, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };
@@ -1469,8 +1475,6 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
-    if (Invocation.getLangOptions().hasFeature(Feature::ExtensibleEnums))
-      MainModule->setSupportsExtensibleEnums(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

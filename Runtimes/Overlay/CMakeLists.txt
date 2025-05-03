@@ -50,6 +50,9 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
 
 add_subdirectory(clang)
+if(ANDROID)
+  add_subdirectory(Android)
+endif()
 if(WIN32)
   add_subdirectory(Windows)
 endif()

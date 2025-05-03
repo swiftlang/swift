@@ -98,6 +98,7 @@ def find_matches(swift_src_root):
     # `-enable-upcoming-feature` in the test directories.
     output = subprocess.check_output(
         [
+            "git",
             "grep",
             "--extended-regexp",
             "--recursive",

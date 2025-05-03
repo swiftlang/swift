@@ -5,5 +5,5 @@
 // REQUIRES: OS=macosx
 
 extension Array {
-  @_hasStorage public var foo: Int { get set } // expected-warning {{'@_hasStorage' attribute cannot be applied to declaration in extension}}
+  @_hasStorage public var foo: Int { get set }
 }

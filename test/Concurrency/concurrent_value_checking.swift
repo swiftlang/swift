@@ -141,9 +141,8 @@ func globalTest() async {
   // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@+1 {{property access is 'async'}}
   let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-  await globalAsync(a) // expected-tns-warning {{sending 'a' risks causing data races}}
-  // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local nonisolated uses}}
-  await globalSync(a) // expected-tns-note {{access can happen concurrently}}
+  await globalAsync(a)
+  await globalSync(a)
 
   // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@+1 {{property access is 'async'}}
@@ -178,9 +177,8 @@ func globalTestMain(nc: NotConcurrent) async {
   // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@+1 {{property access is 'async'}}
   let a = globalValue // expected-warning {{non-sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-  await globalAsync(a) // expected-tns-warning {{sending 'a' risks causing data races}}
-  // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local main actor-isolated uses}}
-  await globalSync(a) // expected-tns-note {{access can happen concurrently}}
+  await globalAsync(a)
+  await globalSync(a)
   _ = await ClassWithGlobalActorInits(nc)
   // expected-tns-warning @-1 {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' to main actor-isolated context}}
   // expected-tns-warning @-2 {{sending 'nc' risks causing data races}}
@@ -305,7 +303,7 @@ var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-wa
 // ----------------------------------------------------------------------
 func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 
-func concurrentClosures<T>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{26-26=: Sendable}}
+func concurrentClosures<T: SendableMetatype>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{44-44= & Sendable}}
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
     acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a '@Sendable' closure}}
@@ -451,13 +449,13 @@ enum E11<T>: @unchecked Sendable {
 
 class C11 { }
 
-class C12: @unchecked C11 { } // expected-typechecker-error{{'unchecked' attribute cannot apply to non-protocol type 'C11'}}
+class C12: @unchecked C11 { } // expected-typechecker-error{{'@unchecked' cannot apply to non-protocol type 'C11'}}
 
 protocol P { }
 
-protocol Q: @unchecked Sendable { } // expected-typechecker-error{{'unchecked' attribute only applies in inheritance clauses}}
+protocol Q: @unchecked Sendable { } // expected-typechecker-error{{'@unchecked' only applies in inheritance clauses}}
 
-typealias TypeAlias1 = @unchecked P // expected-typechecker-error{{'unchecked' attribute only applies in inheritance clauses}}
+typealias TypeAlias1 = @unchecked P // expected-typechecker-error{{'@unchecked' only applies in inheritance clauses}}
 
 #endif
 

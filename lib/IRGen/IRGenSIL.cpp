@@ -1205,8 +1205,9 @@ public:
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
 
-  void visitSILBasicBlock(SILBasicBlock *BB);
+  bool shouldUseDispatchThunk(SILDeclRef method);
 
+  void visitSILBasicBlock(SILBasicBlock *BB);
   void emitErrorResultVar(CanSILFunctionType FnTy,
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
@@ -1437,6 +1438,7 @@ public:
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i);
   void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
@@ -3860,6 +3862,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
+  // Lower the arguments and return value in the callee's generic context.
+  GenericContextScope scope(IGM,
+                            origCalleeType->getInvocationGenericSignature());
+
   Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
@@ -3871,9 +3877,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   emission->begin();
-
-  // Lower the arguments and return value in the callee's generic context.
-  GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   auto &calleeFP = emission->getCallee().getFunctionPointer();
 
@@ -6364,6 +6367,10 @@ void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
   setLoweredExplosion(i, v);
 }
 
+void IRGenSILFunction::visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i) {
+  // end_cow_mutation_addr is purely for SIL.
+}
+
 void IRGenSILFunction::visitDestroyNotEscapedClosureInst(
     swift::DestroyNotEscapedClosureInst *i) {
   // The closure operand is allowed to be an optional closure.
@@ -8414,28 +8421,17 @@ void IRGenSILFunction::visitObjCSuperMethodInst(swift::ObjCSuperMethodInst *i) {
                               /*startAtSuper=*/true);
 }
 
-void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
-  assert(!i->getMember().isForeign);
-
-  Explosion base = getLoweredExplosion(i->getOperand());
-  llvm::Value *baseValue = base.claimNext();
-
-  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
-  PrettyStackTraceSILDeclRef entry("lowering class method call to", method);
-
-  auto methodType = i->getType().castTo<SILFunctionType>();
-
+bool IRGenSILFunction::shouldUseDispatchThunk(SILDeclRef method) {
   AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
   // Because typechecking for the debugger has more lax rules, check the access
   // level of the getter to decide whether to use a dispatch thunk for the
   // debugger.
-  bool shouldUseDispatchThunkIfInDebugger =
-      !classDecl->getASTContext().LangOpts.DebuggerSupport ||
-      methodAccess == AccessLevel::Public;
+  bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
+  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
   if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      shouldUseDispatchThunkIfInDebugger) {
+      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This
@@ -8452,9 +8448,22 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
     shouldUseDispatchThunk =
         classDecl->getModuleContext() != IGM.getSwiftModule();
   }
+  return shouldUseDispatchThunk;
+}
 
-  if (shouldUseDispatchThunk) {
-    llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
+void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
+  assert(!i->getMember().isForeign);
+
+  Explosion base = getLoweredExplosion(i->getOperand());
+  llvm::Value *baseValue = base.claimNext();
+
+  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
+  PrettyStackTraceSILDeclRef entry("lowering class method call to", method);
+
+  auto methodType = i->getType().castTo<SILFunctionType>();
+  if (shouldUseDispatchThunk(method)) {
+    llvm::Constant *fnPtr =
+        IGM.getAddrOfDispatchThunk(method, NotForDefinition);
 
     if (methodType->isAsync()) {
       auto *fnPtrType = fnPtr->getType();

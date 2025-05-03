@@ -721,6 +721,8 @@ endfunction()
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [ONLY_SWIFTMODULE]
+#     [NO_SWIFTMODULE]
 #     [IS_SDK_OVERLAY]
 #     [IS_FRAGILE]
 #     INSTALL_IN_COMPONENT comp
@@ -741,9 +743,6 @@ endfunction()
 #
 # STATIC
 #   Build a static library.
-#
-# ONLY_SWIFTMODULE
-#   Do not build either static or shared, build just the .swiftmodule.
 #
 # SDK sdk
 #   SDK to build for.
@@ -784,6 +783,12 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
+# NO_SWIFTMODULE
+#   Only build either static or shared, and skip the .swiftmodule.
+#
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
@@ -811,11 +816,13 @@ function(add_swift_target_library_single target name)
         SHARED
         STATIC
         ONLY_SWIFTMODULE
+        NO_SWIFTMODULE
         NO_LINK_NAME
         INSTALL_WITH_SHARED
         IS_FRAGILE)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
+        ARCHITECTURE_SUBDIR_NAME
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
@@ -882,6 +889,9 @@ function(add_swift_target_library_single target name)
   precondition(SWIFTLIB_SINGLE_SDK MESSAGE "Should specify an SDK")
   precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
+  if (NOT SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME)
+    set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  endif()
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
@@ -897,12 +907,12 @@ function(add_swift_target_library_single target name)
 
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
 
   # macCatalyst ios-like builds are installed in the maccatalyst/x86_64 directory
   if(maccatalyst_build_flavor STREQUAL "ios-like")
     set(SWIFTLIB_SINGLE_SUBDIR
-        "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+        "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
   endif()
 
   if ("${SWIFTLIB_SINGLE_BOOTSTRAPPING}" STREQUAL "")
@@ -926,11 +936,14 @@ function(add_swift_target_library_single target name)
     endif()
   endif()
 
-  # FIXME: swiftDarwin currently trips an assertion in SymbolGraphGen
-  if (SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS AND NOT ${name} STREQUAL "swiftDarwin")
+  # FIXME: swiftDarwin and swiftDifferentiationUnittest currently trip an assertion in SymbolGraphGen
+  if (SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS AND NOT ${name} STREQUAL "swiftDarwin"
+      AND NOT ${name} STREQUAL "swiftDifferentiationUnittest")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend;-emit-symbol-graph")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
          "-Xfrontend;-emit-symbol-graph-dir;-Xfrontend;${out_lib_dir}/symbol-graph/${VARIANT_NAME}")
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+         "-Xfrontend;-symbol-graph-allow-availability-platforms;-Xfrontend;Swift")
   endif()
 
   if(MODULE)
@@ -1024,6 +1037,7 @@ function(add_swift_target_library_single target name)
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
+      ARCHITECTURE_SUBDIR_NAME ${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}
       MODULE_NAME ${module_name}
       MODULE_DIR ${SWIFTLIB_SINGLE_MODULE_DIR}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
@@ -1032,6 +1046,7 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
       ${SWIFTLIB_SINGLE_ONLY_SWIFTMODULE_keyword}
+      ${SWIFTLIB_SINGLE_NO_SWIFTMODULE_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ${SWIFTLIB_SINGLE_NO_LINK_NAME_keyword}
@@ -1048,9 +1063,9 @@ function(add_swift_target_library_single target name)
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
   if(maccatalyst_build_flavor STREQUAL "ios-like")
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    set(VARIANT_SUFFIX "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}")
   endif()
 
   if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGETS}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
@@ -1683,6 +1698,8 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [ONLY_SWIFTMODULE]
+#     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
@@ -1791,6 +1808,12 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
+# NO_SWIFTMODULE
+#   Only build either static or shared, and skip the .swiftmodule.
+#
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
 #
@@ -1879,6 +1902,8 @@ function(add_swift_target_library name)
         IS_STDLIB_CORE
         IS_SWIFT_ONLY
         NOSWIFTRT
+        ONLY_SWIFTMODULE
+        NO_SWIFTMODULE
         OBJECT_LIBRARY
         SHARED
         STATIC
@@ -2490,6 +2515,8 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
+        ${SWIFTLIB_ONLY_SWIFTMODULE_keyword}
+        ${SWIFTLIB_NO_SWIFTMODULE_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"

@@ -908,6 +908,9 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::CompileTimeLiteral:
     Printer.printKeyword("_const", Opts, " ");
     break;
+  case TypeReprKind::ConstValue:
+    Printer.printKeyword("@const", Opts, " ");
+    break;
   }
   printTypeRepr(Base, Printer, Opts);
 }
@@ -918,6 +921,11 @@ StringRef OwnershipTypeRepr::getSpecifierSpelling() const {
 
 ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
   return ParamDecl::getValueOwnershipForSpecifier(getSpecifier());
+}
+
+void CallerIsolatedTypeRepr::printImpl(ASTPrinter &Printer,
+                                       const PrintOptions &Opts) const {
+  Printer.printKeyword("nonisolated(nonsending)", Opts);
 }
 
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,

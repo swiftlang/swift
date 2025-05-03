@@ -54,6 +54,7 @@ class ConstFanClassCorrect: ConstFan {
 }
 
 class ConstFanClassWrong1: ConstFan {
+
 	static _const let v: String // expected-error {{_const let should be initialized with a literal value}}
 	// expected-error@-1 {{'static let' declaration requires an initializer expression or an explicitly stated getter}}
 	// expected-note@-2 {{add an initializer to silence this error}}

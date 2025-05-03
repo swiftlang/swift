@@ -1051,6 +1051,9 @@ public:
   const CanType TheUnconstrainedAnyType;  /// This is 'any ~Copyable & ~Escapable',
                                           /// the empty protocol composition
                                           /// without any implicit constraints.
+  const CanGenericTypeParamType TheSelfType; /// The protocol 'Self' type;
+                                             /// a generic parameter with
+                                             /// depth 0 index 0
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
 #include "swift/AST/TypeNodes.def"
@@ -1093,9 +1096,6 @@ public:
   /// Compute the extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
-
-  /// Return a set of all possible filesystem locations where modules can be found.
-  llvm::StringSet<> getAllModuleSearchPathsSet() const;
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -1192,12 +1192,14 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList,
-                           llvm::VersionTuple &foundVersion) const;
+                           bool isSourceCanImport,
+                           llvm::VersionTuple &foundVersion,
+                           llvm::VersionTuple &foundUnderlyingClangVersion) const;
 
   /// Add successful canImport modules.
-  void addSucceededCanImportModule(StringRef moduleName, bool underlyingVersion,
-                                   const llvm::VersionTuple &versionInfo);
+  void addSucceededCanImportModule(StringRef moduleName,
+                                   const llvm::VersionTuple &versionInfo,
+                                   const llvm::VersionTuple &underlyingVersionInfo);
 
 public:
   namelookup::ImportCache &getImportCache() const;

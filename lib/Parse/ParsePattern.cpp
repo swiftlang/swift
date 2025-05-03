@@ -600,6 +600,12 @@ mapParsedParameters(Parser &parser,
         param->setCompileTimeLiteral();
       }
 
+      if (paramInfo.Attrs.hasAttribute<ConstValAttr>()) {
+        type = new (parser.Context) ConstValueTypeRepr(
+            type, paramInfo.Attrs.getAttribute<ConstValAttr>()->AtLoc);
+        param->setConstValue();
+      }
+
       if (paramInfo.SendingLoc.isValid()) {
         type = new (parser.Context) SendingTypeRepr(type, paramInfo.SendingLoc);
         param->setSending();

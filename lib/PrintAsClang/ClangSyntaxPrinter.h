@@ -96,7 +96,8 @@ public:
       const NominalTypeDecl *typeDecl);
 
   // Returns true when no qualifiers were printed.
-  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D) const;
+  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D,
+                                          bool forC = false) const;
 
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.

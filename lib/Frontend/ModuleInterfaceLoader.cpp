@@ -1741,13 +1741,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   }
 
-  // Inhibit warnings from the genericSubInvocation since we are assuming the user
-  // is not in a position to address them. (Unless we're verifying, in which
-  // case they might.)
-  if (requestedAction != FrontendOptions::ActionType::Typecheck) {
-    genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
-    GenericArgs.push_back("-suppress-warnings");
-  }
+  // Inhibit warnings from the genericSubInvocation since we are assuming the
+  // user is not in a position to address them.
+  genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
+  GenericArgs.push_back("-suppress-warnings");
+
   // Inherit the parent invocation's setting on whether to suppress remarks
   if (suppressRemarks) {
     genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
@@ -1934,6 +1932,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // Load plugin libraries for macro expression as default arguments
   genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
       searchPathOpts.PluginSearchOpts;
+  genericSubInvocation.getSearchPathOptions().ResolvedPluginVerification =
+      searchPathOpts.ResolvedPluginVerification;
 
   // Get module loading behavior options.
   genericSubInvocation.getSearchPathOptions().ScannerModuleValidation = searchPathOpts.ScannerModuleValidation;
@@ -2130,19 +2130,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   BuildArgs.push_back(moduleName);
   if (sysroot) {
     subInvocation.setSysRoot(sysroot.value());
-  }
-
-  // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
-  // of a CF_OPTIONS bug (rdar://142762174).
-  if (moduleName == "CoreGraphics") {
-    subInvocation.getLangOptions().EnableCXXInterop = false;
-    subInvocation.getLangOptions().cxxInteropCompatVersion = {};
-    BuildArgs.erase(llvm::remove_if(BuildArgs,
-                                    [](StringRef arg) -> bool {
-                                      return arg.starts_with(
-                                          "-cxx-interoperability-mode=");
-                                    }),
-                    BuildArgs.end());
   }
 
   // Calculate output path of the module.
@@ -2479,18 +2466,25 @@ struct ExplicitCASModuleLoader::Implementation {
                  llvm::cas::ActionCache &Cache)
       : Ctx(Ctx), CAS(CAS), Cache(Cache) {}
 
-  llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>> loadBuffer(StringRef ID) {
+  std::unique_ptr<llvm::MemoryBuffer> loadBuffer(StringRef ID) {
     auto key = CAS.parseID(ID);
-    if (!key)
-      return key.takeError();
+    if (!key) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_invalid_cas_id, ID,
+                         toString(key.takeError()));
+      return nullptr;
+    }
 
     auto ref = CAS.getReference(*key);
     if (!ref)
       return nullptr;
 
     auto loaded = CAS.getProxy(*ref);
-    if (!loaded)
-      return loaded.takeError();
+    if (!loaded) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
+                         "loading module map from CAS",
+                         toString(loaded.takeError()));
+      return nullptr;
+    }
 
     return loaded->getMemoryBuffer();
   }
@@ -2503,11 +2497,6 @@ struct ExplicitCASModuleLoader::Implementation {
     llvm::StringMap<std::string> ModuleAliases;
     auto buf = loadBuffer(ID);
     if (!buf) {
-      Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
-                         toString(buf.takeError()));
-      return;
-    }
-    if (!*buf) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_missing,
                          ID);
       return;
@@ -2516,7 +2505,7 @@ struct ExplicitCASModuleLoader::Implementation {
         llvm::MemoryBuffer::getFile(ID);
 
     auto hasError = parser.parseSwiftExplicitModuleMap(
-        (*buf)->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap,
+        buf->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap,
         ModuleAliases);
 
     if (hasError)
@@ -2568,41 +2557,54 @@ struct ExplicitCASModuleLoader::Implementation {
     }
   }
 
-  llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>
-  loadFileBuffer(StringRef ID, StringRef Name) {
+  std::unique_ptr<llvm::MemoryBuffer>
+  loadFileBuffer(SourceLoc Loc, StringRef ID, StringRef Name) {
+    auto outputMissing = [&]() {
+      Ctx.Diags.diagnose(Loc, diag::error_opening_explicit_module_file, Name);
+      return nullptr;
+    };
+    auto casError = [&](StringRef Stage, llvm::Error Err) {
+      Ctx.Diags.diagnose(Loc, diag::error_cas, Stage, toString(std::move(Err)));
+      return nullptr;
+    };
     auto key = CAS.parseID(ID);
-    if (!key)
-      return key.takeError();
+    if (!key) {
+      Ctx.Diags.diagnose(Loc, diag::error_invalid_cas_id, ID,
+                         toString(key.takeError()));
+      return nullptr;
+    }
 
     auto moduleLookup = Cache.get(*key);
     if (!moduleLookup)
-      return moduleLookup.takeError();
+      return casError("looking up module output cache",
+                      moduleLookup.takeError());
+
     if (!*moduleLookup)
-      return nullptr;
+      return outputMissing();
 
     auto moduleRef = CAS.getReference(**moduleLookup);
     if (!moduleRef)
-      return nullptr;
+      return outputMissing();
 
     auto proxy = CAS.getProxy(*moduleRef);
     if (!proxy)
-      return proxy.takeError();
+      return casError("loading module build outputs", proxy.takeError());
 
     swift::cas::CompileJobResultSchema schema(CAS);
     if (!schema.isRootNode(*proxy))
-      return nullptr;
+      return outputMissing();
 
     auto result = schema.load(*moduleRef);
     if (!result)
-      return result.takeError();
+      return casError("loading module schema", result.takeError());
 
     auto output = result->getOutput(file_types::ID::TY_SwiftModuleFile);
     if (!output)
-      return nullptr;
+      return outputMissing();
 
     auto buf = CAS.getProxy(output->Object);
     if (!buf)
-      return buf.takeError();
+      return casError("loading dependency module", result.takeError());
 
     return buf->getMemoryBuffer(Name);
   }
@@ -2763,18 +2765,14 @@ bool ExplicitCASModuleLoader::canImportModule(
   std::string moduleCASID = it->second.moduleCacheKey
                                 ? *it->second.moduleCacheKey
                                 : it->second.modulePath;
-  auto moduleBuf = Impl.loadFileBuffer(moduleCASID, it->second.modulePath);
+  auto moduleBuf = Impl.loadFileBuffer(loc, moduleCASID, it->second.modulePath);
   if (!moduleBuf) {
-    Ctx.Diags.diagnose(loc, diag::error_cas, toString(moduleBuf.takeError()));
-    return false;
-  }
-  if (!*moduleBuf) {
     Ctx.Diags.diagnose(loc, diag::error_opening_explicit_module_file,
                        it->second.modulePath);
     return false;
   }
   auto metaData = serialization::validateSerializedAST(
-      (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+      moduleBuf->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
       Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);

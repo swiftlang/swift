@@ -529,8 +529,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
-  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
-                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+  bool serializeDerivedEffects =
+    // We must not serialize computed effects if library evolution is turned on,
+    // because the copy of the function, which is emitted into the current module,
+    // might have different effects in different versions of the library.
+    (resilience != ResilienceStrategy::Resilient ||
+    // But we can serialize computed effects for @alwaysEmitIntoClient functions,
+    // even when library evolution is enabled, because no copy of the function is
+    // emitted in the original module.
+    F.getLinkage() == SILLinkage::PublicNonABI) &&
+    !F.hasSemanticsAttr("optimize.no.crossmodule");
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
@@ -1706,6 +1714,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
@@ -3362,6 +3371,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
+    unsigned(wt.isSpecialized()),
     unsigned(wt.getSerializedKind()),
     conformanceID);
 
@@ -3374,12 +3384,11 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   }
 
   for (auto conditional : wt.getConditionalConformances()) {
-    auto requirementID = S.addTypeRef(conditional.Requirement);
-    auto conformanceID = S.addConformanceRef(conditional.Conformance);
+    auto conformanceID = S.addConformanceRef(conditional);
     WitnessConditionalConformanceLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[WitnessConditionalConformanceLayout::Code],
-        requirementID, conformanceID);
+        conformanceID);
   }
 }
 
@@ -3402,13 +3411,12 @@ void SILSerializer::writeSILWitnessTableEntry(
     auto &assoc = entry.getAssociatedConformanceWitness();
 
     auto requirementID = S.addTypeRef(assoc.Requirement);
-    auto substTypeID = S.addTypeRef(assoc.SubstType);
     auto conformanceID = S.addConformanceRef(assoc.Witness);
 
     WitnessAssocProtocolLayout::emitRecord(
       Out, ScratchRecord,
       SILAbbrCodes[WitnessAssocProtocolLayout::Code],
-      requirementID, substTypeID, conformanceID);
+      requirementID, conformanceID);
     return;
   }
 

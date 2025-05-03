@@ -995,7 +995,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
+    return try unsafe withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
@@ -1005,7 +1005,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
+    return try unsafe withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
@@ -1015,7 +1015,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try withUnsafeBufferPointer {
+    return try unsafe withUnsafeBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
@@ -1059,7 +1059,7 @@ extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible
 extension ContiguousArray {
   @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
-    let p = _baseAddressIfContiguous
+    let p = unsafe _baseAddressIfContiguous
     if unsafe _fastPath(p != nil || isEmpty) {
       return (_owner, UnsafeRawPointer(p))
     }
@@ -1173,7 +1173,7 @@ extension ContiguousArray {
   mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutableBufferPointer(body)
+    return try unsafe withUnsafeMutableBufferPointer(body)
   }
 
   /// Calls the given closure with a pointer to the array's mutable contiguous
@@ -1244,13 +1244,18 @@ extension ContiguousArray {
 
   @available(SwiftStdlib 6.2, *)
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(/*inout*/borrow self)
+    @lifetime(&self)
     @_alwaysEmitIntoClient
     mutating get {
+      // _makeMutableAndUnique*() inserts begin_cow_mutation.
+      // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+      // We have runtime verification to check if begin_cow_mutation/end_cow_mutation are properly nested in asserts build of stdlib,
+      // disable checking whenever it is turned on since the compiler generated `end_cow_mutation_addr` is conservative and cannot be verified.
+      _makeMutableAndUniqueUnchecked()
+#else
       _makeMutableAndUnique()
-      // NOTE: We don't have the ability to schedule a call to
-      //       ContiguousArrayBuffer.endCOWMutation().
-      //       rdar://146785284 (lifetime analysis for end of mutation)
+#endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.mutableCount
       let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
@@ -1272,7 +1277,7 @@ extension ContiguousArray {
     _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
 
-    if let s = _baseAddressIfContiguous {
+    if let s = unsafe _baseAddressIfContiguous {
       unsafe p.initialize(from: s, count: self.count)
       // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
@@ -1446,7 +1451,7 @@ extension ContiguousArray {
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try self.withUnsafeMutableBufferPointer {
+    return try unsafe self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
   }
@@ -1482,7 +1487,7 @@ extension ContiguousArray {
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try self.withUnsafeBufferPointer {
+    return try unsafe self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
   }

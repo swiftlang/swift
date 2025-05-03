@@ -45,17 +45,6 @@
 #define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
 #endif
 
-// Does the runtime provide priority escalation support?
-#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
-    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
-    (defined(__arm64__) || defined(__x86_64__))
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
-#else
-#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
-#endif
-#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
-
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;
@@ -788,12 +777,12 @@ bool swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor);
 
 /// Invoke an executor's `isIsolatingCurrentContext` implementation;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
+int8_t swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// Invoke a Swift executor's `isIsolatingCurrentContext` implementation; returns
 /// `true` if it invoked the Swift implementation, `false` otherwise.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
+int8_t swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
@@ -1052,12 +1041,6 @@ enum swift_task_is_current_executor_flag : uint64_t {
   /// The routine MUST NOT assert on failure.
   /// Even at the cost of not calling 'checkIsolated' if it is available.
   MustNotAssert = 0x10,
-
-  /// The routine should use 'isIsolatingCurrentContext' function on the
-  /// 'expected' executor instead of `checkIsolated`.
-  ///
-  /// This is a variant of `MustNotAssert`
-  UseIsIsolatingCurrentContext = 0x20,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -1080,7 +1063,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_startSynchronously(AsyncTask* job);
+void swift_task_startSynchronously(AsyncTask* job, SerialExecutorRef targetExecutor);
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative

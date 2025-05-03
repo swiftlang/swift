@@ -46,7 +46,7 @@ extension Delegate {
     // expected-note@-1 {{parameter 'completionHandler' is implicitly non-sendable}}
     if let req = (req ?? nil) {
       makeRequest1(req, completionHandler: completionHandler)
-      // expected-warning@-1 {{passing non-sendable parameter 'completionHandler' to function expecting a @Sendable closure}}
+      // expected-warning@-1 {{passing non-sendable parameter 'completionHandler' to function expecting a '@Sendable' closure}}
     }
   }
 }

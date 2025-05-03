@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@
 
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
@@ -2272,6 +2272,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = lifetime->getBase();
   }
 
+  if (auto callerIsolated = dyn_cast<CallerIsolatedTypeRepr>(nestedRepr)) {
+    nestedRepr = callerIsolated->getBase();
+  }
+
   if (auto sending = dyn_cast<SendingTypeRepr>(nestedRepr)) {
     // If we do not have an Ownership Repr and do not have a no escape type,
     // return implicit copyable consuming.
@@ -2294,7 +2298,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     }
     return ownershipRepr->getSpecifier();
   }
-  
+
   return ParamSpecifier::Default;
 }
 
@@ -2608,7 +2612,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      if (lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type.
+      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }

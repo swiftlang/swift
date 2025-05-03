@@ -169,6 +169,7 @@ enum class DescriptiveDeclKind : uint8_t {
   PostfixOperator,
   PrecedenceGroup,
   TypeAlias,
+  GenericTypeAlias,
   GenericTypeParam,
   AssociatedType,
   Type,
@@ -183,7 +184,6 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericClass,
   GenericActor,
   GenericDistributedActor,
-  GenericType,
   Subscript,
   StaticSubscript,
   ClassSubscript,
@@ -310,6 +310,9 @@ struct OverloadSignature {
   /// Whether this is a macro.
   unsigned IsMacro : 1;
 
+  /// Whether this is a generic argument.
+  unsigned IsGenericArg : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
@@ -323,8 +326,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsEnumElement(false), IsNominal(false),
+        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -735,7 +740,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -804,10 +809,7 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1,
-
-    /// Whether this module has enabled `ExtensibleEnums` feature.
-    ExtensibleEnums : 1
+    StrictMemorySafety : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2287,6 +2289,7 @@ private:
   // Flags::Checked.
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   bool isFullyValidated() const {
     return InitContextAndFlags.getInt().contains(
@@ -2435,8 +2438,20 @@ private:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  /// Retrieve the computed capture info, or \c nullopt if it hasn't been
+  /// computed yet.
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    ASSERT(!Captures.hasBeenComputed());
+    ASSERT(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2460,6 +2475,7 @@ class PatternBindingDecl final : public Decl,
   friend class Decl;
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
@@ -2639,13 +2655,9 @@ public:
     getMutablePatternList()[i].setInitContext(init);
   }
 
-  CaptureInfo getCaptureInfo(unsigned i) const {
-    return getPatternList()[i].getCaptureInfo();
-  }
-
-  void setCaptureInfo(unsigned i, CaptureInfo captures) {
-    getMutablePatternList()[i].setCaptureInfo(captures);
-  }
+  /// Retrieve the capture info for the initializer at the given index,
+  /// computing if needed.
+  CaptureInfo getCaptureInfo(unsigned i) const;
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -5915,7 +5927,7 @@ public:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
   bool isCompileTimeLiteral() const;
-  bool isConstVal() const;
+  bool isConstValue() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
@@ -6232,10 +6244,16 @@ public:
                               bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
-  AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind, ModuleDecl *module,
-                                   ResilienceExpansion expansion,
-                                   bool useOldABI) const;
+  AccessStrategy getAccessStrategy(
+      AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+      ResilienceExpansion expansion,
+      std::optional<std::pair<SourceRange, const DeclContext *>> location,
+      bool useOldABI) const;
+
+  /// Whether access is via physical storage.
+  bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
+                                    AccessKind accessKind, ModuleDecl *module,
+                                    ResilienceExpansion expansion) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -6847,6 +6865,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeLiteral = 1 << 1,
+
+    /// Whether or not this parameter is '@const'.
+    IsConstValue = 1 << 2,
   };
 
   llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
@@ -6892,6 +6913,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
+
+    /// Whether or not this parameter is isolated to a caller.
+    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -7180,6 +7204,18 @@ public:
       removeFlag(Flag::IsSending);
   }
 
+  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
+  bool isCallerIsolated() const {
+    return getOptions().contains(Flag::IsCallerIsolated);
+  }
+
+  void setCallerIsolated(bool value = true) {
+    if (value)
+      addFlag(Flag::IsCallerIsolated);
+    else
+      removeFlag(Flag::IsCallerIsolated);
+  }
+
   /// Whether or not this parameter is marked with '@_addressable'.
   bool isAddressable() const {
     return getOptions().contains(Flag::IsAddressable);
@@ -7202,6 +7238,19 @@ public:
     auto flags = ArgumentNameAndFlags.getInt();
     flags = value ? flags | ArgumentNameFlags::IsCompileTimeLiteral
                   : flags - ArgumentNameFlags::IsCompileTimeLiteral;
+    ArgumentNameAndFlags.setInt(flags);
+  }
+
+  /// Whether or not this parameter is marked with '@const'.
+  bool isConstVal() const {
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::IsConstValue);
+  }
+
+  void setConstValue(bool value = true) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::IsConstValue
+                  : flags - ArgumentNameFlags::IsConstValue;
     ArgumentNameAndFlags.setInt(flags);
   }
 
@@ -8090,6 +8139,11 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
+  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// formalizing the attribute.
+  std::optional<ForeignLanguage> getCDeclKind() const;
+
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
@@ -8122,8 +8176,6 @@ public:
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
-
-  std::optional<ExecutionKind> getExecutionBehavior() const;
 
   /// Whether the declaration is later overridden in the module
   ///

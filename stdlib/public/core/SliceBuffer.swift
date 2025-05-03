@@ -52,7 +52,7 @@ internal struct _SliceBuffer<Element>
     endIndexAndFlags: UInt
   ) {
     self.owner = owner
-    self.subscriptBaseAddress = unsafe subscriptBaseAddress
+    unsafe self.subscriptBaseAddress = subscriptBaseAddress
     self.startIndex = startIndex
     self.endIndexAndFlags = endIndexAndFlags
   }
@@ -63,7 +63,7 @@ internal struct _SliceBuffer<Element>
     indices: Range<Int>, hasNativeBuffer: Bool
   ) {
     self.owner = owner
-    self.subscriptBaseAddress = unsafe subscriptBaseAddress
+    unsafe self.subscriptBaseAddress = subscriptBaseAddress
     self.startIndex = indices.lowerBound
     let bufferFlag = UInt(hasNativeBuffer ? 1 : 0)
     self.endIndexAndFlags = (UInt(indices.upperBound) << 1) | bufferFlag
@@ -78,7 +78,7 @@ internal struct _SliceBuffer<Element>
     #else
     self.owner = _emptyArrayStorage
     #endif
-    self.subscriptBaseAddress = unsafe empty.firstElementAddress
+    unsafe self.subscriptBaseAddress = empty.firstElementAddress
     self.startIndex = empty.startIndex
     self.endIndexAndFlags = 1
     _invariantCheck()
@@ -176,7 +176,7 @@ internal struct _SliceBuffer<Element>
   /// identity and count.
   @inlinable
   internal var identity: UnsafeRawPointer {
-    return UnsafeRawPointer(firstElementAddress)
+    return unsafe UnsafeRawPointer(firstElementAddress)
   }
 
   @inlinable
@@ -186,7 +186,7 @@ internal struct _SliceBuffer<Element>
 
   @inlinable
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
-    return firstElementAddress
+    return unsafe firstElementAddress
   }
 
   //===--- Non-essential bits ---------------------------------------------===//
@@ -399,7 +399,7 @@ internal struct _SliceBuffer<Element>
       _internalInvariant(bounds.lowerBound >= startIndex)
       _internalInvariant(bounds.upperBound >= bounds.lowerBound)
       _internalInvariant(bounds.upperBound <= endIndex)
-      return _SliceBuffer(
+      return unsafe _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
         indices: bounds,
@@ -482,7 +482,7 @@ internal struct _SliceBuffer<Element>
     _internalInvariant(_isClassOrObjCExistential(T.self))
     let baseAddress = unsafe UnsafeMutableRawPointer(self.subscriptBaseAddress)
       .assumingMemoryBound(to: T.self)
-    return _SliceBuffer<T>(
+    return unsafe _SliceBuffer<T>(
       owner: self.owner,
       subscriptBaseAddress: baseAddress,
       startIndex: self.startIndex,

@@ -14,8 +14,11 @@
 #include <dispatch/dispatch.h>
 #endif
 
+#include "swift/Threading/Once.h"
+
 #include "Error.h"
 #include "ExecutorBridge.h"
+#include "TaskPrivate.h"
 
 using namespace swift;
 
@@ -27,6 +30,13 @@ void _swift_exit(int result) {
   exit(result);
 }
 
+extern "C" SWIFT_CC(swift)
+void swift_createDefaultExecutorsOnce() {
+  static swift::once_t createExecutorsOnce;
+
+  swift::once(createExecutorsOnce, swift_createDefaultExecutors);
+}
+
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 extern "C" SWIFT_CC(swift)
 SerialExecutorRef swift_getMainExecutor() {
@@ -35,81 +45,9 @@ SerialExecutorRef swift_getMainExecutor() {
 #endif
 
 extern "C" SWIFT_CC(swift)
-void _swift_task_checkIsolatedSwift(
-  HeapObject *executor,
-  const Metadata *executorType,
-  const SerialExecutorWitnessTable *witnessTable
-);
-
-extern "C" SWIFT_CC(swift)
 void _swift_task_checkIsolatedSwift(HeapObject *executor,
                                     const Metadata *executorType,
                                     const SerialExecutorWitnessTable *witnessTable);
-
-extern "C" SWIFT_CC(swift)
-bool _swift_task_isIsolatingCurrentContextSwift(
-  HeapObject *executor,
-  const Metadata *executorType,
-  const SerialExecutorWitnessTable *witnessTable
-);
-
-extern "C" SWIFT_CC(swift)
-bool _swift_task_isMainExecutorSwift(
-  HeapObject *executor,
-  const Metadata *executorType,
-  const SerialExecutorWitnessTable *witnessTable
-);
-
-extern "C" SWIFT_CC(swift)
-void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
-  HeapObject *identity = executor.getIdentity();
-
-  // We might be being called with an actor rather than a "proper"
-  // SerialExecutor; in that case, we won't have a SerialExecutor witness
-  // table.
-  if (executor.hasSerialExecutorWitnessTable()) {
-    _swift_task_checkIsolatedSwift(identity,
-                                   swift_getObjectType(identity),
-                                   executor.getSerialExecutorWitnessTable());
-  } else {
-    const Metadata *objectType = swift_getObjectType(executor.getIdentity());
-    auto typeName = swift_getTypeName(objectType, true);
-
-    swift_Concurrency_fatalError(
-      0, "Incorrect actor executor assumption; expected '%.*s' executor.\n",
-      (int)typeName.length, typeName.data);
-  }
-}
-
-extern "C" SWIFT_CC(swift)
-bool swift_task_isIsolatingCurrentContextImpl(SerialExecutorRef executor) {
-  HeapObject *identity = executor.getIdentity();
-
-  // We might be being called with an actor rather than a "proper"
-  // SerialExecutor; in that case, we won't have a SerialExecutor witness
-  // table.
-  if (executor.hasSerialExecutorWitnessTable()) {
-    return _swift_task_isIsolatingCurrentContextSwift(identity,
-                                   swift_getObjectType(identity),
-                                   executor.getSerialExecutorWitnessTable());
-  } else {
-    const Metadata *objectType = swift_getObjectType(executor.getIdentity());
-    auto typeName = swift_getTypeName(objectType, true);
-
-    swift_Concurrency_fatalError(
-      0, "Incorrect actor executor assumption; expected '%.*s' executor.\n",
-      (int)typeName.length, typeName.data);
-  }
-}
-
-extern "C" SWIFT_CC(swift)
-bool swift_task_isMainExecutorImpl(SerialExecutorRef executor) {
-  HeapObject *identity = executor.getIdentity();
-  return executor.hasSerialExecutorWitnessTable()
-    && _swift_task_isMainExecutorSwift(identity,
-                                       swift_getObjectType(identity),
-                                       executor.getSerialExecutorWitnessTable());
-}
 
 extern "C" SWIFT_CC(swift)
 uint8_t swift_job_getPriority(Job *job) {
@@ -136,6 +74,15 @@ extern "C" SWIFT_CC(swift)
 void swift_dispatchAssertMainQueue() {
   dispatch_assert_queue(dispatch_get_main_queue());
 }
-#endif // SWIFT_CONCURRENCY_ENABLE_DISPATCH
+
+extern "C" SWIFT_CC(swift)
+void *swift_getDispatchQueueForExecutor(SerialExecutorRef executor) {
+  if (executor.getRawImplementation() == (uintptr_t)_swift_task_getDispatchQueueSerialExecutorWitnessTable()) {
+    return executor.getIdentity();
+  }
+  return nullptr;
+}
+
+#endif // SWIFT_CONCURRENCY_USES_DISPATCH
 
 #pragma clang diagnostic pop

@@ -1175,6 +1175,12 @@ def enable_arm64_corocc : Flag<["-"], "enable-arm64-corocc">,
 def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
   HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
 
+def enable_callee_allocated_coro_abi : Flag<["-"], "enable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and use yield_once_2.">;
+
+def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and don't use yield_once_2.">;
+
 def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
   HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
 
@@ -1485,7 +1491,7 @@ def platform_c_calling_convention_EQ :
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
-  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
+  HelpText<"Disable sending args and results when region-based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def scanner_module_validation: Flag<["-"], "scanner-module-validation">,

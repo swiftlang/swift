@@ -641,6 +641,10 @@ public:
     return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
   }
 
+  /// Return true if 'operand' is addressable after type substitution in the
+  /// caller's context.
+  bool isAddressable(const Operand &operand) const;
+
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 
   friend bool operator==(ApplySite lhs, ApplySite rhs) {

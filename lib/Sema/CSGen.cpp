@@ -972,7 +972,7 @@ namespace {
           ty = ty->getInOutObjectType();
           flags = flags.withInOut(true);
         }
-        if (arg.isConst()) {
+        if (arg.isCompileTimeLiteral()) {
           flags = flags.withCompileTimeLiteral(true);
         }
         result.emplace_back(ty, arg.getLabel(), flags);
@@ -1723,9 +1723,6 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
-      auto paramType = CS.DC->mapTypeIntoContext(ty);
-      E->setParamType(paramType);
       return E->getParamDecl()->getValueType();
     }
 
@@ -2584,14 +2581,8 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
-        if (auto *execution =
-                closure->getAttrs().getAttribute<ExecutionAttr>()) {
-          switch (execution->getBehavior()) {
-          case ExecutionKind::Caller:
-            return FunctionTypeIsolation::forNonIsolatedCaller();
-          case ExecutionKind::Concurrent:
-            return FunctionTypeIsolation::forNonIsolated();
-          }
+        if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+          return FunctionTypeIsolation::forNonIsolated();
         }
 
         return FunctionTypeIsolation::forNonIsolated();
@@ -4591,8 +4582,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // non-`Sendable` state across the isolation boundary. `next()` should
   // inherit the isolation of the caller, but for now, use the opt out.
   if (isAsync) {
-    auto *nonisolated = new (ctx)
-        NonisolatedAttr(/*unsafe=*/true, /*implicit=*/true);
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
     makeIteratorVar->getAttrs().add(nonisolated);
   }
 
@@ -4602,8 +4593,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
 
-    auto *makeIteratorRef = UnresolvedDotExpr::createImplicit(
-        ctx, sequenceExpr, makeIterator->getName());
+    auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
+        sequenceExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     Expr *makeIteratorCall =
@@ -4666,11 +4658,13 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
-    auto *nextRef = UnresolvedDotExpr::createImplicit(
-        ctx,
+    auto *makeIteratorVarRef =
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                              /*Implicit=*/true),
-        nextId, labels);
+                              /*Implicit=*/true);
+    auto *nextRef = new (ctx)
+        UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
+                          DeclNameRef(DeclName(ctx, nextId, labels)),
+                          DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     ArgumentList *nextArgs;

@@ -30,6 +30,13 @@ sil_witness_table [serialized] ConformingAssoc: AssocReqt module witness_tables 
   method #AssocReqt.requiredMethod: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 }
 
+// CHECK-LABEL: sil_witness_table [serialized] [specialized] ConformingAssoc: AssocReqt module witness_tables {
+// CHECK: #AssocReqt.requiredMethod: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK: }
+sil_witness_table [serialized] [specialized] ConformingAssoc: AssocReqt module witness_tables {
+  method #AssocReqt.requiredMethod: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+}
+
 protocol AnyProtocol {
   associatedtype AssocType
   associatedtype AssocWithReqt : AssocReqt

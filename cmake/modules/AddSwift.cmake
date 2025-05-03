@@ -324,6 +324,9 @@ function(_add_host_variant_c_compile_flags target)
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_LARGEFILE_SOURCE _FILE_OFFSET_BITS=64>)
   endif()
+
+  target_compile_definitions(${target} PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>,$<BOOL:${SWIFT_ENABLE_SWIFT_IN_SWIFT}>>:SWIFT_ENABLE_SWIFT_IN_SWIFT>)
 endfunction()
 
 function(_add_host_variant_link_flags target)
@@ -963,6 +966,11 @@ function(add_swift_host_tool executable)
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
         )
     endif()
+  endif()
+
+  # Opt-out of OpenBSD BTCFI if instructed where it is enforced by default.
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "OPENBSD" AND SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64" AND NOT SWIFT_OPENBSD_BTCFI)
+    target_link_options(${executable} PRIVATE "LINKER:-z,nobtcfi")
   endif()
 
   if(SWIFT_BUILD_SWIFT_SYNTAX)

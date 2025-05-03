@@ -122,7 +122,28 @@ suite.test("RawSpan from MutableSpan")
     let span = MutableSpan(_unsafeStart: p, count: c)
     let bytes  = span.bytes
     expectEqual(bytes.byteCount, count*MemoryLayout<Int>.stride)
+    let v = bytes.unsafeLoad(
+      fromByteOffset: MemoryLayout<Int>.stride, as: Int.self
+    )
+    expectEqual(v, 1)
   }
+}
+
+suite.test("MutableRawSpan from MutableSpan")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let count = 4
+  var array = Array(0..<count)
+  expectEqual(array[0], 0)
+  array.withUnsafeMutableBufferPointer {
+    let (p, c) = ($0.baseAddress!, $0.count)
+    var span = MutableSpan(_unsafeStart: p, count: c)
+    var bytes  = span.mutableBytes
+    expectEqual(bytes.byteCount, count*MemoryLayout<Int>.stride)
+    bytes.storeBytes(of: 1, as: Int.self)
+  }
+  expectEqual(array[0], 1)
 }
 
 suite.test("indices property")

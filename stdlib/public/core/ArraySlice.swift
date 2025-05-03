@@ -277,12 +277,12 @@ extension ArraySlice: _ArrayProtocol {
   @inlinable
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
     @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
-    get { return _buffer.firstElementAddressIfContiguous }
+    get { return unsafe _buffer.firstElementAddressIfContiguous }
   }
 
   @inlinable
   internal var _baseAddress: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
+    return unsafe _buffer.firstElementAddress
   }
 }
 
@@ -703,7 +703,7 @@ extension ArraySlice: RangeReplaceableCollection {
     if count > 0 {
       _buffer = ArraySlice._allocateBufferUninitialized(minimumCapacity: count)
       _buffer.count = count
-      var p = _buffer.firstElementAddress
+      var p = unsafe _buffer.firstElementAddress
       for _ in 0..<count {
         unsafe p.initialize(to: repeatedValue)
         unsafe p += 1
@@ -752,7 +752,7 @@ extension ArraySlice: RangeReplaceableCollection {
     _ count: Int
   ) -> (ArraySlice, UnsafeMutablePointer<Element>) {
     let result = ArraySlice(_uninitializedCount: count)
-    return (result, result._buffer.firstElementAddress)
+    return (result, unsafe result._buffer.firstElementAddress)
   }
 
   //===--- basic mutations ------------------------------------------------===//
@@ -1171,7 +1171,7 @@ extension ArraySlice {
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
+    return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.
@@ -1207,7 +1207,7 @@ extension ArraySlice {
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
+    return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
 
   @available(SwiftStdlib 6.2, *)
@@ -1283,7 +1283,7 @@ extension ArraySlice {
     _makeMutableAndUnique()
 
     // Create an UnsafeBufferPointer that we can pass to body
-    let pointer = _buffer.firstElementAddress
+    let pointer = unsafe _buffer.firstElementAddress
     var inoutBufferPointer = unsafe UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
@@ -1302,13 +1302,19 @@ extension ArraySlice {
 
   @available(SwiftStdlib 6.2, *)
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(/*inout*/borrow self)
+    @lifetime(&self)
     @_alwaysEmitIntoClient
     mutating get {
+      // _makeMutableAndUnique*() inserts begin_cow_mutation.
+      // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+      // We have runtime verification to check if begin_cow_mutation/end_cow_mutation are properly nested in asserts build of stdlib,
+      // disable checking whenever it is turned on since the compiler generated `end_cow_mutation_addr` is conservative and cannot be verified.
+      _makeMutableAndUniqueUnchecked()
+#else
       _makeMutableAndUnique()
-      // NOTE: We don't have the ability to schedule a call to
-      //       ContiguousArrayBuffer.endCOWMutation().
-      //       rdar://146785284 (lifetime analysis for end of mutation)
+#endif
+      // LifetimeDependence analysis inserts call to Builtin.endCOWMutation.
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
       let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
@@ -1573,7 +1579,7 @@ extension ArraySlice {
   @_alwaysEmitIntoClient
   public func _copyToNewArray() -> [Element] {
     unsafe Array(unsafeUninitializedCapacity: self.count) { buffer, count in
-      var (it, c) = self._buffer._copyContents(initializing: buffer)
+      var (it, c) = unsafe self._buffer._copyContents(initializing: buffer)
       _precondition(it.next() == nil)
       count = c
     }

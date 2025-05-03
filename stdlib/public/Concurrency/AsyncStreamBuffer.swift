@@ -55,6 +55,7 @@ func _unlock(_ ptr: UnsafeRawPointer)
 @available(SwiftStdlib 5.1, *)
 extension AsyncStream {
   @safe
+  @usableFromInline
   internal final class _Storage: @unchecked Sendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
@@ -252,7 +253,7 @@ extension AsyncStream {
     func next() async -> Element? {
       await withTaskCancellationHandler {
         unsafe await withUnsafeContinuation {
-          next($0)
+          unsafe next($0)
         }
       } onCancel: { [cancel] in
         cancel()
@@ -281,6 +282,7 @@ extension AsyncStream {
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream {
   @safe
+  @usableFromInline
   internal final class _Storage: @unchecked Sendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
     enum Terminal {
@@ -512,7 +514,7 @@ extension AsyncThrowingStream {
     func next() async throws -> Element? {
       try await withTaskCancellationHandler {
         try unsafe await withUnsafeThrowingContinuation {
-          next($0)
+          unsafe next($0)
         }
       } onCancel: { [cancel] in
         cancel()

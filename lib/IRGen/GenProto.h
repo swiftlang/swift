@@ -29,7 +29,7 @@ namespace llvm {
 
 namespace swift {
   class AssociatedConformance;
-  class AssociatedType;
+  class AssociatedTypeDecl;
   class CanType;
   class FuncDecl;
   enum class MetadataState : size_t;
@@ -90,11 +90,11 @@ namespace irgen {
   ///
   /// \param parentMetadata - the type metadata for T
   /// \param wtable - the witness table witnessing the conformance of T to P
-  /// \param associatedType - the declaration of X; a member of P
+  /// \param assocType - the declaration of X; a member of P
   MetadataResponse emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                  llvm::Value *parentMetadata,
                                                  llvm::Value *wtable,
-                                                 AssociatedType associatedType,
+                                                 AssociatedTypeDecl *assocType,
                                                  DynamicMetadataRequest request);
 
   // Return the offset one should do on a witness table pointer to retrieve the

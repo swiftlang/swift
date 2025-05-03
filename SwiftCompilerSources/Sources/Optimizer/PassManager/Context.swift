@@ -50,6 +50,8 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
   /// only consumer that has this disabled today (as it disables WMO
@@ -322,6 +324,10 @@ struct FunctionPassContext : MutatingContext {
 
   var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
+  }
+
+  var swiftMutableSpan: NominalTypeDecl {
+    _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {

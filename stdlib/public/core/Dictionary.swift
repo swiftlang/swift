@@ -1376,7 +1376,7 @@ extension Dictionary {
       if
         lhs._variant.isNative,
         rhs._variant.isNative,
-        lhs._variant.asNative._storage === rhs._variant.asNative._storage
+        unsafe (lhs._variant.asNative._storage === rhs._variant.asNative._storage)
       {
         return true
       }
@@ -1388,7 +1388,7 @@ extension Dictionary {
         return true
       }
 #else
-      if lhs._variant.asNative._storage === rhs._variant.asNative._storage {
+      if unsafe (lhs._variant.asNative._storage === rhs._variant.asNative._storage) {
         return true
       }
 #endif
@@ -1793,7 +1793,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     internal init(_native index: _HashTable.Index) {
-      self.init(_variant: .native(index))
+      unsafe self.init(_variant: .native(index))
     }
 
 #if _runtime(_ObjC)
@@ -1876,7 +1876,7 @@ extension Dictionary.Index {
           "Attempting to access Dictionary elements using an invalid index")
       }
       let dummy = unsafe _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
-      _variant = .native(dummy)
+      _variant = unsafe .native(dummy)
       defer { _variant = .cocoa(cocoa) }
       yield &cocoa
     }

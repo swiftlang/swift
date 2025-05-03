@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name attrs \
 // RUN:  -emit-private-module-interface-path %t.private.swiftinterface \
-// RUN:  -enable-experimental-feature ABIAttribute \
-// RUN:  -enable-experimental-feature ExecutionAttribute
+// RUN:  -enable-experimental-feature ABIAttribute
 
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name attrs
 // RUN: %target-swift-typecheck-module-from-interface(%t.private.swiftinterface) -module-name attrs
@@ -10,7 +9,6 @@
 // RUN: %FileCheck %s --check-prefixes CHECK,PRIVATE-CHECK --input-file %t.private.swiftinterface
 
 // REQUIRES: swift_feature_ABIAttribute
-// REQUIRES: swift_feature_ExecutionAttribute
 
 // CHECK: @_transparent public func glass() -> Swift.Int { return 0 }{{$}}
 @_transparent public func glass() -> Int { return 0 }
@@ -87,10 +85,33 @@ public struct MutatingTest {
 @abi(func abiSpiFunc())
 @_spi(spiGroup) public func abiSpiFunc() {}
 
-@execution(concurrent)
-public func testExecutionConcurrent() async {}
-// CHECK: @execution(concurrent) public func testExecutionConcurrent() async
+// We should print feature guards outside, but not inside, an @abi attribute.
+@abi(func sendingABI() -> sending Any?)
+public func sendingABI() -> Any? { nil }
+// CHECK: #if {{.*}} && $ABIAttribute
+// CHECK: @abi(func sendingABI() -> sending Any?)
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #elseif {{.*}} && $SendingArgsAndResults
+// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #else
+// CHECK: @_silgen_name("$s5attrs10sendingABIypSgyF")
+// CHECK: public func sendingABI() -> Any?
+// CHECK: #endif
 
-@execution(caller)
+@concurrent
+public func testExecutionConcurrent() async {}
+// CHECK: @concurrent public func testExecutionConcurrent() async
+
+nonisolated(nonsending)
 public func testExecutionCaller() async {}
-// CHECK: @execution(caller) public func testExecutionCaller() async
+// CHECK: nonisolated(nonsending) public func testExecutionCaller() async
+
+public struct TestPlacementOfAttrsAndSpecifiers {
+  // CHECK: public func test1<T>(_: sending @autoclosure () -> T)
+  public func test1<T>(_: sending @autoclosure () -> T) {}
+  // CHECK: public func test2<T>(_: borrowing @autoclosure () -> T)
+  public func test2<T>(_: borrowing @autoclosure () -> T) {}
+  // CHECK: public func test3<T>(_: inout () async -> T)
+  public func test3<T>(_: inout () async -> T) {}
+}

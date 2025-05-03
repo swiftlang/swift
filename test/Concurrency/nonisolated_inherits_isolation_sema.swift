@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature AsyncCallerExecution -parse-as-library
+// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault -parse-as-library
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_AsyncCallerExecution
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 class NonSendable {} // expected-note {{}}
 

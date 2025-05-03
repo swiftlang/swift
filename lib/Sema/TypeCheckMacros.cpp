@@ -607,8 +607,7 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
       isa<ExtensionDecl>(decl)) {
-    decl->diagnose(diag::invalid_decl_in_macro_expansion,
-                   decl->getDescriptiveKind());
+    decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
@@ -1396,6 +1395,12 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     }
   }
 
+  // Macros are so spectacularly not valid in an `@abi` attribute that we cannot
+  // even attempt to expand them.
+  if (!ABIRoleInfo(attachedTo).providesAPI()) {
+    return nullptr;
+  }
+
   ASTContext &ctx = dc->getASTContext();
 
   auto moduleDecl = dc->getParentModule();
@@ -1843,9 +1848,8 @@ std::optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
   // property into a computed one without telling us pre-expansion. Produce
   // an error to prevent this.
   if (expectObservers && foundNonObservingAccessorInMacro) {
-    storage->diagnose(
-        diag::macro_nonobserver_unexpected_in_expansion, macro->getName(),
-        foundNonObservingAccessorInMacro->getDescriptiveKind());
+    storage->diagnose(diag::macro_nonobserver_unexpected_in_expansion, macro,
+                      foundNonObservingAccessorInMacro);
   }
 
   // We expected to get a non-observing accessor, but there isn't one (from
@@ -2148,8 +2152,8 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     for (auto i : inheritedTypes.getIndices()) {
       auto constraint =
           TypeResolution::forInterface(
-              extension->getDeclContext(),
-              TypeResolverContext::GenericRequirement,
+              extension,
+              TypeResolverContext::Inherited,
               /*unboundTyOpener*/ nullptr,
               /*placeholderHandler*/ nullptr,
               /*packElementOpener*/ nullptr)

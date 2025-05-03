@@ -537,8 +537,8 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   if (!A->getOption().matches(options::OPT_enable_experimental_feature))
     return true;
 
-  if (auto feature = getExperimentalFeature(A->getValue())) {
-    return swift::includeInModuleInterface(*feature);
+  if (auto feature = Feature::getExperimentalFeature(A->getValue())) {
+    return feature->includeInModuleInterface();
   }
 
   return true;
@@ -816,7 +816,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       continue;
     }
 
-    // For all other features, the argument format is `<name>[:adoption]`.
+    // For all other features, the argument format is `<name>[:migrate]`.
     StringRef featureName;
     std::optional<StringRef> featureMode;
     std::tie(featureName, featureMode) = argValue.rsplit(':');
@@ -824,7 +824,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       featureMode = std::nullopt;
     }
 
-    auto feature = getUpcomingFeature(featureName);
+    auto feature = Feature::getUpcomingFeature(featureName);
     if (feature) {
       // Diagnose upcoming features enabled with -enable-experimental-feature.
       if (!isUpcomingFeatureFlag)
@@ -840,7 +840,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       }
 
       // If the feature is also not a recognized experimental feature, skip it.
-      feature = getExperimentalFeature(featureName);
+      feature = Feature::getExperimentalFeature(featureName);
       if (!feature) {
         Diags.diagnose(SourceLoc(), diag::unrecognized_feature, featureName,
                        /*upcoming=*/false);
@@ -850,11 +850,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+    if (auto firstVersion = feature->getLanguageVersion()) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
-                       getFeatureName(*feature), *firstVersion);
+                       feature->getName(), *firstVersion);
         continue;
       }
     }
@@ -862,7 +862,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
     if (Opts.RestrictNonProductionExperimentalFeatures &&
-        !isFeatureAvailableInProduction(*feature)) {
+        !feature->isAvailableInProduction()) {
       Diags.diagnose(SourceLoc(),
                      diag::experimental_not_supported_in_production,
                      featureName);
@@ -872,21 +872,21 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     if (featureMode) {
       if (isEnableFeatureFlag) {
-        const auto isAdoptable = isFeatureAdoptable(*feature);
+        const auto isMigratable = feature->isMigratable();
 
         // Diagnose an invalid mode.
-        StringRef validModeName = "adoption";
+        StringRef validModeName = "migrate";
         if (*featureMode != validModeName) {
           Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
                          featureName,
                          /*didYouMean=*/validModeName,
-                         /*showDidYouMean=*/isAdoptable);
+                         /*showDidYouMean=*/isMigratable);
           continue;
         }
 
-        if (!isAdoptable) {
+        if (!isMigratable) {
           Diags.diagnose(SourceLoc(),
-                         diag::feature_does_not_support_adoption_mode,
+                         diag::feature_does_not_support_migration_mode,
                          featureName);
           continue;
         }
@@ -904,7 +904,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
-      Opts.enableFeature(*feature, /*forAdoption=*/featureMode.has_value());
+      Opts.enableFeature(*feature, /*forMigration=*/featureMode.has_value());
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in
@@ -1205,7 +1205,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
+    if (auto firstVersion = feature.getLanguageVersion()) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion))
         return;
     }
@@ -1364,12 +1364,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::RegionBasedIsolation);
   }
 
-  // Get the executor factory name
-  if (const Arg *A = Args.getLastArg(OPT_executor_factory)) {
-    printf("Got executor-factory option\n");
-    Opts.ExecutorFactory = A->getValue();
-  }
-
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
@@ -1427,8 +1421,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
-
-  Opts.EnableABIInferenceRemarks = Args.hasArg(OPT_remark_abi_inference);
 
   if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
     // Only allow -experimental-skip-non-exportable-decls if either library
@@ -2221,6 +2213,17 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
     Opts.MinimumAccessLevel = AccessLevel::Public;
   }
 
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_allow_availability_platforms,
+        OPT_symbol_graph_block_availability_platforms)) {
+    llvm::SmallVector<StringRef> AvailabilityPlatforms;
+    StringRef(A->getValue())
+        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
+               /*KeepEmpty*/ false);
+    Opts.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
+        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
+    Opts.AvailabilityIsBlockList = A->getOption().matches(OPT_symbol_graph_block_availability_platforms);
+  }
+
   // default values for generating symbol graphs during a build
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
@@ -2416,6 +2419,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
     Opts.ScannerPrefixMapper.push_back(Opt.str());
   }
+
+  Opts.ResolvedPluginVerification |=
+      Args.hasArg(OPT_resolved_plugin_verification);
 
   // rdar://132340493 disable scanner-side validation for non-caching builds
   Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
@@ -2633,7 +2639,7 @@ static void configureDiagnosticEngine(
   std::string docsPath = Options.DiagnosticDocumentationPath;
   if (docsPath.empty()) {
     // Point at the latest Markdown documentation on GitHub.
-    docsPath = "https://github.com/swiftlang/swift/tree/main/userdocs/diagnostics";
+    docsPath = "https://docs.swift.org/compiler/documentation/diagnostics";
   }
   Diagnostics.setDiagnosticDocumentationPath(docsPath);
 
@@ -3130,6 +3136,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableAddressDependencies = Args.hasFlag(
       OPT_enable_address_dependencies, OPT_disable_address_dependencies,
       Opts.EnableAddressDependencies);
+
+  if (LangOpts.Target.isOSDarwin() || LangOpts.Target.isOSLinux()) {
+    // On Darwin and Linux, use yield_once_2 by default.
+    Opts.CoroutineAccessorsUseYieldOnce2 = true;
+  }
+  Opts.CoroutineAccessorsUseYieldOnce2 =
+      Args.hasFlag(OPT_enable_callee_allocated_coro_abi,
+                   OPT_disable_callee_allocated_coro_abi,
+                   Opts.CoroutineAccessorsUseYieldOnce2);
+
   Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
   return false;
@@ -3765,10 +3781,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
                  OPT_disable_async_frame_push_pop_metadata,
                  Opts.EmitAsyncFramePushPopMetadata);
+
+  bool platformSupportsTypedMalloc = !llvm::Triple(Triple).isOSLinux() &&
+    !llvm::Triple(Triple).isOSWindows();
+
   Opts.EmitTypeMallocForCoroFrame =
   Args.hasFlag(OPT_enable_emit_type_malloc_for_coro_frame,
               OPT_disable_emit_type_malloc_for_coro_frame,
-              Opts.EmitTypeMallocForCoroFrame);
+              (Opts.EmitTypeMallocForCoroFrame && platformSupportsTypedMalloc));
+
   Opts.AsyncFramePointerAll = Args.hasFlag(OPT_enable_async_frame_pointer_all,
                                            OPT_disable_async_frame_pointer_all,
                                            Opts.AsyncFramePointerAll);

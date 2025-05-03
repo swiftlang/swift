@@ -467,8 +467,8 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
-    bool hasConst = sv->getAttrs().getAttribute<CompileTimeLiteralAttr>();
-    if (!hasConst)
+    bool hasUnderscoreConst = sv->getAttrs().getAttribute<CompileTimeLiteralAttr>();
+    if (!hasUnderscoreConst)
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
@@ -619,6 +619,9 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeExpr(init, initContext);
   }
+
+  // Compute captures in case diagnostics are emitted.
+  (void)binding->getCaptureInfo(i);
 }
 
 Expr *PatternBindingCheckedAndContextualizedInitRequest::evaluate(
@@ -846,6 +849,10 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getOpaqueReadOwnership();
+
   enum class DiagKind {
     BorrowedAttr,
     NoncopyableType
@@ -856,12 +863,10 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     if (auto *getter = storage->getEffectfulGetAccessor()) {
       switch (kind) {
       case DiagKind::NoncopyableType:
-        getter->diagnose(diag::noncopyable_effectful_getter,
-                         getter->getDescriptiveKind());
+        getter->diagnose(diag::noncopyable_effectful_getter, getter);
         break;
       case DiagKind::BorrowedAttr:
-        getter->diagnose(diag::borrowed_with_effect,
-                         getter->getDescriptiveKind());
+        getter->diagnose(diag::borrowed_with_effect, getter);
         break;
       }
     }
@@ -2669,25 +2674,42 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 ///
 /// The underscored accessor could, however, still be required for ABI
 /// stability.
-bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
-    AccessorKind kind, AccessorDecl const *decl) const {
-  auto &ctx = getASTContext();
+static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+    AbstractStorageDecl const *storage, AccessorKind kind,
+    AccessorDecl const *decl, AbstractStorageDecl const *derived) {
+  auto &ctx = storage->getASTContext();
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
 
+  // If any overridden decl requires the underscored version, then this decl
+  // does too.  Otherwise dispatch to the underscored version on a value
+  // statically the super but dynamically this subtype would not dispatch to an
+  // override of the underscored version but rather (incorrectly) the
+  // supertype's implementation.
+  if (storage == derived) {
+    auto *current = storage;
+    while ((current = current->getOverriddenDecl())) {
+      auto *currentDecl = cast_or_null<AccessorDecl>(
+          decl ? decl->getOverriddenDecl() : nullptr);
+      if (requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+              current, kind, currentDecl, derived)) {
+        return true;
+      }
+    }
+  }
+
   // Non-stable modules have no ABI to keep stable.
-  if (getModuleContext()->getResilienceStrategy() !=
+  if (storage->getModuleContext()->getResilienceStrategy() !=
       ResilienceStrategy::Resilient)
     return false;
 
   // Non-exported storage has no ABI to keep stable.
-  if (!isExported(this))
+  if (!isExported(storage))
     return false;
 
   // The non-underscored accessor is not present, the underscored accessor
   // won't be either.
-  // TODO: CoroutineAccessors: What if only the underscored is written out?
-  auto *accessor = decl ? decl : getOpaqueAccessor(kind);
+  auto *accessor = decl ? decl : storage->getOpaqueAccessor(kind);
   if (!accessor)
     return false;
 
@@ -2698,15 +2720,41 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
   if (!ctx.supportsVersionedAvailability())
     return true;
 
-  auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
-  auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
+  AvailabilityContext accessorAvailability = [&] {
+    if (storage->getModuleContext()->isMainModule()) {
+      return AvailabilityContext::forDeclSignature(accessor);
+    }
+    // Calculate the availability of the imported declaration ourselves starting
+    // from always available and constraining by walking the enclosing decl
+    // contexts.
+    auto retval = AvailabilityContext::forAlwaysAvailable(ctx);
+    auto declContext = storage->getInnermostDeclContext();
+    while (declContext) {
+      const Decl *decl = declContext->getInnermostDeclarationDeclContext();
+      if (!decl)
+        break;
+
+      retval.constrainWithDecl(decl);
+      declContext = decl->getDeclContext();
+    }
+    return retval;
+  }();
+  auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.
-  if (modifyAvailability.getPlatformRange().isContainedIn(featureAvailability))
+  if (accessorAvailability.getPlatformRange().isContainedIn(
+          featureAvailability))
     return false;
 
   // The underscored accessor is required for ABI stability.
   return true;
+}
+
+bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+    AccessorKind kind, AccessorDecl const *decl) const {
+  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+      this, kind, decl,
+      /*derived=*/this);
 }
 
 bool RequiresOpaqueModifyCoroutineRequest::evaluate(
@@ -3844,6 +3892,10 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getImplInfo();
+
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
       param->isImmutableInFunctionBody()
@@ -3859,9 +3911,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     // If we see `@_hasStorage` in a context with no stored properties, diagnose
     // and ignore it.
     if (isa<ExtensionDecl, EnumDecl, ProtocolDecl>(DC)) {
-      storage->diagnose(diag::attr_invalid_in_context, attr,
-                        DC->getAsDecl()->getDescriptiveKind())
-        .warnInSwiftInterface(storage->getDeclContext());
+      storage->diagnose(diag::attr_invalid_in_context, attr, DC->getAsDecl())
+          .warnInSwiftInterface(storage->getDeclContext());
 
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.

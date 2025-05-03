@@ -1146,6 +1146,7 @@ public:
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeLiteral ||
+           T->getKind() == TypeReprKind::ConstValue ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
            T->getKind() == TypeReprKind::Sending;
   }
@@ -1218,6 +1219,21 @@ public:
   static bool classof(const CompileTimeLiteralTypeRepr *T) { return true; }
 };
 
+/// An '@const' type.
+/// \code
+///   x : @const Int
+/// \endcode
+class ConstValueTypeRepr : public SpecifierTypeRepr {
+public:
+  ConstValueTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::ConstValue, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ConstValue;
+  }
+  static bool classof(const ConstValueTypeRepr *T) { return true; }
+};
+
 /// A sending type.
 /// \code
 ///   x : sending Int
@@ -1231,6 +1247,35 @@ public:
     return T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SendingTypeRepr *T) { return true; }
+};
+
+/// A 'nonisolated(nonsending)' function type.
+/// \code
+///   x : nonisolated(nonsending) () async -> Int
+/// \endcode
+class CallerIsolatedTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc Loc;
+
+public:
+  CallerIsolatedTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : TypeRepr(TypeReprKind::CallerIsolated), Base(Base), Loc(Loc) {
+    assert(Base);
+  }
+
+  TypeRepr *getBase() const { return Base; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CallerIsolated;
+  }
+  static bool classof(const CallerIsolatedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
+  SourceLoc getLocImpl() const { return Base->getLoc(); }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1661,8 +1706,10 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Integer:
+  case TypeReprKind::CallerIsolated:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

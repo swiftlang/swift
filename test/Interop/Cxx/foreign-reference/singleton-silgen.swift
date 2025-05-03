@@ -15,11 +15,8 @@ import Singleton
 // CHECK: [[ACCESS_1:%.*]] = begin_access [read] [unknown] [[BOX]] : $*DeletedSpecialMembers
 // CHECK: [[X_1:%.*]] = load [trivial] [[ACCESS_1]] : $*DeletedSpecialMembers
 
-// CHECK: [[TMP:%.*]] = alloc_stack $DeletedSpecialMembers
-// CHECK: store [[X_1]] to [trivial] [[TMP]]
-
-// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
-// CHECK: apply [[TEST_FN]]([[TMP]]) : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
+// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (DeletedSpecialMembers) -> Int32
+// CHECK: apply [[TEST_FN]]([[X_1]]) : $@convention(cxx_method) (DeletedSpecialMembers) -> Int32
 // CHECK: [[ACCESS_2:%.*]] = begin_access [read] [unknown] [[BOX]] : $*DeletedSpecialMembers
 // CHECK: [[X_2:%.*]] = load [trivial] [[ACCESS_2]] : $*DeletedSpecialMembers
 
@@ -36,6 +33,6 @@ public func test() {
 
 // CHECK-LABEL: sil{{ \[available .*\] | }}[clang DeletedSpecialMembers.create] @{{_ZN21DeletedSpecialMembers6createEv|\?create\@DeletedSpecialMembers\@\@SAPEAU1\@XZ}} : $@convention(c) () -> DeletedSpecialMembers
 
-// CHECK-LABEL: sil{{ \[available .*\] | }}[clang DeletedSpecialMembers.test] @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
+// CHECK-LABEL: sil{{ \[available .*\] | }}[clang DeletedSpecialMembers.test] @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (DeletedSpecialMembers) -> Int32
 
 // CHECK-LABEL: sil{{ \[available .*\] | }}[serialized] [clang mutateIt] @{{_Z8mutateItR21DeletedSpecialMembers|\?mutateIt\@\@YAXAEAUDeletedSpecialMembers\@\@\@Z}} : $@convention(c) (DeletedSpecialMembers) -> ()

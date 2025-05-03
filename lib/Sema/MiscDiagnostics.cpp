@@ -343,8 +343,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
             if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
-                                 diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind(),
+                                 diag::effectful_keypath_component, asd,
                                  /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
@@ -807,9 +806,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         declParent = VD->getDeclContext()->getParentModule();
       }
 
-      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                         VD->getBaseIdentifier(),
-                         VD->getDescriptiveKind(),
+      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access, VD,
                          declParent);
       Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD);
 
@@ -847,14 +844,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
       for (const ModuleValuePair &pair : sortedResults) {
-        DescriptiveDeclKind k = pair.second->getDescriptiveKind();
-
         SmallString<32> namePlusDot = pair.first->getName().str();
         namePlusDot.push_back('.');
 
-        Ctx.Diags.diagnose(DRE->getLoc(), topLevelDiag,
-                           namePlusDot, k, pair.first->getName())
-          .fixItInsert(DRE->getStartLoc(), namePlusDot);
+        Ctx.Diags
+            .diagnose(DRE->getLoc(), topLevelDiag, namePlusDot, pair.second,
+                      pair.first)
+            .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
     
@@ -1508,11 +1504,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy =
-          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
-                                module, ResilienceExpansion::Minimal,
-                                /*useOldABI=*/false);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),
@@ -2244,11 +2239,12 @@ public:
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
-    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
-    // compatibility with the Swift 6 diagnostic behavior where we previously
-    // skipped diagnosing.
-    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
-      warnUntilVersion.emplace(7);
+    // Prior to the next language mode, downgrade to a warning if we're in a
+    // macro to preserve compatibility with the Swift 6 diagnostic behavior
+    // where we previously skipped diagnosing.
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+      warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
@@ -3656,9 +3652,18 @@ public:
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
+
+        // Type checking did not set a range for this query (it may be invalid).
+        // Treat the condition as if it were always true.
+        if (!availabilityRange.has_value()) {
+          alwaysAvailableCount++;
+          continue;
+        }
+
         // If there is no lower endpoint it means that the condition has no
         // OS version specification that matches the target platform.
-        if (!availabilityRange.hasLowerEndpoint()) {
+        // FIXME: [availability] Handle empty ranges (never available).
+        if (!availabilityRange->hasLowerEndpoint()) {
           // An inactive #unavailable condition trivially evaluates to false.
           if (condition->isUnavailability()) {
             neverAvailableCount++;
@@ -3671,7 +3676,7 @@ public:
         }
 
         conditions.push_back(
-            {availabilityRange, condition->isUnavailability()});
+            {*availabilityRange, condition->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this

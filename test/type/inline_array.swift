@@ -60,7 +60,7 @@ let _ = S<[[Int x 3]]>()
 // expected-error@-1 {{element count must precede inline array element type}}
 let _ = S<[@escaping () -> Int x 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}
-// expected-error@-2 {{@escaping attribute may only be used in function parameter position}}
+// expected-error@-2 {{'@escaping' may only be used in function parameter position}}
 let _ = S<[Int.Type x 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}
 let _ = S<[sending P & Q x 3]>()

@@ -410,5 +410,5 @@ SourceLoc ast_scope::extractNearestSourceLoc(
 
 SourceRange TryScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return expr->getSourceRange();
+  return SourceRange(expr->getStartLoc(), endLoc);
 }

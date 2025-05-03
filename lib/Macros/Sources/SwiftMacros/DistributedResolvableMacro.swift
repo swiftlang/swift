@@ -80,7 +80,7 @@ extension DistributedResolvableMacro {
     if var variable = requirement.decl.as(VariableDeclSyntax.self) {
       variable.modifiers = variable.modifiers.filter { !$0.isAccessControl }
       access.reversed().forEach { modifier in
-        variable.modifiers = variable.modifiers.prepending(modifier)
+        variable.modifiers = [modifier] + variable.modifiers
       }
 
       var accessorStubs: [String] = []
@@ -106,7 +106,7 @@ extension DistributedResolvableMacro {
     } else if var fun = requirement.decl.as(FunctionDeclSyntax.self) {
       fun.modifiers = fun.modifiers.filter { !$0.isAccessControl }
       access.reversed().forEach { modifier in
-        fun.modifiers = fun.modifiers.prepending(modifier)
+        fun.modifiers = [modifier] + fun.modifiers
       }
 
       // normal function stub

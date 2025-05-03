@@ -141,7 +141,7 @@ func testIUOResult(x: IUOResult) {
 // Subscript index must be ExpressibleByStringLiteral.
 @dynamicMemberLookup
 struct Invalid1 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-error @+1 {{'@dynamicMemberLookup' requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: Int) -> Int {
     return 42
   }
@@ -150,7 +150,7 @@ struct Invalid1 {
 // Subscript may not be variadic.
 @dynamicMemberLookup
 struct Invalid2 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-error @+1 {{'@dynamicMemberLookup' requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: String...) -> Int {
     return 42
   }
@@ -189,7 +189,7 @@ func NotAllowedOnFunc() {}
 // @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+// expected-error @+1 {{'@dynamicMemberLookup' requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 class InvalidBase {}
 
@@ -789,20 +789,20 @@ do {
 
 @dynamicMemberLookup
 struct S1_52957 {
-  subscript(dynamicMember: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S1_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
-  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}}{{13-13=dynamicMember }}
+  subscript(dynamicMember: String) -> String { // expected-error {{'@dynamicMemberLookup' requires 'S1_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the '@dynamicMemberLookup' requirement}}{{13-13=dynamicMember }}
     fatalError()
   }
 }
 
 @dynamicMemberLookup
 struct S2_52957 {
-  subscript(foo bar: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  subscript(foo bar: String) -> String { // expected-error {{'@dynamicMemberLookup' requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
     fatalError()
   }
 
-  subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
-  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}} {{13-13=dynamicMember }}
+  subscript(foo: String) -> String { // expected-error {{'@dynamicMemberLookup' requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the '@dynamicMemberLookup' requirement}} {{13-13=dynamicMember }}
     fatalError()
   }
 }

@@ -699,7 +699,7 @@ final internal class __SharedStringStorage
     countAndFlags: _StringObject.CountAndFlags
   ) {
     self._owner = nil
-    self.start = unsafe ptr
+    unsafe self.start = ptr
     self.immortal = true
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
@@ -728,7 +728,7 @@ final internal class __SharedStringStorage
   ) {
     // ptr *must* be the start of an allocation
     self._owner = nil
-    self.start = unsafe ptr
+    unsafe self.start = ptr
     self.immortal = false
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags

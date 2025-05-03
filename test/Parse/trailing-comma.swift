@@ -60,6 +60,7 @@ struct S {
 // String Literal Interpolation
 
 "\(1,)"
+"\(1, f:)" // expected-error {{expected expression in list of expressions}}
 
 // Availability Spec List
 
@@ -87,7 +88,7 @@ struct Foo {
   var y: Int
   
   var value: (Int, Int) {
-    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in @storageRestrictions list}}
+    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in '@storageRestrictions' list}}
     init(initialValue) {
       self.x = initialValue.0
       self.y = initialValue.1

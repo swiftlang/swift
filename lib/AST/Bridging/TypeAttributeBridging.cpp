@@ -87,25 +87,6 @@ BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
       {unbridged(cKind), cKindLoc.unbridged()});
 }
 
-BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
-    BridgedExecutionTypeAttrExecutionKind behavior,
-    BridgedSourceLoc cBehaviorLoc) {
-  auto behaviorKind = [=] {
-    switch (behavior) {
-    case BridgedExecutionTypeAttrExecutionKind_Concurrent:
-      return ExecutionKind::Concurrent;
-    case BridgedExecutionTypeAttrExecutionKind_Caller:
-      return ExecutionKind::Caller;
-    }
-    llvm_unreachable("bad kind");
-  }();
-  return new (cContext.unbridged()) ExecutionTypeAttr(
-      cAtLoc.unbridged(), cNameLoc.unbridged(), cParensRange.unbridged(),
-      {behaviorKind, cBehaviorLoc.unbridged()});
-}
-
 BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,

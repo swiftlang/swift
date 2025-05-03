@@ -46,6 +46,7 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1184,11 +1185,6 @@ void Serializer::writeHeader() {
         options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
-      }
-
-      if (M->supportsExtensibleEnums()) {
-        options_block::ExtensibleEnumsLayout ExtensibleEnums(Out);
-        ExtensibleEnums.emit(ScratchRecord);
       }
 
       if (Options.SerializeOptionsForDebugging) {
@@ -2942,15 +2938,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 #include "swift/AST/DeclAttr.def"
 
-    case DeclAttrKind::Execution: {
-      auto *theAttr = cast<ExecutionAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[ExecutionDeclAttrLayout::Code];
-      ExecutionDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode,
-          static_cast<uint8_t>(theAttr->getBehavior()));
-      return;
-    }
-
     case DeclAttrKind::ABI: {
       auto *theAttr = cast<ABIAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ABIDeclAttrLayout::Code];
@@ -2997,6 +2984,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
+                                      theAttr->Underscored,
                                       theAttr->Name);
       return;
     }
@@ -3129,7 +3117,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
              !theAttr->getParsedAttr()->hasCachedRenamedDecl());
       auto domain = theAttr->getDomain();
 
-      // FIXME: [availability] Serialize domain and kind directly.
+      auto getDomainKind = [](AvailabilityDomain domain) -> AvailabilityDomainKind {
+        switch (domain.getKind()) {
+          case AvailabilityDomain::Kind::Universal:
+            return AvailabilityDomainKind::Universal;
+          case AvailabilityDomain::Kind::SwiftLanguage:
+            return AvailabilityDomainKind::SwiftLanguage;
+          case AvailabilityDomain::Kind::PackageDescription:
+            return AvailabilityDomainKind::PackageDescription;
+          case AvailabilityDomain::Kind::Embedded:
+            return AvailabilityDomainKind::Embedded;
+          case AvailabilityDomain::Kind::Platform:
+            return AvailabilityDomainKind::Platform;
+          case AvailabilityDomain::Kind::Custom:
+            return AvailabilityDomainKind::Custom;
+        }
+      };
+
+      auto domainKind = getDomainKind(domain);
+      const Decl *domainDecl = domain.getDecl();
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
       blob.append(theAttr->getRename());
@@ -3140,13 +3147,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          domain.isPackageDescription(),
           theAttr->isSPI(),
-          domain.isEmbedded(),
+          static_cast<uint8_t>(domainKind),
+          static_cast<unsigned>(domain.getPlatformKind()),
+          S.addDeclRef(domainDecl),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(domain.getPlatformKind()),
           theAttr->getMessage().size(),
           theAttr->getRename().size(),
           blob);
@@ -3456,9 +3463,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Nonisolated: {
       auto *theAttr = cast<NonisolatedAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
-      NonisolatedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                            theAttr->isUnsafe(),
-                                            theAttr->isImplicit());
+      NonisolatedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
       return;
     }
 
@@ -4737,7 +4744,9 @@ public:
         param->isAutoClosure(),
         param->isIsolated(),
         param->isCompileTimeLiteral(),
+        param->isConstVal(),
         param->isSending(),
+        param->isCallerIsolated(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
@@ -5313,8 +5322,7 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
     if (initialOffset == Out.GetCurrentBitNo()) {
-      llvm::PrettyStackTraceString message("failed to serialize anything");
-      abort();
+      abortWithPrettyStackTraceMessage("failed to serialize anything");
     }
   };
 
@@ -5436,6 +5444,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
   if (options.contains(SILParameterInfo::ImplicitLeading)) {
     options -= SILParameterInfo::ImplicitLeading;
     result |= SILParameterInfoFlags::ImplicitLeading;
+  }
+  
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    result |= SILParameterInfoFlags::Const;
   }
 
   // If we still have options left, this code is out of sync... return none.
@@ -5799,6 +5812,7 @@ public:
                                            paramKind,
                                            hasDecl,
                                            genericParam->getDepth(),
+                                           genericParam->getWeight(),
                                            genericParam->getIndex(),
                                            declOrIdentifier,
                                            valueTypeID);
@@ -5828,8 +5842,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeLiteral(), paramFlags.isSending(),
-          paramFlags.isAddressable());
+          paramFlags.isCompileTimeLiteral(), paramFlags.isConstValue(),
+          paramFlags.isSending(), paramFlags.isAddressable());
     }
   }
 
@@ -6135,8 +6149,7 @@ void Serializer::writeASTBlockEntity(Type ty) {
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
     if (initialOffset == Out.GetCurrentBitNo()) {
-      llvm::PrettyStackTraceString message("failed to serialize anything");
-      abort();
+      abortWithPrettyStackTraceMessage("failed to serialize anything");
     }
   };
 

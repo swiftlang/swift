@@ -1914,15 +1914,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     if (subMap.empty())
       return param;
 
-    return param.subst(
-      [&](SubstitutableType *type) -> Type {
-        if (cast<GenericTypeParamType>(type)->getDepth() < typeContextDepth)
-          return Type(type).subst(subMap);
-        return type;
-      },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return lookupConformance(substType, proto);
-      });
+    OuterSubstitutions replacer{subMap, typeContextDepth};
+    return param.subst(replacer, replacer,
+                       SubstFlags::PreservePackExpansionLevel);
   };
 
   /// Separate the explicit generic parameters from the implicit, opaque
@@ -2234,8 +2228,11 @@ bool isNonSendableExtension(const Decl *D) {
   if (!ED || !ED->isUnavailable())
     return false;
 
-  auto nonSendable =
-      ED->getExtendedNominal()->getAttrs().getEffectiveSendableAttr();
+  auto *NTD = ED->getExtendedNominal();
+  if (!NTD)
+    return false;
+
+  auto nonSendable = NTD->getAttrs().getEffectiveSendableAttr();
   if (!isa_and_nonnull<NonSendableAttr>(nonSendable))
     return false;
 
@@ -3302,18 +3299,9 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
 }
 
 static void
-suppressingFeatureCustomAvailability(PrintOptions &options,
-                                     llvm::function_ref<void()> action) {
-  // FIXME: [availability] Save and restore a bit controlling whether
-  // @available attributes for custom domains are printed.
-  action();
-}
-
-static void
-suppressingFeatureExecutionAttribute(PrintOptions &options,
-                                    llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope1(options.SuppressExecutionAttribute, true);
-  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Execution);
+suppressingFeatureExtensibleAttribute(PrintOptions &options,
+                                      llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Extensible);
   action();
 }
 
@@ -3351,7 +3339,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
-    printer << "$" << getFeatureName(feature);
+    printer << "$" << Feature(feature).getName();
   }
 
 #ifndef NDEBUG
@@ -3863,13 +3851,13 @@ static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
                                 const ParamDecl *param,
                                 ParameterTypeFlags flags,
-                                bool escaping) {
-  if (!options.excludeAttrKind(TypeAttrKind::Autoclosure) &&
-      flags.isAutoClosure())
-    printer.printAttrName("@autoclosure ");
-  if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
-      flags.isNoDerivative())
-    printer.printAttrName("@noDerivative ");
+                                bool escaping,
+                                bool isIsolatedToCaller = false) {
+  // Always print `nonisolated(nonsending)` specifier on a parameter
+  // first, to avoid any issues with ordering.
+  if (isIsolatedToCaller) {
+    printer.printKeyword("nonisolated(nonsending)", options, " ");
+  }
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -3898,7 +3886,7 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (flags.isSending()) {
     if (!options.SuppressSendingArgsAndResults) {
-      printer.printAttrName("sending ");
+      printer.printKeyword("sending", options, " ");
     } else if (flags.getOwnershipSpecifier() ==
                ParamSpecifier::ImplicitlyCopyableConsuming) {
       // Ok. We are suppressing sending. If our ownership specifier was
@@ -3916,11 +3904,24 @@ static void printParameterFlags(ASTPrinter &printer,
       printer.printKeyword("isolated", options, " ");
   }
 
-  if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
-    printer.printKeyword("@escaping", options, " ");
-
   if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
+
+  if (!options.excludeAttrKind(TypeAttrKind::Autoclosure) &&
+      flags.isAutoClosure())
+    printer.printAttrName("@autoclosure ");
+  if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
+      flags.isNoDerivative())
+    printer.printAttrName("@noDerivative ");
+
+  // `inout` implies `@escaping`
+  if (flags.getOwnershipSpecifier() != ParamSpecifier::InOut) {
+    if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
+      printer.printAttrName("@escaping ");
+  }
+
+  if (flags.isConstValue())
+    printer.printAttrName("@const ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -3936,11 +3937,18 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->isStatic() && Options.PrintStaticKeyword)
     printStaticKeyword(decl->getCorrectStaticSpelling());
   if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
+    // If InferPropertyIntroducerFromAccessors is set, turn all read-only
+    // properties to `let`.
+    auto introducer = decl->getIntroducer();
+    if (Options.InferPropertyIntroducerFromAccessors &&
+          !cast<VarDecl>(decl)->isSettable(nullptr))
+      introducer = VarDecl::Introducer::Let;
+
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
     
     Printer.printIntroducerKeyword(
-      decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
+      introducer == VarDecl::Introducer::Let ? "let" : "var",
       Options, " ");
   }
   printContextIfNeeded(decl);
@@ -4029,11 +4037,24 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   printArgName();
 
+  auto interfaceTy = param->getInterfaceType();
+
+  // If type of this parameter is isolated to a caller, let's
+  // strip the isolation from the type to avoid printing it as
+  // part of the function type because that would break ordering
+  // between specifiers and attributes.
+  if (param->isCallerIsolated()) {
+    if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
+      interfaceTy =
+          funcTy->withIsolation(FunctionTypeIsolation::forNonIsolated());
+    }
+  }
+
   TypeLoc TheTypeLoc;
   if (auto *repr = param->getTypeRepr()) {
-    TheTypeLoc = TypeLoc(repr, param->getInterfaceType());
+    TheTypeLoc = TypeLoc(repr, interfaceTy);
   } else {
-    TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
+    TheTypeLoc = TypeLoc::withoutLoc(interfaceTy);
   }
 
   {
@@ -4045,7 +4066,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
         !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
       auto type = TheTypeLoc.getType();
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type));
+                          isEscaping(type),
+                          param->isCallerIsolated());
     }
 
     printTypeLocForImplicitlyUnwrappedOptional(
@@ -4225,7 +4247,8 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
         Printer << getAccessorLabel(decl->getAccessorKind());
 
         auto params = decl->getParameters();
-        if (params->size() != 0 && !params->get(0)->isImplicit()) {
+        if (params->size() != 0 && !params->get(0)->isImplicit()
+              && Options.PrintExplicitAccessorParameters) {
           auto Name = params->get(0)->getName();
           if (!Name.empty()) {
             Printer << "(";
@@ -4305,13 +4328,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (proto && Options.TransformContext) {
         auto BaseType = Options.TransformContext->getBaseType();
         if (BaseType->getClassOrBoundGenericClass()) {
-          ResultTy = ResultTy.subst(
-            [&](Type t) -> Type {
-              if (t->isEqual(proto->getSelfInterfaceType()))
+          ResultTy = ResultTy.transformRec(
+            [&](TypeBase *t) -> std::optional<Type> {
+              if (isa<DependentMemberType>(t))
+                return t;
+              else if (t->isEqual(proto->getSelfInterfaceType()))
                 return DynamicSelfType::get(t, Ctx);
-              return t;
-            },
-            MakeAbstractConformanceForGenericType());
+              return std::nullopt;
+            });
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
         }
       }
@@ -4518,7 +4542,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
     if (!Options.SuppressSendingArgsAndResults) {
-      if (auto typeRepr = decl->getElementTypeRepr()) {
+      if (decl->getElementTypeRepr()) {
         if (isa<SendingTypeRepr>(decl->getResultTypeRepr()))
           Printer << "sending ";
       }
@@ -6505,8 +6529,7 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      if (!Options.SuppressExecutionAttribute)
-        Printer << "@execution(caller) ";
+      Printer << "nonisolated(nonsending) ";
       break;
     }
 
@@ -7741,6 +7764,11 @@ void SILParameterInfo::print(
   if (options.contains(SILParameterInfo::Isolated)) {
     options -= SILParameterInfo::Isolated;
     Printer << "@sil_isolated ";
+  }
+      
+  if (options.contains(SILParameterInfo::Const)) {
+    options -= SILParameterInfo::Const;
+    Printer << "@const ";
   }
 
   if (lifetimeDependence) {
