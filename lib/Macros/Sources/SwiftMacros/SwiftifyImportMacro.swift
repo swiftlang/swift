@@ -545,7 +545,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
       } else {
         "MutableSpan"
       }
-    return "unsafe _cxxOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
+    return "unsafe _swiftifyOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
   }
 }
 
@@ -701,10 +701,15 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       }()
       """
     }
-    return
+    var expr = ExprSyntax(
       """
-      unsafe \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
+      \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
       """
+    )
+    if generateSpan {
+      expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
+    }
+    return "unsafe \(expr)"
   }
 }
 
