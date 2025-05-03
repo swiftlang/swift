@@ -778,6 +778,13 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
     args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
+    if skipTrivialCount {
+      if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+        let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
+        args[i] = castIntToTargetType(
+          expr: "\(unwrappedName).count", type: getParam(signature, i).type)
+      }
+    }
     let call = try base.buildFunctionCall(args)
     let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
 
