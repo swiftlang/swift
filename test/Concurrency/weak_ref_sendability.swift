@@ -6,6 +6,7 @@
 // parameters.
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_WeakLet
 
 final class S: Sendable {
   func foo() {}
