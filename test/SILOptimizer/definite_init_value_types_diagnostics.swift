@@ -20,9 +20,9 @@ struct ValueStruct {
     self.init()
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
-  init(d: Bool) {
+  init(d: Bool) {// expected-error {{return from initializer without initializing all stored properties}} {{29:3-3=self.ivar = ivar\n}} {{15-15=, ivar: EmptyStruct}}
     if d {
-      return // expected-error {{return from initializer without initializing all stored properties}}
+      return 
     }
 
     self = ValueStruct()
@@ -70,13 +70,13 @@ struct AddressStruct {
     self.init()
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
-  init(d: Bool) {
+  init(d: Bool) { // expected-error {{return from initializer without initializing all stored properties}} {{79:3-3=self.ivar = ivar\n}} {{15-15=, ivar: EmptyStruct}}
     if d {
       return
     }
 
     self = AddressStruct()
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 // Old versions of swift-syntax have this logical use-before-definition; make

@@ -31,13 +31,13 @@ public func testInitSwitch() {
   struct S {
     var x: Int // expected-note {{'self.x' not initialized}}
 
-    init(_ e: HasUnavailableElement) {
+    init(_ e: HasUnavailableElement) {// expected-error {{return from initializer without initializing all stored properties}} {{41:5-5=self.x = x\n}} {{36-36=, x: Int}}
       switch e {
       case .available:
         x = 1
       case .unavailable:
         ()
       }
-    } // expected-error {{return from initializer without initializing all stored properties}}
+    }
   }
 }
