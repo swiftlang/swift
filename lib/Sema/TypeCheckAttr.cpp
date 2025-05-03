@@ -258,6 +258,14 @@ public:
     }
   }
 
+  void visitPreEnumExtensibilityAttr(PreEnumExtensibilityAttr *attr) {
+    if (!D->getAttrs().hasAttribute<ExtensibleAttr>()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::pre_enum_extensibility_without_extensible, attr);
+      return;
+    }
+  }
+
   void visitConcurrentAttr(ConcurrentAttr *attr) {
     checkExecutionBehaviorAttribute(attr);
 
