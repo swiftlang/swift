@@ -413,3 +413,7 @@ Added: _swift_task_dealloc_through
 
 // SwiftSettings
 Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ
+
+// Clock systemEpochs
+Added: _$ss15ContinuousClockV11systemEpochAB7InstantVvpMV
+Added: _$ss15SuspendingClockV11systemEpochAB7InstantVvpMV
