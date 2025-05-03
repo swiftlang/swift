@@ -1126,12 +1126,19 @@ protected:
       if (paramTypeInContext->hasError()) {
         return;
       }
-      auto kind = inferLifetimeDependenceKind(paramTypeInContext,
-                                              param->getValueOwnership());
+      auto targetDeps =
+        createDeps(selfIndex).add(selfIndex, LifetimeDependenceKind::Inherit);
 
-      pushDeps(createDeps(selfIndex)
-                   .add(selfIndex, LifetimeDependenceKind::Inherit)
-                   .add(newValIdx, *kind));
+      // The 'newValue' dependence kind must match the getter's dependence kind
+      // because generated the implementation '_modify' accessor composes the
+      // getter's result with the setter's 'newValue'. In particular, if the
+      // result type is non-Escapable then the setter must not depend on
+      // 'newValue'.
+      if (!paramTypeInContext->isEscapable()) {
+        targetDeps = std::move(targetDeps)
+          .add(newValIdx, LifetimeDependenceKind::Inherit);
+      }
+      pushDeps(std::move(targetDeps));
       break;
     }
     case AccessorKind::MutableAddress:
