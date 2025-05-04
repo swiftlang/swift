@@ -10,6 +10,6 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) {
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func myFunc(_ ptr: Span<CInt>) {
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.count)!)
+// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
