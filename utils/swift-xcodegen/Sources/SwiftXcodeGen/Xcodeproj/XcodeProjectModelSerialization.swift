@@ -108,6 +108,28 @@ extension Xcode.Project: PropertyListSerializable {
   }
 }
 
+extension Xcode.BuildableFolder.TargetException: PropertyListSerializable {
+  var xcodeClassName: String { "PBXFileSystemSynchronizedBuildFileExceptionSet" }
+
+  fileprivate func serialize(
+    to serializer: PropertyListSerializer
+  ) throws -> [String: PropertyList] {
+    var dict = [String: PropertyList]()
+    dict["isa"] = .string(xcodeClassName)
+    dict["additionalCompilerFlagsByRelativePath"] = .dictionary(
+      Dictionary(
+        uniqueKeysWithValues:
+          extraCompilerArgs.map {
+            ($0.rawPath, PropertyList.string($1.joined(separator: " ")))
+          }
+      )
+    )
+    dict["membershipExceptions"] = .array(sources.map { .string($0.rawPath) })
+    dict["target"] = .identifier(serializer.id(of: target))
+    return dict
+  }
+}
+
 extension Xcode.Reference: PropertyListSerializable {
   fileprivate var xcodeClassName: String {
     switch self {
@@ -138,6 +160,13 @@ extension Xcode.Reference: PropertyListSerializable {
         try .identifier(serializer.serialize(object: reference))
       }))
     case let fileRef as Xcode.FileReference:
+      if let buildableFolder = fileRef.buildableFolder {
+        dict["exceptions"] = try .array(
+          buildableFolder.makeTargetExceptions().map {
+            try .identifier(serializer.serialize(object: $0))
+          }
+        )
+      }
       if let fileType = fileRef.fileType {
         dict["explicitFileType"] = .string(fileType)
       }
@@ -202,7 +231,7 @@ extension Xcode.Target: PropertyListSerializable {
     }))
     if !buildableFolders.isEmpty {
       dict["fileSystemSynchronizedGroups"] = .array(
-        buildableFolders.map { .identifier(serializer.id(of: $0)) }
+        buildableFolders.map { .identifier(serializer.id(of: $0.ref)) }
       )
     }
     dict["productName"] = .string(productName)

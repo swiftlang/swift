@@ -129,12 +129,19 @@ extension PathProtocol {
     return false
   }
 
-  var isCSourceLike: Bool {
+  var isClangSource: Bool {
     hasExtension(.c, .cpp, .m, .mm)
   }
 
   var isSourceLike: Bool {
-    isCSourceLike || hasExtension(.swift)
+    isClangSource || hasExtension(.swift)
+  }
+
+  /// Checks whether this file a source file that should be excluded from
+  /// any generated targets.
+  var isExcludedSource: Bool {
+    // We don't get useful build arguments for these.
+    hasExtension(.asm, .s, .cc, .cl, .inc, .proto)
   }
 
   var isDocLike: Bool {

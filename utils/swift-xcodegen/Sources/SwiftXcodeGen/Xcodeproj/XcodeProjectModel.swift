@@ -135,7 +135,11 @@ public struct Xcode {
     public var objectID: String?
     public var fileType: String?
     public var isDirectory: Bool
-    public fileprivate(set) var isBuildableFolder: Bool = false
+    public private(set) unowned var buildableFolder: BuildableFolder?
+
+    public var isBuildableFolder: Bool {
+      buildableFolder != nil
+    }
 
     init(
       path: String, isDirectory: Bool, pathBase: RefPathBase = .groupDir,
@@ -146,8 +150,102 @@ public struct Xcode {
       self.objectID = objectID
       self.fileType = fileType
     }
+
+    /// Turn a folder reference into a buildable folder.
+    func getOrCreateBuildableFolder(at path: RelativePath) -> BuildableFolder {
+      precondition(isDirectory)
+      if let buildableFolder {
+        precondition(buildableFolder.path == path)
+        return buildableFolder
+      }
+      let folder = BuildableFolder(for: self, at: path)
+      buildableFolder = folder
+      return folder
+    }
   }
-  
+
+  public final class BuildableFolder {
+    public let ref: FileReference
+    public let path: RelativePath
+
+    /// The "primary" targets that are directly associated with the buildable
+    /// folder and are automatically inferred for every child source file.
+    private(set) var primaryTargets: Set<Xcode.Target> = []
+
+    /// Any source file specific compiler arguments.
+    private(set) var fileArgs: [FileInTarget: [String]] = [:]
+
+    /// Any non-default target memberships.
+    private(set) var targetMemberships: [RelativePath: Set<Xcode.Target>] = [:]
+
+    fileprivate init(for ref: FileReference, at path: RelativePath) {
+      self.ref = ref
+      self.path = path
+    }
+
+    /// Add a primary target to the buildable folder.
+    fileprivate func addPrimaryTarget(_ target: Target) {
+      primaryTargets.insert(target)
+    }
+
+    /// Map the given source file path such that it's relative to the
+    /// buildable folder itself.
+    private func mapSourcePath(_ sourcePath: RelativePath) -> RelativePath {
+      sourcePath.removingPrefix(path)!
+    }
+
+    /// Create the corresponding target exceptions for the buildable folder.
+    public func makeTargetExceptions() -> [TargetException] {
+      var result: [Xcode.Target: TargetException] = [:]
+      func getOrCreateException(for target: Xcode.Target) -> TargetException {
+        if let exception = result[target] {
+          return exception
+        }
+        let exception = TargetException(for: target)
+        result[target] = exception
+        return exception
+      }
+
+      // Populate target memberships.
+      for (path, targets) in targetMemberships.sorted(by: \.key.rawPath) {
+        // If it's missing from primary targets, it needs adding to the
+        // corresponding exception.
+        for missingPrimary in primaryTargets.subtracting(targets) {
+          getOrCreateException(for: missingPrimary).sources.append(path)
+        }
+        // Add to any non-primary targets.
+        for inSecondary in targets.subtracting(primaryTargets) {
+          getOrCreateException(for: inSecondary).sources.append(path)
+        }
+      }
+
+      // Populate per-file args.
+      for (fileInTarget, args) in fileArgs {
+        getOrCreateException(for: fileInTarget.target)
+          .extraCompilerArgs[fileInTarget.path] = args
+      }
+
+      return result.values.sorted(by: \.target.name)
+    }
+
+    /// Change the target membership for a given set of paths.
+    public func setTargets(
+      _ targets: Set<Xcode.Target>, for sourcePaths: [RelativePath]
+    ) {
+      for source in sourcePaths.map(mapSourcePath) {
+        targetMemberships[source] = targets
+      }
+    }
+
+    /// Set additional per-file arguments for a given path.
+    public func setExtraCompilerArgs(
+      _ args: [String], for sourcePath: RelativePath, in target: Xcode.Target
+    ) {
+      let key = FileInTarget(path: mapSourcePath(sourcePath), target: target)
+      fileArgs[key] = args
+    }
+  }
+
   /// A group that can contain References (FileReferences and other Groups).
   /// The resolved path of a group is used as the base path for any child
   /// references whose source tree type is GroupRelative.
@@ -193,7 +291,7 @@ public struct Xcode {
     public var buildPhases: [BuildPhase]
     public var productReference: FileReference?
     public var dependencies: [TargetDependency]
-    public private(set) var buildableFolders: [FileReference]
+    public private(set) var buildableFolders: [BuildableFolder]
     public enum ProductType: String {
       case application = "com.apple.product-type.application"
       case staticArchive = "com.apple.product-type.library.static"
@@ -273,11 +371,10 @@ public struct Xcode {
       dependencies.append(TargetDependency(target: target))
     }
 
-    /// Turn a given folder reference into a buildable folder for this target.
-    public func addBuildableFolder(_ fileRef: FileReference) {
-      precondition(fileRef.isDirectory)
-      fileRef.isBuildableFolder = true
-      buildableFolders.append(fileRef)
+    /// Add an associated buildable folder to the target.
+    public func addBuildableFolder(_ folder: BuildableFolder) {
+      folder.addPrimaryTarget(self)
+      buildableFolders.append(folder)
     }
 
     /// A simple wrapper to prevent ownership cycles in the `dependencies`
@@ -449,5 +546,41 @@ public struct Xcode {
       public var USE_HEADERMAP: String?
       public var LD: String?
     }
+  }
+}
+
+extension Xcode.BuildableFolder {
+  /// A "target exception" for a buildable folder stores information about
+  /// source files in the folder that are augmented in some way for a given
+  /// target.
+  public final class TargetException {
+    unowned let target: Xcode.Target
+
+    /// The sources that are either excluded from the buildable folder
+    /// (for a primary exception), or are members of another target.
+    fileprivate(set) var sources: [RelativePath] = []
+
+    /// A set of extra compiler arguments for a given source.
+    fileprivate(set) var extraCompilerArgs: [RelativePath: [String]] = [:]
+
+    init(for target: Xcode.Target) {
+      self.target = target
+    }
+  }
+
+  struct FileInTarget: Hashable {
+    var path: RelativePath
+    var target: Xcode.Target
+  }
+}
+
+extension Xcode.Target: Hashable {
+  public static func == (lhs: Xcode.Target, rhs: Xcode.Target) -> Bool {
+    // Identity is a key part of Target, so there's no useful value comparison
+    // to do.
+    lhs === rhs
+  }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
   }
 }
