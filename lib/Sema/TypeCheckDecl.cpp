@@ -3072,17 +3072,38 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   auto nominalGenericParams = nominalSig.getGenericParams();
   auto typealiasGenericParams = typealiasSig.getGenericParams();
 
-  // Check for inferred types.
-  if (nominalGenericParams.size() != typealiasGenericParams.size())
-    return isTypeInferredByTypealias(typealias, nominal);
+  if (nominalGenericParams.size() != typealiasGenericParams.size()) {
 
-  // Check that the type parameters are the same the whole way through.
-  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
-                  typealiasGenericParams.begin(),
-                  [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
-                    return gp1->isEqual(gp2);
-                  }))
-    return false;
+    unsigned nominalMaxDepth = nominalGenericParams.back()->getDepth();
+    unsigned typealiasMaxDepth = typealiasGenericParams.back()->getDepth();
+    unsigned maxDepth = std::max(nominalMaxDepth, typealiasMaxDepth);
+
+    for (const auto &type : nominalGenericParams) {
+      if (type->getDepth() == maxDepth) {
+        nominalGenericParams = nominalGenericParams.drop_back();
+      }
+    }
+
+    for (const auto &type : typealiasGenericParams) {
+      if (type->getDepth() == maxDepth) {
+        typealiasGenericParams = typealiasGenericParams.drop_back();
+      }
+    }
+
+    if (nominalGenericParams.size() != typealiasGenericParams.size()) {
+      return false;
+    }
+
+    if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
+                    typealiasGenericParams.begin(),
+                    [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+                      return gp1->isEqual(gp2);
+                    })) {
+      return false;
+    }
+
+    return isTypeInferredByTypealias(typealias, nominal);
+  }
 
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
