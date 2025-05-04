@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Xcodeproj
 import Darwin
 
 extension Xcode.Reference {

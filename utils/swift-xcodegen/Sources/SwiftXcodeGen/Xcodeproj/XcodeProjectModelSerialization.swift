@@ -386,6 +386,14 @@ extension Xcode.BuildSettingsTable: PropertyListSerializable {
   }
 }
 
+fileprivate struct InternalError: Error {
+  private let description: String
+  public init(_ description: String) {
+    assertionFailure(description)
+    self.description = description
+  }
+}
+
 /// Private helper function that combines a base property list and an overlay
 /// property list, respecting the semantics of `$(inherited)` as we go.
 fileprivate func combineBuildSettingsPropertyLists(
