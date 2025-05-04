@@ -1138,12 +1138,9 @@ NOTE(rbi_add_generic_parameter_sendable_conformance,none,
 
 // Concurrency related diagnostics
 ERROR(cannot_find_executor_factory_type, none,
-      "the specified executor factory '%0' could not be found", (StringRef))
+      "the DefaultExecutorFactory type could not be found", ())
 ERROR(executor_factory_must_conform, none,
-      "the executor factory '%0' does not conform to 'ExecutorFactory'",
-      (StringRef))
-ERROR(executor_factory_not_supported, none,
-      "deployment target too low for executor factory specification", ())
+      "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics
