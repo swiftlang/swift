@@ -19,3 +19,48 @@ import SizedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: UnsafeMutableRawBufferPointer)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: UnsafeMutableRawBufferPointer)
 
+@inlinable
+public func callComplexExpr(_ p: UnsafeMutableRawBufferPointer) {
+  complexExpr(CInt(p.count), 1, p)
+}
+
+@inlinable
+public func callNonnull(_ p: UnsafeMutableRawBufferPointer) {
+  nonnull(p)
+}
+
+@inlinable
+public func callNullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
+  nullUnspecified(p)
+}
+
+@inlinable
+public func callNullable(_ p: UnsafeMutableRawBufferPointer?) {
+  nullable(p)
+}
+
+@inlinable
+public func callOpaque(_ p: UnsafeRawBufferPointer) {
+  opaque(p)
+}
+
+@inlinable
+public func callReturnPointer() {
+  let a: UnsafeMutableRawBufferPointer? = returnPointer(4) // call wrapper
+  let b: UnsafeMutableRawPointer? = returnPointer(4) // call unsafe interop
+}
+
+@inlinable
+public func callShared(_ p: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
+  shared(CInt(p.count), p, p2)
+}
+
+@inlinable
+public func callSimple(_ p: UnsafeMutableRawBufferPointer) {
+  simple(p)
+}
+
+@inlinable
+public func callSwiftAttr(_ p: UnsafeMutableRawBufferPointer) {
+  swiftAttr(p)
+}

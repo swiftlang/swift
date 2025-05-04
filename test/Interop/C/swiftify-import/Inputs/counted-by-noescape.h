@@ -17,7 +17,7 @@ void nullUnspecified(int len, int * __counted_by(len) _Null_unspecified __noesca
 
 void nonnull(int len, int * __counted_by(len) _Nonnull __noescape p);
 
-//void nullable(int len, int * __counted_by(len) _Nullable p);
+void nullable(int len, int * __counted_by(len) _Nullable p __noescape);
 
 int * __counted_by(len) __noescape returnPointer(int len);
 
