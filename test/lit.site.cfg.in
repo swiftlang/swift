@@ -68,6 +68,7 @@ msvc_runtime_flags = {
 }
 config.swift_stdlib_msvc_runtime = \
     msvc_runtime_flags["@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@"]
+config.windows_runtime_dir = "@SWIFT_WINDOWS_RUNTIME_DIR@"
 
 config.darwin_enable_maccatalyst = "@SWIFT_ENABLE_MACCATALYST@" == "TRUE"
 config.darwin_maccatalyst_build_flavor = "@BUILD_FLAVOR@"

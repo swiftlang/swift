@@ -1387,13 +1387,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   }
 }
 
-static bool isCreateExecutorsFunctionAvailable(SILGenModule &SGM) {
-  FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
-  if (!createExecutorsFuncDecl)
-    return false;
-
-  auto &ctx = createExecutorsFuncDecl->getASTContext();
-
+static bool isCreateExecutorsFunctionAvailable(SILGenModule &SGM,
+                                               ASTContext &ctx) {
   if (ctx.LangOpts.hasFeature(Feature::Embedded))
     return true;
 
@@ -1428,7 +1423,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   // DefaultExecutorFactory type, call swift_createExecutors()
   Type factoryNonCanTy = SGM.getConfiguredExecutorFactory();
 
-  if (isCreateExecutorsFunctionAvailable(SGM) && factoryNonCanTy) {
+  if (isCreateExecutorsFunctionAvailable(SGM, ctx) && factoryNonCanTy) {
     CanType factoryTy = factoryNonCanTy->getCanonicalType();
 
     ProtocolDecl *executorFactoryProtocol

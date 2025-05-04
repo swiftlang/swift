@@ -22,4 +22,12 @@ public struct PlatformExecutorFactory: ExecutorFactory {
     DispatchGlobalTaskExecutor()
 }
 
+@available(SwiftStdlib 6.2, *)
+public struct Win32NativeExecutorFactory: ExecutorFactory {
+  public static let mainExecutor: any MainExecutor
+    = Win32EventLoopExecutor(isMainExecutor: true)
+  public static let defaultExecutor: any TaskExecutor
+    = Win32ThreadPoolExecutor()
+}
+
 #endif // os(Windows)

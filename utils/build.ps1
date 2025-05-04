@@ -1361,6 +1361,9 @@ function Build-CMakeProject {
             if ($SwiftSDK -ne "") {
               $SwiftArgs += @("-sdk", $SwiftSDK)
             } else {
+              # If you update this, you also need to update test/lit.cfg, which
+              # adds these arguments to config.host_build_swift as well as
+              # putting them into config.*_overlay_opt.
               $SwiftArgs += @(
                 "-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml",
                 "-strict-implicit-module-context",
@@ -1728,6 +1731,12 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
       SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
       SWIFT_BUILD_REMOTE_MIRROR = "NO";
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
+    }
+  }
+
+  if ($Platform.OS -eq [OS]::Windows) {
+    $TestDefines += @{
+      SWIFT_WINDOWS_RUNTIME_DIR = (Get-ProjectBinaryCache $Platform Runtime)
     }
   }
 
@@ -2172,6 +2181,8 @@ function Build-CURL([Hashtable] $Platform) {
 }
 
 function Build-Runtime([Hashtable] $Platform) {
+  $RuntimeBinaryCache = Get-ProjectBinaryCache $Platform Runtime
+
   $PlatformDefines = @{}
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
@@ -2185,10 +2196,15 @@ function Build-Runtime([Hashtable] $Platform) {
       }
     }
   }
+  if ($Platform.OS -eq [OS]::Windows) {
+    $PlatformDefines += @{
+      SWIFT_WINDOWS_RUNTIME_DIR = "$RuntimeBinaryCache";
+    }
+  }
 
   Build-CMakeProject `
     -Src $SourceCache\swift `
-    -Bin (Get-ProjectBinaryCache $Platform Runtime) `
+    -Bin $RuntimeBinaryCache `
     -InstallTo "$(Get-SwiftSDK $Platform.OS)\usr" `
     -Platform $Platform `
     -CacheScript $SourceCache\swift\cmake\caches\Runtime-$($Platform.OS.ToString())-$($Platform.Architecture.LLVMName).cmake `
