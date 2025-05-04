@@ -48,6 +48,11 @@ extension IntField {
 
 struct S<X, Y> {}
 typealias InferredSpecializedNestedTypes<X> = S<X, (Int, [Int]?)>
+extension InferredSpecializedNestedTypes {
+    func returnTuple(value: Y) -> (Int, [Int]?) {
+        return value
+    }
+}
 
 
 struct S2<X,Y,Z> {
