@@ -20,7 +20,42 @@ import CountedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 @inlinable
+public func callComplexExpr(_ p: UnsafeMutableBufferPointer<CInt>) {
+  complexExpr(CInt(p.count), 1, p)
+}
+
+@inlinable
+public func callNonnull(_ p: UnsafeMutableBufferPointer<CInt>) {
+  nonnull(p)
+}
+
+@inlinable
+public func callNullUnspecified(_ p: UnsafeMutableBufferPointer<CInt>) {
+  nullUnspecified(p)
+}
+
+@inlinable
+public func callNullable(_ p: UnsafeMutableBufferPointer<CInt>?) {
+  nullable(p)
+}
+
+@inlinable
 public func callReturnPointer() {
   let a: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
   let b: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+}
+
+@inlinable
+public func callShared(_ p: UnsafeMutableBufferPointer<CInt>, _ p2: UnsafeMutableBufferPointer<CInt>) {
+  shared(CInt(p.count), p, p2)
+}
+
+@inlinable
+public func callSimple(_ p: UnsafeMutableBufferPointer<CInt>) {
+  simple(p)
+}
+
+@inlinable
+public func callSwiftAttr(_ p: UnsafeMutableBufferPointer<CInt>) {
+  swiftAttr(p)
 }
