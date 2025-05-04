@@ -64,6 +64,29 @@ extension A2 {
   }
 }
 
+
+struct S4<A, B> {
+  // Generic parameters: <A, B, C>
+  // Depth:               0  0  1
+  struct Nested<C> {
+      let c: C
+  }
+}
+
+struct S5<A> {
+  // Generic parameters: <A, B, C>
+  // Depth:               0  1  1
+  typealias Alias<B, C> = S4<A, B>.Nested<C>
+
+}
+
+extension S5.Alias{
+  func adding(_ c: Int) -> Self {
+        S4.Nested(c: self.c + c) //expected-error {{binary operator '+' cannot be applied to operands of type 'C' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int)}}
+    }
+}
+
+
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
