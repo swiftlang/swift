@@ -451,6 +451,7 @@ UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
+UNINTERESTING_FEATURE(DefaultIsolationTypealias)
 
 static bool usesFeatureSwiftSettings(const Decl *decl) {
   // We just need to guard `#SwiftSettings`.

@@ -182,6 +182,9 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
               ActorIsolationState(ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultActorIsolationRequest,
+              std::optional<DefaultIsolation>(SourceFile *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
               bool(ValueDecl *),
               Uncached, NoLocationInfo)
