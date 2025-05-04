@@ -165,6 +165,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorLinux.swift
   PlatformExecutorWindows.swift
   PlatformExecutorOpenBSD.swift
+  PlatformExecutorFreeBSD.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
