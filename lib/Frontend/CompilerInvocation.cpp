@@ -2548,7 +2548,20 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.EmitMacroExpansionFiles = !negated;
   }
 
-  Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
+  {
+    OptSpecifier obsoleteOpts[] = {
+      OPT_fixit_all,
+      OPT_emit_fixits_path,
+    };
+
+    for (auto option: obsoleteOpts) {
+      if (auto *arg = Args.getLastArg(option)) {
+        Diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete,
+                       arg->getOption().getPrefixedName());
+      }
+    }
+  }
+
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {
