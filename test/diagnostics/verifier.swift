@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-frontend -typecheck -verify -serialize-diagnostics-path %t/serialized.dia -emit-fixits-path %t/fixits %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -verify -serialize-diagnostics-path %t/serialized.dia %s 2>&1 | %FileCheck %s
 // RUN: not %target-swift-frontend -typecheck -verify -warnings-as-errors %s 2>&1 | %FileCheck %s -check-prefix CHECK-WARNINGS-AS-ERRORS
 // RUN: %FileCheck %s -check-prefix CHECK-SERIALIZED <%t/serialized.dia
-// RUN: %FileCheck %s -check-prefix CHECK-FIXITS <%t/fixits
 
 // Wrong message
 let x: Int = "hello, world!" // expected-error {{foo bar baz}}
@@ -45,10 +44,3 @@ extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') c
 
 // Verify the serialized diags have the right magic at the top.
 // CHECK-SERIALIZED: DIA
-
-// Ensure the verifier doesn't interfere with -emit-fixits-path.
-// CHECK-FIXITS: {
-// CHECK-FIXITS: "file":
-// CHECK-FIXITS: "offset":
-// CHECK-FIXITS: "text": " as! Int"
-// CHECK-FIXITS: }
