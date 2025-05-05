@@ -129,6 +129,14 @@ extension SuspendingClock: Clock {
 
 @available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
+extension SuspendingClock {
+  @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  public var systemEpoch: Instant { unsafeBitCast(Duration.seconds(0), to: Instant.self) }
+}
+
+@available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension SuspendingClock.Instant: InstantProtocol {
   @available(SwiftStdlib 5.7, *)
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
