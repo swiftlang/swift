@@ -342,7 +342,7 @@ private struct LifetimeVariable {
 
   private init(introducer: Value, _ context: some Context) {
     if let arg = introducer as? FunctionArgument {
-      self.varDecl = arg.varDecl
+      self.varDecl = arg.findVarDecl()
       self.sourceLoc = arg.sourceLoc
       self.isArgument = true
       self.isClosureCapture = arg.isClosureCapture
