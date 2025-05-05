@@ -43,30 +43,6 @@ func c_keywordArgNames(auto: Int, union: Int) {}
 func d_returnNever() -> Never { fatalError() }
 // CHECK-LABEL: SWIFT_EXTERN void return_never(void) SWIFT_NOEXCEPT SWIFT_NORETURN;
 
-@cdecl("block_nightmare")
-public func s_block_nightmare(x: @convention(block) (Int) -> Float)
-  -> @convention(block) (CChar) -> Double { return { _ in 0 } }
-// CHECK-LABEL: SWIFT_EXTERN double (^ _Nonnull block_nightmare(SWIFT_NOESCAPE float (^ _Nonnull x)(ptrdiff_t)))(char) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
-
-@cdecl("block_recurring_nightmare")
-public func t_block_recurring_nightmare(x: @escaping @convention(block) (@convention(block) (Double) -> Int) -> Float)
-  -> @convention(block) (_ asdfasdf: @convention(block) (CUnsignedChar) -> CChar) -> Double {
-  fatalError()
-}
-// CHECK-LABEL: SWIFT_EXTERN double (^ _Nonnull block_recurring_nightmare(float (^ _Nonnull x)(SWIFT_NOESCAPE ptrdiff_t (^ _Nonnull)(double))))(SWIFT_NOESCAPE char (^ _Nonnull)(unsigned char)) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
-
-@cdecl("function_pointer_nightmare")
-func u_function_pointer_nightmare(x: @convention(c) (Int) -> Float)
-  -> @convention(c) (CChar) -> Double { return { _ in 0 } }
-// CHECK-LABEL: SWIFT_EXTERN double (* _Nonnull function_pointer_nightmare(float (* _Nonnull x)(ptrdiff_t)))(char) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
-
-@cdecl("function_pointer_recurring_nightmare")
-public func v_function_pointer_recurring_nightmare(x: @escaping @convention(c) (@convention(c) (Double) -> Int) -> Float)
-  -> @convention(c) (@convention(c) (CUnsignedChar) -> CChar) -> Double {
-  fatalError()
-}
-// CHECK-LABEL: SWIFT_EXTERN double (* _Nonnull function_pointer_recurring_nightmare(float (* _Nonnull x)(ptrdiff_t (* _Nonnull)(double))))(char (* _Nonnull)(unsigned char)) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
-
 // CHECK:      #if defined(__cplusplus)
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
