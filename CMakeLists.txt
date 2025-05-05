@@ -87,6 +87,12 @@ set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to c
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
+# This is needed to allow to pass Swift-only C++ flags from `build-script`,
+# since `--swift-cmake-options` does not work as expected, and specifying
+# `CMAKE_CXX_FLAGS` to `--extra-cmake-options` would apply the setting to other
+# build products as well.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SWIFT_CXX_FLAGS}")
+
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
