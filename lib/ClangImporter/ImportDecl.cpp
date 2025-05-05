@@ -2141,8 +2141,7 @@ namespace {
       }
 
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
-      if (decl->getTypeForDecl()->isDependentType() &&
-          !Impl.importSymbolicCXXDecls) {
+      if (decl->getTypeForDecl()->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_is_dependent,
@@ -3068,11 +3067,8 @@ namespace {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
-      if ((semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
-           semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) &&
-          // Let un-specialized class templates through. We'll sort out their
-          // members once they're instantiated.
-          !Impl.importSymbolicCXXDecls) {
+      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
+          semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
 
         HeaderLoc loc(decl->getLocation());
         if (hasUnsafeAPIAttr(decl))
@@ -3267,12 +3263,6 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      // Treat a specific specialization like the unspecialized class template
-      // when importing it in symbolic mode.
-      if (Impl.importSymbolicCXXDecls)
-        return Impl.importDecl(decl->getSpecializedTemplate(),
-                               Impl.CurrentVersion);
-
       bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
                     decl->getSpecializedTemplate()->getName() == "pair";
 
@@ -3959,8 +3949,6 @@ namespace {
               Impl.SwiftContext, SourceLoc(), templateParams, SourceLoc());
       }
 
-      bool importFuncWithoutSignature =
-          isa<clang::CXXMethodDecl>(decl) && Impl.importSymbolicCXXDecls;
       if (!dc->isModuleScopeContext() && !isClangNamespace(dc) &&
           !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
@@ -4027,39 +4015,12 @@ namespace {
           importedType =
               Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
       } else {
-        if (importFuncWithoutSignature) {
-          importedType = ImportedType{Impl.SwiftContext.getVoidType(), false};
-          if (decl->param_empty())
-            bodyParams = ParameterList::createEmpty(Impl.SwiftContext);
-          else {
-            llvm::SmallVector<ParamDecl *, 4> params;
-            for (const auto &param : decl->parameters()) {
-
-              Identifier bodyName =
-                  Impl.importFullName(param, Impl.CurrentVersion)
-                      .getBaseIdentifier(Impl.SwiftContext);
-              auto paramInfo = Impl.createDeclWithClangNode<ParamDecl>(
-                  param, AccessLevel::Private, SourceLoc(), SourceLoc(),
-                  Identifier(), Impl.importSourceLoc(param->getLocation()),
-                  bodyName, Impl.ImportedHeaderUnit);
-              paramInfo->setSpecifier(ParamSpecifier::Default);
-              paramInfo->setInterfaceType(Impl.SwiftContext.TheAnyType);
-              if (param->hasDefaultArg()) {
-                paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
-                paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
-              }
-              params.push_back(paramInfo);
-            }
-            bodyParams = ParameterList::create(Impl.SwiftContext, params);
-          }
-        } else {
-          // Import the function type. If we have parameters, make sure their
-          // names get into the resulting function type.
-          importedType = Impl.importFunctionParamsAndReturnType(
-              dc, decl, {decl->param_begin(), decl->param_size()},
-              decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
-              templateParams);
-        }
+        // Import the function type. If we have parameters, make sure their
+        // names get into the resulting function type.
+        importedType = Impl.importFunctionParamsAndReturnType(
+            dc, decl, {decl->param_begin(), decl->param_size()},
+            decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
+            templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
           if (mdecl->isStatic()) {
@@ -4166,12 +4127,10 @@ namespace {
         }
         func->setAccess(importer::convertClangAccess(decl->getAccess()));
 
-        if (!importFuncWithoutSignature) {
-          bool success = processSpecialImportedFunc(
-              func, importedName, decl->getOverloadedOperator());
-          if (!success)
-            return nullptr;
-        }
+        bool success = processSpecialImportedFunc(
+            func, importedName, decl->getOverloadedOperator());
+        if (!success)
+          return nullptr;
       }
 
       result->setIsObjC(false);
@@ -4486,8 +4445,7 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
-      if (!Impl.importSymbolicCXXDecls &&
-          decl->hasAttr<clang::NoUniqueAddressAttr>()) {
+      if (decl->hasAttr<clang::NoUniqueAddressAttr>()) {
         if (const auto *rd = decl->getType()->getAsRecordDecl()) {
           // Clang can store the next field in the padding of this one. Swift
           // does not support this yet so let's not import the field and
@@ -4748,11 +4706,6 @@ namespace {
       auto name = importedName.getBaseIdentifier(Impl.SwiftContext);
       if (name.empty())
         return nullptr;
-
-      if (Impl.importSymbolicCXXDecls)
-        // Import an unspecialized C++ class template as a Swift value/class
-        // type in symbolic mode.
-        return Impl.importDecl(decl->getTemplatedDecl(), Impl.CurrentVersion);
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto dc = Impl.importDeclContextOf(

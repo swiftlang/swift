@@ -836,27 +836,3 @@ void swift::ide::printHeaderInterface(
   }
   Printer.forceNewlines();
 }
-
-void swift::ide::printSymbolicSwiftClangModuleInterface(
-    ModuleDecl *M, ASTPrinter &Printer, const clang::Module *clangModule) {
-  std::string headerComment;
-  llvm::raw_string_ostream(headerComment)
-      << "// Swift interface for " << (clangModule->IsSystem ? "system " : "")
-      << "module '" << clangModule->Name << "'\n";
-  Printer.printText(headerComment);
-
-  ModuleTraversalOptions opts;
-  opts |= ModuleTraversal::VisitSubmodules;
-  auto popts =
-      PrintOptions::printModuleInterface(/*printFullConvention=*/false);
-  popts.PrintDocumentationComments = false;
-  popts.SkipInlineCXXNamespace = true;
-
-  auto &SwiftContext = M->getTopLevelModule()->getASTContext();
-  auto &Importer =
-      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-  Importer.withSymbolicFeatureEnabled([&]() {
-    printModuleInterface(M, {}, opts, Printer, popts,
-                         /*SynthesizeExtensions=*/false);
-  });
-}
