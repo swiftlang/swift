@@ -2205,6 +2205,13 @@ BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownershi
                                  (swift::LoadOwnershipQualifier)ownership)};
 }
 
+
+BridgedInstruction BridgedBuilder::createUncheckedOwnershipConversion(BridgedValue op,
+                                                                      BridgedValue::Ownership ownership) const {
+  return {unbridged().createUncheckedOwnershipConversion(regularLoc(), op.getSILValue(),
+                                                         BridgedValue::unbridge(ownership))};
+}
+
 BridgedInstruction BridgedBuilder::createLoadBorrow(BridgedValue op) const {
   return {unbridged().createLoadBorrow(regularLoc(), op.getSILValue())};
 }
