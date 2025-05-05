@@ -333,11 +333,6 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   assert(rotateSingleBlockLoops || loop->getBlocks().size() != 1);
 
-  // Need a conditional branch that guards the entry into the loop.
-  auto *loopEntryBranch = dyn_cast<CondBranchInst>(header->getTerminator());
-  if (!loopEntryBranch)
-    return false;
-
   // The header needs to exit the loop.
   if (!loop->isLoopExiting(header)) {
     LLVM_DEBUG(llvm::dbgs() << *loop << " not an exiting header\n");
@@ -353,28 +348,27 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  // Make sure we can duplicate the header.
-  SmallVector<SILInstruction *, 8> moveToPreheader;
-  SinkAddressProjections sinkProj;
-  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
-                                     sinkProj)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << *loop << " instructions in header preventing rotating\n");
+  SILBasicBlock *newHeader = nullptr;
+  SILBasicBlock *exit = nullptr;
+  auto *loopEntryBranch = dyn_cast<TermInst>(header->getTerminator());
+  if (auto *switchEnum = dyn_cast<SwitchEnumInst>(loopEntryBranch)) {
+    if (switchEnum->getNumCases() != 2) {
+      return false;
+    }
+    newHeader = switchEnum->getCase(0).second;
+    exit = switchEnum->getCase(1).second;
+  } else if (auto *condBranch = dyn_cast<CondBranchInst>(loopEntryBranch)) {
+    newHeader = condBranch->getTrueBB();
+    exit = condBranch->getFalseBB();
+  } else {
     return false;
   }
 
-  auto *newHeader = loopEntryBranch->getTrueBB();
-  auto *exit = loopEntryBranch->getFalseBB();
-  if (loop->contains(exit))
+  if (loop->contains(exit)) {
     std::swap(newHeader, exit);
+  }
   assert(loop->contains(newHeader) && !loop->contains(exit)
          && "Could not find loop header and exit block");
-
-  // It does not make sense to rotate the loop if the new header is loop
-  // exiting as well.
-  if (loop->isLoopExiting(newHeader)) {
-    return false;
-  }
 
   // Incomplete liveranges in the dead-end exit block can cause a missing adjacent
   // phi-argument for a re-borrow if there is a borrow-scope is in the loop.
@@ -390,6 +384,16 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // preheader insertions.
   if (!newHeader->getSinglePredecessorBlock() && header != latch)
     return false;
+
+  // Make sure we can duplicate the header.
+  SmallVector<SILInstruction *, 8> moveToPreheader;
+  SinkAddressProjections sinkProj;
+  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
+                                     sinkProj)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << *loop << " instructions in header preventing rotating\n");
+    return false;
+  }
 
   // Now that we know we can perform the rotation - move the instructions that
   // need moving.
@@ -446,7 +450,6 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // If there were any uses of instructions in the duplicated loop entry check
   // block rewrite them using the ssa updater.
-  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
 
   loop->moveToHeader(newHeader);
 
@@ -466,14 +469,18 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // the latch.
   header->getParent()->moveBlockAfter(header, latch);
 
-  // Merge the old latch with the old header if possible.
-  if (mergeBasicBlockWithSuccessor(latch, domInfo, loopInfo))
-    newHeader = latch; // The old Header is gone. Latch is now the Header.
-
   // Cloning the header into the preheader created critical edges from the
   // preheader and original header to both the new header and loop exit.
   splitCriticalEdgesFrom(preheader, domInfo, loopInfo);
   splitCriticalEdgesFrom(newHeader, domInfo, loopInfo);
+  splitCriticalEdgesFrom(header, domInfo, loopInfo);
+
+  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
+
+  // Merge the old latch with the old header if possible.
+  if (mergeBasicBlockWithSuccessor(latch, domInfo, loopInfo)) {
+    newHeader = latch; // The old Header is gone. Latch is now the Header.
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "  to " << *loop);
   LLVM_DEBUG(loop->getHeader()->getParent()->dump());
