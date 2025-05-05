@@ -7958,6 +7958,10 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
     return ActorIsolation::forNonisolated(false);
 
+  // @preconcurrency disables isolation inference.
+  if (rootNormal->isPreconcurrency())
+    return ActorIsolation::forNonisolated(false);
+
   // Isolation inference rules follow. If we aren't inferring isolated conformances,
   // we're done.
   if (!ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances))
