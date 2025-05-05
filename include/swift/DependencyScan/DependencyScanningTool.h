@@ -85,11 +85,6 @@ public:
   llvm::ErrorOr<swiftscan_import_set_t>
   getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
 
-  /// Query diagnostics consumed so far.
-  std::vector<DependencyScanDiagnosticCollector::ScannerDiagnosticInfo> getDiagnostics();
-  /// Discared the collection of diagnostics encountered so far.
-  void resetDiagnostics();
-
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
   llvm::ErrorOr<ScanQueryInstance>
@@ -104,9 +99,6 @@ private:
 
   /// Shared state mutual-exclusivity lock
   llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
-
-  /// A shared consumer that accumulates encountered diagnostics.
-  DependencyScanDiagnosticCollector CDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };
