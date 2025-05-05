@@ -2201,13 +2201,6 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
-namespace {
-  static StringRef pathStringFromSearchPath(
-      const SearchPathOptions::SearchPath &next) {
-    return next.Path;
-  }
-}
-
 std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
 const {
   assert(LangOpts.Target.isOSDarwin());

@@ -516,7 +516,7 @@ bool ClangImporter::getHeaderDependencies(
         [&cache](StringRef path) {
           return cache.getScanService().remapPath(path);
         });
-    cache.recordDependencies(bridgedDeps);
+    cache.recordDependencies(bridgedDeps, Impl.SwiftContext.Diags);
 
     llvm::copy(dependencies->FileDeps, std::back_inserter(headerFileInputs));
     auto bridgedDependencyIDs =
