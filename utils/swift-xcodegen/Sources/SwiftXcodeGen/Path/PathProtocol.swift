@@ -74,8 +74,10 @@ public extension PathProtocol {
   func hasExtension(_ exts: FileExtension...) -> Bool {
     // Note that querying `.extension` involves re-parsing, so only do it
     // once here.
-    let ext = storage.extension
-    return exts.contains(where: { ext == $0.rawValue })
+    guard let ext = storage.extension else { return false }
+    return exts.contains(where: {
+      ext.compare($0.rawValue, options: .caseInsensitive) == .orderedSame
+    })
   }
 
   func starts(with other: Self) -> Bool {
@@ -127,12 +129,19 @@ extension PathProtocol {
     return false
   }
 
-  var isCSourceLike: Bool {
+  var isClangSource: Bool {
     hasExtension(.c, .cpp, .m, .mm)
   }
 
   var isSourceLike: Bool {
-    isCSourceLike || hasExtension(.swift)
+    isClangSource || hasExtension(.swift)
+  }
+
+  /// Checks whether this file a source file that should be excluded from
+  /// any generated targets.
+  var isExcludedSource: Bool {
+    // We don't get useful build arguments for these.
+    hasExtension(.asm, .s, .cc, .cl, .inc, .proto)
   }
 
   var isDocLike: Bool {
