@@ -19,8 +19,6 @@
 // CHECK-DAG: @"$e4test3StrV9staticVarSaySiGvpZ" = global {{.*}} ptr @"$e4test3StrV9staticVar_WZTv_r"
 // CHECK-DAG: @"$e4test3StrV14twoDimensionalSaySaySiGGvpZ" = global {{.*}} ptr @"$e4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r"
 
-// Currently, constant static arrays only work on Darwin platforms.
-// REQUIRES: VENDOR=apple
 // REQUIRES: swift_feature_Embedded
 
 
