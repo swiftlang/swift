@@ -506,6 +506,13 @@ struct TypeRefIsConcrete
   }
     
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    for (auto Args : O->getArgumentLists()) {
+      for (auto *Arg : Args) {
+        if (!visit(Arg))
+          return false;
+      }
+    }
+
     return false;
   }
 
