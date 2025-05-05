@@ -49,6 +49,7 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 target_link_libraries(SwiftBasicTests
   PRIVATE
   swiftBasic
+  swiftFrontend
   swiftOption
   swiftThreading
   clangBasic
