@@ -2840,10 +2840,11 @@ public:
     checkExplicitAvailability(SD);
 
     if (!checkOverrides(SD)) {
-      // If a subscript has an override attribute but does not override
-      // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!SD->getOverriddenDecl()) {
+        auto *overriddenDecl = SD->getOverriddenDecl();
+        if (!overriddenDecl) {
+          // If a subscript has an override attribute but does not override
+          // anything, complain.
           auto DC = SD->getDeclContext();
           auto isClassContext = DC->getSelfClassDecl() != nullptr;
           auto isStructOrEnumContext = DC->getSelfEnumDecl() != nullptr ||
@@ -2857,6 +2858,28 @@ public:
                 .highlight(OA->getLocation());
           }
           OA->setInvalid();
+        } else if (auto outerTy = DC->getDeclaredInterfaceType()) {
+          // This is an overridden subscript; if the outer type has
+          // `@dynamicMemberLookup` but isn't directly annotated with it (e.g.,
+          // it's inherited), its members won't go through
+          // `@dynamicMemberLookup` checking via `AttributeChecker`. We need to
+          // ensure that if the overridden decl was a valid dynamic member
+          // lookup subscript, this override remains valid.
+          if (outerTy->hasDynamicMemberLookupAttribute()) {
+            auto D = outerTy->getAnyNominal();
+            if (!D->getAttrs().hasAttribute<DynamicMemberLookupAttr>()) {
+              if (overriddenDecl
+                      ->getDynamicMemberLookupSubscriptEligibility() !=
+                  DynamicMemberLookupSubscriptEligibility::None) {
+                auto accessScope = D->getFormalAccessScope();
+                if (SD->evaluateDynamicMemberLookupEligibility(
+                        &accessScope, &SD->getDiags()) ==
+                    DynamicMemberLookupSubscriptEligibility::None) {
+                  SD->setInvalid();
+                }
+              }
+            }
+          }
         }
       }
     }

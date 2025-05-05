@@ -10853,10 +10853,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
 
     // While looking for subscript choices it's possible to find
-    // `subscript(dynamicMember: {Reference{Writable}}KeyPath)` on types marked
-    // as `@dynamicMemberLookup`; let's mark this candidate as representing
-    // "dynamic lookup" unless it's a direct call to such subscript (in that
-    // case label is expected to match).
+    // `subscript(dynamicMember: {Reference{Writable}}KeyPath, ...)` on types
+    // marked as `@dynamicMemberLookup`; let's mark this candidate as
+    // representing "dynamic lookup" unless it's a direct call to such subscript
+    // (in that case label is expected to match).
     if (auto *SD = dyn_cast<SubscriptDecl>(cand)) {
       if (memberLocator && instanceTy->hasDynamicMemberLookupAttribute()) {
         if (SD->getDynamicMemberLookupSubscriptEligibility() ==
@@ -10979,7 +10979,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // or if all of the candidates come from conditional conformances (which
   // might not be applicable), and we are looking for members in a type with
   // the @dynamicMemberLookup attribute, then we resolve a reference to a
-  // `subscript(dynamicMember:)` method and pass the member name as a string
+  // `subscript(dynamicMember:...)` method and pass the member name as a string
   // parameter.
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial() &&

@@ -65,6 +65,7 @@ class PointerAuthQualifier;
 
 namespace {
 class AttributeChecker;
+class DeclChecker;
 } // end anonymous namespace
 
 namespace swift {
@@ -7569,10 +7570,13 @@ enum class ObjCSubscriptKind {
 ///
 /// `@dynamicMemberLookup` requires that a subscript:
 ///
-///   1. Take a single argument with an explicit `dynamicMember` argument label,
+///   1. Take an initial argument with an explicit `dynamicMember` argument
+///      label,
 ///   2. Whose parameter type is non-variadic and is either
 ///      * A `{{Reference}Writable}KeyPath`, or
 ///      * A concrete type conforming to `ExpressibleByStringLiteral`,
+///   3. And whose following arguments (if any) are all either variadic or have
+///      a default value
 ///
 /// Subscripts which don't meet these requirements strictly are not eligible.
 enum class DynamicMemberLookupSubscriptEligibility : uint8_t {
@@ -7621,6 +7625,7 @@ enum class DynamicMemberLookupSubscriptEligibility : uint8_t {
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
   friend AttributeChecker;
+  friend DeclChecker;
   friend class ResultTypeRequest;
 
   SourceLoc StaticLoc;

@@ -31,6 +31,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -57,6 +58,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 #include <optional>
 
 using namespace swift;
@@ -2110,35 +2112,83 @@ SubscriptDecl::evaluateDynamicMemberLookupEligibility(
       return;
     }
 
-    auto index = indices->get(0);
-    if (index->getArgumentName() != getASTContext().Id_dynamicMember) {
+    auto isInvalid = false;
+    auto &ctx = getASTContext();
+    auto diagnosedOutOfOrder = false;
+    auto firstIndex = indices->get(0);
+    if (firstIndex->getArgumentName() != ctx.Id_dynamicMember) {
+      if (!Diags) {
+        // If we're not here to produce diagnostics during type-checking,
+        // there's no need to keep going.
+        return;
+      }
+
+      isInvalid = true;
+
+      // We can separately diagnose whether the `dynamicMember` parameter is out
+      // of order vs. whether we're missing a `dynamicMember` label altogether.
+      if (indices->size() > 1) {
+        for (auto idx : range(1, indices->size())) {
+          auto index = indices->get(idx);
+          if (index->getArgumentName() == ctx.Id_dynamicMember) {
+            queue.getDiags()
+                .diagnose(this,
+                          diag::invalid_dynamic_member_subscript_out_of_order)
+                .highlight(index->getSourceRange());
+            diagnosedOutOfOrder = true;
+            break;
+          }
+        }
+      }
+
       // If there is no argument label at all, we can offer a fix-it to insert
       // it. Note that we intentionally don't want to emit a diagnostic if there
       // _is_ a label, since it's clearly just not a dynamic member lookup
       // subscript.
-      if (Diags && index->getParameterNameLoc().isValid() &&
-          index->getArgumentNameLoc().isInvalid()) {
+      if (!diagnosedOutOfOrder && firstIndex->getParameterNameLoc().isValid() &&
+          firstIndex->getArgumentNameLoc().isInvalid()) {
         queue.getDiags()
             .diagnose(this,
                       diag::invalid_dynamic_member_subscript_missing_label)
-            .highlight(index->getSourceRange())
-            .fixItInsert(index->getParameterNameLoc(), "dynamicMember ");
+            .highlight(firstIndex->getSourceRange())
+            .fixItInsert(firstIndex->getParameterNameLoc(), "dynamicMember ");
       }
-
-      return;
     }
 
-    if (!index->hasInterfaceType() || index->isVariadic()) {
+    for (auto index : *indices) {
+      if (!index->hasInterfaceType() ||
+          (index == firstIndex && index->isVariadic())) {
+        isInvalid = true;
+      }
+
+      if (index != firstIndex &&
+          (!diagnosedOutOfOrder ||
+           index->getArgumentName() != ctx.Id_dynamicMember) &&
+          (!index->isDefaultArgument() && !index->isVariadic() &&
+           !isa<PackExpansionType>(
+               index->getInterfaceType()->getCanonicalType()))) {
+        queue.getDiags()
+            .diagnose(this,
+                      diag::invalid_dynamic_member_subscript_missing_default)
+            .highlight(index->getSourceRange())
+            .fixItInsertAfter(index->getEndLoc(), " = <#Default#>");
+        isInvalid = true;
+      }
+    }
+
+    if (isInvalid) {
+      // There's no point in checking the `dynamicMember` argument type since
+      // we've already output diagnostics.
       return;
     }
 
     if (TypeChecker::conformsToKnownProtocol(
-            index->getTypeInContext(),
+            firstIndex->getTypeInContext(),
             KnownProtocolKind::ExpressibleByStringLiteral)) {
       queue.clear();
       eligibility = DynamicMemberLookupSubscriptEligibility::String;
     } else if (getDynamicMemberParamTypeAsKeyPathType(
-                   index->getInterfaceType())) {
+                   firstIndex->getInterfaceType())) {
       queue.clear();
       eligibility = DynamicMemberLookupSubscriptEligibility::KeyPath;
     }
@@ -2175,8 +2225,12 @@ SubscriptDecl::evaluateDynamicMemberLookupEligibility(
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
 /// least one subscript member declared like this:
 ///
-/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
-///   (dynamicMember name: KeywordType) -> LookupValue { get }
+/// subscript(dynamicMember name: T, ...) -> U
+///   (where T is a concrete type conforming to `ExpressibleByStringLiteral`)
+///
+///   or
+///
+/// subscript(dynamicMember name: {{Reference}Writable}KeyPath<T, U>, ...) -> V
 ///
 /// ... but doesn't care about the mutating'ness of the getter/setter.
 /// We just manually check the requirements here.
