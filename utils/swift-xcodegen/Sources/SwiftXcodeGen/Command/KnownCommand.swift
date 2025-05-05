@@ -147,12 +147,22 @@ extension Command.Flag {
     swiftc(.experimentalSkipNonInlinableFunctionBodies)
   static let experimentalSkipNonInlinableFunctionBodiesWithoutTypes = 
     swiftc(.experimentalSkipNonInlinableFunctionBodiesWithoutTypes)
+  static let enableUpcomingFeature =
+    swiftc(.enableUpcomingFeature)
+  static let disableExperimentalFeature =
+    swiftc(.disableExperimentalFeature)
+  static let disableUpcomingFeature =
+    swiftc(.disableUpcomingFeature)
   static let F =
     swiftc(.F)
   static let Fsystem =
     swiftc(.Fsystem)
+  static let libraryLevel =
+    swiftc(.libraryLevel)
   static let moduleName =
     swiftc(.moduleName)
+  static let moduleAbiName =
+    swiftc(.moduleAbiName)
   static let moduleLinkName =
     swiftc(.moduleLinkName)
   static let nostdimport =
@@ -171,8 +181,12 @@ extension Command.Flag {
     swiftc(.runtimeCompatibilityVersion)
   static let sdk =
     swiftc(.sdk)
+  static let strictMemorySafety =
+    swiftc(.strictMemorySafety)
   static let swiftVersion =
     swiftc(.swiftVersion)
+  static let warnImplicitOverrides =
+    swiftc(.warnImplicitOverrides)
   static let wholeModuleOptimization =
     swiftc(.wholeModuleOptimization)
   static let wmo =
@@ -236,13 +250,18 @@ extension KnownCommand {
     .experimentalSkipAllFunctionBodies,
     .experimentalSkipNonInlinableFunctionBodies,
     .experimentalSkipNonInlinableFunctionBodiesWithoutTypes,
+    .enableUpcomingFeature,
+    .disableExperimentalFeature,
+    .disableUpcomingFeature,
     .F,
     .Fsystem,
     .I,
     .nostdimport,
     .O,
     .Onone,
+    .libraryLevel,
     .moduleName,
+    .moduleAbiName,
     .moduleLinkName,
     .packageName,
     .parseAsLibrary,
@@ -250,7 +269,9 @@ extension KnownCommand {
     .runtimeCompatibilityVersion,
     .target,
     .sdk,
+    .strictMemorySafety,
     .swiftVersion,
+    .warnImplicitOverrides,
     .wholeModuleOptimization,
     .wmo,
     .Xcc,
