@@ -2172,29 +2172,6 @@ SubscriptDecl::evaluateDynamicMemberLookupEligibility(
   return eligibility;
 }
 
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl) {
-  return decl->getDynamicMemberLookupSubscriptEligibility() !=
-         DynamicMemberLookupSubscriptEligibility::None;
-}
-
-bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl) {
-  return decl->getDynamicMemberLookupSubscriptEligibility() ==
-         DynamicMemberLookupSubscriptEligibility::String;
-}
-
-BoundGenericType *
-swift::getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl) {
-  return decl->getDynamicMemberLookupKeyPathType();
-}
-
-bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl) {
-  return decl->getDynamicMemberLookupSubscriptEligibility() ==
-         DynamicMemberLookupSubscriptEligibility::KeyPath;
-}
-
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
 /// least one subscript member declared like this:
 ///
