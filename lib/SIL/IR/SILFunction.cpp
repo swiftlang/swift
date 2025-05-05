@@ -618,7 +618,8 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)
-    return ClangNodeOwner->getClangDecl()->isWeakImported();
+    return ClangNodeOwner->getClangDecl()->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   // For native functions check a flag on the SILFunction
   // itself.
