@@ -12,7 +12,7 @@
 // RUN: %check-in-clang-c %t/cdecl.h -Wnullable-to-nonnull-conversion
 
 /// Build a client against cdecl.h
-// RUN: %clang -c %t/Client.c -fmodules -I %t \
+// RUN: %clang-no-modules -c %t/Client.c -I %t \
 // RUN:   -F %S/../Inputs/clang-importer-sdk-path/frameworks \
 // RUN:   -I %clang-include-dir -Werror \
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
