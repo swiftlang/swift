@@ -66,6 +66,7 @@
 #include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LangStandard.h"
+#include "clang/Basic/MacroBuilder.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -1464,8 +1465,14 @@ ClangImporter::create(ASTContext &ctx,
         importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
-    importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
-        clangDiags, swiftTargetClangInvocation->TargetOpts));
+    auto targetInfo = clang::TargetInfo::CreateTargetInfo(
+        clangDiags, swiftTargetClangInvocation->TargetOpts);
+    // Ensure the target info has configured target-specific defines
+    std::string defineBuffer;
+    llvm::raw_string_ostream predefines(defineBuffer);
+    clang::MacroBuilder builder(predefines);
+    targetInfo->getTargetDefines(instance.getLangOpts(), builder);
+    importer->Impl.setSwiftTargetInfo(targetInfo);
     importer->Impl.setSwiftCodeGenOptions(new clang::CodeGenOptions(
         swiftTargetClangInvocation->getCodeGenOpts()));
   } else {
