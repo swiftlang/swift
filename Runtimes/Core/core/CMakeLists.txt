@@ -188,7 +188,6 @@ add_library(swiftCore
   StringWordBreaking.swift
   Substring.swift
   SwiftNativeNSArray.swift
-  SwiftSettings.swift
   TemporaryAllocation.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift

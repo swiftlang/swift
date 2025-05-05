@@ -8650,20 +8650,5 @@ GROUPED_WARNING(
     "behavior",
     (StringRef, DeclAttribute))
 
-//===----------------------------------------------------------------------===//
-//                            MARK: SwiftSettings
-//===----------------------------------------------------------------------===//
-
-ERROR(swift_settings_invalid_setting, none,
-      "Unrecognized setting passed to #SwiftSettings", ())
-
-ERROR(swift_settings_must_be_top_level, none,
-      "#SwiftSettings can only be invoked as a top level declaration", ())
-
-ERROR(swift_settings_duplicate_setting, none,
-      "duplicate setting passed to #SwiftSettings", ())
-NOTE(swift_settings_duplicate_setting_original_loc, none,
-     "setting originally passed here", ())
-
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

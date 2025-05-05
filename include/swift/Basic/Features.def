@@ -498,9 +498,6 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// is resilient or not.
 EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 
-/// Allow SwiftSettings
-EXPERIMENTAL_FEATURE(SwiftSettings, false)
-
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
