@@ -311,6 +311,14 @@ public:
     PendingNewlines++;
   }
 
+  void printColonForType(const PrintOptions &options)
+  {
+    if (options.PrintSpaceBeforeInheritance) {
+      *this << ' ';
+    }
+    *this << ": ";
+  }
+
   void forceNewlines() {
     if (PendingNewlines > 0) {
       llvm::SmallString<16> Str;

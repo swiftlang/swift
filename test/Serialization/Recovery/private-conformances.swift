@@ -33,31 +33,31 @@ import protocol_lib
 
 public protocol PublicProtocol {}
 
-// CHECK: class C1 : PublicProtocol {
+// CHECK: class C1: PublicProtocol {
 public class C1 : PrivateProtocol, PublicProtocol {}
 
 // CHECK: class C2 {
 public class C2 {}
 
-// CHECK: extension C2 : PublicProtocol {
+// CHECK: extension C2: PublicProtocol {
 extension C2 : PrivateProtocol, PublicProtocol {}
 
-// CHECK: enum E1 : PublicProtocol {
+// CHECK: enum E1: PublicProtocol {
 public enum E1 : PrivateProtocol, PublicProtocol {}
 
 // CHECK: enum E2 {
 public enum E2 {}
 
-// CHECK: extension E2 : PublicProtocol {
+// CHECK: extension E2: PublicProtocol {
 extension E2 : PrivateProtocol, PublicProtocol {}
 
-// CHECK: struct S1 : PublicProtocol {
+// CHECK: struct S1: PublicProtocol {
 public struct S1 : PrivateProtocol, PublicProtocol {}
 
 // CHECK: struct S2 {
 public struct S2 {}
 
-// CHECK: extension S2 : PublicProtocol {
+// CHECK: extension S2: PublicProtocol {
 extension S2 : PrivateProtocol, PublicProtocol {}
 
 #elseif INHERITS_LIB

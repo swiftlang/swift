@@ -9,7 +9,7 @@
 import FooKit
 @_implementationOnly import FooKit_SECRET
 
-// CHECK-LABEL: class GoodChild : Parent {
+// CHECK-LABEL: class GoodChild: Parent {
 //  CHECK-NEXT:   override init()
 //  CHECK-NEXT:   /* placeholder for init(SECRET:) */
 //  CHECK-NEXT:   /* placeholder for init(requiredSECRET:) */
@@ -40,7 +40,7 @@ public class GoodChild: Parent {
   }
 }
 
-// CHECK-LABEL: class GoodGenericChild<Toy> : Parent {
+// CHECK-LABEL: class GoodGenericChild<Toy>: Parent {
 //  CHECK-NEXT:   override init()
 //  CHECK-NEXT:   /* placeholder for init(SECRET:) */
 //  CHECK-NEXT:   /* placeholder for init(requiredSECRET:) */
@@ -71,7 +71,7 @@ public class GoodGenericChild<Toy>: Parent {
   }
 }
 
-// CHECK-LABEL: class QuietChild : Parent {
+// CHECK-LABEL: class QuietChild: Parent {
 //  CHECK-NEXT:   /* placeholder for init(SECRET:) */
 //  CHECK-NEXT:   /* placeholder for init(requiredSECRET:) */
 //  CHECK-NEXT:   deinit
@@ -110,7 +110,7 @@ internal class PrivateGrandchild: GoodChild {
   }
 }
 
-// CHECK-LABEL: class SubscriptChild : SubscriptParent {
+// CHECK-LABEL: class SubscriptChild: SubscriptParent {
 //  CHECK-NEXT:   @_implementationOnly override subscript(index: Int32) -> Parent?
 //  CHECK-NEXT:   deinit
 //  CHECK-NEXT: }

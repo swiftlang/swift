@@ -585,7 +585,7 @@ struct PrintOptions {
 
   /// Whether to print a space before the `:` of an inheritance list in a type
   /// decl.
-  bool PrintSpaceBeforeInheritance = true;
+  bool PrintSpaceBeforeInheritance = false;
 
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
@@ -771,6 +771,7 @@ struct PrintOptions {
   static PrintOptions printQualifiedSILType() {
     PrintOptions result = PrintOptions::printSIL();
     result.FullyQualifiedTypesIfAmbiguous = true;
+    result.PrintSpaceBeforeInheritance = true;
     return result;
   }
 

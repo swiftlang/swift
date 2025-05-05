@@ -90,7 +90,7 @@ import Foundation
 // @objc subclass of @_objcImplementation class
 //
 
-// CHECK-LABEL: @objc @_inheritsConvenienceInitializers open class SwiftSubclass : objc_implementation.ImplClass {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers open class SwiftSubclass: objc_implementation.ImplClass {
 open class SwiftSubclass: ImplClass {
   // CHECK-DAG: @objc override dynamic open func mainMethod
   override open func mainMethod(_: Int32) {

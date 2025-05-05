@@ -7,7 +7,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_SendableCompletionHandlers
 
-// CHECK-LABEL: class EffProps : NSObject {
+// CHECK-LABEL: class EffProps: NSObject {
 // CHECK:       @available(*, renamed: "getter:doggo()")
 // CHECK-NEXT:  func getDogWithCompletion(_ completionHandler: @escaping @Sendable (NSObject) -> Void)
 // CHECK:       var doggo: NSObject { get async }
@@ -42,6 +42,6 @@
 // CHECK-NEXT:  func regularMainDog() async -> String
 // CHECK: }
 
-// CHECK-LABEL: class NotEffProps : NSObject {
+// CHECK-LABEL: class NotEffProps: NSObject {
 // CHECK-NOT: var
 // CHECK: func EffPropGetDogWithCompletion(_ s: OpaquePointer, _ myBlock: @escaping (NSObject) -> Void) -> Double

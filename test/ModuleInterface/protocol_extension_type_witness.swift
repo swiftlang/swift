@@ -25,7 +25,7 @@ public struct S<B>: P {
   public func d(_: String) {}
 }
 
-// CHECK-LABEL: public struct S<B> : protocol_extension_type_witness.P {
+// CHECK-LABEL: public struct S<B>: protocol_extension_type_witness.P {
 // CHECK-NEXT:    public func b(_: B)
 // CHECK-NEXT:    public func d(_: Swift.String)
 // CHECK-NEXT:    public typealias A = B

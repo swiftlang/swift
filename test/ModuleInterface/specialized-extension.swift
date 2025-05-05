@@ -35,7 +35,7 @@ extension Tree<Int>.Branch<String>.Nest<Void>.Egg { public static func twite() {
 // CHECK: }
 extension [String] { public func rejoinder() -> String { return self.joined() } }
 
-// CHECK: public typealias StringDict<T> = [Swift.String : T]
+// CHECK: public typealias StringDict<T> = [Swift.String: T]
 public typealias StringDict<T> = [String: T]
 
 // CHECK: extension Swift.Dictionary where Key == Swift.String, Value == Swift.Int

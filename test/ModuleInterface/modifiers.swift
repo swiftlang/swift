@@ -67,7 +67,7 @@ public class Base {
 } // CHECK-NEXT: {{^}$}}
 
 
-// CHECK-LABEL: public class SubImplicit : {{(Test[.])?Base}} {
+// CHECK-LABEL: public class SubImplicit: {{(Test[.])?Base}} {
 public class SubImplicit: Base {
   // CHECK-NEXT: @objc override public init(){{$}}
   // CHECK-NEXT: @objc required public init(x: Swift.Int){{$}}
@@ -75,7 +75,7 @@ public class SubImplicit: Base {
 } // CHECK-NEXT: {{^}$}}
 
 
-// CHECK-LABEL: public class SubExplicit : {{(Test[.])?Base}} {
+// CHECK-LABEL: public class SubExplicit: {{(Test[.])?Base}} {
 public class SubExplicit: Base {
   // Make sure adding "required" preserves both "required" and "override".
   // CHECK-NEXT: @objc override required public init(){{$}}

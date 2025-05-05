@@ -98,26 +98,26 @@ public struct Transparent {
 //--- Client.swift
 import A
 
-// CHECK-LABEL: sil hidden @$s6Client15testTransparentyyF : $@convention(thin) () -> ()
-// CHECK: [[X:%.*]] = struct $Int (%1 : $Builtin.Int{{[0-9]+}})
+// CHECK-LABEL: sil hidden @$s6Client15testTransparentyyF: $@convention(thin) () -> ()
+// CHECK: [[X:%.*]] = struct $Int (%1: $Builtin.Int{{[0-9]+}})
 // CHECK-NEXT: // function_ref Transparent.init(x:)
-// CHECK-NEXT: [[TRANSPARENT_REF:%.*]] = function_ref @$s1A11TransparentV1xACSi_tcfC : $@convention(method) (Int, @thin Transparent.Type) -> Transparent
-// CHECK-NEXT: apply [[TRANSPARENT_REF]]([[X]], %0) : $@convention(method) (Int, @thin Transparent.Type) -> Transparent
+// CHECK-NEXT: [[TRANSPARENT_REF:%.*]] = function_ref @$s1A11TransparentV1xACSi_tcfC: $@convention(method) (Int, @thin Transparent.Type) -> Transparent
+// CHECK-NEXT: apply [[TRANSPARENT_REF]]([[X]], %0): $@convention(method) (Int, @thin Transparent.Type) -> Transparent
 func testTransparent() {
   _ = Transparent(x: 42)
 }
 
-// CHECK-LABEL: sil shared @$s1A11TransparentV1xACSi_tcfC : $@convention(method) (Int, @thin Transparent.Type) -> Transparent
+// CHECK-LABEL: sil shared @$s1A11TransparentV1xACSi_tcfC: $@convention(method) (Int, @thin Transparent.Type) -> Transparent
 
-// CHECK-LABEL: sil hidden @$s6Client13testInlinableyyF : $@convention(thin) () -> ()
-// CHECK: [[X:%.*]] = struct $Int (%1 : $Builtin.Int{{[0-9]+}})
+// CHECK-LABEL: sil hidden @$s6Client13testInlinableyyF: $@convention(thin) () -> ()
+// CHECK: [[X:%.*]] = struct $Int (%1: $Builtin.Int{{[0-9]+}})
 // CHECK-NEXT: // function_ref Inlinable.init(x:)
-// CHECK-NEXT: [[INLINABLE_REF:%.*]] = function_ref @$s1A9InlinableV1xACSi_tcfC : $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
-// CHECK-NEXT: apply [[INLINABLE_REF]]([[X]], %0) : $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
+// CHECK-NEXT: [[INLINABLE_REF:%.*]] = function_ref @$s1A9InlinableV1xACSi_tcfC: $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
+// CHECK-NEXT: apply [[INLINABLE_REF]]([[X]], %0): $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
 func testInlinable() {
   _ = Inlinable(x: 42)
 }
 
-// CHECK-LABEL: sil @$s1A9InlinableV1xACSi_tcfC : $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
+// CHECK-LABEL: sil @$s1A9InlinableV1xACSi_tcfC: $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
 
-// CHECK-LABEL: sil shared @$s1A11TransparentV1xSivi : $@convention(thin) (Int, @thin Transparent.Type) -> @out Int
+// CHECK-LABEL: sil shared @$s1A11TransparentV1xSivi: $@convention(thin) (Int, @thin Transparent.Type) -> @out Int

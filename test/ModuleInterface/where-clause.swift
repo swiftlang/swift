@@ -19,7 +19,7 @@ public struct Holder<Value> {
         self.value = value
     }
 
-    // CHECK-NEXT: public init<T>(_ value: T) where Value == Swift.AnyHashable, T : Swift.Hashable{{$}}
+    // CHECK-NEXT: public init<T>(_ value: T) where Value == Swift.AnyHashable, T: Swift.Hashable{{$}}
     public init<T : Hashable>(_ value: T) where Value == AnyHashable {
         self.value = value
     }

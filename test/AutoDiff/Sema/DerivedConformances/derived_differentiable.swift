@@ -9,7 +9,7 @@ struct GenericTangentVectorMember<T: Differentiable>: Differentiable,
   var x: T.TangentVector
 }
 
-// CHECK-AST-LABEL: internal struct GenericTangentVectorMember<T> : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} where T : Differentiable
+// CHECK-AST-LABEL: internal struct GenericTangentVectorMember<T> : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} where T: Differentiable
 // CHECK-AST:   internal var x: T.TangentVector
 // CHECK-AST:   internal static func + (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
 // CHECK-AST:   internal static func - (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
@@ -24,7 +24,7 @@ public struct ConditionallyDifferentiable<T> {
 extension ConditionallyDifferentiable: Differentiable where T: Differentiable {}
 
 // CHECK-AST-LABEL: public struct ConditionallyDifferentiable<T> {
-// CHECK-AST:         @differentiable(reverse, wrt: self where T : Differentiable)
+// CHECK-AST:         @differentiable(reverse, wrt: self where T: Differentiable)
 // CHECK-AST:         public var x: T
 // CHECK-AST:         internal init(x: T)
 // CHECK-AST:       }
@@ -61,25 +61,25 @@ final class AdditiveArithmeticClass<T: AdditiveArithmetic & Differentiable>: Add
   }
 }
 
-// CHECK-AST-LABEL: final internal class AdditiveArithmeticClass<T> : AdditiveArithmetic, Differentiable where T : AdditiveArithmetic, T : Differentiable {
+// CHECK-AST-LABEL: final internal class AdditiveArithmeticClass<T> : AdditiveArithmetic, Differentiable where T : AdditiveArithmetic, T: Differentiable {
 // CHECK-AST:         final internal var x: T, y: T
-// CHECK-AST:         internal struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}}
+// CHECK-AST:         internal struct TangentVector: {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}}
 // CHECK-AST:       }
 
 @frozen
 public struct FrozenStruct: Differentiable {}
 
-// CHECK-AST-LABEL: @frozen public struct FrozenStruct : Differentiable {
-// CHECK-AST:   @frozen public struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
+// CHECK-AST-LABEL: @frozen public struct FrozenStruct: Differentiable {
+// CHECK-AST:   @frozen public struct TangentVector: {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 // CHECK-AST:   internal init()
 
 @usableFromInline
 struct UsableFromInlineStruct: Differentiable {}
 
 // CHECK-AST-LABEL: @usableFromInline
-// CHECK-AST: struct UsableFromInlineStruct : Differentiable {
+// CHECK-AST: struct UsableFromInlineStruct: Differentiable {
 // CHECK-AST:   @usableFromInline
-// CHECK-AST:   struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
+// CHECK-AST:   struct TangentVector: {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 // CHECK-AST:   internal init()
 
 // Test property wrappers.
@@ -96,8 +96,8 @@ struct WrappedPropertiesStruct: Differentiable {
   @noDerivative @Wrapper var nondiff: Float
 }
 
-// CHECK-AST-LABEL: internal struct WrappedPropertiesStruct : Differentiable {
-// CHECK-AST:   internal struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
+// CHECK-AST-LABEL: internal struct WrappedPropertiesStruct: Differentiable {
+// CHECK-AST:   internal struct TangentVector: {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 // CHECK-AST:     internal var x: Float.TangentVector
 // CHECK-AST:     internal var y: Float.TangentVector
 // CHECK-AST:     internal var z: Float.TangentVector
@@ -111,8 +111,8 @@ class WrappedPropertiesClass: Differentiable {
   @noDerivative @Wrapper var noDeriv: Float = 4
 }
 
-// CHECK-AST-LABEL: internal class WrappedPropertiesClass : Differentiable {
-// CHECK-AST:   internal struct TangentVector : {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
+// CHECK-AST-LABEL: internal class WrappedPropertiesClass: Differentiable {
+// CHECK-AST:   internal struct TangentVector: {{(Differentiable, AdditiveArithmetic)|(AdditiveArithmetic, Differentiable)}} {
 // CHECK-AST:     internal var x: Float.TangentVector
 // CHECK-AST:     internal var y: Float.TangentVector
 // CHECK-AST:     internal var z: Float.TangentVector
@@ -125,8 +125,8 @@ struct AutoDeriveEncodableTV1: TangentVectorMustBeEncodable {
   var x: Float
 }
 
-// CHECK-AST-LABEL: internal struct AutoDeriveEncodableTV1 : TangentVectorMustBeEncodable {
-// CHECK-AST:   internal struct TangentVector : {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
+// CHECK-AST-LABEL: internal struct AutoDeriveEncodableTV1: TangentVectorMustBeEncodable {
+// CHECK-AST:   internal struct TangentVector: {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
 
 struct AutoDeriveEncodableTV2 {
   var x: Float
@@ -134,8 +134,8 @@ struct AutoDeriveEncodableTV2 {
 
 extension AutoDeriveEncodableTV2: TangentVectorMustBeEncodable {}
 
-// CHECK-AST-LABEL: extension AutoDeriveEncodableTV2 : TangentVectorMustBeEncodable {
-// CHECK-AST:   internal struct TangentVector : {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
+// CHECK-AST-LABEL: extension AutoDeriveEncodableTV2: TangentVectorMustBeEncodable {
+// CHECK-AST:   internal struct TangentVector: {{(Encodable, Differentiable, AdditiveArithmetic)|(Encodable, AdditiveArithmetic, Differentiable)|(Differentiable, Encodable, AdditiveArithmetic)|(AdditiveArithmetic, Encodable, Differentiable)|(Differentiable, AdditiveArithmetic, Encodable)|(AdditiveArithmetic, Differentiable, Encodable)}} {
 
 protocol TangentVectorP: Differentiable {
   var requirement: Int { get }
@@ -155,8 +155,8 @@ extension TangentVectorP where Self == StructWithTangentVectorConstrained.Tangen
   var requirement: Int { 42 }
 }
 
-// CHECK-AST-LABEL: internal struct StructWithTangentVectorConstrained : TangentVectorConstrained {
-// CHECK-AST:   internal struct TangentVector : {{(TangentVectorP, Differentiable, AdditiveArithmetic)|(TangentVectorP, AdditiveArithmetic, Differentiable)|(Differentiable, TangentVectorP, AdditiveArithmetic)|(AdditiveArithmetic, TangentVectorP, Differentiable)|(Differentiable, AdditiveArithmetic, TangentVectorP)|(AdditiveArithmetic, Differentiable, TangentVectorP)}} {
+// CHECK-AST-LABEL: internal struct StructWithTangentVectorConstrained: TangentVectorConstrained {
+// CHECK-AST:   internal struct TangentVector: {{(TangentVectorP, Differentiable, AdditiveArithmetic)|(TangentVectorP, AdditiveArithmetic, Differentiable)|(Differentiable, TangentVectorP, AdditiveArithmetic)|(AdditiveArithmetic, TangentVectorP, Differentiable)|(Differentiable, AdditiveArithmetic, TangentVectorP)|(AdditiveArithmetic, Differentiable, TangentVectorP)}} {
 
 // https://github.com/apple/swift/issues/56601
 
@@ -165,18 +165,18 @@ public struct S1: Differentiable {
   public var scalar: Float
 }
 
-// CHECK-AST-LABEL: public struct S1 : Differentiable {
+// CHECK-AST-LABEL: public struct S1: Differentiable {
 // CHECK-AST: public var simd: [Float]
 // CHECK-AST: public var scalar: Float
-// CHECK-AST: struct TangentVector : AdditiveArithmetic, Differentiable {
+// CHECK-AST: struct TangentVector: AdditiveArithmetic, Differentiable {
 // CHECK-AST:   var simd: Array<Float>.TangentVector
 // CHECK-AST:   var scalar: Float
 
-// CHECK-SIL-LABEL: public struct S1 : Differentiable {
+// CHECK-SIL-LABEL: public struct S1: Differentiable {
 // CHECK-SIL: @differentiable(reverse, wrt: self)
 // CHECK-SIL: @_hasStorage public var simd: [Float] { get set }
 // CHECK-SIL: @differentiable(reverse, wrt: self)
 // CHECK-SIL: @_hasStorage public var scalar: Float { get set }
-// CHECK-SIL: struct TangentVector : AdditiveArithmetic, Differentiable {
+// CHECK-SIL: struct TangentVector: AdditiveArithmetic, Differentiable {
 // CHECK-SIL:   @_hasStorage var simd: Array<Float>.DifferentiableView { get set }
 // CHECK-SIL:   @_hasStorage var scalar: Float { get set }

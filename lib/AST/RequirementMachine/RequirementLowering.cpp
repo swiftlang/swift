@@ -1195,7 +1195,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
         if (!assocType->getInherited().empty())
           out << ", ";
 
-        whereClause->print(out, /*printWhereKeyword*/false);
+        whereClause->print(out, PrintOptions(), /*printWhereKeyword*/false);
       }
     }
     return result;

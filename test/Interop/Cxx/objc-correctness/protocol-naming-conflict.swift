@@ -5,8 +5,8 @@
 
 import ProtocolNamingConflict
 
-// CHECK: class Thing : FooProtocol
+// CHECK: class Thing: FooProtocol
 // CHECK-IDE-TEST: protocol FooProtocol
-// CHECK-IDE-TEST: class Foo : FooProtocol
+// CHECK-IDE-TEST: class Foo: FooProtocol
 class Thing: FooProtocol {
 }

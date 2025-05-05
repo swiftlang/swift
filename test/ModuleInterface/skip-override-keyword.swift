@@ -21,7 +21,7 @@ public class BaseClass {
   @usableFromInline func doSomethingUsableFromInline() {}
 }
 
-// CHECK: @_inheritsConvenienceInitializers public class DerivedClass : {{Foo|FooWithTesting}}.BaseClass
+// CHECK: @_inheritsConvenienceInitializers public class DerivedClass: {{Foo|FooWithTesting}}.BaseClass
 public class DerivedClass: BaseClass {
   // CHECK: public init()
   public override init() { super.init() }

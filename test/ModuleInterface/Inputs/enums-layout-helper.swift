@@ -1,4 +1,4 @@
-// CHECK-LABEL: public enum FutureproofEnum : Swift.Int
+// CHECK-LABEL: public enum FutureproofEnum: Swift.Int
 public enum FutureproofEnum: Int {
   // CHECK-NEXT: case a{{$}}
   case a = 1
@@ -10,7 +10,7 @@ public enum FutureproofEnum: Int {
   case d
 }
 
-// CHECK-LABEL: public enum FrozenEnum : Swift.Int
+// CHECK-LABEL: public enum FrozenEnum: Swift.Int
 @_frozen public enum FrozenEnum: Int {
   // CHECK-NEXT: case a{{$}}
   case a = 1
@@ -22,7 +22,7 @@ public enum FutureproofEnum: Int {
   case d
 }
 
-// CHECK-LABEL: public enum FutureproofObjCEnum : Swift.Int32
+// CHECK-LABEL: public enum FutureproofObjCEnum: Swift.Int32
 @objc public enum FutureproofObjCEnum: Int32 {
   // CHECK-NEXT: case a = 1{{$}}
   case a = 1
@@ -34,7 +34,7 @@ public enum FutureproofEnum: Int {
   case d
 }
 
-// CHECK-LABEL: public enum FrozenObjCEnum : Swift.Int32
+// CHECK-LABEL: public enum FrozenObjCEnum: Swift.Int32
 @_frozen @objc public enum FrozenObjCEnum: Int32 {
   // CHECK-NEXT: case a = 1{{$}}
   case a = 1
@@ -46,7 +46,7 @@ public enum FutureproofEnum: Int {
   case d
 }
 
-// CHECK-LABEL: public enum FutureproofUnicodeScalarEnum : Swift.Unicode.Scalar
+// CHECK-LABEL: public enum FutureproofUnicodeScalarEnum: Swift.Unicode.Scalar
 public enum FutureproofUnicodeScalarEnum: Unicode.Scalar {
   // CHECK-NEXT: case a{{$}}
   case a = "A"

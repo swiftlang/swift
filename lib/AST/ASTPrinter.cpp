@@ -897,6 +897,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       FreshOptions.TransformContext = options.TransformContext;
       FreshOptions.CurrentModule = options.CurrentModule;
       FreshOptions.FullyQualifiedTypesIfAmbiguous = options.FullyQualifiedTypesIfAmbiguous;
+      FreshOptions.PrintSpaceBeforeInheritance = options.PrintSpaceBeforeInheritance;
       T.print(Printer, FreshOptions);
       return;
     }
@@ -1972,7 +1973,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
                               PrintNameContext::GenericParameter);
 
             if (param->isValue()) {
-              Printer << " : ";
+              Printer.printColonForType(Options);
               printType(param->getValueType());
             }
 
@@ -1985,7 +1986,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
             printType(param);
 
             if (param->isValue()) {
-              Printer << " : ";
+              Printer.printColonForType(Options);
               printType(param->getValueType());
             }
           }
@@ -2029,7 +2030,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         if (printRequirements)
           Printer << " " << tok::kw_where << " ";
         else
-          Printer << " : ";
+          Printer.printColonForType(Options);
 
         isFirstReq = false;
       } else {
@@ -2078,7 +2079,8 @@ void PrintAST::printSingleDepthOfGenericSignature(
         if (printRequirements)
           Printer << " " << tok::kw_where << " ";
         else
-          Printer << " : ";
+        
+        Printer.printColonForType(Options);
 
         isFirstReq = false;
       } else {
@@ -2164,13 +2166,15 @@ void PrintAST::printRequirement(const Requirement &req) {
     printTransformedType(req.getFirstType());
     Printer << ", ";
     printTransformedType(req.getSecondType());
-    Printer << ")) : Any";
+    Printer << "))";
+    Printer.printColonForType(Options);
+    Printer << "Any";
     return;
   case RequirementKind::Layout:
     if (isPackRequirement)
       Printer << "repeat ";
     printTransformedType(req.getFirstType());
-    Printer << " : ";
+    Printer.printColonForType(Options);
     req.getLayoutConstraint()->print(Printer, Options);
     return;
   case RequirementKind::Conformance:
@@ -2178,7 +2182,7 @@ void PrintAST::printRequirement(const Requirement &req) {
     if (isPackRequirement)
       Printer << "repeat ";
     printTransformedType(req.getFirstType());
-    Printer << " : ";
+    Printer.printColonForType(Options);
     break;
   case RequirementKind::SameType:
     if (isPackRequirement)
@@ -2195,7 +2199,7 @@ void PrintAST::printRequirement(const InverseRequirement &inverse,
   if (!forInherited) {
     Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
     printTransformedType(inverse.subject);
-    Printer << " : ";
+    Printer.printColonForType(Options);
     Printer.printStructurePost(PrintStructureKind::GenericRequirement);
   }
 
@@ -2923,10 +2927,7 @@ void PrintAST::printInherited(const Decl *decl) {
   if (TypesToPrint.empty())
     return;
 
-  if (Options.PrintSpaceBeforeInheritance) {
-    Printer << " ";
-  }
-  Printer << ": ";
+  Printer.printColonForType(Options);
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
     printTypeLoc(inherited, [&] {
@@ -4629,8 +4630,10 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (auto *group = decl->getPrecedenceGroup())
-    Printer << " : " << group->getName();
+  if (auto *group = decl->getPrecedenceGroup()) {
+    Printer.printColonForType(Options);
+    Printer << group->getName();
+  }
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
@@ -6338,7 +6341,7 @@ public:
       if (T->isDictionary()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
-        Printer << " : ";
+        Printer.printColonForType(Options);
         visit(T->getGenericArgs()[1]);
         Printer << "]";
         return;
@@ -7125,7 +7128,7 @@ public:
     } else {
       Printer << "[";
       visit(T->getKeyType());
-      Printer << " : ";
+      Printer << ": ";
       visit(T->getValueType());
       Printer << "]";
     }
@@ -8162,43 +8165,43 @@ swift::getInheritedForPrinting(
 //  Generic param list printing.
 //===----------------------------------------------------------------------===//
 
-void RequirementRepr::print(raw_ostream &out) const {
+void RequirementRepr::print(raw_ostream &out, const PrintOptions &options) const {
   StreamPrinter printer(out);
-  print(printer);
+  print(printer, options);
 }
 
-void RequirementRepr::print(ASTPrinter &out) const {
+void RequirementRepr::print(ASTPrinter &out, const PrintOptions &options) const {
   auto printLayoutConstraint =
       [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
-        LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
+        LayoutConstraintLoc.getLayoutConstraint()->print(out, options);
       };
 
   switch (getKind()) {
   case RequirementReprKind::LayoutConstraint:
     if (auto *repr = getSubjectRepr()) {
-      repr->print(out, PrintOptions());
+      repr->print(out, options);
     }
-    out << " : ";
+    out.printColonForType(options);
     printLayoutConstraint(getLayoutConstraintLoc());
     break;
 
   case RequirementReprKind::TypeConstraint:
     if (auto *repr = getSubjectRepr()) {
-      repr->print(out, PrintOptions());
+      repr->print(out, options);
     }
-    out << " : ";
+    out.printColonForType(options);
     if (auto *repr = getConstraintRepr()) {
-      repr->print(out, PrintOptions());
+      repr->print(out, options);
     }
     break;
 
   case RequirementReprKind::SameType:
     if (auto *repr = getFirstTypeRepr()) {
-      repr->print(out, PrintOptions());
+      repr->print(out, options);
     }
     out << " == ";
     if (auto *repr = getSecondTypeRepr()) {
-      repr->print(out, PrintOptions());
+      repr->print(out, options);
     }
     break;
   }
@@ -8211,6 +8214,7 @@ void GenericParamList::print(raw_ostream &out, const PrintOptions &PO) const {
 
 static void printTrailingRequirements(ASTPrinter &Printer,
                                       ArrayRef<RequirementRepr> Reqs,
+                                      const PrintOptions &Options,
                                       bool printWhereKeyword) {
   if (Reqs.empty())
     return;
@@ -8221,7 +8225,7 @@ static void printTrailingRequirements(ASTPrinter &Printer,
       Reqs,
       [&](const RequirementRepr &req) {
         Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-        req.print(Printer);
+        req.print(Printer, Options);
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       },
       [&] { Printer << ", "; });
@@ -8235,7 +8239,7 @@ void GenericParamList::print(ASTPrinter &Printer,
       [&](const GenericTypeParamDecl *P) {
         Printer << P->getName();
         if (!P->getInherited().empty()) {
-          Printer << " : ";
+          Printer.printColonForType(PO);
 
           auto loc = P->getInherited().getEntry(0);
           if (willUseTypeReprPrinting(loc, nullptr, PO)) {
@@ -8247,13 +8251,15 @@ void GenericParamList::print(ASTPrinter &Printer,
       },
       [&] { Printer << ", "; });
 
-  printTrailingRequirements(Printer, getRequirements(),
+  printTrailingRequirements(Printer, getRequirements(), PO,
                             /*printWhereKeyword*/ true);
   Printer << '>';
 }
 
 void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                const PrintOptions &PO,
                                 bool printWhereKeyword) const {
   StreamPrinter Printer(OS);
-  printTrailingRequirements(Printer, getRequirements(), printWhereKeyword);
+  printTrailingRequirements(Printer, getRequirements(), PO,
+                            printWhereKeyword);
 }

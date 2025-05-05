@@ -20,7 +20,7 @@
 // CHECK: @available(*, unavailable, message: "This Objective-C protocol has only been forward-declared; import its owning module to use it")
 // CHECK: protocol ForwardDeclaredProtocol {
 // CHECK: }
-// CHECK: class IncompleteTypeConsumer1 : NSObject {
+// CHECK: class IncompleteTypeConsumer1: NSObject {
 // CHECK:   var propertyUsingAForwardDeclaredProtocol1: (any ForwardDeclaredProtocol)!
 // CHECK:   var propertyUsingAForwardDeclaredInterface1: ForwardDeclaredInterface!
 // CHECK:   init!()

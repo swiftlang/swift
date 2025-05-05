@@ -56,7 +56,7 @@ import ObjCxxModule
 // CHECK-NEXT:     public static func freeCxxFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK-NEXT: }
 // CHECK-EMPTY:
-// CHECK-NEXT: open class ObjCClass : NSObject {
+// CHECK-NEXT: open class ObjCClass: NSObject {
 // CHECK-EMPTY:
 // CHECK-NEXT:     open func myTestMethod()
 // CHECK-NEXT: }

@@ -2,7 +2,7 @@
 
 // CHECK:      struct Base {
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   enum EnumClass : CChar {
+// CHECK-NEXT:   enum EnumClass: CChar {
 // CHECK-NEXT:     init?(rawValue: CChar)
 // CHECK-NEXT:     var rawValue: CChar { get }
 // CHECK-NEXT:     typealias RawValue = CChar
@@ -10,7 +10,7 @@
 // CHECK-NEXT:     case ecb
 // CHECK-NEXT:     case ecc
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct Enum : Hashable, Equatable, RawRepresentable {
+// CHECK-NEXT:   struct Enum: Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:     init(_ rawValue: {{UInt32|Int32}})
 // CHECK-NEXT:     init(rawValue: {{UInt32|Int32}})
 // CHECK-NEXT:     var rawValue: {{UInt32|Int32}}

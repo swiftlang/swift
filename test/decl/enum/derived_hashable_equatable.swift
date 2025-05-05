@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -print-ast %s | %FileCheck %s
 
-// CHECK-LABEL: internal enum Simple : Hashable
+// CHECK-LABEL: internal enum Simple: Hashable
 enum Simple: Hashable {
   // CHECK:        case a
   case a
@@ -43,7 +43,7 @@ enum Simple: Hashable {
   // CHECK-NEXT:   }
 }
 
-// CHECK-LABEL: internal enum HasAssociatedValues : Hashable
+// CHECK-LABEL: internal enum HasAssociatedValues: Hashable
 enum HasAssociatedValues: Hashable {
   // CHECK:        case a(Int)
   case a(Int)
@@ -91,7 +91,7 @@ enum HasAssociatedValues: Hashable {
   // CHECK-NEXT:   }
 }
 
-// CHECK-LABEL: internal enum HasUnavailableElement : Hashable
+// CHECK-LABEL: internal enum HasUnavailableElement: Hashable
 enum HasUnavailableElement: Hashable {
   // CHECK:       case a
   case a
@@ -136,7 +136,7 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:  }
 }
 
-// CHECK-LABEL: internal enum HasAssociatedValuesAndUnavailableElement : Hashable
+// CHECK-LABEL: internal enum HasAssociatedValuesAndUnavailableElement: Hashable
 enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK:        case a(Int)
   case a(Int)
@@ -177,7 +177,7 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:  }
 }
 
-// CHECK-LABEL: internal enum UnavailableEnum : Hashable
+// CHECK-LABEL: internal enum UnavailableEnum: Hashable
 @available(*, unavailable)
 enum UnavailableEnum: Hashable {
   // CHECK:        case a

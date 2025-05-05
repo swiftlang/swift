@@ -17,7 +17,7 @@ class B: A {
     super.x = 2;
   }
 }
-// CHECK: @_inheritsConvenienceInitializers internal class B : A {
+// CHECK: @_inheritsConvenienceInitializers internal class B: A {
 // CHECK:   override internal init() {
 // CHECK:     super.init()
 // CHECK:     super.x = 2

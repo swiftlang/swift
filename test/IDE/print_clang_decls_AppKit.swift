@@ -16,7 +16,7 @@
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}
 
-// APPKIT-LABEL: {{^}}class NSView : NSObject, NSCoding, NSAccessibility {{{$}}
+// APPKIT-LABEL: {{^}}class NSView: NSObject, NSCoding, NSAccessibility {{{$}}
 // APPKIT-NEXT: init?(coder aDecoder: NSCoder)
 // APPKIT-NEXT: func isDescendant(of aView: NSView) -> Bool
 // APPKIT-NEXT: @available(swift, obsoleted: 3, renamed: "isDescendant(of:)")
@@ -33,7 +33,7 @@
 // APPKIT-LABEL:      extension NSView {
 // APPKIT-NEXT:   unowned(unsafe) var nextKeyView: @sil_unmanaged NSView?
 
-// APPKIT-LABEL: {{^}}class NSMenuItem : NSObject, NSCopying, NSCoding {
+// APPKIT-LABEL: {{^}}class NSMenuItem: NSObject, NSCopying, NSCoding {
 // APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?
 // APPKIT-NEXT: var title: String
 // APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString?

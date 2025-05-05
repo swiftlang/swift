@@ -58,12 +58,12 @@ public class C2 { }
 @available(SwiftStdlib 5.1, *)
 public class C3: C2 { }
 
-// CHECK: public class C4 : Swift.UnsafeSendable
+// CHECK: public class C4: Swift.UnsafeSendable
 
 @available(SwiftStdlib 5.1, *)
 public class C4: UnsafeSendable { }
 
-// CHECK: public class C5 : @unchecked Swift.Sendable
+// CHECK: public class C5: @unchecked Swift.Sendable
 
 @available(SwiftStdlib 5.1, *)
 public class C5: @unchecked Sendable { }
@@ -72,7 +72,7 @@ public class C5: @unchecked Sendable { }
 @available(SwiftStdlib 5.1, *)
 public class C6 { }
 
-// CHECK: extension {{(Test.)?}}C6 : @unchecked Swift.Sendable
+// CHECK: extension {{(Test.)?}}C6: @unchecked Swift.Sendable
 
 @available(SwiftStdlib 5.1, *)
 extension C6: @unchecked Sendable { }
@@ -81,7 +81,7 @@ extension C6: @unchecked Sendable { }
 @available(SwiftStdlib 5.1, *)
 public class C7 { }
 
-// CHECK: extension {{(Test.)?}}C7 : Swift.UnsafeSendable
+// CHECK: extension {{(Test.)?}}C7: Swift.UnsafeSendable
 
 @available(SwiftStdlib 5.1, *)
 extension C7: UnsafeSendable { }
@@ -93,7 +93,7 @@ public protocol P2 {
 }
 
 
-// CHECK: class {{(Test.)?}}C8 : {{(Test.)?}}P2 {
+// CHECK: class {{(Test.)?}}C8: {{(Test.)?}}P2 {
 @available(SwiftStdlib 5.1, *)
 public class C8 : P2 {
   // CHECK: @{{(Test.)?}}SomeGlobalActor public func method()
@@ -111,4 +111,4 @@ public struct StructWithImplicitlyNonSendable {
 // bit in conformances which is not serialized and not present in the textual
 // form.
 
-// SYNTHESIZED: extension Test.C2 : Swift.Sendable {}
+// SYNTHESIZED: extension Test.C2: Swift.Sendable {}

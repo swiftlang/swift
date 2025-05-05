@@ -7,7 +7,7 @@
 @frozen
 public struct S_Implicit_Noncopyable: ~Copyable {}
 
-// CHECK-NOT: extension Test.S_Implicit_Noncopyable : Swift.BitwiseCopyable {}
+// CHECK-NOT: extension Test.S_Implicit_Noncopyable: Swift.BitwiseCopyable {}
 
 // CHECK:      public protocol BitwiseCopyable {
 // CHECK-NEXT: }

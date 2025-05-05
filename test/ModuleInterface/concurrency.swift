@@ -71,7 +71,7 @@ func callFn() async {
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()
 // CHECK-NEXT: }
 
-// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredUnsafeMainActor :
+// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredUnsafeMainActor:
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
 // CHECK-NEXT:   @preconcurrency @_Concurrency.MainActor public func explicitPreconcurrency()
 // CHECK-NEXT: }
@@ -80,16 +80,16 @@ func callFn() async {
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()
 // CHECK-NEXT: }
 
-// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredPreconcurrencyMainActor :
+// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredPreconcurrencyMainActor:
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
 // CHECK-NEXT:   @preconcurrency @_Concurrency.MainActor public func explicitPreconcurrency()
 // CHECK-NEXT: }
 
-// CHECK-TYPECHECKED: public struct UncheckedSendable : @unchecked Swift.Sendable
-// CHECK-ASWRITTEN: public struct UncheckedSendable : @unchecked Sendable
+// CHECK-TYPECHECKED: public struct UncheckedSendable: @unchecked Swift.Sendable
+// CHECK-ASWRITTEN: public struct UncheckedSendable: @unchecked Sendable
 
-// CHECK-TYPECHECKED: extension Swift.UnsafePointer : @unchecked @retroactive Swift.Sendable
-// CHECK-ASWRITTEN: extension UnsafePointer : @retroactive @unchecked Sendable
+// CHECK-TYPECHECKED: extension Swift.UnsafePointer: @unchecked @retroactive Swift.Sendable
+// CHECK-ASWRITTEN: extension UnsafePointer: @retroactive @unchecked Sendable
 
 // RUN: %target-swift-emit-module-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name LibraryPreserveTypesAsWritten -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) -enable-experimental-concurrency

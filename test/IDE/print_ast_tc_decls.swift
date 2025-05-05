@@ -457,7 +457,7 @@ class d0120_TestClassBase {
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {
-// PASS_COMMON-LABEL: {{^}}@_inheritsConvenienceInitializers {{()?}}class d0121_TestClassDerived : d0120_TestClassBase {{{$}}
+// PASS_COMMON-LABEL: {{^}}@_inheritsConvenienceInitializers {{()?}}class d0121_TestClassDerived: d0120_TestClassBase {{{$}}
 
   required init() { super.init() }
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
@@ -504,7 +504,7 @@ protocol d0130_TestProtocol {
 }
 
 protocol d0150_TestClassProtocol : class {}
-// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol : AnyObject {{{$}}
+// PASS_COMMON-LABEL: {{^}}protocol d0150_TestClassProtocol: AnyObject {{{$}}
 
 @objc protocol d0151_TestClassProtocol {}
 // PASS_COMMON-LABEL: {{^}}@objc protocol d0151_TestClassProtocol {{{$}}
@@ -627,15 +627,15 @@ struct d0200_EscapedIdentifiers {
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  typealias `protocol` = `class`{{$}}
 
   class `extension` : `class` {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension` : `class` {{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension`: d0200_EscapedIdentifiers.`class` {{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension`: `class` {{{$}}
 // PASS_COMMON:      {{^}}    {{(override )?}}init(){{$}}
 // PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where`>(
       class: Int, struct: `protocol`, foo: `let`, bar: `where`) where `where` : `protocol` {}
-// PASS_COMMON-NEXT: {{^}}  func `func`<`let`, `where`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`) where `let` : {{(d0200_EscapedIdentifiers.)?}}`class`, `where` : {{(d0200_EscapedIdentifiers.)?}}`class`{{$}}
+// PASS_COMMON-NEXT: {{^}}  func `func`<`let`, `where`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`) where `let` : {{(d0200_EscapedIdentifiers.)?}}`class`, `where`: {{(d0200_EscapedIdentifiers.)?}}`class`{{$}}
 
   var `var`: `struct` = `struct`()
 // PASS_COMMON-NEXT: {{^}}  @_hasInitialValue var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
@@ -764,7 +764,7 @@ class d0260_ExplodePattern_TestClassBase {
 }
 
 class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {
-// PASS_EXPLODE_PATTERN-LABEL: {{^}}@_inheritsConvenienceInitializers class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {{{$}}
+// PASS_EXPLODE_PATTERN-LABEL: {{^}}@_inheritsConvenienceInitializers class d0261_ExplodePattern_TestClassDerived: d0260_ExplodePattern_TestClassBase {{{$}}
 
   override final var baseProp2: Int {
     get {
@@ -783,15 +783,15 @@ struct StructWithoutInheritance1 {}
 // PASS_ONE_LINE-DAG: {{^}}struct StructWithoutInheritance1 {{{$}}
 
 struct StructWithInheritance1 : FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance1 : FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance1: FooProtocol {{{$}}
 
 struct StructWithInheritance2 : FooProtocol, BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance2 : FooProtocol, BarProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance2: FooProtocol, BarProtocol {{{$}}
 
 struct StructWithInheritance3 : QuxProtocol, SubFooProtocol {
   typealias Qux = Int
 }
-// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance3 : QuxProtocol, SubFooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance3: QuxProtocol, SubFooProtocol {{{$}}
 
 //===---
 //===--- Inheritance list in classes.
@@ -801,24 +801,24 @@ class ClassWithoutInheritance1 {}
 // PASS_ONE_LINE-DAG: {{^}}class ClassWithoutInheritance1 {{{$}}
 
 class ClassWithInheritance1 : FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance1 : FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance1: FooProtocol {{{$}}
 
 class ClassWithInheritance2 : FooProtocol, BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance2 : FooProtocol, BarProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance2: FooProtocol, BarProtocol {{{$}}
 
 class ClassWithInheritance3 : FooClass {}
-// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance3 : FooClass {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance3: FooClass {{{$}}
 
 class ClassWithInheritance4 : FooClass, FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance4 : FooClass, FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance4: FooClass, FooProtocol {{{$}}
 
 class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance5: FooClass, FooProtocol, BarProtocol {{{$}}
 
 class ClassWithInheritance6 : QuxProtocol, SubFooProtocol {
   typealias Qux = Int
 }
-// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance6 : QuxProtocol, SubFooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance6: QuxProtocol, SubFooProtocol {{{$}}
 
 //===---
 //===--- Inheritance list in enums.
@@ -828,21 +828,21 @@ enum EnumWithoutInheritance1 {}
 // PASS_ONE_LINE-DAG: {{^}}enum EnumWithoutInheritance1 {{{$}}
 
 enum EnumWithInheritance1 : FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance1 : FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance1: FooProtocol {{{$}}
 
 enum EnumWithInheritance2 : FooProtocol, BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance2 : FooProtocol, BarProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance2: FooProtocol, BarProtocol {{{$}}
 
 enum EnumDeclWithUnderlyingType1 : Int { case X }
-// PASS_ONE_LINE-DAG: {{^}}enum EnumDeclWithUnderlyingType1 : Int {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}enum EnumDeclWithUnderlyingType1: Int {{{$}}
 
 enum EnumDeclWithUnderlyingType2 : Int, FooProtocol { case X }
-// PASS_ONE_LINE-DAG: {{^}}enum EnumDeclWithUnderlyingType2 : Int, FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}enum EnumDeclWithUnderlyingType2: Int, FooProtocol {{{$}}
 
 enum EnumWithInheritance3 : QuxProtocol, SubFooProtocol {
   typealias Qux = Int
 }
-// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance3 : QuxProtocol, SubFooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance3: QuxProtocol, SubFooProtocol {{{$}}
 
 //===---
 //===--- Inheritance list in protocols.
@@ -852,14 +852,14 @@ protocol ProtocolWithoutInheritance1 {}
 // PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithoutInheritance1 {{{$}}
 
 protocol ProtocolWithInheritance1 : FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance1 : FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance1: FooProtocol {{{$}}
 
 protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol { }
-// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance2 : BarProtocol, FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance2: BarProtocol, FooProtocol {{{$}}
 
 protocol ProtocolWithInheritance3 : QuxProtocol, SubFooProtocol {
 }
-// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance3 : QuxProtocol, SubFooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance3: QuxProtocol, SubFooProtocol {{{$}}
 
 //===---
 //===--- Inheritance list in extensions
@@ -867,7 +867,7 @@ protocol ProtocolWithInheritance3 : QuxProtocol, SubFooProtocol {
 
 struct StructInherited { }
 
-// PASS_ONE_LINE-DAG: {{.*}}extension StructInherited : QuxProtocol, SubFooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{.*}}extension StructInherited: QuxProtocol, SubFooProtocol {{{$}}
 extension StructInherited : QuxProtocol, SubFooProtocol {
   typealias Qux = Int
 }
@@ -888,16 +888,16 @@ protocol AssociatedType1 {
 // PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl1 = Int{{$}}
 
   associatedtype AssociatedTypeDecl2 : FooProtocol
-// PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl2 : FooProtocol{{$}}
+// PASS_ONE_LINE-DAG: {{^}}  associatedtype AssociatedTypeDecl2: FooProtocol{{$}}
 
   associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3 : BarProtocol, FooProtocol{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3: BarProtocol, FooProtocol{{$}}
 
   associatedtype AssociatedTypeDecl4 where AssociatedTypeDecl4 : QuxProtocol, AssociatedTypeDecl4.Qux == Int
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl4 : QuxProtocol where Self.AssociatedTypeDecl4.Qux == Int{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl4: QuxProtocol where Self.AssociatedTypeDecl4.Qux == Int{{$}}
 
   associatedtype AssociatedTypeDecl5: FooClass
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl5 : FooClass{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl5: FooClass{{$}}
 }
 
 //===---
@@ -1100,7 +1100,7 @@ enum d2300_EnumDeclWithValues1 : Int {
   case EDV2_First = 10
   case EDV2_Second
 }
-// PASS_COMMON: {{^}}enum d2300_EnumDeclWithValues1 : Int {{{$}}
+// PASS_COMMON: {{^}}enum d2300_EnumDeclWithValues1: Int {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
 // PASS_COMMON-DAG: {{^}}  typealias RawValue = Int
@@ -1112,7 +1112,7 @@ enum d2400_EnumDeclWithValues2 : Double {
   case EDV3_First = 10
   case EDV3_Second
 }
-// PASS_COMMON: {{^}}enum d2400_EnumDeclWithValues2 : Double {{{$}}
+// PASS_COMMON: {{^}}enum d2400_EnumDeclWithValues2: Double {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
 // PASS_COMMON-DAG: {{^}}  typealias RawValue = Double
@@ -1140,7 +1140,7 @@ infix operator %%%
 func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
-// PASS_2500-LABEL: {{^}}infix operator %%% : DefaultPrecedence{{$}}
+// PASS_2500-LABEL: {{^}}infix operator %%%: DefaultPrecedence{{$}}
 // PASS_2500: {{^}}func %%% (lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 precedencegroup BoringPrecedence {
@@ -1198,7 +1198,7 @@ struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1
   }
 }
 
-// PASS_COMMON: {{^}}struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1 {{{$}}
+// PASS_COMMON: {{^}}struct d2800_ProtocolWithAssociatedType1Impl: d2700_ProtocolWithAssociatedType1 {{{$}}
 // PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Int{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias TA1 = Int
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
@@ -1213,8 +1213,8 @@ struct GenericParams1<
     StructGenericFooX : FooClass,
     StructGenericBar : FooProtocol & BarProtocol,
     StructGenericBaz> {
-// PASS_ONE_LINE_TYPE-DAG: {{^}}struct GenericParams1<StructGenericFoo, StructGenericFooX, StructGenericBar, StructGenericBaz> where StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : BarProtocol, StructGenericBar : FooProtocol {{{$}}
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}struct GenericParams1<StructGenericFoo, StructGenericFooX, StructGenericBar, StructGenericBaz> where StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : BarProtocol, StructGenericBar : FooProtocol {{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}struct GenericParams1<StructGenericFoo, StructGenericFooX, StructGenericBar, StructGenericBaz> where StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : BarProtocol, StructGenericBar: FooProtocol {{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}struct GenericParams1<StructGenericFoo, StructGenericFooX, StructGenericBar, StructGenericBaz> where StructGenericFoo : FooProtocol, StructGenericFooX : FooClass, StructGenericBar : BarProtocol, StructGenericBar: FooProtocol {{{$}}
   init<
       GenericFoo : FooProtocol,
       GenericFooX : FooClass,
@@ -1222,10 +1222,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  init<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar : FooProtocol{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  init<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar: FooProtocol{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  init<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar : FooProtocol{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  init<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar: FooProtocol{{$}}
 
   func genericParams1<
       GenericFoo : FooProtocol,
@@ -1234,10 +1234,10 @@ struct GenericParams1<
       GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz,
                   d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz)
   {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar : FooProtocol{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  func genericParams1<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar: FooProtocol{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar : FooProtocol{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  func genericParams1<GenericFoo, GenericFooX, GenericBar, GenericBaz>(a: StructGenericFoo, b: StructGenericBar, c: StructGenericBaz, d: GenericFoo, e: GenericFooX, f: GenericBar, g: GenericBaz) where GenericFoo : FooProtocol, GenericFooX : FooClass, GenericBar : BarProtocol, GenericBar: FooProtocol{{$}}
 
   func contextualWhereClause1() where StructGenericBaz == Never {}
   // PASS_PRINT_AST: func contextualWhereClause1() where StructGenericBaz == Never{{$}}
@@ -1245,36 +1245,36 @@ struct GenericParams1<
   subscript(index: Int) -> Never where StructGenericBaz: FooProtocol {
     return fatalError()
   }
-  // PASS_PRINT_AST: subscript(index: Int) -> Never where StructGenericBaz : FooProtocol { get }{{$}}
+  // PASS_PRINT_AST: subscript(index: Int) -> Never where StructGenericBaz: FooProtocol { get }{{$}}
 }
 extension GenericParams1 where StructGenericBaz: FooProtocol {
   static func contextualWhereClause2() where StructGenericBaz: FooClass {}
-  // PASS_PRINT_AST: static func contextualWhereClause2() where StructGenericBaz : FooClass{{$}}
+  // PASS_PRINT_AST: static func contextualWhereClause2() where StructGenericBaz: FooClass{{$}}
 
   typealias ContextualWhereClause3 = Never where StructGenericBaz: QuxProtocol, StructGenericBaz.Qux == Void
-  // PASS_PRINT_AST: typealias ContextualWhereClause3 = Never where StructGenericBaz : QuxProtocol, StructGenericBaz.Qux == (){{$}}
+  // PASS_PRINT_AST: typealias ContextualWhereClause3 = Never where StructGenericBaz: QuxProtocol, StructGenericBaz.Qux == (){{$}}
 }
 
 struct GenericParams2<T : FooProtocol> where T : BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams2<T> where T : BarProtocol, T : FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct GenericParams2<T> where T : BarProtocol, T: FooProtocol {{{$}}
 
 struct GenericParams3<T : FooProtocol> where T : BarProtocol, T : QuxProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams3<T> where T : BarProtocol, T : FooProtocol, T : QuxProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct GenericParams3<T> where T : BarProtocol, T : FooProtocol, T: QuxProtocol {{{$}}
 
 struct GenericParams4<T : QuxProtocol> where T.Qux : FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams4<T> where T : QuxProtocol, T.Qux : FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct GenericParams4<T> where T : QuxProtocol, T.Qux: FooProtocol {{{$}}
 
 struct GenericParams5<T : QuxProtocol> where T.Qux : FooProtocol & BarProtocol {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T> where T : QuxProtocol, T.Qux : BarProtocol, T.Qux : FooProtocol {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T> where T : QuxProtocol, T.Qux : BarProtocol, T.Qux : FooProtocol {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T> where T : QuxProtocol, T.Qux : BarProtocol, T.Qux: FooProtocol {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T> where T : QuxProtocol, T.Qux : BarProtocol, T.Qux: FooProtocol {{{$}}
 
 struct GenericParams6<T : QuxProtocol, U : QuxProtocol> where T.Qux == U.Qux {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U: QuxProtocol, T.Qux == U.Qux {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams6<T, U> where T : QuxProtocol, U: QuxProtocol, T.Qux == U.Qux {{{$}}
 
 struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux: QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux: QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
 
 //===---
 //===--- Tupe sugar for library types.
@@ -1309,12 +1309,12 @@ struct d2900_TypeSugar1 {
 // SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f6(x: [Int]...){{$}}
 
   func f7(x: [Int : Int]...) {}
-// PASS_COMMON-NEXT: {{^}}  func f7(x: [Int : Int]...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f7(x: [Int : Int]...){{$}}
+// PASS_COMMON-NEXT: {{^}}  func f7(x: [Int: Int]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f7(x: [Int: Int]...){{$}}
 
   func f8(x: Dictionary<String, Int>...) {}
 // PASS_COMMON-NEXT: {{^}}  func f8(x: Dictionary<String, Int>...){{$}}
-// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f8(x: [String : Int]...){{$}}
+// SYNTHESIZE_SUGAR_ON_TYPES-NEXT: {{^}}  func f8(x: [String: Int]...){{$}}
 }
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
@@ -1416,15 +1416,15 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 // Protocol with where clauses
 
 protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int {}
-// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : QuxProtocol where Self.Qux == Int {
+// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause: QuxProtocol where Self.Qux == Int {
 
 protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
-// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self.Qux == Int {
+// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc: QuxProtocol where Self.Qux == Int {
   associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
-// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : FooProtocol, QuxProtocol where Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
+// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : FooProtocol, QuxProtocol where Self.A1.Qux: QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
 
   associatedtype A2 : QuxProtocol where A2.Qux == Self
-// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2 : QuxProtocol where Self == Self.A2.Qux{{$}}
+// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2: QuxProtocol where Self == Self.A2.Qux{{$}}
 }
 
 #if true
@@ -1439,4 +1439,4 @@ public typealias MyPairI<B> = MyPair<Int, B>
 public typealias MyPairAlias<T, U> = MyPair<T, U>
 // PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
 typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
-// PASS_PRINT_AST: typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol
+// PASS_PRINT_AST: typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U: BarProtocol

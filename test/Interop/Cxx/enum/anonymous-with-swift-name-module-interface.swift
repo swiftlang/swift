@@ -3,7 +3,7 @@
 // CHECK: @available(*, unavailable, message: "Not available in Swift")
 // CHECK: typealias SOColorMask = UInt32
 
-// CHECK: struct SOColorMask : OptionSet, @unchecked Sendable {
+// CHECK: struct SOColorMask: OptionSet, @unchecked Sendable {
 // CHECK:   init(rawValue: UInt32)
 // CHECK:   let rawValue: UInt32
 // CHECK:   typealias RawValue = UInt32
@@ -29,7 +29,7 @@
 
 // CHECK-NOT: typealias CFColorMask = UInt32
 
-// CHECK: struct CFColorMask : OptionSet {
+// CHECK: struct CFColorMask: OptionSet {
 // CHECK:   init(rawValue: UInt32)
 // CHECK:   let rawValue: UInt32
 // CHECK:   typealias RawValue = UInt32
@@ -66,7 +66,7 @@
 // CHECK:     func childFn() -> CFColorMask
 // CHECK:     @available(*, unavailable, message: "Not available in Swift")
 // CHECK:     typealias NewName = UInt32
-// CHECK:     struct NewName : OptionSet, @unchecked Sendable {
+// CHECK:     struct NewName: OptionSet, @unchecked Sendable {
 // CHECK:         init(rawValue: UInt32)
 // CHECK:         let rawValue: UInt32
 // CHECK:         typealias RawValue = UInt32
@@ -92,7 +92,7 @@
 // CHECK: @available(swift, obsoleted: 3, renamed: "GlobalNewName")
 // CHECK: @available(*, unavailable, message: "Not available in Swift")
 // CHECK: typealias GlobalOldName = GlobalNewName
-// CHECK: struct GlobalNewName : OptionSet, @unchecked Sendable {
+// CHECK: struct GlobalNewName: OptionSet, @unchecked Sendable {
 // CHECK:     init(rawValue: UInt32)
 // CHECK:     let rawValue: UInt32
 // CHECK:     typealias RawValue = UInt32

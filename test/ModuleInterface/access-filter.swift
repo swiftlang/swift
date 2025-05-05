@@ -121,7 +121,7 @@ extension InternalStruct_BAD: PublicProto {
   internal static var dummy: Int { return 0 }
 }
 
-// CHECK: extension AccessFilter.UFIStruct : AccessFilter.PublicProto {{[{]$}}
+// CHECK: extension AccessFilter.UFIStruct: AccessFilter.PublicProto {{[{]$}}
 extension UFIStruct: PublicProto {
   // CHECK-NEXT: @usableFromInline
   // CHECK-NEXT: internal func requirement()
@@ -197,12 +197,12 @@ extension GenericStruct where InternalStruct_BAD == T {
   @usableFromInline internal func constrainedToInternalStruct2_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.PublicProto {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T: AccessFilter.PublicProto {{[{]$}}
 extension GenericStruct where T: PublicProto {
   // CHECK-NEXT: public func constrainedToPublicProto(){{$}}
   public func constrainedToPublicProto() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.UFIProto {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T: AccessFilter.UFIProto {{[{]$}}
 extension GenericStruct where T: UFIProto {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIProto(){{$}}
@@ -212,12 +212,12 @@ extension GenericStruct where T: InternalProto_BAD {
   @usableFromInline internal func constrainedToInternalProto_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.PublicClass {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T: AccessFilter.PublicClass {{[{]$}}
 extension GenericStruct where T: PublicClass {
   // CHECK-NEXT: public func constrainedToPublicClass(){{$}}
   public func constrainedToPublicClass() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.UFIClass {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T: AccessFilter.UFIClass {{[{]$}}
 extension GenericStruct where T: UFIClass {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIClass(){{$}}
@@ -227,7 +227,7 @@ extension GenericStruct where T: InternalClass_BAD {
   @usableFromInline internal func constrainedToInternalClass_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T : AnyObject {{[{]$}}
+// CHECK: extension AccessFilter.GenericStruct where T: AnyObject {{[{]$}}
 extension GenericStruct where T: AnyObject {
   // CHECK-NEXT: public func constrainedToAnyObject(){{$}}
   public func constrainedToAnyObject() {}

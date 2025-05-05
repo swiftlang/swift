@@ -3,7 +3,7 @@ import FooHelper
 import SwiftOnoneSupport
 
 /// Aaa.  FooEnum1.  Bbb.
-public struct FooEnum1 : Hashable, Equatable, RawRepresentable {
+public struct FooEnum1: Hashable, Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -15,7 +15,7 @@ public struct FooEnum1 : Hashable, Equatable, RawRepresentable {
 /// Aaa.  FooEnum1X.  Bbb.
 public var FooEnum1X: FooEnum1 { get }
 
-public struct FooEnum2 : Hashable, Equatable, RawRepresentable {
+public struct FooEnum2: Hashable, Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -28,7 +28,7 @@ public var FooEnum2X: FooEnum2 { get }
 
 public var FooEnum2Y: FooEnum2 { get }
 
-public struct FooEnum3 : Hashable, Equatable, RawRepresentable {
+public struct FooEnum3: Hashable, Equatable, RawRepresentable {
 
     public init(_ rawValue: UInt32)
 
@@ -42,7 +42,7 @@ public var FooEnum3X: FooEnum3 { get }
 public var FooEnum3Y: FooEnum3 { get }
 
 /// Aaa.  FooComparisonResult.  Bbb.
-public enum FooComparisonResult : Int {
+public enum FooComparisonResult: Int {
 
     case orderedAscending = -1
 
@@ -52,7 +52,7 @@ public enum FooComparisonResult : Int {
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-public struct FooRuncingOptions : OptionSet {
+public struct FooRuncingOptions: OptionSet {
 
     public init(rawValue: Int)
 
@@ -181,7 +181,7 @@ public protocol FooProtocolBase {
     var fooProperty3: Int32 { get }
 }
 
-public protocol FooProtocolDerived : FooProtocolBase {
+public protocol FooProtocolDerived: FooProtocolBase {
 }
 
 open class FooClassBase {
@@ -200,7 +200,7 @@ open class FooClassBase {
 }
 
 /// Aaa.  FooClassDerived.  Bbb.
-open class FooClassDerived : FooClassBase, FooProtocolDerived {
+open class FooClassDerived: FooClassBase, FooProtocolDerived {
 
     open var fooProperty1: Int32
 
@@ -288,10 +288,10 @@ extension FooClassBase {
 public protocol _InternalProt {
 }
 
-open class ClassWithInternalProt : _InternalProt {
+open class ClassWithInternalProt: _InternalProt {
 }
 
-open class FooClassPropertyOwnership : FooClassBase {
+open class FooClassPropertyOwnership: FooClassBase {
 
     unowned(unsafe) open var assignable: AnyObject!
 
@@ -308,7 +308,7 @@ open class FooClassPropertyOwnership : FooClassBase {
     open var scalar: Int32
 }
 
-open class FooUnavailableMembers : FooClassBase {
+open class FooUnavailableMembers: FooClassBase {
 
     public convenience init!(int i: Int32)
 
@@ -326,7 +326,7 @@ public class FooCFType {
 }
 
 @available(*, deprecated, message: "use CNAuthorizationStatus")
-public enum ABAuthorizationStatus : Int {
+public enum ABAuthorizationStatus: Int {
 
     case notDetermined = 0
 
@@ -338,7 +338,7 @@ public class FooOverlayClassBase {
     public func f()
 }
 
-public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
+public class FooOverlayClassDerived: Foo.FooOverlayClassBase {
 
     override public func f()
 }

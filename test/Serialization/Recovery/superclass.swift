@@ -23,31 +23,31 @@ func use(_: A2_Grandchild) {} // expected-error {{cannot find type 'A2_Grandchil
 
 import SuperclassObjC
 
-// CHECK-LABEL: class A1_Sub : DisappearingSuperclass {
+// CHECK-LABEL: class A1_Sub: DisappearingSuperclass {
 // CHECK-RECOVERY-NOT: class A1_Sub
 public class A1_Sub: DisappearingSuperclass {}
-// CHECK-LABEL: class A2_Grandchild : A1_Sub {
+// CHECK-LABEL: class A2_Grandchild: A1_Sub {
 // CHECK-RECOVERY-NOT: class A2_Grandchild
 public class A2_Grandchild: A1_Sub {}
 
-// CHECK-LABEL: class B1_ConstrainedGeneric<T> where T : DisappearingSuperclass {
+// CHECK-LABEL: class B1_ConstrainedGeneric<T> where T: DisappearingSuperclass {
 // CHECK-RECOVERY-NOT: class B1_ConstrainedGeneric
 public class B1_ConstrainedGeneric<T> where T: DisappearingSuperclass {}
 
-// CHECK-LABEL: struct B2_ConstrainedGeneric<T> where T : DisappearingSuperclass {
+// CHECK-LABEL: struct B2_ConstrainedGeneric<T> where T: DisappearingSuperclass {
 // CHECK-RECOVERY-NOT: struct B2_ConstrainedGeneric
 public struct B2_ConstrainedGeneric<T> where T: DisappearingSuperclass {}
 
 // CHECK-ALWAYS-LABEL: class C1_GenericBase<T> {
 public class C1_GenericBase<T> {}
 
-// CHECK-ALWAYS-LABEL: class C2_CRTPish : C1_GenericBase<C2_CRTPish> {
+// CHECK-ALWAYS-LABEL: class C2_CRTPish: C1_GenericBase<C2_CRTPish> {
 public class C2_CRTPish: C1_GenericBase<C2_CRTPish> {}
-// CHECK-ALWAYS-LABEL: class C3_NestingCRTPish : C1_GenericBase<C3_NestingCRTPish.Nested> {
+// CHECK-ALWAYS-LABEL: class C3_NestingCRTPish: C1_GenericBase<C3_NestingCRTPish.Nested> {
 public class C3_NestingCRTPish: C1_GenericBase<C3_NestingCRTPish.Nested> {
   public struct Nested {}
 }
-// CHECK-ALWAYS-LABEL: class C4_ExtensionNestingCRTPish : C1_GenericBase<C4_ExtensionNestingCRTPish.Nested> {
+// CHECK-ALWAYS-LABEL: class C4_ExtensionNestingCRTPish: C1_GenericBase<C4_ExtensionNestingCRTPish.Nested> {
 public class C4_ExtensionNestingCRTPish: C1_GenericBase<C4_ExtensionNestingCRTPish.Nested> {}
 extension C4_ExtensionNestingCRTPish {
   public struct Nested {}

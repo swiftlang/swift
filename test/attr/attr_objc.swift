@@ -1667,7 +1667,7 @@ class infer_instanceVar2<
     GP_Class_ObjC : Class_ObjC1,
     GP_Protocol_Class : Protocol_Class1,
     GP_Protocol_ObjC : Protocol_ObjC1> : ObjCBase {
-// CHECK-LABEL: class infer_instanceVar2<{{.*}}> : ObjCBase where {{.*}} {
+// CHECK-LABEL: class infer_instanceVar2<{{.*}}>: ObjCBase where {{.*}} {
   override init() {}
 
   var var_GP_Unconstrained: GP_Unconstrained
@@ -1738,7 +1738,7 @@ class infer_instanceVar2<
 }
 
 class infer_instanceVar3 : Class_ObjC1 {
-// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_instanceVar3 : Class_ObjC1 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_instanceVar3: Class_ObjC1 {
 
   var v1: Int = 0
 // CHECK-LABEL: {{^}}  @_hasInitialValue var v1: Int
@@ -1803,19 +1803,19 @@ protocol infer_throughConformanceProto1 {
 }
 
 class infer_class1 : PlainClass {}
-// CHECK-LABEL: {{^}}@_inheritsConvenienceInitializers class infer_class1 : PlainClass {
+// CHECK-LABEL: {{^}}@_inheritsConvenienceInitializers class infer_class1: PlainClass {
 
 class infer_class2 : Class_ObjC1 {}
-// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class2 : Class_ObjC1 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class2: Class_ObjC1 {
 
 class infer_class3 : infer_class2 {}
-// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class3 : infer_class2 {
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers class infer_class3: infer_class2 {
 
 class infer_class4 : Protocol_Class1 {}
-// CHECK-LABEL: {{^}}class infer_class4 : Protocol_Class1 {
+// CHECK-LABEL: {{^}}class infer_class4: Protocol_Class1 {
 
 class infer_class5 : Protocol_ObjC1 {}
-// CHECK-LABEL: {{^}}class infer_class5 : Protocol_ObjC1 {
+// CHECK-LABEL: {{^}}class infer_class5: Protocol_ObjC1 {
 
 //
 // If a protocol conforms to an @objc protocol, this does not infer @objc on
@@ -1832,25 +1832,25 @@ protocol infer_protocol1 {
 }
 
 protocol infer_protocol2 : Protocol_Class1 {
-// CHECK-LABEL: {{^}}protocol infer_protocol2 : Protocol_Class1 {
+// CHECK-LABEL: {{^}}protocol infer_protocol2: Protocol_Class1 {
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol3 : Protocol_ObjC1 {
-// CHECK-LABEL: {{^}}protocol infer_protocol3 : Protocol_ObjC1 {
+// CHECK-LABEL: {{^}}protocol infer_protocol3: Protocol_ObjC1 {
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol4 : Protocol_Class1, Protocol_ObjC1 {
-// CHECK-LABEL: {{^}}protocol infer_protocol4 : Protocol_Class1, Protocol_ObjC1 {
+// CHECK-LABEL: {{^}}protocol infer_protocol4: Protocol_Class1, Protocol_ObjC1 {
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }
 
 protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
-// CHECK-LABEL: {{^}}protocol infer_protocol5 : Protocol_Class1, Protocol_ObjC1 {
+// CHECK-LABEL: {{^}}protocol infer_protocol5: Protocol_Class1, Protocol_ObjC1 {
   func nonObjC1()
   // CHECK: {{^}} func nonObjC1()
 }

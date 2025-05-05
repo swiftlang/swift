@@ -8,7 +8,7 @@ struct S: ~Copyable {
   deinit {}
 }
 
-// CHECK:  internal struct S : ~Copyable {
+// CHECK:  internal struct S: ~Copyable {
 // CHECK:   internal consuming func c() {
 // CHECK:     discard self
 // CHECK:   }

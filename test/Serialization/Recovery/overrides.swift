@@ -95,7 +95,7 @@ public final class A_Sub3Final: Base {
 }
 
 
-// CHECK-LABEL: class A_Sub : Base {
+// CHECK-LABEL: class A_Sub: Base {
 // CHECK-NEXT: func disappearingMethod()
 // CHECK-NEXT: func nullabilityChangeMethod() -> Any?
 // CHECK-NEXT: func typeChangeMethod() -> Any
@@ -106,13 +106,13 @@ public final class A_Sub3Final: Base {
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-LABEL: class A_Sub2 : A_Sub {
+// CHECK-LABEL: class A_Sub2: A_Sub {
 // CHECK-NEXT: func disappearingMethod()
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-LABEL: final class A_Sub3Final : Base {
+// CHECK-LABEL: final class A_Sub3Final: Base {
 // CHECK-NEXT: func disappearingMethod()
 // CHECK-NEXT: func nullabilityChangeMethod() -> Any?
 // CHECK-NEXT: func typeChangeMethod() -> Any
@@ -123,7 +123,7 @@ public final class A_Sub3Final: Base {
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class A_Sub : Base {
+// CHECK-RECOVERY-LABEL: class A_Sub: Base {
 // CHECK-RECOVERY-NEXT: func disappearingMethod()
 // CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Any?
 // CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
@@ -134,13 +134,13 @@ public final class A_Sub3Final: Base {
 // CHECK-RECOVERY-NEXT: deinit
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class A_Sub2 : A_Sub {
+// CHECK-RECOVERY-LABEL: class A_Sub2: A_Sub {
 // CHECK-RECOVERY-NEXT: func disappearingMethod()
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class A_Sub3Final : Base {
+// CHECK-RECOVERY-LABEL: class A_Sub3Final: Base {
 // CHECK-RECOVERY-NEXT: func disappearingMethod()
 // CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Any?
 // CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
@@ -161,7 +161,7 @@ public class B_GenericSub : GenericBase<Base> {
   public override func typeChangeMethod() -> Any { return self }
 }
 
-// CHECK-LABEL: class B_GenericSub : GenericBase<Base> {
+// CHECK-LABEL: class B_GenericSub: GenericBase<Base> {
 // CHECK-NEXT: func disappearingMethod()
 // CHECK-NEXT: func nullabilityChangeMethod() -> Base?
 // CHECK-NEXT: func typeChangeMethod() -> Any
@@ -169,7 +169,7 @@ public class B_GenericSub : GenericBase<Base> {
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class B_GenericSub : GenericBase<Base> {
+// CHECK-RECOVERY-LABEL: class B_GenericSub: GenericBase<Base> {
 // CHECK-RECOVERY-NEXT: func disappearingMethod()
 // CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Base?
 // CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
@@ -182,13 +182,13 @@ public class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
   public override subscript(index: Int) -> Any { return self }
 }
 
-// CHECK-LABEL: class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
+// CHECK-LABEL: class C1_IndexedSubscriptDisappears: IndexedSubscriptDisappearsBase {
 // CHECK-NEXT: subscript(index: Int) -> Any { get }
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
+// CHECK-RECOVERY-LABEL: class C1_IndexedSubscriptDisappears: IndexedSubscriptDisappearsBase {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
@@ -199,13 +199,13 @@ public class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
   public override subscript(key: Any) -> Any { return key }
 }
 
-// CHECK-LABEL: class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
+// CHECK-LABEL: class C2_KeyedSubscriptDisappears: KeyedSubscriptDisappearsBase {
 // CHECK-NEXT: subscript(key: Any) -> Any { get }
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
+// CHECK-RECOVERY-LABEL: class C2_KeyedSubscriptDisappears: KeyedSubscriptDisappearsBase {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
@@ -216,13 +216,13 @@ public class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisap
   public override subscript(index: Int) -> Base { fatalError() }
 }
 
-// CHECK-LABEL: class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
+// CHECK-LABEL: class C3_GenericIndexedSubscriptDisappears: GenericIndexedSubscriptDisappearsBase<Base> {
 // CHECK-NEXT: subscript(index: Int) -> Base { get }
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
+// CHECK-RECOVERY-LABEL: class C3_GenericIndexedSubscriptDisappears: GenericIndexedSubscriptDisappearsBase<Base> {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
@@ -233,13 +233,13 @@ public class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappear
   public override subscript(key: Any) -> Base { fatalError() }
 }
 
-// CHECK-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
+// CHECK-LABEL: class C4_GenericKeyedSubscriptDisappears: GenericKeyedSubscriptDisappearsBase<Base> {
 // CHECK-NEXT: subscript(key: Any) -> Base { get }
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
+// CHECK-RECOVERY-LABEL: class C4_GenericKeyedSubscriptDisappears: GenericKeyedSubscriptDisappearsBase<Base> {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
@@ -251,13 +251,13 @@ open class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
   public override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
+// CHECK-LABEL: class D1_DesignatedInitDisappears: DesignatedInitDisappearsBase {
 // CHECK-NEXT: init()
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
+// CHECK-RECOVERY-LABEL: class D1_DesignatedInitDisappears: DesignatedInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
@@ -268,12 +268,12 @@ open class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
   public override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
+// CHECK-LABEL: class D2_OnlyDesignatedInitDisappears: OnlyDesignatedInitDisappearsBase {
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
+// CHECK-RECOVERY-LABEL: class D2_OnlyDesignatedInitDisappears: OnlyDesignatedInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
 // CHECK-RECOVERY-NEXT: {{^}$}}
@@ -283,12 +283,12 @@ open class D3_ConvenienceInitDisappears : ConvenienceInitDisappearsBase {
   public override init() { fatalError() }
 }
 
-// CHECK-LABEL: class D3_ConvenienceInitDisappears : ConvenienceInitDisappearsBase {
+// CHECK-LABEL: class D3_ConvenienceInitDisappears: ConvenienceInitDisappearsBase {
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D3_ConvenienceInitDisappears : ConvenienceInitDisappearsBase {
+// CHECK-RECOVERY-LABEL: class D3_ConvenienceInitDisappears: ConvenienceInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
 // CHECK-RECOVERY-NEXT: {{^}$}}
@@ -299,13 +299,13 @@ open class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
   public override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
+// CHECK-LABEL: class D4_UnknownInitDisappears: UnknownInitDisappearsBase {
 // CHECK-NEXT: init()
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
+// CHECK-RECOVERY-LABEL: class D4_UnknownInitDisappears: UnknownInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
@@ -316,13 +316,13 @@ open class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
   public override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
+// CHECK-LABEL: class D5_OnlyUnknownInitDisappears: OnlyUnknownInitDisappearsBase {
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
+// CHECK-RECOVERY-LABEL: class D5_OnlyUnknownInitDisappears: OnlyUnknownInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
@@ -333,13 +333,13 @@ open class D6_UnknownInitDisappearsGrandchild : D4_UnknownInitDisappears {
   public override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D6_UnknownInitDisappearsGrandchild : D4_UnknownInitDisappears {
+// CHECK-LABEL: class D6_UnknownInitDisappearsGrandchild: D4_UnknownInitDisappears {
 // CHECK-NEXT: init()
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D6_UnknownInitDisappearsGrandchild : D4_UnknownInitDisappears {
+// CHECK-RECOVERY-LABEL: class D6_UnknownInitDisappearsGrandchild: D4_UnknownInitDisappears {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
@@ -350,13 +350,13 @@ open class D7_UnknownInitDisappearsGrandchildRequired : D4_UnknownInitDisappears
   public required override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D7_UnknownInitDisappearsGrandchildRequired : D4_UnknownInitDisappears {
+// CHECK-LABEL: class D7_UnknownInitDisappearsGrandchildRequired: D4_UnknownInitDisappears {
 // CHECK-NEXT: init()
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D7_UnknownInitDisappearsGrandchildRequired : D4_UnknownInitDisappears {
+// CHECK-RECOVERY-LABEL: class D7_UnknownInitDisappearsGrandchildRequired: D4_UnknownInitDisappears {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
@@ -367,13 +367,13 @@ open class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
   public required override init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
+// CHECK-LABEL: class D8_UnknownInitDisappearsRequired: UnknownInitDisappearsBase {
 // CHECK-NEXT: init()
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
+// CHECK-RECOVERY-LABEL: class D8_UnknownInitDisappearsRequired: UnknownInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
@@ -384,13 +384,13 @@ open class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappears
   public required init(value: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappearsRequired {
+// CHECK-LABEL: class D9_UnknownInitDisappearsRequiredGrandchild: D8_UnknownInitDisappearsRequired {
 // CHECK-NEXT: init()
 // CHECK-NEXT: init(value: Int)
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappearsRequired {
+// CHECK-RECOVERY-LABEL: class D9_UnknownInitDisappearsRequiredGrandchild: D8_UnknownInitDisappearsRequired {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: deinit
@@ -400,13 +400,13 @@ public class E1_MethodWithDisappearingType : MethodWithDisappearingType {
   public override func boxItUp() -> BoxedInt { fatalError() }
 }
 
-// CHECK-LABEL: class E1_MethodWithDisappearingType : MethodWithDisappearingType {
+// CHECK-LABEL: class E1_MethodWithDisappearingType: MethodWithDisappearingType {
 // CHECK-NEXT: override func boxItUp() -> BoxedInt
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class E1_MethodWithDisappearingType : MethodWithDisappearingType {
+// CHECK-RECOVERY-LABEL: class E1_MethodWithDisappearingType: MethodWithDisappearingType {
 // CHECK-RECOVERY-NEXT: /* placeholder for boxItUp() */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: deinit
@@ -416,14 +416,14 @@ public class E2_InitializerStub : InitializerWithDisappearingType {
   public init(unrelatedValue: Int) { fatalError() }
 }
 
-// CHECK-LABEL: class E2_InitializerStub : InitializerWithDisappearingType {
+// CHECK-LABEL: class E2_InitializerStub: InitializerWithDisappearingType {
 // CHECK-NEXT: init(unrelatedValue: Int)
 // CHECK-NEXT: init(boxedInt box: BoxedInt)
 // CHECK-NEXT: init()
 // CHECK-NEXT: deinit
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class E2_InitializerStub : InitializerWithDisappearingType {
+// CHECK-RECOVERY-LABEL: class E2_InitializerStub: InitializerWithDisappearingType {
 // CHECK-RECOVERY-NEXT: init(unrelatedValue: Int)
 // CHECK-RECOVERY-NEXT: /* placeholder for init(boxedInt:) */
 // CHECK-RECOVERY-NEXT: init()

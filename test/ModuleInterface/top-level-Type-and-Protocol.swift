@@ -15,7 +15,7 @@ public protocol Protocol {}
 // CHECK: public func usesType(_ x: MyModule.`Type`)
 public func usesType(_ x: Type) {}
 
-// CHECK: public func genericProtocol<T>(_ x: T) where T : MyModule.`Protocol`
+// CHECK: public func genericProtocol<T>(_ x: T) where T: MyModule.`Protocol`
 public func genericProtocol<T: Protocol>(_ x: T) {}
 
 // CHECK: public func existentialProtocol(_ x: any MyModule.`Protocol`)

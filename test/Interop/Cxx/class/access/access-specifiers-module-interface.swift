@@ -13,13 +13,13 @@
 // CHECK-NEXT:   public struct PublicStruct {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   public struct PublicEnum : Hashable, Equatable, RawRepresentable {
+// CHECK-NEXT:   public struct PublicEnum: Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:     public init(_ rawValue: [[ENUM_UNDERLYING_TYPE:Int32|UInt32]])
 // CHECK-NEXT:     public init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     public var rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     public typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:   }
-// CHECK-NEXT:   @frozen public enum PublicClosedEnum : [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
+// CHECK-NEXT:   @frozen public enum PublicClosedEnum: [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
 // CHECK-NEXT:     public init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     public var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     public typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -27,7 +27,7 @@
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     public static var Value1: PublicPrivate.PublicClosedEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   public enum PublicOpenEnum : [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
+// CHECK-NEXT:   public enum PublicOpenEnum: [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
 // CHECK-NEXT:     public init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     public var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     public typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -35,7 +35,7 @@
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     public static var Value1: PublicPrivate.PublicOpenEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   public struct PublicFlagEnum : OptionSet, @unchecked Sendable {
+// CHECK-NEXT:   public struct PublicFlagEnum: OptionSet, @unchecked Sendable {
 // CHECK-NEXT:     public init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     public let rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     public typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -48,13 +48,13 @@
 // CHECK-NEXT:   private struct PrivateStruct {
 // CHECK-NEXT:     public init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   private struct PrivateEnum : Hashable, Equatable, RawRepresentable {
+// CHECK-NEXT:   private struct PrivateEnum: Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:     private init(_ rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     private init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     private var rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     private typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:   }
-// CHECK-NEXT:   @frozen private enum PrivateClosedEnum : [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
+// CHECK-NEXT:   @frozen private enum PrivateClosedEnum: [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
 // CHECK-NEXT:     private init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     private var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     private typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -62,7 +62,7 @@
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     private static var Value1: PublicPrivate.PrivateClosedEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   private enum PrivateOpenEnum : [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
+// CHECK-NEXT:   private enum PrivateOpenEnum: [[ENUM_UNDERLYING_TYPE]], @unchecked Sendable {
 // CHECK-NEXT:     private init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     private var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     private typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -70,7 +70,7 @@
 // CHECK-NEXT:     @available(swift, obsoleted: 3, renamed: "value1")
 // CHECK-NEXT:     private static var Value1: PublicPrivate.PrivateOpenEnum { get }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   private struct PrivateFlagEnum : OptionSet, @unchecked Sendable {
+// CHECK-NEXT:   private struct PrivateFlagEnum: OptionSet, @unchecked Sendable {
 // CHECK-NEXT:     private init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     private let rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     private typealias RawValue = [[ENUM_UNDERLYING_TYPE]]

@@ -10,7 +10,7 @@
 // REQUIRES: swift_feature_SendableCompletionHandlers
 import _Concurrency
 
-// CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {
+// CHECK-LABEL: class SlowServer: NSObject, ServiceProvider {
 
 // rdar://76685011: Make sure we don't print implicit @available in generated interfaces.
 // CHECK-NOT: @available
@@ -22,69 +22,69 @@ import _Concurrency
 // NEGATIVE-NOT: @Sendable{{.+}}func
 // NEGATIVE-NOT: @Sendable{{.+}}var
 
-// CHECK-LABEL: class SendableClass :
+// CHECK-LABEL: class SendableClass:
 // CHECK-SAME: @unchecked Sendable
 
 // CHECK-LABEL: class NonSendableClass
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension NonSendableClass : @unchecked Sendable {
+// CHECK-NEXT: extension NonSendableClass: @unchecked Sendable {
 
-// CHECK-LABEL: class AuditedSendable :
+// CHECK-LABEL: class AuditedSendable:
 // CHECK-SAME: @unchecked Sendable
 
 // CHECK-LABEL: class AuditedNonSendable
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension AuditedNonSendable : @unchecked Sendable {
+// CHECK-NEXT: extension AuditedNonSendable: @unchecked Sendable {
 
 // CHECK-LABEL: class AuditedBoth
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension AuditedBoth : @unchecked Sendable {
+// CHECK-NEXT: extension AuditedBoth: @unchecked Sendable {
 
 // CHECK-LABEL: public protocol SendableProtocol
-// CHECK-SAME: : Sendable
+// CHECK-SAME:: Sendable
 
-// CHECK-LABEL: enum SendableEnum :
+// CHECK-LABEL: enum SendableEnum:
 // CHECK-SAME: @unchecked Sendable
 
-// CHECK-LABEL: enum NonSendableEnum :
+// CHECK-LABEL: enum NonSendableEnum:
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension NonSendableEnum : @unchecked Sendable {
+// CHECK-NEXT: extension NonSendableEnum: @unchecked Sendable {
 
-// CHECK-LABEL: struct SendableOptions :
+// CHECK-LABEL: struct SendableOptions:
 // CHECK-SAME: @unchecked Sendable
 
-// CHECK-LABEL: struct NonSendableOptions :
+// CHECK-LABEL: struct NonSendableOptions:
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension NonSendableOptions : @unchecked Sendable {
+// CHECK-NEXT: extension NonSendableOptions: @unchecked Sendable {
 
-// CHECK-LABEL: public struct SendableError :
+// CHECK-LABEL: public struct SendableError:
 // CHECK-NOT: @unchecked Sendable
-// CHECK: public enum Code :
+// CHECK: public enum Code:
 // CHECK-SAME: @unchecked Sendable
 
-// CHECK-LABEL: public struct NonSendableError :
+// CHECK-LABEL: public struct NonSendableError:
 // CHECK-NOT: @unchecked Sendable
-// CHECK: public enum Code :
+// CHECK: public enum Code:
 // CHECK-SAME: @unchecked Sendable
 
-// CHECK-LABEL: struct SendableStringEnum :
+// CHECK-LABEL: struct SendableStringEnum:
 // CHECK-SAME: @unchecked Sendable
 
-// CHECK-LABEL: struct NonSendableStringEnum :
-// CHECK-NOT: @unchecked Sendable
-// CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension NonSendableStringEnum : @unchecked Sendable {
-
-// CHECK-LABEL: struct SendableStringStruct :
-// CHECK-SAME: @unchecked Sendable
-
-// CHECK-LABEL: struct NonSendableStringStruct :
+// CHECK-LABEL: struct NonSendableStringEnum:
 // CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
-// CHECK-NEXT: extension NonSendableStringStruct : @unchecked Sendable {
+// CHECK-NEXT: extension NonSendableStringEnum: @unchecked Sendable {
+
+// CHECK-LABEL: struct SendableStringStruct:
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: struct NonSendableStringStruct:
+// CHECK-NOT: @unchecked Sendable
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension NonSendableStringStruct: @unchecked Sendable {
 

@@ -19,7 +19,7 @@
 // INTERFACE: public class Base {
 // INTERFACE:   public init(x: Swift.Int = 45, y: Swift.Int = 98)
 // INTERFACE: }
-// INTERFACE: public class Derived : Inherited.Base {
+// INTERFACE: public class Derived: Inherited.Base {
 // INTERFACE:   override public init(x: Swift.Int = super, y: Swift.Int = super)
 // INTERFACE: }
 

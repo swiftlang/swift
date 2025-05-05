@@ -4847,6 +4847,7 @@ PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
   result.AbstractAccessors = false;
   result.PrintForSIL = true;
   result.PrintInSILBody = true;
+  result.PrintSpaceBeforeInheritance = true;
   result.PreferTypeRepr = false;
   result.OpaqueReturnTypePrinting =
      OpaqueReturnTypePrintingMode::StableReference;
