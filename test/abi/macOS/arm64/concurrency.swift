@@ -418,6 +418,10 @@ Added: _swift_task_dealloc_through
 // SwiftSettings
 Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ
 
+// Clock systemEpochs
+Added: _$ss15ContinuousClockV11systemEpochAB7InstantVvpMV
+Added: _$ss15SuspendingClockV11systemEpochAB7InstantVvpMV
+
 // Hashable for (Throwing)AsyncStream
 Added: _$sScS12ContinuationV7storageScS8_StorageCyx_Gvg
 Added: _$sScS12ContinuationV7storageScS8_StorageCyx_GvpMV
