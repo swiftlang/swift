@@ -16,16 +16,16 @@
  and serialization to .xcodeproj plists.  There is no consistency checking to
  ensure, for example, that build settings have valid values, dependency cycles
  are not created, etc.
- 
+
  Everything here is geared toward supporting project generation.  The intended
  usage model is for custom logic to build up a project using Xcode terminology
  (e.g. "group", "reference", "target", "build phase"), but there is almost no
  provision for modifying the model after it has been built up.  The intent is
  to create it as desired from the start.
- 
+
  Rather than try to represent everything that Xcode's project model supports,
  the approach is to start small and to add functionality as needed.
- 
+
  Note that this API represents only the project model — there is no notion of
  workspaces, schemes, etc (although schemes are represented individually in a
  separate API).  The notion of build settings is also somewhat different from
@@ -37,11 +37,11 @@
  configuration of the settings, since most values are the same between Debug
  and Release.  Also, the build settings themselves are represented as structs
  of named fields, instead of dictionaries with arbitrary name strings as keys.
- 
+
  It is expected that some of these simplifications will need to be lifted over
  time, based on need.  That should be done carefully, however, to avoid ending
  up with an overly complicated model.
- 
+
  Some things that are incomplete in even this first model:
  - copy files build phases are incomplete
  - shell script build phases are incomplete
@@ -57,7 +57,7 @@
  */
 
 public struct Xcode {
-  
+
   /// An Xcode project, consisting of a tree of groups and file references,
   /// a list of targets, and some additional information.  Note that schemes
   /// are outside of the project data model.
@@ -74,7 +74,7 @@ public struct Xcode {
       self.projectDir = ""
       self.targets = []
     }
-    
+
     /// Creates and adds a new target (which does not initially have any
     /// build phases).
     public func addTarget(objectID: String? = nil, productType: Target.ProductType? = nil, name: String) -> Target {
@@ -94,7 +94,7 @@ public struct Xcode {
     /// Name of the reference, if different from the last path component
     /// (if not set, Xcode will use the last path component as the name).
     public var name: String?
-    
+
     /// Determines the base path for a reference's relative path (this is
     /// what for some reason is called a "source tree" in Xcode).
     public enum RefPathBase: String {
@@ -111,13 +111,13 @@ public struct Xcode {
       /// destination, or even an overridden build setting.
       case buildDir = "BUILT_PRODUCTS_DIR"
     }
-    
+
     init(path: String, pathBase: RefPathBase = .groupDir, name: String? = nil) {
       self.path = path
       self.pathBase = pathBase
       self.name = name
     }
-    
+
     /// Whether this is either a group or directory reference (blue folder).
     public var isDirectoryLike: Bool {
       if self is Xcode.Group {
@@ -129,13 +129,17 @@ public struct Xcode {
       return false
     }
   }
-  
+
   /// A reference to a file system entity (a file, folder, etc).
   public final class FileReference: Reference {
     public var objectID: String?
     public var fileType: String?
     public var isDirectory: Bool
-    public fileprivate(set) var isBuildableFolder: Bool = false
+    public private(set) unowned var buildableFolder: BuildableFolder?
+
+    public var isBuildableFolder: Bool {
+      buildableFolder != nil
+    }
 
     init(
       path: String, isDirectory: Bool, pathBase: RefPathBase = .groupDir,
@@ -146,14 +150,108 @@ public struct Xcode {
       self.objectID = objectID
       self.fileType = fileType
     }
+
+    /// Turn a folder reference into a buildable folder.
+    func getOrCreateBuildableFolder(at path: RelativePath) -> BuildableFolder {
+      precondition(isDirectory)
+      if let buildableFolder {
+        precondition(buildableFolder.path == path)
+        return buildableFolder
+      }
+      let folder = BuildableFolder(for: self, at: path)
+      buildableFolder = folder
+      return folder
+    }
   }
-  
+
+  public final class BuildableFolder {
+    public let ref: FileReference
+    public let path: RelativePath
+
+    /// The "primary" targets that are directly associated with the buildable
+    /// folder and are automatically inferred for every child source file.
+    private(set) var primaryTargets: Set<Xcode.Target> = []
+
+    /// Any source file specific compiler arguments.
+    private(set) var fileArgs: [FileInTarget: [String]] = [:]
+
+    /// Any non-default target memberships.
+    private(set) var targetMemberships: [RelativePath: Set<Xcode.Target>] = [:]
+
+    fileprivate init(for ref: FileReference, at path: RelativePath) {
+      self.ref = ref
+      self.path = path
+    }
+
+    /// Add a primary target to the buildable folder.
+    fileprivate func addPrimaryTarget(_ target: Target) {
+      primaryTargets.insert(target)
+    }
+
+    /// Map the given source file path such that it's relative to the
+    /// buildable folder itself.
+    private func mapSourcePath(_ sourcePath: RelativePath) -> RelativePath {
+      sourcePath.removingPrefix(path)!
+    }
+
+    /// Create the corresponding target exceptions for the buildable folder.
+    public func makeTargetExceptions() -> [TargetException] {
+      var result: [Xcode.Target: TargetException] = [:]
+      func getOrCreateException(for target: Xcode.Target) -> TargetException {
+        if let exception = result[target] {
+          return exception
+        }
+        let exception = TargetException(for: target)
+        result[target] = exception
+        return exception
+      }
+
+      // Populate target memberships.
+      for (path, targets) in targetMemberships.sorted(by: \.key.rawPath) {
+        // If it's missing from primary targets, it needs adding to the
+        // corresponding exception.
+        for missingPrimary in primaryTargets.subtracting(targets) {
+          getOrCreateException(for: missingPrimary).sources.append(path)
+        }
+        // Add to any non-primary targets.
+        for inSecondary in targets.subtracting(primaryTargets) {
+          getOrCreateException(for: inSecondary).sources.append(path)
+        }
+      }
+
+      // Populate per-file args.
+      for (fileInTarget, args) in fileArgs {
+        getOrCreateException(for: fileInTarget.target)
+          .extraCompilerArgs[fileInTarget.path] = args
+      }
+
+      return result.values.sorted(by: \.target.name)
+    }
+
+    /// Change the target membership for a given set of paths.
+    public func setTargets(
+      _ targets: Set<Xcode.Target>, for sourcePaths: [RelativePath]
+    ) {
+      for source in sourcePaths.map(mapSourcePath) {
+        targetMemberships[source] = targets
+      }
+    }
+
+    /// Set additional per-file arguments for a given path.
+    public func setExtraCompilerArgs(
+      _ args: [String], for sourcePath: RelativePath, in target: Xcode.Target
+    ) {
+      let key = FileInTarget(path: mapSourcePath(sourcePath), target: target)
+      fileArgs[key] = args
+    }
+  }
+
   /// A group that can contain References (FileReferences and other Groups).
   /// The resolved path of a group is used as the base path for any child
   /// references whose source tree type is GroupRelative.
   public final class Group: Reference {
     public var subitems = [Reference]()
-    
+
     /// Creates and appends a new Group to the list of subitems.
     /// The new group is returned so that it can be configured.
     @discardableResult
@@ -166,7 +264,7 @@ public struct Xcode {
       subitems.append(group)
       return group
     }
-    
+
     /// Creates and appends a new FileReference to the list of subitems.
     @discardableResult
     public func addFileReference(
@@ -193,7 +291,7 @@ public struct Xcode {
     public var buildPhases: [BuildPhase]
     public var productReference: FileReference?
     public var dependencies: [TargetDependency]
-    public private(set) var buildableFolders: [FileReference]
+    public private(set) var buildableFolders: [BuildableFolder]
     public enum ProductType: String {
       case application = "com.apple.product-type.application"
       case staticArchive = "com.apple.product-type.library.static"
@@ -212,11 +310,11 @@ public struct Xcode {
       self.dependencies = []
       self.buildableFolders = []
     }
-    
+
     // FIXME: There's a lot repetition in these methods; using generics to
     // try to avoid that raised other issues in terms of requirements on
     // the Reference class, though.
-    
+
     /// Adds a "headers" build phase, i.e. one that copies headers into a
     /// directory of the product, after suitable processing.
     @discardableResult
@@ -225,7 +323,7 @@ public struct Xcode {
       buildPhases.append(phase)
       return phase
     }
-    
+
     /// Adds a "sources" build phase, i.e. one that compiles sources and
     /// provides them to be linked into the executable code of the product.
     @discardableResult
@@ -234,7 +332,7 @@ public struct Xcode {
       buildPhases.append(phase)
       return phase
     }
-    
+
     /// Adds a "frameworks" build phase, i.e. one that links compiled code
     /// and libraries into the executable of the product.
     @discardableResult
@@ -243,7 +341,7 @@ public struct Xcode {
       buildPhases.append(phase)
       return phase
     }
-    
+
     /// Adds a "copy files" build phase, i.e. one that copies files to an
     /// arbitrary location relative to the product.
     @discardableResult
@@ -252,7 +350,7 @@ public struct Xcode {
       buildPhases.append(phase)
       return phase
     }
-    
+
     /// Adds a "shell script" build phase, i.e. one that runs a custom
     /// shell script as part of the build.
     @discardableResult
@@ -265,7 +363,7 @@ public struct Xcode {
       buildPhases.append(phase)
       return phase
     }
-    
+
     /// Adds a dependency on another target.
     /// FIXME: We do not check for cycles.  Should we?  This is an extremely
     /// minimal API so it's not clear that we should.
@@ -273,11 +371,10 @@ public struct Xcode {
       dependencies.append(TargetDependency(target: target))
     }
 
-    /// Turn a given folder reference into a buildable folder for this target.
-    public func addBuildableFolder(_ fileRef: FileReference) {
-      precondition(fileRef.isDirectory)
-      fileRef.isBuildableFolder = true
-      buildableFolders.append(fileRef)
+    /// Add an associated buildable folder to the target.
+    public func addBuildableFolder(_ folder: BuildableFolder) {
+      folder.addPrimaryTarget(self)
+      buildableFolders.append(folder)
     }
 
     /// A simple wrapper to prevent ownership cycles in the `dependencies`
@@ -286,11 +383,11 @@ public struct Xcode {
       public unowned var target: Target
     }
   }
-  
+
   /// Abstract base class for all build phases in a target.
   public class BuildPhase {
     public var files: [BuildFile] = []
-    
+
     /// Adds a new build file that refers to `fileRef`.
     @discardableResult
     public func addBuildFile(fileRef: FileReference) -> BuildFile {
@@ -299,25 +396,25 @@ public struct Xcode {
       return buildFile
     }
   }
-  
+
   /// A "headers" build phase, i.e. one that copies headers into a directory
   /// of the product, after suitable processing.
   public final class HeadersBuildPhase: BuildPhase {
     // Nothing extra yet.
   }
-  
+
   /// A "sources" build phase, i.e. one that compiles sources and provides
   /// them to be linked into the executable code of the product.
   public final class SourcesBuildPhase: BuildPhase {
     // Nothing extra yet.
   }
-  
+
   /// A "frameworks" build phase, i.e. one that links compiled code and
   /// libraries into the executable of the product.
   public final class FrameworksBuildPhase: BuildPhase {
     // Nothing extra yet.
   }
-  
+
   /// A "copy files" build phase, i.e. one that copies files to an arbitrary
   /// location relative to the product.
   public final class CopyFilesBuildPhase: BuildPhase {
@@ -326,7 +423,7 @@ public struct Xcode {
       self.dstDir = dstDir
     }
   }
-  
+
   /// A "shell script" build phase, i.e. one that runs a custom shell script.
   public final class ShellScriptBuildPhase: BuildPhase {
     public var script: String
@@ -340,7 +437,7 @@ public struct Xcode {
       self.alwaysRun = alwaysRun
     }
   }
-  
+
   /// A build file, representing the membership of a file reference in a
   /// build phase of a target.
   public final class BuildFile {
@@ -348,19 +445,19 @@ public struct Xcode {
     init(fileRef: FileReference) {
       self.fileRef = fileRef
     }
-    
+
     public var settings = Settings()
-    
+
     /// A set of file settings.
     public struct Settings: Encodable {
       public var ATTRIBUTES: [String]?
       public var COMPILER_FLAGS: String?
-      
+
       public init() {
       }
     }
   }
-  
+
   /// A table of build settings, which for the sake of simplicity consists
   /// (in this simplified model) of a set of common settings, and a set of
   /// overlay settings for Debug and Release builds.  There can also be a
@@ -369,21 +466,21 @@ public struct Xcode {
     /// Common build settings are in both generated configurations (Debug
     /// and Release).
     public var common = BuildSettings()
-    
+
     /// Debug build settings are overlaid over the common settings in the
     /// generated Debug configuration.
     public var debug = BuildSettings()
-    
+
     /// Release build settings are overlaid over the common settings in the
     /// generated Release configuration.
     public var release = BuildSettings()
-    
+
     /// An optional file reference to an .xcconfig file.
     public var xcconfigFileRef: FileReference?
-    
+
     public init() {
     }
-    
+
     /// A set of build settings, which is represented as a struct of optional
     /// build settings.  This is not optimally efficient, but it is great for
     /// code completion and type-checking.
@@ -449,5 +546,41 @@ public struct Xcode {
       public var USE_HEADERMAP: String?
       public var LD: String?
     }
+  }
+}
+
+extension Xcode.BuildableFolder {
+  /// A "target exception" for a buildable folder stores information about
+  /// source files in the folder that are augmented in some way for a given
+  /// target.
+  public final class TargetException {
+    unowned let target: Xcode.Target
+
+    /// The sources that are either excluded from the buildable folder
+    /// (for a primary exception), or are members of another target.
+    fileprivate(set) var sources: [RelativePath] = []
+
+    /// A set of extra compiler arguments for a given source.
+    fileprivate(set) var extraCompilerArgs: [RelativePath: [String]] = [:]
+
+    init(for target: Xcode.Target) {
+      self.target = target
+    }
+  }
+
+  struct FileInTarget: Hashable {
+    var path: RelativePath
+    var target: Xcode.Target
+  }
+}
+
+extension Xcode.Target: Hashable {
+  public static func == (lhs: Xcode.Target, rhs: Xcode.Target) -> Bool {
+    // Identity is a key part of Target, so there's no useful value comparison
+    // to do.
+    lhs === rhs
+  }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
   }
 }
