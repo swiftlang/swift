@@ -9929,9 +9929,53 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   return ObjCSubscriptKind::Keyed;
 }
 
+DynamicMemberLookupSubscriptEligibility
+SubscriptDecl::getStoredDynamicMemberLookupEligibility() const {
+  return Bits.SubscriptDecl.DynamicMemberLookupEligibility
+             ? static_cast<DynamicMemberLookupSubscriptEligibility>(
+                   Bits.SubscriptDecl.DynamicMemberLookupEligibility - 1)
+             : DynamicMemberLookupSubscriptEligibility::None;
+}
+
+void SubscriptDecl::setDynamicMemberLookupEligibility(
+    DynamicMemberLookupSubscriptEligibility eligibility) {
+  Bits.SubscriptDecl.DynamicMemberLookupEligibility =
+      static_cast<uint8_t>(eligibility) + 1;
+}
+
 void SubscriptDecl::setElementInterfaceType(Type type) {
   getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
                                         std::move(type));
+}
+
+BoundGenericType *
+SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
+  // Allow composing a key path type with a `Sendable` protocol as a way to
+  // express sendability requirements.
+  if (auto *existential = paramTy->getAs<ExistentialType>()) {
+    auto layout = existential->getExistentialLayout();
+
+    auto protocols = layout.getProtocols();
+    if (!llvm::all_of(protocols, [](ProtocolDecl *proto) {
+          return proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+                 proto->getInvertibleProtocolKind();
+        })) {
+      return nullptr;
+    }
+
+    paramTy = layout.getSuperclass();
+    if (!paramTy) {
+      return nullptr;
+    }
+  }
+
+  if (!paramTy->isKeyPath() &&
+      !paramTy->isWritableKeyPath() &&
+      !paramTy->isReferenceWritableKeyPath()) {
+    return nullptr;
+  }
+
+  return paramTy->getAs<BoundGenericType>();
 }
 
 SubscriptDecl *
@@ -10030,6 +10074,24 @@ SourceRange SubscriptDecl::getSignatureSourceRange() const {
     }
   }
   return getSubscriptLoc();
+}
+
+DynamicMemberLookupSubscriptEligibility
+SubscriptDecl::getDynamicMemberLookupSubscriptEligibility() {
+  evaluateDynamicMemberLookupEligibility();
+  return getStoredDynamicMemberLookupEligibility();
+}
+
+BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType() {
+  if (getDynamicMemberLookupSubscriptEligibility() !=
+      DynamicMemberLookupSubscriptEligibility::KeyPath) {
+    return nullptr;
+  }
+
+  auto *indices = getIndices();
+  assert(indices->size() > 0 && "subscript must have at least one arg");
+  return getDynamicMemberParamTypeAsKeyPathType(
+    indices->get(0)->getInterfaceType());
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {

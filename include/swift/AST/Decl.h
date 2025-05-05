@@ -63,6 +63,10 @@ namespace clang {
 class PointerAuthQualifier;
 } // end namespace clang
 
+namespace {
+class AttributeChecker;
+} // end anonymous namespace
+
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
@@ -542,9 +546,24 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
-    StaticSpelling : 2
+  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2+2,
+    StaticSpelling : 2,
+
+    /// Whether this decl has been evaluated as eligible to satisfy an
+    /// `@dynamicMemberLookup` requirement, and if eligible, the type of dynamic
+    /// member parameter it would use to satisfy the requirement.
+    ///
+    /// * 0b00 - not yet evaluated
+    /// * 0b01 - evaluated; not eligible
+    /// * 0b10 - evaluated; eligible, taking a `{{Reference}Writable}KeyPath`
+    ///          value
+    /// * 0b11 - evaluated; eligible, taking an `ExpressibleByStringLiteral`
+    ///          value
+    ///
+    /// i.e., 0 or `DynamicMemberLookupSubscriptEligibility` values + 1
+    DynamicMemberLookupEligibility : 2
   );
+
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+2+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
@@ -7545,6 +7564,33 @@ enum class ObjCSubscriptKind {
   Keyed
 };
 
+/// Describes how a `SubscriptDecl` could be eligible to fulfill a
+/// `@dynamicMemberLookup` requirement.
+///
+/// `@dynamicMemberLookup` requires that a subscript:
+///
+///   1. Take a single argument with an explicit `dynamicMember` argument label,
+///   2. Whose parameter type is non-variadic and is either
+///      * A `{{Reference}Writable}KeyPath`, or
+///      * A concrete type conforming to `ExpressibleByStringLiteral`,
+///
+/// Subscripts which don't meet these requirements strictly are not eligible.
+enum class DynamicMemberLookupSubscriptEligibility : uint8_t {
+  /// The `SubscriptDecl` cannot fulfill a `@dynamicMemberLookup` requirement.
+  ///
+  /// This can be due to a name mismatch, type mismatch, missing default
+  /// arguments, or otherwise.
+  None,
+
+  /// The `SubscriptDecl` can fulfill a `@dynamicMemberLookup` requirement with
+  /// a `{{Reference}Writable}KeyPath` dynamic member parameter.
+  KeyPath,
+
+  /// The `SubscriptDecl` can fulfill a `@dynamicMemberLookup` requirement with
+  /// an `ExpressibleByStringLiteral`-conforming dynamic member parameter.
+  String,
+};
+
 /// Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
@@ -7574,12 +7620,35 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+  friend AttributeChecker;
   friend class ResultTypeRequest;
 
   SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
+
+  // Evaluates and stores the decl's eligibility to fulfill
+  // `@dynamicMemberLookup` requirements. Given `Diags`, emits diagnostics for
+  // requirement mismatches; should only be passed in by `AttributeChecker` and
+  // `DeclChecker` within a type-checking context.
+  //
+  // Implemented in the type checker because checking the validity of a
+  // string-based dynamic member parameter requires checking conformance to
+  // `ExpressibleByStringLiteral`.
+  DynamicMemberLookupSubscriptEligibility
+  evaluateDynamicMemberLookupEligibility(
+      AccessScope *requiredAccessScope = nullptr,
+      DiagnosticEngine *Diags = nullptr);
+
+  // Maps `Bits.SubscriptDecl.DynamicMemberLookupEligibility` as stored to a
+  // `DynamicMemberLookupSubscriptEligibility`; `None` if `@dynamicMemberLookup`
+  // requirements have not been checked yet.
+  DynamicMemberLookupSubscriptEligibility
+  getStoredDynamicMemberLookupEligibility() const;
+
+  void setDynamicMemberLookupEligibility(
+      DynamicMemberLookupSubscriptEligibility eligibility);
 
   void setElementInterfaceType(Type type);
 
@@ -7598,6 +7667,11 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
+
+  /// Returns the given as a `BoundGenericType` if it is a
+  /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
+  /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
+  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -7659,6 +7733,16 @@ public:
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// Determines, caches, and returns whether the decl can be used to satisfy an
+  /// `@dynamicMemberLookup` requirement (and if so, how).
+  DynamicMemberLookupSubscriptEligibility
+  getDynamicMemberLookupSubscriptEligibility();
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement
+  /// using a `{{Reference}Writable}KeyPath` dynamic member parameter, returns
+  /// the type of that parameter; `nullptr` otherwise.
+  BoundGenericType *getDynamicMemberLookupKeyPathType();
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(

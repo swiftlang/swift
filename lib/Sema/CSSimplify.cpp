@@ -11002,8 +11002,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         auto *SD = cast<SubscriptDecl>(candidate.getDecl());
         bool isKeyPathBased = isValidKeyPathDynamicMemberLookup(SD);
 
-        if (isValidStringDynamicMemberLookup(SD, DC->getParentModule()) ||
-            isKeyPathBased)
+        if (isValidStringDynamicMemberLookup(SD) || isKeyPathBased)
           result.addViable(OverloadChoice::getDynamicMemberLookup(
               baseTy, SD, name, isKeyPathBased));
       }
