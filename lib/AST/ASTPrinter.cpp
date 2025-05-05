@@ -6023,6 +6023,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
+    StringRef PublicModuleName = File->getPublicModuleName();
+    if (Options.UsePublicModuleNames && !PublicModuleName.empty()) {
+      Name = Mod->getASTContext().getIdentifier(PublicModuleName);
+    }
+
     if (Options.UseOriginallyDefinedInModuleNames) {
       Decl *D = Ty->getDecl();
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
