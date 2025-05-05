@@ -311,7 +311,7 @@ extension ObservableMacro: ExtensionMacro {
     }
 
     let decl: DeclSyntax = """
-        extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
+        extension \(raw: type.trimmedDescription): nonisolated \(raw: qualifiedConformanceName) {}
         """
     let ext = decl.cast(ExtensionDeclSyntax.self)
 
