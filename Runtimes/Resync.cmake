@@ -96,6 +96,9 @@ endforeach()
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
 copy_files("" "Core" FILES "Info.plist.in")
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Synchronization/Info.plist.in")
+copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
+
 # Platform Overlays
 
 # Copy magic linker symbols
@@ -153,6 +156,8 @@ copy_files(public/Platform Overlay/Windows/CRT
 # libraries, and test support libraries.
 
 # Supplemental Libraries
+copy_library_sources("Synchronization" "public" "Supplemental")
+
 
 # Copy StringProcessing, RegexParser, RegexBuilder
 if(NOT DEFINED StringProcessing_ROOT_DIR)
