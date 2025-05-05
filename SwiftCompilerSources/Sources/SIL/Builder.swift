@@ -582,6 +582,7 @@ public struct Builder {
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 
+  @discardableResult
   public func createEndCOWMutationAddr(address: Value) -> EndCOWMutationAddrInst {
     let endMutation = bridged.createEndCOWMutationAddr(address.bridged)
     return notifyNew(endMutation.getAs(EndCOWMutationAddrInst.self))
