@@ -259,7 +259,7 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      CDC(), Alloc(), Saver(Alloc) {}
+      Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
@@ -326,18 +326,6 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
   return std::move(*DependenciesOrErr);
 }
 
-std::vector<
-    DependencyScanDiagnosticCollector::ScannerDiagnosticInfo>
-DependencyScanningTool::getDiagnostics() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  return CDC.Diagnostics;
-}
-
-void DependencyScanningTool::resetDiagnostics() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  CDC.reset();
-}
-
 llvm::ErrorOr<ScanQueryInstance>
 DependencyScanningTool::initCompilerInstanceForScan(
     ArrayRef<const char *> CommandArgs,
@@ -353,10 +341,6 @@ DependencyScanningTool::initCompilerInstanceForScan(
 
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
-
-  // FIXME: The shared CDC must be deprecated once all clients have switched
-  // to using per-scan diagnostic output embedded in the `swiftscan_dependency_graph_s`
-  Instance->addDiagnosticConsumer(&CDC);
   Instance->addDiagnosticConsumer(scannerDiagnosticsCollector.get());
 
   // Basic error checking on the arguments
