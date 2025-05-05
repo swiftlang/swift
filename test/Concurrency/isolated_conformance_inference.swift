@@ -32,6 +32,11 @@ extension CExplicit: Q {
   func g() { }
 }
 
+@SomeGlobalActor
+class CViaNonisolatedWitness: P {
+  nonisolated func f() { } // okay! conformance above is nonisolated via this witness
+}
+
 // expected-error@+3{{conformance of 'CNonIsolated' to protocol 'P' crosses into global actor 'SomeGlobalActor'-isolated code and can cause data races}}
 // expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
 // expected-note@+1{{isolate this conformance to the global actor 'SomeGlobalActor' with '@SomeGlobalActor'}}{{33-33=@SomeGlobalActor }}
@@ -49,4 +54,6 @@ nonisolated func testConformancesFromNonisolated() {
 
   // Okay, these are nonisolated conformances.
   let _: any Q = CExplicit()
+
+  let _: any P = CViaNonisolatedWitness()
 }
