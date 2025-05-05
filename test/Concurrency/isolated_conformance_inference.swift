@@ -47,7 +47,21 @@ nonisolated class CNonIsolated: P {
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
-nonisolated func testConformancesFromNonisolated() {
+// @preconcurrency suppresses actor isolation inference
+struct NotSendable: Equatable, Hashable {
+}
+
+@available(*, unavailable)
+extension NotSendable: Sendable {}
+
+extension NotSendable : Codable {}
+
+@MainActor
+struct TestDerivedCodable : @preconcurrency Codable {
+  var x: NotSendable
+}
+
+nonisolated func testConformancesFromNonisolated(tdc: TestDerivedCodable) {
   let _: any P = CExplicit() // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'CExplicit' to 'P' cannot be used in nonisolated context}}
 
   let _: any P = CNonIsolated()
@@ -56,4 +70,6 @@ nonisolated func testConformancesFromNonisolated() {
   let _: any Q = CExplicit()
 
   let _: any P = CViaNonisolatedWitness()
+
+  let _: any Codable = tdc
 }
