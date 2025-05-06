@@ -21,6 +21,8 @@
 
 //--- Lib.swift
 
+// CHECK-NOT: assume_nonnull
+
 // CHECK: #if defined(__cplusplus)
 // CHECK: extern "C" {
 // CHECK: #endif
@@ -42,6 +44,23 @@ func c_keywordArgNames(auto: Int, union: Int) {}
 @cdecl("return_never")
 func d_returnNever() -> Never { fatalError() }
 // CHECK-LABEL: SWIFT_EXTERN void return_never(void) SWIFT_NOEXCEPT SWIFT_NORETURN;
+
+/// Pointer types
+// CHECK: /// Pointer types
+
+@cdecl("pointers")
+func f_pointers(_ x: UnsafeMutablePointer<Int>,
+                  y: UnsafePointer<Int>,
+                  z: UnsafeMutableRawPointer,
+                  w: UnsafeRawPointer,
+                  u: OpaquePointer) {}
+// CHECK: SWIFT_EXTERN void pointers(ptrdiff_t * _Nonnull x, ptrdiff_t const * _Nonnull y, void * _Nonnull z, void const * _Nonnull w, void * _Nonnull u) SWIFT_NOEXCEPT;
+
+@cdecl("nullable_pointers")
+func g_nullablePointers(_ x: UnsafeMutableRawPointer,
+                          y: UnsafeMutableRawPointer?,
+                          z: UnsafeMutableRawPointer!) {}
+// CHECK: SWIFT_EXTERN void nullable_pointers(void * _Nonnull x, void * _Nullable y, void * _Null_unspecified z) SWIFT_NOEXCEPT;
 
 // CHECK:      #if defined(__cplusplus)
 // CHECK-NEXT: }
