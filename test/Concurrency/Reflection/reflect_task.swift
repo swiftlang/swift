@@ -13,6 +13,8 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: asan
 
+// REQUIRES: rdar150478597
+
 import Swift
 import _Concurrency
 
