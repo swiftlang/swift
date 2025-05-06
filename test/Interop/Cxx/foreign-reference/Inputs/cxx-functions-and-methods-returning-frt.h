@@ -179,7 +179,7 @@ __attribute__((swift_attr("unsafe")));
 
 // C++ APIs returning cxx frts (for testing diagnostics)
 struct StructWithAPIsReturningCxxFrt {
-  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt(); // expected-warning {{'StaticMethodReturningCxxFrt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}} 
+  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt(); // expected-warning {{'StaticMethodReturningCxxFrt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
   static FRTStruct *_Nonnull StaticMethodReturningCxxFrtWithAnnotation()
       __attribute__((swift_attr("returns_retained")));
 };
