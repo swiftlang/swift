@@ -629,6 +629,3 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               std::optional<SemanticAvailabilitySpec>
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
-
-SWIFT_REQUEST(TypeChecker, SourceFileLangOptionsRequest,
-              SourceFileLangOptions (SourceFile *), Cached, NoLocationInfo)

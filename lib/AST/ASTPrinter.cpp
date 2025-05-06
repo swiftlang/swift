@@ -4808,9 +4808,6 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         case BuiltinMacroKind::IsolationMacro:
           Printer << "IsolationMacro";
           break;
-        case BuiltinMacroKind::SwiftSettingsMacro:
-          Printer << "SwiftSettingsMacro";
-          break;
         }
         break;
 

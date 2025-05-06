@@ -183,9 +183,6 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   case BridgedBuiltinIsolationMacro:
     return MacroDefinition::forBuiltin(BuiltinMacroKind::IsolationMacro);
-
-  case BridgedBuiltinSwiftSettingsMacro:
-    return MacroDefinition::forBuiltin(BuiltinMacroKind::SwiftSettingsMacro);
   }
 
   // Type-check the macro expansion.
@@ -1154,14 +1151,6 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
           adjustMacroExpansionBufferName(*discriminator));
       break;
     }
-
-    case BuiltinMacroKind::SwiftSettingsMacro: {
-      // Just insert empty scratch space. We are not expanding to anything.
-      std::string scratchSpace;
-      evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-          scratchSpace, adjustMacroExpansionBufferName(*discriminator));
-      break;
-    }
     }
     break;
   }
@@ -1278,9 +1267,6 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
     case BuiltinMacroKind::IsolationMacro:
       expandedExpr = new (ctx) CurrentContextIsolationExpr(
           macroBufferRange.getStart(), expandedType);
-      break;
-
-    case BuiltinMacroKind::SwiftSettingsMacro:
       break;
     }
   }
@@ -1500,7 +1486,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
     case BuiltinMacroKind::IsolationMacro:
-    case BuiltinMacroKind::SwiftSettingsMacro:
       // FIXME: Error here.
       return nullptr;
     }
@@ -1653,7 +1638,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
     case BuiltinMacroKind::IsolationMacro:
-    case BuiltinMacroKind::SwiftSettingsMacro:
       // FIXME: Error here.
       return nullptr;
     }
