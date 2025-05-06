@@ -450,17 +450,17 @@ public enum VariableScopeInstruction {
     scopeBegin.uses.lazy.filter { $0.endsLifetime || $0.instruction is ExtendLifetimeInst }
   }
 
-  // TODO: with SIL verification, we might be able to make varDecl non-Optional.
-  public var varDecl: VarDecl? {
-    if let debugVarDecl = instruction.debugResultDecl {
-      return debugVarDecl
-    }
+  // TODO: assert that VarDecl is valid whenever isFromVarDecl returns tyue.
+  public func findVarDecl() -> VarDecl? {
     // SILGen may produce double var_decl instructions for the same variable:
     //   %box = alloc_box [var_decl] "x"
     //   begin_borrow %box [var_decl]
     //
-    // Assume that, if the begin_borrow or move_value does not have its own debug_value, then it must actually be
-    // associated with its operand's var_decl.
+    // Therefore, first check if begin_borrow or move_value has any debug_value users.
+    if let debugVarDecl = instruction.findVarDeclFromDebugUsers() {
+      return debugVarDecl
+    }
+    // Otherwise, assume that the var_decl is associated with its operand's var_decl.
     return instruction.operands[0].value.definingInstruction?.findVarDecl()
   }
 }
@@ -472,14 +472,14 @@ extension Instruction {
       return varDeclInst.varDecl
     }
     if let varScopeInst = VariableScopeInstruction(self) {
-      return varScopeInst.varDecl
+      return varScopeInst.findVarDecl()
     }
-    return debugResultDecl
+    return findVarDeclFromDebugUsers()
   }
 
-  var debugResultDecl: VarDecl? {
+  func findVarDeclFromDebugUsers() -> VarDecl? {
     for result in results {
-      if let varDecl = result.debugUserDecl {
+      if let varDecl = result.findVarDeclFromDebugUsers() {
         return varDecl
       }
     }
@@ -488,14 +488,14 @@ extension Instruction {
 }
 
 extension Value {
-  var debugValDecl: VarDecl? {
+  public func findVarDecl() -> VarDecl? {
     if let arg = self as? Argument {
-      return arg.varDecl
+      return arg.findVarDecl()
     }
-    return debugUserDecl
+    return findVarDeclFromDebugUsers()
   }
 
-  var debugUserDecl: VarDecl? {
+  func findVarDeclFromDebugUsers() -> VarDecl? {
     for use in uses {
       if let debugVal = use.instruction as? DebugValueInst {
         return debugVal.varDecl
