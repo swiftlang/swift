@@ -329,9 +329,9 @@ func fneg_test(_ half: Builtin.FPIEEE16,
                double: Builtin.FPIEEE64)
   -> (Builtin.FPIEEE16, Builtin.FPIEEE32, Builtin.FPIEEE64)
 {
-  // CHECK: fsub half 0xH8000, {{%.*}}
-  // CHECK: fsub float -0.000000e+00, {{%.*}}
-  // CHECK: fsub double -0.000000e+00, {{%.*}}
+  // CHECK: fneg half
+  // CHECK: fneg float
+  // CHECK: fneg double
   return (Builtin.fneg_FPIEEE16(half),
           Builtin.fneg_FPIEEE32(single),
           Builtin.fneg_FPIEEE64(double))
