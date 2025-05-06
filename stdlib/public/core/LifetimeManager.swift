@@ -295,8 +295,6 @@ public func _overrideLifetime<
 >(
   _ dependent: consuming T, borrowing source: borrowing U
 ) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
 
@@ -313,8 +311,6 @@ public func _overrideLifetime<
 >(
   _ dependent: consuming T, copying source: borrowing U
 ) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
 
@@ -332,7 +328,5 @@ public func _overrideLifetime<
   _ dependent: consuming T,
   mutating source: inout U
 ) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
