@@ -71,7 +71,7 @@ entry(%o : $*Huge, %x : $Huge):
 // CHECK:         call swiftcc {{.*}} @"$s24huge_partial_applicationTA{{(\.ptrauth)?}}"{{.*}}(ptr noalias nocapture dereferenceable({{.*}}) %0, ptr swiftself [[CLOSURE]])
 // CHECK:       define internal swiftcc void @"$s24huge_partial_applicationTA"(ptr noalias nocapture dereferenceable({{.*}}) %0, ptr swiftself %1)
 // CHECK-NOT:     alloca
-// CHECK:         [[GEP:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T17indirect_argument4HugeV }>, ptr %1, i32 0, i32 1
+// CHECK:         [[GEP:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T17indirect_argument4HugeV }>, ptr %1, i32 0, i32 1
 // CHECK-NOT:     alloca
 // CHECK-NOT:     tail
 // CHECK:         call swiftcc void @huge_partial_application(ptr noalias nocapture dereferenceable({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) [[GEP]]
@@ -90,7 +90,7 @@ entry(%x : $Huge, %y : $Huge):
 // CHECK:         call swiftcc {{.*}} @"$s30huge_partial_application_stretTA{{(\.ptrauth)?}}"{{.*}}(ptr noalias nocapture sret({{.*}}) [[TMP_RET]], ptr noalias nocapture dereferenceable({{.*}}) %1, ptr swiftself [[CLOSURE]])
 // CHECK:       define internal swiftcc void @"$s30huge_partial_application_stretTA"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1, ptr swiftself %2)
 // CHECK-NOT:     alloca
-// CHECK:         [[GEP:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T17indirect_argument4HugeV }>, ptr %2, i32 0, i32 1
+// CHECK:         [[GEP:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T17indirect_argument4HugeV }>, ptr %2, i32 0, i32 1
 // CHECK-NOT:     alloca
 // CHECK-NOT:     tail
 // CHECK:         call swiftcc void @huge_partial_application_stret(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1, ptr noalias nocapture dereferenceable({{.*}}) [[GEP]])

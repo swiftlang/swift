@@ -26,7 +26,7 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK: [[WITNESS_FOR_SIZE:%.*]] = load [[INT]], ptr [[WITNESS_ADDR]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
 
@@ -62,7 +62,7 @@ public func functionWithResilientTypesRectangle(_ r: Rectangle) {
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, ptr [[METADATA]], [[INT]] [[IDX:2|4|6]]
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, ptr [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, i32 [[FIELD_OFFSET]]
-// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], ptr [[FIELD_PAYLOAD_PTR]]
 
   _ = r.color
@@ -88,23 +88,23 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 
 // CHECK: [[DST:%.*]] = alloca %T17struct_resilience6MySizeV
 
-// CHECK: [[W_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, ptr %1, i32 0, i32 0
-// CHECK: [[W_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[W_ADDR]], i32 0, i32 0
+// CHECK: [[W_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17struct_resilience6MySizeV, ptr %1, i32 0, i32 0
+// CHECK: [[W_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[W_ADDR]], i32 0, i32 0
 // CHECK: [[W:%.*]] = load [[INT]], ptr [[W_PTR]]
 
-// CHECK: [[H_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, ptr %1, i32 0, i32 1
-// CHECK: [[H_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[H_ADDR]], i32 0, i32 0
+// CHECK: [[H_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17struct_resilience6MySizeV, ptr %1, i32 0, i32 1
+// CHECK: [[H_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[H_ADDR]], i32 0, i32 0
 // CHECK: [[H:%.*]] = load [[INT]], ptr [[H_PTR]]
 
 
 // CHECK: call void @llvm.lifetime.start.p0({{i32|i64}} {{8|16}}, ptr [[DST]])
 
-// CHECK: [[W_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, ptr [[DST]], i32 0, i32 0
-// CHECK: [[W_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[W_ADDR]], i32 0, i32 0
+// CHECK: [[W_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17struct_resilience6MySizeV, ptr [[DST]], i32 0, i32 0
+// CHECK: [[W_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[W_ADDR]], i32 0, i32 0
 // CHECK: store [[INT]] [[W]], ptr [[W_PTR]]
 
-// CHECK: [[H_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, ptr [[DST]], i32 0, i32 1
-// CHECK: [[H_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[H_ADDR]], i32 0, i32 0
+// CHECK: [[H_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17struct_resilience6MySizeV, ptr [[DST]], i32 0, i32 1
+// CHECK: [[H_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[H_ADDR]], i32 0, i32 0
 // CHECK: store [[INT]] [[H]], ptr [[H_PTR]]
 
 
@@ -136,7 +136,7 @@ public struct StructWithResilientStorage {
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, ptr [[METADATA]], [[INT]] [[IDX:2|4|6]]
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, ptr [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, i32 [[FIELD_OFFSET]]
-// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], ptr [[FIELD_PAYLOAD_PTR]]
 // CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
 
@@ -150,8 +150,8 @@ public struct StructWithIndirectResilientEnum {
 
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s17struct_resilience31StructWithIndirectResilientEnumV1nSivg"(ptr {{.*}})
-// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T17struct_resilience31StructWithIndirectResilientEnumV, ptr %0, i32 0, i32 1
-// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[FIELD_PTR]], i32 0, i32 0
+// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %T17struct_resilience31StructWithIndirectResilientEnumV, ptr %0, i32 0, i32 1
+// CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], ptr [[FIELD_PAYLOAD_PTR]]
 // CHECK:      ret [[INT]] [[FIELD_PAYLOAD]]
 
@@ -187,7 +187,7 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK: [[ANY:%.*]] = alloca %Any
 // CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct16ResilientWeakRefVMa"([[INT]] 0)
 // CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response [[META]], 0
-// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, ptr [[ANY]], i32 0, i32 1
+// CHECK: [[TYADDR:%.*]] = getelementptr inbounds{{.*}} %Any, ptr [[ANY]], i32 0, i32 1
 // CHECK: store ptr [[META2]], ptr [[TYADDR]]
 // CHECK: call ptr @__swift_allocate_boxed_opaque_existential_0(ptr [[ANY]])
 // CHECK: call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(ptr noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
@@ -208,7 +208,7 @@ public func memoryLayoutDotSizeWithResilientStruct() -> Int {
   // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
   // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 
-  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
   // CHECK: [[WITNESS_FOR_SIZE:%.*]] = load [[INT]], ptr [[WITNESS_ADDR]]
 
   // CHECK: ret [[INT]] [[WITNESS_FOR_SIZE]]
@@ -226,7 +226,7 @@ public func memoryLayoutDotStrideWithResilientStruct() -> Int {
   // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
   // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 
-  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 9
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 9
   // CHECK: [[WITNESS_FOR_STRIDE:%.*]] = load [[INT]], ptr [[WITNESS_ADDR]]
 
   // CHECK: ret [[INT]] [[WITNESS_FOR_STRIDE]]
@@ -244,7 +244,7 @@ public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
   // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
   // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 
-  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 10
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 10
   // CHECK: [[WITNESS_FOR_FLAGS:%.*]] = load i32, ptr [[WITNESS_ADDR]]
 
   // Not checked because it only exists on 64-bit: [[EXTENDED_FLAGS:%.*]] = zext i32 [[WITNESS_FOR_FLAGS]] to [[INT]]
@@ -286,7 +286,7 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
 // CHECK: [[FIELDS:%.*]] = alloca [4 x ptr]
 // CHECK: [[TUPLE_LAYOUT:%.*]] = alloca %swift.full_type_layout,
 
-// CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds [4 x ptr], ptr [[FIELDS]], i32 0, i32 0
+// CHECK: [[FIELDS_ADDR:%.*]] = getelementptr inbounds{{.*}} [4 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // public let s: Size
 

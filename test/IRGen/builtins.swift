@@ -212,11 +212,11 @@ func sizeof_alignof_metatype_test() {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 0, i32 8
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 0, i32 8
   // CHECK-NEXT: [[SIZE:%.*]] = load i64, ptr [[T0]]
   // CHECK-NEXT: store i64 [[SIZE]], ptr [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 0, i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 0, i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = zext i32 [[FLAGS]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 255
@@ -227,7 +227,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 9
   // CHECK-NEXT: [[STRIDE:%.*]] = load i64, ptr [[T0]]
   // CHECK-NEXT: store i64 [[STRIDE]], ptr [[S:%.*]]
   var s = Builtin.strideof(T.self)
@@ -667,7 +667,7 @@ func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 // ObjC
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK:      [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
+// CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load ptr, ptr [[ADDR]]
 // CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}(ptr [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr [[REF]])
@@ -680,7 +680,7 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
 // CHECK-SAME:    (ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK:      [[ADDR:%.+]] = getelementptr inbounds %AnyObject, ptr %0, i32 0, i32 0
+// CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} %AnyObject, ptr %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load ptr, ptr [[ADDR]]
 // CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull(ptr [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr [[REF]])
@@ -733,7 +733,7 @@ func COWBufferForReading(_ ref: __owned C) -> C {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i32 [[FLAGS]], 65536
   // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i32 [[ISNOTPOD]], 0
@@ -752,7 +752,7 @@ func ispod_test() {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_isbitwisetakable_test
 func generic_isbitwisetakable_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i32 [[FLAGS]], 1048576
   // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i32 [[ISNOTBITWISETAKABLE]], 0

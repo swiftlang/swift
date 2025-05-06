@@ -42,12 +42,11 @@
 // specialized InternalThing.computedX.getter
 // CHECK-A-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc [[INT]] @"$s1A13InternalThingV9computedXxvgSi_Ts5"([[INT]]{{( returned)?}} %0)
 // specialized InternalThing.computedX.setter
-// CHECK-A-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s1A13InternalThingV9computedXxvsSi_Ts5"([[INT]] %0, ptr nocapture swiftself {{(writeonly )?}}dereferenceable({{(4|8)}}) %1)
-
+// CHECK-A-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s1A13InternalThingV9computedXxvsSi_Ts5"([[INT]] %0, ptr nocapture swiftself {{(writeonly )?}}dereferenceable({{(4|8)}}){{.*}} %1)
 // specialized InternalThing.subscript.getter
 // CHECK-A-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc [[INT]] @"$s1A13InternalThingVyxSicigSi_Ts5"([[INT]] %0, [[INT]]{{( returned)?}} %1)
 // specialized InternalThing.subscript.setter
-// CHECK-A-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s1A13InternalThingVyxSicisSi_Ts5"([[INT]] %0, [[INT]] %1, ptr nocapture swiftself {{(writeonly )?}}dereferenceable({{(4|8)}}) %2)
+// CHECK-A-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s1A13InternalThingVyxSicisSi_Ts5"([[INT]] %0, [[INT]] %1, ptr nocapture swiftself {{(writeonly )?}}dereferenceable({{(4|8)}}){{.*}} %2)
 
 // specialized InternalRef.compute()
 // CHECK-A-FRAG-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc [[INT:(i64|i32)]] @"$s1A11InternalRefC7computexyFAA09ResilientA10BoxedThingVySiG_Ts5"
