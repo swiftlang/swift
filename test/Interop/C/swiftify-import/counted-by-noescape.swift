@@ -1,7 +1,7 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence | %FileCheck %s
+// RUN: %target-swift-ide-test -target arm64-apple-macos -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
