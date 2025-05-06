@@ -409,7 +409,10 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
              const FrontendOptions &frontendOpts,
              clang::HeaderSearch &clangHeaderSearchInfo,
              const llvm::StringMap<StringRef> &exposedModuleHeaderNames,
-             bool useCxxImport = false) {
+             bool useCxxImport = false,
+             bool useNonModularIncludes = false) {
+  useNonModularIncludes |= frontendOpts.EmitClangHeaderWithNonModularIncludes;
+
   // Note: we can't use has_feature(modules) as it's always enabled in C++20
   // mode.
   out << "#if __has_feature(objc_modules)\n";
@@ -446,7 +449,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
   llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
   llvm::ErrorOr<std::string> cwd = fileSystem.getCurrentWorkingDirectory();
 
-  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+  if (useNonModularIncludes) {
     assert(cwd && "Access to current working directory required");
 
     for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
@@ -498,7 +501,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
       }
       if (seenImports.insert(Name).second) {
         out << importDirective << ' ' << Name.str() << importDirectiveLineEnd;
-        if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+        if (useNonModularIncludes) {
           if (const clang::Module *underlyingClangModule =
                   swiftModule->findUnderlyingClangModule()) {
             collectClangModuleHeaderIncludes(
@@ -521,7 +524,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
       out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << importDirectiveLineEnd;
-      if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
+      if (useNonModularIncludes) {
         collectClangModuleHeaderIncludes(
             clangModule, fileManager, requiredTextualIncludes, visitedModules,
             includeDirs, cwd.get());
@@ -529,11 +532,13 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     }
   }
 
-  if (frontendOpts.EmitClangHeaderWithNonModularIncludes) {
-    out << "#else\n";
-    for (auto header : requiredTextualIncludes) {
+  if (useNonModularIncludes && !requiredTextualIncludes.empty()) {
+    out << "#elif defined(__OBJC__)\n";
+    for (auto header : requiredTextualIncludes)
       out << "#import <" << header << ">\n";
-    }
+    out << "#else\n";
+    for (auto header : requiredTextualIncludes)
+      out << "#include <" << header << ">\n";
   }
   out << "#endif\n\n";
   for (const auto header : textualIncludes) {
@@ -544,8 +549,13 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     if (bridgingHeader.empty())
       out << "#import <" << M.getName().str() << '/' << M.getName().str()
           << ".h>\n\n";
-    else
-      out << "#import \"" << bridgingHeader << "\"\n\n";
+    else {
+      out << "#if defined(__OBJC__)\n";
+      out << "#import \"" << bridgingHeader << "\"\n";
+      out << "#else\n";
+      out << "#include \"" << bridgingHeader << "\"\n";
+      out << "#endif\n\n";
+    }
   }
 }
 
@@ -606,17 +616,24 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
 
   // C content (@cdecl)
+  std::string moduleContentsScratch;
   if (M->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
     SmallPtrSet<ImportModuleTy, 8> imports;
-    emitExternC(os, [&] {
-      printModuleContentsAsC(os, imports, *M, interopContext);
-    });
+    llvm::raw_string_ostream cModuleContents{moduleContentsScratch};
+    printModuleContentsAsC(cModuleContents, imports, *M, interopContext);
+
+    llvm::StringMap<StringRef> exposedModuleHeaderNames;
+    writeImports(os, imports, *M, bridgingHeader, frontendOpts,
+                 clangHeaderSearchInfo, exposedModuleHeaderNames,
+                 /*useCxxImport=*/false, /*useNonModularIncludes*/true);
+
+    emitExternC(os, [&] { os << "\n" << cModuleContents.str(); });
+    moduleContentsScratch.clear();
   }
 
   // Objective-C content
   SmallPtrSet<ImportModuleTy, 8> imports;
-  std::string objcModuleContentsBuf;
-  llvm::raw_string_ostream objcModuleContents{objcModuleContentsBuf};
+  llvm::raw_string_ostream objcModuleContents{moduleContentsScratch};
   printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
   emitObjCConditional(os, [&] {
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
