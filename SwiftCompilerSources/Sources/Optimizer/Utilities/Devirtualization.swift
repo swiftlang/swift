@@ -234,12 +234,17 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     _ context: some MutatingContext
   ) -> Bool {
     let builder = Builder(atBeginOf: block, location: location, context)
-    if let payloadTy = enumCase.payload,
-       !payloadTy.isTrivial(in: parentFunction)
+    if let payloadTy = enumCase.payload
     {
-      let caseAddr = builder.createUncheckedTakeEnumDataAddr(enumAddress: destroyedAddress, caseIndex: enumCase.index)
-      let destroyPayload = builder.createDestroyAddr(address: caseAddr)
-      return devirtualizeDeinits(of: destroyPayload, context)
+      if !payloadTy.isTrivial(in: parentFunction) {
+        let caseAddr = builder.createUncheckedTakeEnumDataAddr(enumAddress: destroyedAddress, caseIndex: enumCase.index)
+        let destroyPayload = builder.createDestroyAddr(address: caseAddr)
+        return devirtualizeDeinits(of: destroyPayload, context)
+      }
+    }
+
+    if !operand.value.type.isTrivial(in: parentFunction) {
+      builder.createEndLifetime(of: operand.value)
     }
     return true
   }

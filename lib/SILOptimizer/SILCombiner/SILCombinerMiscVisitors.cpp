@@ -852,9 +852,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                           IEAI->getOperand()->getType().getObjectType());
     auto storeQual = !func->hasOwnership()
                          ? StoreOwnershipQualifier::Unqualified
-                     : IEAI->getOperand()->getType().isMoveOnly()
-                         ? StoreOwnershipQualifier::Init
-                         : StoreOwnershipQualifier::Trivial;
+                     : IEAI->getOperand()->getType().isTrivial(*func)
+                         ? StoreOwnershipQualifier::Trivial
+                         : StoreOwnershipQualifier::Init;
     Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(), storeQual);
     return eraseInstFromFunction(*IEAI);
   }
@@ -1196,16 +1196,13 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
     if (auto *oldLoad = dyn_cast<LoadInst>(svi)) {
       SILBuilderWithScope localBuilder(oldLoad, Builder);
       // If the old load is trivial and our enum addr is non-trivial, we need to
-      // use a load_borrow here. We know that the unchecked_enum_data will
-      // produce a trivial value meaning that we can just do a
-      // load_borrow/immediately end the lifetime here.
+      // use a load [take] here.
       if (oldLoad->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial &&
           !enumAddr->getType().isTrivial(Builder.getFunction())) {
-        localBuilder.emitScopedBorrowOperation(
-            loc, enumAddr, [&](SILValue newLoad) {
-              newValue = localBuilder.createUncheckedEnumData(
-                  loc, newLoad, enumElt, payloadType);
-            });
+        auto newLoad = localBuilder.emitLoadValueOperation(
+            loc, enumAddr, LoadOwnershipQualifier::Take);
+        newValue = localBuilder.createUncheckedEnumData(loc, newLoad, enumElt,
+                                                        payloadType);
       } else {
         auto newLoad = localBuilder.emitLoadValueOperation(
             loc, enumAddr, oldLoad->getOwnershipQualifier());

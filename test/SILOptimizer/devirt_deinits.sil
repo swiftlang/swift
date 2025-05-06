@@ -217,6 +217,7 @@ bb0(%0 : $*S3<Int>):
 // CHECK:         apply [[D]]([[L]])
 // CHECK-NEXT:    br bb4
 // CHECK:       bb2:
+// CHECK-NEXT:    end_lifetime %0
 // CHECK-NEXT:    br bb4
 // CHECK:       bb3:
 // CHECK-NEXT:    br bb4

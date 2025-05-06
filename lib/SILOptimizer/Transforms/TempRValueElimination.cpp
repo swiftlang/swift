@@ -23,7 +23,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeBits.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -887,8 +886,6 @@ void TempRValueOptPass::run() {
   LLVM_DEBUG(llvm::dbgs() << "Copy Peephole in Func " << function->getName()
                           << "\n");
 
-  SmallVector<SILValue> valuesToComplete;
-
   // Find all copy_addr instructions.
   llvm::SmallSetVector<CopyAddrInst *, 8> deadCopies;
 
@@ -918,16 +915,6 @@ void TempRValueOptPass::run() {
         auto nextIter = std::next(si->getIterator());
 
         ii = tryOptimizeStoreIntoTemp(si);
-
-        // If the optimization was successful, and the stack loc was an enum
-        // type, collect the stored value for lifetime completion.
-        // This is needed because we can have incomplete address lifetimes on
-        // none/trivial paths for an enum type. Once we convert to value form,
-        // this will cause incomplete value lifetimes which can raise ownership
-        // verification errors, because we rely on linear lifetimes in OSSA.
-        if (ii == nextIter && isOrHasEnum) {
-          valuesToComplete.push_back(stored);
-        }
         continue;
       }
 
@@ -955,16 +942,7 @@ void TempRValueOptPass::run() {
     }
   }
 
-  // Call the utlity to complete ossa lifetime.
-  bool completedAny = false;
-  OSSALifetimeCompletion completion(function, da->get(function), deBlocks);
-  for (auto it : valuesToComplete) {
-    auto completed = completion.completeOSSALifetime(
-        it, OSSALifetimeCompletion::Boundary::Liveness);
-    completedAny = (completed == LifetimeCompletion::WasCompleted);
-  }
-
-  if (!deadCopies.empty() || completedAny) {
+  if (!deadCopies.empty()) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 }

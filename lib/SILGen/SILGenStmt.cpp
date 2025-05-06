@@ -1428,6 +1428,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       createBasicBlock(), failExitingBlock,
       [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
+        if (nextResultTyIsAddressOnly) {
+          SGF.enterDestroyCleanup(addrOnlyBuf);
+        }
         scope.exitAndBranch(S);
       },
       SGF.loadProfilerCount(S));

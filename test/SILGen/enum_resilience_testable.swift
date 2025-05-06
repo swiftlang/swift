@@ -20,9 +20,11 @@
 // CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt: bb3, case #Medium.Postcard!enumelt: bb4, default bb5
 // CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr [[BOX]]
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
 // CHECK:       bb2:
+// CHECK-NEXT:    destroy_addr [[BOX]]
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
 // CHECK:       bb3:

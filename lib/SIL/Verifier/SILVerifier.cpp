@@ -2753,8 +2753,6 @@ public:
   }
 
   void checkEndLifetimeInst(EndLifetimeInst *I) {
-    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
-            "Source value should be non-trivial");
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "end_lifetime is only valid in functions with qualified "
             "ownership");
@@ -3024,8 +3022,7 @@ public:
           F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
-      require(Src->getType().isTrivial(*SI->getFunction()) ||
-                  Src->getOwnershipKind() == OwnershipKind::None,
+      require(Src->getType().isTrivial(*SI->getFunction()),
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;

@@ -28,6 +28,12 @@ llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     llvm::cl::desc("Don't abort compilation if the memory lifetime checker "
                    "detects an error."));
 
+llvm::cl::opt<bool> ExcludeTrivialEnumMemoryLifetimeVerification(
+    "exclude-trivial-enum-memory-lifetime-verification",
+    llvm::cl::desc("Exclude memory lifetime verification of enums on "
+                   "trivial/non-payloaded paths"),
+    llvm::cl::init(false));
+
 namespace {
 
 /// A utility for verifying memory lifetime.
@@ -278,7 +284,7 @@ void MemoryLifetimeVerifier::requireBitsClear(const Bits &bits, SILValue addr,
                                              SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
     require(bits & loc->subLocations, "memory is initialized, but shouldn't be",
-            where, /*excludeTrivialEnums*/ true);
+            where, ExcludeTrivialEnumMemoryLifetimeVerification);
   }
 }
 
@@ -636,8 +642,8 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
       BlockState &predState = dataFlow[pred];
       if (predState.reachableFromEntry) {
         require((bs.data.entrySet ^ predState.exitSet) & nonTrivialLocations,
-          "lifetime mismatch in predecessors", pred->getTerminator(),
-          /*excludeTrivialEnums*/ true);
+                "lifetime mismatch in predecessors", pred->getTerminator(),
+                ExcludeTrivialEnumMemoryLifetimeVerification);
       }
     }
 
@@ -651,15 +657,14 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
           "indirect argument is not alive at function return", term);
         require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
                 "memory is initialized at function return but shouldn't be",
-                term,
-                /*excludeTrivialEnums*/ true);
+                term, ExcludeTrivialEnumMemoryLifetimeVerification);
         break;
       case SILInstructionKind::ThrowInst:
         require(expectedThrowBits & ~bs.data.exitSet,
           "indirect argument is not alive at throw", term);
         require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
                 "memory is initialized at throw but shouldn't be", term,
-                /*excludeTrivialEnums*/ true);
+                ExcludeTrivialEnumMemoryLifetimeVerification);
         break;
       default:
         break;
