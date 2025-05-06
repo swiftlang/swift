@@ -158,7 +158,7 @@ extension CopyAddrInst : LoadingInstruction {
       return false
     }
     if !parentFunction.hasOwnership {
-      if !isTakeOfSrc || !isInitializationOfDest {
+      if !isTakeOfSource || !isInitializationOfDestination {
         // For simplicity, bail if we would have to insert compensating retains and releases.
         return false
       }
