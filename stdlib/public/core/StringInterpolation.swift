@@ -216,8 +216,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @backDeployed(before: SwiftStdlib 6.2)
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func appendInterpolation<T>(
     _ value: T?,
     default: @autoclosure () -> some StringProtocol
@@ -247,8 +246,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @backDeployed(before: SwiftStdlib 6.2)
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func appendInterpolation<T>(
     _ value: T?,
     default: @autoclosure () -> some StringProtocol
@@ -278,8 +276,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @backDeployed(before: SwiftStdlib 6.2)
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func appendInterpolation<T>(
     _ value: T?, 
     default: @autoclosure () -> some StringProtocol
@@ -309,8 +306,7 @@ extension DefaultStringInterpolation {
   /// - Parameters:
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
-  @backDeployed(before: SwiftStdlib 6.2)
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func appendInterpolation<T>(
     _ value: T?, 
     default: @autoclosure () -> some StringProtocol
