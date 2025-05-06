@@ -3651,8 +3651,7 @@ namespace {
           }
 
           if (importer::matchSwiftAttrOnRecordPtr<bool>(
-                  retType, {{"returned_as_retained_by_default", true},
-                            {"returned_as_unretained_by_default", true}})) {
+                  retType, {{"returned_as_unretained_by_default", true}})) {
             unannotatedAPIWarningNeeded = false;
           }
 
