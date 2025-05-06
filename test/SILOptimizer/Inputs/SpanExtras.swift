@@ -281,20 +281,6 @@ extension MutableSpan where Element: ~Copyable {
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension MutableSpan where Element: BitwiseCopyable {
-
-  /// Construct a RawSpan over the memory represented by this span
-  ///
-  /// - Returns: a RawSpan over the memory represented by this span
-  @unsafe //FIXME: remove when the lifetime inference is fixed
-  @_alwaysEmitIntoClient
-  public var _unsafeRawSpan: RawSpan {
-    @lifetime(borrow self)
-    get { RawSpan(_unsafeMutableSpan: self) }
-  }
-}
-
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -687,11 +673,91 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 extension OutputSpan: Sendable {}
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension OutputSpan where Element: ~Copyable {
+extension OutputSpan where Element: ~Copyable  {
+  @unsafe
+  @_alwaysEmitIntoClient
+  @lifetime(borrow buffer)
+  public init(
+    _uncheckedBuffer buffer: UnsafeMutableBufferPointer<Element>,
+    initializedCount: Int
+  ) {
+    unsafe _pointer = .init(buffer.baseAddress)
+    capacity = buffer.count
+    _initialized = initializedCount
+  }
 
-@available(macOS 9999, *)
-@available(macOS 9999, *)
-@available(macOS 9999, *)
+  /// Unsafely create an OutputSpan over partly-initialized memory.
+  ///
+  /// The memory in `buffer` must remain valid throughout the lifetime
+  /// of the newly-created `OutputSpan`. Its prefix must contain
+  /// `initializedCount` initialized instances, followed by uninitialized
+  /// memory. The default value of `initializedCount` is 0, representing
+  /// the common case of a completely uninitialized `buffer`.
+  ///
+  /// - Parameters:
+  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - initializedCount: the number of initialized elements
+  ///                       at the beginning of `buffer`.
+  @unsafe
+  @_alwaysEmitIntoClient
+  @lifetime(borrow buffer)
+  public init(
+    buffer: UnsafeMutableBufferPointer<Element>,
+    initializedCount: Int
+  ) {
+    precondition(buffer._isWellAligned(), "Misaligned OutputSpan")
+    if let baseAddress = buffer.baseAddress {
+      precondition(
+        unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
+        "Buffer must not wrap around the address space"
+      )
+    }
+    precondition(
+      0 <= initializedCount && initializedCount <= buffer.count,
+      "OutputSpan count is not within capacity"
+    )
+    unsafe self.init(
+      _uncheckedBuffer: buffer, initializedCount: initializedCount
+    )
+  }
+}
+
+extension UnsafePointer where Pointee: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+  }
+}
+
+extension UnsafeMutablePointer where Pointee: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+  }
+}
+
+extension UnsafeBufferPointer where Element: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned()
+  }
+}
+
+extension UnsafeMutableBufferPointer  where Element: ~Copyable {
+  @inlinable
+  public func _isWellAligned() -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned()
+  }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
+extension OutputSpan where Element: ~Copyable  {
+
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
@@ -767,11 +833,7 @@ extension OutputSpan {
     fromContentsOf source: some Collection<Element>
   ) {
     let void: Void? = source.withContiguousStorageIfAvailable {
-#if false
       append(fromContentsOf: Span(_unsafeElements: $0))
-#else //FIXME: remove once rdar://136838539 & rdar://136849171 are fixed
-      append(fromContentsOf: $0)
-#endif
     }
     if void != nil {
       return
@@ -792,24 +854,6 @@ extension OutputSpan {
     _initialized &+= copied
   }
 
-  //FIXME: remove once rdar://136838539 & rdar://136849171 are fixed
-  @lifetime(self: copy self)
-  public mutating func append(
-    fromContentsOf source: UnsafeBufferPointer<Element>
-  ) {
-    guard !source.isEmpty else { return }
-    precondition(
-      source.count <= available,
-      "destination span cannot contain every element from source."
-    )
-    let tail = _start.advanced(by: _initialized&*MemoryLayout<Element>.stride)
-    source.baseAddress!.withMemoryRebound(to: Element.self, capacity: source.count) {
-      _ = tail.initializeMemory(as: Element.self, from: $0, count: source.count)
-    }
-    _initialized += source.count
-  }
-
-  //FIXME: rdar://136838539 & rdar://136849171
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(
@@ -863,21 +907,8 @@ extension OutputSpan where Element: ~Copyable {
   public mutating func moveAppend(
     fromContentsOf source: UnsafeMutableBufferPointer<Element>
   ) {
-#if false //FIXME: rdar://136838539 & rdar://136849171
-    let source = OutputSpan(_initializing: source, initialized: source.count)
+    let source = OutputSpan(buffer: source, initializedCount: source.count)
     moveAppend(fromContentsOf: source)
-#else
-    guard !source.isEmpty else { return }
-    precondition(
-      source.count <= available,
-      "buffer cannot contain every element from source."
-    )
-    let tail = _start.advanced(by: _initialized&*MemoryLayout<Element>.stride)
-    tail.moveInitializeMemory(
-      as: Element.self, from: source.baseAddress!, count: source.count
-    )
-    _initialized &+= source.count
-#endif
   }
 }
 
@@ -912,11 +943,9 @@ extension OutputSpan where Element: ~Copyable {
     }
   }
 
-  /* FIXME: rdar://147194789 ([nonescapable] 'mutating get' causes a
-     type checking error for non-existent _read accessor)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(borrow self)
+    @lifetime(&self)
     mutating get { // the accessor must provide a mutable projection
       let pointer = _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = UnsafeMutableBufferPointer(start: pointer, count: _initialized)
@@ -924,7 +953,6 @@ extension OutputSpan where Element: ~Copyable {
       return _overrideLifetime(span, mutating: &self)
     }
   }
-   */
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
