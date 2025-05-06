@@ -136,7 +136,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       SM.getEntireTextForBuffer(sourceFile->getBufferID());
   StringRef macroDeclText =
       SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
-          SM, macro->getSourceRangeIncludingAttrs()));
+          SM, macro->getSourceRange()));
 
   auto checkResult = swift_Macros_checkMacroDefinition(
       &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
