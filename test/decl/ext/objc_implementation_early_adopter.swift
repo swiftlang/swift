@@ -432,15 +432,15 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(TypeMatchOptionalityInvalid) extension ObjCClass {
-  func nonPointerResult() -> CInt! { fatalError() } // expected-warning{{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-warning {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-warning{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-warning {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @_objcImplementation(InvalidMembers) extension ObjCClass {
   // expected-warning@-1 {{extension for category 'InvalidMembers' should provide implementation for instance method 'unimplementedMember()'}}
 
   func nonObjCMethod(_: EmptySwiftProto) {
-    // expected-warning@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
+    // expected-warning@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
 
