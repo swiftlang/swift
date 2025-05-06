@@ -34,14 +34,14 @@ public class Argument : Value, Hashable {
 
   public var isLexical: Bool { false }
 
-  public var varDecl: VarDecl? {
+  public func findVarDecl() -> VarDecl? {
     if let varDecl = bridged.getVarDecl().getAs(VarDecl.self) {
       return varDecl
     }
-    return debugUserDecl
+    return findVarDeclFromDebugUsers()
   }
 
-  public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
+  public var sourceLoc: SourceLoc? { findVarDecl()?.nameLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
