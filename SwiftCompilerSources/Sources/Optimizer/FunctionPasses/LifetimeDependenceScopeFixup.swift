@@ -194,19 +194,7 @@ private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ con
       }
       scoped = beginApply
     // None of the below cases can generate a mutable address.
-    case let .owned:
-      fallthrough
-    case let .borrowed:
-      fallthrough
-    case let .local:
-      fallthrough
-    case let .initialized:
-      fallthrough
-    case let .caller:
-      fallthrough
-    case let .global:
-      fallthrough
-    case let .unknown:
+    case .owned, .borrowed, .local, .initialized, .caller, .global, .unknown:
       return
   }
 
