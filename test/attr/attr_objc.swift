@@ -1999,7 +1999,7 @@ class Class_ObjC2 {
   // CHECK-LABEL: @objc(isFoo) func foo() -> Bool {
 }
 
-@objc() // expected-error {{expected name within parentheses of '@objc'}}
+@objc() // expected-error {{expected name within parentheses of @objc attribute}}
 class Class_ObjC3 { 
 }
 
@@ -2016,8 +2016,8 @@ extension PlainClass {
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)
   class func createWithRed(_: Float, green: Float, blue: Float, alpha: Float) { }
-  // expected-error@-2{{missing ':' after selector piece in '@objc'}}{{28-28=:}}
-  // expected-error@-3{{missing ':' after selector piece in '@objc'}}{{39-39=:}}
+  // expected-error@-2{{missing ':' after selector piece in @objc attribute}}{{28-28=:}}
+  // expected-error@-3{{missing ':' after selector piece in @objc attribute}}{{39-39=:}}
 
   // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::) // access-note-move{{PlainClass.badlyNamed(_:y:)}}
