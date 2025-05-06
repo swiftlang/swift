@@ -318,8 +318,8 @@ final public class AssignOrInitInst : Instruction, StoringInstruction {}
 public protocol SourceDestAddrInstruction : Instruction {
   var sourceOperand: Operand { get }
   var destinationOperand: Operand { get }
-  var isTakeOfSrc: Bool { get }
-  var isInitializationOfDest: Bool { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
 }
 
 extension SourceDestAddrInstruction {
@@ -330,10 +330,10 @@ extension SourceDestAddrInstruction {
 }
 
 final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool {
+  public var isTakeOfSource: Bool {
     bridged.CopyAddrInst_isTakeOfSrc()
   }
-  public var isInitializationOfDest: Bool {
+  public var isInitializationOfDestination: Bool {
     bridged.CopyAddrInst_isInitializationOfDest()
   }
 }
@@ -342,10 +342,10 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
 
-  public var isTakeOfSrc: Bool {
+  public var isTakeOfSource: Bool {
     bridged.ExplicitCopyAddrInst_isTakeOfSrc()
   }
-  public var isInitializationOfDest: Bool {
+  public var isInitializationOfDestination: Bool {
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
 }
@@ -542,8 +542,8 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
     CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
   }
 
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 
   public var isolatedConformances: CastingIsolatedConformances {
@@ -723,8 +723,8 @@ class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {
 
 final public
 class UncheckedRefCastAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
 }
 
 final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
@@ -829,7 +829,9 @@ final public
 class DeinitExistentialValueInst : Instruction {}
 
 final public
-class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var isImmutable: Bool { bridged.OpenExistentialAddr_isImmutable() }
+}
 
 final public
 class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
@@ -1318,8 +1320,8 @@ final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, U
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
 final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
 }
 
 final public class CopyableToMoveOnlyWrapperValueInst: SingleValueInstruction, UnaryInstruction {}
@@ -1696,6 +1698,9 @@ final public class ThrowAddrInst : TermInst {
 }
 
 final public class YieldInst : TermInst {
+  public func convention(of operand: Operand) -> ArgumentConvention {
+    return bridged.YieldInst_getConvention(operand.bridged).convention
+  }
 }
 
 final public class UnwindInst : TermInst {
