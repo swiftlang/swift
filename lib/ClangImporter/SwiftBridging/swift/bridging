@@ -193,23 +193,6 @@
 
 /// Applied to a C++ foreign reference type annotated with
 /// SWIFT_SHARED_REFERENCE. Indicates that C++ APIs returning this type are
-/// assumed to return an owned (+1) value by default, unless explicitly annotated with
-/// SWIFT_RETURNS_UNRETAINED.
-///
-/// For example:
-/// ```c++
-/// struct SWIFT_SHARED_REFERENCE(retainFoo, releaseFoo)
-/// SWIFT_RETURNED_AS_RETAINED_BY_DEFAULT
-/// Foo { ... };
-/// ```
-///
-/// In Swift, C++ APIs returning `Foo*` will be assumed to return an owned
-/// value.
-#define SWIFT_RETURNED_AS_RETAINED_BY_DEFAULT                                      \
-  __attribute__((swift_attr("returned_as_retained_by_default")))
-
-/// Applied to a C++ foreign reference type annotated with
-/// SWIFT_SHARED_REFERENCE. Indicates that C++ APIs returning this type are
 /// assumed to return an unowned (+0) value by default, unless explicitly annotated
 /// with SWIFT_RETURNS_RETAINED.
 ///
