@@ -6,7 +6,7 @@
 void simple(int len, const void * __sized_by(len) __noescape p);
 
 void swiftAttr(int len, const void *p) __attribute__((swift_attr(
-    "@_SwiftifyImport(.sizedBy(pointer: .param(2), size: \"len\"), .nonescaping(pointer: .param(2)))")));
+    "@_SwiftifyImport(.sizedBy(pointer: .param(2), size: \"len\"), .nonescaping(pointer: .param(2)), availability: [\"Span\": \"macOS 10.14.4\"])")));
 
 void shared(int len, const void * __sized_by(len) __noescape p1, const void * __sized_by(len) __noescape p2);
 
