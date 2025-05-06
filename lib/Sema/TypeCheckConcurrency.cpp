@@ -5785,28 +5785,8 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       return {};
     };
 
-    // Otherwise, see if we have one specified by our file unit.
-    bool ignoreUnspecifiedMeansMainActorIsolated = false;
-    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
-      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
-        auto options = sourceFile->getLanguageOptions();
-        if (auto isolation = options.defaultIsolation) {
-          if (*isolation) {
-            auto result = globalActorHelper(*options.defaultIsolation);
-            if (result)
-              return *result;
-          } else {
-            // If we found a nil type, then we know we should ignore unspecified
-            // means main actor isolated.
-            ignoreUnspecifiedMeansMainActorIsolated = true;
-          }
-        }
-      }
-    }
-
     // If we are required to use main actor... just use that.
-    if (!ignoreUnspecifiedMeansMainActorIsolated &&
-        ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    if (ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;

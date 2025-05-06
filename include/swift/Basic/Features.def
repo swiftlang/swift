@@ -489,9 +489,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
-/// Allow SwiftSettings
-EXPERIMENTAL_FEATURE(SwiftSettings, false)
-
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
