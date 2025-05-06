@@ -2763,6 +2763,9 @@ public:
       *this << "[keep_unique] ";
     *this << getIDAndType(ECMI->getOperand());
   }
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *ECMI) {
+    *this << getIDAndType(ECMI->getOperand());
+  }
   void visitEndInitLetRefInst(EndInitLetRefInst *I) {
     *this << getIDAndType(I->getOperand());
   }
@@ -4372,6 +4375,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   printSerializedKind(OS, getSerializedKind());
+
+  if (isSpecialized())
+    OS << "[specialized] ";
 
   getConformance()->printName(OS, Options);
   Options.GenericSig =

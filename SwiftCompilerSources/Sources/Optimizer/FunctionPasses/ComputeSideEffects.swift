@@ -70,7 +70,10 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
 
   // Finally replace the function's side effects.
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
+    let globalEffects = function.isProgramTerminationPoint ?
+                            collectedEffects.globalEffects.forProgramTerminationPoints
+                          : collectedEffects.globalEffects
+    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: globalEffects)
   }
 }
 

@@ -506,11 +506,11 @@ void swift::swift_abortRetainUnowned(const void *object) {
   if (object) {
     swift::fatalError(FatalErrorFlags::ReportBacktrace,
                       "Fatal error: Attempted to read an unowned reference but "
-                      "object %p was already deallocated\n", object);
+                      "object %p was already destroyed\n", object);
   } else {
     swift::fatalError(FatalErrorFlags::ReportBacktrace,
                       "Fatal error: Attempted to read an unowned reference but "
-                      "the object was already deallocated\n");
+                      "the object was already destroyed\n");
   }
 }
 

@@ -1576,9 +1576,7 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()))
-                        .subst(subs);
+  auto nativeType = Type(SGF.getASTContext().TheSelfType).subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
   auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
@@ -3815,6 +3813,7 @@ static SILFunction *getOrCreateKeyPathSetter(
   auto semantics = AccessSemantics::Ordinary;
   auto strategy = property->getAccessStrategy(semantics, AccessKind::Write,
                                               SGM.M.getSwiftModule(), expansion,
+                                              std::nullopt,
                                               /*useOldABI=*/false);
 
   LValueOptions lvOptions;
@@ -4152,9 +4151,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto formalCanTy = formalTy->getCanonicalType();
       
       // Get the Equatable conformance from the Hashable conformance.
-      auto equatable = hashable.getAssociatedConformance(
-          GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
-          equatableProtocol);
+      auto equatable = hashable.getAssociatedConformance(C.TheSelfType, equatableProtocol);
 
       assert(equatable.isAbstract() == hashable.isAbstract());
       if (equatable.isConcrete())
@@ -4330,10 +4327,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         hashValueVar->getDeclContext()->getGenericSignatureOfContext();
       assert(hashGenericSig);
       SubstitutionMap hashableSubsMap = SubstitutionMap::get(
-          hashGenericSig,
-          [&](SubstitutableType *type) -> Type { return formalTy; },
-          [&](CanType dependentType, Type replacementType, ProtocolDecl *proto)
-              -> ProtocolConformanceRef { return hashable; });
+          hashGenericSig, formalTy, hashable);
 
       // Read the storage.
       ManagedValue base = ManagedValue::forBorrowedAddressRValue(indexAddr);
@@ -4633,7 +4627,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     auto strategy = storage->getAccessStrategy(
         AccessSemantics::Ordinary,
         storage->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
-        M.getSwiftModule(), expansion,
+        M.getSwiftModule(), expansion, std::nullopt,
         /*useOldABI=*/false);
 
     AbstractStorageDecl *externalDecl = nullptr;
@@ -7178,6 +7172,14 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
 
     if (subType.isLoadable(SGF.F)) {
+      // Trivial types don't undergo any lifetime analysis, so simply load
+      // the value.
+      if (subType.isTrivial(SGF.F)
+          && !address.getType().isMoveOnlyWrapped()) {
+        return RValue(SGF, {SGF.B.createLoadCopy(E, address)},
+                      subType.getASTType());
+      }
+
       // Use a formal access load borrow so this closes in the writeback scope
       // above.
       ManagedValue value = SGF.B.createFormalAccessLoadBorrow(E, address);

@@ -1504,11 +1504,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy =
-          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
-                                module, ResilienceExpansion::Minimal,
-                                /*useOldABI=*/false);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),
@@ -2240,11 +2239,12 @@ public:
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
-    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
-    // compatibility with the Swift 6 diagnostic behavior where we previously
-    // skipped diagnosing.
-    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
-      warnUntilVersion.emplace(7);
+    // Prior to the next language mode, downgrade to a warning if we're in a
+    // macro to preserve compatibility with the Swift 6 diagnostic behavior
+    // where we previously skipped diagnosing.
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+      warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)

@@ -9,7 +9,7 @@
 
 public class X {} // expected-error {{cannot use allocating type 'X' in -no-allocations mode}}
 public func use_a_class() -> X {
-	let x = X() // expected-note {{called from here}}
+	let x = X() // expected-note {{instance of type created here}}
 	return x
 }
 

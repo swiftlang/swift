@@ -175,7 +175,15 @@ public func == (
   case (.none, .none):
     return true
   case let (.some(ty0), .some(ty1)):
+#if compiler(>=5.3) && $GeneralizedIsSameMetaTypeBuiltin
     return Bool(Builtin.is_same_metatype(ty0, ty1))
+#else
+    // FIXME: Remove this branch once all supported compilers understand the
+    // generalized is_same_metatype builtin
+    let p1 = unsafeBitCast(ty0, to: UnsafeRawPointer.self)
+    let p2 = unsafeBitCast(ty1, to: UnsafeRawPointer.self)
+    return p1 == p2
+#endif
   default:
     return false
   }

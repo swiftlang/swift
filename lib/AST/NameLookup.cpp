@@ -323,23 +323,16 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
-      overridden.insert(overrides);
-
-      // Because initializers from Objective-C base classes have greater
-      // visibility than initializers written in Swift classes, we can
-      // have a "break" in the set of declarations we found, where
-      // C.init overrides B.init overrides A.init, but only C.init and
-      // A.init are in the chain. Make sure we still remove A.init from the
-      // set in this case.
-      if (decl->getBaseName().isConstructor()) {
-        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
-        ///        cause instead (incomplete circularity detection).
-        assert(decl != overrides && "Circular class inheritance?");
-        decl = overrides;
-        continue;
+      if (!overridden.insert(overrides).second) {
+        // If we've already seen a decl then there's no need to visit the decls
+        // that it overrides since they should already be in the set. This also
+        // prevents infinite loops in the case that the AST contains an
+        // override chain with a cycle due to circular inheritance.
+        break;
       }
 
-      break;
+      DEBUG_ASSERT(decl != overrides && "Circular class inheritance?");
+      decl = overrides;
     }
   }
 
@@ -2317,6 +2310,13 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (!ObjCMethodLookup && !createObjCMethodLookup())
     return;
 
+  // Only record API decls.
+  Decl *abiRoleDecl = method;
+  if (auto accessor = dyn_cast<AccessorDecl>(method))
+    abiRoleDecl = accessor->getStorage();
+  if (!ABIRoleInfo(abiRoleDecl).providesAPI())
+    return;
+
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
@@ -2736,6 +2736,18 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
         if (auto superclassDecl = classDecl->getSuperclassDecl())
           if (visited.insert(superclassDecl).second)
             stack.push_back(superclassDecl);
+      }
+    }
+
+    // Qualified name lookup can find generic value parameters.
+    auto gpList = current->getGenericParams();
+
+    // .. But not in type contexts (yet)
+    if (!(options & NL_OnlyTypes) && gpList && !member.isSpecial()) {
+      auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
+
+      if (gp && gp->isValue()) {
+        decls.push_back(gp);
       }
     }
 

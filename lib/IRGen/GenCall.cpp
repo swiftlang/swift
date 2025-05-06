@@ -262,10 +262,14 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(
     llvm::Function *projectFn = cast<llvm::Function>(
         (cast<llvm::Constant>(args[2])->stripPointerCasts()));
     auto *fnTy = projectFn->getFunctionType();
-
-    llvm::Value *context =
+    llvm::Value *callerContext = nullptr;
+    if (projectFn == getOrCreateResumePrjFn()) {
+      callerContext = popAsyncContext(calleeContext);
+    } else {
+      callerContext =
         Builder.CreateCallWithoutDbgLoc(fnTy, projectFn, {calleeContext});
-    storeCurrentAsyncContext(context);
+    }
+    storeCurrentAsyncContext(callerContext);
   }
 
   return id;
@@ -5113,9 +5117,7 @@ void irgen::emitYieldOnceCoroutineEntry(
   auto *buffer = emission.getCoroutineBuffer();
   llvm::SmallVector<llvm::Value *, 2> finalArgs;
   llvm::Constant *allocFn = nullptr;
-  if (IGF.getOptions().EmitTypeMallocForCoroFrame
-      && !llvm::Triple(IGF.IGM.Triple).isOSLinux()
-      && !llvm::Triple(IGF.IGM.Triple).isOSWindows()) {
+  if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
     // Use swift_coroFrameAllocStub to emit our allocator.

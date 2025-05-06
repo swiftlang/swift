@@ -81,6 +81,8 @@ add_library(swift_Concurrency
   PartialAsyncTask.swift
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
+  PlatformExecutorFreeBSD.swift
+  PlatformExecutorOpenBSD.swift
   PlatformExecutorWindows.swift
   PriorityQueue.swift
   SourceCompatibilityShims.swift
@@ -130,6 +132,10 @@ target_link_libraries(swift_Concurrency PRIVATE
 set_target_properties(swift_Concurrency PROPERTIES
   Swift_MODULE_NAME _Concurrency
   LINKER_LANGUAGE CXX)
+if(NOT BUILD_SHARED_LIBS AND CMAKE_STATIC_LIBRARY_PREFIX_Swift)
+  set_target_properties(swift_Concurrency PROPERTIES
+    PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX_Swift})
+endif()
 
 install(TARGETS swift_Concurrency
   EXPORT SwiftCoreTargets

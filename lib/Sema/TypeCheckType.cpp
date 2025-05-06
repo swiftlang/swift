@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckType.h"
-#include "AsyncCallerExecutionMigration.h"
+#include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
@@ -967,16 +967,8 @@ static Type applyGenericArguments(Type type,
     }
     
     // Try to form a substitution map.
-    auto subs = SubstitutionMap::get(bug->getGenericSignature(),
-                                     args,
-                                     [&](CanType dependentType,
-                                         Type conformingReplacementType,
-                                         ProtocolDecl *conformedProtocol)
-                                     -> ProtocolConformanceRef {
-                                       // no generic builtins have conformance
-                                       // requirements yet.
-                                       llvm_unreachable("not implemented yet");
-                                     });
+    auto subs = SubstitutionMap::get(bug->getGenericSignature(), args,
+                                     LookUpConformanceInModule());
                                      
     auto bound = bug->getBound(subs);
     
@@ -4245,8 +4237,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
   } else {
-    if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
-            .isEnabledForAdoption()) {
+    if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
+            .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
@@ -6335,6 +6327,18 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
     resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, {}, resultType);
   }
 
+  // However, if overload resolution finds a value generic decl from name
+  // lookup, replace the returned member type to be the underlying value type
+  // of the generic.
+  //
+  // This can occur in code that does something like: 'type(of: x).a' where
+  // 'a' is the static value generic member.
+  if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
+    if (gp->isValue()) {
+      resultType = gp->getValueType();
+    }
+  }
+
   return resultType;
 }
 
@@ -6560,7 +6564,7 @@ private:
     // A missing `any` or `some` is always diagnosed if this feature not
     // disabled.
     auto featureState = ctx.LangOpts.getFeatureState(Feature::ExistentialAny);
-    if (featureState.isEnabled() || featureState.isEnabledForAdoption()) {
+    if (featureState.isEnabled() || featureState.isEnabledForMigration()) {
       return true;
     }
 
@@ -6653,10 +6657,10 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    // If `ExistentialAny` is enabled in adoption mode, warn unconditionally.
+    // If `ExistentialAny` is enabled in migration mode, warn unconditionally.
     // Otherwise, warn until the feature's coming-of-age language mode.
     const auto feature = Feature::ExistentialAny;
-    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption()) {
+    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForMigration()) {
       diag->limitBehavior(DiagnosticBehavior::Warning);
     } else {
       diag->warnUntilSwiftVersion(feature.getLanguageVersion().value());

@@ -1387,9 +1387,9 @@ public:
 class SpecializedConformanceInfo : public ConformanceInfo {
   friend ProtocolInfo;
 
-  const SpecializedProtocolConformance *Conformance;
+  const ProtocolConformance *Conformance;
 public:
-  SpecializedConformanceInfo(const SpecializedProtocolConformance *C)
+  SpecializedConformanceInfo(const ProtocolConformance *C)
       : Conformance(C) {}
 
   llvm::Value *getTable(IRGenFunction &IGF,
@@ -2225,7 +2225,6 @@ namespace {
         Flags = Flags.withIsSynthesizedNonUnique(conf->isSynthesizedNonUnique());
         Flags = Flags.withIsConformanceOfProtocol(conf->isConformanceOfProtocol());
         Flags = Flags.withHasGlobalActorIsolation(isolation.isGlobalActor());
-        Flags = withSerialExecutorCheckingModeFlags(Flags, conf);
       } else {
         Flags = Flags.withIsRetroactive(false)
                      .withIsSynthesizedNonUnique(false);
@@ -2348,12 +2347,6 @@ namespace {
               LinkEntity::forBaseConformanceDescriptor(requirement));
           B.addRelativeAddress(baseConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
-          // distributed thunks don't need resilience
-          if (entry.getMethodWitness().Requirement.isDistributedThunk()) {
-            witnesses = witnesses.drop_back();
-            continue;
-          }
-
           // Method descriptor.
           auto declRef = entry.getMethodWitness().Requirement;
           auto requirement =
@@ -2448,31 +2441,6 @@ namespace {
       B.addRelativeAddress(globalActorConformanceDescriptor);
     }
 
-    static ConformanceFlags
-    withSerialExecutorCheckingModeFlags(ConformanceFlags Flags, const NormalProtocolConformance *conf) {
-      ProtocolDecl *proto = conf->getProtocol();
-      auto &C = proto->getASTContext();
-
-      ConformanceFlags UpdatedFlags = Flags;
-      if (proto->isSpecificProtocol(swift::KnownProtocolKind::SerialExecutor)) {
-        conf->forEachValueWitness([&](const ValueDecl *req,
-                                      Witness witness) {
-          bool nameMatch = witness.getDecl()->getBaseIdentifier() == C.Id_isIsolatingCurrentContext;
-          if (nameMatch) {
-            if (DeclContext *NominalOrExtension = witness.getDecl()->getDeclContext()) {
-              // If the witness is NOT the default implementation in the _Concurrency library,
-              // we should record that this is an user provided implementation and we should call it.
-              bool hasNonDefaultIsIsolatingCurrentContext =
-                  !NominalOrExtension->getParentModule()->isConcurrencyModule();
-              UpdatedFlags = UpdatedFlags.withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
-                            hasNonDefaultIsIsolatingCurrentContext);
-            }
-          }
-        });
-      }
-
-      return UpdatedFlags;
-    }
   };
 }
 
@@ -2608,8 +2576,15 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   const ConformanceInfo *info;
 
   auto *specConf = conformance;
-  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance))
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance)) {
+    SILWitnessTable *wt = getSILModule().lookUpWitnessTable(inheritedC);
+    if (wt && wt->getConformance() == inheritedC) {
+      info = new SpecializedConformanceInfo(inheritedC);
+      Conformances.try_emplace(conformance, info);
+      return *info;
+    }
     specConf = inheritedC->getInheritedConformance();
+  }
 
   // If there is a specialized SILWitnessTable for the specialized conformance,
   // directly use it.

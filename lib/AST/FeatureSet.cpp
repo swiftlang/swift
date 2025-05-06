@@ -12,6 +12,7 @@
 
 #include "FeatureSet.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -108,7 +109,6 @@ UNINTERESTING_FEATURE(UnqualifiedLookupValidation)
 UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
-UNINTERESTING_FEATURE(ImportSymbolicCXXDecls)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
@@ -123,7 +123,7 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(AsyncCallerExecution)
+UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
@@ -293,6 +293,23 @@ static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
   }
 }
 
+static bool usesFeatureLifetimeDependenceMutableAccessors(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
+    return false;
+  }
+  auto var = cast<VarDecl>(decl);
+  if (!var->isGetterMutating()) {
+    return false;
+  }
+  if (auto dc = var->getDeclContext()) {
+    if (auto nominal = dc->getSelfNominalTypeDecl()) {
+      auto sig = nominal->getGenericSignature();
+      return !var->getInterfaceType()->isEscapable(sig);
+    }
+  }
+  return false;
+}
+
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -392,6 +409,11 @@ static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureCDecl(Decl *decl) {
+  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
+  return attr && !attr->Underscored;
+}
+
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<SafeAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeAttr>())
@@ -470,6 +492,54 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   return false;
 }
 
+class UsesTypeValueExpr : public ASTWalker {
+public:
+  bool used = false;
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    if (isa<TypeValueExpr>(expr)) {
+      used = true;
+      return Action::Stop();
+    }
+
+    return Action::Continue(expr);
+  }
+};
+
+static bool usesFeatureValueGenericsNameLookup(Decl *decl) {
+  // Be conservative and mark any function that has a TypeValueExpr in its body
+  // as having used this feature. It's a little difficult to fine grain this
+  // check because the following:
+  //
+  // func a() -> Int {
+  //   A<123>.n
+  // }
+  //
+  // Would appear to have the same expression as something like:
+  //
+  // extension A where n == 123 {
+  //   func b() -> Int {
+  //     n
+  //   }
+  // }
+
+  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
+
+  if (!fn)
+    return false;
+
+  auto body = fn->getMacroExpandedBody();
+
+  if (!body)
+    return false;
+
+  UsesTypeValueExpr utve;
+
+  body->walk(utve);
+
+  return utve.used;
+}
+
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
     return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
@@ -488,6 +558,8 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
     return false;
   }
 }
+
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 
 static bool usesFeatureCustomAvailability(Decl *decl) {
   for (auto attr : decl->getSemanticAvailableAttrs()) {
@@ -551,6 +623,10 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
     return true;
 
   return false;
+}
+
+static bool usesFeatureExtensibleAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ExtensibleAttr>();
 }
 
 // ----------------------------------------------------------------------------
@@ -638,8 +714,12 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
   while (!features.empty()) {
+    // If we were in an @abi attribute, collect from the API counterpart.
+    auto abiRole = ABIRoleInfo(enclosingDecl);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      enclosingDecl = abiRole.getCounterpart();
     // Find the next outermost enclosing declaration.
-    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+    else if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
     else
       enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();

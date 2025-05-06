@@ -4110,6 +4110,7 @@ public:
     bool isIsolated;
     bool isCompileTimeLiteral, isConstValue;
     bool isSending;
+    bool isCallerIsolated;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -4122,6 +4123,7 @@ public:
                                          isCompileTimeLiteral,
                                          isConstValue,
                                          isSending,
+                                         isCallerIsolated,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -4167,6 +4169,7 @@ public:
     param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setConstValue(isConstValue);
     param->setSending(isSending);
+    param->setCallerIsolated(isCallerIsolated);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -5988,9 +5991,10 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::CDecl_DECL_ATTR: {
         bool isImplicit;
+        bool isUnderscored;
         serialization::decls_block::CDeclDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) CDeclAttr(blobData, isImplicit);
+            scratch, isImplicit, isUnderscored);
+        Attr = new (ctx) CDeclAttr(blobData, isImplicit, isUnderscored);
         break;
       }
 
@@ -7617,12 +7621,13 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
   unsigned rawParamKind;
   bool hasDecl;
   unsigned depth;
+  unsigned weight;
   unsigned index;
   DeclID declOrIdentifier;
   TypeID valueTypeID;
 
   decls_block::GenericTypeParamTypeLayout::readRecord(
-      scratch, rawParamKind, hasDecl, depth, index, declOrIdentifier,
+      scratch, rawParamKind, hasDecl, depth, weight, index, declOrIdentifier,
       valueTypeID);
 
   auto paramKind = getActualParamKind(rawParamKind);
@@ -7651,10 +7656,11 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
     return valueType.takeError();
 
   if (declOrIdentifier == 0) {
-    return GenericTypeParamType::get(*paramKind, depth, index, *valueType,
+    return GenericTypeParamType::get(*paramKind, depth, index, weight, *valueType,
                                      MF.getContext());
   }
 
+  ASSERT(weight == 0);
   auto name = MF.getDeclBaseName(declOrIdentifier).getIdentifier();
   return GenericTypeParamType::get(name, *paramKind, depth, index, *valueType,
                                    MF.getContext());

@@ -1395,6 +1395,12 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     }
   }
 
+  // Macros are so spectacularly not valid in an `@abi` attribute that we cannot
+  // even attempt to expand them.
+  if (!ABIRoleInfo(attachedTo).providesAPI()) {
+    return nullptr;
+  }
+
   ASTContext &ctx = dc->getASTContext();
 
   auto moduleDecl = dc->getParentModule();
@@ -2146,8 +2152,8 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     for (auto i : inheritedTypes.getIndices()) {
       auto constraint =
           TypeResolution::forInterface(
-              extension->getDeclContext(),
-              TypeResolverContext::GenericRequirement,
+              extension,
+              TypeResolverContext::Inherited,
               /*unboundTyOpener*/ nullptr,
               /*placeholderHandler*/ nullptr,
               /*packElementOpener*/ nullptr)

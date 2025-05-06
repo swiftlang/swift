@@ -415,6 +415,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           return SILIsolationInfo::getGlobalActorIsolated(SILValue(), selfASTType);
         }
 
+        if (auto *fArg = dyn_cast<SILFunctionArgument>(actualIsolatedValue)) {
+          if (auto info =
+                  SILIsolationInfo::getActorInstanceIsolated(fArg, fArg))
+            return info;
+        }
+
         // TODO: We really should be doing this based off of an Operand. Then
         // we would get the SILValue() for the first element. Today this can
         // only mess up isolation history.
@@ -449,7 +455,21 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           }
         }
 
+        // Ok, we found an actor instance. Look for our actual isolated value.
         if (actorInstance) {
+          if (auto actualIsolatedValue =
+                  ActorInstance::getForValue(actorInstance)) {
+            // See if we have a function parameter. In that case, we want to see
+            // if we have a function argument. In such a case, we need to use
+            // the right parameter and the var decl.
+            if (auto *fArg = dyn_cast<SILFunctionArgument>(
+                    actualIsolatedValue.getValue())) {
+              if (auto info =
+                      SILIsolationInfo::getActorInstanceIsolated(pai, fArg))
+                return info;
+            }
+          }
+
           return SILIsolationInfo::getActorInstanceIsolated(
               pai, actorInstance, actorIsolation.getActor());
         }
@@ -479,6 +499,14 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // This is important so we properly handle setters.
   if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(rei->getField());
+
+    if (auto instance = ActorInstance::getForValue(rei->getOperand())) {
+      if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
+              instance.maybeGetValue())) {
+        if (auto info = SILIsolationInfo::getActorInstanceIsolated(rei, fArg))
+          return info.withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+      }
+    }
 
     auto *nomDecl =
         rei->getOperand()->getType().getNominalOrBoundGenericNominal();
@@ -680,7 +708,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // See if we have a struct_extract from a global actor isolated type.
+  // See if we have a struct_extract from a global-actor-isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(sei->getField());
     if (auto isolation =
@@ -701,12 +729,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         varIsolation.isNonisolatedUnsafe());
   }
 
-  // See if we have an unchecked_enum_data from a global actor isolated type.
+  // See if we have an unchecked_enum_data from a global-actor-isolated type.
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(uedi, uedi->getEnumDecl());
   }
 
-  // See if we have an unchecked_enum_data from a global actor isolated type.
+  // See if we have an unchecked_enum_data from a global-actor-isolated type.
   if (auto *utedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(utedi,
                                                     utedi->getEnumDecl());
@@ -726,7 +754,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // See if we have a convert function from a Sendable actor isolated function,
+  // See if we have a convert function from a Sendable actor-isolated function,
   // we want to treat the result of the convert function as being actor isolated
   // so that we cannot escape the value.
   //
@@ -837,7 +865,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (!SILIsolationInfo::isNonSendableType(arg->getType(), arg->getFunction()))
     return {};
 
-  // Handle a switch_enum from a global actor isolated type.
+  // Handle a switch_enum from a global-actor-isolated type.
   if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
     if (auto *singleTerm = phiArg->getSingleTerminator()) {
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
@@ -868,11 +896,11 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
-  if (auto *isolatedArg = fArg->getFunction()->maybeGetIsolatedArgument()) {
+  if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
+          fArg->getFunction()->maybeGetIsolatedArgument())) {
     auto astType = isolatedArg->getType().getASTType();
-    if (auto *nomDecl = astType->lookThroughAllOptionalTypes()->getAnyActor()) {
-      return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg,
-                                                        nomDecl);
+    if (astType->lookThroughAllOptionalTypes()->getAnyActor()) {
+      return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);
     }
   }
 
@@ -885,7 +913,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     // disconnected so we can construct the actor value. Users cannot write
     // allocator functions so we just need to worry about compiler generated
     // code. In the case of a non-actor, we can only have an allocator that is
-    // global actor isolated, so we will never hit this code path.
+    // global-actor isolated, so we will never hit this code path.
     if (declRef.kind == SILDeclRef::Kind::Allocator) {
       if (auto isolation = fArg->getFunction()->getActorIsolation()) {
         if (isolation->isActorInstanceIsolated()) {
@@ -1017,10 +1045,10 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
   }
 }
 
-bool SILIsolationInfo::hasSameIsolation(ActorIsolation actorIsolation) const {
+bool SILIsolationInfo::hasSameIsolation(ActorIsolation other) const {
   if (getKind() != Kind::Actor)
     return false;
-  return getActorIsolation() == actorIsolation;
+  return getActorIsolation() == other;
 }
 
 bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
@@ -1040,7 +1068,7 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     // If either have an actor instance, and the actor instance doesn't match,
     // return false.
     //
-    // This ensures that cases like comparing two global actor isolated things
+    // This ensures that cases like comparing two global-actor-isolated things
     // do not hit this path.
     //
     // It also catches cases where we have a missing actor instance.
@@ -1360,6 +1388,25 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
 
   // Otherwise, just return other.
   return {other};
+}
+
+void ActorInstance::print(llvm::raw_ostream &os) const {
+  os << "Actor Instance. Kind: ";
+  switch (getKind()) {
+  case Kind::Value:
+    os << "Value.";
+    break;
+  case Kind::ActorAccessorInit:
+    os << "ActorAccessorInit.";
+    break;
+  case Kind::CapturedActorSelf:
+    os << "CapturedActorSelf.";
+    break;
+  }
+
+  if (auto value = maybeGetValue()) {
+    os << " Value: " << value;
+  };
 }
 
 //===----------------------------------------------------------------------===//

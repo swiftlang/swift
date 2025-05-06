@@ -26,7 +26,7 @@ struct IBDesignableStructTy {}
 @IBDesignable // expected-error {{'@IBDesignable' attribute cannot be applied to this declaration}} {{1-15=}}
 protocol IBDesignableProtTy {}
 
-@IBDesignable // expected-error {{@IBDesignable can only be applied to classes and extensions of classes}} {{1-15=}}
+@IBDesignable // expected-error {{'@IBDesignable' can only be applied to classes and extensions of classes}} {{1-15=}}
 extension IBDesignableStructTy {}
 
 class IBDesignableClassExtensionTy {}
@@ -284,13 +284,13 @@ var globalUncheckedVar = 1
 var globalUnknownVar = 1
 
 struct ExclusivityAttrStruct {
-  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on class properties, static properties and global variables}}
+  @exclusivity(unchecked) // expected-error {{'@exclusivity' can only be used on class properties, static properties and global variables}}
   var instanceVar: Int = 27
 
   @exclusivity(unchecked) // ok
   static var staticVar: Int = 27
 
-  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on stored properties}}
+  @exclusivity(unchecked) // expected-error {{'@exclusivity' can only be used on stored properties}}
   static var staticComputedVar: Int { return 1 }
 }
 
@@ -301,7 +301,7 @@ class ExclusivityAttrClass {
   @exclusivity(unchecked) // ok
   static var staticVar: Int = 27
 
-  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on stored properties}}
+  @exclusivity(unchecked) // expected-error {{'@exclusivity' can only be used on stored properties}}
   static var staticComputedVar: Int { return 1 }
 }
 
@@ -331,10 +331,10 @@ func unownedOptionals(x: C) {
 
 // @_nonEphemeral attribute
 struct S1<T> {
-  func foo(@_nonEphemeral _ x: String) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
-  func bar(@_nonEphemeral _ x: T) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
+  func foo(@_nonEphemeral _ x: String) {} // expected-error {{'@_nonEphemeral' only applies to pointer types}}
+  func bar(@_nonEphemeral _ x: T) {} // expected-error {{'@_nonEphemeral' only applies to pointer types}}
 
-  func baz<U>(@_nonEphemeral _ x: U) {} // expected-error {{@_nonEphemeral attribute only applies to pointer types}}
+  func baz<U>(@_nonEphemeral _ x: U) {} // expected-error {{'@_nonEphemeral' only applies to pointer types}}
 
   func qux(@_nonEphemeral _ x: UnsafeMutableRawPointer) {}
   func quux(@_nonEphemeral _ x: UnsafeMutablePointer<Int>?) {}

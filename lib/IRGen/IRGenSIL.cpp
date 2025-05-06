@@ -1438,6 +1438,7 @@ public:
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i);
   void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
@@ -3861,6 +3862,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
+  // Lower the arguments and return value in the callee's generic context.
+  GenericContextScope scope(IGM,
+                            origCalleeType->getInvocationGenericSignature());
+
   Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
@@ -3872,9 +3877,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   emission->begin();
-
-  // Lower the arguments and return value in the callee's generic context.
-  GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   auto &calleeFP = emission->getCallee().getFunctionPointer();
 
@@ -6363,6 +6365,10 @@ void IRGenSILFunction::visitBeginCOWMutationInst(BeginCOWMutationInst *i) {
 void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
   Explosion v = getLoweredExplosion(i->getOperand());
   setLoweredExplosion(i, v);
+}
+
+void IRGenSILFunction::visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i) {
+  // end_cow_mutation_addr is purely for SIL.
 }
 
 void IRGenSILFunction::visitDestroyNotEscapedClosureInst(

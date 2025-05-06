@@ -61,6 +61,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -2140,8 +2141,7 @@ namespace {
       }
 
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
-      if (decl->getTypeForDecl()->isDependentType() &&
-          !Impl.importSymbolicCXXDecls) {
+      if (decl->getTypeForDecl()->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
                       diag::record_is_dependent,
@@ -3067,11 +3067,8 @@ namespace {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
-      if ((semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
-           semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) &&
-          // Let un-specialized class templates through. We'll sort out their
-          // members once they're instantiated.
-          !Impl.importSymbolicCXXDecls) {
+      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
+          semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
 
         HeaderLoc loc(decl->getLocation());
         if (hasUnsafeAPIAttr(decl))
@@ -3266,12 +3263,6 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      // Treat a specific specialization like the unspecialized class template
-      // when importing it in symbolic mode.
-      if (Impl.importSymbolicCXXDecls)
-        return Impl.importDecl(decl->getSpecializedTemplate(),
-                               Impl.CurrentVersion);
-
       bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
                     decl->getSpecializedTemplate()->getName() == "pair";
 
@@ -3664,6 +3655,12 @@ namespace {
             unannotatedAPIWarningNeeded = true;
           }
 
+          if (importer::matchSwiftAttrOnRecordPtr<bool>(
+                  retType, {{"returned_as_retained_by_default", true},
+                            {"returned_as_unretained_by_default", true}})) {
+            unannotatedAPIWarningNeeded = false;
+          }
+
           if (unannotatedAPIWarningNeeded) {
             HeaderLoc loc(decl->getLocation());
             Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
@@ -3952,8 +3949,6 @@ namespace {
               Impl.SwiftContext, SourceLoc(), templateParams, SourceLoc());
       }
 
-      bool importFuncWithoutSignature =
-          isa<clang::CXXMethodDecl>(decl) && Impl.importSymbolicCXXDecls;
       if (!dc->isModuleScopeContext() && !isClangNamespace(dc) &&
           !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
@@ -4020,39 +4015,12 @@ namespace {
           importedType =
               Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
       } else {
-        if (importFuncWithoutSignature) {
-          importedType = ImportedType{Impl.SwiftContext.getVoidType(), false};
-          if (decl->param_empty())
-            bodyParams = ParameterList::createEmpty(Impl.SwiftContext);
-          else {
-            llvm::SmallVector<ParamDecl *, 4> params;
-            for (const auto &param : decl->parameters()) {
-
-              Identifier bodyName =
-                  Impl.importFullName(param, Impl.CurrentVersion)
-                      .getBaseIdentifier(Impl.SwiftContext);
-              auto paramInfo = Impl.createDeclWithClangNode<ParamDecl>(
-                  param, AccessLevel::Private, SourceLoc(), SourceLoc(),
-                  Identifier(), Impl.importSourceLoc(param->getLocation()),
-                  bodyName, Impl.ImportedHeaderUnit);
-              paramInfo->setSpecifier(ParamSpecifier::Default);
-              paramInfo->setInterfaceType(Impl.SwiftContext.TheAnyType);
-              if (param->hasDefaultArg()) {
-                paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
-                paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
-              }
-              params.push_back(paramInfo);
-            }
-            bodyParams = ParameterList::create(Impl.SwiftContext, params);
-          }
-        } else {
-          // Import the function type. If we have parameters, make sure their
-          // names get into the resulting function type.
-          importedType = Impl.importFunctionParamsAndReturnType(
-              dc, decl, {decl->param_begin(), decl->param_size()},
-              decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
-              templateParams);
-        }
+        // Import the function type. If we have parameters, make sure their
+        // names get into the resulting function type.
+        importedType = Impl.importFunctionParamsAndReturnType(
+            dc, decl, {decl->param_begin(), decl->param_size()},
+            decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
+            templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
           if (mdecl->isStatic()) {
@@ -4110,6 +4078,15 @@ namespace {
         if (ctordecl->isCopyConstructor() || ctordecl->isMoveConstructor())
           return nullptr;
 
+        // Don't import the generic ctors of std::span, rely on the ctors that
+        // we instantiate when conforming to the overlay. These generic ctors
+        // can cause crashes in codegen.
+        // FIXME: figure out why.
+        const auto *parent = ctordecl->getParent();
+        if (funcTemplate && parent->isInStdNamespace() &&
+            parent->getIdentifier() && parent->getName() == "span")
+          return nullptr;
+
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
@@ -4150,12 +4127,10 @@ namespace {
         }
         func->setAccess(importer::convertClangAccess(decl->getAccess()));
 
-        if (!importFuncWithoutSignature) {
-          bool success = processSpecialImportedFunc(
-              func, importedName, decl->getOverloadedOperator());
-          if (!success)
-            return nullptr;
-        }
+        bool success = processSpecialImportedFunc(
+            func, importedName, decl->getOverloadedOperator());
+        if (!success)
+          return nullptr;
       }
 
       result->setIsObjC(false);
@@ -4198,7 +4173,8 @@ namespace {
         return;
 
       // FIXME: support C functions imported as members.
-      if (result->getImportAsMemberStatus().isImportAsMember() &&
+      if (!isClangNamespace(result->getDeclContext()) &&
+          result->getImportAsMemberStatus().isImportAsMember() &&
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
@@ -4469,6 +4445,33 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+      if (decl->hasAttr<clang::NoUniqueAddressAttr>()) {
+        if (const auto *rd = decl->getType()->getAsRecordDecl()) {
+          // Clang can store the next field in the padding of this one. Swift
+          // does not support this yet so let's not import the field and
+          // represent it with an opaque blob in codegen.
+          //
+          // This check is not relevant when importing the decl symbolically
+          // (since that isn't used for codegen). In fact, we need to avoid this
+          // check because symbolic imports can expose us to dependent types
+          // whose ASTRecordLayout cannot be queried.
+          const auto &fieldLayout =
+              decl->getASTContext().getASTRecordLayout(rd);
+          auto &clangCtx = decl->getASTContext();
+          if (!decl->isZeroSize(clangCtx) &&
+              fieldLayout.getDataSize() != fieldLayout.getSize()) {
+            const auto *parent = decl->getParent();
+            auto currIdx = decl->getFieldIndex();
+            auto nextIdx = currIdx + 1;
+            const auto &parentLayout = clangCtx.getASTRecordLayout(parent);
+            if (parentLayout.getFieldCount() > nextIdx &&
+                parentLayout.getFieldOffset(nextIdx) <
+                    (parentLayout.getFieldOffset(currIdx) +
+                     clangCtx.toBits(fieldLayout.getSize())))
+              return nullptr;
+          }
+        }
+      }
       // Fields are imported as variables.
       std::optional<ImportedName> correctSwiftName;
       ImportedName importedName;
@@ -4583,19 +4586,70 @@ namespace {
       if (dc->isTypeContext())
         isStatic = true;
 
-      // For now we don't import static constexpr
+      // For now we don't import static constexpr. TODO: Lift this restriction.
       if (isStatic && decl->isConstexpr())
         return nullptr;
 
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
                         ? VarDecl::Introducer::Let
                         : VarDecl::Introducer::Var;
-      auto result = Impl.createDeclWithClangNode<VarDecl>(
-          decl, importer::convertClangAccess(decl->getAccess()),
-          /*IsStatic*/ isStatic, introducer,
-          Impl.importSourceLoc(decl->getLocation()), name, dc);
-      result->setIsObjC(false);
-      result->setIsDynamic(false);
+
+      ValueDecl *result = nullptr;
+
+      bool initIsEvaluatable = false;
+      if (auto init = decl->getInit()) {
+        // Don't import values for partial specializations. TODO: Should we stop
+        // importing partially specialized variables completely?
+        bool partial = isa<clang::VarTemplatePartialSpecializationDecl>(decl);
+
+        // Don't import values when type-dependent or value-dependent.
+        bool typeDependent = decl->getType()->isDependentType();
+        bool valueDependent = init->isValueDependent();
+
+        initIsEvaluatable = !partial && !typeDependent && !valueDependent;
+      }
+
+      // If the variable is const (we're importing it as a let), and has an
+      // initializer, then ask Clang for its constant value and synthesize a
+      // getter with that value.
+      if (introducer == VarDecl::Introducer::Let && initIsEvaluatable) {
+        auto val = decl->evaluateValue();
+        // For now, only import integer and float constants. If in the future
+        // SwiftDeclSynthesizer::createConstant becomes able to import more
+        // types, we can lift this restriction.
+        if (val && (val->isFloat() || val->isInt())) {
+          auto type = Impl.importTypeIgnoreIUO(
+              decl->getType(), ImportTypeKind::Value,
+              ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+              isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
+
+          // FIXME: Handle CGFloat too.
+          if (type && !type->isCGFloat()) {
+            auto convertKind = ConstantConvertKind::None;
+            // Request conversions on enums, and swift_wrapper((enum/struct))
+            // types
+            if (decl->getType()->isEnumeralType())
+              convertKind = ConstantConvertKind::Construction;
+            else if (findSwiftNewtype(decl, Impl.getClangSema(),
+                                      Impl.CurrentVersion))
+              convertKind = ConstantConvertKind::Construction;
+
+            result = synthesizer.createConstant(
+                name, dc, type, *val, convertKind, isStatic, decl,
+                importer::convertClangAccess(decl->getAccess()));
+          }
+        }
+      }
+
+      // Otherwise, import as an external declaration
+      if (!result) {
+        result = Impl.createDeclWithClangNode<VarDecl>(
+            decl, importer::convertClangAccess(decl->getAccess()),
+            /*IsStatic*/ isStatic, introducer,
+            Impl.importSourceLoc(decl->getLocation()), name, dc);
+        result->setIsObjC(false);
+        result->setIsDynamic(false);
+      }
 
       // If imported as member, the member should be final.
       if (dc->getSelfClassDecl())
@@ -4653,15 +4707,10 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      if (Impl.importSymbolicCXXDecls)
-        // Import an unspecialized C++ class template as a Swift value/class
-        // type in symbolic mode.
-        return Impl.importDecl(decl->getTemplatedDecl(), Impl.CurrentVersion);
-
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto dc = Impl.importDeclContextOf(
           decl, importedName.getEffectiveContext());
-      
+
       SmallVector<GenericTypeParamDecl *, 4> genericParams;
       for (auto &param : *decl->getTemplateParameters()) {
         auto genericParamDecl =
@@ -5444,7 +5493,7 @@ namespace {
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
                                               std::move(objcClass));
-      
+
       Identifier categoryName;
       if (!decl->getName().empty())
         categoryName = Impl.SwiftContext.getIdentifier(decl->getName());
@@ -9071,6 +9120,9 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   if (!ClangDecl)
     return;
 
+  if (ClangDecl->getNumParams() != MappedDecl->getParameters()->size())
+    return;
+
   llvm::SmallString<128> MacroString;
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
@@ -9486,7 +9538,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result = importDecl(UnderlyingDecl, version);
     SkippedOverTypedef = true;
   }
-  
+
   if (!Result) {
     SwiftDeclConverter converter(*this, version);
     Result = converter.Visit(ClangDecl);

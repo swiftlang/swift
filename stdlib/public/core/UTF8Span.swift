@@ -181,7 +181,8 @@ extension UTF8Span {
   public var span: Span<UInt8> {
     @lifetime(copy self)
     get {
-      unsafe Span(_unchecked: _unsafeBaseAddress, count: self.count)
+      let newSpan = unsafe Span<UInt8>(_unchecked: _unsafeBaseAddress, count: self.count)
+      return unsafe _overrideLifetime(newSpan, copying: self)
     }
   }
 

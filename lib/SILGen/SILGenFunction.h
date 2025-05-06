@@ -877,7 +877,7 @@ public:
   FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
 
   /// A helper method that calls getFunctionTypeInfo that also marks global
-  /// actor isolated async closures that are not sendable as sendable.
+  /// actor-isolated async closures that are not sendable as sendable.
   FunctionTypeInfo getClosureTypeInfo(AbstractClosureExpr *expr);
 
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }

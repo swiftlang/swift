@@ -444,7 +444,7 @@ static bool _checkWitnessTableIsolation(
   llvm::ArrayRef<const void *> conditionalArgs,
   ConformanceExecutionContext &context
 ) {
-#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES && SWIFT_PTRAUTH
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
   auto description = lookThroughOptionalConditionalWitnessTable(
                          reinterpret_cast<const RelativeWitnessTable *>(wtable))
                          ->getDescription();
@@ -536,48 +536,101 @@ namespace {
   };
 
   struct ConformanceCacheEntry {
-  private:
-    ConformanceCacheKey Key;
+  public:
+    /// Storage used when we have global actor isolation on the conformance.
+    struct ExtendedStorage {
+      /// The protocol to which the type conforms.
+      const ProtocolDescriptor *Proto;
 
-    /// The witness table or along with a bit that indicates whether the
-    /// conformance is isolated to a global actor.
-    llvm::PointerUnion<const WitnessTable *, const ConformanceLookupResult *>
-        WitnessTableOrLookupResult;
+      /// The global actor to which this conformance is isolated, or NULL for
+      /// a nonisolated conformances.
+      const Metadata *globalActorIsolationType = nullptr;
+
+      /// When the conformance is global-actor-isolated, this is the conformance
+      /// of globalActorIsolationType to GlobalActor.
+      const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+
+      /// The next pointer in the list of extended storage allocations.
+      ExtendedStorage *next = nullptr;
+    };
+
+    const Metadata *Type;
+    llvm::PointerUnion<const ProtocolDescriptor *, ExtendedStorage *>
+        ProtoOrStorage;
+
+    /// The witness table.
+    const WitnessTable *Witness;
 
   public:
     ConformanceCacheEntry(ConformanceCacheKey key,
-                          ConformanceLookupResult result)
-        : Key(key) {
-      if (result.globalActorIsolationType) {
-        WitnessTableOrLookupResult = new ConformanceLookupResult(result);
-      } else {
-        WitnessTableOrLookupResult = result.witnessTable;
+                          ConformanceLookupResult result,
+                          std::atomic<ExtendedStorage *> &storageHead)
+      : Type(key.Type), Witness(result.witnessTable)
+    {
+      if (!result.globalActorIsolationType) {
+        ProtoOrStorage = key.Proto;
+        return;
       }
+
+      // Allocate extended storage.
+      void *memory = malloc(sizeof(ExtendedStorage));
+      auto storage = new (memory) ExtendedStorage{
+        key.Proto, result.globalActorIsolationType,
+        result.globalActorIsolationWitnessTable
+      };
+
+      ProtoOrStorage = storage;
+
+      // Add the storage pointer to the list of extended storage allocations
+      // so that we can free them later.
+      auto head = storageHead.load(std::memory_order_relaxed);
+      while (true) {
+        storage->next = head;
+        if (storageHead.compare_exchange_weak(
+                head, storage, std::memory_order_release,
+                std::memory_order_relaxed))
+          break;
+      };
     }
 
     bool matchesKey(const ConformanceCacheKey &key) const {
-      return Key.Type == key.Type && Key.Proto == key.Proto;
+      return Type == key.Type && getProtocol() == key.Proto;
     }
 
     friend llvm::hash_code hash_value(const ConformanceCacheEntry &entry) {
-      return hash_value(entry.Key);
+      return hash_value(entry.getKey());
+    }
+
+    /// Get the protocol.
+    const ProtocolDescriptor *getProtocol() const {
+      if (auto proto = ProtoOrStorage.dyn_cast<const ProtocolDescriptor *>())
+        return proto;
+
+      if (auto storage = ProtoOrStorage.dyn_cast<ExtendedStorage *>())
+        return storage->Proto;
+
+      return nullptr;
+    }
+
+    /// Get the conformance cache key.
+    ConformanceCacheKey getKey() const {
+      return ConformanceCacheKey(Type, getProtocol());
     }
 
     /// Get the cached witness table, or null if we cached failure.
     const WitnessTable *getWitnessTable() const {
-      if (auto witnessTable = WitnessTableOrLookupResult.dyn_cast<const WitnessTable *>())
-        return witnessTable;
-
-      return WitnessTableOrLookupResult.get<const ConformanceLookupResult *>()
-          ->witnessTable;
+      return Witness;
     }
 
     ConformanceLookupResult getResult() const {
-      if (auto witnessTable = WitnessTableOrLookupResult.dyn_cast<const WitnessTable *>())
-        return ConformanceLookupResult { witnessTable, nullptr, nullptr };
+      if (ProtoOrStorage.is<const ProtocolDescriptor *>())
+        return ConformanceLookupResult { Witness, nullptr, nullptr };
 
-      if (auto lookupResult = WitnessTableOrLookupResult.dyn_cast<const ConformanceLookupResult *>())
-        return *lookupResult;
+      if (auto storage = ProtoOrStorage.dyn_cast<ExtendedStorage *>()) {
+        return ConformanceLookupResult(
+            Witness, storage->globalActorIsolationType,
+            storage->globalActorIsolationWitnessTable);
+      }
 
       return nullptr;
     }
@@ -588,6 +641,11 @@ namespace {
 struct ConformanceState {
   ConcurrentReadableHashMap<ConformanceCacheEntry> Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
+
+  /// The head of an intrusive linked list that keeps track of all of the
+  /// conformance cache entries that require extended storage.
+  std::atomic<ConformanceCacheEntry::ExtendedStorage *> ExtendedStorageHead{nullptr};
+
   bool scanSectionsBackwards;
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
@@ -676,7 +734,8 @@ struct ConformanceState {
                           return false; // abandon the new entry
 
                         ::new (entry) ConformanceCacheEntry(
-                            ConformanceCacheKey(type, proto), result);
+                            ConformanceCacheKey(type, proto), result,
+                            ExtendedStorageHead);
                         return true; // keep the new entry
                       });
   }
@@ -710,7 +769,20 @@ static void _registerProtocolConformances(ConformanceState &C,
 
   // Blow away the conformances cache to get rid of any negative entries that
   // may now be obsolete.
-  C.Cache.clear();
+  C.Cache.clear([&](ConcurrentFreeListNode *&freeListHead) {
+    // The extended storage for conformance entries will need to be freed
+    // eventually. Put it on the concurrent free list so the cache will do so.
+    auto storageHead = C.ExtendedStorageHead.load(std::memory_order_relaxed);
+    while (storageHead) {
+      auto current = storageHead;
+      auto newHead = current->next;
+      if (C.ExtendedStorageHead.compare_exchange_weak(
+              storageHead, newHead, std::memory_order_release,
+              std::memory_order_relaxed)) {
+        ConcurrentFreeListNode::add(&freeListHead, current);
+      }
+    }
+  });
 }
 
 void swift::addImageProtocolConformanceBlockCallbackUnsafe(

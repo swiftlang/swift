@@ -2984,6 +2984,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                       theAttr->isImplicit(),
+                                      theAttr->Underscored,
                                       theAttr->Name);
       return;
     }
@@ -4745,6 +4746,7 @@ public:
         param->isCompileTimeLiteral(),
         param->isConstVal(),
         param->isSending(),
+        param->isCallerIsolated(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
@@ -5810,6 +5812,7 @@ public:
                                            paramKind,
                                            hasDecl,
                                            genericParam->getDepth(),
+                                           genericParam->getWeight(),
                                            genericParam->getIndex(),
                                            declOrIdentifier,
                                            valueTypeID);

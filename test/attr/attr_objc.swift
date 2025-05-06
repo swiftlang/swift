@@ -92,24 +92,24 @@ class FáncyName {}
 @objc(FancyName)
 extension FáncyName {}
 
-@objc // bad-access-note-move{{subject_globalVar}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+@objc // bad-access-note-move{{subject_globalVar}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
 var subject_globalVar: Int
 
 var subject_getterSetter: Int {
-  @objc // bad-access-note-move{{getter:subject_getterSetter()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{getter:subject_getterSetter()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   get {
     return 0
   }
-  @objc // bad-access-note-move{{setter:subject_getterSetter()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{setter:subject_getterSetter()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   set {
   }
 }
 
 var subject_global_observingAccessorsVar1: Int = 0 {
-  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   willSet {
   }
-  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   didSet {
   }
 }
@@ -159,24 +159,24 @@ class subject_staticVar1 {
   class var staticVar2: Int { return 42 }
 }
 
-@objc // bad-access-note-move{{subject_freeFunc()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-7=}}
+@objc // bad-access-note-move{{subject_freeFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{1-7=}}
 func subject_freeFunc() {
-  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_localVar: Int
   // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
 
-  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   func subject_nestedFreeFunc() {
   }
 }
 
-@objc // bad-access-note-move{{subject_genericFunc(t:)}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-7=}}
+@objc // bad-access-note-move{{subject_genericFunc(t:)}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{1-7=}}
 func subject_genericFunc<T>(t: T) {
-  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_localVar: Int
   // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
 
-  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   func subject_instanceFunc() {}
 }
 
@@ -185,25 +185,25 @@ func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be
 
 @objc // bad-access-note-move{{subject_struct}} expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_struct {
-  @objc // bad-access-note-move{{subject_struct.subject_instanceVar}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_struct.subject_instanceVar}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_instanceVar: Int
 
-  @objc // bad-access-note-move{{subject_struct.init()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_struct.init()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   init() {}
 
-  @objc // bad-access-note-move{{subject_struct.subject_instanceFunc()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_struct.subject_instanceFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   func subject_instanceFunc() {}
 }
 
 @objc // bad-access-note-move{{subject_genericStruct}} expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_genericStruct<T> {
-  @objc // bad-access-note-move{{subject_genericStruct.subject_instanceVar}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_genericStruct.subject_instanceVar}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_instanceVar: Int
 
-  @objc // bad-access-note-move{{subject_genericStruct.init()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_genericStruct.init()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   init() {}
 
-  @objc // bad-access-note-move{{subject_genericStruct.subject_instanceFunc()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_genericStruct.subject_instanceFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   func subject_instanceFunc() {}
 }
 
@@ -251,7 +251,7 @@ class subject_genericClass2<T> : Class_ObjC1 {
 
 extension subject_genericClass where T : Hashable {
   @objc // bad-access-note-move{{subject_genericClass.prop}}
-  var prop: Int { return 0 } // access-note-adjust{{@objc}} expected-error{{members of constrained extensions cannot be declared @objc}}
+  var prop: Int { return 0 } // access-note-adjust{{@objc}} expected-error{{members of constrained extensions cannot be declared '@objc'}}
 }
 
 extension subject_genericClass {
@@ -285,10 +285,10 @@ enum subject_enum: Int {
   @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
   case subject_enumElement7
 
-  @objc // bad-access-note-move{{subject_enum.init()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_enum.init()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   init() {}
 
-  @objc // bad-access-note-move{{subject_enum.subject_instanceFunc()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // bad-access-note-move{{subject_enum.subject_instanceFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   func subject_instanceFunc() {}
 }
 
@@ -315,48 +315,48 @@ protocol subject_protocol3 {}
 // CHECK-LABEL: @objc protocol subject_protocol3 {
 
 @objc // access-note-move{{subject_protocol4}}
-protocol subject_protocol4 : PlainProtocol {} // expected-error {{@objc protocol 'subject_protocol4' cannot refine non-@objc protocol 'PlainProtocol'}}
+protocol subject_protocol4 : PlainProtocol {} // expected-error {{'@objc' protocol 'subject_protocol4' cannot refine non-'@objc' protocol 'PlainProtocol'}}
 
 @objc // access-note-move{{subject_protocol5}}
-protocol subject_protocol5 : Protocol_Class1 {} // expected-error {{@objc protocol 'subject_protocol5' cannot refine non-@objc protocol 'Protocol_Class1'}}
+protocol subject_protocol5 : Protocol_Class1 {} // expected-error {{'@objc' protocol 'subject_protocol5' cannot refine non-'@objc' protocol 'Protocol_Class1'}}
 
 @objc // access-note-move{{subject_protocol6}}
 protocol subject_protocol6 : Protocol_ObjC1 {}
 
 protocol subject_containerProtocol1 {
-  @objc // bad-access-note-move{{subject_containerProtocol1.subject_instanceVar}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{subject_containerProtocol1.subject_instanceVar}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   var subject_instanceVar: Int { get }
 
-  @objc // bad-access-note-move{{subject_containerProtocol1.subject_instanceFunc()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{subject_containerProtocol1.subject_instanceFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   func subject_instanceFunc()
 
-  @objc // bad-access-note-move{{subject_containerProtocol1.subject_staticFunc()}} expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{subject_containerProtocol1.subject_staticFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   static func subject_staticFunc()
 }
 
 @objc // access-note-move{{subject_containerObjCProtocol1}}
 protocol subject_containerObjCProtocol1 {
   func func_FunctionReturn1() -> PlainStruct
-  // expected-error@-1 {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be a member of an '@objc' protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   func func_FunctionParam1(a: PlainStruct)
-  // expected-error@-1 {{method cannot be a member of an @objc protocol because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1 {{method cannot be a member of an '@objc' protocol because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   func func_Variadic(_: AnyObject...)
-  // expected-error @-1{{method cannot be a member of an @objc protocol because it has a variadic parameter}}
+  // expected-error @-1{{method cannot be a member of an '@objc' protocol because it has a variadic parameter}}
   // expected-note @-2{{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   subscript(a: PlainStruct) -> Int { get }
-  // expected-error@-1 {{subscript cannot be a member of an @objc protocol because its type cannot be represented in Objective-C}}
+  // expected-error@-1 {{subscript cannot be a member of an '@objc' protocol because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
   var varNonObjC1: PlainStruct { get }
-  // expected-error@-1 {{property cannot be a member of an @objc protocol because its type cannot be represented in Objective-C}}
+  // expected-error@-1 {{property cannot be a member of an '@objc' protocol because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }
@@ -396,7 +396,7 @@ extension subject_class1 {}
 // expected-warning@-1 {{extension with Objective-C category name 'ConflictingName' conflicts with previous extension with the same category name; this is an error in the Swift 6 language mode}}
 
 protocol nonObjCProtocol {
-  @objc // bad-access-note-move{{nonObjCProtocol.objcRequirement()}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{nonObjCProtocol.objcRequirement()}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   func objcRequirement()
 }
 
@@ -418,42 +418,42 @@ class ConcreteContext3 {
   func dynamicSelf1_() -> Self { return self }
 
   @objc // bad-access-note-move{{ConcreteContext3.genericParams()}}
-  func genericParams<T: NSObject>() -> [T] { return [] } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked @objc because it has generic parameters}}
+  func genericParams<T: NSObject>() -> [T] { return [] } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because it has generic parameters}}
 
   @objc // bad-access-note-move{{ConcreteContext3.returnObjCProtocolMetatype()}}
-  func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   typealias AnotherNSCoding = NSCoding
   typealias MetaNSCoding1 = NSCoding.Protocol
   typealias MetaNSCoding2 = AnotherNSCoding.Protocol
 
   @objc // bad-access-note-move{{ConcreteContext3.returnObjCAliasProtocolMetatype1()}}
-  func returnObjCAliasProtocolMetatype1() -> AnotherNSCoding.Protocol { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  func returnObjCAliasProtocolMetatype1() -> AnotherNSCoding.Protocol { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{ConcreteContext3.returnObjCAliasProtocolMetatype2()}}
-  func returnObjCAliasProtocolMetatype2() -> MetaNSCoding1 { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  func returnObjCAliasProtocolMetatype2() -> MetaNSCoding1 { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{ConcreteContext3.returnObjCAliasProtocolMetatype3()}}
-  func returnObjCAliasProtocolMetatype3() -> MetaNSCoding2 { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  func returnObjCAliasProtocolMetatype3() -> MetaNSCoding2 { return NSCoding.self } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   typealias Composition = NSCopying & NSCoding
 
   @objc // bad-access-note-move{{ConcreteContext3.returnCompositionMetatype1()}}
-  func returnCompositionMetatype1() -> Composition.Protocol { return Composition.self } // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  func returnCompositionMetatype1() -> Composition.Protocol { return Composition.self } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{ConcreteContext3.returnCompositionMetatype2()}}
-  func returnCompositionMetatype2() -> (NSCopying & NSCoding).Protocol { return (NSCopying & NSCoding).self } // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  func returnCompositionMetatype2() -> (NSCopying & NSCoding).Protocol { return (NSCopying & NSCoding).self } // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   typealias NSCodingExistential = NSCoding.Type
 
   @objc // bad-access-note-move{{ConcreteContext3.inoutFunc(a:)}}
-  func inoutFunc(a: inout Int) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because inout parameters cannot be represented in Objective-C}}
+  func inoutFunc(a: inout Int) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because inout parameters cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{ConcreteContext3.metatypeOfExistentialMetatypePram1(a:)}}
-  func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{ConcreteContext3.metatypeOfExistentialMetatypePram2(a:)}}
-  func metatypeOfExistentialMetatypePram2(a: NSCoding.Type.Protocol) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  func metatypeOfExistentialMetatypePram2(a: NSCoding.Type.Protocol) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
 }
 
 func genericContext1<T>(_: T) {
@@ -505,7 +505,7 @@ class GenericContext3<T> {
 
 class GenericContext4<T> {
   @objc // bad-access-note-move{{GenericContext4.foo()}}
-  func foo() where T: Hashable { } // access-note-adjust{{@objc}} expected-error {{instance method cannot be marked @objc because it has a 'where' clause}}
+  func foo() where T: Hashable { } // access-note-adjust{{@objc}} expected-error {{instance method cannot be marked '@objc' because it has a 'where' clause}}
 }
 
 @objc // bad-access-note-move{{ConcreteSubclassOfGeneric}} expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{1-7=}}
@@ -610,7 +610,7 @@ class subject_subscriptGeneric<T> {
 
 class subject_subscriptInvalid1 {
   @objc // bad-access-note-move{{subject_subscriptInvalid1.subscript(_:)}}
-  class subscript(_ i: Int) -> AnyObject? { // access-note-adjust{{@objc}} expected-error {{class subscript cannot be marked @objc}}
+  class subscript(_ i: Int) -> AnyObject? { // access-note-adjust{{@objc}} expected-error {{class subscript cannot be marked '@objc'}}
     return nil
   }
 }
@@ -618,48 +618,48 @@ class subject_subscriptInvalid1 {
 class subject_subscriptInvalid2 {
   @objc // bad-access-note-move{{subject_subscriptInvalid2.subscript(_:)}}
   subscript(a: PlainClass) -> Int {
-  // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{classes not annotated with '@objc' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid3 {
   @objc // bad-access-note-move{{subject_subscriptInvalid3.subscript(_:)}}
-  subscript(a: PlainClass.Type) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  subscript(a: PlainClass.Type) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid4 {
   @objc // bad-access-note-move{{subject_subscriptInvalid4.subscript(_:)}}
-  subscript(a: PlainStruct) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  subscript(a: PlainStruct) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
     // expected-note@-1{{Swift structs cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid5 {
   @objc // bad-access-note-move{{subject_subscriptInvalid5.subscript(_:)}}
-  subscript(a: PlainEnum) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  subscript(a: PlainEnum) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
     // expected-note@-1{{enums cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid6 {
   @objc // bad-access-note-move{{subject_subscriptInvalid6.subscript(_:)}}
-  subscript(a: PlainProtocol) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  subscript(a: PlainProtocol) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
     // expected-note@-1{{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid7 {
   @objc // bad-access-note-move{{subject_subscriptInvalid7.subscript(_:)}}
-  subscript(a: Protocol_Class1) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  subscript(a: Protocol_Class1) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
     // expected-note@-1{{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
 class subject_subscriptInvalid8 {
   @objc // bad-access-note-move{{subject_subscriptInvalid8.subscript(_:)}}
-  subscript(a: Protocol_Class1 & Protocol_Class2) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
+  subscript(a: Protocol_Class1 & Protocol_Class2) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
     // expected-note@-1{{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
     get { return 0 }
   }
@@ -667,7 +667,7 @@ class subject_subscriptInvalid8 {
 
 class subject_propertyInvalid1 {
   @objc // bad-access-note-move{{subject_propertyInvalid1.plainStruct}}
-  let plainStruct = PlainStruct() // access-note-adjust{{@objc}} expected-error {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  let plainStruct = PlainStruct() // access-note-adjust{{@objc}} expected-error {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-1{{Swift structs cannot be represented in Objective-C}}
 }
 
@@ -718,37 +718,37 @@ class infer_instanceFunc1 {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func7_(a:)}}
   func func7_(a: PlainClass) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{classes not annotated with '@objc' cannot be represented in Objective-C}}
 
   func func7m(a: PlainClass.Type) {}
 // CHECK-LABEL: {{^}} func func7m(a: PlainClass.Type) {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func7m_(a:)}}
   func func7m_(a: PlainClass.Type) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
 
   func func8() -> PlainClass {}
 // CHECK-LABEL: {{^}} func func8() -> PlainClass {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func8_()}}
   func func8_() -> PlainClass {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
-  // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{classes not annotated with '@objc' cannot be represented in Objective-C}}
 
   func func8m() -> PlainClass.Type {}
 // CHECK-LABEL: {{^}} func func8m() -> PlainClass.Type {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func8m_()}}
   func func8m_() -> PlainClass.Type {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
 
   func func9(a: PlainStruct) {}
 // CHECK-LABEL: {{^}} func func9(a: PlainStruct) {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func9_(a:)}}
   func func9_(a: PlainStruct) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   func func10() -> PlainStruct {}
@@ -756,7 +756,7 @@ class infer_instanceFunc1 {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func10_()}}
   func func10_() -> PlainStruct {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   func func11(a: PlainEnum) {}
@@ -764,7 +764,7 @@ class infer_instanceFunc1 {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func11_(a:)}}
   func func11_(a: PlainEnum) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
   func func12(a: PlainProtocol) {}
@@ -772,7 +772,7 @@ class infer_instanceFunc1 {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func12_(a:)}}
   func func12_(a: PlainProtocol) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   func func13(a: Class_ObjC1) {}
@@ -786,7 +786,7 @@ class infer_instanceFunc1 {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func14_(a:)}}
   func func14_(a: Protocol_Class1) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   func func15(a: Protocol_ObjC1) {}
@@ -878,9 +878,9 @@ class infer_instanceFunc1 {
   // Check that we produce diagnostics for every parameter and return type.
   @objc // bad-access-note-move{{infer_instanceFunc1.func_MultipleDiags(a:b:)}}
   func func_MultipleDiags(a: PlainStruct, b: PlainEnum) -> Any {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter 1 cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter 1 cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
-  // access-note-adjust{{@objc}} expected-error@-3 {{method cannot be marked @objc because the type of the parameter 2 cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-3 {{instance method cannot be marked '@objc' because the type of the parameter 2 cannot be represented in Objective-C}}
   // expected-note@-4 {{non-'@objc' enums cannot be represented in Objective-C}}
   // Produces an extra: expected-note@-5 * {{attribute 'objc' was added by access note for fancy tests}}
 
@@ -889,7 +889,7 @@ class infer_instanceFunc1 {
 
   @objc // bad-access-note-move{{infer_instanceFunc1.func_UnnamedParam2(_:)}}
   func func_UnnamedParam2(_: PlainStruct) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   @objc // access-note-move{{infer_instanceFunc1.func_varParam1(a:)}}
@@ -955,7 +955,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.instanceVar1_}}
   var (instanceVar1_, instanceVar2_): (Int, PlainProtocol)
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
   // Fake for access notes: @objc // access-note-move@-3{{infer_instanceVar1.instanceVar2_}}
 
@@ -1031,7 +1031,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_tuple1_}}
   var var_tuple1_: ()
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple2: Void
@@ -1039,7 +1039,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_tuple2_}}
   var var_tuple2_: Void
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple3: (Int)
@@ -1053,7 +1053,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_tuple4_}}
   var var_tuple4_: (Int, Int)
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{tuples cannot be represented in Objective-C}}
 
   //===--- Stdlib integer types.
@@ -1084,15 +1084,15 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainClass_}}
   var var_PlainClass_: PlainClass
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
+  // expected-note@-2 {{classes not annotated with '@objc' cannot be represented in Objective-C}}
 
   var var_PlainStruct: PlainStruct
 // CHECK-LABEL: {{^}}  var var_PlainStruct: PlainStruct
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainStruct_}}
   var var_PlainStruct_: PlainStruct
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_PlainEnum: PlainEnum
@@ -1100,7 +1100,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainEnum_}}
   var var_PlainEnum_: PlainEnum
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
   var var_PlainProtocol: PlainProtocol
@@ -1108,7 +1108,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainProtocol_}}
   var var_PlainProtocol_: PlainProtocol
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_ClassObjC: Class_ObjC1
@@ -1122,7 +1122,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ProtocolClass_}}
   var var_ProtocolClass_: Protocol_Class1
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_ProtocolObjC: Protocol_ObjC1
@@ -1137,28 +1137,28 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainClassMetatype_}}
   var var_PlainClassMetatype_: PlainClass.Type
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
 
   var var_PlainStructMetatype: PlainStruct.Type
 // CHECK-LABEL: {{^}}  var var_PlainStructMetatype: PlainStruct.Type
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainStructMetatype_}}
   var var_PlainStructMetatype_: PlainStruct.Type
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
 
   var var_PlainEnumMetatype: PlainEnum.Type
 // CHECK-LABEL: {{^}}  var var_PlainEnumMetatype: PlainEnum.Type
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainEnumMetatype_}}
   var var_PlainEnumMetatype_: PlainEnum.Type
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
 
   var var_PlainExistentialMetatype: PlainProtocol.Type
 // CHECK-LABEL: {{^}}  var var_PlainExistentialMetatype: any PlainProtocol.Type
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainExistentialMetatype_}}
   var var_PlainExistentialMetatype_: PlainProtocol.Type
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
 
   var var_ClassObjCMetatype: Class_ObjC1.Type
 // CHECK-LABEL: {{^}}  var var_ClassObjCMetatype: Class_ObjC1.Type
@@ -1171,7 +1171,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ProtocolClassMetatype_}}
   var var_ProtocolClassMetatype_: Protocol_Class1.Type
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
 
   var var_ProtocolObjCMetatype1: Protocol_ObjC1.Type
 // CHECK-LABEL: {{^}}  var var_ProtocolObjCMetatype1: any Protocol_ObjC1.Type
@@ -1201,7 +1201,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential1_}}
   var var_Existential1_: PlainProtocol
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential2: PlainProtocol & PlainProtocol
@@ -1209,7 +1209,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential2_}}
   var var_Existential2_: PlainProtocol & PlainProtocol
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential3: PlainProtocol & Protocol_Class1
@@ -1217,7 +1217,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential3_}}
   var var_Existential3_: PlainProtocol & Protocol_Class1
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential4: PlainProtocol & Protocol_ObjC1
@@ -1225,7 +1225,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential4_}}
   var var_Existential4_: PlainProtocol & Protocol_ObjC1
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential5: Protocol_Class1
@@ -1233,7 +1233,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential5_}}
   var var_Existential5_: Protocol_Class1
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential6: Protocol_Class1 & Protocol_Class2
@@ -1241,7 +1241,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential6_}}
   var var_Existential6_: Protocol_Class1 & Protocol_Class2
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential7: Protocol_Class1 & Protocol_ObjC1
@@ -1249,7 +1249,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_Existential7_}}
   var var_Existential7_: Protocol_Class1 & Protocol_ObjC1
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential8: Protocol_ObjC1
@@ -1566,7 +1566,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType3_}}
   var var_ArrayType3_: [PlainStruct]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType4: [(AnyObject) -> AnyObject] // no-error
@@ -1574,7 +1574,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType4_}}
   var var_ArrayType4_: [(AnyObject) -> AnyObject]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType5: [Protocol_ObjC1]
@@ -1594,7 +1594,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType7_}}
   var var_ArrayType7_: [PlainClass]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType8: [PlainProtocol]
@@ -1602,7 +1602,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType8_}}
   var var_ArrayType8_: [PlainProtocol]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
@@ -1610,7 +1610,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType9_}}
   var var_ArrayType9_: [Protocol_ObjC1 & PlainProtocol]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
@@ -1631,7 +1631,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType13_}}
   var var_ArrayType13_: [Any?]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType15: [AnyObject?]
@@ -1639,7 +1639,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType15_}}
   var var_ArrayType15_: [AnyObject?]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_ArrayType16: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
@@ -1653,7 +1653,7 @@ class infer_instanceVar1 {
 
   @objc // bad-access-note-move{{infer_instanceVar1.var_ArrayType17_}}
   var var_ArrayType17_: [[(AnyObject) -> AnyObject]]
-  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error @-1{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 }
 
@@ -1675,7 +1675,7 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.var_GP_Unconstrained_}}
   var var_GP_Unconstrained_: GP_Unconstrained
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_PlainClass: GP_PlainClass
@@ -1683,7 +1683,7 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.var_GP_PlainClass_}}
   var var_GP_PlainClass_: GP_PlainClass
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_PlainProtocol: GP_PlainProtocol
@@ -1691,7 +1691,7 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.var_GP_PlainProtocol_}}
   var var_GP_PlainProtocol_: GP_PlainProtocol
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Class_ObjC: GP_Class_ObjC
@@ -1699,7 +1699,7 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.var_GP_Class_ObjC_}}
   var var_GP_Class_ObjC_: GP_Class_ObjC
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Protocol_Class: GP_Protocol_Class
@@ -1707,7 +1707,7 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.var_GP_Protocol_Class_}}
   var var_GP_Protocol_Class_: GP_Protocol_Class
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Protocol_ObjC: GP_Protocol_ObjC
@@ -1715,7 +1715,7 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.var_GP_Protocol_ObjCa}}
   var var_GP_Protocol_ObjCa: GP_Protocol_ObjC
-  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   func func_GP_Unconstrained(a: GP_Unconstrained) {}
@@ -1723,17 +1723,17 @@ class infer_instanceVar2<
 
   @objc // bad-access-note-move{{infer_instanceVar2.func_GP_Unconstrained_(a:)}}
   func func_GP_Unconstrained_(a: GP_Unconstrained) {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{infer_instanceVar2.func_GP_Unconstrained_()}}
   func func_GP_Unconstrained_() -> GP_Unconstrained {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{infer_instanceVar2.func_GP_Class_ObjC__()}}
   func func_GP_Class_ObjC__() -> GP_Class_ObjC {}
-  // access-note-adjust{{@objc}} expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 }
 
@@ -1875,8 +1875,8 @@ class HasIBOutlet {
   // CHECK-LABEL: {{^}} @objc @IBOutlet @_hasInitialValue weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
-  // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
-  // expected-error@-2 {{@IBOutlet property has non-optional type 'PlainStruct'}}
+  // expected-error@-1 {{'@IBOutlet' property cannot have non-object type 'PlainStruct'}} {{3-13=}}
+  // expected-error@-2 {{'@IBOutlet' property has non-optional type 'PlainStruct'}}
   // expected-note@-3 {{add '?' to form the optional type 'PlainStruct?'}}
   // expected-note@-4 {{add '!' to form an implicitly unwrapped optional}}
   // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
@@ -1892,7 +1892,7 @@ class HasIBAction {
   // CHECK: {{^}}  @objc @IBAction @MainActor @preconcurrency func goodAction(_ sender: AnyObject?) {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
-  // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1905,7 +1905,7 @@ class HasIBSegueAction {
   // CHECK: {{^}}  @objc @IBSegueAction func goodSegueAction(_ coder: AnyObject) -> AnyObject {
 
   @IBSegueAction func badSegueAction(_ coder: PlainStruct?) -> Int? {fatalError()}
-  // expected-error@-1{{method cannot be marked @IBSegueAction because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be marked '@IBSegueAction' because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1946,7 +1946,7 @@ class HasNSManaged {
 
   @NSManaged
   var badManaged: PlainStruct
-  // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
+  // expected-error@-1 {{property cannot be marked '@NSManaged' because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // CHECK-LABEL: {{^}}  @NSManaged dynamic var badManaged: PlainStruct {
   // CHECK-NEXT: {{^}} get
@@ -1999,7 +1999,7 @@ class Class_ObjC2 {
   // CHECK-LABEL: @objc(isFoo) func foo() -> Bool {
 }
 
-@objc() // expected-error {{expected name within parentheses of @objc attribute}}
+@objc() // expected-error {{expected name within parentheses of '@objc'}}
 class Class_ObjC3 { 
 }
 
@@ -2016,8 +2016,8 @@ extension PlainClass {
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)
   class func createWithRed(_: Float, green: Float, blue: Float, alpha: Float) { }
-  // expected-error@-2{{missing ':' after selector piece in @objc attribute}}{{28-28=:}}
-  // expected-error@-3{{missing ':' after selector piece in @objc attribute}}{{39-39=:}}
+  // expected-error@-2{{missing ':' after selector piece in '@objc'}}{{28-28=:}}
+  // expected-error@-3{{missing ':' after selector piece in '@objc'}}{{39-39=:}}
 
   // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::) // access-note-move{{PlainClass.badlyNamed(_:y:)}}
@@ -2125,7 +2125,7 @@ class Sub1 : Super {
   @objc(foo) // bad-access-note-move{{Sub1.foo}} expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{9-12=renamedFoo}}
   override var foo: Int { get { return 5 } }
 
-  override func process(i: Int?) -> Int { } // expected-error{{method cannot be an @objc override because the type of the parameter cannot be represented in Objective-C}}
+  override func process(i: Int?) -> Int { } // expected-error{{method cannot be an '@objc' override because the type of the parameter cannot be represented in Objective-C}}
 }
 
 class Sub2 : Super {
@@ -2159,18 +2159,18 @@ class ClosureArguments {
   func foo(f: (Int) -> ()) {}
   // CHECK: @objc func bar
   @objc // bad-access-note-move{{ClosureArguments.bar(f:)}}
-  func bar(f: (NotObjCEnum) -> NotObjCStruct) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  func bar(f: (NotObjCEnum) -> NotObjCStruct) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func bas
   @objc // bad-access-note-move{{ClosureArguments.bas(f:)}}
-  func bas(f: (NotObjCEnum) -> ()) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  func bas(f: (NotObjCEnum) -> ()) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zim
   @objc // bad-access-note-move{{ClosureArguments.zim(f:)}}
-  func zim(f: () -> NotObjCStruct) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  func zim(f: () -> NotObjCStruct) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zang
   @objc // bad-access-note-move{{ClosureArguments.zang(f:)}}
-  func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   @objc // bad-access-note-move{{ClosureArguments.zangZang(f:)}}
-  func zangZang(f: (Int...) -> ()) {} // access-note-adjust{{@objc}} expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  func zangZang(f: (Int...) -> ()) {} // access-note-adjust{{@objc}} expected-error{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: {{^}}  func fooImplicit
   func fooImplicit(f: (Int) -> ()) {}
   // CHECK: {{^}}  func barImplicit
@@ -2236,24 +2236,24 @@ class Load3 {
 // Members of protocol extensions cannot be @objc
 
 extension PlainProtocol {
-  @objc // bad-access-note-move{{PlainProtocol.property}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{PlainProtocol.property}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   var property: Int { return 5 }
 
-  @objc // bad-access-note-move{{PlainProtocol.subscript(_:)}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{PlainProtocol.subscript(_:)}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() }
 
-  @objc // bad-access-note-move{{PlainProtocol.fun()}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{PlainProtocol.fun()}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   func fun() { }
 }
 
 extension Protocol_ObjC1 {
-  @objc // bad-access-note-move{{Protocol_ObjC1.property}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{Protocol_ObjC1.property}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   var property: Int { return 5 }
 
-  @objc // bad-access-note-move{{Protocol_ObjC1.subscript(_:)}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{Protocol_ObjC1.subscript(_:)}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() }
 
-  @objc // bad-access-note-move{{Protocol_ObjC1.fun()}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // bad-access-note-move{{Protocol_ObjC1.fun()}} expected-error{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
   func fun() { }
 }
 
@@ -2295,28 +2295,28 @@ class ClassThrows1 {
   // Errors
 
   @objc // bad-access-note-move{{ClassThrows1.methodReturnsOptionalObjCClass()}}
-  func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil } // access-note-adjust{{@objc}} expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Class_ObjC1?'; 'nil' indicates failure to Objective-C}}
+  func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil } // access-note-adjust{{@objc}} expected-error{{throwing method cannot be marked '@objc' because it returns a value of optional type 'Class_ObjC1?'; 'nil' indicates failure to Objective-C}}
 
   @objc // bad-access-note-move{{ClassThrows1.methodReturnsOptionalArray()}}
-  func methodReturnsOptionalArray() throws -> [String]? { return nil } // access-note-adjust{{@objc}} expected-error{{throwing method cannot be marked @objc because it returns a value of optional type '[String]?'; 'nil' indicates failure to Objective-C}}
+  func methodReturnsOptionalArray() throws -> [String]? { return nil } // access-note-adjust{{@objc}} expected-error{{throwing method cannot be marked '@objc' because it returns a value of optional type '[String]?'; 'nil' indicates failure to Objective-C}}
 
   @objc // bad-access-note-move{{ClassThrows1.methodReturnsInt()}}
-  func methodReturnsInt() throws -> Int { return 0 } // access-note-adjust{{@objc}} expected-error{{throwing method cannot be marked @objc because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
+  func methodReturnsInt() throws -> Int { return 0 } // access-note-adjust{{@objc}} expected-error{{throwing method cannot be marked '@objc' because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
 
   @objc // bad-access-note-move{{ClassThrows1.methodAcceptsThrowingFunc(fn:)}}
   func methodAcceptsThrowingFunc(fn: (String) throws -> Int) { }
-  // access-note-adjust{{@objc}} expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{throwing function types cannot be represented in Objective-C}}
 
   @objc // bad-access-note-move{{ClassThrows1.init(radians:)}}
-  init?(radians: Double) throws { } // access-note-adjust{{@objc}} expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+  init?(radians: Double) throws { } // access-note-adjust{{@objc}} expected-error{{a failable and throwing initializer cannot be marked '@objc' because 'nil' indicates failure to Objective-C}}
 
   @objc // bad-access-note-move{{ClassThrows1.init(string:)}}
-  init!(string: String) throws { } // access-note-adjust{{@objc}} expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+  init!(string: String) throws { } // access-note-adjust{{@objc}} expected-error{{a failable and throwing initializer cannot be marked '@objc' because 'nil' indicates failure to Objective-C}}
 
   @objc // bad-access-note-move{{ClassThrows1.fooWithErrorEnum1(x:)}}
   func fooWithErrorEnum1(x: ErrorEnum) {}
-  // access-note-adjust{{@objc}} expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{non-'@objc' enums cannot be represented in Objective-C}}
 
   // CHECK: {{^}} func fooWithErrorEnum2(x: ErrorEnum)
@@ -2324,7 +2324,7 @@ class ClassThrows1 {
 
   @objc // bad-access-note-move{{ClassThrows1.fooWithErrorProtocolComposition1(x:)}}
   func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
-  // access-note-adjust{{@objc}} expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // access-note-adjust{{@objc}} expected-error@-1{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{protocol-constrained type containing 'Error' cannot be represented in Objective-C}}
 
   // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: any Error & Protocol_ObjC1)
@@ -2374,7 +2374,7 @@ class ImplicitClassThrows1 {
   func methodReturnsBridgedValueType2() throws -> NSRange {
     return NSRange()
   }
-  // access-note-adjust{{@objc}} expected-error@-3{{throwing method cannot be marked @objc because it returns a value of type 'NSRange' (aka '_NSRange'); return 'Void' or a type that bridges to an Objective-C class}}
+  // access-note-adjust{{@objc}} expected-error@-3{{throwing method cannot be marked '@objc' because it returns a value of type 'NSRange' (aka '_NSRange'); return 'Void' or a type that bridges to an Objective-C class}}
 
   // CHECK: {{^}} func methodReturnsError() throws -> any Error
   func methodReturnsError() throws -> Error { return ErrorEnum.failed }
@@ -2504,7 +2504,7 @@ extension PlainClass {
   final func objc_ext_objc_okay(_: Int) { }
 
   final func objc_ext_objc_not_okay(_: PlainStruct) { }
-  // expected-error@-1{{method cannot be in an @objc extension of a class (without @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be in an '@objc' extension of a class (without '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   // CHECK-LABEL: {{^}} @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) {
@@ -2529,19 +2529,19 @@ class OperatorInClass {
   }
   // CHECK: {{^}} @objc static func + (lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass
   @objc
-  static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass { // expected-error {{operator methods cannot be declared @objc}}
+  static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass { // expected-error {{operator methods cannot be declared '@objc'}}
     return lhs
   }
 } // CHECK: {{^}$}}
 
 @objc // access-note-move{{OperatorInProtocol}}
 protocol OperatorInProtocol {
-  static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols must not have operator requirements}}
+  static func +(lhs: Self, rhs: Self) -> Self // expected-error {{'@objc' protocols must not have operator requirements}}
 }
 
 class AdoptsOperatorInProtocol : OperatorInProtocol {
   static func +(lhs: AdoptsOperatorInProtocol, rhs: AdoptsOperatorInProtocol) -> Self {}
-  // expected-error@-1 {{operator methods cannot be declared @objc}}
+  // expected-error@-1 {{operator methods cannot be declared '@objc'}}
 }
 
 //===--- @objc inference for witnesses
@@ -2625,7 +2625,7 @@ extension User {
 	}
 
 	var other: String {
-    unsafeAddress { // expected-error {{addressors are not allowed to be marked @objc}}
+    unsafeAddress { // expected-error {{addressors are not allowed to be marked '@objc'}}
     }
   }
 }
@@ -2684,7 +2684,7 @@ class issue51538_C {}
 @objc // access-note-move{{issue51538_P}}
 protocol issue51538_P {
   func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
-  func throwingMethod2() throws -> Unmanaged<issue51538_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  func throwingMethod2() throws -> Unmanaged<issue51538_C> // expected-error {{method cannot be a member of an '@objc' protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 }
@@ -2694,5 +2694,5 @@ protocol issue51538_P {
 class issue55246 {
   @objc // bad-access-note-move{{issue55246.subscript(_:)}}
   subscript<T>(foo : [T]) -> Int { return 0 }
-  // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
+  // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked '@objc' because it has generic parameters}}
 }

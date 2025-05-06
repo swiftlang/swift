@@ -160,6 +160,8 @@ MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
 MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
      "Diagnose any '@const' entities which could not be simplified to a compile-time value")
+MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
+     "Diagnose violations of Embedded Swift language restrictions")
 
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")

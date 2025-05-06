@@ -7821,6 +7821,7 @@ public:
   }
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
+  void setAccessKind(OpenedExistentialAccess kind) { ForAccess = kind; }
 
   CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
@@ -9578,6 +9579,14 @@ public:
   void setKeepUnique(bool keepUnique = true) {
     sharedUInt8().EndCOWMutationInst.keepUnique = keepUnique;
   }
+};
+class EndCOWMutationAddrInst
+    : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationAddrInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  EndCOWMutationAddrInst(SILDebugLocation debugLoc, SILValue address)
+      : UnaryInstructionBase(debugLoc, address) {}
 };
 
 /// Given an escaping closure return true iff it has a non-nil context and the

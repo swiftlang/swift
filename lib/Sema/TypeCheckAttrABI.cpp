@@ -880,26 +880,6 @@ public:
 
       return false;
 
-    case DeclAttribute::InferredInABIAttr:
-      if (!abi && api->canClone()) {
-        // Infer an identical attribute.
-        abi = api->clone(ctx);
-        abi->setImplicit(true);
-        abiDecl->getAttrs().add(abi);
-
-        if (ctx.LangOpts.EnableABIInferenceRemarks) {
-          SmallString<64> scratch;
-          auto abiAttrAsString = printAttr(abi, abiDecl, scratch);
-
-          abiDecl->diagnose(diag::abi_attr_inferred_attribute,
-                            abiAttrAsString, api->isDeclModifier());
-          noteAttrHere(api, apiDecl, /*isMatch=*/true);
-        }
-      }
-
-      // Other than the cloning behavior, Inferred behaves like Equivalent.
-      LLVM_FALLTHROUGH;
-
     case DeclAttribute::EquivalentInABIAttr:
       // Diagnose if API doesn't have attribute.
       if (!api) {
@@ -1152,6 +1132,7 @@ void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
   }
 
   // Check that each pattern has the same number of variables.
+  bool didDiagnose = false;
   for (auto i : range(PBD->getNumPatternEntries())) {
     SmallVector<VarDecl *, 8> VDs;
     SmallVector<VarDecl *, 8> AVDs;
@@ -1161,18 +1142,24 @@ void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
 
     if (VDs.size() < AVDs.size()) {
       for (auto AVD : drop_begin(AVDs, VDs.size())) {
-        AVD->diagnose(diag::attr_abi_mismatched_var,
-                      AVD, /*isABI=*/true);
+        AVD->diagnose(diag::attr_abi_mismatched_var, AVD, /*isABI=*/true);
+        didDiagnose = true;
       }
     }
     else if (VDs.size() > AVDs.size()) {
       for (auto VD : drop_begin(VDs, AVDs.size())) {
-        VD->diagnose(diag::attr_abi_mismatched_var,
-                     VD, /*isABI=*/false);
+        VD->diagnose(diag::attr_abi_mismatched_var, VD, /*isABI=*/false);
+        didDiagnose = true;
       }
     }
   }
+  if (didDiagnose)
+    return;
+
+  // Check the ABI PBD--this is what checks the underlying vars.
+  TypeChecker::typeCheckDecl(APBD);
 }
+
 } // end anonymous namespace
 
 void TypeChecker::checkDeclABIAttribute(Decl *D, ABIAttr *attr) {

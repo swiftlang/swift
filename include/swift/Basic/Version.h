@@ -131,6 +131,13 @@ public:
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 
+  /// Returns a major version to represent the next future language mode. This
+  /// exists to make it easier to find and update clients when a new language
+  /// mode is added.
+  static constexpr unsigned getFutureMajorLanguageVersion() {
+    return 7;
+  }
+
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
   static std::array<StringRef, 4> getValidEffectiveVersions() {

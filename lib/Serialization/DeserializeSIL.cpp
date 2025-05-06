@@ -2726,6 +2726,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
+  case SILInstructionKind::EndCOWMutationAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    ResultInst = Builder.createEndCOWMutationAddr(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(MF->getType(TyID),
+                                      (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
+
   case SILInstructionKind::DestructureTupleInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     SILValue Operand = getLocalValue(
@@ -4591,9 +4600,10 @@ llvm::Expected<SILWitnessTable *>
 
   unsigned RawLinkage;
   unsigned IsDeclaration;
+  unsigned IsSpecialized;
   unsigned Serialized;
   ProtocolConformanceID conformance;
-  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
+  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration, IsSpecialized,
                                  Serialized, conformance);
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
@@ -4621,7 +4631,7 @@ llvm::Expected<SILWitnessTable *>
                                     theConformance);
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance);
+    existingWt = SILMod.lookUpWitnessTable(theConformance, IsSpecialized != 0);
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches
@@ -4636,7 +4646,7 @@ llvm::Expected<SILWitnessTable *>
 
   } else {
     // Otherwise, create a new witness table declaration.
-    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
+    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance, IsSpecialized != 0);
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
   }

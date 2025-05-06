@@ -241,6 +241,22 @@ func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
 @lifetime(borrow arg)
 func reborrowSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
 
+@lifetime(&arg)
+func reborrowGenericInout<T: ~Escapable>(_ arg: inout T) -> T { arg }
+
+@lifetime(copy arg)
+func inheritSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
+
+@lifetime(copy arg)
+func inheritGeneric<T: ~Escapable>(_ arg: consuming T) -> T { arg }
+
+public struct NE: ~Escapable {}
+
+@lifetime(&ne)
+func borrowNE<T: ~Escapable>(ne: inout T) -> T {
+  ne
+}
+
 // =============================================================================
 // Initialization
 // =============================================================================
@@ -340,6 +356,30 @@ func testInheritedCopyVar(_ arg: [Int] ) {
   parse(result) // ✅ Safe: within lifetime of 'a'
 }
 
+@lifetime(copy span)
+public func testBorrowInheritedArg<T>(_ span: Span<T>) -> Span<T> {
+  reborrowSpan(span) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2{{it depends on the lifetime of argument 'span'}}
+} // expected-note {{this use causes the lifetime-dependent value to escape}}
+
+@lifetime(copy t)
+public func testBorrowInheritedInoutArg<T: ~Escapable>(_ t: inout T) -> T {
+  // expected-error @-1{{lifetime-dependent variable 't' escapes its scope}}
+  // expected-note @-2{{it depends on the lifetime of argument 't'}}
+  reborrowGenericInout(&t)
+  // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
+}
+
+@lifetime(copy span)
+public func testCopyInheritedArg<T>(_ span: Span<T>) -> Span<T> {
+  inheritSpan(span)
+}
+
+@lifetime(copy t)
+public func testCopyInheritedGenericArg<T: ~Escapable>(_ t: consuming T) -> T {
+  inheritGeneric(t)
+}
+
 // =============================================================================
 // Scoped dependence on inherited dependence
 // =============================================================================
@@ -363,6 +403,23 @@ func testScopedOfInheritedWithLet(_ arg: [Int] ) {
   // expected-note @-1{{it depends on the lifetime of this parent value}}  
   _ = result
 } // expected-note {{this use of the lifetime-dependent value is out of scope}}
+
+// Test a scoped dependence on an inherited inout argument.
+//
+// If testScopedOfInheritedWithLet is not an error, then its result can outlive its borrowed value:
+//  let ne1 = NE()
+//  var ne2 = ne1
+//  let dep = foo(ne: &ne2)
+//  _ = consume ne2
+//  _ = dep
+//
+@lifetime(copy ne)
+public func testScopedOfInheritedInout<T: ~Escapable>(ne: inout T) -> T {
+  // expected-error @-1{{lifetime-dependent variable 'ne' escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of argument 'ne'}}
+  borrowNE(ne: &ne)
+  // expected-note  @-1{{this use causes the lifetime-dependent value to escape}}
+}
 
 // =============================================================================
 // Scoped dependence on trivial values
@@ -434,9 +491,8 @@ func testGlobal(local: InnerTrivial) -> Span<Int> {
 
 @lifetime(&a)
 func testInoutBorrow(a: inout [Int]) -> Span<Int> {
-  a.span() // expected-error {{lifetime-dependent value escapes its scope}}
-  // expected-note @-1{{it depends on this scoped access to variable 'a'}}
-} // expected-note {{this use causes the lifetime-dependent value to escape}}
+  a.span() // OK
+}
 
 @lifetime(&a)
 func testInoutMutableBorrow(a: inout [Int]) -> MutableSpan<Int> {
@@ -462,12 +518,10 @@ extension Container {
 
   @lifetime(&self)
   mutating func mutableView() -> MutableView {
-    // Reading 'self.owner' creates a local borrow scope. This new MutableView
-    // depends on a the local borrow scope for 'self.owner', so it cannot be
-    // returned.
-    MutableView(owner: self.owner) // expected-error {{lifetime-dependent value escapes its scope}}
-    // expected-note @-1{{it depends on this scoped access to variable 'self'}}
-  } // expected-note    {{this use causes the lifetime-dependent value to escape}}
+    // Reading 'self.owner' creates a local borrow scope. The caller's exclusive access on 'self' is sufficient for the
+    // result.
+    MutableView(owner: self.owner) // OK
+  }
 
   @lifetime(&self)
   mutating func mutableViewModifiesOwner() -> MutableView {
@@ -512,9 +566,6 @@ func testExprExtendTrivialTemp(outer: Outer) {
 
 func testExprExtendObjectTemp(outer: Outer) {
   parse(outer.innerObjectTemp.span())
-  // expected-error @-1{{lifetime-dependent value escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-  // expected-note  @-3{{this use of the lifetime-dependent value is out of scope}}
 }
 
 func testLocalExtendTrivialTemp(outer: Outer) {
@@ -524,9 +575,7 @@ func testLocalExtendTrivialTemp(outer: Outer) {
 
 func testLocalExtendObjectTemp(outer: Outer) {
   let span = outer.innerObjectTemp.span()
-  // expected-error @-1{{lifetime-dependent variable 'span' escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-  parse(span) // expected-note {{this use of the lifetime-dependent value is out of scope}}
+  parse(span)
 }
 
 @lifetime(borrow outer)

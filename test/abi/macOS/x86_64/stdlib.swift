@@ -1016,9 +1016,6 @@ Added: _$ss11InlineArrayVMa
 // InlineArray nominal type descriptor
 Added: _$ss11InlineArrayVMn
 
-// InlineArray.count property descriptor
-Added: _$ss11InlineArrayVsRi__rlE5countSivpZMV
-
 // InlineArray._storage _read accessor
 Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvr
 
@@ -1130,3 +1127,5 @@ Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7Ra
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
 
+// Duration.nanoseconds(_:)
+Added: _$ss8DurationV11nanosecondsyABSdFZ

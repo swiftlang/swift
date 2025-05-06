@@ -17,6 +17,9 @@ func foo() {
 // CHECK-DAG:          "swift": "Swift"
 // CHECK-DAG:          "swift": "SwiftOnoneSupport"
 
+// Additional occurence in source-imported dependencies field
+// CHECK:      "swift": "ExtensionAvailable"
+
 // CHECK:      "swift": "ExtensionAvailable"
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {

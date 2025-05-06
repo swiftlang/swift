@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Sema/Concurrency.h"
 
 #include <cassert>
@@ -442,6 +443,37 @@ namespace detail {
   struct Identity {
     typedef T type;
   };
+}
+
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
+/// \returns \c true if any errors were produced, \c false if no diagnostics or
+/// only warnings and notes were produced or if a decl contains a sending
+/// parameter or result
+template <typename... DiagArgs>
+bool diagnoseNonSendableTypesWithSendingCheck(
+    ValueDecl *decl, Type type, SendableCheckContext fromContext,
+    Type derivedConformance, SourceLoc typeLoc, SourceLoc diagnoseLoc,
+    Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type... diagArgs) {
+  if (auto param = dyn_cast<ParamDecl>(decl)) {
+    if (param->isSending()) {
+      return false;
+    }
+  }
+  if (auto *func = dyn_cast<FuncDecl>(decl)) {
+    if (func->hasSendingResult())
+      return false;
+  }
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    if (isa_and_nonnull<SendingTypeRepr>(subscript->getResultTypeRepr()))
+      return false;
+  }
+
+  return diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc, diagnoseLoc, diag,
+      std::forward<decltype(diagArgs)>(diagArgs)...);
 }
 
 /// Diagnose any non-Sendable types that occur within the given type, using

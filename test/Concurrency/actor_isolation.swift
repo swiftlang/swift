@@ -1264,11 +1264,11 @@ func testGlobalActorInheritance() {
 protocol GloballyIsolatedProto {
 }
 
-// rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
+// rdar://75849035 - trying to conform an actor to a global-actor-isolated protocol should result in an error
 func test_conforming_actor_to_global_actor_protocol() {
   @available(SwiftStdlib 5.1, *)
   actor MyValue : GloballyIsolatedProto {}
-  // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
+  // expected-error@-1 {{actor 'MyValue' cannot conform to global-actor-isolated protocol 'GloballyIsolatedProto'}}
 }
 
 func test_nonisolated_variable() {

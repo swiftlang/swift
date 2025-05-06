@@ -135,7 +135,22 @@ extension _ArrayBuffer {
 #endif
     return isUnique
   }
-  
+
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+   @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutationUnchecked() -> Bool {
+    let isUnique: Bool
+    if !_isClassOrObjCExistential(Element.self) {
+      isUnique = _storage.beginCOWMutationUnflaggedNative()
+    } else if !_storage.beginCOWMutationNative() {
+      return false
+    } else {
+      isUnique = _isNative
+    }
+    return isUnique
+  }
+#endif
+
   /// Puts the buffer in an immutable state.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.
@@ -330,7 +345,7 @@ extension _ArrayBuffer {
       .assumingMemoryBound(to: AnyObject.self)
     let (_, c) = unsafe _nonNative._copyContents(
       initializing: UnsafeMutableBufferPointer(start: ptr, count: buffer.count))
-    return unsafe (IndexingIterator(_elements: self, _position: c), c)
+    return (IndexingIterator(_elements: self, _position: c), c)
   }
 
   /// Returns a `_SliceBuffer` containing the given sub-range of elements in

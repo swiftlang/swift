@@ -2146,6 +2146,22 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
+### end_cow_mutation_addr
+
+```
+sil-instruction ::= 'end_cow_mutation_addr' sil-operand
+
+end_cow_mutation_addr %0 : $*T
+// %0 must be of an address $*T type
+```
+
+This instruction marks the end of mutation of an address. The address could be
+an opaque archetype, a struct, tuple or enum type and the end_cow_mutation_addr
+will apply to all members contained within it.
+It is currently only generated in cases where we maybe deriving a MutableSpan from
+`%0` since it is not possible to schedule an `end_cow_mutation` in the standard
+library automatically for Array.mutableSpan etc.
+
 ### destroy_not_escaped_closure
 
 ```

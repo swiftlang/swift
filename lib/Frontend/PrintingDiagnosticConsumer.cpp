@@ -48,20 +48,20 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // Use the swift-syntax formatter.
     auto bufferStack = DiagnosticBridge::getSourceBufferStack(SM, Info.Loc);
-    if (!bufferStack.empty()) {
-      if (Info.Kind != DiagnosticKind::Note)
-        DiagBridge.flush(Stream, /*includeTrailingBreak=*/true,
-                         /*forceColors=*/ForceColors);
+    if (Info.Kind != DiagnosticKind::Note || bufferStack.empty())
+      DiagBridge.flush(Stream, /*includeTrailingBreak=*/true,
+                       /*forceColors=*/ForceColors);
 
+    if (bufferStack.empty()) {
+      DiagBridge.emitDiagnosticWithoutLocation(Info, Stream, ForceColors);
+    } else {
       DiagBridge.enqueueDiagnostic(SM, Info, bufferStack.front());
-      break;
     }
-#endif
-
+    return;
+#else
     // Fall through when we don't have the new diagnostics renderer available.
-    // This also happens if the location of the diagnostic is invalid, because
-    // the new rendered cannot cope with that.
     LLVM_FALLTHROUGH;
+#endif
   }
 
   case DiagnosticOptions::FormattingStyle::LLVM:
@@ -215,4 +215,6 @@ PrintingDiagnosticConsumer::PrintingDiagnosticConsumer(
     llvm::raw_ostream &stream)
     : Stream(stream) {}
 
-PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {}
+PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
+  flush();
+}

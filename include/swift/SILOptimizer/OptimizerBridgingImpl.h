@@ -183,6 +183,10 @@ bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
 }
 
+bool BridgedPassContext::moduleHasLoweredAddresses() const {
+  return invocation->getPassManager()->getModule()->useLoweredAddresses();
+}
+
 bool BridgedPassContext::isTransforming(BridgedFunction function) const {
   return invocation->getFunction() == function.getFunction();
 }
@@ -213,6 +217,11 @@ BridgedPostDomTree BridgedPassContext::getPostDomTree() const {
 BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->getASTContext().getArrayDecl()};
+}
+
+BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getASTContext().getMutableSpanDecl()};
 }
 
 // AST
@@ -441,7 +450,7 @@ OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedConfor
   return {mod->lookUpWitnessTable(ref.getConcrete())};
 }
 
-BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkage,
+BridgedWitnessTable BridgedPassContext::createSpecializedWitnessTable(BridgedLinkage linkage,
                                                            bool serialized,
                                                            BridgedConformance conformance,
                                                            BridgedArrayRef bridgedEntries) const {
@@ -453,7 +462,7 @@ BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkag
   return {swift::SILWitnessTable::create(*mod, (swift::SILLinkage)linkage,
                                          serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                          conformance.unbridged().getConcrete(),
-                                         entries, {})};
+                                         entries, {}, /*specialized=*/true)};
 }
 
 BridgedVTable BridgedPassContext::createSpecializedVTable(BridgedType classType,
@@ -585,6 +594,11 @@ BridgedDeclObj BridgedPassContext::getCurrentModuleContext() const {
 bool BridgedPassContext::enableWMORequiredDiagnostics() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getOptions().EnableWMORequiredDiagnostics;
+}
+
+bool BridgedPassContext::noAllocations() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().NoAllocations;
 }
 
 bool BridgedPassContext::enableAddressDependencies() const {

@@ -787,11 +787,6 @@ public:
     return storage->auxiliaryFiles;
   }
 
-  void
-  setAuxiliaryFiles(const ArrayRef<std::string> auxiliaryFiles) {
-    storage->auxiliaryFiles.assign(auxiliaryFiles.begin(), auxiliaryFiles.end());
-  }
-
   bool isStaticLibrary() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->isStatic;
