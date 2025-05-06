@@ -1172,6 +1172,8 @@ struct BridgedBuilder{
         BridgedInstruction::CastingIsolatedConformances isolatedConformances,
         BridgedValue source, BridgedCanType sourceFormalType,
         BridgedValue destination, BridgedCanType targetFormalType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedOwnershipConversion(
+        BridgedValue op, BridgedValue::Ownership ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoad(BridgedValue op, SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoadBorrow(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginDeallocRef(BridgedValue reference,
