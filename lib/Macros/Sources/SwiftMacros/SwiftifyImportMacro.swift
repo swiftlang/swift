@@ -545,7 +545,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
       } else {
         "MutableSpan"
       }
-    return "unsafe _cxxOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
+    return "unsafe _swiftifyOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
   }
 }
 
@@ -701,10 +701,15 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       }()
       """
     }
-    return
+    var expr = ExprSyntax(
       """
-      unsafe \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
+      \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
       """
+    )
+    if generateSpan {
+      expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
+    }
+    return "unsafe \(expr)"
   }
 }
 
@@ -778,6 +783,13 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
     args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
+    if skipTrivialCount {
+      if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+        let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
+        args[i] = castIntToTargetType(
+          expr: "\(unwrappedName).count", type: getParam(signature, i).type)
+      }
+    }
     let call = try base.buildFunctionCall(args)
     let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
 

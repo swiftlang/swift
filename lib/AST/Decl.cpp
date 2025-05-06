@@ -75,6 +75,7 @@
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -1468,9 +1469,9 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
 bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
-  if (auto clangDecl = getClangDecl()) {
-    return clangDecl->isWeakImported();
-  }
+  if (auto clangDecl = getClangDecl())
+    return clangDecl->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;

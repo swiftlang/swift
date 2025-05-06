@@ -80,6 +80,9 @@ sil @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> ()
 sil @initHolder : $@convention(method) (@thin Holder.Type) -> @owned Holder
 sil @readAccess : $@yield_once @convention(method) (@guaranteed Holder) -> @lifetime(borrow 0) @yields @guaranteed NE
 
+sil @yieldInoutHolder : $@yield_once @convention(method) (@inout Holder) -> @yields @inout Holder
+sil @yieldInoutNE : $@yield_once @convention(method) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+
 // NCContainer.wrapper._read:
 //   var wrapper: Wrapper {
 //     _read {
@@ -440,6 +443,53 @@ bb0(%0 : @owned $B):
   dealloc_stack %1
   %24 = tuple ()
   return %24
+}
+
+// =============================================================================
+// Coroutine extension
+// =============================================================================
+
+// Sink the inner end_apply and the outer end_access.
+//
+// CHECK-LABEL: sil hidden [ossa] @testCoroutineInsideAccess : $@convention(thin) (@inout Holder) -> () {
+// CHECK: bb0(%0 : $*Holder):
+// CHECK: [[BORROW:%[0-9]+]] = begin_borrow [lexical] [var_decl]
+// CHECK: [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] %0
+// CHECK: ({{.*}}, [[TOKEN:%[0-9]+]]) = begin_apply %{{.*}}([[ACCESS]]) : $@yield_once @convention(method) (@inout Holder) -> @yields @inout Holder
+// CHECK: apply
+// CHECK: [[MD:%[0-9]+]] = mark_dependence [unresolved] %10 on %7
+// CHECK: apply
+// CHECK: end_borrow
+// CHECK: end_access
+// CHECK: end_apply [[TOKEN]] as $()
+// CHECK: end_access [[ACCESS]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK-LABEL: } // end sil function 'testCoroutineInsideAccess'
+sil hidden [ossa] @testCoroutineInsideAccess : $@convention(thin) (@inout Holder) -> () {// %0 "w"
+bb0(%0 : $*Holder):
+  debug_value %0, var, name "w", argno 1, expr op_deref
+  %2 = alloc_box ${ var NE }, var, name "span"
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = begin_access [modify] [unknown] %0
+  %6 = function_ref @yieldInoutHolder : $@yield_once @convention(method) (@inout Holder) -> @yields @inout Holder
+  (%7, %8) = begin_apply %6(%5) : $@yield_once @convention(method) (@inout Holder) -> @yields @inout Holder
+  %9 = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %10 = apply %9(%7) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %11 = mark_dependence [unresolved] %10 on %7
+  %12 = end_apply %8 as $()
+  end_access %5
+  store %11 to [init] %4
+  %15 = begin_access [read] [unknown] %4
+  %16 = load_borrow [unchecked] %15
+  %17 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %18 = apply %17(%16) : $@convention(thin) (@guaranteed NE) -> ()
+  end_borrow %16
+  end_access %15
+  end_borrow %3
+  destroy_value %2
+  %99 = tuple ()
+  return %99
 }
 
 // =============================================================================

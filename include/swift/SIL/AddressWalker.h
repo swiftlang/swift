@@ -229,7 +229,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
-        isa<MergeIsolationRegionInst>(user)) {
+        isa<MergeIsolationRegionInst>(user) || isa<EndCOWMutationAddrInst>(user)) {
       callVisitUse(op);
       continue;
     }

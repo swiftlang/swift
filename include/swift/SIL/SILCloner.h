@@ -80,20 +80,23 @@ struct SubstitutionMapWithLocalArchetypes {
     return Type(type);
   }
 
-  ProtocolConformanceRef operator()(CanType origType,
-                                    Type substType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type origType,
                                     ProtocolDecl *proto) {
-    if (isa<LocalArchetypeType>(origType))
-      return swift::lookupConformance(substType, proto);
+    if (origType->is<LocalArchetypeType>())
+      return swift::lookupConformance(origType.subst(IFS), proto);
 
-    if (isa<PrimaryArchetypeType>(origType) ||
-        isa<PackArchetypeType>(origType))
-      origType = origType->mapTypeOutOfContext()->getCanonicalType();
+    if (origType->is<PrimaryArchetypeType>() ||
+        origType->is<PackArchetypeType>())
+      origType = origType->mapTypeOutOfContext();
 
-    if (SubsMap)
-      return SubsMap->lookupConformance(origType, proto);
+    if (SubsMap) {
+      return SubsMap->lookupConformance(
+        origType->getCanonicalType(), proto);
+    }
 
-    return ProtocolConformanceRef::forAbstract(substType, proto);
+    return ProtocolConformanceRef::forAbstract(
+      origType.subst(IFS), proto);
   }
 
   void dump(llvm::raw_ostream &out) const {
@@ -3165,6 +3168,14 @@ void SILCloner<ImplClass>::visitEndCOWMutationInst(EndCOWMutationInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createEndCOWMutation(getOpLocation(Inst->getLoc()),
                         getOpValue(Inst->getOperand()), Inst->doKeepUnique()));
+}
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndCOWMutationAddrInst(
+    EndCOWMutationAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndCOWMutationAddr(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(

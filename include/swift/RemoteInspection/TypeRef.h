@@ -238,10 +238,6 @@ public:
   const TypeRef *subst(TypeRefBuilder &Builder,
                        const GenericArgumentMap &Subs) const;
 
-  const TypeRef *subst(TypeRefBuilder &Builder,
-                       const GenericArgumentMap &Subs,
-                       bool &DidSubstitute) const;
-
   std::optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;

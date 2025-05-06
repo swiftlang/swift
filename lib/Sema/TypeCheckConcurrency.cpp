@@ -2694,6 +2694,18 @@ namespace {
             }
           }
 
+          // @isolated(any) functions (async or not) cannot be converted to
+          // synchronous, non-@isolated(any) functions.
+          if (fromIsolation.isErased() && !toIsolation.isErased() &&
+              !toFnType->isAsync()) {
+            ctx.Diags
+                .diagnose(funcConv->getLoc(),
+                          diag::isolated_any_conversion_to_synchronous_func,
+                          fromFnType, toFnType)
+                .warnUntilFutureSwiftVersion();
+            return;
+          }
+
           // Conversions from non-Sendable types are handled by
           // region-based isolation.
           // Function conversions are used to inject concurrency attributes
@@ -3040,7 +3052,7 @@ namespace {
           // If the local function is generic and this is one of its generic
           // parameters, ignore it.
           if (genericSig.getNextDepth() > 0 &&
-              genericDepth < genericSig.getNextDepth() - 1)
+              genericDepth >= genericSig.getNextDepth())
             continue;
 
           if (type->isTypeParameter() && innermostGenericDC)
@@ -4681,6 +4693,10 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
           attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
         return ActorIsolation::forNonisolated(attr->isUnsafe());
       }
+
+      if (explicitClosure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+        return ActorIsolation::forNonisolated(/*unsafe=*/false);
+      }
     }
 
     // `nonisolated(nonsending)` inferred from the context makes
@@ -4933,10 +4949,11 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // return caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
-          func && func->hasAsync() &&
-          func->getModuleContext() == decl->getASTContext().MainModule) {
-        return ActorIsolation::forCallerIsolationInheriting();
+      if (auto *value = dyn_cast<ValueDecl>(decl)) {
+        if (value->isAsync() &&
+            value->getModuleContext() == decl->getASTContext().MainModule) {
+          return ActorIsolation::forCallerIsolationInheriting();
+        }
       }
     }
 
@@ -5768,38 +5785,16 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       return {};
     };
 
-    // Otherwise, see if we have one specified by our file unit.
-    bool ignoreUnspecifiedMeansMainActorIsolated = false;
-    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
-      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
-        auto options = sourceFile->getLanguageOptions();
-        if (auto isolation = options.defaultIsolation) {
-          if (*isolation) {
-            auto result = globalActorHelper(*options.defaultIsolation);
-            if (result)
-              return *result;
-          } else {
-            // If we found a nil type, then we know we should ignore unspecified
-            // means main actor isolated.
-            ignoreUnspecifiedMeansMainActorIsolated = true;
-          }
-        }
-      }
-    }
-
     // If we are required to use main actor... just use that.
-    if (!ignoreUnspecifiedMeansMainActorIsolated &&
-        ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    if (ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;
   }
 
-  // If we have an async function... by default we inherit isolation.
+  // If we have an async function or storage... by default we inherit isolation.
   if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-        func && func->hasAsync() &&
-        func->getModuleContext() == ctx.MainModule) {
+    if (value->isAsync() && value->getModuleContext() == ctx.MainModule) {
       return {
           {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
     }
@@ -6212,11 +6207,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (selfTypeIsolation.isolation) {
         auto isolation = selfTypeIsolation.isolation;
 
-        if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-            ctx.LangOpts.hasFeature(
-                Feature::NonisolatedNonsendingByDefault) &&
-            func && func->hasAsync() &&
-            func->getModuleContext() == ctx.MainModule &&
+        if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+            value->isAsync() && value->getModuleContext() == ctx.MainModule &&
             isolation.isNonisolated()) {
           isolation = ActorIsolation::forCallerIsolationInheriting();
         }

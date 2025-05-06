@@ -506,6 +506,13 @@ struct TypeRefIsConcrete
   }
     
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    for (auto Args : O->getArgumentLists()) {
+      for (auto *Arg : Args) {
+        if (!visit(Arg))
+          return false;
+      }
+    }
+
     return false;
   }
 
@@ -1350,15 +1357,12 @@ class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
   TypeRefBuilder &Builder;
   GenericArgumentMap Substitutions;
-  // Set true iff the Substitution map was actually used
-  bool DidSubstitute;
+
 public:
   using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
 
   TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
-      : Builder(Builder), Substitutions(Substitutions), DidSubstitute(false) {}
-
-  bool didSubstitute() const { return DidSubstitute; }
+      : Builder(Builder), Substitutions(Substitutions) {}
 
   const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return B;
@@ -1488,7 +1492,6 @@ public:
     if (found == Substitutions.end())
       return GTP;
     assert(found->second->isConcrete());
-    DidSubstitute = true; // We actually used the Substitutions
 
     // When substituting a concrete type containing a metatype into a
     // type parameter, (eg: T, T := C.Type), we must also represent
@@ -1607,15 +1610,6 @@ public:
 const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
                               const GenericArgumentMap &Subs) const {
   return TypeRefSubstitution(Builder, Subs).visit(this);
-}
-
-const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
-                              const GenericArgumentMap &Subs,
-			      bool &DidSubstitute) const {
-  auto subst = TypeRefSubstitution(Builder, Subs);
-  auto TR = subst.visit(this);
-  DidSubstitute = subst.didSubstitute();
-  return TR;
 }
 
 bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,

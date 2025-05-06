@@ -1914,15 +1914,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     if (subMap.empty())
       return param;
 
-    return param.subst(
-      [&](SubstitutableType *type) -> Type {
-        if (cast<GenericTypeParamType>(type)->getDepth() < typeContextDepth)
-          return Type(type).subst(subMap);
-        return type;
-      },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return lookupConformance(substType, proto);
-      });
+    OuterSubstitutions replacer{subMap, typeContextDepth};
+    return param.subst(replacer, replacer,
+                       SubstFlags::PreservePackExpansionLevel);
   };
 
   /// Separate the explicit generic parameters from the implicit, opaque
@@ -3307,7 +3301,8 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
 static void
 suppressingFeatureExtensibleAttribute(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
-  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Extensible);
+  ExcludeAttrRAII scope1(options.ExcludeAttrList, DeclAttrKind::Extensible);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::PreEnumExtensibility);
   action();
 }
 
@@ -4813,9 +4808,6 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         case BuiltinMacroKind::IsolationMacro:
           Printer << "IsolationMacro";
           break;
-        case BuiltinMacroKind::SwiftSettingsMacro:
-          Printer << "SwiftSettingsMacro";
-          break;
         }
         break;
 
@@ -6026,6 +6018,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Identifier Name = Mod->getRealName();
     if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
+    }
+
+    StringRef PublicModuleName = File->getPublicModuleName();
+    if (Options.UsePublicModuleNames && !PublicModuleName.empty()) {
+      Name = Mod->getASTContext().getIdentifier(PublicModuleName);
     }
 
     if (Options.UseOriginallyDefinedInModuleNames) {

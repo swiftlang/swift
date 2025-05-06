@@ -1876,9 +1876,10 @@ SubstitutionMap getApplySubstitutionsFromParsed(
         // Provide the replacement type.
         return parses[index].replacement;
       },
-      [&](CanType dependentType, Type replacementType,
+      [&](InFlightSubstitution &IFS, Type dependentType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
-        replacementType = replacementType->getReferenceStorageReferent();
+        auto replacementType = dependentType.subst(IFS)
+            ->getReferenceStorageReferent();
         if (auto conformance = lookupConformance(replacementType, proto))
           return conformance;
 
@@ -3468,6 +3469,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createEndCOWMutation(InstLoc, Val, keepUnique);
+    break;
+  }
+  case SILInstructionKind::EndCOWMutationAddrInst: {
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createEndCOWMutationAddr(InstLoc, Val);
     break;
   }
   case SILInstructionKind::DestroyNotEscapedClosureInst: {

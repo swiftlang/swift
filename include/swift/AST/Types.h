@@ -1054,6 +1054,9 @@ public:
   bool is##NAME();
   #include "swift/AST/KnownStdlibTypes.def"
 
+  /// Check if this type is from the Builtin module.
+  bool isBuiltinType();
+
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
   
@@ -7069,8 +7072,8 @@ public:
   Type operator()(SubstitutableType *maybeOpaqueType) const;
 
   /// LookupConformanceFn
-  ProtocolConformanceRef operator()(CanType maybeOpaqueType,
-                                    Type replacementType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type maybeOpaqueType,
                                     ProtocolDecl *protocol) const;
 
   OpaqueSubstitutionKind
@@ -7108,8 +7111,8 @@ public:
   Type operator()(SubstitutableType *type) const;
 
   /// LookupConformanceFn
-  ProtocolConformanceRef operator()(CanType origType,
-                                    Type substType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type origType,
                                     ProtocolDecl *protocol) const;
 
 };
@@ -8197,6 +8200,10 @@ inline Type TypeBase::getNominalParent() {
 
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
+}
+
+inline bool TypeBase::isBuiltinType() {
+  return isa<BuiltinType>(getCanonicalType());
 }
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {

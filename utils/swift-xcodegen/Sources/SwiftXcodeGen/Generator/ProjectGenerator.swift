@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Xcodeproj
 import Darwin
 
 extension Xcode.Reference {
@@ -36,6 +35,7 @@ fileprivate final class ProjectGenerator {
   private var targets: [String: Xcode.Target] = [:]
   private var unbuildableSources: [RelativePath] = []
   private var runnableBuildTargets: [RunnableTarget: Xcode.Target] = [:]
+  private var buildableFolders: [RelativePath: Xcode.BuildableFolder] = [:]
 
   /// The group in which external files are stored.
   private var externalsGroup: Xcode.Group {
@@ -54,6 +54,13 @@ fileprivate final class ProjectGenerator {
     project.addTarget(name: "swift-include-substitutions")
   }()
   private var includeSubstitutions: Set<BuildArgs.PathSubstitution> = []
+
+  private lazy var unbuildablesTarget: Xcode.Target = {
+    generateBaseTarget(
+      "Unbuildables", at: ".", canUseBuildableFolder: false,
+      productType: .staticArchive, includeInAllTarget: false
+    )!
+  }()
 
   /// The main repo dir relative to the project.
   private lazy var mainRepoDirInProject: RelativePath? =
@@ -206,6 +213,42 @@ fileprivate final class ProjectGenerator {
     return getOrCreateProjectRef(ref.withPath(repoRelativePath.appending(path)))
   }
 
+  @discardableResult
+  func getOrCreateRepoBuildableFolder(
+    at path: RelativePath
+  ) -> Xcode.BuildableFolder? {
+    guard let ref = getOrCreateRepoRef(.folder(path)) else { return nil }
+    let folder = ref.getOrCreateBuildableFolder(at: path)
+    buildableFolders[path] = folder
+
+    // Exclude any sources we don't want to handle.
+    do {
+      let excluded = try buildDir.getAllRepoSubpaths(of: path)
+        .filter(\.isExcludedSource)
+      folder.setTargets([], for: excluded)
+    } catch {
+      log.error("\(error)")
+    }
+
+    return folder
+  }
+
+  private func getParentBuildableFolder(
+    _ path: RelativePath
+  ) -> Xcode.BuildableFolder? {
+    // First check the mapping directly.
+    if let buildableFolder = buildableFolders[path] {
+      return buildableFolder
+    }
+    // Then check the parent.
+    if let parent = path.parentDir,
+        let buildableFolder = getParentBuildableFolder(parent) {
+      buildableFolders[path] = buildableFolder
+      return buildableFolder
+    }
+    return nil
+  }
+
   func getAllRepoSubpaths(of parent: RelativePath) throws -> [RelativePath] {
     try buildDir.getAllRepoSubpaths(of: parent)
   }
@@ -226,14 +269,15 @@ fileprivate final class ProjectGenerator {
       }
       return newName
     }()
-    var buildableFolder: Xcode.FileReference?
-    if let parentPath, !parentPath.components.isEmpty {
+    var buildableFolder: Xcode.BuildableFolder?
+    // Note that special targets like "Unbuildables" have an empty parent path.
+    if let parentPath, !parentPath.isEmpty {
       // If we've been asked to use buildable folders, see if we can create
       // a folder reference at the parent path. Otherwise, create a group at
       // the parent path. If we can't create either a folder or group, this is
       // nested in a folder reference and there's nothing we can do.
       if spec.useBuildableFolders && canUseBuildableFolder {
-        buildableFolder = getOrCreateRepoRef(.folder(parentPath))
+        buildableFolder = getOrCreateRepoBuildableFolder(at: parentPath)
       }
       guard buildableFolder != nil ||
               group(for: repoRelativePath.appending(parentPath)) != nil else {
@@ -263,6 +307,13 @@ fileprivate final class ProjectGenerator {
     // The product name needs to be unique across every project we generate
     // (to allow the combined workspaces to work), so add in the project name.
     target.buildSettings.common.PRODUCT_NAME = "\(self.name)_\(name)"
+
+    // Don't optimize or generate debug info, that will only slow down
+    // compilation; we don't actually care about the binary.
+    target.buildSettings.common.GCC_OPTIMIZATION_LEVEL = "0"
+    target.buildSettings.common.GCC_GENERATE_DEBUGGING_SYMBOLS = "NO"
+    target.buildSettings.common.GCC_WARN_64_TO_32_BIT_CONVERSION = "NO"
+
     return target
   }
 
@@ -299,10 +350,9 @@ fileprivate final class ProjectGenerator {
     at parentPath: RelativePath, sources: [RelativePath]
   ) throws -> Bool {
     // To use a buildable folder, all child sources need to be accounted for
-    // in the target. If we have any stray sources not part of the target,
-    // attempting to use a buildable folder would incorrectly include them.
-    // Additionally, special targets like "Unbuildables" have an empty parent
-    // path, avoid buildable folders for them.
+    // in the target. Ignore special targets like "Unbuildables" which have an
+    // empty parent path.
+    // TODO: We ought to be able to add stray sources as exclusions.
     guard spec.useBuildableFolders, !parentPath.isEmpty else { return false }
     let sources = Set(sources)
     return try getAllRepoSubpaths(of: parentPath)
@@ -312,20 +362,10 @@ fileprivate final class ProjectGenerator {
   /// Checks whether a given Clang target can be represented using a buildable
   /// folder.
   func canUseBuildableFolder(for clangTarget: ClangTarget) throws -> Bool {
-    // In addition to the standard checking, we also must not have any
-    // unbuildable sources or sources with unique arguments.
-    // TODO: To improve the coverage of buildable folders, we ought to start
-    // automatically splitting umbrella Clang targets like 'stdlib', since
-    // they currently always have files with unique args.
-    guard spec.useBuildableFolders, clangTarget.unbuildableSources.isEmpty else {
-      return false
-    }
-    let parent = clangTarget.parentPath
-    let hasConsistentArgs = try clangTarget.sources.allSatisfy {
-      try !buildDir.clangArgs.hasUniqueArgs(for: $0, parent: parent)
-    }
-    guard hasConsistentArgs else { return false }
-    return try canUseBuildableFolder(at: parent, sources: clangTarget.sources)
+    try canUseBuildableFolder(
+      at: clangTarget.parentPath,
+      sources: clangTarget.sources + clangTarget.unbuildableSources
+    )
   }
 
   func canUseBuildableFolder(
@@ -337,21 +377,62 @@ fileprivate final class ProjectGenerator {
     )
   }
 
-  func generateClangTarget(
-    _ targetInfo: ClangTarget, includeInAllTarget: Bool = true
+  func addSourcesPhaseToClangTarget(
+    _ target: Xcode.Target, sources: [RelativePath], targetPath: RelativePath
   ) throws {
+    let sourcesToBuild = target.addSourcesBuildPhase()
+    for source in sources {
+      var fileArgs = try buildDir.clangArgs.getUniqueArgs(
+        for: source, parent: targetPath, infer: spec.inferArgs
+      )
+      if !fileArgs.isEmpty {
+        applyBaseSubstitutions(to: &fileArgs)
+      }
+      // If we're using a buildable folder, the extra arguments are added to it
+      // directly.
+      if let buildableFolder = getParentBuildableFolder(source) {
+        if !fileArgs.isEmpty {
+          buildableFolder.setExtraCompilerArgs(
+            fileArgs.printedArgs, for: source, in: target
+          )
+        }
+        continue
+      }
+      // Otherwise we add as a file reference and add the arguments to the
+      // target.
+      guard let sourceRef = getOrCreateRepoRef(.file(source)) else {
+        continue
+      }
+      let buildFile = sourcesToBuild.addBuildFile(fileRef: sourceRef)
+
+      // Add any per-file settings.
+      buildFile.settings.COMPILER_FLAGS = fileArgs.printed
+    }
+  }
+
+  func generateClangTarget(_ targetInfo: ClangTarget) throws {
     let targetPath = targetInfo.parentPath
     guard checkNotExcluded(targetPath, for: "Clang target") else {
       return
     }
-    unbuildableSources += targetInfo.unbuildableSources
 
-    // Need to defer the addition of headers since the target may want to use
-    // a buildable folder.
+    // Need to defer the addition of headers and unbuildable sources since the
+    // target may want to use a buildable folder.
     defer {
-      for header in targetInfo.headers {
-        getOrCreateRepoRef(.file(header))
+      // If we're using a buildable folder, the headers are automatically
+      // included.
+      if let buildableFolder = getParentBuildableFolder(targetPath) {
+        buildableFolder.setTargets(
+          [unbuildablesTarget], for: targetInfo.unbuildableSources
+        )
+      } else {
+        for header in targetInfo.headers {
+          getOrCreateRepoRef(.file(header))
+        }
       }
+      // Add the unbuildable sources regardless of buildable folder since
+      // we still need the compiler arguments to be set.
+      unbuildableSources += targetInfo.unbuildableSources
     }
 
     // If we have no sources, we're done.
@@ -363,21 +444,19 @@ fileprivate final class ProjectGenerator {
         build args
         """)
       }
+      // Still create a buildable folder if we can. It won't have an associated
+      // target, but unbuildable sources may still be added as exceptions.
+      if try canUseBuildableFolder(for: targetInfo) {
+        getOrCreateRepoBuildableFolder(at: targetPath)
+      }
       return
     }
     let target = generateBaseTarget(
       targetInfo.name, at: targetPath,
       canUseBuildableFolder: try canUseBuildableFolder(for: targetInfo),
-      productType: .staticArchive,
-      includeInAllTarget: includeInAllTarget
+      productType: .staticArchive, includeInAllTarget: true
     )
     guard let target else { return }
-
-    // Don't optimize or generate debug info, that will only slow down
-    // compilation; we don't actually care about the binary.
-    target.buildSettings.common.GCC_OPTIMIZATION_LEVEL = "0"
-    target.buildSettings.common.GCC_GENERATE_DEBUGGING_SYMBOLS = "NO"
-    target.buildSettings.common.GCC_WARN_64_TO_32_BIT_CONVERSION = "NO"
 
     var libBuildArgs = try buildDir.clangArgs.getArgs(for: targetPath)
     applyBaseSubstitutions(to: &libBuildArgs)
@@ -390,23 +469,9 @@ fileprivate final class ProjectGenerator {
 
     target.buildSettings.common.OTHER_CPLUSPLUSFLAGS = libBuildArgs.printedArgs
 
-    let sourcesToBuild = target.addSourcesBuildPhase()
-
-    for source in targetInfo.sources {
-      guard let sourceRef = getOrCreateRepoRef(.file(source)) else {
-        continue
-      }
-      let buildFile = sourcesToBuild.addBuildFile(fileRef: sourceRef)
-
-      // Add any per-file settings.
-      var fileArgs = try buildDir.clangArgs.getUniqueArgs(
-        for: source, parent: targetPath, infer: spec.inferArgs
-      )
-      if !fileArgs.isEmpty {
-        applyBaseSubstitutions(to: &fileArgs)
-        buildFile.settings.COMPILER_FLAGS = fileArgs.printed
-      }
-    }
+    try addSourcesPhaseToClangTarget(
+      target, sources: targetInfo.sources, targetPath: targetPath
+    )
   }
 
   /// Record path substitutions for a given target.
@@ -760,14 +825,11 @@ fileprivate final class ProjectGenerator {
       try generateClangTarget(target)
     }
 
+    // Add any unbuildable sources to the special 'Unbuildables' target.
     if !unbuildableSources.isEmpty {
-      let target = ClangTarget(
-        name: "Unbuildables", 
-        parentPath: ".",
-        sources: unbuildableSources,
-        headers: []
+      try addSourcesPhaseToClangTarget(
+        unbuildablesTarget, sources: unbuildableSources, targetPath: "."
       )
-      try generateClangTarget(target, includeInAllTarget: false)
     }
 
     // Add targets for runnable targets if needed.

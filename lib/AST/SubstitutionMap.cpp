@@ -272,61 +272,31 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   auto path = genericSig->getConformancePath(type, proto);
 
-  ProtocolConformanceRef conformance;
-  for (const auto &step : path) {
-    // For the first step, grab the initial conformance.
-    if (conformance.isInvalid()) {
-      if (auto initialConformance = getSignatureConformance(
-            step.first, step.second)) {
-        conformance = *initialConformance;
-        continue;
-      }
+  // For the first step, grab the initial conformance.
+  auto iter = path.begin();
+  const auto step = *iter++;
 
-      // We couldn't find the initial conformance, fail.
-      return ProtocolConformanceRef::forInvalid();
-    }
+  ProtocolConformanceRef conformance =
+      *getSignatureConformance(step.first, step.second);
 
-    // If we've hit an abstract conformance, everything from here on out is
-    // abstract.
-    // FIXME: This may not always be true, but it holds for now.
-    if (conformance.isAbstract()) {
-      // FIXME: Rip this out once we can get a concrete conformance from
-      // an archetype.
-      return swift::lookupConformance(type.subst(*this), proto);
-    }
+  // For each remaining step, project an associated conformance.
+  while (iter != path.end()) {
+    // FIXME: Remove this hack. It is unsound, because we may not have diagnosed
+    // anything but still end up with an ErrorType in the AST.
+    if (conformance.isConcrete()) {
+      auto concrete = conformance.getConcrete();
+      auto normal = concrete->getRootNormalConformance();
 
-    // For the second step, we're looking into the requirement signature for
-    // this protocol.
-    if (conformance.isPack()) {
-      auto pack = conformance.getPack();
-      conformance = ProtocolConformanceRef(
-          pack->getAssociatedConformance(step.first, step.second));
-      if (conformance.isInvalid())
-        return conformance;
-
-      continue;
-    }
-
-    auto concrete = conformance.getConcrete();
-    auto normal = concrete->getRootNormalConformance();
-
-    // If we haven't set the signature conformances yet, force the issue now.
-    if (!normal->hasComputedAssociatedConformances()) {
-      // If we're in the process of checking the type witnesses, fail
-      // gracefully.
-      //
-      // FIXME: This is unsound, because we may not have diagnosed anything but
-      // still end up with an ErrorType in the AST.
-      if (proto->getASTContext().evaluator.hasActiveRequest(
-            ResolveTypeWitnessesRequest{normal})) {
-        return ProtocolConformanceRef::forInvalid();
+      if (!normal->hasComputedAssociatedConformances()) {
+        if (proto->getASTContext().evaluator.hasActiveRequest(
+              ResolveTypeWitnessesRequest{normal})) {
+          return ProtocolConformanceRef::forInvalid();
+        }
       }
     }
 
-    // Get the associated conformance.
-    conformance = concrete->getAssociatedConformance(step.first, step.second);
-    if (conformance.isInvalid())
-      return conformance;
+    const auto step = *iter++;
+    conformance = conformance.getAssociatedConformance(step.first, step.second);
   }
 
   return conformance;
@@ -473,16 +443,18 @@ Type QueryOverrideSubs::operator()(SubstitutableType *type) const {
 }
 
 ProtocolConformanceRef
-LookUpConformanceInOverrideSubs::operator()(CanType type,
-                                            Type substType,
+LookUpConformanceInOverrideSubs::operator()(InFlightSubstitution &IFS,
+                                            Type type,
                                             ProtocolDecl *proto) const {
   if (type->getRootGenericParam()->getDepth() >= info.BaseDepth)
-    return ProtocolConformanceRef::forAbstract(substType, proto);
+    return ProtocolConformanceRef::forAbstract(type.subst(IFS), proto);
 
-  if (auto conformance = info.BaseSubMap.lookupConformance(type, proto))
+  if (auto conformance = info.BaseSubMap.lookupConformance(
+        type->getCanonicalType(), proto)) {
     return conformance;
+  }
 
-  return lookupConformance(substType, proto);
+  return lookupConformance(type.subst(IFS), proto);
 }
 
 SubstitutionMap
@@ -665,8 +637,8 @@ Type OuterSubstitutions::operator()(SubstitutableType *type) const {
 }
 
 ProtocolConformanceRef OuterSubstitutions::operator()(
-                                        CanType dependentType,
-                                        Type conformingReplacementType,
+                                        InFlightSubstitution &IFS,
+                                        Type dependentType,
                                         ProtocolDecl *conformedProtocol) const {
   auto sig = subs.getGenericSignature();
   if (!sig->isValidTypeParameter(dependentType) ||
@@ -683,10 +655,10 @@ ProtocolConformanceRef OuterSubstitutions::operator()(
     // Once we check for that and handle it properly, the lookupConformance()
     // can become a forAbstract().
     return swift::lookupConformance(
-      conformingReplacementType, conformedProtocol);
+      dependentType.subst(IFS), conformedProtocol);
   }
 
   return LookUpConformanceInSubstitutionMap(subs)(
-      dependentType, conformingReplacementType, conformedProtocol);
+      IFS, dependentType, conformedProtocol);
 }
 

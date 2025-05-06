@@ -2201,57 +2201,10 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
-namespace {
-  static StringRef pathStringFromSearchPath(
-      const SearchPathOptions::SearchPath &next) {
-    return next.Path;
-  }
-}
-
 std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
 const {
   assert(LangOpts.Target.isOSDarwin());
   return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
-}
-
-llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
-const {
-  llvm::StringSet<> result;
-
-  // Import and framework paths are "special", they contain more than path
-  // strings, but path strings are all we care about here.
-  using SearchPathView = ArrayRefView<SearchPathOptions::SearchPath, StringRef,
-                                      pathStringFromSearchPath>;
-
-  SearchPathView importPathsOnly{SearchPathOpts.getImportSearchPaths()};
-  result.insert(importPathsOnly.begin(), importPathsOnly.end());
-
-  SearchPathView frameworkPathsOnly{SearchPathOpts.getFrameworkSearchPaths()};
-  result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
-
-  if (LangOpts.Target.isOSDarwin()) {
-    auto implicitFrameworkSearchPaths = getDarwinImplicitFrameworkSearchPaths();
-    result.insert(implicitFrameworkSearchPaths.begin(),
-                  implicitFrameworkSearchPaths.end());
-  }
-  result.insert(SearchPathOpts.RuntimeLibraryImportPaths.begin(),
-                SearchPathOpts.RuntimeLibraryImportPaths.end());
-
-  // ClangImporter special-cases the path for SwiftShims, so do the same here
-  // If there are no shims in the resource dir, add a search path in the SDK.
-  SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
-  llvm::sys::path::append(shimsPath, "shims");
-  if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = SearchPathOpts.getSDKPath();
-    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-  }
-  result.insert(shimsPath.str());
-
-  // Clang system modules are found in the SDK root
-  SmallString<128> clangSysRootPath(SearchPathOpts.getSDKPath());
-  llvm::sys::path::append(clangSysRootPath, "usr", "include");
-  result.insert(clangSysRootPath.str());
-  return result;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -6585,13 +6538,16 @@ const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionTypeRepresentation trueRep) {
-  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+  return getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+      params, resultTy, trueRep);
 }
 
 const clang::Type *ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
-  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  auto *ty =
+      getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+          params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 

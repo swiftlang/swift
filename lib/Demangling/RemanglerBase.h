@@ -1,4 +1,4 @@
-//===--- Demangler.h - String to Node-Tree Demangling -----------*- C++ -*-===//
+//===--- RemanglerBase.h - String to Node-Tree Demangling -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

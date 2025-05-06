@@ -818,6 +818,16 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return false;
   }
 
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+ @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutationUnchecked() -> Bool {
+    if Bool(Builtin.beginCOWMutation(&_storage)) {
+      return true
+    }
+    return false;
+  }
+#endif
+
   /// Puts the buffer in an immutable state.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.

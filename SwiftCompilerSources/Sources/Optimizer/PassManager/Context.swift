@@ -326,6 +326,10 @@ struct FunctionPassContext : MutatingContext {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }
 
+  var swiftMutableSpan: NominalTypeDecl {
+    _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)
+  }
+
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
       let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
@@ -749,6 +753,20 @@ extension PointerToAddressInst {
   func set(alignment: Int?, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension CopyAddrInst {
+  func set(isTakeOfSource: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsTakeOfSrc(isTakeOfSource)
+    context.notifyInstructionChanged(self)
+  }
+
+  func set(isInitializationOfDestination: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsInitializationOfDest(isInitializationOfDestination)
     context.notifyInstructionChanged(self)
   }
 }
