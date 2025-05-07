@@ -5600,7 +5600,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
               segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
                 getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
-          diagnoseUnintendedInterpolation(firstArg, kind);
+          diagnoseUnintendedInterpolation(segment, firstArg, kind);
     }
 
     bool interpolationWouldBeUnintended(ConcreteDeclRef appendMethod,
@@ -5666,12 +5666,39 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return firstArg;
     }
 
-    void diagnoseUnintendedInterpolation(Expr * arg, UnintendedInterpolationKind kind) {
+    std::string baseInterpolationTypeName(CallExpr *segment) {
+      if (auto selfApplyExpr = dyn_cast<SelfApplyExpr>(segment->getFn())) {
+        auto baseType = selfApplyExpr->getBase()->getType();
+        return baseType->getWithoutSpecifierType()->getString();
+      }
+      return "unknown";
+    }
+    
+    void diagnoseUnintendedInterpolation(CallExpr *segment,
+                                         Expr * arg,
+                                         UnintendedInterpolationKind kind) {
       Ctx.Diags
           .diagnose(arg->getStartLoc(),
                     diag::debug_description_in_string_interpolation_segment,
                     (bool)kind)
           .highlight(arg->getSourceRange());
+
+      if (kind == UnintendedInterpolationKind::Optional) {
+        auto wrappedArgType = arg->getType()->getRValueType()->getOptionalObjectType();
+        auto baseTypeName = baseInterpolationTypeName(segment);
+        
+        // Suggest using a default value parameter, but only for non-string values
+        // when the base interpolation type is the default.
+        if (!wrappedArgType->isString() && baseTypeName == "DefaultStringInterpolation")
+          Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_parameter)
+            .highlight(arg->getSourceRange())
+            .fixItInsertAfter(arg->getEndLoc(), ", default: <#default value#>");
+
+        // Suggest providing a default value using the nil-coalescing operator.
+        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
+          .highlight(arg->getSourceRange())
+          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
+      }
 
       // Suggest 'String(describing: <expr>)'.
       auto argStart = arg->getStartLoc();
@@ -5682,13 +5709,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
           .highlight(arg->getSourceRange())
           .fixItInsert(argStart, "String(describing: ")
           .fixItInsertAfter(arg->getEndLoc(), ")");
-
-      if (kind == UnintendedInterpolationKind::Optional) {
-        // Suggest inserting a default value.
-        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
-          .highlight(arg->getSourceRange())
-          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
-      }
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
