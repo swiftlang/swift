@@ -184,7 +184,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 
-// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK: [[WITNESS_FOR_SIZE:%size]] = load [[INT]], ptr [[WITNESS_ADDR]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16

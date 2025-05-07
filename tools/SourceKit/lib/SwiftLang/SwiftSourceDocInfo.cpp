@@ -764,7 +764,8 @@ static StringRef getModuleName(const ValueDecl *VD,
   // overlay's declaring module as the owning module.
   if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
     MD = Declaring;
-  return MD->getNameStr();
+
+  return MD->getPublicModuleName(/*onlyIfImported=*/false).str();
 }
 
 struct DeclInfo {

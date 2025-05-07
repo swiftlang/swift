@@ -376,11 +376,6 @@ EXPERIMENTAL_FEATURE(ParserASTGen, false)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 
-/// Import C++ class templates as semantically-meaningless symbolic
-/// Swift types and C++ methods as symbolic functions with blank
-/// signatures.
-EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
-
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
@@ -493,9 +488,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
-
-/// Allow SwiftSettings
-EXPERIMENTAL_FEATURE(SwiftSettings, false)
 
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)

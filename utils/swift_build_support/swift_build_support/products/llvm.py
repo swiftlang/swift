@@ -313,7 +313,7 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define(
                 'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
 
-        builtins_runtimes_target_for_darwin = 'arm64-apple-darwin'
+        builtins_runtimes_target_for_darwin = f'{arch}-apple-darwin'
         if system() == "Darwin":
             llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'

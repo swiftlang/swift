@@ -1064,12 +1064,6 @@ Added: _swift_ConformanceExecutionContextSize
 Added: _swift_conformsToProtocolWithExecutionContext
 Added: _swift_isInConformanceExecutionContext
 
-// Swift Settings
-Added: _$ss12SwiftSettingVABycfC
-Added: _$ss12SwiftSettingVMa
-Added: _$ss12SwiftSettingVMn
-Added: _$ss12SwiftSettingVN
-
 // EnumeratedSequence Collection conformances
 Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
 Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc

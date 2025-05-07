@@ -87,9 +87,9 @@ class Foo {
   // x86_64-macosx: define hidden swiftcc float @"$s8abitypes3FooC17getXFromRectSwift{{.*}}"(float %0, float %1, float %2, float %3, ptr swiftself %4) {{.*}} {
   // x86_64-macosx: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 8
   // x86_64-macosx: [[SEL:%.*]] = load ptr, ptr @"\01L_selector(getXFromRect:)", align 8
-  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 0
+  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds{{.*}} { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 0
   // x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, ptr [[T0]]
-  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 1
+  // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds{{.*}} { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 1
   // x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, ptr [[T0]]
   // x86_64-macosx: [[RESULT:%.*]] = call float @objc_msgSend(ptr %4, ptr [[SEL]], <2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
   // armv7-ios: define hidden swiftcc float @"$s8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, ptr swiftself %4) {{.*}} {
@@ -199,9 +199,9 @@ class Foo {
 
   // x86_64-macosx:      define hidden swiftcc i64 @"$s8abitypes3FooC7getpair{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr swiftself %1) {{.*}} {
   // x86_64-macosx:      [[RESULT:%.*]] = call i64 @objc_msgSend
-  // x86_64-macosx:      [[GEP1:%.*]] = getelementptr inbounds { i64 }, ptr {{.*}}, i32 0, i32 0
+  // x86_64-macosx:      [[GEP1:%.*]] = getelementptr inbounds{{.*}} { i64 }, ptr {{.*}}, i32 0, i32 0
   // x86_64-macosx:      store i64 [[RESULT]], ptr [[GEP1]]
-  // x86_64-macosx:      [[GEP2:%.*]] = getelementptr inbounds { i64 }, ptr {{.*}}, i32 0, i32 0
+  // x86_64-macosx:      [[GEP2:%.*]] = getelementptr inbounds{{.*}} { i64 }, ptr {{.*}}, i32 0, i32 0
   // x86_64-macosx:      load i64, ptr [[GEP2]]
   // x86_64-macosx:      ret i64
   func getpair(_ p: StructReturns) -> IntPair {
@@ -218,7 +218,7 @@ class Foo {
   // x86_64-macosx:      call void @llvm.lifetime.start
   // x86_64-macosx:      store i32 {{.*}}
   // x86_64-macosx:      store i32 {{.*}}
-  // x86_64-macosx:      [[T0:%.*]] = getelementptr inbounds { i64 }, ptr
+  // x86_64-macosx:      [[T0:%.*]] = getelementptr inbounds{{.*}} { i64 }, ptr
   // x86_64-macosx:      load i64, ptr [[T0]], align 8
   // x86_64-macosx:      call void @llvm.lifetime.end
   // x86_64-macosx:      ret i64
@@ -567,35 +567,35 @@ class Foo {
 // We need to allocate enough memory on the stack to hold the argument value we load.
 // arm64-ios: define swiftcc void @"$s8abitypes14testBOOLStructyyF"()
 // arm64-ios:  [[COERCED:%.*]] = alloca i64
-// arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
-// arm64-ios:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
-// arm64-ios:  [[PTR2:%.*]] = getelementptr inbounds %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds{{.*}} %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  [[PTR1:%.*]] = getelementptr inbounds{{.*}} %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  [[PTR2:%.*]] = getelementptr inbounds{{.*}} %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
 // arm64-ios:  store i8 0, ptr [[PTR2]], align 8
 // arm64-ios:  [[ARG:%.*]] = load i64, ptr [[COERCED]]
 // arm64-ios:  call void @objc_msgSend(ptr {{.*}}, ptr {{.*}}, i64 [[ARG]])
 //
 // arm64e-ios: define swiftcc void @"$s8abitypes14testBOOLStructyyF"()
 // arm64e-ios:  [[COERCED:%.*]] = alloca i64
-// arm64e-ios:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
-// arm64e-ios:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
-// arm64e-ios:  [[PTR2:%.*]] = getelementptr inbounds %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
+// arm64e-ios:  [[PTR0:%.*]] = getelementptr inbounds{{.*}} %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
+// arm64e-ios:  [[PTR1:%.*]] = getelementptr inbounds{{.*}} %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
+// arm64e-ios:  [[PTR2:%.*]] = getelementptr inbounds{{.*}} %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
 // arm64e-ios:  store i8 0, ptr [[PTR2]], align 8
 // arm64e-ios:  [[ARG:%.*]] = load i64, ptr [[COERCED]]
 // arm64e-ios:  call void @objc_msgSend(ptr {{.*}}, ptr {{.*}}, i64 [[ARG]])
 // arm64-macosx: define swiftcc void @"$s8abitypes14testBOOLStructyyF"()
 // arm64-macosx:  [[COERCED:%.*]] = alloca i64
-// arm64-macosx:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
-// arm64-macosx:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
-// arm64-macosx:  [[PTR2:%.*]] = getelementptr inbounds %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
+// arm64-macosx:  [[PTR0:%.*]] = getelementptr inbounds{{.*}} %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
+// arm64-macosx:  [[PTR1:%.*]] = getelementptr inbounds{{.*}} %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
+// arm64-macosx:  [[PTR2:%.*]] = getelementptr inbounds{{.*}} %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
 // arm64-macosx:  store i8 0, ptr [[PTR2]], align 8
 // arm64-macosx:  [[ARG:%.*]] = load i64, ptr [[COERCED]]
 // arm64-macosx:  call void @objc_msgSend(ptr {{.*}}, ptr {{.*}}, i64 [[ARG]])
 //
 // arm64-watchos: define swiftcc void @"$s8abitypes14testBOOLStructyyF"()
 // arm64-watchos:  [[COERCED:%.*]] = alloca i64
-// arm64-watchos:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
-// arm64-watchos:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
-// arm64-watchos:  [[PTR2:%.*]] = getelementptr inbounds %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
+// arm64-watchos:  [[PTR0:%.*]] = getelementptr inbounds{{.*}} %TSo14FiveByteStructV, ptr [[COERCED]], {{i.*}} 0, {{i.*}} 0
+// arm64-watchos:  [[PTR1:%.*]] = getelementptr inbounds{{.*}} %T10ObjectiveC8ObjCBoolV, ptr [[PTR0]], {{i.*}} 0, {{i.*}} 0
+// arm64-watchos:  [[PTR2:%.*]] = getelementptr inbounds{{.*}} %TSb, ptr [[PTR1]], {{i.*}} 0, {{i.*}} 0
 // arm64-watchos:  store i8 0, ptr [[PTR2]], align 8
 // arm64-watchos:  [[ARG:%.*]] = load i64, ptr [[COERCED]]
 // arm64-watchos:  call void @objc_msgSend(ptr {{.*}}, ptr {{.*}}, i64 [[ARG]])

@@ -147,7 +147,7 @@ entry:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @partial_apply_concrete_witness() {{.*}} {
 // CHECK:         [[CONTEXT:%.*]] = call noalias ptr @swift_allocObject({{.*}})
-// CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, ptr }>, ptr [[CONTEXT]], i32 0, i32 1
+// CHECK:         [[WTABLE:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr [[CONTEXT]], i32 0, i32 1
 // CHECK:         store ptr @"$s19sil_witness_methods3BarCyxq_q0_GAA1PAAWP", ptr [[WTABLE]]
 // CHECK:         [[RESULT:%.*]] = insertvalue { ptr, ptr } { ptr @"$s36generic_type_concrete_method_witnessTA", ptr undef }, ptr [[CONTEXT]], 1
 // CHECK:         ret { ptr, ptr } [[RESULT]]

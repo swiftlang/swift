@@ -1132,8 +1132,8 @@ protected:
       // The 'newValue' dependence kind must match the getter's dependence kind
       // because generated the implementation '_modify' accessor composes the
       // getter's result with the setter's 'newValue'. In particular, if the
-      // result type is non-Escapable then the setter must not depend on
-      // 'newValue'.
+      // result type is Escapable then the getter does not have any lifetime
+      // dependency, so the setter cannot depend on 'newValue'.
       if (!paramTypeInContext->isEscapable()) {
         targetDeps = std::move(targetDeps)
           .add(newValIdx, LifetimeDependenceKind::Inherit);

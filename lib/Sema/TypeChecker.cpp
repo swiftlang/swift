@@ -283,10 +283,6 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // checking.
     (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
-    // Before we type check any of the top level code decls, generate the per
-    // file language options.
-    (void)SF->getLanguageOptions();
-
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
