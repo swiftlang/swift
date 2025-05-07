@@ -58,9 +58,8 @@ struct ClangBuildArgsProvider {
 
   /// Retrieve the arguments at a given path, including those in the parent.
   func getArgs(for path: RelativePath) -> BuildArgs {
-    // Sort the arguments to get a deterministic ordering.
     // FIXME: We ought to get the command from the arg tree.
-    .init(for: .clang, args: args.getArgs(for: path).sorted())
+    .init(for: .clang, args: args.getArgs(for: path))
   }
 
   /// Retrieve the arguments at a given path, excluding those already covered
@@ -68,7 +67,7 @@ struct ClangBuildArgsProvider {
   func getUniqueArgs(
     for path: RelativePath, parent: RelativePath, infer: Bool = false
   ) -> BuildArgs {
-    var fileArgs: Set<Command.Argument> = []
+    var fileArgs: [Command.Argument] = []
     if hasBuildArgs(for: path) {
       fileArgs = args.getUniqueArgs(for: path, parent: parent)
     } else if infer {
@@ -78,14 +77,8 @@ struct ClangBuildArgsProvider {
         fileArgs = args.getUniqueArgs(for: component, parent: parent)
       }
     }
-    // Sort the arguments to get a deterministic ordering.
     // FIXME: We ought to get the command from the arg tree.
-    return .init(for: .clang, args: fileArgs.sorted())
-  }
-
-  /// Whether the given path has any unique args not covered by `parent`.
-  func hasUniqueArgs(for path: RelativePath, parent: RelativePath) -> Bool {
-    args.hasUniqueArgs(for: path, parent: parent)
+    return .init(for: .clang, args: fileArgs)
   }
 
   /// Whether the given file has build arguments.
