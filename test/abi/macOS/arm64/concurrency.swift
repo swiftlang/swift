@@ -411,6 +411,3 @@ Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
-
-// SwiftSettings
-Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ

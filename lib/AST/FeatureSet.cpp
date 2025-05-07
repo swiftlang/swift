@@ -449,14 +449,6 @@ UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(CopyBlockOptimization)
 
-static bool usesFeatureSwiftSettings(const Decl *decl) {
-  // We just need to guard `#SwiftSettings`.
-  auto *macro = dyn_cast<MacroDecl>(decl);
-  return macro && macro->isStdlibDecl() &&
-         macro->getMacroRoles().contains(MacroRole::Declaration) &&
-         macro->getBaseIdentifier().is("SwiftSettings");
-}
-
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
     return cd->getFormalAccess() == AccessLevel::Open &&
