@@ -1,10 +1,10 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -target arm64-apple-macos -print-module -module-to-print=SizedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -target arm64-apple-macos -emit-module -plugin-path %swift-plugin-dir -o %t/SizedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/SizedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __noescape parameters.
 import SizedByNoEscapeClang
