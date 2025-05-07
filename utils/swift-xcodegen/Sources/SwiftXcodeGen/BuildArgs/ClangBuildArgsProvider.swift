@@ -50,8 +50,16 @@ struct ClangBuildArgsProvider {
       commandsToAdd[relFilePath] = (output, command.command.args)
     }
     for (path, (output, commandArgs)) in commandsToAdd {
-      // Only include arguments that have known flags.
-      args.insert(commandArgs.filter({ $0.flag != nil }), for: path)
+      let commandArgs = commandArgs.filter { arg in
+        // Only include arguments that have known flags.
+        // Ignore `-fdiagnostics-color`, we don't want ANSI escape sequences
+        // in Xcode build logs.
+        guard let flag = arg.flag, flag != .fDiagnosticsColor else {
+          return false
+        }
+        return true
+      }
+      args.insert(commandArgs, for: path)
       outputs[path] = output
     }
   }
