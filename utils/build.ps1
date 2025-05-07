@@ -2934,6 +2934,7 @@ function Build-SourceKitLSP([Hashtable] $Platform) {
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
       SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
       SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
