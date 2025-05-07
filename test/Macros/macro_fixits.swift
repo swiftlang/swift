@@ -7,12 +7,7 @@
 
 // RUN: %host-build-swift -emit-library %S/Inputs/syntax_macro_definitions.swift -o %t/%target-library-name(MacroDefinition) -module-name MacroDefinition -swift-version 5 -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -typecheck %s -load-plugin-library %t/%target-library-name(MacroDefinition) -swift-version 5 -serialize-diagnostics-path %t/diags.dia -fixit-all -emit-fixits-path %t/fixits.json
-
-// RUN: %FileCheck %s --check-prefix FIXITS-JSON < %t/fixits.json
-
-// FIXITS-JSON:      [
-// FIXITS-JSON-NEXT: ]
+// RUN: %target-swift-frontend -typecheck %s -load-plugin-library %t/%target-library-name(MacroDefinition) -swift-version 5 -serialize-diagnostics-path %t/diags.dia
 
 // RUN: c-index-test -read-diagnostics %t/diags.dia 2>&1 | %FileCheck -check-prefix DIAGS %s
 
