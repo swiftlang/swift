@@ -618,8 +618,9 @@ ERROR(ast_format_requires_dump_ast,none,
 ERROR(unknown_dump_ast_format,none,
       "unknown format '%0' requested with '-dump-ast-format'", (StringRef))
 
-ERROR(dependency_scan_unexpected_variant, none,
-      "unexpected variant during dependency scanning on module '%0'", (StringRef))
+WARNING(dependency_scan_unexpected_variant, none,
+        "unexpected module variant during dependency scanning on module '%0', "
+        "compilation of this target is likely to fail or succeed in a way that is not deterministic", (StringRef))
 NOTE(dependency_scan_unexpected_variant_context_hash_note, none,
      "first module context hash: '%0', second module context hash: '%1'", (StringRef, StringRef))
 NOTE(dependency_scan_unexpected_variant_module_map_note, none,
