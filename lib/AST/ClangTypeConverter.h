@@ -70,14 +70,16 @@ public:
   /// \returns The appropriate clang type on success, nullptr on failure.
   ///
   /// Precondition: The representation argument must be C-compatible.
-  const clang::Type *getFunctionType(
-    ArrayRef<AnyFunctionType::Param> params, Type resultTy,
-    AnyFunctionType::Representation repr);
+  const clang::Type *getFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                     Type resultTy,
+                                     AnyFunctionType::Representation repr,
+                                     bool templateArgument);
 
   /// Compute the C function type for a SIL function type.
   const clang::Type *getFunctionType(ArrayRef<SILParameterInfo> params,
                                      std::optional<SILResultInfo> result,
-                                     SILFunctionType::Representation repr);
+                                     SILFunctionType::Representation repr,
+                                     bool templateArgument);
 
   /// Check whether the given Clang declaration is an export of a Swift
   /// declaration introduced by this converter, and if so, return the original
@@ -148,7 +150,8 @@ private:
   clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
   clang::QualType visitBoundGenericType(BoundGenericType *type);
   clang::QualType visitEnumType(EnumType *type);
-  clang::QualType visitFunctionType(FunctionType *type);
+  clang::QualType visitFunctionType(FunctionType *type,
+                                    bool templateArgument = false);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
   clang::QualType visitExistentialType(ExistentialType *type);
   clang::QualType visitBuiltinRawPointerType(BuiltinRawPointerType *type);
@@ -156,7 +159,8 @@ private:
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);
   clang::QualType visitArchetypeType(ArchetypeType *type);
   clang::QualType visitDependentMemberType(DependentMemberType *type);
-  clang::QualType visitSILFunctionType(SILFunctionType *type);
+  clang::QualType visitSILFunctionType(SILFunctionType *type,
+                                       bool templateArgument = false);
   clang::QualType visitGenericTypeParamType(GenericTypeParamType *type);
   clang::QualType visitDynamicSelfType(DynamicSelfType *type);
   clang::QualType visitSILBlockStorageType(SILBlockStorageType *type);
