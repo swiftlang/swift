@@ -54,6 +54,31 @@ class CompileCommandsTests: XCTestCase {
       knownCommandOnly: true
     )
 
+    for op in ["&&", "||", ">", "<", ">>", ";", "(", ")"] {
+      assertParse(
+        "x y x/y/clang -DX -I \(op) ignored",
+        executable: "x/y/clang",
+        args: [.option(.D, spacing: .unspaced, value: "X"), .flag(.I)],
+        knownCommandOnly: true
+      )
+      assertParse(
+        "x y x/y/clang -DX -I x\(op) ignored",
+        executable: "x/y/clang",
+        args: [
+          .option(.D, spacing: .unspaced, value: "X"),
+          .option(.I, spacing: .spaced, value: "x")
+        ],
+        knownCommandOnly: true
+      )
+    }
+
+    assertParse(
+      #"x/y/clang \< x\< "<""#,
+      executable: "x/y/clang",
+      args: [.value("<"), .value("x<"), .value("<")],
+      knownCommandOnly: true
+    )
+
     assertParse(
       "clang -DX -I", 
       args: [.option(.D, spacing: .unspaced, value: "X"), .flag(.I)]
