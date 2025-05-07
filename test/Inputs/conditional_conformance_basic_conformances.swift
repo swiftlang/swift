@@ -48,7 +48,7 @@ public func single_generic<T: P2>(_: T.Type) {
 // CHECK:         %conditional.requirement.buffer = alloca [1 x ptr], align 8
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVMa"(i64 0, ptr %T)
 // CHECK-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[T_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr %T.P2, ptr [[T_P2_PTR]], align 8
 // CHECK-NEXT:    [[Single_P1:%.*]] = call ptr @swift_getWitnessTable
@@ -123,7 +123,7 @@ public func single_concrete() {
 // CHECK-STABLE-ABI-FALSE-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-STABLE-ABI-TRUE-NEXT:     [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", ptr [[A_P2_PTR]], align 8
 
@@ -145,7 +145,7 @@ public func single_concrete() {
 
 // TYPEBYNAME:       cacheIsNull:
 // TYPEBYNAME-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
-// TYPEBYNAME-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// TYPEBYNAME-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // TYPEBYNAME-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // TYPEBYNAME-NEXT:    store ptr @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", ptr [[A_P2_PTR]], align 8
 
@@ -166,7 +166,7 @@ public func single_concrete() {
 // TYPEBYNAME_PRESPECIALIZED-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // TYPEBYNAME_PRESPECIALIZED:       cacheIsNull:
-// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// TYPEBYNAME_PRESPECIALIZED-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // TYPEBYNAME_PRESPECIALIZED-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // TYPEBYNAME_PRESPECIALIZED-NEXT:    store ptr @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", ptr [[A_P2_PTR]], align 8
 
@@ -237,7 +237,7 @@ public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, ptr %U, ptr %V)
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr %U.P2, ptr [[B_P2_PTR]], align 8
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1
@@ -257,7 +257,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, ptr %X, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 2))
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr %X.P2, ptr [[B_P2_PTR]], align 8
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1
@@ -294,7 +294,7 @@ public func double_concrete_concrete() {
 // CHECK-STABLE-ABI-FALSE-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-STABLE-ABI-TRUE-NEXT:     [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMD")
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", ptr [[B_P2_PTR]], align 8
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1

@@ -103,7 +103,7 @@ public func generic_generic<T: P2, U>(_: T.Type, _: U.Type)
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, ptr %T, ptr %U, ptr %T.P2)
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr %U.P3, ptr [[C_P3_PTR]], align 8
 // CHECK-NEXT:    [[B_AT2_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1
@@ -142,7 +142,7 @@ public func generic_concrete<T: P2>(_: T.Type)
 // CHECK-SAME:         )
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", ptr [[C_P3_PTR]], align 8
 // CHECK-NEXT:    [[B_AT2_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1
@@ -167,7 +167,7 @@ public func concrete_generic<U>(_: U.Type)
 // CHECK:       %conditional.requirement.buffer = alloca [3 x ptr], align 8
 // CHECK:       [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVMa"(i64 0, ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s34conditional_conformance_with_assoc8IsAlsoP2VMf", i32 0, i32 2), ptr %U, ptr @"$s34conditional_conformance_with_assoc8IsAlsoP2VAA0G0AAWP")
 // CHECK-NEXT:  [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:  [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:  [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:  [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:  store ptr %U.P3, ptr [[C_P3_PTR]], align 8
 // CHECK-NEXT:  [[B_AT2_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1
@@ -206,7 +206,7 @@ public func concrete_concrete() {
 // CHECK-STABLE-ABI-FALSE-NEXT:   [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-STABLE-ABI-FALSE-NEXT:   extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-STABLE-ABI-TRUE-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
-// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
+// CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", ptr [[C_P3_PTR]], align 8
 // CHECK-NEXT:    [[B_AT2_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 1

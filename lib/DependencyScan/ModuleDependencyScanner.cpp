@@ -532,7 +532,7 @@ ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
   for (const auto &dep : moduleDependencies)
     discoveredClangModules.insert(dep.first);
 
-  cache.recordDependencies(moduleDependencies);
+  cache.recordDependencies(moduleDependencies, Diagnostics);
   return cache.findDependency(moduleID);
 }
 
@@ -566,7 +566,7 @@ ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
   if (moduleDependencies.empty())
     return std::nullopt;
 
-  cache.recordDependencies(moduleDependencies);
+  cache.recordDependencies(moduleDependencies, Diagnostics);
   return cache.findDependency(moduleName);
 }
 
@@ -927,7 +927,7 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
           std::lock_guard<std::mutex> guard(cacheAccessLock);
           moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
           if (!moduleDependencies.empty())
-            cache.recordDependencies(moduleDependencies);
+            cache.recordDependencies(moduleDependencies, Diagnostics);
         }
       };
 
@@ -1138,7 +1138,7 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   ScanningThreadPool.wait();
 
   auto recordResolvedModuleImport =
-      [&cache, &moduleLookupResult, &importedSwiftDependencies,
+      [this, &cache, &moduleLookupResult, &importedSwiftDependencies,
        moduleID](const ScannerImportStatementInfo &moduleImport) {
         if (moduleID.ModuleName == moduleImport.importIdentifier)
           return;
@@ -1152,7 +1152,7 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
         } else {
           // Cache discovered module dependencies.
           if (!lookupResult.value().empty()) {
-            cache.recordDependencies(lookupResult.value());
+            cache.recordDependencies(lookupResult.value(), Diagnostics);
             importedSwiftDependencies.insert({moduleImport.importIdentifier,
                                               lookupResult.value()[0].first.Kind});
           }
@@ -1306,7 +1306,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   ScanningThreadPool.wait();
 
   // Aggregate both previously-cached and freshly-scanned module results
-  auto recordResult = [&cache, &swiftOverlayLookupResult,
+  auto recordResult = [this, &cache, &swiftOverlayLookupResult,
                        &swiftOverlayDependencies,
                        moduleID](const std::string &moduleName) {
     auto lookupResult = swiftOverlayLookupResult[moduleName];
@@ -1318,7 +1318,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
             {moduleName, cachedInfo.value()->getKind()});
       } else {
         // Cache discovered module dependencies.
-        cache.recordDependencies(lookupResult.value());
+        cache.recordDependencies(lookupResult.value(), Diagnostics);
         if (!lookupResult.value().empty())
           swiftOverlayDependencies.insert({moduleName, lookupResult.value()[0].first.Kind});
       }

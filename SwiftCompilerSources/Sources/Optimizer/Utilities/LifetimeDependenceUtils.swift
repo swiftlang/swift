@@ -495,7 +495,7 @@ extension LifetimeDependence.Scope {
       case is DestroyAddrInst:
         range.insert(inst)
       case let sdai as SourceDestAddrInstruction
-             where sdai.sourceOperand == use && sdai.isTakeOfSrc:
+             where sdai.sourceOperand == use && sdai.isTakeOfSource:
         range.insert(inst)
       case let li as LoadInst where li.loadOwnership == .take:
         range.insert(inst)

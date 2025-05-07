@@ -475,7 +475,6 @@ public:
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
   const bool UseClangIncludeTree;
-  bool importSymbolicCXXDecls;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;

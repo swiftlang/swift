@@ -223,7 +223,7 @@
 /test/Generics/                                     @hborla @slavapestov
 /test/Generics/inverse*                             @kavon
 /test/IDE/                                          @ahoppen @bnbarham @hamishknight @rintaro
-/test/IRGen/                                        @rjmccall
+/test/IRGen/                                        @AnthonyLatsis @rjmccall
 /test/Index/                                        @ahoppen @bnbarham @hamishknight @rintaro
 /test/Interop/                                      @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro @hnrklssn
 /test/Macros/SwiftifyImport                         @hnrklssn @Xazax-hun

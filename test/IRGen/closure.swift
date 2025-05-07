@@ -36,7 +36,7 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // -- partial_apply stub
 // CHECK: define internal swiftcc i64 @"$s7closure1b3seqS2icx_tAA9OrdinableRzlFS2icfU_TA"(i64 %0, ptr swiftself %1) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8] }>, ptr %1, i32 0, i32 1
+// CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, [16 x i8] }>, ptr %1, i32 0, i32 1
 // CHECK:   [[TYPE:%.*]] = load ptr, ptr [[BINDINGSADDR]], align 8
 // CHECK:   [[WITNESSADDR:%.*]] = getelementptr inbounds ptr, ptr [[BINDINGSADDR]], i32 1
 // CHECK:   [[WITNESS:%.*]] = load ptr, ptr [[WITNESSADDR]], align 8
