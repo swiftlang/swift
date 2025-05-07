@@ -8809,8 +8809,7 @@ swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
     if (const clang::RecordDecl *record =
             ptrType->getPointeeType()->getAsRecordDecl()) {
       return matchSwiftAttrConsideringInheritance<RC>(
-          record, {{"returned_as_unretained_by_default", RC::Unowned},
-                   {"returned_as_retained_by_default", RC::Owned}});
+          record, {{"returned_as_unretained_by_default", RC::Unowned}});
     }
   }
 
