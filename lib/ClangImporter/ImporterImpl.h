@@ -217,6 +217,10 @@ enum class ImportTypeAttr : uint8_t {
   ///
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter = 1 << 5,
+
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((swift_attr("sending"))) .
+  Sending = 1 << 6,
 };
 
 /// Find and iterate over swift attributes embedded in the type
