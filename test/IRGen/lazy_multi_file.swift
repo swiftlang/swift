@@ -16,7 +16,7 @@ class Subclass : LazyContainerClass {
   //
   // CHECK-LABEL: @"$s15lazy_multi_file8SubclassC6getStrSSyF"({{(ptr noalias nocapture sret, )?}}ptr swiftself %0) {{.*}} {
   func getStr() -> String {
-    // CHECK: = getelementptr inbounds %T15lazy_multi_file8SubclassC, ptr %0, i32 0, i32 3
+    // CHECK: = getelementptr inbounds{{.*}} %T15lazy_multi_file8SubclassC, ptr %0, i32 0, i32 3
     return str
   }
 }

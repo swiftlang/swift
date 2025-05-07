@@ -41,7 +41,7 @@ entry(%p : $*(), %i: $Builtin.Word):
 // CHECK:      define{{( protected)?}} {{.*}}void @dynamic_size(ptr noalias %0, i64 %1, ptr %T) {{.*}} {
 // CHECK:   [[T1:%.*]] = getelementptr inbounds ptr, ptr %T, i64 -1
 // CHECK-NEXT:   [[VWT:%T.valueWitnesses]] = load ptr, ptr [[T1]], align 8
-// CHECK:        [[STRIDE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 9
+// CHECK:        [[STRIDE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 9
 // CHECK:        [[STRIDE:%.*]] = load i64, ptr [[STRIDE_ADDR]]
 // CHECK-NEXT:   [[T0:%.*]] = mul nsw i64 %1, [[STRIDE]]
 // CHECK-NEXT:   getelementptr inbounds i8, ptr %0, i64 [[T0]]

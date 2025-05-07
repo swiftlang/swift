@@ -262,8 +262,8 @@ struct AliasAnalysis {
     case let copy as SourceDestAddrInstruction:
       let mayRead = memLoc.mayAlias(with: copy.source, self)
       let mayWrite = memLoc.mayAlias(with: copy.destination, self)
-      var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSrc))
-      if !copy.isInitializationOfDest {
+      var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSource))
+      if !copy.isInitializationOfDestination {
         effects.merge(with: defaultEffects(of: copy, on: memLoc))
       }
       return effects

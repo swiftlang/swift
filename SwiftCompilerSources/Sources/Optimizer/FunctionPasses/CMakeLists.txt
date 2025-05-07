@@ -33,4 +33,5 @@ swift_compiler_sources(Optimizer
   SimplificationPasses.swift
   StackPromotion.swift
   StripObjectHeaders.swift
+  TempRValueElimination.swift
 )

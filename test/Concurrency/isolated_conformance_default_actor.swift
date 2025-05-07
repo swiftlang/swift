@@ -46,8 +46,8 @@ func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
 nonisolated func testConformancesFromNonisolated() {
-  let _: any P = CExplicitMainActor() // expected-error{{main actor-isolated conformance of 'CExplicitMainActor' to 'P' cannot be used in nonisolated context}}
-  let _: any P = CImplicitMainActor() // expected-error{{main actor-isolated conformance of 'CImplicitMainActor' to 'P' cannot be used in nonisolated context}}
+  let _: any P = CExplicitMainActor() // okay
+  let _: any P = CImplicitMainActor() // okay
 
   let _: any P = CNonIsolated()
   let _: any P = CImplicitMainActorNonisolatedConformance()

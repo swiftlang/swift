@@ -870,7 +870,7 @@ InferredGenericSignatureRequest::evaluate(
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
   for (const auto &req : addedRequirements)
-    requirements.push_back({req, SourceLoc()});
+    requirements.push_back({req, loc});
 
   desugarRequirements(requirements, inverses, errors);
 
