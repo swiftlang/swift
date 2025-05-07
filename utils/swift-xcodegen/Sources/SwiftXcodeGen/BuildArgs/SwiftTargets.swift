@@ -17,7 +17,6 @@ struct SwiftTargets {
   private var dependenciesByTargetName: [String: Set<String>] = [:]
   private var targetsByName: [String: SwiftTarget] = [:]
   private var targetsByOutput: [String: SwiftTarget] = [:]
-  private var addedFiles: Set<RelativePath> = []
 
   // Track some state for debugging
   private var debugLogUnknownFlags: Set<String> = []
@@ -204,22 +203,10 @@ struct SwiftTargets {
     var buildRule: SwiftTarget.BuildRule?
     var emitModuleRule: SwiftTarget.EmitModuleRule?
     if forBuild && !repoSources.isEmpty {
-      // Bail if we've already recorded a target with one of these inputs.
-      // TODO: Attempt to merge?
-      // TODO: Should we be doing this later?
-      for input in repoSources {
-        guard addedFiles.insert(input).inserted else {
-          log.debug("""
-            ! Skipping '\(name)' with output '\(primaryOutput)'; \
-            contains input '\(input)' already added
-            """)
-          return
-        }
-      }
       // We've already ensured that `repoSources` is non-empty.
-      let parent = repoSources.commonAncestor!
       buildRule = .init(
-        parentPath: parent, sources: sources, buildArgs: buildArgs
+        parentPath: repoSources.commonAncestor!, sources: sources,
+        buildArgs: buildArgs
       )
     }
     if forModule {
