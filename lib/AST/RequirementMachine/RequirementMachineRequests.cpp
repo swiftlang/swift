@@ -671,7 +671,8 @@ AbstractGenericSignatureRequest::evaluate(
 
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramsAsTypes, defaults);
-  applyInverses(ctx, paramsAsTypes, inverses, defaults, errors);
+  applyInverses(ctx, paramsAsTypes, inverses, requirements,
+                defaults, errors);
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -884,7 +885,8 @@ InferredGenericSignatureRequest::evaluate(
 
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
-  applyInverses(ctx, paramTypes, inverses, defaults, errors);
+  applyInverses(ctx, paramTypes, inverses, requirements,
+                defaults, errors);
   
   // Any remaining implicit defaults in a conditional inverse requirement
   // extension must be made explicit.
