@@ -7910,6 +7910,9 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (!rootNormal)
     return ActorIsolation::forNonisolated(false);
 
+  if (conformance != rootNormal)
+    return rootNormal->getIsolation();
+
   // If the conformance is explicitly non-isolated, report that.
   if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
@@ -7947,17 +7950,55 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
     return ActorIsolation::forNonisolated(false);
 
-  // If we are inferring isolated conformances and the conforming type is
-  // isolated to a global actor, use the conforming type's isolation.
+  // @preconcurrency disables isolation inference.
+  if (rootNormal->isPreconcurrency())
+    return ActorIsolation::forNonisolated(false);
+
+  // Isolation inference rules follow. If we aren't inferring isolated conformances,
+  // we're done.
+  if (!ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances))
+    return ActorIsolation::forNonisolated(false);
+
   auto nominal = dc->getSelfNominalTypeDecl();
-  if (ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances) &&
-      nominal) {
-    auto nominalIsolation = getActorIsolation(nominal);
-    if (nominalIsolation.isGlobalActor())
-      return nominalIsolation;
+  if (!nominal) {
+    return ActorIsolation::forNonisolated(false);
   }
 
-  return ActorIsolation::forNonisolated(false);
+  // If we are inferring isolated conformances and the conforming type is
+  // isolated to a global actor, we may use the conforming type's isolation.
+  auto nominalIsolation = getActorIsolation(nominal);
+  if (!nominalIsolation.isGlobalActor()) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  // If all of the value witnesses are nonisolated, then we should not infer
+  // global actor isolation.
+  bool anyIsolatedWitness = false;
+  auto protocol = conformance->getProtocol();
+  for (auto requirement : protocol->getMembers()) {
+    if (isa<TypeDecl>(requirement))
+      continue;
+
+    auto valueReq = dyn_cast<ValueDecl>(requirement);
+    if (!valueReq)
+      continue;
+
+    auto witness = conformance->getWitnessDecl(valueReq);
+    if (!witness)
+      continue;
+
+    auto witnessIsolation = getActorIsolation(witness);
+    if (witnessIsolation.isActorIsolated()) {
+      anyIsolatedWitness = true;
+      break;
+    }
+  }
+
+  if (!anyIsolatedWitness) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  return nominalIsolation;
 }
 
 namespace {
