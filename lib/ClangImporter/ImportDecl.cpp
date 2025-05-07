@@ -9096,10 +9096,6 @@ public:
   void printAvailability() {
     printSeparator();
     out << "availability: [";
-    if (!SwiftContext.LangOpts.Target.isOSDarwin() || SwiftContext.LangOpts.Target.isDriverKit()) {
-      out << ":]";
-      return;
-    }
     printAvailabilityOfType("Span");
     printSeparator();
     printAvailabilityOfType("MutableSpan");
