@@ -95,6 +95,7 @@ add_swift_host_library(swiftAST STATIC
   RawComment.cpp
   Requirement.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ApplyInverses.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/Diagnostics.cpp
