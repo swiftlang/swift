@@ -78,6 +78,10 @@ internal func _jobDeallocate(_ job: Builtin.Job,
 internal func _jobGetPriority(_ job: Builtin.Job) -> UInt8
 
 @available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("swift_job_setPriority")
+internal func _jobSetPriority(_ job: Builtin.Job, _ priority: UInt8)
+
+@available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_job_getKind")
 internal func _jobGetKind(_ job: Builtin.Job) -> UInt8
 
