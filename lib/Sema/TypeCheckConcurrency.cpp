@@ -5191,19 +5191,35 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     }
 
     auto *proto = conformance->getProtocol();
-    switch (auto protoIsolation = getActorIsolation(proto)) {
+    auto inferredIsolation = getInferredActorIsolation(proto);
+    auto protoIsolation = inferredIsolation.isolation;
+    switch (protoIsolation) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
     case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       break;
+    case ActorIsolation::Nonisolated:
+      if (inferredIsolation.source.kind == IsolationSource::Kind::Explicit) {
+        if (!foundIsolation) {
+          // We found an explicitly 'nonisolated' protocol.
+          foundIsolation = {
+              protoIsolation,
+              IsolationSource(proto, IsolationSource::Conformance)};
+        }
+        continue;
+      } else {
+        break;
+      }
 
     case ActorIsolation::Erased:
       llvm_unreachable("protocol cannot have erased isolation");
 
     case ActorIsolation::GlobalActor:
-      if (!foundIsolation) {
+      // If we encountered an explicit globally isolated conformance, allow it
+      // to override the nonisolated isolation kind.
+      if (!foundIsolation ||
+          conformance->getSourceKind() == ConformanceEntryKind::Explicit) {
         foundIsolation = {
           protoIsolation,
           IsolationSource(proto, IsolationSource::Conformance)
