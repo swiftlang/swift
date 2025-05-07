@@ -592,6 +592,12 @@ def create_argument_parser():
                 'will get little benefit from it (e.g. tools for '
                 'bootstrapping or debugging Swift)')
 
+    option('--extra-swift-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the Swift build. '
+                'Can be passed multiple times to add multiple options.',
+           default=[])
+
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
@@ -1403,6 +1409,13 @@ def create_argument_parser():
            help='CMake options used for llvm in the form of comma '
                 'separated options "-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp". Can '
                 'be called multiple times to add multiple such options.')
+    option('--extra-llvm-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the LLVM build. '
+                'Can be passed multiple times to add multiple options. '
+                'These are the last arguments passed to CMake and can override '
+                'existing options.',
+           default=[])
 
     option('--llvm-build-compiler-rt-with-use-runtimes', toggle_true, default=True,
            help='Switch to LLVM_ENABLE_RUNTIMES as the mechanism to build compiler-rt'
