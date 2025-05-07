@@ -9095,11 +9095,8 @@ public:
 
   void printAvailability() {
     printSeparator();
-    out << "availability: [";
+    out << "spanAvailability: ";
     printAvailabilityOfType("Span");
-    printSeparator();
-    printAvailabilityOfType("MutableSpan");
-    out << "]";
   }
 
 private:
@@ -9113,7 +9110,7 @@ private:
 
   void printAvailabilityOfType(StringRef Name) {
     ValueDecl *D = getDecl(Name);
-    out << "\"" << Name << "\":" << "\"";
+    out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
       auto introducedOpt = attr.getIntroduced();

@@ -1111,8 +1111,23 @@ func parseStringMappingParam(_ paramAST: LabeledExprSyntax?, paramName: String) 
 func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
   return try parseStringMappingParam(paramAST, paramName: "typeMappings")
 }
-func parseAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
-  return try parseStringMappingParam(paramAST, paramName: "availability")
+
+func parseSpanAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> String? {
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  guard let label = unwrappedParamAST.label else {
+    return nil
+  }
+  if label.trimmed.text != "spanAvailability" {
+    return nil
+  }
+  let paramExpr = unwrappedParamAST.expression
+  guard let stringLitExpr = paramExpr.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected a string literal, got '\(paramExpr)'", node: paramExpr)
+  }
+  return stringLitExpr.representedLiteralValue
 }
 
 func parseCxxSpansInSignature(
@@ -1333,54 +1348,33 @@ func isMutableSpan(_ type: TypeSyntax) -> Bool {
   return name == "MutableSpan" || name == "MutableRawSpan"
 }
 
-func isImmutableSpan(_ type: TypeSyntax) -> Bool {
+func isAnySpan(_ type: TypeSyntax) -> Bool {
   if let optType = type.as(OptionalTypeSyntax.self) {
-    return isImmutableSpan(optType.wrappedType)
+    return isAnySpan(optType.wrappedType)
   }
   if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
-    return isImmutableSpan(impOptType.wrappedType)
+    return isAnySpan(impOptType.wrappedType)
   }
   if let attrType = type.as(AttributedTypeSyntax.self) {
-    return isImmutableSpan(attrType.baseType)
+    return isAnySpan(attrType.baseType)
   }
   guard let identifierType = type.as(IdentifierTypeSyntax.self) else {
     return false
   }
   let name = identifierType.name.text
-  return name == "Span" || name == "RawSpan"
+  return name == "Span" || name == "RawSpan" ||  name == "MutableSpan" || name == "MutableRawSpan"
 }
 
-func getAvailability(_ newSignature: FunctionSignatureSyntax, _ typeAvailability: [String: String]?)
+func getAvailability(_ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?)
   throws -> [AttributeListSyntax.Element] {
-  guard let typeAvailability else {
+  guard let spanAvailability else {
     return []
   }
-  var hasMutableSpan = false
-  var hasSpan = false
-  if let returnClause = newSignature.returnClause {
-    hasMutableSpan = isMutableSpan(returnClause.type)
-    hasSpan = isImmutableSpan(returnClause.type)
-  }
-  for param in newSignature.parameterClause.parameters {
-    if hasMutableSpan {
-      break
-    }
-    hasMutableSpan = isMutableSpan(param.type)
-    hasSpan = hasSpan || isImmutableSpan(param.type)
-  }
-  if !hasMutableSpan && !hasSpan {
+  let returnIsSpan = newSignature.returnClause != nil && isAnySpan(newSignature.returnClause!.type)
+  if !returnIsSpan && !newSignature.parameterClause.parameters.contains(where: { isAnySpan($0.type) }) {
     return []
   }
-  let availability =
-    if hasMutableSpan {
-      typeAvailability["MutableSpan"]
-    } else {
-      typeAvailability["Span"]
-    }
-  guard let availability else {
-    throw RuntimeError("incomplete Span/MutableSpan availability info passed to @_SwiftifyImport")
-  }
-  return [.attribute(AttributeSyntax("@available(\(raw: availability), *)"))]
+  return [.attribute(AttributeSyntax("@available(\(raw: spanAvailability), *)"))]
 }
 
 func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSyntax) -> Bool {
@@ -1453,8 +1447,8 @@ public struct SwiftifyImportMacro: PeerMacro {
       if typeMappings != nil {
         arguments = arguments.dropLast()
       }
-      let typeAvailability = try parseAvailabilityParam(arguments.last)
-      if typeAvailability != nil {
+      let spanAvailability = try parseSpanAvailabilityParam(arguments.last)
+      if spanAvailability != nil {
         arguments = arguments.dropLast()
       }
       var nonescapingPointers = Set<Int>()
@@ -1512,7 +1506,7 @@ public struct SwiftifyImportMacro: PeerMacro {
       let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
       let lifetimeAttrs =
         returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
-      let availabilityAttr = try getAvailability(newSignature, typeAvailability)
+      let availabilityAttr = try getAvailability(newSignature, spanAvailability)
       let disfavoredOverload: [AttributeListSyntax.Element] =
         (onlyReturnTypeChanged
           ? [
