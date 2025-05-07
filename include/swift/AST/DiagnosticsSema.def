@@ -4993,6 +4993,8 @@ NOTE(iuo_to_any_coercion_note_func_result,none,
      (const ValueDecl *))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
+NOTE(default_optional_parameter,none,
+     "use a default value parameter to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
