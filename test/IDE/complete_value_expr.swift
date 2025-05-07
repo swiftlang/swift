@@ -1123,13 +1123,13 @@ func testInterpolatedString1() {
 
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      lazyInstanceVar[#Int#]{{; name=.+$}}
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      instanceVar[#Int#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc5()[#Int?#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc6()[#Int!#]{{; name=.+$}}
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc0[#() -> ()#]; name=instanceFunc0
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc1(_:)[#(Int) -> ()#]; name=instanceFunc1(_:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc2(_:b:)[#(Int, inout Double) -> ()#]; name=instanceFunc2(_:b:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc3(_:_:)[#(Int, (Float, Double)) -> ()#]; name=instanceFunc3(_:_:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc4(_:b:c:d:)[#(Int?, Int?, inout Int?, inout Int?) -> ()#]; name=instanceFunc4(_:b:c:d:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc5()[#Int?#]; name=instanceFunc5()
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc6()[#Int!#]; name=instanceFunc6()
 
 //===--- Check protocol extensions
 
