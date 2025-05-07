@@ -187,8 +187,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         // Handle clang arguments. For caching build, all arguments are passed
         // with `-direct-clang-cc1-module-build`.
-        for (const auto &arg : swiftModuleClangCC1CommandLineArgs)
-          Args.push_back(arg);
+        llvm::append_range(Args, swiftModuleClangCC1CommandLineArgs);
 
         for (const auto &candidate : compiledCandidates) {
           Args.push_back("-candidate-module-file");

@@ -267,8 +267,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
     : clangScanningTool(*globalScanningService.ClangScanningService,
-                        globalScanningService.getClangScanningFS()),
-      swiftModuleClangCC1CommandLineArgs() {
+                        globalScanningService.getClangScanningFS()) {
   // Create a scanner-specific Invocation and ASTContext.
   workerCompilerInvocation =
       std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
@@ -320,9 +319,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
   // with `-direct-clang-cc1-module-build`.
   if (ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
     swiftModuleClangCC1CommandLineArgs.push_back("-direct-clang-cc1-module-build");
-    auto *importer =
-        static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
-    for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args()) {
+    for (auto &Arg : scanClangImporter->getSwiftExplicitModuleDirectCC1Args()) {
       swiftModuleClangCC1CommandLineArgs.push_back("-Xcc");
       swiftModuleClangCC1CommandLineArgs.push_back(Arg);
     }
