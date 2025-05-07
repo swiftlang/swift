@@ -565,3 +565,19 @@ do {
     types.assertTypesAreEqual()
   }
 }
+
+protocol Env {
+  associatedtype A
+  associatedtype B
+}
+
+func testExistentialArchetypeMismatch(existential: any Env) {
+  // Different generic environments.
+  func f<T: Env, U: Env>(_ t: T, _ u: U) where T.B == U.B {}
+  // Different interface types.
+  func g<T: Env>(_ t: T) where T.A == T.B {}
+  f(existential, existential)
+  // expected-error@-1 {{local function 'f' requires the types 'T.B' and 'U.B' be equivalent}}
+  g(existential)
+  // expected-error@-1 {{local function 'g' requires the types 'T.A' and 'T.B' be equivalent}}
+}
