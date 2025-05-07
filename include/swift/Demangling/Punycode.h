@@ -54,9 +54,15 @@ bool decodePunycode(StringRef InputPunycode,
 ///
 /// If \p mapNonSymbolChars is true, non-symbol ASCII characters (characters
 /// except [$_a-zA-Z0-9]) are also encoded like non-ASCII unicode characters.
-/// Returns false if \p InputUTF8 contains surrogate code points.
+///
+/// If \p repairInvalidUTF8 is true, invalid UTF-8 sequences will be replaced
+/// with one or more Unicode replacement characters.
+///
+/// Returns false if \p InputUTF8 contains surrogate code points and
+/// repairInvalidUTF8 is false.
 bool encodePunycodeUTF8(StringRef InputUTF8, std::string &OutPunycode,
-                        bool mapNonSymbolChars = false);
+                        bool mapNonSymbolChars = false,
+                        bool repairInvalidUTF8 = false);
 
 bool decodePunycodeUTF8(StringRef InputPunycode, std::string &OutUTF8);
 
