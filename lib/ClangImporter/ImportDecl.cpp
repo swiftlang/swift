@@ -9115,27 +9115,17 @@ private:
     return decls[0];
   }
 
-  StringRef getDarwinOSString() {
-    auto Target = SwiftContext.LangOpts.Target;
-    if (Target.isMacOSX()) {
-      return "macOS";
-    } else if (Target.isTvOS()) {
-      return "tvOS";
-    } else if (Target.isiOS()) {
-      return "iOS";
-    } else if (Target.isWatchOS()) {
-      return "watchOS";
-    } else if (Target.isXROS()) {
-      return "visionOS";
-    }
-    llvm_unreachable("unknown darwin OS");
-  }
-
   void printAvailabilityOfType(StringRef Name) {
     ValueDecl *D = getDecl(Name);
-    auto Availability = AvailabilityInference::availableRange(D);
-
-    out << "\"" << Name << "\":" << "\"" << getDarwinOSString() << " " << Availability.getVersionString() << "\"";
+    out << "\"" << Name << "\":" << "\"";
+    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
+    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+      auto introducedOpt = attr.getIntroduced();
+      if (!introducedOpt.has_value()) continue;
+      printSeparator();
+      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+    }
+    out << "\"";
   }
 
   void printSeparator() {
