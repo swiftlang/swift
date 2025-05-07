@@ -247,11 +247,15 @@ extension InlineArray where Element: Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
+#if $ValueGenericsNameLookup
     self = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
+#else
+    fatalError()
+#endif
   }
 }
 
@@ -272,14 +276,6 @@ extension InlineArray where Element: ~Copyable {
   /// argument.
   @available(SwiftStdlib 6.2, *)
   public typealias Index = Int
-
-  // FIXME: Remove when SE-0452 "Integer Generic Parameters" is implemented.
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public static var count: Int {
-    count
-  }
 
   /// The number of elements in the array.
   ///
