@@ -1151,6 +1151,10 @@ public:
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
 
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context, and the macro was attached to a node imported from clang.
+  bool isInMacroExpansionFromClangHeader() const;
+
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
   ///
