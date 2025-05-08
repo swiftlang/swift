@@ -329,6 +329,7 @@ func main::decl1(
   // expected-error@-2 {{name in constant declaration cannot be qualified with a module selector}} expected-note@-2 {{remove module selector from this name}} {{28-34=}}
 
   switch Optional(main::decl1g) {
+  // expected-error@-1 {{cannot find 'main::decl1g' in scope}}
   case Optional.some(let main::decl1i):
     // expected-error@-1 {{name in constant declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{26-32=}}
     break
@@ -337,6 +338,7 @@ func main::decl1(
   }
 
   switch Optional(main::decl1g) {
+  // expected-error@-1 {{cannot find 'main::decl1g' in scope}}
   case let Optional.some(main::decl1j):
     // expected-error@-1 {{name in constant declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{26-32=}}
     break
@@ -345,6 +347,7 @@ func main::decl1(
   }
 
   switch Optional(main::decl1g) {
+  // expected-error@-1 {{cannot find 'main::decl1g' in scope}}
  case let main::decl1k?:
     // expected-error@-1 {{name in constant declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{11-17=}}
     break

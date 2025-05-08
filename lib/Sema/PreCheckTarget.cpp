@@ -558,8 +558,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       }
     }
 
-    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
-    LookupName = DeclNameRef(lookupName);
+    LookupName = Name.withArgumentLabels(context, lookupLabels);
   }
 
   // Perform standard value name lookup.
@@ -576,8 +575,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
-    ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               LookupName.getFullName(), Loc,
+    ASTScope::lookupLocalDecls(DC->getParentSourceFile(), LookupName, Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -2080,8 +2078,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                     Ctx.Id_self, Loc);
+  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(
+                                   DC->getParentSourceFile(),
+                                   DeclNameRef::createSelf(Ctx), Loc);
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
