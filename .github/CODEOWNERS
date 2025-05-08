@@ -8,27 +8,28 @@
 
 # TODO: /.clang-format
 
-/.clang-tidy   @egorzhdan
+/.clang-tidy      @egorzhdan
 
-# TODO: /.dir-locals.el
+/.dir-locals.el   @al45tair
+/.editorconfig    @hamishknight
 # TODO: /.flake8
-# TODO: /.gitattributes
+/.gitattributes   @shahmishal
 
 # .github
 /.github/                                 @shahmishal
 /.github/CODEOWNERS                       @AnthonyLatsis @shahmishal
-/.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
-/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @shahmishal @xedin
+/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @shahmishal @xedin
 
-# TODO: /.gitignore
+/.gitignore           @shahmishal
 # TODO: /.mailmap
 # TODO: /Brewfile
-# TODO: /CHANGELOG.md
+/CHANGELOG.md         @hborla
 # TODO: /CMakeLists.txt
-# TODO: /CODE_OF_CONDUCT.md
-# TODO: /CODE_OWNERS.TXT
-# TODO: /CONTRIBUTING.md
-# TODO: /LICENSE.txt
+/CODE_OF_CONDUCT.md   @swiftlang/core-team
+/CODE_OWNERS.TXT      @swiftlang/core-team
+/CONTRIBUTING.md      @AnthonyLatsis @xedin
+/LICENSE.txt          @swiftlang/core-team
 # TODO: /README.md
 
 # Runtimes
@@ -60,7 +61,7 @@
 /docs/ABI/RegisterUsage.md                @al45tair
 /docs/CrossCompilationModel.md            @MaxDesiatov
 /docs/Generics                            @slavapestov
-/docs/HowToGuides/                        @AnthonyLatsis @LucianoPAlmeida @xedin
+/docs/HowToGuides/                        @AnthonyLatsis @xedin
 /docs/Optimizer*                          @eeckstein
 /docs/SIL*                                @jckarter
 /docs/Windows*                            @compnerd
