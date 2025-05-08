@@ -1822,6 +1822,9 @@ public:
     /// cases this doesn't actually make sense but we need to accept them for
     /// backwards compatibility.
     AllowLowercaseAndUppercaseSelf = 1 << 6,
+
+    /// If passed, `$0` etc. are allowed.
+    AllowAnonymousParamNames = 1 << 7,
   };
   using DeclNameOptions = OptionSet<DeclNameFlag>;
 
@@ -1829,6 +1832,9 @@ public:
     return DeclNameOptions(flag1) | flag2;
   }
 
+  /// Parse a declaration name that results in a `DeclNameRef` in the syntax
+  /// tree.
+  /// 
   /// Without \c DeclNameFlag::AllowCompoundNames, parse an
   /// unqualified-decl-base-name.
   ///
