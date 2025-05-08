@@ -9032,10 +9032,11 @@ public:
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
   clang::ASTContext &ctx;
+  ASTContext &SwiftContext;
   llvm::raw_ostream &out;
   bool firstParam = true;
-  SwiftifyInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
-      : ctx(ctx), out(out) {
+  SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext, llvm::raw_ostream &out)
+      : ctx(ctx), SwiftContext(SwiftContext), out(out) {
     out << "@_SwiftifyImport(";
   }
   ~SwiftifyInfoPrinter() { out << ")"; }
@@ -9092,7 +9093,34 @@ public:
     out << "]";
   }
 
+  void printAvailability() {
+    printSeparator();
+    out << "spanAvailability: ";
+    printAvailabilityOfType("Span");
+  }
+
 private:
+  ValueDecl *getDecl(StringRef DeclName) {
+    SmallVector<ValueDecl *, 1> decls;
+    SwiftContext.lookupInSwiftModule(DeclName, decls);
+    assert(decls.size() == 1);
+    if (decls.size() != 1) return nullptr;
+    return decls[0];
+  }
+
+  void printAvailabilityOfType(StringRef Name) {
+    ValueDecl *D = getDecl(Name);
+    out << "\"";
+    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
+    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+      auto introducedOpt = attr.getIntroduced();
+      if (!introducedOpt.has_value()) continue;
+      printSeparator();
+      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+    }
+    out << "\"";
+  }
+
   void printSeparator() {
     if (!firstParam) {
       out << ", ";
@@ -9144,7 +9172,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
           }
           return false;
         };
-    SwiftifyInfoPrinter printer(getClangASTContext(), out);
+    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
     bool returnIsStdSpan = registerStdSpanTypeMapping(
         MappedDecl->getResultInterfaceType(), ClangDecl->getReturnType());
     if (auto CAT =
@@ -9188,6 +9216,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
     }
     if (returnIsStdSpan && returnHasLifetimeInfo)
       attachMacro = true;
+    printer.printAvailability();
     printer.printTypeMapping(typeMapping);
   }
 
