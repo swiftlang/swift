@@ -16,7 +16,7 @@ declare void @swift_unknownObjectRelease(ptr)
 declare ptr @llvm.objc.retain(ptr)
 declare void @llvm.objc.release(ptr)
 declare ptr @swift_allocObject(ptr , i64, i64) nounwind
-declare void @swift_release(ptr nocapture)
+declare void @swift_release(ptr captures(none))
 declare ptr @swift_retain(ptr returned) nounwind
 declare ptr @swift_bridgeObjectRetain(ptr)
 declare void @swift_bridgeObjectRelease(ptr)

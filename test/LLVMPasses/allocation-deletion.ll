@@ -7,7 +7,7 @@ target triple = "x86_64-apple-macosx10.9"
 %swift.heapmetadata = type { ptr, ptr }
 
 declare ptr @swift_allocObject(ptr , i64, i64) nounwind
-declare void @swift_release(ptr nocapture)
+declare void @swift_release(ptr captures(none))
 declare void @swift_retain(ptr ) nounwind
 declare { i64, i64, i64 } @swift_retainAndReturnThree(ptr , i64, i64 , i64 )
 
@@ -36,7 +36,7 @@ entry:
 ; trivial_alloc_eliminate1 - Show that we can eliminate an allocation with a
 ; trivial destructor.
 @trivial_dtor_metadata = internal constant %swift.heapmetadata { ptr @trivial_dtor, ptr null }
-define internal i64 @trivial_dtor(ptr nocapture) nounwind readonly {
+define internal i64 @trivial_dtor(ptr captures(none)) nounwind readonly {
 entry:
   %1 = getelementptr inbounds %swift.refcounted, ptr %0, i64 1
   %length = load i64, ptr %1, align 8
