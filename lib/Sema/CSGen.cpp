@@ -2157,7 +2157,8 @@ namespace {
 
       // If a contextual type exists for this expression, apply it directly.
       if (contextualType &&
-          (contextualType->isArray() || contextualType->isInlineArray())) {
+          (contextualType->getArrayElementType() ||
+           contextualType->getInlineArrayElementType())) {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);

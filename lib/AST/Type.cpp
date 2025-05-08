@@ -833,6 +833,9 @@ Type TypeBase::getArrayElementType() {
   if (!isArray())
     return Type();
 
+  if (!is<BoundGenericStructType>())
+    return Type();
+
   // Array<T>
   auto boundStruct = castTo<BoundGenericStructType>();
   return boundStruct->getGenericArgs()[0];
@@ -840,6 +843,9 @@ Type TypeBase::getArrayElementType() {
 
 Type TypeBase::getInlineArrayElementType() {
   if (!isInlineArray())
+    return Type();
+
+  if (!is<BoundGenericStructType>())
     return Type();
 
   // InlineArray<n, T>
