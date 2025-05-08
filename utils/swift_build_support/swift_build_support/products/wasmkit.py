@@ -14,6 +14,7 @@ import os
 import shutil
 
 from . import product
+from . import swiftpm
 from .. import shell
 
 
@@ -37,7 +38,7 @@ class WasmKit(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return []
+        return [swiftpm.SwiftPM]
 
     def should_build(self, host_target):
         return self.args.build_wasmkit
@@ -72,10 +73,8 @@ class WasmKit(product.Product):
 
 
 def run_swift_build(host_target, product, swpft_package_product_name):
-    # Building with the host toolchain's SwiftPM
-    swiftc_path = os.path.abspath(product.toolchain.swiftc)
-    toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
-    swift_build = os.path.join(toolchain_path, 'bin', 'swift-build')
+    # Building with the freshly-built SwiftPM
+    swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
 
     build_args = [
         swift_build,
