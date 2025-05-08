@@ -269,7 +269,10 @@ class LLVM(cmake_product.CMakeProduct):
                     'llvm-size'
                 ])
         else:
-            build_targets = ['all']
+            # We build LLVMTestingSupport unconditionally
+            # to support scenarios where tests are run
+            # outside of `build-script` (e.g. with `run-test`)
+            build_targets = ['all', 'LLVMTestingSupport']
 
             if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
                self.is_cross_compile_target(host_target):
@@ -384,11 +387,6 @@ class LLVM(cmake_product.CMakeProduct):
         # have old toolchains without more modern linker features.
         if self.args.build_lld:
             llvm_enable_projects.append('lld')
-
-        if self.args.test:
-            # LLVMTestingSupport is not built at part of `all`
-            # and is required by some Swift tests
-            build_targets.append('LLVMTestingSupport')
 
         llvm_cmake_options.define('LLVM_ENABLE_PROJECTS',
                                   ';'.join(llvm_enable_projects))
