@@ -1069,14 +1069,7 @@ func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) thro
   return (pointer, dependence)
 }
 
-func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
-  guard let unwrappedParamAST = paramAST else {
-    return nil
-  }
-  let paramExpr = unwrappedParamAST.expression
-  guard let dictExpr = paramExpr.as(DictionaryExprSyntax.self) else {
-    return nil
-  }
+func parseStringLiteralDict(_ dictExpr: DictionaryExprSyntax) throws -> [String: String] {
   var dict: [String: String] = [:]
   switch dictExpr.content {
   case .colon(_):
@@ -1096,6 +1089,45 @@ func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: St
     throw DiagnosticError("unknown dictionary literal", node: dictExpr)
   }
   return dict
+}
+
+func parseStringMappingParam(_ paramAST: LabeledExprSyntax?, paramName: String) throws -> [String: String]? {
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  guard let label = unwrappedParamAST.label else {
+    return nil
+  }
+  if label.trimmed.text != paramName {
+    return nil
+  }
+  let paramExpr = unwrappedParamAST.expression
+  guard let dictExpr = paramExpr.as(DictionaryExprSyntax.self) else {
+    return nil
+  }
+  return try parseStringLiteralDict(dictExpr)
+}
+
+func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
+  return try parseStringMappingParam(paramAST, paramName: "typeMappings")
+}
+
+func parseSpanAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> String? {
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  guard let label = unwrappedParamAST.label else {
+    return nil
+  }
+  if label.trimmed.text != "spanAvailability" {
+    return nil
+  }
+  let paramExpr = unwrappedParamAST.expression
+  guard let stringLitExpr = paramExpr.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected a string literal, got '\(paramExpr)'", node: paramExpr)
+  }
+  return stringLitExpr.representedLiteralValue
 }
 
 func parseCxxSpansInSignature(
@@ -1316,6 +1348,35 @@ func isMutableSpan(_ type: TypeSyntax) -> Bool {
   return name == "MutableSpan" || name == "MutableRawSpan"
 }
 
+func isAnySpan(_ type: TypeSyntax) -> Bool {
+  if let optType = type.as(OptionalTypeSyntax.self) {
+    return isAnySpan(optType.wrappedType)
+  }
+  if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+    return isAnySpan(impOptType.wrappedType)
+  }
+  if let attrType = type.as(AttributedTypeSyntax.self) {
+    return isAnySpan(attrType.baseType)
+  }
+  guard let identifierType = type.as(IdentifierTypeSyntax.self) else {
+    return false
+  }
+  let name = identifierType.name.text
+  return name == "Span" || name == "RawSpan" ||  name == "MutableSpan" || name == "MutableRawSpan"
+}
+
+func getAvailability(_ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?)
+  throws -> [AttributeListSyntax.Element] {
+  guard let spanAvailability else {
+    return []
+  }
+  let returnIsSpan = newSignature.returnClause != nil && isAnySpan(newSignature.returnClause!.type)
+  if !returnIsSpan && !newSignature.parameterClause.parameters.contains(where: { isAnySpan($0.type) }) {
+    return []
+  }
+  return [.attribute(AttributeSyntax("@available(\(raw: spanAvailability), *)"))]
+}
+
 func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSyntax) -> Bool {
   for elem in attrs {
     guard let attr = elem.as(AttributeSyntax.self) else {
@@ -1386,6 +1447,10 @@ public struct SwiftifyImportMacro: PeerMacro {
       if typeMappings != nil {
         arguments = arguments.dropLast()
       }
+      let spanAvailability = try parseSpanAvailabilityParam(arguments.last)
+      if spanAvailability != nil {
+        arguments = arguments.dropLast()
+      }
       var nonescapingPointers = Set<Int>()
       var lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]] = [:]
       var parsedArgs = try arguments.compactMap {
@@ -1441,6 +1506,7 @@ public struct SwiftifyImportMacro: PeerMacro {
       let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
       let lifetimeAttrs =
         returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
+      let availabilityAttr = try getAvailability(newSignature, spanAvailability)
       let disfavoredOverload: [AttributeListSyntax.Element] =
         (onlyReturnTypeChanged
           ? [
@@ -1469,6 +1535,7 @@ public struct SwiftifyImportMacro: PeerMacro {
                 atSign: .atSignToken(),
                 attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
           ]
+            + availabilityAttr
             + lifetimeAttrs
             + disfavoredOverload)
       return [DeclSyntax(newFunc)]
