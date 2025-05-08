@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -O -target arm64-apple-macos15.0 %s -o %t/a.out
+// RUN: %target-build-swift -O -target %target-cpu-apple-macos15.0 %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
