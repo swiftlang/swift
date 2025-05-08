@@ -769,6 +769,7 @@ class DeclNameRef {
 public:
   static DeclNameRef createSubscript();
   static DeclNameRef createConstructor();
+  static DeclNameRef createSelf(const ASTContext &ctx);
 
   DeclNameRef() : storage(DeclName()) { }
 

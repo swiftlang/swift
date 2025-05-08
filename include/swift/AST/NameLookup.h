@@ -33,7 +33,7 @@
 
 namespace swift {
 class ASTContext;
-class DeclName;
+class DeclNameRef;
 class Type;
 class TypeDecl;
 class ValueDecl;
@@ -773,12 +773,12 @@ public:
   ///
   /// \param stopAfterInnermostBraceStmt If lookup should consider
   /// local declarations inside the innermost syntactic scope only.
-  static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
+  static void lookupLocalDecls(SourceFile *, DeclNameRef, SourceLoc,
                                bool stopAfterInnermostBraceStmt,
                                ABIRole roleFilter,
                                SmallVectorImpl<ValueDecl *> &);
 
-  static void lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+  static void lookupLocalDecls(SourceFile *sf, DeclNameRef name, SourceLoc loc,
                                bool stopAfterInnermostBraceStmt,
                                SmallVectorImpl<ValueDecl *> &results) {
     lookupLocalDecls(sf, name, loc, stopAfterInnermostBraceStmt,
@@ -786,7 +786,7 @@ public:
   }
 
   /// Returns the result if there is exactly one, nullptr otherwise.
-  static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclName, SourceLoc);
+  static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclNameRef, SourceLoc);
 
   /// Entry point to record the visible statement labels from the given
   /// point.
