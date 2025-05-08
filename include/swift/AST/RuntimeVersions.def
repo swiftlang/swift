@@ -152,7 +152,10 @@ RUNTIME_VERSION(
 
 RUNTIME_VERSION(
   (6, 1),
-  FUTURE
+  PLATFORM(macOS,   (15, 4, 0))
+  PLATFORM(iOS,     (18, 4, 0))
+  PLATFORM(watchOS, (11, 4, 0))
+  PLATFORM(xrOS,    (2, 4, 0))
 )
 
 END_MAJOR_VERSION(6)
