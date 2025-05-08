@@ -55,6 +55,7 @@ class Identifier;
 class CompilerInstance;
 class IRGenOptions;
 class CompilerInvocation;
+class DiagnosticEngine;
 
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependencyKind : int8_t {
@@ -1254,7 +1255,8 @@ public:
                         ModuleDependencyInfo dependencies);
 
   /// Record dependencies for the given module collection.
-  void recordDependencies(ModuleDependencyVector moduleDependencies);
+  void recordDependencies(ModuleDependencyVector moduleDependencies,
+                          DiagnosticEngine &diags);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
