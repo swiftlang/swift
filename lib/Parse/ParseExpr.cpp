@@ -2263,6 +2263,10 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
     Identifier baseNameId;
     baseNameLoc = consumeIdentifier(baseNameId, /*diagnoseDollarPrefix=*/false);
     baseName = baseNameId;
+  } else if (flags.contains(DeclNameFlag::AllowAnonymousParamNames)
+             && Tok.is(tok::dollarident)) {
+    baseName = Context.getIdentifier(Tok.getText());
+    baseNameLoc = consumeToken(tok::dollarident);
   } else if (flags.contains(DeclNameFlag::AllowOperators) &&
              Tok.isAnyOperator()) {
     baseName = Context.getIdentifier(Tok.getText());
@@ -3047,8 +3051,13 @@ ParserResult<Expr> Parser::parseExprClosure() {
 ///   expr-anon-closure-argument:
 ///     dollarident
 Expr *Parser::parseExprAnonClosureArg() {
-  StringRef Name = Tok.getText();
-  SourceLoc Loc = consumeToken(tok::dollarident);
+  DeclNameLoc nameLoc;
+  DeclNameRef nameRef =
+      parseDeclNameRef(nameLoc, diag::impossible_parse,
+                       DeclNameFlag::AllowAnonymousParamNames);
+
+  StringRef Name = nameRef.getBaseIdentifier().str();
+  SourceLoc Loc = nameLoc.getBaseNameLoc();
   assert(Name[0] == '$' && "Not a dollarident");
 
   // We know from the lexer that this is all-numeric.

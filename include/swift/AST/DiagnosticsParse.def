@@ -2199,5 +2199,9 @@ ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
 ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
       "'using' is an experimental feature that is currently disabled", ())
 
+ERROR(impossible_parse,none,
+      "parser entered impossible state; please file a bug report with this "
+      "source file", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
