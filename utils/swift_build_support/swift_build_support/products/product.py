@@ -402,15 +402,15 @@ class Product(object):
 
         toolchain_args = {}
 
-        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
-        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
-
         # We only set the actual sysroot if we are actually cross
         # compiling. This is important since otherwise cmake seems to change the
         # RUNPATH to be a relative rather than an absolute path, breaking
         # certain cmark tests (and maybe others).
         maybe_sysroot = self.get_linux_sysroot(platform, arch)
+        print(f'DEBUG: detected sysroot for Linux (None = host sysroot) = {maybe_sysroot}')
         if maybe_sysroot is not None:
+            toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+            toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
             toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
 
         target = self.get_linux_target(platform, arch)
