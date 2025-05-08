@@ -54,13 +54,15 @@ public enum _SwiftifyInfo {
 /// It will replace some std::span arguments with Swift's Span type when sufficient information is
 /// available.
 ///
-/// Currently not supported: return pointers, nested pointers, pointee "count" parameters, endedBy.
+/// Currently not supported: nested pointers, pointee "count" parameters, endedBy.
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
-public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
+public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
+                             spanAvailability: String? = nil,
+                             typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
