@@ -1619,11 +1619,13 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
           return;
         }
-
-        appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
-      } else {
-        appendType(EMT->getInstanceType(), sig, forDecl);
       }
+
+      if (EMT->getInstanceType()->isExistentialType() &&
+          EMT->getExistentialLayout().needsExtendedShape(AllowInverses))
+        appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
+      else
+        appendType(EMT->getInstanceType(), sig, forDecl);
 
       if (EMT->hasRepresentation()) {
         appendOperator("Xm",
