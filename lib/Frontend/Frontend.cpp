@@ -783,15 +783,6 @@ bool CompilerInstance::setUpModuleLoaders() {
     this->DefaultSerializedLoader = ISML.get();
     Context->addModuleLoader(std::move(ISML));
 
-    // When caching is enabled, we rely on ClangImporter for
-    // 'addClangInvovcationDependencies'
-    if (Invocation.getCASOptions().EnableCaching) {
-      std::unique_ptr<ClangImporter> clangImporter =
-        ClangImporter::create(*Context, Invocation.getPCHHash(),
-                              getDependencyTracker());
-      Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
-    }
-
     return false;
   }
 
