@@ -1,18 +1,12 @@
 #pragma once
 
-struct One {
-  int method(void) const { return 1; }
-  int operator[](int i) const { return 1; }
+struct P {};
+
+class C1 {
+public:
+  P GetPrim() const { return P(); }
 };
 
-struct IOne : One {
-  int methodI(void) const { return -1; }
-};
+class C2 : public C1 {};
 
-struct IIOne : IOne {
-  int methodII(void) const { return -11; }
-};
-
-struct IIIOne : IIOne {
-  int methodIII(void) const { return -111; }
-};
+class C3 : public C2 {};
