@@ -897,7 +897,7 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
     auto loc = declRef->getLoc();
     if (name.isSimpleName() && loc.isValid()) {
       auto *SF = CS.DC->getParentSourceFile();
-      auto *D = ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc);
+      auto *D = ASTScope::lookupSingleLocalDecl(SF, name, loc);
       inferTypeVars(D);
     }
   }
