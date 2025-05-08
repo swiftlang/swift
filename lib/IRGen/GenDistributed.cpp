@@ -600,7 +600,7 @@ static llvm::Value *lookupWitnessTable(IRGenFunction &IGF, llvm::Value *witness,
 
   // Sign the protocol descriptor.
   auto schema = IGF.IGM.getOptions().PointerAuth.ProtocolDescriptorsAsArguments;
-  if (schema && protocolDescriptor) {
+  if (schema && signedProtocolDescriptor) {
     auto authInfo = PointerAuthInfo::emit(
         IGF, schema, nullptr,
         PointerAuthEntity::Special::ProtocolDescriptorAsArgument);
