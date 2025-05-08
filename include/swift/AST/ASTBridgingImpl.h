@@ -556,6 +556,10 @@ bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
 }
 
+bool BridgedASTType::isBuiltinType() const {
+  return unbridged()->isBuiltinType();
+}
+
 OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
   return {unbridged()->getNominalOrBoundGenericNominal()};
 }
@@ -594,17 +598,6 @@ BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionT
 
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
   return {unbridged().subst(substMap.unbridged()).getPointer()};
-}
-
-
-BridgedASTType BridgedASTType::subst(BridgedASTType fromType, BridgedASTType toType) const {
-  auto *fromTy = fromType.unbridged()->castTo<swift::SubstitutableType>();
-  swift::Type toTy = toType.unbridged();
-  return {unbridged().subst([fromTy, toTy](swift::SubstitutableType *t) -> swift::Type {
-    if (t == fromTy)
-      return toTy;
-    return t;
-  }, swift::LookUpConformanceInModule(), swift::SubstFlags::SubstituteLocalArchetypes).getPointer()};
 }
 
 BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const {

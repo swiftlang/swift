@@ -141,6 +141,14 @@ extension ContinuousClock: Clock {
 
 @available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
+extension ContinuousClock {
+  @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  public var systemEpoch: Instant { unsafeBitCast(Duration.seconds(0), to: Instant.self) }
+}
+
+@available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 

@@ -4993,6 +4993,8 @@ NOTE(iuo_to_any_coercion_note_func_result,none,
      (const ValueDecl *))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
+NOTE(default_optional_parameter,none,
+     "use a default value parameter to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
@@ -5044,6 +5046,10 @@ ERROR(capture_across_type_decl,none,
       "%kindonly0 declaration cannot close over value %base1 defined in outer "
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
+
+ERROR(isolated_any_conversion_to_synchronous_func,none,
+      "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
+      (Type, Type))
 
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
@@ -8698,7 +8704,7 @@ GROUPED_WARNING(
     (StringRef, DeclAttribute))
 
 //===----------------------------------------------------------------------===//
-// MARK: @extensible Attribute
+// MARK: @extensible and @preEnumExtensibility Attributes
 //===----------------------------------------------------------------------===//
 
 ERROR(extensible_attr_on_frozen_type,none,
@@ -8710,20 +8716,8 @@ ERROR(extensible_attr_on_internal_type,none,
       "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
-//===----------------------------------------------------------------------===//
-//                            MARK: SwiftSettings
-//===----------------------------------------------------------------------===//
-
-ERROR(swift_settings_invalid_setting, none,
-      "Unrecognized setting passed to #SwiftSettings", ())
-
-ERROR(swift_settings_must_be_top_level, none,
-      "#SwiftSettings can only be invoked as a top level declaration", ())
-
-ERROR(swift_settings_duplicate_setting, none,
-      "duplicate setting passed to #SwiftSettings", ())
-NOTE(swift_settings_duplicate_setting_original_loc, none,
-     "setting originally passed here", ())
+ERROR(pre_enum_extensibility_without_extensible,none,
+      "%0 can only be used together with '@extensible' attribute", (DeclAttribute))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

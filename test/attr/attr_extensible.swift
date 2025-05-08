@@ -38,3 +38,12 @@ struct Test {
     set { }
   }
 }
+
+@preEnumExtensibility
+@extensible
+public enum PE {
+}
+
+@preEnumExtensibility // expected-error {{@preEnumExtensibility can only be used together with '@extensible' attribute}}
+public enum WrongPreE {
+}

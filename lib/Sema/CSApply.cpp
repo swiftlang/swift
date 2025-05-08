@@ -120,8 +120,9 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   }
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement,
+      [&](InFlightSubstitution &IFS, Type original,
           ProtocolDecl *protoType) -> ProtocolConformanceRef {
+    auto replacement = original.subst(IFS);
     assert(!replacement->is<GenericTypeParamType>());
 
     if (replacement->hasError() ||
@@ -1345,8 +1346,32 @@ namespace {
           new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy, dc);
       thunk->setParameterList(thunkParamList);
       thunk->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
+
+      // TODO: We should do this in the ActorIsolation checker but for now it is
+      // too risky. This is a narrow fix for 6.2.
+      //
+      // The problem that this is working around is given an autoclosure that
+      // returns an autoclosure that partially applies over an instance method,
+      // we do not visit the inner autoclosure in the ActorIsolation checker
+      // meaning that we do not properly call setActorIsolation on the
+      // AbstractClosureExpr that we produce here.
+      switch (thunkTy->getIsolation().getKind()) {
+      case FunctionTypeIsolation::Kind::NonIsolated:
+      case FunctionTypeIsolation::Kind::Parameter:
+      case FunctionTypeIsolation::Kind::Erased:
+        break;
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        thunk->setActorIsolation(ActorIsolation::forGlobalActor(
+            thunkTy->getIsolation().getGlobalActorType()));
+        break;
+      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        thunk->setActorIsolation(
+            ActorIsolation::forCallerIsolationInheriting());
+        break;
+      }
+
       cs.cacheType(thunk);
-      
+
       // If the `self` type is existential, it must be opened.
       OpaqueValueExpr *baseOpened = nullptr;
       Expr *origBaseExpr = baseExpr;
@@ -2647,18 +2672,8 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
-
       auto subMap = SubstitutionMap::get(
-          genericSig,
-          [&](SubstitutableType *type) -> Type {
-            assert(type->isEqual(genericSig.getGenericParams()[0]));
-            return valueType;
-          },
-          [&](CanType origType, Type replacementType,
-              ProtocolDecl *protoType) -> ProtocolConformanceRef {
-            assert(bridgedToObjectiveCConformance);
-            return bridgedToObjectiveCConformance;
-          });
+          genericSig, valueType, bridgedToObjectiveCConformance);
 
       ConcreteDeclRef fnSpecRef(fn, subMap);
 

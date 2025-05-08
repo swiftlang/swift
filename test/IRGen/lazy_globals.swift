@@ -34,7 +34,7 @@ var (x, y, z) = (1, 2, 3)
 // CHECK: define hidden swiftcc i64 @"$s12lazy_globals4getXSiyF"() {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = call swiftcc ptr @"$s12lazy_globals1xSivau"()
-// CHECK:   %._value = getelementptr inbounds %TSi, ptr %0, i32 0, i32 0
+// CHECK:   %._value = getelementptr inbounds{{.*}} %TSi, ptr %0, i32 0, i32 0
 // CHECK:   [[V:%.*]] = load i64, ptr %._value, align 8
 // CHECK:   ret i64 [[V]]
 // CHECK: }

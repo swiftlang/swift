@@ -70,7 +70,10 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
 
   // Finally replace the function's side effects.
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
+    let globalEffects = function.isProgramTerminationPoint ?
+                            collectedEffects.globalEffects.forProgramTerminationPoints
+                          : collectedEffects.globalEffects
+    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: globalEffects)
   }
 }
 
@@ -105,10 +108,10 @@ private struct CollectedEffects {
       addEffects(.read, to: copy.source)
       addEffects(.write, to: copy.destination)
 
-      if !copy.isTakeOfSrc {
+      if !copy.isTakeOfSource {
         addEffects(.copy, to: copy.source)
       }
-      if !copy.isInitializationOfDest {
+      if !copy.isInitializationOfDestination {
         addDestroyEffects(ofAddress: copy.destination)
       }
 
@@ -491,7 +494,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     case let copy as CopyAddrInst:
       if address == copy.sourceOperand &&
           !address.value.hasTrivialType &&
-          (!function.hasOwnership || copy.isTakeOfSrc) {
+          (!function.hasOwnership || copy.isTakeOfSource) {
         foundTakingLoad = true
       }
       return .continueWalk

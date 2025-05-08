@@ -318,7 +318,7 @@ func smallResultLargerError() throws(SmallError) -> Int8? {
 // CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
 // CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallResultLargerErrors4Int8VSgyAA05SmallF0VYKF"(ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
 // CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
-// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds { i16 }, ptr [[COERCED]], i32 0, i32 0
+// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds{{.*}} { i16 }, ptr [[COERCED]], i32 0, i32 0
 // CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
 func callSmallResultLargerError() {
   let res = try! smallResultLargerError()
@@ -337,7 +337,7 @@ func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
 // CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
 // CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallErrorLargerResultSiyAA017UInt8OptSingletonD0OYKF"(ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
 // CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
-// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds { i16 }, ptr [[COERCED]], i32 0, i32 0
+// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds{{.*}} { i16 }, ptr [[COERCED]], i32 0, i32 0
 // CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
 func callSmallErrorLargerResult() {
   do {

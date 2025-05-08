@@ -109,7 +109,6 @@ UNINTERESTING_FEATURE(UnqualifiedLookupValidation)
 UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
-UNINTERESTING_FEATURE(ImportSymbolicCXXDecls)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
@@ -452,14 +451,6 @@ UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
-static bool usesFeatureSwiftSettings(const Decl *decl) {
-  // We just need to guard `#SwiftSettings`.
-  auto *macro = dyn_cast<MacroDecl>(decl);
-  return macro && macro->isStdlibDecl() &&
-         macro->getMacroRoles().contains(MacroRole::Declaration) &&
-         macro->getBaseIdentifier().is("SwiftSettings");
-}
-
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
     return cd->getFormalAccess() == AccessLevel::Open &&
@@ -559,6 +550,8 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
     return false;
   }
 }
+
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 
 static bool usesFeatureCustomAvailability(Decl *decl) {
   for (auto attr : decl->getSemanticAvailableAttrs()) {

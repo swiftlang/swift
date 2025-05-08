@@ -967,16 +967,8 @@ static Type applyGenericArguments(Type type,
     }
     
     // Try to form a substitution map.
-    auto subs = SubstitutionMap::get(bug->getGenericSignature(),
-                                     args,
-                                     [&](CanType dependentType,
-                                         Type conformingReplacementType,
-                                         ProtocolDecl *conformedProtocol)
-                                     -> ProtocolConformanceRef {
-                                       // no generic builtins have conformance
-                                       // requirements yet.
-                                       llvm_unreachable("not implemented yet");
-                                     });
+    auto subs = SubstitutionMap::get(bug->getGenericSignature(), args,
+                                     LookUpConformanceInModule());
                                      
     auto bound = bug->getBound(subs);
     
@@ -4246,7 +4238,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       isolation = FunctionTypeIsolation::forNonIsolated();
   } else {
     if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-            .isEnabledForAdoption()) {
+            .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
@@ -6572,7 +6564,7 @@ private:
     // A missing `any` or `some` is always diagnosed if this feature not
     // disabled.
     auto featureState = ctx.LangOpts.getFeatureState(Feature::ExistentialAny);
-    if (featureState.isEnabled() || featureState.isEnabledForAdoption()) {
+    if (featureState.isEnabled() || featureState.isEnabledForMigration()) {
       return true;
     }
 
@@ -6665,10 +6657,10 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    // If `ExistentialAny` is enabled in adoption mode, warn unconditionally.
+    // If `ExistentialAny` is enabled in migration mode, warn unconditionally.
     // Otherwise, warn until the feature's coming-of-age language mode.
     const auto feature = Feature::ExistentialAny;
-    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption()) {
+    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForMigration()) {
       diag->limitBehavior(DiagnosticBehavior::Warning);
     } else {
       diag->warnUntilSwiftVersion(feature.getLanguageVersion().value());

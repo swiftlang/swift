@@ -817,6 +817,8 @@ ASTContext::ASTContext(
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
       TheUnconstrainedAnyType(
           ProtocolCompositionType::theUnconstrainedAnyType(*this)),
+      TheSelfType(CanGenericTypeParamType(
+          GenericTypeParamType::getType(0, 0, *this))),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -2199,57 +2201,10 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
-namespace {
-  static StringRef pathStringFromSearchPath(
-      const SearchPathOptions::SearchPath &next) {
-    return next.Path;
-  }
-}
-
 std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
 const {
   assert(LangOpts.Target.isOSDarwin());
   return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
-}
-
-llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
-const {
-  llvm::StringSet<> result;
-
-  // Import and framework paths are "special", they contain more than path
-  // strings, but path strings are all we care about here.
-  using SearchPathView = ArrayRefView<SearchPathOptions::SearchPath, StringRef,
-                                      pathStringFromSearchPath>;
-
-  SearchPathView importPathsOnly{SearchPathOpts.getImportSearchPaths()};
-  result.insert(importPathsOnly.begin(), importPathsOnly.end());
-
-  SearchPathView frameworkPathsOnly{SearchPathOpts.getFrameworkSearchPaths()};
-  result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
-
-  if (LangOpts.Target.isOSDarwin()) {
-    auto implicitFrameworkSearchPaths = getDarwinImplicitFrameworkSearchPaths();
-    result.insert(implicitFrameworkSearchPaths.begin(),
-                  implicitFrameworkSearchPaths.end());
-  }
-  result.insert(SearchPathOpts.RuntimeLibraryImportPaths.begin(),
-                SearchPathOpts.RuntimeLibraryImportPaths.end());
-
-  // ClangImporter special-cases the path for SwiftShims, so do the same here
-  // If there are no shims in the resource dir, add a search path in the SDK.
-  SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
-  llvm::sys::path::append(shimsPath, "shims");
-  if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = SearchPathOpts.getSDKPath();
-    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-  }
-  result.insert(shimsPath.str());
-
-  // Clang system modules are found in the SDK root
-  SmallString<128> clangSysRootPath(SearchPathOpts.getSDKPath());
-  llvm::sys::path::append(clangSysRootPath, "usr", "include");
-  result.insert(clangSysRootPath.str());
-  return result;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -5099,8 +5054,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
                                                 Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
-                                name);
+  GenericTypeParamType::Profile(id, paramKind, depth, index, /*weight=*/0,
+                                valueType, name);
 
   void *insertPos;
   if (auto gpTy = ctx.getImpl().GenericParamTypes.FindNodeOrInsertPos(id, insertPos))
@@ -5110,8 +5065,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
   if (paramKind == GenericTypeParamKind::Pack)
     props |= RecursiveTypeProperties::HasParameterPack;
 
-  auto canType = GenericTypeParamType::get(paramKind, depth, index, valueType,
-                                           ctx);
+  auto canType = GenericTypeParamType::get(paramKind, depth, index, /*weight=*/0,
+                                           valueType, ctx);
 
   auto result = new (ctx, AllocationArena::Permanent)
       GenericTypeParamType(name, canType, ctx);
@@ -5130,10 +5085,10 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param) {
 
 GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
                                                 unsigned depth, unsigned index,
-                                                Type valueType,
+                                                unsigned weight, Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
+  GenericTypeParamType::Profile(id, paramKind, depth, index, weight, valueType,
                                 Identifier());
 
   void *insertPos;
@@ -5145,7 +5100,7 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
     props |= RecursiveTypeProperties::HasParameterPack;
 
   auto result = new (ctx, AllocationArena::Permanent)
-      GenericTypeParamType(paramKind, depth, index, valueType, props, ctx);
+      GenericTypeParamType(paramKind, depth, index, weight, valueType, props, ctx);
   ctx.getImpl().GenericParamTypes.InsertNode(result, insertPos);
   return result;
 }
@@ -5154,14 +5109,21 @@ GenericTypeParamType *GenericTypeParamType::getType(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
+}
+
+GenericTypeParamType *GenericTypeParamType::getOpaqueResultType(unsigned depth,
+                                                                unsigned index,
+                                                                const ASTContext &ctx) {
+  return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
+                                   /*weight=*/1, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getPack(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Pack, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
@@ -5169,7 +5131,7 @@ GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
                                                      Type valueType,
                                                      const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Value, depth, index,
-                                   valueType, ctx);
+                                   /*weight=*/0, valueType, ctx);
 }
 
 ArrayRef<GenericTypeParamType *>
@@ -6576,13 +6538,16 @@ const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionTypeRepresentation trueRep) {
-  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+  return getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+      params, resultTy, trueRep);
 }
 
 const clang::Type *ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
-  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  auto *ty =
+      getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+          params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
@@ -6639,8 +6604,7 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
 
-  auto param = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, *this);
-  auto sig = GenericSignature::get(param, { });
+  auto sig = GenericSignature::get({TheSelfType}, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;

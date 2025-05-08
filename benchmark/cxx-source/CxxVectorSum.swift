@@ -13,8 +13,6 @@
 // This is a benchmark that tracks how quickly Swift can sum up a C++ vector
 // as compared to the C++ implementation of such sum.
 
-/* FIXME: rdar://150067288
-
 import TestsUtils
 import CxxStdlibPerformance
 import Cxx
@@ -121,5 +119,3 @@ public func run_CxxVectorOfU32_Sum_Swift_Reduce(_ n: Int) {
     }
     blackHole(sum)
 }
-
-*/

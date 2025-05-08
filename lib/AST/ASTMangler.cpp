@@ -395,7 +395,7 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
-          return GenericTypeParamType::getType(0, 0, ctx);
+          return ctx.TheSelfType;
         }
         return std::nullopt;
       });
@@ -431,7 +431,7 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
-          return GenericTypeParamType::getType(0, 0, ctx);
+          return ctx.TheSelfType;
         }
         return std::nullopt;
       });
@@ -5274,15 +5274,11 @@ static void extractExistentialInverseRequirements(
 
   auto &ctx = PCT->getASTContext();
 
-  // Form a parameter referring to the existential's Self.
-  auto existentialSelf =
-      GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
-
   for (auto ip : PCT->getInverses()) {
     auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
     assert(proto);
     ASSERT(!getABIDecl(proto) && "can't use @abi on inverse protocols");
-    inverses.push_back({existentialSelf, proto, SourceLoc()});
+    inverses.push_back({ctx.TheSelfType, proto, SourceLoc()});
   }
 }
 

@@ -423,8 +423,6 @@ class NameImporter {
   llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
                  std::unique_ptr<InheritedNameSet>> allProperties;
 
-  bool importSymbolicCXXDecls;
-
   ClangImporter::Implementation *importerImpl;
 
 public:
@@ -432,8 +430,6 @@ public:
                clang::Sema &cSema, ClangImporter::Implementation *importerImpl)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
         enumInfos(clangSema.getPreprocessor()),
-        importSymbolicCXXDecls(
-            ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)),
         importerImpl(importerImpl) {}
 
   /// Determine the Swift name for a Clang decl
@@ -497,10 +493,6 @@ public:
   const InheritedNameSet *getAllPropertyNames(
                             clang::ObjCInterfaceDecl *classDecl,
                             bool forInstance);
-
-  inline void enableSymbolicImportFeature(bool isEnabled) {
-    importSymbolicCXXDecls = isEnabled;
-  }
 
   /// Retrieve a purported custom name even if it is invalid.
   static std::optional<StringRef>

@@ -831,8 +831,7 @@ int swift::compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   return 0;
 }
 
-/// Canonical ordering for type parameters.
-int swift::compareDependentTypes(Type type1, Type type2) {
+static int compareDependentTypesRec(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
 
@@ -853,7 +852,7 @@ int swift::compareDependentTypes(Type type1, Type type2) {
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
   if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
+        compareDependentTypesRec(depMemTy1->getBase(), depMemTy2->getBase()))
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
@@ -867,6 +866,17 @@ int swift::compareDependentTypes(Type type1, Type type2) {
     return result;
 
   return 0;
+}
+
+/// Canonical ordering for type parameters.
+int swift::compareDependentTypes(Type type1, Type type2) {
+  auto *root1 = type1->getRootGenericParam();
+  auto *root2 = type2->getRootGenericParam();
+  if (root1->getWeight() != root2->getWeight()) {
+    return root2->getWeight() ? -1 : +1;
+  }
+
+  return compareDependentTypesRec(type1, type2);
 }
 
 #pragma mark Generic signature verification

@@ -318,8 +318,8 @@ final public class AssignOrInitInst : Instruction, StoringInstruction {}
 public protocol SourceDestAddrInstruction : Instruction {
   var sourceOperand: Operand { get }
   var destinationOperand: Operand { get }
-  var isTakeOfSrc: Bool { get }
-  var isInitializationOfDest: Bool { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
 }
 
 extension SourceDestAddrInstruction {
@@ -330,10 +330,10 @@ extension SourceDestAddrInstruction {
 }
 
 final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool {
+  public var isTakeOfSource: Bool {
     bridged.CopyAddrInst_isTakeOfSrc()
   }
-  public var isInitializationOfDest: Bool {
+  public var isInitializationOfDestination: Bool {
     bridged.CopyAddrInst_isInitializationOfDest()
   }
 }
@@ -342,10 +342,10 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
 
-  public var isTakeOfSrc: Bool {
+  public var isTakeOfSource: Bool {
     bridged.ExplicitCopyAddrInst_isTakeOfSrc()
   }
-  public var isInitializationOfDest: Bool {
+  public var isInitializationOfDestination: Bool {
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
 }
@@ -450,17 +450,17 @@ public enum VariableScopeInstruction {
     scopeBegin.uses.lazy.filter { $0.endsLifetime || $0.instruction is ExtendLifetimeInst }
   }
 
-  // TODO: with SIL verification, we might be able to make varDecl non-Optional.
-  public var varDecl: VarDecl? {
-    if let debugVarDecl = instruction.debugVarDecl {
-      return debugVarDecl
-    }
+  // TODO: assert that VarDecl is valid whenever isFromVarDecl returns tyue.
+  public func findVarDecl() -> VarDecl? {
     // SILGen may produce double var_decl instructions for the same variable:
     //   %box = alloc_box [var_decl] "x"
     //   begin_borrow %box [var_decl]
     //
-    // Assume that, if the begin_borrow or move_value does not have its own debug_value, then it must actually be
-    // associated with its operand's var_decl.
+    // Therefore, first check if begin_borrow or move_value has any debug_value users.
+    if let debugVarDecl = instruction.findVarDeclFromDebugUsers() {
+      return debugVarDecl
+    }
+    // Otherwise, assume that the var_decl is associated with its operand's var_decl.
     return instruction.operands[0].value.definingInstruction?.findVarDecl()
   }
 }
@@ -472,17 +472,33 @@ extension Instruction {
       return varDeclInst.varDecl
     }
     if let varScopeInst = VariableScopeInstruction(self) {
-      return varScopeInst.varDecl
+      return varScopeInst.findVarDecl()
     }
-    return debugVarDecl
+    return findVarDeclFromDebugUsers()
   }
 
-  var debugVarDecl: VarDecl? {
+  func findVarDeclFromDebugUsers() -> VarDecl? {
     for result in results {
-      for use in result.uses {
-        if let debugVal = use.instruction as? DebugValueInst {
-          return debugVal.varDecl
-        }
+      if let varDecl = result.findVarDeclFromDebugUsers() {
+        return varDecl
+      }
+    }
+    return nil
+  }
+}
+
+extension Value {
+  public func findVarDecl() -> VarDecl? {
+    if let arg = self as? Argument {
+      return arg.findVarDecl()
+    }
+    return findVarDeclFromDebugUsers()
+  }
+
+  func findVarDeclFromDebugUsers() -> VarDecl? {
+    for use in uses {
+      if let debugVal = use.instruction as? DebugValueInst {
+        return debugVal.varDecl
       }
     }
     return nil
@@ -526,8 +542,8 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
     CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
   }
 
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 
   public var isolatedConformances: CastingIsolatedConformances {
@@ -707,8 +723,8 @@ class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {
 
 final public
 class UncheckedRefCastAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
 }
 
 final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
@@ -813,7 +829,9 @@ final public
 class DeinitExistentialValueInst : Instruction {}
 
 final public
-class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var isImmutable: Bool { bridged.OpenExistentialAddr_isImmutable() }
+}
 
 final public
 class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
@@ -1226,6 +1244,10 @@ final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction
   public var doKeepUnique: Bool { bridged.EndCOWMutationInst_doKeepUnique() }
 }
 
+final public class EndCOWMutationAddrInst : Instruction, UnaryInstruction {
+  public var address: Value { operand.value }
+}
+
 final public
 class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -1298,8 +1320,8 @@ final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, U
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
 final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
 }
 
 final public class CopyableToMoveOnlyWrapperValueInst: SingleValueInstruction, UnaryInstruction {}
@@ -1676,6 +1698,9 @@ final public class ThrowAddrInst : TermInst {
 }
 
 final public class YieldInst : TermInst {
+  public func convention(of operand: Operand) -> ArgumentConvention {
+    return bridged.YieldInst_getConvention(operand.bridged).convention
+  }
 }
 
 final public class UnwindInst : TermInst {

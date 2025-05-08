@@ -765,6 +765,13 @@ static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
       return ActorIsolation::forNonisolated(false);
     }
 
+    // If we have a closure expr, check if our type is
+    // nonisolated(nonsending). In that case, we use that instead.
+    if (auto *closureExpr = constant.getAbstractClosureExpr()) {
+      if (auto actorIsolation = closureExpr->getActorIsolation())
+        return actorIsolation;
+    }
+
     // If we have actor isolation for our constant, put the isolation onto the
     // function. If the isolation is unspecified, we do not return it.
     if (auto isolation =

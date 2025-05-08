@@ -173,7 +173,7 @@ bb0(%0 : $*Self):
   // implementation
 
   // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias ptr @swift_allocObject({{.*}})
-  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], ptr }>, ptr [[CONTEXT]], i32 0, i32 2
+  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, [{{4|8}} x i8], ptr }>, ptr [[CONTEXT]], i32 0, i32 2
   // CHECK-NEXT: store ptr %SelfWitnessTable, ptr [[WTABLE_ADDR]]
 
   %fn3 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
@@ -211,7 +211,7 @@ bb0(%0 : $@thick Self.Type):
   // implementation
 
   // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias ptr @swift_allocObject({{.*}})
-  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], ptr }>, ptr [[CONTEXT]], i32 0, i32 2
+  // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, [{{4|8}} x i8], ptr }>, ptr [[CONTEXT]], i32 0, i32 2
   // CHECK-NEXT: store ptr %SelfWitnessTable, ptr [[WTABLE_ADDR]]
 
   %fn3 = function_ref @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
@@ -289,7 +289,7 @@ bb0(%0 : $*ConformingStruct):
 
   // Make sure we can partially apply direct references to default implementations
   // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias ptr @swift_allocObject({{.*}})
-  // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, ptr }>, ptr [[CONTEXT]], i32 0, i32 1
+  // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr [[CONTEXT]], i32 0, i32 1
   // CHECK-NEXT: store ptr %SelfWitnessTable, ptr [[WTABLE]]
 
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()

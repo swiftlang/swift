@@ -816,7 +816,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       continue;
     }
 
-    // For all other features, the argument format is `<name>[:adoption]`.
+    // For all other features, the argument format is `<name>[:migrate]`.
     StringRef featureName;
     std::optional<StringRef> featureMode;
     std::tie(featureName, featureMode) = argValue.rsplit(':');
@@ -872,21 +872,21 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     if (featureMode) {
       if (isEnableFeatureFlag) {
-        const auto isAdoptable = feature->isAdoptable();
+        const auto isMigratable = feature->isMigratable();
 
         // Diagnose an invalid mode.
-        StringRef validModeName = "adoption";
+        StringRef validModeName = "migrate";
         if (*featureMode != validModeName) {
           Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
                          featureName,
                          /*didYouMean=*/validModeName,
-                         /*showDidYouMean=*/isAdoptable);
+                         /*showDidYouMean=*/isMigratable);
           continue;
         }
 
-        if (!isAdoptable) {
+        if (!isMigratable) {
           Diags.diagnose(SourceLoc(),
-                         diag::feature_does_not_support_adoption_mode,
+                         diag::feature_does_not_support_migration_mode,
                          featureName);
           continue;
         }
@@ -904,7 +904,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
-      Opts.enableFeature(*feature, /*forAdoption=*/featureMode.has_value());
+      Opts.enableFeature(*feature, /*forMigration=*/featureMode.has_value());
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in
@@ -2548,7 +2548,20 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.EmitMacroExpansionFiles = !negated;
   }
 
-  Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
+  {
+    OptSpecifier obsoleteOpts[] = {
+      OPT_fixit_all,
+      OPT_emit_fixits_path,
+    };
+
+    for (auto option: obsoleteOpts) {
+      if (auto *arg = Args.getLastArg(option)) {
+        Diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete,
+                       arg->getOption().getPrefixedName());
+      }
+    }
+  }
+
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {

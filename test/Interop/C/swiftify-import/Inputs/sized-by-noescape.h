@@ -16,8 +16,7 @@ void nullUnspecified(int len, const void * __sized_by(len) __noescape _Null_unsp
 
 void nonnull(int len, const void * __sized_by(len) __noescape _Nonnull p);
 
-// Nullable ~Escapable types not supported yet
-//void nullable(int len, const void * __sized_by(len) __noescape _Nullable p);
+void nullable(int len, const void * __sized_by(len) __noescape _Nullable p);
 
 const void * __sized_by(len) __noescape _Nonnull returnPointer(int len);
 

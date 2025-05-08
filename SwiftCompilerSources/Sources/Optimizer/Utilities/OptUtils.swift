@@ -954,7 +954,7 @@ extension CopyAddrInst {
         let srcFieldAddr = builder.createStructElementAddr(structAddress: source, fieldIndex: idx)
         let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
         builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
-                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDestination)
       }
       context.erase(instruction: self)
       return true
@@ -964,7 +964,7 @@ extension CopyAddrInst {
         let srcFieldAddr = builder.createTupleElementAddr(tupleAddress: source, elementIndex: idx)
         let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
         builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
-                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDest)
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDestination)
       }
       context.erase(instruction: self)
       return true
@@ -973,7 +973,7 @@ extension CopyAddrInst {
   }
 
   private func isTake(for fieldValue: Value) -> Bool {
-    return isTakeOfSrc && !fieldValue.type.objectType.isTrivial(in: parentFunction)
+    return isTakeOfSource && !fieldValue.type.objectType.isTrivial(in: parentFunction)
   }
 
   @discardableResult
@@ -992,7 +992,7 @@ extension CopyAddrInst {
     if type.isTrivial(in: parentFunction) {
       return .trivial
     }
-    if isTakeOfSrc {
+    if isTakeOfSource {
       return .take
     }
     return .copy
@@ -1005,7 +1005,7 @@ extension CopyAddrInst {
     if type.isTrivial(in: parentFunction) {
       return .trivial
     }
-    if isInitializationOfDest {
+    if isInitializationOfDestination {
       return .initialize
     }
     return .assign

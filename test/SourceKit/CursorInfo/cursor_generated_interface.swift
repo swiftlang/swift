@@ -41,7 +41,7 @@ public class ASwiftType {
 }
 
 // LibA is a mixed framework with no source info and a submodule
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=12:36 -print-raw-response | %FileCheck %s --check-prefix=CHECKA
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=11:36 -print-raw-response | %FileCheck %s --check-prefix=CHECKA
 // CHECKA: key.name: "ASwiftType"
 // CHECKA: key.modulename: "LibA"
 // CHECKA: key.decl_lang: source.lang.swift
@@ -60,7 +60,7 @@ framework module LibA {
 @interface AObjcType
 @end
 
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=12:54 -print-raw-response | %FileCheck %s --check-prefix=CHECKAOBJ
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=11:54 -print-raw-response | %FileCheck %s --check-prefix=CHECKAOBJ
 // CHECKAOBJ: key.name: "AObjcType"
 // CHECKAOBJ: key.line: [[@LINE-5]]
 // CHECKAOBJ: key.column: 12
@@ -72,7 +72,7 @@ framework module LibA {
 @interface ASubType
 @end
 
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=12:70 -print-raw-response | %FileCheck %s --check-prefix=CHECKASUB
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=11:70 -print-raw-response | %FileCheck %s --check-prefix=CHECKASUB
 // CHECKASUB: key.name: "ASubType"
 // CHECKASUB: key.line: [[@LINE-5]]
 // CHECKASUB: key.column: 12
@@ -84,7 +84,7 @@ framework module LibA {
 public class BType {}
 
 // LibB has source info
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=14:32 -print-raw-response | %FileCheck %s --check-prefix=CHECKB
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=13:32 -print-raw-response | %FileCheck %s --check-prefix=CHECKB
 // CHECKB: key.name: "BType"
 // CHECKB: key.line: [[@LINE-5]]
 // CHECKB: key.column: 14
@@ -96,7 +96,7 @@ public class BType {}
 public class CType {}
 
 // LibC has no source info
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=14:47 -print-raw-response | %FileCheck %s --check-prefix=CHECKC
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=13:47 -print-raw-response | %FileCheck %s --check-prefix=CHECKC
 // CHECKC: key.name: "CType"
 // CHECKC: key.modulename: "LibC"
 // CHECKC: key.decl_lang: source.lang.swift
@@ -105,7 +105,7 @@ public class CType {}
 @interface DType
 @end
 
-// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=14:57 -print-raw-response | %FileCheck %s --check-prefix=CHECKD
+// RUN: %sourcekitd-test -req=interface-gen-open -module LibA -- -F %t/frameworks -target %target-triple == -req=cursor -pos=13:57 -print-raw-response | %FileCheck %s --check-prefix=CHECKD
 // CHECKD: key.name: "DType"
 // CHECKD: key.line: [[@LINE-5]]
 // CHECKD: key.column: 12
