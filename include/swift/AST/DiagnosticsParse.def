@@ -2183,5 +2183,9 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
+ERROR(impossible_parse,none,
+      "parser entered impossible state; please file a bug report with this "
+      "source file", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
