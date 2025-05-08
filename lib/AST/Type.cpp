@@ -435,11 +435,11 @@ Type ExistentialLayout::getSuperclass() const {
   return Type();
 }
 
-bool ExistentialLayout::needsExtendedShape() const {
+bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
   if (!getParameterizedProtocols().empty())
     return true;
 
-  if (hasInverses())
+  if (allowInverses && hasInverses())
     return true;
 
   return false;
