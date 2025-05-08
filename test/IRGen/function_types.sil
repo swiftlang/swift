@@ -52,9 +52,9 @@ struct X {}
 
 sil @out_void_return : $@convention(thin) () -> @out X
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @use_void_return_value(ptr noalias nocapture sret({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @use_void_return_value(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call swiftcc void @out_void_return(ptr noalias nocapture sret({{.*}}) %0)
+// CHECK-NEXT:    call swiftcc void @out_void_return(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0)
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 sil @use_void_return_value : $@convention(thin) () -> @out X {
