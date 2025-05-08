@@ -16,7 +16,7 @@ entry(%1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Hu
   return undef : $()
 }
 
-// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @arguments_in_decl(ptr captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(40), ptr noalias, ptr noalias nocapture, ptr)
+// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @arguments_in_decl(ptr captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(40), ptr noalias, ptr noalias captures(none), ptr)
 sil @arguments_in_decl : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @arguments_in_def_out(ptr noalias captures(none) sret({{.*}}) %0, ptr captures(none) dereferenceable(4) %1, ptr noalias captures(none) dereferenceable(4) %2, ptr noalias captures(none) dereferenceable(4) %3, ptr noalias captures(none) dereferenceable(40) %4, ptr noalias %5, ptr noalias captures(none) %6, ptr %T)
@@ -31,7 +31,7 @@ entry(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*B
   return undef : $()
 }
 
-// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @arguments_in_decl_out(ptr noalias captures(none) sret({{.*}}), ptr captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(40), ptr noalias, ptr noalias nocapture, ptr)
+// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @arguments_in_decl_out(ptr noalias captures(none) sret({{.*}}), ptr captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(40), ptr noalias, ptr noalias captures(none), ptr)
 sil @arguments_in_decl_out : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> @out Builtin.Int32
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @arguments_in_def_huge_ret(ptr noalias captures(none) sret({{.*}}V) %0, ptr captures(none) dereferenceable(4) %1, ptr noalias captures(none) dereferenceable(4) %2, ptr noalias captures(none) dereferenceable(4) %3, ptr noalias captures(none) dereferenceable(40) %4, ptr noalias %5, ptr noalias captures(none) %6, ptr %T)
@@ -46,7 +46,7 @@ entry(%1 : $*Builtin.Int32, %2 : $*Builtin.Int32, %3 : $*Builtin.Int32, %4 : $Hu
   return %y : $Huge
 }
 
-// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @arguments_in_decl_huge_ret(ptr noalias captures(none) sret({{.*}}), ptr captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(40), ptr noalias, ptr noalias nocapture, ptr)
+// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @arguments_in_decl_huge_ret(ptr noalias captures(none) sret({{.*}}), ptr captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(4), ptr noalias captures(none) dereferenceable(40), ptr noalias, ptr noalias captures(none), ptr)
 sil @arguments_in_decl_huge_ret : $@convention(thin) <T> (@inout Builtin.Int32, @in Builtin.Int32, @in_guaranteed Builtin.Int32, Huge, @in T, @in ()) -> Huge
 
 
