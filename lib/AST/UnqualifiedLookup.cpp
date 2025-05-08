@@ -383,7 +383,8 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
     return nullptr;
 
   auto selfDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                  DeclName(Ctx.Id_self), Loc);
+                                                  DeclNameRef::createSelf(Ctx),
+                                                  Loc);
   if (!selfDecl) {
     return nullptr;
   }
@@ -910,14 +911,14 @@ namespace {
 
 class ASTScopeDeclConsumerForLocalLookup
     : public AbstractASTScopeDeclConsumer {
-  DeclName name;
+  DeclNameRef name;
   bool stopAfterInnermostBraceStmt;
   ABIRole roleFilter;
   SmallVectorImpl<ValueDecl *> &results;
 
 public:
   ASTScopeDeclConsumerForLocalLookup(
-      DeclName name, bool stopAfterInnermostBraceStmt,
+      DeclNameRef name, bool stopAfterInnermostBraceStmt,
       ABIRole roleFilter, SmallVectorImpl<ValueDecl *> &results)
     : name(name), stopAfterInnermostBraceStmt(stopAfterInnermostBraceStmt),
       roleFilter(roleFilter), results(results) {}
@@ -928,6 +929,8 @@ public:
 
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC) override {
+    if (name.hasModuleSelector()) return false;
+    
     for (auto *value: values) {
       bool foundMatch = false;
       if (auto *varDecl = dyn_cast<VarDecl>(value)) {
@@ -941,7 +944,7 @@ public:
         });
       }
 
-      if (!foundMatch && value->getName().matchesRef(name)
+      if (!foundMatch && value->getName().matchesRef(name.getFullName())
               && hasCorrectABIRole(value))
         results.push_back(value);
     }
@@ -968,7 +971,7 @@ public:
 
 /// Lookup that only finds local declarations and does not trigger
 /// interface type computation.
-void ASTScope::lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+void ASTScope::lookupLocalDecls(SourceFile *sf, DeclNameRef name, SourceLoc loc,
                                 bool stopAfterInnermostBraceStmt,
                                 ABIRole roleFilter,
                                 SmallVectorImpl<ValueDecl *> &results) {
@@ -977,7 +980,7 @@ void ASTScope::lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
   ASTScope::unqualifiedLookup(sf, loc, consumer);
 }
 
-ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclName name,
+ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclNameRef name,
                                            SourceLoc loc) {
   SmallVector<ValueDecl *, 1> result;
   ASTScope::lookupLocalDecls(sf, name, loc,

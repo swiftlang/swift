@@ -757,7 +757,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       else
         roleFilter = currentIsABIOnly ? ABIRole::ProvidesABI
                                       : ABIRole::ProvidesAPI;
-      ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+      ASTScope::lookupLocalDecls(currentFile,
+                                 DeclNameRef(current->getBaseName()),
                                  current->getLoc(),
                                  /*stopAfterInnermostBraceStmt=*/true,
                                  roleFilter, otherDefinitions);
