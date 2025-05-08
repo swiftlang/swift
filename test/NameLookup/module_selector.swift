@@ -294,6 +294,7 @@ func decl1(
   label p3: @escaping () -> A
 ) {
   switch Optional(main::p2) {
+  // expected-error@-1 {{cannot find 'main::p2' in scope}}
   case Optional.some(let decl1i):
     break
   case .none:
@@ -301,6 +302,7 @@ func decl1(
   }
 
   switch Optional(main::p2) {
+  // expected-error@-1 {{cannot find 'main::p2' in scope}}
   case let Optional.some(decl1j):
     break
   case .none:
@@ -308,6 +310,7 @@ func decl1(
   }
 
   switch Optional(main::p2) {
+  // expected-error@-1 {{cannot find 'main::p2' in scope}}
  case let decl1k?:
     break
   case .none:
