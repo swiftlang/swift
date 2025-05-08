@@ -130,10 +130,16 @@ private struct FunctionChecker {
         throw Diagnostic(.embedded_swift_allocating_type, (instruction as! SingleValueInstruction).type,
                               at: instruction.location)
       }
+
     case is BeginApplyInst:
-      throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
+      if context.options.noAllocations {
+        throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
+      }
+
     case is ThunkInst:
-      throw Diagnostic(.embedded_swift_allocating, at: instruction.location)
+      if context.options.noAllocations {
+        throw Diagnostic(.embedded_swift_allocating, at: instruction.location)
+      }
 
     case let pai as PartialApplyInst:
       if context.options.noAllocations && !pai.isOnStack {
