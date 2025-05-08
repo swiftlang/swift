@@ -189,6 +189,11 @@ private struct FunctionChecker {
       case let wmi as WitnessMethodInst:
         throw Diagnostic(.embedded_cannot_specialize_witness_method, wmi.member, at: apply.location)
       default:
+        if apply.substitutionMap.replacementTypes.contains(where: { $0.hasDynamicSelf }),
+           apply.calleeHasGenericSelfMetatypeParameter
+        {
+          throw Diagnostic(.embedded_call_generic_function_with_dynamic_self, at: apply.location)
+        }
         throw Diagnostic(.embedded_call_generic_function, at: apply.location)
       }
     }
@@ -367,6 +372,15 @@ private extension ApplySite {
       return true
     }
     return false
+  }
+
+  var calleeHasGenericSelfMetatypeParameter: Bool {
+    let convention = FunctionConvention(for: callee.type.canonicalType, in: parentFunction)
+    guard convention.hasSelfParameter, let selfParam = convention.parameters.last else {
+      return false
+    }
+    let selfParamType = selfParam.type
+    return selfParamType.isMetatype && selfParamType.instanceTypeOfMetatype.isGenericTypeParameter
   }
 }
 
