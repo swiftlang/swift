@@ -436,6 +436,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasDynamicSelf() const {
+  return unbridged()->hasDynamicSelfType();
+}
+
 bool BridgedASTType::isArchetype() const {
   return unbridged()->is<swift::ArchetypeType>();
 }
