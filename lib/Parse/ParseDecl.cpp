@@ -564,8 +564,8 @@ bool Parser::parseSpecializeAttributeArguments(
     std::optional<bool> &Exported,
     std::optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, AvailabilityRange *SILAvailability,
-    SmallVectorImpl<Identifier> &spiGroups,
+    DeclNameRef &targetFunction, DeclNameLoc &targetFunctionLoc,
+    AvailabilityRange *SILAvailability, SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
@@ -677,9 +677,8 @@ bool Parser::parseSpecializeAttributeArguments(
       }
       if (ParamLabel == "target") {
         if (!parseSILTargetName(*this)) {
-          DeclNameLoc loc;
           targetFunction = parseDeclNameRef(
-              loc, diag::attr_specialize_expected_function,
+              targetFunctionLoc, diag::attr_specialize_expected_function,
               DeclNameFlag::AllowZeroArgCompoundNames |
                   DeclNameFlag::AllowKeywordsUsingSpecialNames |
                   DeclNameFlag::AllowOperators |
@@ -893,13 +892,14 @@ bool Parser::parseSpecializeAttribute(
   TrailingWhereClause *trailingWhereClause = nullptr;
 
   DeclNameRef targetFunction;
+  DeclNameLoc targetFunctionLoc;
   SmallVector<Identifier, 4> spiGroups;
   SmallVector<AvailableAttr *, 4> availableAttrs;
   if (!parseSpecializeAttributeArguments(
           ClosingBrace, isPublic, DiscardAttribute, exported, kind,
           trailingWhereClause,
-          targetFunction, SILAvailability, spiGroups, availableAttrs,
-          parseSILTargetName, parseSILSIPModule)) {
+          targetFunction, targetFunctionLoc, SILAvailability, spiGroups,
+          availableAttrs, parseSILTargetName, parseSILSIPModule)) {
     return false;
   }
 
@@ -931,13 +931,13 @@ bool Parser::parseSpecializeAttribute(
     Attr = SpecializedAttr::create(Context, AtLoc,
                                   SourceRange(Loc, rParenLoc),
                                   trailingWhereClause, exported.value(),
-                                  kind.value(), targetFunction, spiGroups,
-                                  availableAttrs);
+                                  kind.value(), targetFunction,
+                                  targetFunctionLoc, spiGroups, availableAttrs);
   else
     Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                   trailingWhereClause, exported.value(),
-                                  kind.value(), targetFunction, spiGroups,
-                                  availableAttrs);
+                                  kind.value(), targetFunction,
+                                  targetFunctionLoc, spiGroups, availableAttrs);
   return true;
 }
 
@@ -3593,6 +3593,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     SourceLoc LParenLoc = consumeAttributeLParen();
     DeclNameRef replacedFunction;
+    DeclNameLoc replacedFunctionLoc;
     {
       // Parse 'for'.
       if (Tok.getText() != "for") {
@@ -3607,15 +3608,12 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       consumeToken(tok::colon);
-      {
-        DeclNameLoc loc;
-        replacedFunction = parseDeclNameRef(
-            loc, diag::attr_dynamic_replacement_expected_function,
-            DeclNameFlag::AllowZeroArgCompoundNames |
-                DeclNameFlag::AllowKeywordsUsingSpecialNames |
-                DeclNameFlag::AllowOperators |
-                DeclNameFlag::AllowLowercaseAndUppercaseSelf);
-      }
+      replacedFunction = parseDeclNameRef(
+          replacedFunctionLoc, diag::attr_dynamic_replacement_expected_function,
+          DeclNameFlag::AllowZeroArgCompoundNames |
+              DeclNameFlag::AllowKeywordsUsingSpecialNames |
+              DeclNameFlag::AllowOperators |
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     }
 
     // Parse the matching ')'.
@@ -3629,7 +3627,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
 
     DynamicReplacementAttr *attr = DynamicReplacementAttr::create(
-        Context, AtLoc, Loc, LParenLoc, replacedFunction, RParenLoc);
+        Context, AtLoc, Loc, LParenLoc, replacedFunction, replacedFunctionLoc,
+                                                                  RParenLoc);
     Attributes.add(attr);
     break;
   }

@@ -893,11 +893,12 @@ BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
 
 SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
-    "replacedFunction:rParenLoc:)")
+    "replacedFunction:replacedFunctionLoc:rParenLoc:)")
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc atLoc,
-    swift::SourceLoc attrNameLoc, swift::SourceLoc lParenLoc,
-    BridgedDeclNameRef cReplacedFunction, swift::SourceLoc rParenLoc);
+    BridgedASTContext cContext, swift::SourceLoc cAtLoc,
+    swift::SourceLoc cAttrNameLoc, swift::SourceLoc cLParenLoc,
+    BridgedDeclNameRef cReplacedFunction,
+    BridgedDeclNameLoc cReplacedFunctionLoc, swift::SourceLoc cRParenLoc);
 
 SWIFT_NAME("BridgedEffectsAttr.createParsed(_:atLoc:range:effectKind:)")
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
@@ -1228,22 +1229,24 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedSpecializationKind : uint8_t {
 };
 
 SWIFT_NAME("BridgedSpecializeAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME("BridgedSpecializedAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME(
     "BridgedSPIAccessControlAttr.createParsed(_:atLoc:range:spiGroupName:)")

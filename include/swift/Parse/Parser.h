@@ -1067,7 +1067,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityRange *SILAvailability,
+      DeclNameLoc &targetFunctionLoc, AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
