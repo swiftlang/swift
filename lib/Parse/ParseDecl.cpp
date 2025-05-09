@@ -6681,7 +6681,13 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
           .fixItRemove(Tok.getLoc());
         return nullptr;
     }
-    HasNext = consumeIf(tok::period);
+    if (Tok.is(tok::colon_colon)
+          && (Kind == ImportKind::Module || importPath.size() > 1)) {
+      diagnose(Tok, diag::module_selector_submodule_not_allowed);
+      diagnose(Tok, diag::replace_module_selector_with_member_lookup)
+        .fixItReplace(Tok.getLoc(), ".");
+    }
+    HasNext = consumeIf(tok::period) || consumeIf(tok::colon_colon);
   } while (HasNext);
 
   if (Tok.is(tok::code_complete)) {
