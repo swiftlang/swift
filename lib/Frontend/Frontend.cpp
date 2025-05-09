@@ -456,7 +456,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getCASOptions();
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
     return true;
   }
@@ -466,6 +466,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         "creating base cache key",
                          toString(BaseKey.takeError()));
     return true;
   }
@@ -636,7 +637,7 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
                                     CASOpts.ClangIncludeTrees,
                                     CASOpts.ClangIncludeTreeFileList);
       if (!FS) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
                              toString(FS.takeError()));
         return true;
       }

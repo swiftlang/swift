@@ -680,8 +680,11 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   for (auto &file : TrackedFiles) {
     auto includeTreeFile = clang::cas::IncludeTree::File::create(
         FS->getCAS(), file.first, file.second.FileRef);
-    if (!includeTreeFile)
-      return includeTreeFile.takeError();
+    if (!includeTreeFile) {
+      return llvm::createStringError("CASFS createTree failed for " +
+                                     file.first + ": " +
+                                     toString(includeTreeFile.takeError()));
+    }
     Files.push_back(
         {includeTreeFile->getRef(),
          (clang::cas::IncludeTree::FileList::FileSizeTy)file.second.Size});
@@ -690,7 +693,8 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   auto includeTreeList =
       clang::cas::IncludeTree::FileList::create(FS->getCAS(), Files, {});
   if (!includeTreeList)
-    return includeTreeList.takeError();
+    return llvm::createStringError("casfs include-tree filelist error: " +
+                                   toString(includeTreeList.takeError()));
 
   return *includeTreeList;
 }
@@ -706,9 +710,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       return false;
 
     // CASOption mismatch, return error.
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::error_cas,
-        "conflicting CAS options used in scanning service");
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_conflict_options);
     return true;
   }
 
@@ -720,7 +722,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
   if (!CachingFS) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_fs_creation,
                                  toString(CachingFS.takeError()));
     return true;
   }
