@@ -31,7 +31,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "WASM")
 elseif(LINUX OR ANDROID OR BSD)
   set(SwiftOverlay_ENABLE_REFLECTION_default OFF)
 elseif(WIN32)
-  set(SwiftOverlay_ENABLE_REFLECTION_default OFF)
+  set(SwiftOverlay_ENABLE_REFLECTION_default ON)
 endif()
 
 include("${SwiftOverlay_VENDOR_MODULE_DIR}/DefaultSettings.cmake" OPTIONAL)
