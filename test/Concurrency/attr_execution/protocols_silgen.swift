@@ -48,8 +48,8 @@ struct AllCaller : P {
   // CHECK: } // end sil function '$s21attr_execution_silgen9AllCallerVAA1PA2aDP10callerTestyyYaFTW'
   nonisolated(nonsending) func callerTest() async {}
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP14concurrentTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed AllCaller) -> () {
-  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] : $*AllCaller):
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP14concurrentTestyyYaFTW : $@convention(witness_method: P) @async (@in_guaranteed AllCaller) -> () {
+  // CHECK: bb0([[SELF:%.*]] : $*AllCaller):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV14concurrentTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, AllCaller) -> ()
   // CHECK:   [[NIL:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
@@ -57,8 +57,8 @@ struct AllCaller : P {
   // CHECK: } // end sil function '$s21attr_execution_silgen9AllCallerVAA1PA2aDP14concurrentTestyyYaFTW'
   nonisolated(nonsending) func concurrentTest() async {}
 
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP13mainActorTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed AllCaller) -> () {
-  // CHECK: bb0({{%.*}} : @guaranteed $Optional<any Actor>, [[SELF:%.*]] : $*AllCaller):
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen9AllCallerVAA1PA2aDP13mainActorTestyyYaFTW : $@convention(witness_method: P) @async (@in_guaranteed AllCaller) -> () {
+  // CHECK: bb0([[SELF:%.*]] : $*AllCaller):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV13mainActorTestyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, AllCaller) -> ()
   // CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
@@ -70,11 +70,8 @@ struct AllCaller : P {
 }
 
 struct AllConcurrent : P {
-  // TODO: This seems wrong. We need to have our thunk have the implicit
-  // isolated parameter from an ABI perspective.
-  //
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen13AllConcurrentVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@in_guaranteed AllConcurrent) -> () {
-  // CHECK: bb0([[SELF:%.*]] :
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen13AllConcurrentVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed AllConcurrent) -> () {
+  // CHECK: bb0([[ACTOR]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] :
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen13AllConcurrentV10callerTestyyYaF : $@convention(method) @async (AllConcurrent) -> ()
   // CHECK:   apply [[FUNC]]([[LOAD]])
@@ -99,11 +96,8 @@ struct AllConcurrent : P {
 }
 
 struct AllMainActor : P {
-  // TODO: This is incorrect from an ABI perspective. The witness needs to have
-  // the implicit isolated parameter.
-  //
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen12AllMainActorVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@in_guaranteed AllMainActor) -> () {
-  // CHECK: bb0([[SELF:%.*]] :
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen12AllMainActorVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed AllMainActor) -> () {
+  // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] :
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen12AllMainActorV10callerTestyyYaF : $@convention(method) @async (AllMainActor) -> ()
   // CHECK:   apply [[FUNC]]([[LOAD]])
