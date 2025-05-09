@@ -110,7 +110,7 @@ class TPSReport<CoverSheet> : Strategy {
   func disrupt() -> GrowthHack
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classArchetypeWitnessMethod(ptr noalias nocapture swiftself dereferenceable({{4|8}}) %0, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classArchetypeWitnessMethod(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{4|8}}) %0, ptr %Self, ptr %SelfWitnessTable)
 
 sil @classArchetypeWitnessMethod : $@convention(witness_method: Strategy) <T><CoverSheet where T : TPSReport<CoverSheet>> (@in_guaranteed T) -> () {
 entry(%self : $*T):
@@ -118,7 +118,7 @@ entry(%self : $*T):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testClassArchetypeWitnessMethod(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{4|8}}) %1, ptr %T, ptr %CoverSheet)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testClassArchetypeWitnessMethod(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{4|8}}) %1, ptr %T, ptr %CoverSheet)
 // CHECK: entry:
 // CHECK:  [[WITNESS_FN:%.*]] = load ptr, ptr getelementptr inbounds (ptr, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP", i32 3)
 // CHECK: call swiftcc void [[WITNESS_FN]](ptr noalias sret({{.*}}) %0, ptr noalias swiftself %1, ptr %T, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP")
