@@ -1723,12 +1723,52 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
+/// Determine whether a synth
+static bool synthesizedRequirementIsNonIsolated(
+    const NormalProtocolConformance *conformance) {
+  // @preconcurrency suppresses this.
+  if (conformance->isPreconcurrency())
+    return false;
+
+  // Explicit global actor isolation suppresses this.
+  if (conformance->hasExplicitGlobalActorIsolation())
+    return false;
+
+  // Explicit nonisolated forces this.
+  if (conformance->getOptions()
+          .contains(ProtocolConformanceFlags::Nonisolated))
+    return true;
+
+  // When we are inferring conformance isolation, only add nonisolated if
+  // either
+  //   (1) the protocol inherits from SendableMetatype, or
+  //   (2) the conforming type is nonisolated.
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances))
+    return true;
+
+  // Check inheritance from SendableMetatype, which implies that the conformance
+  // will be nonisolated.
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (sendableMetatypeProto &&
+      conformance->getProtocol()->inheritsFrom(sendableMetatypeProto))
+    return true;
+
+  auto nominalType = conformance->getType()->getAnyNominal();
+  if (!nominalType)
+    return true;
+
+  return !getActorIsolation(nominalType).isMainActor();
+}
+
 bool swift::addNonIsolatedToSynthesized(DerivedConformance &derived,
                                         ValueDecl *value) {
   if (auto *conformance = derived.Conformance) {
-    if (conformance && conformance->isPreconcurrency())
+    if (!synthesizedRequirementIsNonIsolated(conformance))
       return false;
   }
+
   return addNonIsolatedToSynthesized(derived.Nominal, value);
 }
 
