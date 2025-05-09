@@ -126,6 +126,9 @@ UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
+// TODO: Return true for inlinable function bodies with module selectors in them
+UNINTERESTING_FEATURE(ModuleSelector)
+
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
       [](SmallVectorImpl<InverseRequirement> &inverseReqs) {
