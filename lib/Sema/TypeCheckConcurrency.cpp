@@ -2290,12 +2290,6 @@ static bool safeToDropGlobalActor(
   if (otherIsolation.isErased())
     return true;
 
-  // We currently allow unconditional dropping of global actors from
-  // async function types, despite this confusing Sendable checking
-  // in light of SE-338.
-  if (funcTy->isAsync())
-    return true;
-
   // If the argument is passed over an isolation boundary, it's not
   // safe to erase actor isolation, because the callee can call the
   // function synchronously from outside the isolation domain.
@@ -2645,7 +2639,8 @@ namespace {
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
     void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
       auto diagnoseNonSendableParametersAndResult =
-          [&](FunctionType *fnType, bool downgradeToWarning = false) {
+          [&](FunctionType *fnType,
+              std::optional<unsigned> warnUntilSwiftMode = std::nullopt) {
             auto *dc = getDeclContext();
             llvm::SmallPtrSet<Type, 2> nonSendableTypes;
 
@@ -2675,8 +2670,8 @@ namespace {
                     diag::invalid_function_conversion_with_non_sendable,
                     fromType, toType);
 
-                if (downgradeToWarning)
-                  diag.warnUntilFutureSwiftVersion();
+                if (warnUntilSwiftMode)
+                  diag.warnUntilSwiftVersion(*warnUntilSwiftMode);
               }
 
               for (auto type : nonSendableTypes) {
@@ -2693,20 +2688,27 @@ namespace {
           auto toIsolation = toFnType->getIsolation();
 
           if (auto fromActor = fromFnType->getGlobalActor()) {
-            if (toFnType->hasGlobalActor() ||
-                (toFnType->isAsync() && !toIsolation.isNonIsolatedCaller()))
-              return;
+            if (!toFnType->hasGlobalActor()) {
+              auto dc = const_cast<DeclContext *>(getDeclContext());
+              // If it's unsafe to drop global actor attribute:
+              //  - for Sendable types we are going to perform Sendability
+              //    checking of parameters/result.
+              //  - for non-Sendable types we either leave it to region-based
+              //    isolation to determine whether it's okay or not or
+              //    diagnose if types are not-async.
+              if (safeToDropGlobalActor(dc, fromActor, toType,
+                                        getImmediateApply())) {
+                return;
+              }
 
-            auto dc = const_cast<DeclContext*>(getDeclContext());
-            if (!safeToDropGlobalActor(dc, fromActor, toType,
-                                       getImmediateApply())) {
-              // otherwise, it's not a safe cast.
-              ctx.Diags
-                  .diagnose(funcConv->getLoc(),
-                            diag::converting_func_loses_global_actor, fromType,
-                            toType, fromActor)
-                  .warnUntilSwiftVersion(6);
-              return;
+              if (!toFnType->isAsync()) {
+                ctx.Diags
+                    .diagnose(funcConv->getLoc(),
+                              diag::converting_func_loses_global_actor,
+                              fromType, toType, fromActor)
+                    .warnUntilSwiftVersion(6);
+                return;
+              }
             }
           }
 
@@ -2772,11 +2774,12 @@ namespace {
             case FunctionTypeIsolation::Kind::NonIsolatedCaller:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(
-                  toFnType, /*downgradeToWarning=*/true);
+                  toFnType, version::Version::getFutureMajorLanguageVersion());
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor: {
-              // Handled above by `safeToDropGlobalActor` check.
+              diagnoseNonSendableParametersAndResult(toFnType,
+                                                     /*warnUntilSwiftMode*/ 6);
               break;
             }
 
@@ -2784,7 +2787,8 @@ namespace {
               // nonisolated synchronous <-> @concurrent
               if (fromFnType->isAsync() != toFnType->isAsync()) {
                 diagnoseNonSendableParametersAndResult(
-                    toFnType, /*downgradeToWarning=*/true);
+                    toFnType,
+                    version::Version::getFutureMajorLanguageVersion());
               }
               break;
             }
@@ -2799,7 +2803,7 @@ namespace {
             case FunctionTypeIsolation::Kind::Parameter:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(
-                  toFnType, /*downgradeToWarning=*/true);
+                  toFnType, version::Version::getFutureMajorLanguageVersion());
               break;
 
             case FunctionTypeIsolation::Kind::NonIsolated: {
@@ -2809,7 +2813,8 @@ namespace {
               // actor isolation.
               if (fromFnType->isAsync()) {
                 diagnoseNonSendableParametersAndResult(
-                  toFnType, /*downgradeToWarning=*/true);
+                    toFnType,
+                    version::Version::getFutureMajorLanguageVersion());
                 break;
               }
               // Runs on the actor.
@@ -2821,7 +2826,9 @@ namespace {
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor:
-              llvm_unreachable("invalid conversion");
+              diagnoseNonSendableParametersAndResult(
+                  toFnType, version::Version::getFutureMajorLanguageVersion());
+              break;
             }
             break;
           }
