@@ -39,6 +39,7 @@ swift_compiler_sources(Optimizer
   SimplifySwitchEnum.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
+  SimplifyUncheckedAddrCast.swift
   SimplifyUncheckedEnumData.swift
   SimplifyValueToBridgeObject.swift
   SimplifyWitnessMethod.swift)
