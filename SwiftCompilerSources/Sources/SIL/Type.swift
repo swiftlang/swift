@@ -82,6 +82,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public var builtinVectorElementType: Type { canonicalType.builtinVectorElementType.silType! }
 
+  public func builtinFixedArrayElementType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
+    canonicalType.builtinFixedArrayElementType.loweredType(in: function, maximallyAbstracted: maximallyAbstracted)
+  }
+
   public var superClassType: Type? { canonicalType.superClassType?.silType }
 
   public func isExactSuperclass(of type: Type) -> Bool {
