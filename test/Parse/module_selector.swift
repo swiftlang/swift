@@ -5,6 +5,25 @@
 
 // REQUIRES: swift_feature_ModuleSelector
 
+// ModuleSelectorImports
+import struct ModuleSelectorTestingKit::A
+
+import struct _::A
+// expected-error@-1 {{'_' cannot be used as an identifier here}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}}
+
+import struct ModuleSelectorTestingKit::Submodule::A
+// expected-legacy-error@-1 {{module selector cannot specify a submodule}} {{41-52=}}
+
+import struct ModuleSelectorTestingKit.Submodule::A
+// expected-error@-1 {{module selector cannot specify a submodule}}
+// expected-note@-2 {{replace '::' with '.'}} {{49-51=.}}
+
+import ctypes::bits
+// expected-error@-1 {{module selector cannot specify a submodule}}
+// expected-note@-2 {{replace '::' with '.'}} {{14-16=.}}
+
+
 // ModuleSelectorCorrectCode
 extension ModuleSelectorTestingKit::A {}
 

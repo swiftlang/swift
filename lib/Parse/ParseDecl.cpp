@@ -6663,27 +6663,55 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   }
 
   ImportPath::Builder importPath;
-  bool HasNext;
-  do {
-    if (Tok.is(tok::code_complete)) {
-      consumeToken();
-      if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completeImportDecl(importPath);
-      }
-      return makeParserCodeCompletionStatus();
+  if (Kind != ImportKind::Module && isAtModuleSelector()) {
+    // First, parse as much as possible.
+    importPath.push_back(*parseModuleSelector());
+
+    Identifier declName;
+    SourceLoc declNameLoc;
+    if (Tok.isAtStartOfLine()) {
+      diagnose(getEndOfPreviousLoc(),
+               diag::expected_identifier_after_module_selector);
+    } else {
+      parseAnyIdentifier(declName, declNameLoc,
+                         diag::expected_identifier_after_module_selector,
+                         /*diagnoseDollarPrefix=*/true);
     }
-    importPath.push_back(Identifier(), Tok.getLoc());
-    if (parseAnyIdentifier(importPath.back().Item,
-                           /*diagnoseDollarPrefix=*/false,
-                           diag::expected_identifier_in_decl, "import"))
-      return nullptr;
-    if (Tok.is(tok::oper_postfix)) {
+    importPath.push_back(declName, declNameLoc);
+
+    // If either identifier failed to parse, bail.
+    for (auto &elem : importPath) {
+      if (elem.Item.empty())
+        return nullptr;
+    }
+  } else {
+    bool HasNext;
+    do {
+      if (Tok.is(tok::code_complete)) {
+        consumeToken();
+        if (CodeCompletionCallbacks) {
+          CodeCompletionCallbacks->completeImportDecl(importPath);
+        }
+        return makeParserCodeCompletionStatus();
+      }
+      importPath.push_back(Identifier(), Tok.getLoc());
+      if (parseAnyIdentifier(importPath.back().Item,
+                             /*diagnoseDollarPrefix=*/false,
+                             diag::expected_identifier_in_decl, "import"))
+        return nullptr;
+      if (Tok.is(tok::oper_postfix)) {
         diagnose(Tok, diag::unexpected_operator_in_import_path)
           .fixItRemove(Tok.getLoc());
         return nullptr;
-    }
-    HasNext = consumeIf(tok::period);
-  } while (HasNext);
+      }
+      if (Tok.is(tok::colon_colon)) {
+        diagnose(Tok, diag::module_selector_submodule_not_allowed);
+        diagnose(Tok, diag::replace_module_selector_with_member_lookup)
+          .fixItReplace(Tok.getLoc(), ".");
+      }
+      HasNext = consumeIf(tok::period) || consumeIf(tok::colon_colon);
+    } while (HasNext);
+  }
 
   if (Tok.is(tok::code_complete)) {
     // We omit the code completion token if it immediately follows the module
