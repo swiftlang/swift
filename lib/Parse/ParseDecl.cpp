@@ -6582,7 +6582,9 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
           .fixItRemove(Tok.getLoc());
         return nullptr;
     }
-    HasNext = consumeIf(tok::period);
+    HasNext = consumeIf(tok::period) ||
+        (Context.LangOpts.hasFeature(Feature::ModuleSelector) &&
+         consumeIf(tok::colon_colon));
   } while (HasNext);
 
   if (Tok.is(tok::code_complete)) {

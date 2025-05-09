@@ -1,11 +1,14 @@
-// RUN: %target-typecheck-verify-swift -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector
 
 // Make sure the lack of the experimental flag disables the feature:
-// RUN: not %target-typecheck-verify-swift -module-name main -I %S/Inputs 2>/dev/null
+// RUN: not %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs 2>/dev/null
 
 // REQUIRES: swift_feature_ModuleSelector
 
 import ModuleSelectorTestingKit
+
+import ctypes::bits   // FIXME: ban using :: with submodules?
+import struct ModuleSelectorTestingKit::A
 
 let magnitude: Never = fatalError()
 
