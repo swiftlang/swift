@@ -2118,10 +2118,11 @@ PrivateImportAttr *PrivateImportAttr::create(ASTContext &Ctxt, SourceLoc AtLoc,
 DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
                                                SourceRange baseRange,
                                                DeclNameRef name,
+                                               DeclNameLoc nameLoc,
                                                SourceRange parenRange)
     : DeclAttribute(DeclAttrKind::DynamicReplacement, atLoc, baseRange,
                     /*Implicit=*/false),
-      ReplacedFunctionName(name) {
+      ReplacedFunctionName(name),  ReplacedFunctionNameLoc(nameLoc) {
   Bits.DynamicReplacementAttr.HasTrailingLocationInfo = true;
   getTrailingLocations()[0] = parenRange.Start;
   getTrailingLocations()[1] = parenRange.End;
@@ -2130,11 +2131,12 @@ DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
 DynamicReplacementAttr *
 DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
                                SourceLoc DynReplLoc, SourceLoc LParenLoc,
-                               DeclNameRef ReplacedFunction, SourceLoc RParenLoc) {
+                               DeclNameRef ReplacedFunction,
+                               DeclNameLoc nameLoc, SourceLoc RParenLoc) {
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(2),
                            alignof(DynamicReplacementAttr));
   return new (mem) DynamicReplacementAttr(
-      AtLoc, SourceRange(DynReplLoc, RParenLoc), ReplacedFunction,
+      AtLoc, SourceRange(DynReplLoc, RParenLoc), ReplacedFunction, nameLoc,
       SourceRange(LParenLoc, RParenLoc));
 }
 
@@ -2490,12 +2492,15 @@ AbstractSpecializeAttr::AbstractSpecializeAttr(DeclAttrKind DK,
                                SpecializationKind kind,
                                GenericSignature specializedSignature,
                                DeclNameRef targetFunctionName,
+                               DeclNameLoc targetFunctionNameLoc,
                                ArrayRef<Identifier> spiGroups,
                                ArrayRef<AvailableAttr *> availableAttrs,
                                size_t typeErasedParamsCount)
     : DeclAttribute(DK, atLoc, range, /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause), specializedSignature(specializedSignature),
-      targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()),
+      targetFunctionName(targetFunctionName),
+      targetFunctionNameLoc(targetFunctionNameLoc),
+      numSPIGroups(spiGroups.size()),
       numAvailableAttrs(availableAttrs.size()),
       numTypeErasedParams(typeErasedParamsCount),
       typeErasedParamsInitialized(false) {
@@ -2517,6 +2522,7 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        TrailingWhereClause *clause,
                                        bool exported, SpecializationKind kind,
                                        DeclNameRef targetFunctionName,
+                                       DeclNameLoc targetFunctionNameLoc,
                                        ArrayRef<Identifier> spiGroups,
                                        ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature) {
@@ -2540,7 +2546,8 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
   return new (mem)
       SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
-                     targetFunctionName, spiGroups, availableAttrs, typeErasedParamsCount);
+                     targetFunctionName, targetFunctionNameLoc, spiGroups,
+                     availableAttrs, typeErasedParamsCount);
 }
 
 SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
@@ -2553,8 +2560,8 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
       spiGroups.size(), availableAttrs.size(), 0);
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem) SpecializeAttr(
-      SourceLoc(), SourceRange(), nullptr, exported, kind,
-      specializedSignature, targetFunctionName, spiGroups, availableAttrs, 0);
+      SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
+      targetFunctionName, DeclNameLoc(), spiGroups, availableAttrs, 0);
 }
 
 SpecializeAttr *SpecializeAttr::create(
@@ -2568,7 +2575,8 @@ SpecializeAttr *SpecializeAttr::create(
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
   auto *attr = new (mem) SpecializeAttr(
       SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
-      targetFunctionName, spiGroups, availableAttrs, typeErasedParams.size());
+      targetFunctionName, DeclNameLoc(), spiGroups, availableAttrs,
+      typeErasedParams.size());
   attr->setTypeErasedParams(typeErasedParams);
   attr->setResolver(resolver, data);
   return attr;
@@ -2581,6 +2589,7 @@ SpecializedAttr *SpecializedAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        TrailingWhereClause *clause,
                                        bool exported, SpecializationKind kind,
                                        DeclNameRef targetFunctionName,
+                                       DeclNameLoc targetFunctionNameLoc,
                                        ArrayRef<Identifier> spiGroups,
                                        ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature) {
@@ -2604,7 +2613,8 @@ SpecializedAttr *SpecializedAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
   return new (mem)
       SpecializedAttr(atLoc, range, clause, exported, kind, specializedSignature,
-                     targetFunctionName, spiGroups, availableAttrs, typeErasedParamsCount);
+                     targetFunctionName, targetFunctionNameLoc, spiGroups,
+                     availableAttrs, typeErasedParamsCount);
 }
 
 SpecializedAttr *SpecializedAttr::create(ASTContext &ctx, bool exported,
@@ -2618,7 +2628,8 @@ SpecializedAttr *SpecializedAttr::create(ASTContext &ctx, bool exported,
   void *mem = ctx.Allocate(size, alignof(SpecializedAttr));
   return new (mem) SpecializedAttr(
       SourceLoc(), SourceRange(), nullptr, exported, kind,
-      specializedSignature, targetFunctionName, spiGroups, availableAttrs, 0);
+      specializedSignature, targetFunctionName, DeclNameLoc(), spiGroups,
+      availableAttrs, 0);
 }
 
 SpecializedAttr *SpecializedAttr::create(
@@ -2632,7 +2643,8 @@ SpecializedAttr *SpecializedAttr::create(
   void *mem = ctx.Allocate(size, alignof(SpecializedAttr));
   auto *attr = new (mem) SpecializedAttr(
       SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
-      targetFunctionName, spiGroups, availableAttrs, typeErasedParams.size());
+      targetFunctionName, DeclNameLoc(), spiGroups, availableAttrs,
+      typeErasedParams.size());
   attr->setTypeErasedParams(typeErasedParams);
   attr->setResolver(resolver, data);
   return attr;
