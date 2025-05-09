@@ -8,13 +8,13 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ ptr2: UnsafePointer<CInt>, _ len: CInt
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ len: CInt) {
-// CHECK-NEXT:     let _ptrCount: some BinaryInteger = len
-// CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
+// CHECK-NEXT:     let _ptrCount: some BinaryInteger = `len`
+// CHECK-NEXT:     if `ptr`.count < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     let _ptr2Count: some BinaryInteger = len
-// CHECK-NEXT:     if ptr2.count < _ptr2Count || _ptr2Count < 0 {
+// CHECK-NEXT:     let _ptr2Count: some BinaryInteger = `len`
+// CHECK-NEXT:     if `ptr2`.count < _ptr2Count || _ptr2Count < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, len)
+// CHECK-NEXT:     return unsafe myFunc(`ptr`.baseAddress!, `ptr2`.baseAddress!, `len`)
 // CHECK-NEXT: }

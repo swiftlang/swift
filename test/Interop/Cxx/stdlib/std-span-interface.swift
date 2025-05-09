@@ -69,6 +69,8 @@ import CxxStdlib
 // CHECK-NEXT: @_alwaysEmitIntoClient public func MixedFuncWithMutableSafeWrapper7(_ p: UnsafeMutableBufferPointer<Int32>) -> SpanOfInt
 
 // CHECK:      @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func `func`(_ copy: Span<CInt>)
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper(_ s: Span<CInt>)
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy s)
@@ -90,3 +92,6 @@ import CxxStdlib
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper5(_ s: ConstSpanOfInt, _ p: Span<Int32>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper6(_ s: ConstSpanOfInt, _ p: UnsafeMutableBufferPointer<Int32>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper7(_ p: UnsafeBufferPointer<Int32>) -> ConstSpanOfInt
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(copy: copy copy)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func mutableKeyword(_ copy: inout MutableSpan<CInt>)

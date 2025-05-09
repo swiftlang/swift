@@ -24,3 +24,13 @@ int * __counted_by(len) __noescape returnPointer(int len);
 int * __counted_by(len1) returnLifetimeBound(int len1, int len2, int * __counted_by(len2) p __lifetimebound);
 
 void anonymous(int len, int * __counted_by(len) _Nullable __noescape);
+
+void keyword(int len, int * __counted_by(len) _Nullable func __noescape);
+
+void pointerName(int len, int * __counted_by(len) _Nullable pointerName __noescape);
+
+void lenName(int lenName, int size, int * __counted_by(lenName * size) _Nullable p __noescape);
+
+void func(int len, int * __counted_by(len) _Nullable func __noescape);
+
+void funcRename(int len, int * __counted_by(len) _Nullable func __noescape) __attribute__((swift_name("funcRename(len:func:)")));
