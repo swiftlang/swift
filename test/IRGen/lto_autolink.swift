@@ -43,8 +43,7 @@ import AutolinkElfCPragma
 import AutolinkModuleMapLink
 #endif
 
-// UNSUPPORTED: OS=macosx && CPU=arm64
 // UNSUPPORTED: OS=ios && CPU=arm64e
 // UNSUPPORTED: OS=watchos && (CPU=arm64_32 || CPU=armv7k)
-// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// XFAIL: OS=linux-android && CPU=aarch64
 // UNSUPPORTED: CPU=wasm32
