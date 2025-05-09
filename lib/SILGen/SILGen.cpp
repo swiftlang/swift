@@ -689,9 +689,11 @@ static bool shouldEmitFunctionBody(const AbstractFunctionDecl *AFD) {
     return false;
 
   auto &ctx = AFD->getASTContext();
-  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck || AFD->isInMacroExpansionFromClangHeader()) {
     // Force the function body to be type-checked and then skip it if there
-    // have been any errors.
+    // have been any errors. Normally macro expansions are type checked in the module they
+    // expand in - this does not apply to swift macros applied to nodes imported from clang,
+    // so force type checking of them here if they haven't already, to prevent crashing.
     (void)AFD->getTypecheckedBody();
 
     // FIXME: Only skip bodies that contain type checking errors.
