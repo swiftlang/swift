@@ -22,6 +22,8 @@ import Glibc
 import Musl
 #elseif canImport(CRT)
 import CRT
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 import Swift

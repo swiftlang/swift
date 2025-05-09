@@ -23,6 +23,8 @@ import Bionic
 import Musl
 #elseif canImport(ucrt)
 import ucrt
+#elseif canImport(FreeBSD)
+import FreeBSD
 #else
 #error("'malloc' not found")
 #endif

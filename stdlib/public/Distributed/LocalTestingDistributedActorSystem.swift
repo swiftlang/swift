@@ -22,6 +22,8 @@ import Musl
 import Android
 #elseif os(Windows)
 import WinSDK
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 /// A `DistributedActorSystem` designed for local only testing.

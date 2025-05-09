@@ -35,6 +35,8 @@ import Glibc
 import Android
 #elseif canImport(CRT)
 import CRT
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 @inlinable

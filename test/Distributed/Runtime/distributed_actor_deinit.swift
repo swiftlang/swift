@@ -29,6 +29,11 @@ import Glibc
 typealias ThreadID = pthread_t
 func getCurrentThreadID() -> ThreadID { pthread_self() }
 func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { pthread_equal(a, b) != 0 }
+#elseif canImport(FreeBSD)
+import FreeBSD
+typealias ThreadID = pthread_t
+func getCurrentThreadID() -> ThreadID { pthread_self() }
+func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { pthread_equal(a, b) != 0 }
 #elseif os(Windows)
 import WinSDK
 typealias ThreadID = UInt32
