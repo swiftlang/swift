@@ -14,7 +14,7 @@ func foo() -> LargeClass {
 
 foo()
 
-// CHECK: call swiftcc void @"$s4main3fooSo10LargeClassVyF"(ptr noalias captures(none) sret(%TSo10LargeClassV) %{{.*}})
+// CHECK: call swiftcc void @"$s4main3fooSo10LargeClassVyF"(ptr noalias nocapture sret(%TSo10LargeClassV) %{{.*}})
 
 // The C++ function:
 // CHECK: define{{( dso_local)?}} void @{{_Z21funcReturnsLargeClassv|"\?funcReturnsLargeClass@@YA\?AULargeClass@@XZ"}}({{%struct.LargeClass\*|ptr}}{{.*}} sret(%struct.LargeClass){{( align .*)?}} %{{.*}})
