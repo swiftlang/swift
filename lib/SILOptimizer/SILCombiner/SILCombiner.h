@@ -220,8 +220,10 @@ public:
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true) {
-    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
+    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist,
+                                   salvageDebugInfo);
     MadeChange = true;
     // Dummy return, so the caller doesn't need to explicitly return nullptr.
     return nullptr;
@@ -232,9 +234,10 @@ public:
   void eraseInstIncludingUsers(SILInstruction *inst);
 
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
-                                        bool AddOperandsToWorklist = true) {
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
     SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist, salvageDebugInfo);
   }
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
