@@ -451,6 +451,7 @@ class LLVM(cmake_product.CMakeProduct):
 
         self.cmake_options.extend(host_config.cmake_options)
         self.cmake_options.extend(llvm_cmake_options)
+        self.cmake_options.extend_raw(self.args.extra_llvm_cmake_options)
 
         self._handle_cxx_headers(host_target, platform)
 
