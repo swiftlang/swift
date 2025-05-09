@@ -39,6 +39,7 @@ install(TARGETS swiftSwiftOnoneSupport
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftSwiftOnoneSupport)
 install_swift_interface(swiftSwiftOnoneSupport)
+install_swift_doc(swiftSwiftOnoneSupport)
 
 # Configure plist creation for Darwin platforms.
 generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftSwiftOnoneSupport)

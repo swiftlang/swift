@@ -23,5 +23,6 @@ install(TARGETS swiftCRT
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftCRT)
 install_swift_interface(swiftCRT)
+install_swift_doc(swiftCRT)
 
 embed_manifest(swiftCRT)

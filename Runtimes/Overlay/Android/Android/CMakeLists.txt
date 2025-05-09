@@ -21,5 +21,6 @@ install(TARGETS swiftAndroid
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftAndroid)
 install_swift_interface(swiftAndroid)
+install_swift_doc(swiftAndroid)
 
 embed_manifest(swiftAndroid)

@@ -15,5 +15,6 @@ install(TARGETS swiftWinSDK
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftWinSDK)
 install_swift_interface(swiftWinSDK)
+install_swift_doc(swiftWinSDK)
 
 embed_manifest(swiftWinSDK)
