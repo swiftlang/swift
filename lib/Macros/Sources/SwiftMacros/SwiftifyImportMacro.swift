@@ -45,11 +45,19 @@ protocol ParamInfo: CustomStringConvertible {
   ) -> BoundsCheckedThunkBuilder
 }
 
+func getParamName(_ param: FunctionParameterSyntax, _ paramIndex: Int) -> TokenSyntax {
+  let name = param.secondName ?? param.firstName
+  if name.trimmed.text == "_" {
+    return "_param\(raw: paramIndex)"
+  }
+  return name
+}
+
 func tryGetParamName(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> TokenSyntax? {
   switch expr {
   case .param(let i):
     let funcParam = getParam(funcDecl, i - 1)
-    return funcParam.secondName ?? funcParam.firstName
+    return getParamName(funcParam, i - 1)
   case .`self`:
     return .keyword(.self)
   default: return nil
@@ -419,7 +427,12 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
       // filter out deleted parameters, i.e. ones where argTypes[i] _contains_ nil
       return type == nil || type! != nil
     }.map { (i: Int, e: FunctionParameterSyntax) in
-      e.with(\.type, (argTypes[i] ?? e.type)!)
+      let param = e.with(\.type, (argTypes[i] ?? e.type)!)
+      let name = param.secondName ?? param.firstName
+      if name.trimmed.text == "_" {
+        return param.with(\.secondName, getParamName(param, i))
+      }
+      return param
     }
     if let last = newParams.popLast() {
       newParams.append(last.with(\.trailingComma, nil))
@@ -437,7 +450,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     let functionRef = DeclReferenceExprSyntax(baseName: base.name)
     let args: [ExprSyntax] = base.signature.parameterClause.parameters.enumerated()
       .map { (i: Int, param: FunctionParameterSyntax) in
-        let name = param.secondName ?? param.firstName
+        let name = getParamName(param, i)
         let declref = DeclReferenceExprSyntax(baseName: name)
         return pointerArgs[i] ?? ExprSyntax(declref)
       }
@@ -647,7 +660,7 @@ extension ParamBoundsThunkBuilder {
   }
 
   var name: TokenSyntax {
-    return param.secondName ?? param.firstName
+    getParamName(param, index)
   }
 }
 
@@ -828,8 +841,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func castPointerToOpaquePointer(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
-    let i = try getParameterIndexForParamName(signature.parameterClause.parameters, name)
-    let type = peelOptionalType(getParam(signature, i).type)
+    let type = peelOptionalType(getParam(signature, index).type)
     if type.canRepresentBasicType(type: OpaquePointer.self) {
       return ExprSyntax("OpaquePointer(\(baseAddress))")
     }

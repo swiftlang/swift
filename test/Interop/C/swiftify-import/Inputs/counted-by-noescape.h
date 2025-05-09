@@ -22,3 +22,5 @@ void nullable(int len, int * __counted_by(len) _Nullable p __noescape);
 int * __counted_by(len) __noescape returnPointer(int len);
 
 int * __counted_by(len1) returnLifetimeBound(int len1, int len2, int * __counted_by(len2) p __lifetimebound);
+
+void anonymous(int len, int * __counted_by(len) _Nullable __noescape);
