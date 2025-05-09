@@ -3077,6 +3077,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool hasDynamicSelf() const;
   BRIDGED_INLINE bool isArchetype() const;
   BRIDGED_INLINE bool archetypeRequiresClass() const;
   BRIDGED_INLINE bool isExistentialArchetype() const;

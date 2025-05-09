@@ -415,7 +415,9 @@ ERROR(embedded_swift_allocating,none,
 ERROR(embedded_capture_of_generic_value_with_deinit,none,
       "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 ERROR(embedded_call_generic_function,none,
-      "cannot specialize generic function in this context", ())
+      "cannot specialize generic function or default protocol method in this context", ())
+ERROR(embedded_call_generic_function_with_dynamic_self,none,
+      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
 NOTE(embedded_specialization_called_from,none,
       "generic specialization called here", ())
 NOTE(embedded_existential_created,none,
