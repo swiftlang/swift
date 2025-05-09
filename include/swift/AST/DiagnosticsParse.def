@@ -101,6 +101,8 @@ NOTE(extra_whitespace_module_selector,none,
      "remove extraneous whitespace after '::'", ())
 ERROR(module_selector_submodule_not_allowed,none,
       "module selector cannot specify a submodule", ())
+NOTE(replace_module_selector_with_member_lookup,none,
+     "replace '::' with '.'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
