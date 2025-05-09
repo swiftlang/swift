@@ -1015,11 +1015,12 @@ BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
 
 SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
-    "replacedFunction:rParenLoc:)")
+    "replacedFunction:replacedFunctionLoc:rParenLoc:)")
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
-    BridgedDeclNameRef cReplacedFunction, BridgedSourceLoc cRParenLoc);
+    BridgedDeclNameRef cReplacedFunction,
+    BridgedDeclNameLoc cReplacedFunctionLoc, BridgedSourceLoc cRParenLoc);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEffectsKind {
   BridgedEffectsKindReadNone,
@@ -1388,13 +1389,14 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedSpecializationKind : uint8_t {
 };
 
 SWIFT_NAME("BridgedSpecializeAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME(
     "BridgedSPIAccessControlAttr.createParsed(_:atLoc:range:spiGroupName:)")
