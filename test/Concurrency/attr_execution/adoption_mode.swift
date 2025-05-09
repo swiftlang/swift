@@ -272,3 +272,22 @@ do {
   }
 }
 
+// The compiler used to mark autoclosure in `MyThing` reference as "non-implicit"
+// which caused a crash in migration mode because it assumes that autoclosures
+// are always implicit.
+do {
+  struct Other {
+    init(test: Int) {}
+  }
+
+  struct S<T> {
+    typealias MyThing = Other
+    var value: T
+  }
+
+  func test(c: S<Int?>) {
+    _ = c.value.map {
+      type(of: c).MyThing(test: $0) // Ok (used to crash due to autoclosure use)
+    }
+  }
+}
