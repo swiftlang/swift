@@ -12,6 +12,9 @@
 import CountedByNoEscapeClang
 
 // CHECK:      @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(_param1: copy _param1)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func anonymous(_ _param1: inout MutableSpan<Int32>?)
+// CHECK-NEXT:  @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>)
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -101,4 +104,10 @@ public func callSimple(_ p: inout MutableSpan<CInt>) {
 @inlinable
 public func callSwiftAttr(_ p: inout MutableSpan<CInt>) {
   swiftAttr(&p)
+}
+
+@lifetime(p: copy p)
+@inlinable
+public func callAnonymous(_ p: inout MutableSpan<CInt>?) {
+  anonymous(&p)
 }
