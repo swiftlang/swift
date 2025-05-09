@@ -135,6 +135,23 @@ class HasStoredPropertyClassInvalid {
   // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-2]]_2_33_{{.*}}AddStoredPropertyfMf_.swift:1:22: error: covariant 'Self' type cannot be referenced from a stored property initializer
 }
 
+// Redeclaration checking should behave as though expansions are part of the
+// source file.
+struct RedeclChecking {
+  #varValue
+
+  // expected-error@+1 {{invalid redeclaration of 'value'}}
+  var value: Int { 0 }
+}
+
+// CHECK-DIAGS: macro_expand.swift:[[@LINE-3]]:7: error: invalid redeclaration of 'value'
+// CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-8]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:1:5: note: 'value' previously declared here
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-9]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:
+// CHECK-DIAGS: var value: Int {
+// CHECK-DIAGS:     1
+// CHECK-DIAGS: }
+// CHECK-DIAGS: END CONTENTS OF FILE
+
 @attached(body)
 public macro ThrowCancellation() = #externalMacro(module: "MacroDefinition", type: "ThrowCancellationMacro")
 
@@ -701,6 +718,29 @@ func testPropertyWrapperMacro() {
   #hasPropertyWrapperParam(x: 0)
   #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
 }
+
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
 
 #if TEST_DIAGNOSTICS
 @freestanding(expression)

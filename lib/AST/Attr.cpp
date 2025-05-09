@@ -61,7 +61,7 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
                 DeclAttribute::APIBreakingToRemove | DeclAttribute::APIStableToRemove), \
                 #Name " needs to specify either APIBreakingToRemove or APIStableToRemove"); \
   static_assert(DeclAttribute::hasOneBehaviorFor##Id(DeclAttribute::InABIAttrMask), \
-                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, InferredInABIAttr, or UnreachableInABIAttr");
+                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, or UnreachableInABIAttr");
 #include "swift/AST/DeclAttr.def"
 
 #define TYPE_ATTR(_, Id)                                                       \

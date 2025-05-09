@@ -380,21 +380,14 @@ public:
     /// valid if they match. 
     EquivalentInABIAttr = 1ull << 18,
 
-    /// Attribute can be used in an \c \@abi attribute, but must match
-    /// equivalent on API decl; if omitted, API decl's attribute will be 
-    /// cloned. Use where you would want to use \c EquivalentInABIAttr but 
-    /// repeating the attribute is judged too burdensome.
-    InferredInABIAttr = 1ull << 19,
-
     /// Use for attributes which are \em only valid on declarations that cannot
     /// have an \c @abi attribute, such as \c ImportDecl .
-    UnreachableInABIAttr = 1ull << 20,
+    UnreachableInABIAttr = 1ull << 19,
   };
 
   enum : uint64_t {
     InABIAttrMask = ForbiddenInABIAttr | UnconstrainedInABIAttr
-                  | EquivalentInABIAttr | InferredInABIAttr
-                  | UnreachableInABIAttr
+                  | EquivalentInABIAttr | UnreachableInABIAttr
   };
 
   LLVM_READNONE
