@@ -58,7 +58,7 @@ public:
   std::string ImplicitObjCPCHPath;
 
   /// The map of aliases and real names of imported or referenced modules.
-  llvm::StringMap<StringRef> ModuleAliasMap;
+  llvm::StringMap<std::string> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;

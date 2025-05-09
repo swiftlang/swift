@@ -620,7 +620,7 @@ public:
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
   /// are the real (physical) module names on disk.
-  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+  void setModuleAliases(const llvm::StringMap<std::string> &aliasMap);
 
   /// Adds a given alias to the map of Identifiers between module aliases and
   /// their actual names.
