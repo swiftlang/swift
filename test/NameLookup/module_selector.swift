@@ -40,6 +40,7 @@ extension A: @retroactive Swift::Equatable {
     let fn: (Swift::Int, Swift::Int) -> Swift::Int = (Swift::+)
 
     let magnitude: Int.Swift::Magnitude = main::magnitude
+    // expected-error@-1 {{cannot convert value of type 'Never' to specified type 'Int.Magnitude' (aka 'UInt')}}
 
     _ = (fn, magnitude)
 
@@ -78,18 +79,21 @@ extension B: @retroactive main::Equatable {
   // @_derivative(of:)
 
   @_dynamicReplacement(for: main::negate())
+  // FIXME improve: expected-error@-1 {{replaced function 'main::negate()' could not be found}}
 
   mutating func myNegate() {
     let fn: (main::Int, main::Int) -> main::Int =
       (main::+)
 
     let magnitude: Int.main::Magnitude = main::magnitude
+    // FIXME improve: expected-error@-1 {{'main::Magnitude' is not a member type of struct 'Swift.Int'}}
 
     _ = (fn, magnitude)
 
     if main::Bool.main::random() {
 
       main::negate()
+      // FIXME improve: expected-error@-1 {{cannot find 'main::negate' in scope}}
     }
     else {
       self = main::B(value: .main::min)
@@ -130,6 +134,7 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
       (ModuleSelectorTestingKit::+)
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
+    // FIXME improve: expected-error@-1 {{'ModuleSelectorTestingKit::Magnitude' is not a member type of struct 'Swift.Int'}}
 
     _ = (fn, magnitude)
 
@@ -169,6 +174,7 @@ extension D: @retroactive Swift::Equatable {
   // @_derivative(of:)
 
   @_dynamicReplacement(for: Swift::negate())
+  // FIXME improve: expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
 
   mutating func myNegate() {
 
@@ -176,12 +182,14 @@ extension D: @retroactive Swift::Equatable {
       (Swift::+)
 
     let magnitude: Int.Swift::Magnitude = Swift::magnitude
+    // expected-error@-1 {{cannot convert value of type 'Never' to specified type 'Int.Magnitude' (aka 'UInt')}}
 
     _ = (fn, magnitude)
 
     if Swift::Bool.Swift::random() {
 
       Swift::negate()
+      // FIXME improve: expected-error@-1 {{cannot find 'Swift::negate' in scope}}
     }
     else {
       self = Swift::D(value: .Swift::min)
