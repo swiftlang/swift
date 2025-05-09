@@ -33,7 +33,7 @@ In order for the Swift project to be able to advance quickly, it is important th
 
 ### @swift-ci
 
-Users with [commit access](/CONTRIBUTING.md#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
+[Organization members](https://www.swift.org/contributing/#member) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
 
 1. Smoke Testing
 2. Validation Testing
