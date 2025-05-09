@@ -129,6 +129,9 @@ def _apply_default_arguments(args):
     if args.lldb_assertions is None:
         args.lldb_assertions = args.assertions
 
+    if args.swift_stdlib_strict_availability is None:
+        args.swift_stdlib_strict_availability = False
+
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
         raise ValueError('error: --ios-all is unavailable in open-source '
@@ -1028,6 +1031,14 @@ def create_argument_parser():
     option('--no-llbuild-assertions', store('llbuild_assertions'),
            const=False,
            help='disable assertions in llbuild')
+
+    option('--swift-stdlib-strict-availability', store,
+           const=True,
+           help='enable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+    option('--no-swift-stdlib-strict-availability',
+           store('swift_stdlib_strict_availability'),
+           const=False,
+           help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')

@@ -11,6 +11,8 @@ set(SwiftCore_ENABLE_COMMANDLINE_SUPPORT_default OFF) # TODO: enable this by def
 set(SwiftCore_ENABLE_STDIN_default ON)
 set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
 
+set(SwiftCore_ENABLE_STRICT_AVAILABILITY_default OFF)
+
 set(SwiftCore_BACKTRACER_PATH_default "")
 
 # Provide a boolean option that a user can optionally enable.
@@ -20,7 +22,7 @@ macro(defaulted_option variable helptext)
   if(NOT DEFINED ${variable}_default)
     set(${variable}_default OFF)
   endif()
-  option(${variable} ${helptext} ${${variable}_default})
+  option(${variable} "${helptext}" ${${variable}_default})
 endmacro()
 
 # Create a defaulted cache entry
