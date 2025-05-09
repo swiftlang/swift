@@ -1472,3 +1472,119 @@ bb0(%0 : $*P):
   %15 = tuple ()
   return %15
 }
+
+// CHECK-LABEL: sil [ossa] @store_to_temp :
+// CHECK:         %1 = load [copy] %0
+// CHECK-NEXT:    return %1
+// CHECK-LABEL: } // end sil function 'store_to_temp'
+sil [ossa] @store_to_temp : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load [copy] %0
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2
+  %4 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_to_temp_take :
+// CHECK:         %1 = load [copy] %0
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    return %1
+// CHECK-LABEL: } // end sil function 'store_to_temp_take'
+sil [ossa] @store_to_temp_take : $@convention(thin) (@in Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load [take] %0
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2
+  %4 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_to_temp_trivial :
+// CHECK:         %1 = load [trivial] %0
+// CHECK-NEXT:    return %1
+// CHECK-LABEL: } // end sil function 'store_to_temp_trivial'
+sil [ossa] @store_to_temp_trivial : $@convention(thin) (@in_guaranteed Int) -> @owned Int {
+bb0(%0 : $*Int):
+  %1 = load [trivial] %0
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  %4 = load [trivial] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_with_early_destroy_of_src :
+// CHECK:         alloc_stack
+// CHECK-NEXT:    store %1
+// CHECK-LABEL: } // end sil function 'store_with_early_destroy_of_src'
+sil [ossa] @store_with_early_destroy_of_src : $@convention(thin) (@in Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load [copy] %0
+  fix_lifetime %0
+  destroy_addr %0
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2
+  %4 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_with_load_in_different_block :
+// CHECK:         alloc_stack
+// CHECK-NEXT:    store %1
+// CHECK-LABEL: } // end sil function 'store_with_load_in_different_block'
+sil [ossa] @store_with_load_in_different_block : $@convention(thin) (@in Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load [copy] %0
+  br bb1
+bb1:
+  fix_lifetime %0
+  destroy_addr %0
+  br bb2
+bb2:
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2
+  %4 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_with_load_with_multiple_uses :
+// CHECK:         fix_lifetime
+// CHECK:         alloc_stack
+// CHECK-NEXT:    store %1
+// CHECK-LABEL: } // end sil function 'store_with_load_with_multiple_uses'
+sil [ossa] @store_with_load_with_multiple_uses : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load [copy] %0
+  fix_lifetime %1
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2
+  %4 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_without_load :
+// CHECK:         alloc_stack
+// CHECK-NEXT:    store %0
+// CHECK-LABEL: } // end sil function 'store_without_load'
+sil [ossa] @store_without_load : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2
+  %4 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
