@@ -22,7 +22,16 @@ set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
 
 find_package(SwiftCore)
 
+include(GNUInstallDirs)
+
 include(AvailabilityMacros)
+include(EmitSwiftInterface)
+include(PlatformInfo)
+include(ResourceEmbedding)
+
+option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
+set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${PROJECT_NAME}_INSTALL_NESTED_SUBDIR>:/${${PROJECT_NAME}_PLATFORM_SUBDIR}/${${PROJECT_NAME}_ARCH_SUBDIR}>")
+set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${PROJECT_NAME}_INSTALL_NESTED_SUBDIR>:/${${PROJECT_NAME}_PLATFORM_SUBDIR}>")
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
