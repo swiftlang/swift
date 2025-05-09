@@ -5891,6 +5891,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection);
       break;
     }
+    case SILInstructionKind::VectorBaseAddrInst: {
+      if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createVectorBaseAddr(InstLoc, Val);
+      break;
+    }
     case SILInstructionKind::TailAddrInst: {
       SILValue IndexVal;
       SILType ResultObjTy;
