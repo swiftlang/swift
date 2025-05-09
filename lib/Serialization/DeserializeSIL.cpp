@@ -2452,6 +2452,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
     break;
   }
+  case SILInstructionKind::VectorBaseAddrInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND);
+    ResultInst = Builder.createVectorBaseAddr(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
   case SILInstructionKind::IndexAddrInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);

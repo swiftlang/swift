@@ -3411,6 +3411,7 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
 CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
 CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
+CONSTANT_TRANSLATION(VectorBaseAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 
 //===---
