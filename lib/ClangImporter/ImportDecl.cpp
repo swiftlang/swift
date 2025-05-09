@@ -9142,44 +9142,48 @@ private:
 } // namespace
 
 namespace {
-  /// Look for any side effects within a Stmt.
-  struct CATExprValidator : clang::ConstStmtVisitor<CATExprValidator, bool> {
-    bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
-    bool VisitIntegerLiteral(const clang::IntegerLiteral *) { return true; }
-    bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) { return this->Visit(c->getSubExpr()); }
-    bool VisitParenExpr(const clang::ParenExpr *p) { return this->Visit(p->getSubExpr()); }
+struct CountedByExpressionValidator
+    : clang::ConstStmtVisitor<CountedByExpressionValidator, bool> {
+  bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
+  bool VisitIntegerLiteral(const clang::IntegerLiteral *) { return true; }
+  bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
+    return this->Visit(c->getSubExpr());
+  }
+  bool VisitParenExpr(const clang::ParenExpr *p) {
+    return this->Visit(p->getSubExpr());
+  }
 
 #define SUPPORTED_UNOP(UNOP) \
-    bool VisitUnary ## UNOP(const clang::UnaryOperator *unop) { \
-      return this->Visit(unop->getSubExpr()); \
-    }
-    SUPPORTED_UNOP(Plus)
-    SUPPORTED_UNOP(Minus)
-    SUPPORTED_UNOP(Not)
+  bool VisitUnary ## UNOP(const clang::UnaryOperator *unop) { \
+    return this->Visit(unop->getSubExpr()); \
+  }
+  SUPPORTED_UNOP(Plus)
+  SUPPORTED_UNOP(Minus)
+  SUPPORTED_UNOP(Not)
 #undef SUPPORTED_UNOP
 
 #define SUPPORTED_BINOP(BINOP) \
-    bool VisitBin ## BINOP(const clang::BinaryOperator *binop) { \
-      return this->Visit(binop->getLHS()) && this->Visit(binop->getRHS()); \
-    }
-    SUPPORTED_BINOP(Add)
-    SUPPORTED_BINOP(Sub)
-    SUPPORTED_BINOP(Div)
-    SUPPORTED_BINOP(Mul)
-    SUPPORTED_BINOP(Rem)
-    SUPPORTED_BINOP(Shl)
-    SUPPORTED_BINOP(Shr)
-    SUPPORTED_BINOP(And)
-    SUPPORTED_BINOP(Xor)
-    SUPPORTED_BINOP(Or)
+  bool VisitBin ## BINOP(const clang::BinaryOperator *binop) { \
+    return this->Visit(binop->getLHS()) && this->Visit(binop->getRHS()); \
+  }
+  SUPPORTED_BINOP(Add)
+  SUPPORTED_BINOP(Sub)
+  SUPPORTED_BINOP(Div)
+  SUPPORTED_BINOP(Mul)
+  SUPPORTED_BINOP(Rem)
+  SUPPORTED_BINOP(Shl)
+  SUPPORTED_BINOP(Shr)
+  SUPPORTED_BINOP(And)
+  SUPPORTED_BINOP(Xor)
+  SUPPORTED_BINOP(Or)
 #undef SUPPORTED_BINOP
 
-    bool VisitStmt(const clang::Stmt *) { return false; }
-  };
+  bool VisitStmt(const clang::Stmt *) { return false; }
+};
 } // namespace
 
 static bool SwiftifiableCAT(const clang::CountAttributedType *CAT) {
-  return CAT && CATExprValidator().Visit(CAT->getCountExpr());
+  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr());
 }
 
 void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
