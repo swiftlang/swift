@@ -767,6 +767,7 @@ extension ASTGenVisitor {
       attrNameLoc: self.generateSourceLoc(node.attributeName),
       lParenLoc: self.generateSourceLoc(node.leftParen),
       replacedFunction: replacedFunction.name,
+      replacedFunctionLoc: replacedFunction.loc,
       rParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
@@ -1908,7 +1909,7 @@ extension ASTGenVisitor {
     let exported: Bool? = nil
     let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
-    let targetFunction: BridgedDeclNameRef? = nil
+    let targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)? = nil
     let spiGroups: [Identifier] = []
     let availableAttrs: [BridgedAvailableAttr] = []
 
@@ -1921,7 +1922,8 @@ extension ASTGenVisitor {
       whereClause: whereClause.asNullable,
       exported: exported ?? false,
       kind: kind ?? .full,
-      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      targetFunction: targetFunction?.name ?? BridgedDeclNameRef(),
+      targetFunctionLoc: targetFunction?.loc ?? BridgedDeclNameLoc(),
       spiGroups: spiGroups.lazy.bridgedArray(in: self),
       availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
     )
@@ -1941,7 +1943,7 @@ extension ASTGenVisitor {
     var exported: Bool?
     var kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
-    var targetFunction: BridgedDeclNameRef? = nil
+    var targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)?
     var spiGroups: [Identifier] = []
     var availableAttrs: [BridgedAvailableAttr] = []
 
@@ -1953,7 +1955,7 @@ extension ASTGenVisitor {
         if targetFunction != nil {
           // TODO: Diangose.
         }
-        targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName).name
+        targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName)
       case .specializeAvailabilityArgument(let arg):
         availableAttrs = self.generateAvailableAttr(
           atLoc: self.generateSourceLoc(arg.availabilityLabel),
@@ -2017,7 +2019,8 @@ extension ASTGenVisitor {
       whereClause: whereClause.asNullable,
       exported: exported ?? false,
       kind: kind ?? .full,
-      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      targetFunction: targetFunction?.name ?? BridgedDeclNameRef(),
+      targetFunctionLoc: targetFunction?.loc ?? BridgedDeclNameLoc(),
       spiGroups: spiGroups.lazy.bridgedArray(in: self),
       availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
     )
