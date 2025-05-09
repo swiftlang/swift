@@ -6906,7 +6906,7 @@ bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
 
   // Array literals.
   if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
-    if (Type elementType = toType->isArrayType()) {
+    if (auto elementType = toType->getArrayElementType()) {
       peepholeArrayUpcast(arrayLiteral, toType, bridged, elementType, locator);
       return true;
     }

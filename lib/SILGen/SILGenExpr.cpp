@@ -6673,7 +6673,7 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   // Array conversion does not always go down the ArrayConverter
   // path. Recognize the Array source type here both for ArrayToPointer and
   // InoutToPointer cases and diagnose on the element type.
-  Type eltTy = sourceTy->isArrayType();
+  Type eltTy = sourceTy->getArrayElementType();
   if (!eltTy)
     eltTy = sourceTy;
 
