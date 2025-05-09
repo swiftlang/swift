@@ -7,7 +7,7 @@ protocol HasReturn42 {
 }
 
 
-// CHECK: define {{.*}}i32 @"$sSo18ConformsToProtocolV4main11HasReturn42A2cDP8return42s5Int32VyFTW"(ptr nocapture swiftself dereferenceable(1) %{{.*}}, ptr %{{.*}}, ptr %{{.*}})
+// CHECK: define {{.*}}i32 @"$sSo18ConformsToProtocolV4main11HasReturn42A2cDP8return42s5Int32VyFTW"(ptr{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable(1) %{{.*}}, ptr %{{.*}}, ptr %{{.*}})
 // CHECK: [[OUT:%.*]] = call i32 @{{_ZN18ConformsToProtocol8return42Ev|"\?return42@ConformsToProtocol@@QEAAHXZ"}}(ptr
 // CHECK: ret i32 [[OUT]]
 

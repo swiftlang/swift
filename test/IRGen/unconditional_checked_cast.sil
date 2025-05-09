@@ -10,7 +10,7 @@ sil_vtable C {}
 class D : C {}
 sil_vtable D {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @downcast_test(ptr noalias nocapture sret({{.*}}) %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @downcast_test(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: entry:
 // CHECK-NEXT: [[INPUTPTR:%[0-9]+]] = load ptr, ptr [[INPUTPTRPTR:%[0-9]+]], align 8
 // CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s26unconditional_checked_cast1DCMa"(i64 0)
