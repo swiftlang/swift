@@ -11454,15 +11454,8 @@ SourceRange FuncDecl::getSourceRange() const {
     return SourceRange();
 
   SourceLoc endLoc = getOriginalBodySourceRange().End;
-  if (endLoc.isInvalid()) {
-    if (isa<AccessorDecl>(this))
-      return startLoc;
-
-    if (getBodyKind() == BodyKind::Synthesize)
-      return SourceRange();
-
+  if (endLoc.isInvalid())
     endLoc = getGenericTrailingWhereClauseSourceRange().End;
-  }
   if (endLoc.isInvalid())
     endLoc = getResultTypeSourceRange().End;
   if (endLoc.isInvalid())
