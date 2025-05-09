@@ -933,7 +933,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     moduleInfo->details = getModuleDetails();
 
     // Create a link libraries set for this module
-    auto &linkLibraries = moduleDependencyInfo.getLinkLibraries();
+    auto linkLibraries = moduleDependencyInfo.getLinkLibraries();
     swiftscan_link_library_set_t *linkLibrarySet =
         new swiftscan_link_library_set_t;
     linkLibrarySet->count = linkLibraries.size();

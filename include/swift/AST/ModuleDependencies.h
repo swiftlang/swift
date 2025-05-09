@@ -689,7 +689,7 @@ public:
     storage->importedSwiftModules.assign(dependencyIDs.begin(),
                                          dependencyIDs.end());
   }
-  const ArrayRef<ModuleDependencyID> getImportedSwiftDependencies() const {
+  ArrayRef<ModuleDependencyID> getImportedSwiftDependencies() const {
     return storage->importedSwiftModules;
   }
 
@@ -698,7 +698,7 @@ public:
     storage->importedClangModules.assign(dependencyIDs.begin(),
                                          dependencyIDs.end());
   }
-  const ArrayRef<ModuleDependencyID> getImportedClangDependencies() const {
+  ArrayRef<ModuleDependencyID> getImportedClangDependencies() const {
     return storage->importedClangModules;
   }
 
@@ -732,7 +732,7 @@ public:
     }
     }
   }
-  const ArrayRef<ModuleDependencyID> getHeaderClangDependencies() const {
+  ArrayRef<ModuleDependencyID> getHeaderClangDependencies() const {
     switch (getKind()) {
     case swift::ModuleDependencyKind::SwiftInterface: {
       auto swiftInterfaceStorage =
@@ -760,7 +760,7 @@ public:
     storage->swiftOverlayDependencies.assign(dependencyIDs.begin(),
                                              dependencyIDs.end());
   }
-  const ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
+  ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
     return storage->swiftOverlayDependencies;
   }
 
@@ -770,11 +770,11 @@ public:
     storage->crossImportOverlayModules.assign(dependencyIDs.begin(),
                                               dependencyIDs.end());
   }
-  const ArrayRef<ModuleDependencyID> getCrossImportOverlayDependencies() const {
+  ArrayRef<ModuleDependencyID> getCrossImportOverlayDependencies() const {
     return storage->crossImportOverlayModules;
   }
 
-  const ArrayRef<LinkLibrary> getLinkLibraries() const {
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
     return storage->linkLibraries;
   }
 
@@ -783,7 +783,7 @@ public:
     storage->linkLibraries.assign(linkLibraries.begin(), linkLibraries.end());
   }
 
-  const ArrayRef<std::string> getAuxiliaryFiles() const {
+  ArrayRef<std::string> getAuxiliaryFiles() const {
     return storage->auxiliaryFiles;
   }
 
@@ -795,7 +795,7 @@ public:
     return false;
   }
 
-  const ArrayRef<std::string> getHeaderInputSourceFiles() const {
+  ArrayRef<std::string> getHeaderInputSourceFiles() const {
     if (auto *detail = getAsSwiftInterfaceModule())
       return detail->textualModuleDetails.bridgingSourceFiles;
     if (auto *detail = getAsSwiftSourceModule())
@@ -805,7 +805,7 @@ public:
     return {};
   }
 
-  std::vector<std::string> getCommandline() const {
+  ArrayRef<std::string> getCommandline() const {
     if (auto *detail = getAsClangModule())
       return detail->buildCommandLine;
     if (auto *detail = getAsSwiftInterfaceModule())
@@ -828,7 +828,7 @@ public:
     llvm_unreachable("Unexpected type");
   }
 
-  std::vector<std::string> getBridgingHeaderCommandline() const {
+  ArrayRef<std::string> getBridgingHeaderCommandline() const {
     if (auto *detail = getAsSwiftSourceModule())
       return detail->bridgingHeaderBuildCommandLine;
     return {};
