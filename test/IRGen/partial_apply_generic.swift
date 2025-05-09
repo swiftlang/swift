@@ -37,7 +37,7 @@ var x = seq ~> split
 // Indirect return
 //
 
-// CHECK-LABEL: define internal swiftcc { ptr, ptr } @"$s21partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA"(ptr noalias nocapture %0, ptr swiftself %1)
+// CHECK-LABEL: define internal swiftcc { ptr, ptr } @"$s21partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftself %1)
 // CHECK:         tail call swiftcc { ptr, ptr } @"$s21partial_apply_generic5split{{[_0-9a-zA-Z]*}}F"(ptr noalias %0,
 
 struct HugeStruct { var a, b, c, d: Int }
