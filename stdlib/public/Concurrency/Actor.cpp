@@ -2511,8 +2511,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 
 SWIFT_CC(swift)
 static void
-swift_task_startSynchronouslyImpl(AsyncTask *task,
-                                  SerialExecutorRef targetExecutor) {
+swift_task_immediateImpl(AsyncTask *task,
+                         SerialExecutorRef targetExecutor) {
   swift_retain(task);
   if (targetExecutor.isGeneric()) {
   // If the target is generic, it means that the closure did not specify
@@ -2526,7 +2526,7 @@ swift_task_startSynchronouslyImpl(AsyncTask *task,
   _swift_task_setCurrent(originalTask);
   } else {
     assert(swift_task_isCurrentExecutor(targetExecutor) &&
-           "startSynchronously must only be invoked when it is correctly in "
+           "'immediate' must only be invoked when it is correctly in "
            "the same isolation already, but wasn't!");
 
     // We can run synchronously, we're on the expected executor so running in
