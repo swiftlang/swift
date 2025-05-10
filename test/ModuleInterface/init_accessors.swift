@@ -28,7 +28,7 @@ public struct Inlinable {
 // CHECK-NEXT:    @usableFromInline
 // CHECK-NEXT:    @storageRestrictions(initializes: _x) init
 // CHECK-NEXT:    get
-// CHECK-NEXT  }
+// CHECK-NEXT:  }
 
   public var x: Int {
     @usableFromInline
@@ -75,7 +75,7 @@ public struct Transparent {
 // CHECK-NEXT:     self._x = newValue
 // CHECK-NEXT:   }
 // CHECK-NEXT:   get
-// CHECK-NEXT  }
+// CHECK-NEXT:  }
 
   public var x: Int {
     @_alwaysEmitIntoClient

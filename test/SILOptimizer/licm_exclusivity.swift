@@ -16,7 +16,7 @@
 // TESTSIL: bb
 // TESTSIL: begin_access [modify] [dynamic] [no_nested_conflict]
 // TESTSIL: br bb{{.*}}
-// TESTSIL-NEXT bb{{.*}}:
+// TESTSIL-NEXT: bb{{.*}}:
 // TESTSIL: end_access
 var x = 0
 func run_ReversedArray(_ N: Int) {

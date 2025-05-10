@@ -17,7 +17,7 @@ class E : B {
 // CHECK:         end_borrow %2
 // CHECK:         destroy_value %1 
 // CHECK:         return %4
-// CHEKCK       } // end sil function '@load_borrow_and_copy'
+// CHECK:       } // end sil function 'load_borrow_and_copy'
 sil [ossa] @load_borrow_and_copy : $@convention(thin) (@inout E) -> Int {
 bb0(%0 : $*E):
   %1 = load_borrow %0
@@ -40,7 +40,7 @@ bb0(%0 : $*E):
 // CHECK:         end_borrow %3
 // CHECK:         destroy_value %2 
 // CHECK:         return %5
-// CHEKCK       } // end sil function '@load_borrow_and_copy_forwarding'
+// CHECK:       } // end sil function 'load_borrow_and_copy_forwarding'
 sil [ossa] @load_borrow_and_copy_forwarding : $@convention(thin) (@inout B) -> Int {
 bb0(%0 : $*B):
   %1 = load_borrow %0
@@ -58,7 +58,7 @@ bb0(%0 : $*B):
 // CHECK-LABEL: sil [ossa] @load_borrow_and_copy_different_block :
 // CHECK:         %1 = load_borrow %0
 // CHECK:         %3 = copy_value %1
-// CHEKCK       } // end sil function '@load_borrow_and_copy_different_block'
+// CHECK:       } // end sil function 'load_borrow_and_copy_different_block'
 sil [ossa] @load_borrow_and_copy_different_block : $@convention(thin) (@inout E) -> () {
 bb0(%0 : $*E):
   %1 = load_borrow %0
@@ -84,7 +84,7 @@ bb3:
 // CHECK-NOT:     load_borrow
 // CHECK:         %1 = tuple ()
 // CHECK:         return %1
-// CHEKCK       } // end sil function '@dead_load_borrow'
+// CHECK:       } // end sil function 'dead_load_borrow'
 sil [ossa] @dead_load_borrow : $@convention(thin) (@inout B) -> () {
 bb0(%0 : $*B):
   %1 = load_borrow %0
