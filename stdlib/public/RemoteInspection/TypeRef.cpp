@@ -26,6 +26,12 @@
 using namespace swift;
 using namespace reflection;
 
+#ifdef DEBUG_TYPE_LOWERING
+  #define DEBUG_LOG(expr) expr;
+#else
+  #define DEBUG_LOG(expr)
+#endif
+
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   std::ostream &stream;
   unsigned Indent;
@@ -120,6 +126,31 @@ public:
       printRec(std::get<1>(NameElement));
     }
     stream << ")";
+  }
+
+  void visitPackTypeRef(const PackTypeRef *P) {
+    printHeader("pack");
+
+    for (auto Element : P->getElements()) {
+      printRec(Element);
+    }
+    stream << ")";
+  }
+
+  void visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    printHeader("pack_expansion");
+
+    Indent += 2;
+    stream << "\n";
+    printHeader("pattern");
+    printRec(PE->getPattern());
+
+    stream << "\n";
+    printHeader("count");
+    printRec(PE->getCount());
+
+    stream << ")";
+    Indent -= 2;
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -447,6 +478,18 @@ struct TypeRefIsConcrete
     return true;
   }
 
+  bool visitPackTypeRef(const PackTypeRef *P) {
+    for (auto Element : P->getElements()) {
+      if (!visit(Element))
+        return false;
+    }
+    return true;
+  }
+
+  bool visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    return false;
+  }
+
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
     for (const auto &Param : F->getParameters())
       if (!visit(Param.getType()))
@@ -672,6 +715,20 @@ public:
       tuple->addChild(tupleElt, Dem);
     }
     return tuple;
+  }
+
+  Demangle::NodePointer visitPackTypeRef(const PackTypeRef *P) {
+    auto pack = Dem.createNode(Node::Kind::Pack);
+    for (auto Element : P->getElements())
+      pack->addChild(visit(Element), Dem);
+    return pack;
+  }
+
+  Demangle::NodePointer visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    auto expansion = Dem.createNode(Node::Kind::PackExpansion);
+    expansion->addChild(visit(PE->getPattern()), Dem);
+    expansion->addChild(visit(PE->getCount()), Dem);
+    return expansion;
   }
 
   Demangle::NodePointer visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -1239,6 +1296,19 @@ public:
     return TupleTypeRef::create(Builder, Elements, Labels);
   }
 
+  const TypeRef *visitPackTypeRef(const PackTypeRef *P) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : P->getElements())
+      Elements.push_back(visit(Element));
+    return PackTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    auto *Pattern = visit(PE->getPattern());
+    auto *Count = visit(PE->getCount());
+    return PackExpansionTypeRef::create(Builder, Pattern, Count);
+  }
+
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
     std::vector<remote::FunctionParam<const TypeRef *>> SubstitutedParams;
     for (const auto &Param : F->getParameters()) {
@@ -1350,15 +1420,49 @@ class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
   TypeRefBuilder &Builder;
   GenericArgumentMap Substitutions;
-  // Set true iff the Substitution map was actually used
-  bool DidSubstitute;
+
+  std::vector<unsigned> ActivePackExpansions;
+
+  /// Simplified variant of InFlightSubstitution::expandPackExpansionShape()
+  /// that only implements the case where the replacement packs are concrete,
+  /// that is, they do not contain more pack expansions. This will always be
+  /// true here, because even more generally, our "substitution maps" do not
+  /// contain type parameters.
+  template<typename Fn>
+  bool expandPackExpansion(const PackExpansionTypeRef *origExpansion,
+                           Fn handleComponent) {
+    // Substitute the shape using the baseline substitutions, not the
+    // current elementwise projections.
+    auto *substShape = origExpansion->getCount()->subst(Builder, Substitutions);
+
+    auto *substPackShape = dyn_cast<PackTypeRef>(substShape);
+    if (!substPackShape) {
+      DEBUG_LOG(fprintf(stderr, "Replacement for pack must be another pack"));
+      return false;
+    }
+
+    ActivePackExpansions.push_back(0);
+    for (auto *substShapeElt : substPackShape->getElements()) {
+      if (isa<PackExpansionTypeRef>(substShapeElt)) {
+        DEBUG_LOG(fprintf(stderr, "Replacement pack cannot contain further expansions"));
+        return false;
+      }
+
+      auto *origPattern = origExpansion->getPattern();
+      auto *substElt = visit(origPattern);
+      handleComponent(substElt);
+
+      ++ActivePackExpansions.back();
+    }
+    ActivePackExpansions.pop_back();
+    return true;
+  }
+
 public:
   using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
 
   TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
-      : Builder(Builder), Substitutions(Substitutions), DidSubstitute(false) {}
-
-  bool didSubstitute() const { return DidSubstitute; }
+      : Builder(Builder), Substitutions(Substitutions) {}
 
   const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return B;
@@ -1383,18 +1487,66 @@ public:
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<std::string> Labels;
     std::vector<const TypeRef *> Elements;
-    for (auto Element : T->getElements())
-      Elements.push_back(visit(Element));
-    auto Labels = T->getLabels();
+    for (auto NameElement : llvm::zip_first(T->getLabels(), T->getElements())) {
+      auto *Element = std::get<1>(NameElement);
+      if (auto *PE = dyn_cast<PackExpansionTypeRef>(Element)) {
+        bool result = expandPackExpansion(PE, [&](const TypeRef *substElt) {
+          Labels.push_back(std::get<0>(NameElement));
+          Elements.push_back(substElt);
+        });
+        if (!result)
+          return T;
+      } else {
+        Labels.push_back(std::get<0>(NameElement));
+        Elements.push_back(visit(Element));
+      }
+    }
+
+    // Unwrap one-element tuples.
+    if (Elements.size() == 1 && Labels[0].empty() &&
+        !isa<PackExpansionTypeRef>(Elements[0])) {
+      return Elements[0];
+    }
+
     return TupleTypeRef::create(Builder, Elements, Labels);
+  }
+
+  const TypeRef *visitPackTypeRef(const PackTypeRef *P) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : P->getElements()) {
+      if (auto *PE = dyn_cast<PackExpansionTypeRef>(Element)) {
+        bool result = expandPackExpansion(PE, [&](const TypeRef *substElt) {
+          Elements.push_back(substElt);
+        });
+        if (!result)
+          return P;
+      } else {
+        Elements.push_back(visit(Element));
+      }
+    }
+    return PackTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    return nullptr;
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
     std::vector<remote::FunctionParam<const TypeRef *>> SubstitutedParams;
     for (const auto &Param : F->getParameters()) {
-      auto typeRef = Param.getType();
-      SubstitutedParams.push_back(Param.withType(visit(typeRef)));
+      auto *TR = Param.getType();
+      if (auto *PE = dyn_cast<PackExpansionTypeRef>(TR)) {
+        bool result = expandPackExpansion(PE, [&](const TypeRef *substElt) {
+          SubstitutedParams.push_back(Param.withType(visit(substElt)));
+        });
+        if (!result)
+          return F;
+      } else {
+        SubstitutedParams.push_back(Param.withType(visit(TR)));
+      }
     }
 
     auto SubstitutedResult = visit(F->getResult());
@@ -1487,13 +1639,30 @@ public:
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
     if (found == Substitutions.end())
       return GTP;
-    assert(found->second->isConcrete());
-    DidSubstitute = true; // We actually used the Substitutions
+
+    auto substType = found->second;
+    assert(substType->isConcrete());
+
+    if (!ActivePackExpansions.empty()) {
+      auto *P = dyn_cast<PackTypeRef>(substType);
+      if (!P) {
+        DEBUG_LOG(fprintf(stderr, "Replacement for pack is not a pack: "); P->dump());
+        return nullptr;
+      }
+
+      unsigned index = ActivePackExpansions.back();
+      if (index >= P->getElements().size()) {
+        DEBUG_LOG(fprintf(stderr, "Packs with wrong shape: "); P->dump());
+        return nullptr;
+      }
+
+      substType = P->getElements()[index];
+    }
 
     // When substituting a concrete type containing a metatype into a
     // type parameter, (eg: T, T := C.Type), we must also represent
     // the metatype as a value.
-    return thickenMetatypes(Builder, found->second);
+    return thickenMetatypes(Builder, substType);
   }
 
   const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -1607,15 +1776,6 @@ public:
 const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
                               const GenericArgumentMap &Subs) const {
   return TypeRefSubstitution(Builder, Subs).visit(this);
-}
-
-const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
-                              const GenericArgumentMap &Subs,
-			      bool &DidSubstitute) const {
-  auto subst = TypeRefSubstitution(Builder, Subs);
-  auto TR = subst.visit(this);
-  DidSubstitute = subst.didSubstitute();
-  return TR;
 }
 
 bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
