@@ -1431,7 +1431,7 @@ function Build-CMakeProject {
     Add-KeyValueIfNew $Defines CMAKE_MAKE_PROGRAM "$ninja"
 
     # Generate the project
-    $cmakeGenerateArgs = @("-B", $Bin, "-S", $Src, "-G", $Generator)
+    $cmakeGenerateArgs = @("-B", $Bin, "-S", $Src, "-G", $Generator, "--trace", "-DCMAKE_VERBOSE_MAKEFILE=ON")
     if ($CacheScript) {
       $cmakeGenerateArgs += @("-C", $CacheScript)
     }
