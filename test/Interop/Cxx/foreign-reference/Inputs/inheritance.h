@@ -109,8 +109,8 @@ __attribute__((swift_attr("release:immortal"))) ImmortalRefType {};
 ImmortalRefType *returnImmortalRefType() { return new ImmortalRefType(); };
 
 struct DerivedFromImmortalRefType : ImmortalRefType {};
-DerivedFromImmortalRefType *returnDerivedFromImmortalRefType() { // expected-warning {{'returnDerivedFromImmortalRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-    return new DerivedFromImmortalRefType();
+DerivedFromImmortalRefType *returnDerivedFromImmortalRefType() {
+  return new DerivedFromImmortalRefType();
 };
 
 } // namespace ImmortalRefereceExample
@@ -122,7 +122,7 @@ ValueType *returnValueType() { return new ValueType(); }
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:ret1")))
 __attribute__((swift_attr("release:rel1"))) RefType {};
-RefType *returnRefType() { return new RefType(); } // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+RefType *returnRefType() { return new RefType(); }
 
 struct DerivedFromValueType : ValueType {};
 DerivedFromValueType *returnDerivedFromValueType() {
@@ -133,21 +133,21 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:ret2")))
 __attribute__((swift_attr("release:rel2"))) DerivedFromValueTypeAndAnnotated
     : ValueType {};
-DerivedFromValueTypeAndAnnotated *returnDerivedFromValueTypeAndAnnotated() { // expected-warning {{'returnDerivedFromValueTypeAndAnnotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-    return new DerivedFromValueTypeAndAnnotated();
+DerivedFromValueTypeAndAnnotated *returnDerivedFromValueTypeAndAnnotated() {
+  return new DerivedFromValueTypeAndAnnotated();
 }
 
 struct DerivedFromRefType final : RefType {};
-DerivedFromRefType *returnDerivedFromRefType() { // expected-warning {{'returnDerivedFromRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-    return new DerivedFromRefType();
+DerivedFromRefType *returnDerivedFromRefType() {
+  return new DerivedFromRefType();
 }
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:ret3")))
 __attribute__((swift_attr("release:rel3"))) DerivedFromRefTypeAndAnnotated
     : RefType {};
-DerivedFromRefTypeAndAnnotated *returnDerivedFromRefTypeAndAnnotated() { // expected-warning {{'returnDerivedFromRefTypeAndAnnotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-    return new DerivedFromRefTypeAndAnnotated();
+DerivedFromRefTypeAndAnnotated *returnDerivedFromRefTypeAndAnnotated() {
+  return new DerivedFromRefTypeAndAnnotated();
 }
 } // namespace ExplicitAnnotationHasPrecedence1
 
@@ -184,8 +184,8 @@ __attribute__((swift_attr("retain:retain_C")))
 __attribute__((swift_attr("release:release_C"))) DerivedFromRefTypeAAndBAnnotated
     : RefTypeA,
         RefTypeB {};
-DerivedFromRefTypeAAndBAnnotated *returnDerivedFromRefTypeAAndBAnnotated() { // expected-warning {{'returnDerivedFromRefTypeAAndBAnnotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-    return new DerivedFromRefTypeAAndBAnnotated();
+DerivedFromRefTypeAAndBAnnotated *returnDerivedFromRefTypeAAndBAnnotated() {
+  return new DerivedFromRefTypeAAndBAnnotated();
 }
 } // namespace ExplicitAnnotationHasPrecedence2
 
@@ -206,10 +206,10 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:RCRetain")))
 __attribute__((swift_attr("release:RCRelease"))) RefType {};
 
-RefType *returnRefType() { return new RefType(); }; // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENC}}
+RefType *returnRefType() { return new RefType(); };
 
 struct DerivedFromRefType final : RefType {};
-DerivedFromRefType *returnDerivedFromRefType() { // expected-warning {{'returnDerivedFromRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+DerivedFromRefType *returnDerivedFromRefType() {
   return new DerivedFromRefType();
 };
 } // namespace BasicInheritanceExample
@@ -236,7 +236,7 @@ DerivedFromBaseRef1AndBaseRef2 *returnDerivedFromBaseRef1AndBaseRef2() {
 };
 
 struct DerivedFromBaseRef3 : BaseRef3 {};
-DerivedFromBaseRef3 *returnDerivedFromBaseRef3() { // expected-warning {{'returnDerivedFromBaseRef3' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+DerivedFromBaseRef3 *returnDerivedFromBaseRef3() {
   return new DerivedFromBaseRef3();
 };
 } // namespace MultipleInheritanceExample1
@@ -312,7 +312,7 @@ __attribute__((swift_attr("release:samerelease"))) B2 {};  // expected-error {{m
 
 struct D : B1, B2 {}; // expected-error {{multiple functions 'sameretain' found; there must be exactly one retain function for reference type 'D'}}
                       // expected-error@-1 {{multiple functions 'samerelease' found; there must be exactly one release function for reference type 'D'}}
-D *returnD() { return new D(); }; // expected-warning {{'returnD' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+D *returnD() { return new D(); };
 } // namespace OverloadedRetainRelease
 
 void sameretain(OverloadedRetainRelease::B1 *v) {}
@@ -339,7 +339,7 @@ struct BVirtual : virtual A {};
 struct CVirtual : virtual A {};
 
 struct VirtualDiamond : BVirtual, CVirtual {};
-VirtualDiamond *returnVirtualDiamond() { return new VirtualDiamond(); }; // expected-warning {{'returnVirtualDiamond' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+VirtualDiamond *returnVirtualDiamond() { return new VirtualDiamond(); };
 } // namespace RefTypeDiamondInheritance
 
 void retainA(RefTypeDiamondInheritance::A *a) {};
@@ -355,7 +355,7 @@ __attribute__((swift_attr("release:releaseB"))) B : A {};
 struct C : A {};
 
 struct Diamond : B, C {};
-Diamond *returnDiamond() { return new Diamond(); }; // expected-warning {{'returnDiamond' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+Diamond *returnDiamond() { return new Diamond(); };
 
 } // namespace NonRefTypeDiamondInheritance
 
@@ -384,7 +384,7 @@ private:
 };
 
 class Forest : public IntrusiveRefCountedTemplate<Forest> {};
-Forest *returnForest() { return new Forest(); }; // expected-warning {{'returnForest' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+Forest *returnForest() { return new Forest(); };
 } // namespace InheritingTemplatedRefType
 
 void forestRetain(InheritingTemplatedRefType::IntrusiveRefCountedTemplate<
