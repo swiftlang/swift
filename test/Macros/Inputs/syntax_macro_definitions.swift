@@ -1215,6 +1215,29 @@ public struct AddCompletionHandler: PeerMacro {
   }
 }
 
+public struct ExpandTypeErrorMacro: PeerMacro {
+  public static func expansion<
+    Context: MacroExpansionContext,
+    Declaration: DeclSyntaxProtocol
+  >(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: Declaration,
+    in context: Context
+  ) throws -> [DeclSyntax] {
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      throw CustomError.message("@ExpandTypeError only works on functions")
+    }
+    return [
+      """
+      public func \(funcDecl.name)(_ bar: Int) {
+        callToMissingFunction(foo)
+      }
+      """
+    ]
+  }
+}
+
+
 public struct InvalidMacro: PeerMacro, DeclarationMacro {
   public static func expansion(
     of node: AttributeSyntax,
