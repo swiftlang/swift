@@ -9009,7 +9009,7 @@ Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   auto bodyRange = AFD->getBodySourceRange();
   auto BeginParserPosition = getParserPosition(bodyRange.Start,
                                                /*previousLoc*/ SourceLoc());
-  auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
+  auto EndLexerState = L->getStateForEndOfTokenLoc(bodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))

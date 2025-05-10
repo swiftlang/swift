@@ -2528,6 +2528,19 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   return extractInlinableText(ctx, init, scratch);
 }
 
+SourceLoc PatternBindingDecl::getStartLoc() const {
+  if (StaticLoc.isValid())
+    return StaticLoc;
+
+  if (VarLoc.isValid())
+    return VarLoc;
+
+  if (getPatternList().empty())
+    return SourceLoc();
+
+  return getPatternList().front().getStartLoc();
+}
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
   SourceLoc endLoc = getPatternList().empty()
@@ -10308,30 +10321,22 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  SourceLoc endLoc;
+  SourceRange thrownTypeRange;
+  if (auto *typeRepr = getThrownTypeRepr())
+    thrownTypeRange = typeRepr->getSourceRange();
 
   // name(parameter list...) async throws(E)
-  if (auto *typeRepr = getThrownTypeRepr())
-    endLoc = typeRepr->getSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getThrowsLoc();
-  if (endLoc.isInvalid())
-    endLoc = getAsyncLoc();
-
-  if (endLoc.isInvalid())
-    return getParameterListSourceRange();
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine({
+    getNameLoc(), getParameterListSourceRange(), thrownTypeRange,
+    getThrowsLoc(), getAsyncLoc()
+  });
 }
 
 SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto endLoc = getParameters()->getSourceRange().End;
-  if (endLoc.isInvalid())
-    return getNameLoc();
-
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getNameLoc(), getParameters()->getSourceRange());
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
@@ -11454,25 +11459,33 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
   return nullptr;
 }
 
+SourceLoc FuncDecl::getStartLoc() const {
+  auto startLoc = StaticLoc;
+  if (startLoc.isInvalid())
+    startLoc = FuncLoc;
+  if (startLoc.isInvalid())
+    startLoc = getNameLoc();
+  if (startLoc.isInvalid())
+    startLoc = getSignatureSourceRange().Start;
+  if (startLoc.isInvalid())
+    startLoc = getResultTypeSourceRange().Start;
+  if (startLoc.isInvalid())
+    startLoc = getGenericTrailingWhereClauseSourceRange().Start;
+  if (startLoc.isInvalid())
+    startLoc = getOriginalBodySourceRange().Start;
+
+  return startLoc;
+}
+
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
 
   if (startLoc.isInvalid())
     return SourceRange();
 
-  if (getBodyKind() == BodyKind::Unparsed)
-    return { startLoc, BodyRange.End };
-
   SourceLoc endLoc = getOriginalBodySourceRange().End;
-  if (endLoc.isInvalid()) {
-    if (isa<AccessorDecl>(this))
-      return startLoc;
-
-    if (getBodyKind() == BodyKind::Synthesize)
-      return SourceRange();
-
+  if (endLoc.isInvalid())
     endLoc = getGenericTrailingWhereClauseSourceRange().End;
-  }
   if (endLoc.isInvalid())
     endLoc = getResultTypeSourceRange().End;
   if (endLoc.isInvalid())

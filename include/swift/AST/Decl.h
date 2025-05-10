@@ -2523,9 +2523,7 @@ public:
                                                Pattern *Pat, Expr *E,
                                                DeclContext *Parent);
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : VarLoc;
-  }
+  SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
 
   unsigned getNumPatternEntries() const {
@@ -8413,9 +8411,7 @@ public:
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
-  }
+  SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
