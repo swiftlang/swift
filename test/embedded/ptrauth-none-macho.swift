@@ -16,7 +16,7 @@ public func foo() {
   callback3?(true, true)
 }
 
-// CHECK-LABEL: define swiftcc void @"$e4main3fooyyF"()
+// CHECK-LABEL: define {{.*}}swiftcc void @"$e4main3fooyyF"()
 
 // CHECK:       [[P1:%.*]] = load ptr, ptr @"$e4main8callbackyycSgvp"
 // CHECK:       call swiftcc void [[P1:%.*]](ptr swiftself {{.*}}) [ "ptrauth"(i32 0, i64 3848) ]
