@@ -2268,6 +2268,11 @@ extension Protocol_ObjC1 {
 //===---
 //===--- Error handling
 //===---
+enum ObjCError: Int, Error {
+  case Others
+}
+protocol MyError: Error { }
+
 // CHECK-LABEL: class ClassThrows1
 class ClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
@@ -2329,6 +2334,15 @@ class ClassThrows1 {
 
   // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: any Error & Protocol_ObjC1)
   func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1) { }
+
+  @objc func throwsError() throws(Error) {}
+  @objc func throwsMyError() throws(MyError) {}
+  // expected-error@-1{{typed 'throws' instance method cannot be represented in Objective-C}}
+  // expected-error@-2{{thrown type 'any MyError' does not conform to the 'Error' protocol}}
+  @objc func throwsObjCError() throws(ObjCError) {}
+  // expected-error@-1{{typed 'throws' instance method cannot be represented in Objective-C}}
+  @objc static func throwsObjCErrorClass() throws(ObjCError) {}
+  // expected-error@-1{{typed 'throws' static method cannot be represented in Objective-C}}
 }
 
 
