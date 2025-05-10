@@ -7944,15 +7944,23 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   auto dc = rootNormal->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
+  auto proto = rootNormal->getProtocol();
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.
-  if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
+  if (getActorIsolation(proto).isActorIsolated())
+    return ActorIsolation::forNonisolated(false);
+
+  // SendableMetatype disables isolation inference.
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (sendableMetatypeProto && proto->inheritsFrom(sendableMetatypeProto))
     return ActorIsolation::forNonisolated(false);
 
   // @preconcurrency disables isolation inference.
   if (rootNormal->isPreconcurrency())
     return ActorIsolation::forNonisolated(false);
+
 
   // Isolation inference rules follow. If we aren't inferring isolated conformances,
   // we're done.

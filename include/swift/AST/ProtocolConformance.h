@@ -713,6 +713,9 @@ public:
     return ExplicitSafety::Unspecified;
   }
 
+  /// Whether this conformance has explicitly-specified global actor isolation.
+  bool hasExplicitGlobalActorIsolation() const;
+
   /// Determine whether we've lazily computed the associated conformance array
   /// already.
   bool hasComputedAssociatedConformances() const {
