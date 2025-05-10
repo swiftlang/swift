@@ -2746,7 +2746,7 @@ public:
     ///
     /// Supported starting in Swift 6.1.
     Task_IsTaskFunctionConsumed                   = 15,
-    Task_IsStartSynchronouslyTask                 = 16,
+    Task_IsImmediateTask                          = 16,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2779,9 +2779,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskFunctionConsumed,
                                 isTaskFunctionConsumed,
                                 setIsTaskFunctionConsumed)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsStartSynchronouslyTask,
-                                isSynchronousStartTask,
-                                setIsSYnchronousStartTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsImmediateTask,
+                                isImmediateTask,
+                                setIsImmediateTask)
 };
 
 /// Flags for schedulable jobs.

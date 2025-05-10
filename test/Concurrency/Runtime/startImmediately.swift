@@ -109,24 +109,24 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
 
   // This task must be guaranteed to happen AFTER 'tt' because we are already on this actor
   // so this enqueue must happen after we give up the actor.
-  print("schedule Task { @MyGlobalActor }, before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  print("schedule Task { @MyGlobalActor }, before immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
   let t1 = Task { @MyGlobalActor in
     print("inside Task { @MyGlobalActor }, after sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
   }
 
-  print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  print("before immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
   let outerTID = getCurrentThreadID()
-  let tt = Task.startSynchronously { @MyGlobalActor in
+  let tt = Task.immediate { @MyGlobalActor in
     let innerTID = getCurrentThreadID()
-    print("inside startSynchronously, outer thread = \(outerTID)")
-    print("inside startSynchronously, inner thread = \(innerTID)")
+    print("inside immediate, outer thread = \(outerTID)")
+    print("inside immediate, inner thread = \(innerTID)")
     if (compareThreadIDs(outerTID, .notEqual, innerTID)) {
       print("ERROR! Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
     }
 
-    print("inside startSynchronously, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("inside immediate, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
     _ = try? await Task.sleep(for: .seconds(1))
-    print("after sleep, inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("after sleep, inside immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
   }
 
   return [t1, tt]
@@ -138,18 +138,18 @@ func syncOnMyGlobalActorHopToDifferentActor() -> [Task<Void, Never>] {
 
   // This task must be guaranteed to happen AFTER 'tt' because we are already on this actor
   // so this enqueue must happen after we give up the actor.
-  print("schedule Task { @DifferentGlobalActor }, before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  print("schedule Task { @DifferentGlobalActor }, before immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
   let t1 = Task { @DifferentGlobalActor in
     print("inside Task { @DifferentGlobalActor } [thread:\(getCurrentThreadID())] @ :\(#line)")
     DifferentGlobalActor.shared.preconditionIsolated("Expected Task{} to be on DifferentGlobalActor")
   }
 
-  print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+  print("before immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
   let outerTID = getCurrentThreadID()
-  let tt = Task.startSynchronously { @DifferentGlobalActor in
+  let tt = Task.immediate { @DifferentGlobalActor in
     let innerTID = getCurrentThreadID()
-    print("inside startSynchronously, outer thread = \(outerTID)")
-    print("inside startSynchronously, inner thread = \(innerTID)")
+    print("inside immediate, outer thread = \(outerTID)")
+    print("inside immediate, inner thread = \(innerTID)")
     if (compareThreadIDs(outerTID, .equal, innerTID)) {
       // This case specifically is NOT synchronously run because we specified a different isolation for the closure
       // and FORCED a hop to the DifferentGlobalActor executor.
@@ -158,14 +158,14 @@ func syncOnMyGlobalActorHopToDifferentActor() -> [Task<Void, Never>] {
     // We crucially need to see this task be enqueued on the different global actor,
     // so it did not execute "synchronously" after all - it had to hop to the other actor.
     dispatchPrecondition(condition: .onQueue(DifferentGlobalActor.queue))
-    DifferentGlobalActor.shared.preconditionIsolated("Expected Task.startSynchronously { @DifferentGlobalActor in } to be on DifferentGlobalActor")
+    DifferentGlobalActor.shared.preconditionIsolated("Expected Task.immediate { @DifferentGlobalActor in } to be on DifferentGlobalActor")
 
-    print("inside startSynchronously, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("inside immediate, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
     _ = try? await Task.sleep(for: .milliseconds(100))
 
-    print("inside startSynchronously, after sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("inside immediate, after sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
     dispatchPrecondition(condition: .onQueue(DifferentGlobalActor.queue))
-    DifferentGlobalActor.shared.preconditionIsolated("Expected Task.startSynchronously { @DifferentGlobalActor in } to be on DifferentGlobalActor")
+    DifferentGlobalActor.shared.preconditionIsolated("Expected Task.immediate { @DifferentGlobalActor in } to be on DifferentGlobalActor")
 
     // do something here
     await MyGlobalActor.test()
@@ -182,33 +182,33 @@ func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
 
   queue.async {
     // This is in order so we don't have a "current task" nor any "current executor"
-    print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("before immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
 
     let outerTID = getCurrentThreadID()
-    let tt = Task.startSynchronously {
+    let tt = Task.immediate {
       dispatchPrecondition(condition: .onQueue(queue))
 
       let innerTID = getCurrentThreadID()
       if compareThreadIDs(outerTID, .notEqual, innerTID) {
-        print("inside startSynchronously, outer thread = \(outerTID)")
-        print("inside startSynchronously, inner thread = \(innerTID)")
+        print("inside immediate, outer thread = \(outerTID)")
+        print("inside immediate, inner thread = \(innerTID)")
         print("ERROR! Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
       }
-      print("inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+      print("inside immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
 
       switch behavior {
       case .suspend:
         // sleep until woken up by outer task; i.e. actually suspend
-        print("inside startSynchronously, before sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
+        print("inside immediate, before sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
         _ = try? await Task.sleep(for: .seconds(10))
-        print("inside startSynchronously, after sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
+        print("inside immediate, after sleep [thread:\(getCurrentThreadID())] @ :\(#line)")
       case .dontSuspend:
-        print("inside startSynchronously, done [thread:\(getCurrentThreadID())] @ :\(#line)")
+        print("inside immediate, done [thread:\(getCurrentThreadID())] @ :\(#line)")
         ()
       }
       sem1.signal()
     }
-    print("after startSynchronously, outside; cancel (wakeup) the synchronous task! [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("after immediate, outside; cancel (wakeup) the synchronous task! [thread:\(getCurrentThreadID())] @ :\(#line)")
     tt.cancel() // wake up the sleep
 
     sem1.wait()
@@ -235,13 +235,13 @@ await Task { @MyGlobalActor in
 
 // CHECK-LABEL: syncOnMyGlobalActor()
 // CHECK: Confirmed to be on @MyGlobalActor
-// CHECK: schedule Task { @MyGlobalActor }, before startSynchronously [thread:[[CALLING_THREAD:.*]]]
-// CHECK: before startSynchronously [thread:[[CALLING_THREAD]]]
+// CHECK: schedule Task { @MyGlobalActor }, before immediate [thread:[[CALLING_THREAD:.*]]]
+// CHECK: before immediate [thread:[[CALLING_THREAD]]]
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, sleep now
+// CHECK: inside immediate, sleep now
 // CHECK: inside Task { @MyGlobalActor }, after sleep
 // resume on some other thread
-// CHECK: after sleep, inside startSynchronously
+// CHECK: after sleep, inside immediate
 
 print("\n\n==== ------------------------------------------------------------------")
 print("syncOnMyGlobalActorHopToDifferentActor()")
@@ -253,22 +253,22 @@ await Task { @MyGlobalActor in
   }
 }.value
 
-// Assertion Notes: We expect the task to be on the specified queue as we force the Task.startSynchronously
+// Assertion Notes: We expect the task to be on the specified queue as we force the Task.immediate
 // task to enqueue on the DifferentGlobalActor, however we CANNOT use threads to verify this behavior,
 // because dispatch may still pull tricks and reuse threads. We can only verify that we're on the right
 // queue, and that the `enqueue` calls on the target executor happen when we expect them to.
 //
 // CHECK: syncOnMyGlobalActorHopToDifferentActor()
 // CHECK: Confirmed to be on @MyGlobalActor
-// CHECK: before startSynchronously
+// CHECK: before immediate
 
 // This IS actually enqueueing on the target actor (not synchronous), as expected:
 // CHECK: NaiveQueueExecutor(DifferentGlobalActor-queue) enqueue
-// CHECK: inside startSynchronously, sleep now
+// CHECK: inside immediate, sleep now
 
 // After the sleep we get back onto the specified executor as expected
 // CHECK: NaiveQueueExecutor(DifferentGlobalActor-queue) enqueue
-// CHECK: inside startSynchronously, after sleep
+// CHECK: inside immediate, after sleep
 
 print("\n\n==== ------------------------------------------------------------------")
 var behavior: SynchronousTaskBehavior = .suspend
@@ -277,12 +277,12 @@ syncOnNonTaskThread(synchronousTask: behavior)
 
 // CHECK-LABEL: syncOnNonTaskThread(synchronousTask: suspend)
 // No interleaving allowed between "before" and "inside":
-// CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD2:.*]]]
+// CHECK-NEXT: before immediate [thread:[[CALLING_THREAD2:.*]]]
 // CHECK-NOT: ERROR!
-// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD2]]]
-// CHECK-NEXT: inside startSynchronously, before sleep [thread:[[CALLING_THREAD2]]]
-// CHECK-NEXT: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD2]]]
-// CHECK-NEXT: inside startSynchronously, after sleep
+// CHECK-NEXT: inside immediate [thread:[[CALLING_THREAD2]]]
+// CHECK-NEXT: inside immediate, before sleep [thread:[[CALLING_THREAD2]]]
+// CHECK-NEXT: after immediate, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD2]]]
+// CHECK-NEXT: inside immediate, after sleep
 
 print("\n\n==== ------------------------------------------------------------------")
 behavior = .dontSuspend
@@ -290,11 +290,11 @@ print("syncOnNonTaskThread(synchronousTask: \(behavior))")
 syncOnNonTaskThread(synchronousTask: behavior)
 
 // CHECK-LABEL: syncOnNonTaskThread(synchronousTask: dontSuspend)
-// CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD3:.*]]]
+// CHECK-NEXT: before immediate [thread:[[CALLING_THREAD3:.*]]]
 // CHECK-NOT: ERROR!
-// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD3]]]
-// CHECK: inside startSynchronously, done [thread:[[CALLING_THREAD3]]]
-// CHECK: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD3]]]
+// CHECK-NEXT: inside immediate [thread:[[CALLING_THREAD3]]]
+// CHECK: inside immediate, done [thread:[[CALLING_THREAD3]]]
+// CHECK: after immediate, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD3]]]
 
 print("\n\n==== ------------------------------------------------------------------")
 print("callActorFromStartSynchronousTask() - not on specific queue")
@@ -302,17 +302,17 @@ callActorFromStartSynchronousTask(recipient: .recipient(Recipient()))
 
 // CHECK: callActorFromStartSynchronousTask()
 // No interleaving allowed between "before" and "inside":
-// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:.*]]]
-// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD4]]]
+// CHECK: before immediate [thread:[[CALLING_THREAD4:.*]]]
+// CHECK-NEXT: inside immediate [thread:[[CALLING_THREAD4]]]
 
-// It is important that as we suspend on the actor call, the 'after' startSynchronously gets to run
-// CHECK-NEXT: inside startSynchronously, call rec.sync() [thread:[[CALLING_THREAD4]]]
-// CHECK: after startSynchronously
+// It is important that as we suspend on the actor call, the 'after' immediate gets to run
+// CHECK-NEXT: inside immediate, call rec.sync() [thread:[[CALLING_THREAD4]]]
+// CHECK: after immediate
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, call rec.sync() done
+// CHECK: inside immediate, call rec.sync() done
 
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, done
+// CHECK: inside immediate, done
 
 /// Don't want to involve protocol calls to not confuse the test with additional details,
 /// so we use concrete types here.
@@ -346,13 +346,13 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
 
   queue.async {
     let outerTID = getCurrentThreadID()
-    print("before startSynchronously [thread:\(outerTID)] @ :\(#line)")
-    let tt = Task.startSynchronously {
+    print("before immediate [thread:\(outerTID)] @ :\(#line)")
+    let tt = Task.immediate {
       dispatchPrecondition(condition: .onQueue(queue))
 
       let innerTID = getCurrentThreadID()
       precondition(compareThreadIDs(outerTID, .equal, innerTID), "Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
-      print("inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+      print("inside immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
 
       for i in 1..<10 {
         queue.async {
@@ -360,12 +360,12 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
         }
       }
 
-      print("inside startSynchronously, call rec.sync() [thread:\(getCurrentThreadID())] @ :\(#line)")
+      print("inside immediate, call rec.sync() [thread:\(getCurrentThreadID())] @ :\(#line)")
       switch rec {
       case .recipient(let recipient): await recipient.callAndSuspend(syncTaskThreadID: innerTID)
       case .recipientOnQueue(let recipient): await recipient.callAndSuspend(syncTaskThreadID: innerTID)
       }
-      print("inside startSynchronously, call rec.sync() done [thread:\(getCurrentThreadID())] @ :\(#line)")
+      print("inside immediate, call rec.sync() done [thread:\(getCurrentThreadID())] @ :\(#line)")
 
       // after suspension we are supposed to hop off to the global pool,
       // thus the thread IDs cannot be the same anymore
@@ -378,11 +378,11 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
         print("NOTICE: Task resumed on same thread as it entered the synchronous task!")
       }
 
-      print("inside startSynchronously, done [thread:\(getCurrentThreadID())] @ :\(#line)")
+      print("inside immediate, done [thread:\(getCurrentThreadID())] @ :\(#line)")
       sem1.signal()
     }
 
-    print("after startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+    print("after immediate [thread:\(getCurrentThreadID())] @ :\(#line)")
     sem2.signal()
   }
 
@@ -397,14 +397,14 @@ callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(
 
 
 //            50: callActorFromStartSynchronousTask()
-//            51: before startSynchronously [thread:0x00007000054f5000] @ :366
-//            52: inside startSynchronously [thread:0x00007000054f5000] @ :372
-//            53: inside startSynchronously, call rec.sync() [thread:0x00007000054f5000] @ :380
+//            51: before immediate [thread:0x00007000054f5000] @ :366
+//            52: inside immediate [thread:0x00007000054f5000] @ :372
+//            53: inside immediate, call rec.sync() [thread:0x00007000054f5000] @ :380
 //            54: Recipient/sync(syncTaskThreadID:) Current actor thread id = 0x000070000567e000 @ :336
-//            55: inside startSynchronously, call rec.sync() done [thread:0x000070000567e000] @ :385
+//            55: inside immediate, call rec.sync() done [thread:0x000070000567e000] @ :385
 //            56: Inner thread id = 0x00007000054f5000
 //            57: Current thread id = 0x000070000567e000
-//            60: after startSynchronously [thread:0x00007000054f5000] @ :418
+//            60: after immediate [thread:0x00007000054f5000] @ :418
 //            61: - async work on queue
 //            62: - async work on queue
 //            63: - async work on queue
@@ -415,24 +415,24 @@ callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(
 //            69: - async work on queue
 //            71: Inner thread id = 0x00007000054f5000
 //            72: Current thread id = 0x000070000567e000
-//            73: inside startSynchronously, done [thread:0x000070000567e000] @ :414
+//            73: inside immediate, done [thread:0x000070000567e000] @ :414
 
 // CHECK-LABEL: callActorFromStartSynchronousTask() - actor in custom executor with its own queue
 // No interleaving allowed between "before" and "inside":
-// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:.*]]]
-// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD4]]]
+// CHECK: before immediate [thread:[[CALLING_THREAD4:.*]]]
+// CHECK-NEXT: inside immediate [thread:[[CALLING_THREAD4]]]
 
 // As we call into an actor, we must enqueue to its custom executor;
 // Make sure the enqueue happens as expected and only then do we give up the calling thread
-// allowing the 'after startSynchronously' to run.
+// allowing the 'after immediate' to run.
 //
-// CHECK-NEXT: inside startSynchronously, call rec.sync() [thread:[[CALLING_THREAD4]]]
-// CHECK: after startSynchronously
+// CHECK-NEXT: inside immediate, call rec.sync() [thread:[[CALLING_THREAD4]]]
+// CHECK: after immediate
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, call rec.sync() done
+// CHECK: inside immediate, call rec.sync() done
 
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, done
+// CHECK: inside immediate, done
 
 actor RecipientOnQueue: RecipientProtocol {
   let executor: NaiveQueueExecutor
