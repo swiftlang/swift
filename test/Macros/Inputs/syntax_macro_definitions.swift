@@ -2881,6 +2881,58 @@ public struct HangingMacro: PeerMacro {
   }
 }
 
+public struct PWithNonisolatedFuncMacro: ExtensionMacro {
+  public static var inferNonisolatedConformances: Bool { false }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P {
+        nonisolated static func requirement() { }
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
+public struct NonisolatedPWithNonisolatedFuncMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P {
+        nonisolated static func requirement() { }
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct BigEndianAccessorMacro: AccessorMacro {
     public static func expansion(
         of node: AttributeSyntax,
