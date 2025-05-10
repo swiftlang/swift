@@ -23,9 +23,9 @@ class SomeClass {
   var computedProperty : Int { return 42 }
 
   init() { x = 0 }
-  init(b : Bool) {
+  init(b : Bool) {// expected-error {{return from initializer without initializing all stored properties}} {{28:3-3=self.x = x\n}} {{16-16=, x: Int}}
     if (b) {}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
   
   func baseMethod() {}
 }
@@ -817,7 +817,7 @@ struct LetProperties {
   }
 
   // Multiple initializations are an error.
-  init(a : Int) {
+  init(a : Int) {// expected-error {{return from initializer without initializing all stored properties}} {{837:3-3=self.z = z\n}} {{15-15=, z: Int?}}
     y = a
     y = a   // expected-error {{immutable value 'self.y' may only be initialized once}}
 
@@ -834,7 +834,7 @@ struct LetProperties {
 
     arr = []
     arr = [] // expected-error {{immutable value 'self.arr' may only be initialized once}}
-  }  // expected-error {{return from initializer without initializing all stored properties}}
+  }
 
   // inout uses of let properties are an error.
   init() throws {
@@ -980,9 +980,9 @@ struct AddressOnlyStructWithInit<T, U> {
   let a : T?
   let b : U?   // expected-note {{'self.b' not initialized}}
   
-  init(a : T) {
+  init(a : T) {// expected-error {{return from initializer without initializing all stored properties}} {{985:3-3=self.b = b\n}} {{13-13=, b: U?}}
     self.a = a
-  }     // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 enum AddressOnlyEnumWithInit<T> {
@@ -1159,10 +1159,10 @@ struct S1_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
   
-  init?(x: Int, y: Int) {
+  init?(x: Int, y: Int) {// expected-error {{return from initializer without initializing all stored properties}} {{1169:3-3=self.b = b\n}} {{23-23=, b: Int}}
     self.a = x
     if y == 42 {
-      return // expected-error {{return from initializer without initializing all stored properties}}
+      return
     }
     // many lines later
     self.b = y
@@ -1173,9 +1173,9 @@ struct S2_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
   
-  init?(x: Int, y: Int) {
+  init?(x: Int, y: Int) {// expected-error {{return from initializer without initializing all stored properties}} {{1179:3-3=self.b = b\n}} {{23-23=, b: Int}}
     self.a = x
-    return // expected-error {{return from initializer without initializing all stored properties}}
+    return
   }
 }
 
@@ -1183,13 +1183,13 @@ struct S3_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
   
-  init?(x: Int, y: Int) {
+  init?(x: Int, y: Int) {// expected-error {{return from initializer without initializing all stored properties}} {{1192:3-3=self.b = b\n}} {{23-23=, b: Int}}
     self.a = x
     if y == 42 {
       self.b = y
       return
     }
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 enum E1_44078 {
