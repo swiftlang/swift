@@ -117,6 +117,11 @@ func testNonSendableDiagnostics(
   let _: nonisolated(nonsending) () async -> NonSendable = globalActor2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-error@-1 {{cannot convert '@MainActor @Sendable () async -> NonSendable' to 'nonisolated(nonsending) () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
+  let _: @concurrent (NonSendable) async -> Void = globalActor1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  // expected-warning@-1 {{cannot convert '@MainActor @Sendable (NonSendable) async -> Void' to '(NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
+  let _: @concurrent () async -> NonSendable = globalActor2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  // expected-warning@-1 {{cannot convert '@MainActor @Sendable () async -> NonSendable' to '() async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
+  
   let _: nonisolated(nonsending) (NonSendable) async -> Void = erased1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-error@-1 {{cannot convert '@isolated(any) @Sendable (NonSendable) async -> Void' to 'nonisolated(nonsending) (NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
   let _: nonisolated(nonsending) () async -> NonSendable = erased2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
