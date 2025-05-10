@@ -32,6 +32,17 @@ import Swift
 @available(SwiftStdlib 6.2, *)
 extension Task where Failure == ${FAILURE_TYPE} {
 
+  @available(SwiftStdlib 6.2, *)
+  @available(*, deprecated, renamed: "immediate")
+  @discardableResult
+  public static func startSynchronously(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
+  ) -> Task<Success, ${FAILURE_TYPE}> {
+    immediate(name: name, priority: priority, operation)
+  }
+
   /// Create and immediately start running a new task in the context of the calling thread/task.
   ///
   /// This function _starts_ the created task on the calling context.
