@@ -309,12 +309,26 @@ class LLVM(cmake_product.CMakeProduct):
         if host_target.startswith('linux'):
             # This preserves the behaviour we had when using
             # LLVM_BUILD_EXTERNAL COMPILER_RT --
-            # that is, having the linker not complaing if symbols used
+            # that is, having the linker not complaining if symbols used
             # by TSan are undefined (namely the ones for Blocks Runtime)
             # In the long term, we want to remove this and
             # build Blocks Runtime before LLVM
-            llvm_cmake_options.define(
-                'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
+            if ("-DCLANG_DEFAULT_LINKER=gold" in llvm_cmake_options
+                or "-DCLANG_DEFAULT_LINKER:STRING=gold" in llvm_cmake_options):
+                print("Assuming just built clang will use a gold linker -- "
+                      "if that's not the case, please adjust the value of "
+                      "`SANITIZER_COMMON_LINK_FLAGS` in `extra-llvm-cmake-options`",
+                      flush=True)
+                llvm_cmake_options.define(
+                    'SANITIZER_COMMON_LINK_FLAGS:STRING',
+                    '-Wl,--unresolved-symbols,ignore-in-object-files')
+            else:
+                print("Assuming just built clang will use a non gold linker -- "
+                      "if that's not the case, please adjust the value of "
+                      "`SANITIZER_COMMON_LINK_FLAGS` in `extra-llvm-cmake-options`",
+                      flush=True)
+                llvm_cmake_options.define(
+                    'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
 
         builtins_runtimes_target_for_darwin = f'{arch}-apple-darwin'
         if system() == "Darwin":
