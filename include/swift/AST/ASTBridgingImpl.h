@@ -60,10 +60,12 @@ swift::DeclNameRef BridgedDeclNameRef::unbridged() const {
 
 BridgedDeclNameLoc::BridgedDeclNameLoc(swift::DeclNameLoc loc)
     : LocationInfo(loc.LocationInfo),
-      NumArgumentLabels(loc.NumArgumentLabels) {}
+      NumArgumentLabels(loc.NumArgumentLabels),
+      HasModuleSelectorLoc(loc.HasModuleSelectorLoc) {}
 
 swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
-  return swift::DeclNameLoc(LocationInfo, NumArgumentLabels);
+  return swift::DeclNameLoc(LocationInfo, NumArgumentLabels,
+                            HasModuleSelectorLoc);
 }
 
 //===----------------------------------------------------------------------===//
