@@ -349,3 +349,25 @@ do {
     }
   }
 }
+
+// Make sure that the solver properly handles mix of non-default integer and floating-point literals
+do {
+  func test(
+    withInitialValue initialValue: Float,
+    increment: Float,
+    count: Int) -> [Float] {}
+
+  func test(
+    withInitialValue initialValue: Double,
+    increment: Double,
+    count: Int) -> [Double] {}
+
+
+  func testDoubleVsFloat(count: Int) {
+    let returnedResult = test(withInitialValue: 0,
+                              increment: 0.1,
+                              count: count)
+
+    let _: [Double] = returnedResult // Ok
+  }
+}
