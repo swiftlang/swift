@@ -43,9 +43,6 @@
 using namespace swift;
 using namespace llvm::opt;
 
-/// The path for Swift libraries in the OS on Darwin.
-#define DARWIN_OS_LIBRARY_PATH "/usr/lib/swift"
-
 static constexpr const char *const localeCodes[] = {
 #define SUPPORTED_LOCALE(Code, Language) #Code,
 #include "swift/AST/LocalizationLanguages.def"
@@ -211,6 +208,12 @@ void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       const FrontendOptions &FrontendOpts,
                                       const LangOptions &LangOpts) {
+  // If this is set, we don't want any runtime import paths.
+  if (SearchPathOpts.SkipAllImplicitImportPaths) {
+    SearchPathOpts.setRuntimeLibraryImportPaths({});
+    return;
+  }
+
   const llvm::Triple &Triple = LangOpts.Target;
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
@@ -220,44 +223,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (LangOpts.hasFeature(Feature::Embedded))
     LibSubDir = "embedded";
 
-  SearchPathOpts.RuntimeLibraryPaths.clear();
-
-#if defined(_WIN32)
-  // Resource path looks like this:
-  //
-  //   C:\...\Swift\Toolchains\6.0.0+Asserts\usr\lib\swift
-  //
-  // The runtimes are in
-  //
-  //   C:\...\Swift\Runtimes\6.0.0\usr\bin
-  //
-  llvm::SmallString<128> RuntimePath(LibPath);
-
-  llvm::sys::path::remove_filename(RuntimePath);
-  llvm::sys::path::remove_filename(RuntimePath);
-  llvm::sys::path::remove_filename(RuntimePath);
-
-  llvm::SmallString<128> VersionWithAttrs(llvm::sys::path::filename(RuntimePath));
-  size_t MaybePlus = VersionWithAttrs.find_first_of('+');
-  StringRef Version = VersionWithAttrs.substr(0, MaybePlus);
-
-  llvm::sys::path::remove_filename(RuntimePath);
-  llvm::sys::path::remove_filename(RuntimePath);
-  llvm::sys::path::append(RuntimePath, "Runtimes", Version, "usr", "bin");
-
-  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(RuntimePath.str()));
-#endif
-
   llvm::sys::path::append(LibPath, LibSubDir);
-  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(LibPath.str()));
-  if (Triple.isOSDarwin())
-    SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
-
-  // If this is set, we don't want any runtime import paths.
-  if (SearchPathOpts.SkipRuntimeLibraryImportPaths) {
-    SearchPathOpts.setRuntimeLibraryImportPaths({});
-    return;
-  }
 
   // Set up the import paths containing the swiftmodules for the libraries in
   // RuntimeLibraryPath.
@@ -270,7 +236,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 
-  if (!SearchPathOpts.ExcludeSDKPathsFromRuntimeLibraryImportPaths && !SearchPathOpts.getSDKPath().empty()) {
+  if (!SearchPathOpts.SkipSDKImportPaths && !SearchPathOpts.getSDKPath().empty()) {
     const char *swiftDir = FrontendOpts.UseSharedResourceFolder
       ? "swift" : "swift_static";
 
@@ -298,6 +264,35 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
   SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
+}
+
+static void
+updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
+                                   const LangOptions &LangOpts) {
+  if (SearchPathOpts.SkipAllImplicitImportPaths) {
+    SearchPathOpts.setImplicitFrameworkSearchPaths({});
+    return;
+  }
+
+  std::vector<std::string> ImplicitFrameworkSearchPaths;
+  if (LangOpts.Target.isOSDarwin()) {
+    if (!SearchPathOpts.SkipSDKImportPaths &&
+        !SearchPathOpts.getSDKPath().empty()) {
+      StringRef SDKPath = SearchPathOpts.getSDKPath();
+      SmallString<128> systemFrameworksScratch(SDKPath);
+      llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
+                              "Frameworks");
+      SmallString<128> systemSubFrameworksScratch(SDKPath);
+      llvm::sys::path::append(systemSubFrameworksScratch, "System", "Library",
+                              "SubFrameworks");
+      SmallString<128> frameworksScratch(SDKPath);
+      llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
+      ImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
+                                      systemSubFrameworksScratch.str().str(),
+                                      frameworksScratch.str().str()};
+    }
+  }
+  SearchPathOpts.setImplicitFrameworkSearchPaths(ImplicitFrameworkSearchPaths);
 }
 
 static void
@@ -411,11 +406,13 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
   SearchPathOpts.setSDKPath(Path);
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
 }
 
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
@@ -2387,8 +2384,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
 
-  Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
-  Opts.ExcludeSDKPathsFromRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdlibimport);
+  Opts.SkipAllImplicitImportPaths |= Args.hasArg(OPT_nostdimport);
+  Opts.SkipSDKImportPaths |= Args.hasArg(OPT_nostdlibimport);
 
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
@@ -4056,6 +4053,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
   setDefaultInProcessPluginServerPathIfNecessary();

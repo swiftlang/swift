@@ -1093,10 +1093,6 @@ public:
   /// Retrieve the module interface checker associated with this AST context.
   ModuleInterfaceChecker *getModuleInterfaceChecker() const;
 
-  /// Compute the extra implicit framework search paths on Apple platforms:
-  /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
-
   /// Load extensions to the given nominal type from the external
   /// module loaders.
   ///
