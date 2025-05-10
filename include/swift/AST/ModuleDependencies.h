@@ -1205,6 +1205,10 @@ public:
   ModuleDependencyIDSetVector
   getAllDependencies(const ModuleDependencyID &moduleID) const;
 
+  /// Query all directly-imported dependencies
+  ModuleDependencyIDSetVector
+  getDirectDependencies(const ModuleDependencyID &moduleID) const;
+
   /// Query all Clang module dependencies.
   ModuleDependencyIDSetVector
   getClangDependencies(const ModuleDependencyID &moduleID) const;
