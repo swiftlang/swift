@@ -515,6 +515,10 @@ TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
   return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
 }
 
+bool NormalProtocolConformance::hasExplicitGlobalActorIsolation() const {
+  return Bits.NormalProtocolConformance.HasExplicitGlobalActor;
+}
+
 void
 NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
   if (!typeExpr) {
