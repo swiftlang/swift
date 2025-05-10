@@ -66,19 +66,24 @@ extension A: @retroactive Swift::Equatable {
 // Test resolution of main:: using `B`
 
 extension main::B {}
-// FIXME improve: expected-error@-1 {{cannot find type 'main::B' in scope}}
+// expected-error@-1 {{type 'B' is not imported through module 'main'}}
+// expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{11-15=ModuleSelectorTestingKit}}
 
 extension B: @retroactive main::Equatable {
-  // FIXME improve: expected-error@-1 {{cannot find type 'main::Equatable' in scope}}
+  // expected-error@-1 {{type 'Equatable' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{27-31=Swift}}
 
   @_implements(main::Equatable, main::==(_:_:))
   // expected-error@-1 {{name of sibling declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{33-39=}}
-  // FIXME improve: expected-error@-2 {{cannot find type 'main::Equatable' in scope}}
+  // expected-error@-2 {{type 'Equatable' is not imported through module 'main'}}
+  // expected-note@-3 {{did you mean module 'Swift'?}} {{16-20=Swift}}
 
   public static func equals(_: main::B, _: main::B) -> main::Bool {
-  // FIXME improve: expected-error@-1 {{cannot find type 'main::B' in scope}}
-  // FIXME improve: expected-error@-2 {{cannot find type 'main::B' in scope}}
-  // FIXME improve: expected-error@-3 {{cannot find type 'main::Bool' in scope}}
+    // expected-error@-1 2{{type 'B' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{32-36=ModuleSelectorTestingKit}}
+    // expected-note@-3 {{did you mean module 'ModuleSelectorTestingKit'?}} {{44-48=ModuleSelectorTestingKit}}
+    // expected-error@-4 {{type 'Bool' is not imported through module 'main'}}
+    // expected-note@-5 {{did you mean module 'Swift'?}} {{56-60=Swift}}
     main::fatalError() // no-error -- not typechecking function bodies
   }
 
@@ -90,12 +95,16 @@ extension B: @retroactive main::Equatable {
 
   mutating func myNegate() {
     let fn: (main::Int, main::Int) -> main::Int =
-    // FIXME improve: expected-error@-1 3{{cannot find type 'main::Int' in scope}}
+    // expected-error@-1 3{{type 'Int' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{14-18=Swift}}
+    // expected-note@-3 {{did you mean module 'Swift'?}} {{25-29=Swift}}
+    // expected-note@-4 {{did you mean module 'Swift'?}} {{39-43=Swift}}
       (main::+)
       // FIXME: should fail????
 
     let magnitude: Int.main::Magnitude = main::magnitude
-    // FIXME improve: expected-error@-1 {{'main::Magnitude' is not a member type of struct 'Swift.Int'}}
+    // expected-error@-1 {{type 'Magnitude' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{24-28=Swift}}
 
     _ = (fn, magnitude)
 
@@ -129,14 +138,17 @@ extension B: @retroactive main::Equatable {
 extension ModuleSelectorTestingKit::C {}
 
 extension C: @retroactive ModuleSelectorTestingKit::Equatable {
-// FIXME improve: expected-error@-1 {{cannot find type 'ModuleSelectorTestingKit::Equatable' in scope}}
+  // expected-error@-1 {{type 'Equatable' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{27-51=Swift}}
 
   @_implements(ModuleSelectorTestingKit::Equatable, ModuleSelectorTestingKit::==(_:_:))
   // expected-error@-1 {{name of sibling declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{53-79=}}
-  // FIXME improve: expected-error@-2 {{cannot find type 'ModuleSelectorTestingKit::Equatable' in scope}}
+  // expected-error@-2 {{type 'Equatable' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-3 {{did you mean module 'Swift'?}} {{16-40=Swift}}
 
   public static func equals(_: ModuleSelectorTestingKit::C, _: ModuleSelectorTestingKit::C) -> ModuleSelectorTestingKit::Bool {
-  // FIXME improve: expected-error@-1 {{cannot find type 'ModuleSelectorTestingKit::Bool' in scope}}
+    // expected-error@-1 {{type 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{96-120=Swift}}
 
     ModuleSelectorTestingKit::fatalError() // no-error -- not typechecking function bodies
   }
@@ -150,12 +162,16 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
   // FIXME improve: expected-note@-1 {{did you mean 'myNegate'?}}
 
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
-    // FIXME improve: expected-error@-1 3{{cannot find type 'ModuleSelectorTestingKit::Int' in scope}}
+    // expected-error@-1 3{{type 'Int' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{14-38=Swift}}
+    // expected-note@-3 {{did you mean module 'Swift'?}} {{45-69=Swift}}
+    // expected-note@-4 {{did you mean module 'Swift'?}} {{79-103=Swift}}
       (ModuleSelectorTestingKit::+)
       // FIXME: should fail????
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
-    // FIXME improve: expected-error@-1 {{'ModuleSelectorTestingKit::Magnitude' is not a member type of struct 'Swift.Int'}}
+    // expected-error@-1 {{type 'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{24-48=Swift}}
 
     _ = (fn, magnitude)
 
@@ -185,7 +201,8 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
 // Test resolution of Swift:: using `D`
 
 extension Swift::D {}
-// FIXME improve: expected-error@-1 {{cannot find type 'Swift::D' in scope}}
+// expected-error@-1 {{type 'D' is not imported through module 'Swift'}}
+// expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{11-16=ModuleSelectorTestingKit}}
 
 extension D: @retroactive Swift::Equatable {
 // Caused by Swift::D failing to typecheck in `equals(_:_:)`: expected-error@-1 *{{extension outside of file declaring struct 'D' prevents automatic synthesis of '==' for protocol 'Equatable'}} expected-note@-1 *{{add stubs for conformance}}
@@ -194,8 +211,9 @@ extension D: @retroactive Swift::Equatable {
   // expected-error@-1 {{name of sibling declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{34-41=}}
 
   public static func equals(_: Swift::D, _: Swift::D) -> Swift::Bool {
-  // expected-error@-1 {{cannot find type 'Swift::D' in scope}}
-  // expected-error@-2 {{cannot find type 'Swift::D' in scope}}
+  // expected-error@-1 2{{type 'D' is not imported through module 'Swift'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{32-37=ModuleSelectorTestingKit}}
+  // expected-note@-3 {{did you mean module 'ModuleSelectorTestingKit'?}} {{45-50=ModuleSelectorTestingKit}}
     Swift::fatalError() // no-error -- not typechecking function bodies
   }
 
@@ -301,7 +319,8 @@ func main::decl1(
   // expected-error@-1 {{name in function declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{6-12=}}
   main::p1: main::A,
   // expected-error@-1 {{argument label cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{3-9=}}
-  // FIXME: expected-error@-2 {{cannot find type 'main::A' in scope}}
+  // expected-error@-2 {{type 'A' is not imported through module 'main'}}
+  // expected-note@-3 {{did you mean module 'ModuleSelectorTestingKit'?}} {{13-17=ModuleSelectorTestingKit}}
   main::label p2: main::inout A,
   // expected-error@-1 {{argument label cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{3-9=}}
   // FIXME: expected-error@-2 {{expected identifier in dotted type}} should be something like {{type 'inout' is not imported through module 'main'}}
@@ -391,7 +410,8 @@ class main::decl4<main::T> {}
 
 typealias main::decl5 = main::Bool
 // expected-error@-1 {{name in typealias declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{11-17=}}
-// FIXME improve: expected-error@-2 {{cannot find type 'main::Bool' in scope}}
+// expected-error@-2 {{type 'Bool' is not imported through module 'main'}}
+// expected-note@-3 {{did you mean module 'Swift'?}} {{25-29=Swift}}
 
 protocol main::decl6 {
   // expected-error@-1 {{name in protocol declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{10-16=}}
@@ -432,7 +452,8 @@ struct Parent {
 
   typealias main::decl5 = main::Bool
   // expected-error@-1 {{name in typealias declaration cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{13-19=}}
-  // FIXME improve: expected-error@-2 {{cannot find type 'main::Bool' in scope}}
+  // expected-error@-2 {{type 'Bool' is not imported through module 'main'}}
+  // expected-note@-3 {{did you mean module 'Swift'?}} {{27-31=Swift}}
 }
 
 @_swift_native_objc_runtime_base(main::BaseClass)
