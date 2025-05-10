@@ -200,6 +200,8 @@ func unsafeFun() {
   _ = color
 
   if unsafe { }
+
+  _ = unsafe ? 1 : 0
 }
 
 func moreUnsafeFunc(unsafe: [Int]) {
