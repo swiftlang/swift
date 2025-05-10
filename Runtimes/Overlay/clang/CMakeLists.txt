@@ -18,5 +18,6 @@ install(TARGETS swift_Builtin_float
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_Builtin_float)
 install_swift_interface(swift_Builtin_float)
+install_swift_doc(swift_Builtin_float)
 
 embed_manifest(swift_Builtin_float)

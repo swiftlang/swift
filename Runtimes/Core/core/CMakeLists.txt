@@ -371,6 +371,7 @@ install(TARGETS swiftCore
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
+install_swift_doc(swiftCore)
 
 # Configure plist creation for Darwin platforms.
 generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)

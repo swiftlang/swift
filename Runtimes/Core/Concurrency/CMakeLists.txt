@@ -145,3 +145,4 @@ install(TARGETS swift_Concurrency
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_Concurrency)
 install_swift_interface(swift_Concurrency)
+install_swift_doc(swift_Concurrency)

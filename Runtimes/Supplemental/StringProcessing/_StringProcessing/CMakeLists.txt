@@ -85,5 +85,6 @@ install(TARGETS swift_StringProcessing
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_StringProcessing)
 install_swift_interface(swift_StringProcessing)
+install_swift_doc(swift_StringProcessing)
 
 embed_manifest(swift_StringProcessing)

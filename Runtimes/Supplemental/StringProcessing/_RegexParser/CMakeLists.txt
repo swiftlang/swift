@@ -42,5 +42,6 @@ install(TARGETS swift_RegexParser
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_RegexParser)
 install_swift_interface(swift_RegexParser)
+install_swift_doc(swift_RegexParser)
 
 embed_manifest(swift_RegexParser)

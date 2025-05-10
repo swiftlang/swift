@@ -30,6 +30,7 @@ include(GNUInstallDirs)
 
 include(AvailabilityMacros)
 include(EmitSwiftInterface)
+include(InstallSwiftDoc)
 include(PlatformInfo)
 include(ResourceEmbedding)
 

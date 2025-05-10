@@ -20,5 +20,6 @@ install(TARGETS swiftRegexBuilder
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftRegexBuilder)
 install_swift_interface(swiftRegexBuilder)
+install_swift_doc(swiftRegexBuilder)
 
 embed_manifest(swiftRegexBuilder)
