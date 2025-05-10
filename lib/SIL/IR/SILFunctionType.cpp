@@ -2638,6 +2638,9 @@ static CanSILFunctionType getSILFunctionType(
         } else if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
           actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
         }
+      } else if (auto *closure = constant->getAbstractClosureExpr()) {
+        if (auto isolation = closure->getActorIsolation())
+          actorIsolation = isolation;
       }
 
       if (!actorIsolation) {
