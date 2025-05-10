@@ -2532,36 +2532,39 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   if (!member)
     return std::nullopt;
 
-  if (!member->choice.isDecl())
+  // If the member is a subscript, it might be a dynamic member lookup access,
+  // in which case we need to peer through the keypath parameter to get the
+  // underlying member.
+  auto *SD = member->choice.isDecl()
+                 ? dyn_cast<SubscriptDecl>(member->choice.getDecl())
+                 : nullptr;
+  auto eligibility = SD ? SD->getDynamicMemberLookupSubscriptEligibility()
+                        : DynamicMemberLookupSubscriptEligibility::None;
+  switch (eligibility) {
+  case DynamicMemberLookupSubscriptEligibility::None:
+    // Not a decl, subscript, or dynamic member lookup subscript; stick with the
+    // existing overload choice.
     return member->choice;
 
-  auto *decl = member->choice.getDecl();
-  if (isa<SubscriptDecl>(decl) &&
-      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl))) {
-    auto *subscript = cast<SubscriptDecl>(decl);
-    // If this is a keypath dynamic member lookup, we have to
-    // adjust the locator to find member referred by it.
-    if (isValidKeyPathDynamicMemberLookup(subscript)) {
-      // Type has a following format:
-      // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
-      auto *fullType = member->adjustedOpenedFullType->castTo<FunctionType>();
-      auto *fnType = fullType->getResult()->castTo<FunctionType>();
-
-      auto paramTy = fnType->getParams()[0].getPlainType();
-      auto keyPath = paramTy->getAnyNominal();
-      auto memberLoc = getConstraintLocator(
-          locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
-
-      auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
-      return memberRef ? std::optional<OverloadChoice>(memberRef->choice)
-                       : std::nullopt;
-    }
-
-    // If this is a string based dynamic lookup, there is no member declaration.
+  case DynamicMemberLookupSubscriptEligibility::String:
+    // There is no member declaration for string-based dynamic member lookup
+    // subscripts.
     return std::nullopt;
-  }
 
-  return member->choice;
+  case DynamicMemberLookupSubscriptEligibility::KeyPath: {
+    auto keyPathType = SD->getDynamicMemberLookupKeyPathType();
+    assert(keyPathType && "KeyPath-based dynamic member lookup subscripts must "
+                          "have a valid dynamic member type");
+
+    auto memberLoc = getConstraintLocator(
+        locator,
+        LocatorPathElt::KeyPathDynamicMember(keyPathType->getAnyNominal()));
+
+    auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
+    return memberRef ? std::optional<OverloadChoice>(memberRef->choice)
+                     : std::nullopt;
+  }
+  }
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagnostic(ASTContext &ctx,

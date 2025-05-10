@@ -1700,9 +1700,14 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
-NOTE(invalid_dynamic_member_subscript, none,
-     "add an explicit argument label to this subscript to satisfy "
-     "the '@dynamicMemberLookup' requirement", ())
+NOTE(invalid_dynamic_member_subscript_missing_label, none,
+     "add an explicit argument label to this subscript to satisfy the "
+     "'@dynamicMemberLookup' requirement", ())
+NOTE(invalid_dynamic_member_subscript_out_of_order, none,
+     "'dynamicMember' argument must appear first in the argument list", ())
+NOTE(invalid_dynamic_member_subscript_missing_default, none,
+     "add a default value to this argument to satisfy the "
+     "'@dynamicMemberLookup' requirement", ())
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",

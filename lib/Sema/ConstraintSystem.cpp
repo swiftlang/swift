@@ -3952,8 +3952,8 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor))
     return getConstraintLocator(UME);
 
-  // All implicit x[dynamicMember:] subscript calls can share the same argument
-  // list.
+  // All implicit `x[dynamicMember:...]` subscript calls can share the same
+  // argument list.
   if (locator->findLast<LocatorPathElt::ImplicitDynamicMemberSubscript>()) {
     return getConstraintLocator(
         ASTNode(), LocatorPathElt::ImplicitDynamicMemberSubscript());
