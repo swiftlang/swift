@@ -81,7 +81,7 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
 __attribute__((used))
 void *memmove(void *dst, const void *src, size_t n) {
-  if ((uintptr_t)dst > (uintptr_t)src) {
+  if ((uintptr_t)dst < (uintptr_t)src) {
     for (int i = 0; i < n; i++) {
       ((char *)dst)[i] = ((char *)src)[i];
     }
