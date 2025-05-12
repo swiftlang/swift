@@ -1620,7 +1620,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // ExtendedExistentialTypeShapes consider existential metatypes to
       // be part of the existential, so if we're symbolically referencing
       // shapes, we need to handle that at this level.
-      if (EMT->hasParameterizedExistential()) {
+      if (EMT->getExistentialLayout().needsExtendedShape(AllowInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(EMT);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
@@ -1629,7 +1629,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       }
 
       if (EMT->getInstanceType()->isExistentialType() &&
-          EMT->hasParameterizedExistential())
+          EMT->getExistentialLayout().needsExtendedShape(AllowInverses))
         appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
       else
         appendType(EMT->getInstanceType(), sig, forDecl);
@@ -1685,8 +1685,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return appendType(strippedTy, sig, forDecl);
       }
 
-      if (PCT->hasParameterizedExistential()
-          || (PCT->hasInverse() && AllowInverses))
+      if (PCT->getExistentialLayout().needsExtendedShape(AllowInverses))
         return appendConstrainedExistential(PCT, sig, forDecl);
 
       // We mangle ProtocolType and ProtocolCompositionType using the
@@ -1700,7 +1699,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
-      if (ET->hasParameterizedExistential()) {
+
+      if (ET->getExistentialLayout().needsExtendedShape(AllowInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(ET);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, ET, sig, forDecl);
@@ -1710,6 +1710,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         return appendConstrainedExistential(ET->getConstraintType(), sig,
                                             forDecl);
       }
+
       return appendType(ET->getConstraintType(), sig, forDecl);
     }
 
