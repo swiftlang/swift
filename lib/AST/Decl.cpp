@@ -11481,9 +11481,6 @@ SourceRange FuncDecl::getSourceRange() const {
   if (startLoc.isInvalid())
     return SourceRange();
 
-  if (getBodyKind() == BodyKind::Unparsed)
-    return { startLoc, BodyRange.End };
-
   SourceLoc endLoc = getOriginalBodySourceRange().End;
   if (endLoc.isInvalid()) {
     if (isa<AccessorDecl>(this))
