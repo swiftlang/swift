@@ -1348,6 +1348,7 @@ function Build-CMakeProject {
       } else {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe")
       }
+      Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
       if (-not ($Platform.OS -eq [OS]::Windows)) {
         Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
       }
