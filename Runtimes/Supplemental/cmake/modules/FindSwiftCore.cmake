@@ -32,9 +32,6 @@ The module may set the following variables if `SwiftCore_DIR` is not set.
  ``SwiftCore_FOUND``
    true if core was found
 
- ``SwiftCore_LIBRARIES`` OR ``SwiftCore_IMPLIB``
-   the libraries to be linked
-
  ``SwiftCore_INCLUDE_DIR``
    the directory containing the Swift.swiftmodule folder
 
@@ -72,7 +69,7 @@ if(APPLE)
   find_package_handle_standard_args(SwiftCore DEFAULT_MSG
     SwiftCore_IMPLIB SwiftCore_INCLUDE_DIR)
 elseif(LINUX)
-  if(SwiftCore_STATIC)
+  if (NOT BUILD_SHARED_LIBS)
     find_path(SwiftCore_INCLUDE_DIR
       "Swift.swiftmodule"
       HINTS
@@ -112,7 +109,7 @@ elseif(WIN32)
 
   add_library(SwiftCore SHARED IMPORTED GLOBAL)
   set_target_properties(SwiftCore PROPERTIES
-    IMPORTED_LOCATION "${SwiftCore_LIBRARY}"
+    IMPORTED_IMPLIB "${SwiftCore_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${SwiftCore_INCLUDE_DIR}")
   find_package_handle_standard_args(SwiftCore DEFAULT_MSG
     SwiftCore_LIBRARY SwiftCore_INCLUDE_DIR)
