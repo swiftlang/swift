@@ -8596,6 +8596,13 @@ GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
       (ActorIsolation, Type, DeclName, ActorIsolation))
 
 //===----------------------------------------------------------------------===//
+// MARK: @_inheritActorContext
+//===----------------------------------------------------------------------===//
+ERROR(inherit_actor_context_only_on_func_types,none,
+      "%0 only applies to parameters with function types (got: %1)",
+      (DeclAttribute, Type))
+
+//===----------------------------------------------------------------------===//
 // MARK: @concurrent and nonisolated(nonsending) attributes
 //===----------------------------------------------------------------------===//
 

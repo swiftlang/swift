@@ -3141,6 +3141,9 @@ void CompletionLookup::getAttributeDeclParamCompletions(
     addDeclAttrParamKeyword("unsafe", /*Parameters=*/{}, "", false);
     addDeclAttrParamKeyword("nonsending", /*Parameters=*/{}, "", false);
     break;
+  case ParameterizedDeclAttributeKind::InheritActorContext:
+    addDeclAttrParamKeyword("always", /*Parameters=*/{}, "", false);
+    break;
   case ParameterizedDeclAttributeKind::AccessControl:
     addDeclAttrParamKeyword("set", /*Parameters=*/{}, "", false);
     break;
