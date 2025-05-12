@@ -1723,7 +1723,8 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
-/// Determine whether a synth
+/// Determine whether a synthesized requirement for the given conformance
+/// should be explicitly marked as 'nonisolated'.
 static bool synthesizedRequirementIsNonIsolated(
     const NormalProtocolConformance *conformance) {
   // @preconcurrency suppresses this.
