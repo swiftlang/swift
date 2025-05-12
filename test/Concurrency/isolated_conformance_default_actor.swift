@@ -60,6 +60,10 @@ class CodableClass: Codable {
   var state: Int = 0
 }
 
+class OtherClass {
+  var otherState: any Encodable.Type = CodableClass.self
+}
+
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
