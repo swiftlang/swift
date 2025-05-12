@@ -4992,7 +4992,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
                                      SGFContext C) {
   ArgumentScope scope(SGF, E);
 
-  auto iaTy = E->getType()->castTo<BoundGenericType>();
+  auto iaTy = E->getType()->castTo<BoundGenericStructType>();
   auto loweredIAType = SGF.getLoweredType(iaTy);
 
   // If this is an empty InlineArray literal and it's loadable, then create an
@@ -5007,9 +5007,19 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
 
+
+  auto *arrayDecl = cast<StructDecl>(iaTy->getDecl());
+  VarDecl *storageProperty = nullptr;
+  for (VarDecl *property : arrayDecl->getStoredProperties()) {
+    if ((property->getTypeInContext()->is<BuiltinFixedArrayType>())) {
+      storageProperty = property;
+      break;
+    }
+  }
+
   SILValue alloc = SGF.emitTemporaryAllocation(E, loweredIAType);
-  SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
-                                            eltTL.getLoweredType().getAddressType());
+  SILValue storage = SGF.B.createStructElementAddr(E, alloc, storageProperty);
+  SILValue addr = SGF.B.createVectorBaseAddr(E, storage);
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
