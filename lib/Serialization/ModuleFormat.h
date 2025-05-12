@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 940; // remove SwiftSettings
+const uint16_t SWIFTMODULE_VERSION_MINOR = 941; // add modifier to @_inheritActorContext
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2553,6 +2553,12 @@ namespace decls_block {
   using NonisolatedDeclAttrLayout =
       BCRecordLayout<Nonisolated_DECL_ATTR,
                      BCFixed<2>, // the modifier (unsafe, nonsending)
+                     BCFixed<1>  // implicit flag
+                     >;
+
+  using InheritActorContextDeclAttrLayout =
+       BCRecordLayout<InheritActorContext_DECL_ATTR,
+                     BCFixed<1>, // the modifier (none = 0, always = 1)
                      BCFixed<1>  // implicit flag
                      >;
 

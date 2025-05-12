@@ -617,6 +617,21 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 
 UNINTERESTING_FEATURE(BuiltinSelect)
 
+static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  if (auto *PL = VD->getParameterList()) {
+    return llvm::any_of(*PL, [&](const ParamDecl *P) {
+      auto *attr = P->getAttrs().getAttribute<InheritActorContextAttr>();
+      return attr && attr->isAlways();
+    });
+  }
+
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

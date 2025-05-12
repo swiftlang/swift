@@ -1239,6 +1239,18 @@ BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceRange cRange,
                                     BridgedNonIsolatedModifier modifier);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedInheritActorContextModifier {
+  BridgedInheritActorContextModifierNone,
+  BridgedInheritActorContextModifierAlways,
+};
+
+SWIFT_NAME("BridgedInheritActorContextAttr.createParsed(_:atLoc:range:modifier:)")
+BridgedInheritActorContextAttr
+BridgedInheritActorContextAttr_createParsed(BridgedASTContext cContext,
+                                            BridgedSourceLoc cAtLoc,
+                                            BridgedSourceRange cRange,
+                                            BridgedInheritActorContextModifier modifier);
+
 SWIFT_NAME("BridgedObjCAttr.createParsedUnnamed(_:atLoc:attrNameLoc:)")
 BridgedObjCAttr
 BridgedObjCAttr_createParsedUnnamed(BridgedASTContext cContext,

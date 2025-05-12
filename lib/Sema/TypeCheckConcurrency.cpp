@@ -4799,6 +4799,11 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
 
     case ActorIsolation::ActorInstance: {
       if (checkIsolatedCapture) {
+        auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
+        // @_inheritActorContext(always) forces the isolation capture.
+        if (explicitClosure && explicitClosure->alwaysInheritsActorContext())
+          return parentIsolation;
+
         if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
           return ActorIsolation::forActorInstanceCapture(param);
       } else {

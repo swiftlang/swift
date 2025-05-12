@@ -4045,6 +4045,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
+  SmallBitVector alwaysInheritActorContext;
   SmallBitVector variadicGenerics;
   SmallBitVector sendingParameters;
 
@@ -4071,7 +4072,8 @@ public:
 
   /// Whether the given parameter is a closure that should inherit the
   /// actor context from the context in which it was created.
-  bool inheritsActorContext(unsigned paramIdx) const;
+  std::pair<bool, InheritActorContextModifier>
+  inheritsActorContext(unsigned paramIdx) const;
 
   bool isVariadicGenericParameter(unsigned paramIdx) const;
 

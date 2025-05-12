@@ -6109,15 +6109,20 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
-                                        bool inheritActorContext,
-                                        bool isPassedToSendingParameter,
+static void applyContextualClosureFlags(Expr *expr, unsigned paramIdx,
+                                        const ParameterListInfo &paramInfo,
                                         bool requiresDynamicIsolationChecking,
                                         bool isMacroArg) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-    closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
-    closure->setInheritsActorContext(inheritActorContext);
-    closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
+    closure->setAllowsImplicitSelfCapture(
+        paramInfo.isImplicitSelfCapture(paramIdx));
+
+    auto [inheritActorContext, modifier] =
+        paramInfo.inheritsActorContext(paramIdx);
+    closure->setInheritsActorContext(inheritActorContext, modifier);
+
+    closure->setIsPassedToSendingParameter(
+        paramInfo.isSendingParameter(paramIdx));
     closure->setRequiresDynamicIsolationChecking(
         requiresDynamicIsolationChecking);
     closure->setIsMacroArgument(isMacroArg);
@@ -6125,19 +6130,14 @@ static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyContextualClosureFlags(captureList->getClosureBody(),
-                                implicitSelfCapture, inheritActorContext,
-                                isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking,
+    applyContextualClosureFlags(captureList->getClosureBody(), paramIdx,
+                                paramInfo, requiresDynamicIsolationChecking,
                                 isMacroArg);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
-    applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
-                                inheritActorContext,
-                                isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking,
-                                isMacroArg);
+    applyContextualClosureFlags(identity->getSubExpr(), paramIdx, paramInfo,
+                                requiresDynamicIsolationChecking, isMacroArg);
   }
 }
 
@@ -6263,19 +6263,13 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
   auto applyFlagsToArgument = [&paramInfo,
                                &closuresRequireDynamicIsolationChecking,
-                               &locator](
-                                  unsigned paramIdx, Expr *argument) {
+                               &locator](unsigned paramIdx, Expr *argument) {
     if (!isClosureLiteralExpr(argument))
       return;
 
-    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
-    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
     bool isMacroArg = isExpr<MacroExpansionExpr>(locator.getAnchor());
 
-    applyContextualClosureFlags(argument, isImplicitSelfCapture,
-                                inheritsActorContext,
-                                isPassedToSendingParameter,
+    applyContextualClosureFlags(argument, paramIdx, paramInfo,
                                 closuresRequireDynamicIsolationChecking,
                                 isMacroArg);
   };
