@@ -749,7 +749,9 @@ function(_compile_swift_files
     endif()
 
     set(exclude_binary_swiftmodule_installation_args "")
-    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE)
+    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE OR
+       (SWIFTFILE_INSTALL_BINARY_SWIFTMODULE STREQUAL "NON_DARWIN_ONLY" AND
+        SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS))
         list(APPEND
           exclude_binary_swiftmodule_installation_args
           "REGEX" "${SWIFTFILE_MODULE_NAME}.swiftmodule/[^/]*\\.swiftmodule$" EXCLUDE)
