@@ -50,6 +50,32 @@ private:
       StringRef sdkModuleOutputPath, llvm::PrefixMapper *prefixMapper,
       bool isTestableImport = false);
 
+  /// Query dependency information for header dependencies
+  /// of a binary Swift module.
+  ///
+  /// \param moduleID the name of the Swift module whose dependency
+  /// information will be augmented with information about the given
+  /// textual header inputs.
+  ///
+  /// \param headerPath the path to the header to be scanned.
+  ///
+  /// \param clangScanningTool The clang dependency scanner.
+  ///
+  /// \param cache The module dependencies cache to update, with information
+  /// about new Clang modules discovered along the way.
+  ///
+  /// \returns \c true if an error occurred, \c false otherwise
+  bool scanHeaderDependenciesOfSwiftModule(
+      const ASTContext &ctx,
+      ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
+      std::optional<llvm::MemoryBufferRef> sourceBuffer,
+      ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &headerClangModuleDependencies,
+      std::vector<std::string> &headerFileInputs,
+      std::vector<std::string> &bridgingHeaderCommandLine,
+      std::optional<std::string> &includeTreeID);
+
+
   /// Store cache entry for include tree.
   llvm::Error
   createCacheKeyForEmbeddedHeader(std::string embeddedHeaderIncludeTree,
@@ -65,7 +91,17 @@ private:
   clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<ModuleInterfaceLoader> swiftScannerModuleLoader;
-  std::unique_ptr<ClangImporter> clangScannerModuleLoader;
+
+  // Base command line invocation for clang scanner queries (both module and header)
+  std::vector<std::string> clangScanningBaseCommandLineArgs;
+  // Command line invocation for clang by-name module lookups
+  std::vector<std::string> clangScanningModuleCommandLineArgs;
+  // Clang-specific (-Xcc) command-line flags to include on
+  // Swift module compilation commands
+  std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
+  // Working directory for clang module lookup queries
+  std::string clangScanningWorkingDirectoryPath;
+
   // CAS instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;

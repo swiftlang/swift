@@ -266,7 +266,7 @@ public:
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
                         InterfaceSubContextDelegate &delegate,
                         llvm::PrefixMapper *mapper,
                         bool isTestableImport) override;
