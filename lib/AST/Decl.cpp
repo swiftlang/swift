@@ -10308,30 +10308,20 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  SourceLoc endLoc;
+  SourceRange thrownTypeRange;
+  if (auto *typeRepr = getThrownTypeRepr())
+    thrownTypeRange = typeRepr->getSourceRange();
 
   // name(parameter list...) async throws(E)
-  if (auto *typeRepr = getThrownTypeRepr())
-    endLoc = typeRepr->getSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getThrowsLoc();
-  if (endLoc.isInvalid())
-    endLoc = getAsyncLoc();
-
-  if (endLoc.isInvalid())
-    return getParameterListSourceRange();
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getParameterListSourceRange(), getAsyncLoc(),
+                              getThrowsLoc(), thrownTypeRange);
 }
 
 SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto endLoc = getParameters()->getSourceRange().End;
-  if (endLoc.isInvalid())
-    return getNameLoc();
-
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getNameLoc(), getParameters()->getSourceRange());
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
