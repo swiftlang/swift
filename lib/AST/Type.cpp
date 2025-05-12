@@ -320,6 +320,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
                            !protoDecl->isMarkerProtocol());
   representsAnyObject = false;
 
+  inverses = InvertibleProtocolSet();
+
   protocols.push_back(protoDecl);
   expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
@@ -353,7 +355,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  auto inverses = type->getInverses();
+  inverses = type->getInverses();
   expandDefaults(protocols, inverses, type->getASTContext());
 
   representsAnyObject = [&]() {
@@ -431,6 +433,16 @@ Type ExistentialLayout::getSuperclass() const {
   }
 
   return Type();
+}
+
+bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+  if (!getParameterizedProtocols().empty())
+    return true;
+
+  if (allowInverses && hasInverses())
+    return true;
+
+  return false;
 }
 
 bool TypeBase::isObjCExistentialType() {
