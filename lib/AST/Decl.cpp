@@ -2528,6 +2528,19 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   return extractInlinableText(ctx, init, scratch);
 }
 
+SourceLoc PatternBindingDecl::getStartLoc() const {
+  if (StaticLoc.isValid())
+    return StaticLoc;
+
+  if (VarLoc.isValid())
+    return VarLoc;
+
+  if (getPatternList().empty())
+    return SourceLoc();
+
+  return getPatternList().front().getStartLoc();
+}
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
   SourceLoc endLoc = getPatternList().empty()
@@ -11441,6 +11454,24 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
     }
   }
   return nullptr;
+}
+
+SourceLoc FuncDecl::getStartLoc() const {
+  auto startLoc = StaticLoc;
+  if (startLoc.isInvalid())
+    startLoc = FuncLoc;
+  if (startLoc.isInvalid())
+    startLoc = getNameLoc();
+  if (startLoc.isInvalid())
+    startLoc = getSignatureSourceRange().Start;
+  if (startLoc.isInvalid())
+    startLoc = getResultTypeSourceRange().Start;
+  if (startLoc.isInvalid())
+    startLoc = getGenericTrailingWhereClauseSourceRange().Start;
+  if (startLoc.isInvalid())
+    startLoc = getOriginalBodySourceRange().Start;
+
+  return startLoc;
 }
 
 SourceRange FuncDecl::getSourceRange() const {
