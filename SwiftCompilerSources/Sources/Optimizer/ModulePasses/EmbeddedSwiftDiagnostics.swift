@@ -220,6 +220,7 @@ private struct FunctionChecker {
       return
     }
     if !conformance.protocol.requiresClass {
+      assert(location.hasValidLineNumber)
       throw Diagnostic(.embedded_swift_existential_protocol, conformance.protocol.name, at: location)
     }
 
