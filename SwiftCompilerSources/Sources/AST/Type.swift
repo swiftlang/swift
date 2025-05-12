@@ -14,7 +14,7 @@ import Basic
 import ASTBridging
 
 /// A Swift type.
-/// It is not necessarily canoncial, e.g. typealiases are not resolved.
+/// It is not necessarily canonical, e.g. typealiases are not resolved.
 public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildren {
   public enum TraitResult {
     case isNot
@@ -206,7 +206,7 @@ extension TypeProperties {
     rawType.bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
   }
 
-  /// Performas a global conformance lookup for this type for `protocol`.
+  /// Performs a global conformance lookup for this type for `protocol`.
   /// It checks conditional requirements.
   ///
   /// This type must be a contextualized type. It must not contain type parameters.
