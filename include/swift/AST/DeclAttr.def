@@ -862,7 +862,6 @@ DECL_ATTR(abi, ABI,
   OnConstructor | OnFunc | OnSubscript | OnVar,
   LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   165)
-DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 
 // Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
 
@@ -881,13 +880,20 @@ SIMPLE_DECL_ATTR(extensible, Extensible,
   OnEnum,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   169)
+DECL_ATTR_FEATURE_REQUIREMENT(Extensible, ExtensibleAttribute)
 
 SIMPLE_DECL_ATTR(concurrent, Concurrent,
   OnFunc | OnConstructor | OnSubscript | OnVar,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   170)
 
-LAST_DECL_ATTR(Concurrent)
+SIMPLE_DECL_ATTR(preEnumExtensibility, PreEnumExtensibility,
+  OnEnum,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  171)
+DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, ExtensibleAttribute)
+  
+LAST_DECL_ATTR(PreEnumExtensibility)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -410,9 +410,6 @@ static void _swift_task_debug_dumpIsCurrentExecutorFlags(
   if (options.contains(swift_task_is_current_executor_flag::Assert))
     SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
                          hint, "Assert");
-  if (options.contains(swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext))
-    SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
-                         hint, "UseIsIsolatingCurrentContext");
 }
 
 // Shimming call to Swift runtime because Swift Embedded does not have
@@ -470,13 +467,6 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
       // Remove the assert option which is what would cause the "crash" mode
       options = swift_task_is_current_executor_flag(
         options & ~swift_task_is_current_executor_flag::Assert);
-    } else if (strcmp(modeStr, "isIsolatingCurrentContext") == 0) {
-      options = swift_task_is_current_executor_flag(
-        options | swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext);
-      // When we're using the isIsolatingCurrentContext we don't want to use crashing APIs,
-      // so disable it explicitly.
-      options = swift_task_is_current_executor_flag(
-        options & ~swift_task_is_current_executor_flag::Assert);
     } else if (strcmp(modeStr, "crash") == 0 ||
                strcmp(modeStr, "swift6") == 0) {
       options = swift_task_is_current_executor_flag(
@@ -501,43 +491,11 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
 
-/// Check the executor's witness table for specific information about e.g.
-/// being able ignore `checkIsolated` and only call `isIsolatingCurrentContext`.
-static swift_task_is_current_executor_flag
-_getIsolationCheckingOptionsFromExecutorWitnessTable(const SerialExecutorWitnessTable *_wtable) {
-  const WitnessTable* wtable = reinterpret_cast<const WitnessTable*>(_wtable);
-#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
-  auto description = lookThroughOptionalConditionalWitnessTable(
-    reinterpret_cast<const RelativeWitnessTable*>(wtable))
-    ->getDescription();
-#else
-  auto description = wtable->getDescription();
-#endif
-  if (!description) {
-    return swift_task_is_current_executor_flag::None;
-  }
-
-  if (description->hasNonDefaultSerialExecutorIsIsolatingCurrentContext()) {
-    // The specific executor has implemented `isIsolatingCurrentContext` and
-    // we do not have to call `checkIsolated`.
-    return swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext;
-  }
-
-  // No changes to the checking mode.
-  return swift_task_is_current_executor_flag::None;
-}
-
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorWithFlagsImpl(
     SerialExecutorRef expectedExecutor,
     swift_task_is_current_executor_flag flags) {
   auto current = ExecutorTrackingInfo::current();
-  if (expectedExecutor.getIdentity() && expectedExecutor.hasSerialExecutorWitnessTable()) {
-    if (auto *wtable = expectedExecutor.getSerialExecutorWitnessTable()) {
-      auto executorSpecificMode = _getIsolationCheckingOptionsFromExecutorWitnessTable(wtable);
-      flags = swift_task_is_current_executor_flag(flags | executorSpecificMode);
-    }
-  }
 
   auto options = SwiftTaskIsCurrentExecutorOptions(flags);
   _swift_task_debug_dumpIsCurrentExecutorFlags(__FUNCTION__, flags);
@@ -557,16 +515,28 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     // We cannot use 'complexEquality' as it requires two executor instances,
     // and we do not have a 'current' executor here.
 
-    if (options.contains(swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext)) {
-      SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext",
-                           expectedExecutor.getIdentity());
-      // The executor has the most recent 'isIsolatingCurrentContext' API
-      // so available so we prefer calling that to 'checkIsolated'.
-      auto result = swift_task_isIsolatingCurrentContext(expectedExecutor);
+    // Invoke the 'isIsolatingCurrentContext', if "undecided" (i.e. nil), we need to make further calls
+    SWIFT_TASK_DEBUG_LOG("executor checking, invoke (%p).isIsolatingCurrentContext",
+                         expectedExecutor.getIdentity());
+    // The executor has the most recent 'isIsolatingCurrentContext' API
+    // so available so we prefer calling that to 'checkIsolated'.
+    auto isIsolatingCurrentContextDecision =
+        getIsIsolatingCurrentContextDecisionFromInt(
+            swift_task_isIsolatingCurrentContext(expectedExecutor));
 
-      SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
-                     expectedExecutor.getIdentity(), result ? "pass" : "fail");
-      return result;
+    SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
+                   expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
+    switch (isIsolatingCurrentContextDecision) {
+      case IsIsolatingCurrentContextDecision::Isolated:
+        // We know for sure that this serial executor is isolating this context, return the decision.
+        return true;
+      case IsIsolatingCurrentContextDecision::NotIsolated:
+        // We know for sure that this serial executor is NOT isolating this context, return this decision.
+        return false;
+      case IsIsolatingCurrentContextDecision::Unknown:
+        // We don't know, so we have to continue trying to check using other methods.
+        // This most frequently would happen if a serial executor did not implement isIsolatingCurrentContext.
+        break;
     }
 
     // Otherwise, as last resort, let the expected executor check using
@@ -675,18 +645,21 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
 
   // Invoke the 'isIsolatingCurrentContext' function if we can; If so, we can
   // avoid calling the `checkIsolated` because their result will be the same.
-  if (options.contains(swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext)) {
-    SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext",
-      expectedExecutor.getIdentity());
+  SWIFT_TASK_DEBUG_LOG("executor checking: call (%p).isIsolatingCurrentContext",
+    expectedExecutor.getIdentity());
 
-    bool checkResult = swift_task_isIsolatingCurrentContext(expectedExecutor);
+  const auto isIsolatingCurrentContextDecision =
+    getIsIsolatingCurrentContextDecisionFromInt(swift_task_isIsolatingCurrentContext(expectedExecutor));
 
-    SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
-      expectedExecutor.getIdentity(), checkResult ? "pass" : "fail");
-    return checkResult;
-  } else {
-    SWIFT_TASK_DEBUG_LOG("executor checking: can NOT call (%p).isIsolatingCurrentContext",
-                         expectedExecutor.getIdentity());
+  SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
+    expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
+  switch (isIsolatingCurrentContextDecision) {
+  case IsIsolatingCurrentContextDecision::Isolated:
+    return true;
+  case IsIsolatingCurrentContextDecision::NotIsolated:
+    return false;
+  case IsIsolatingCurrentContextDecision::Unknown:
+    break;
   }
 
   // This provides a last-resort check by giving the expected SerialExecutor the

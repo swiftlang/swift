@@ -75,6 +75,7 @@
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -1019,6 +1020,36 @@ bool Decl::isInMacroExpansionInContext() const {
   return file->getFulfilledMacroRole() != std::nullopt;
 }
 
+bool Decl::isInMacroExpansionFromClangHeader() const {
+  SourceLoc declLoc = getLoc();
+  if (declLoc.isInvalid())
+    return false;
+
+  auto &ctx = getASTContext();
+  auto &SourceMgr = ctx.SourceMgr;
+
+  auto declBufferID = SourceMgr.findBufferContainingLoc(declLoc);
+  auto declGeneratedSourceInfo = SourceMgr.getGeneratedSourceInfo(declBufferID);
+  if (!declGeneratedSourceInfo)
+    return false;
+  CustomAttr *attr = declGeneratedSourceInfo->attachedMacroCustomAttr;
+  if (!attr)
+    return false;
+
+  SourceLoc macroAttrLoc = attr->AtLoc;
+  if (macroAttrLoc.isInvalid())
+    return false;
+
+  auto macroAttrBufferID = SourceMgr.findBufferContainingLoc(macroAttrLoc);
+  auto macroAttrGeneratedSourceInfo =
+      SourceMgr.getGeneratedSourceInfo(macroAttrBufferID);
+  if (!macroAttrGeneratedSourceInfo)
+    return false;
+
+  return macroAttrGeneratedSourceInfo->kind ==
+         GeneratedSourceInfo::AttributeFromClang;
+}
+
 SourceLoc Decl::getLocFromSource() const {
   switch (getKind()) {
 #define DECL(ID, X) \
@@ -1468,9 +1499,9 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
 bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
-  if (auto clangDecl = getClangDecl()) {
-    return clangDecl->isWeakImported();
-  }
+  if (auto clangDecl = getClangDecl())
+    return clangDecl->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
@@ -3859,6 +3890,13 @@ bool swift::conflicting(ASTContext &ctx,
   if (sig1.IsFunction != sig2.IsFunction)
     return true;
 
+  // Gracefully handle the case where value generic arguments were introduced
+  // as a conflicting value with static variables of the same name.
+  if (sig1.IsGenericArg != sig2.IsGenericArg) {
+    *wouldConflictInSwift5 = true;
+    return true;
+  }
+
   // Variables always conflict with non-variables with the same signature.
   // (e.g variables with zero argument functions, variables with type
   //  declarations)
@@ -4037,6 +4075,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.IsMacro = isa<MacroDecl>(this);
+  signature.IsGenericArg = isa<GenericTypeParamDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 

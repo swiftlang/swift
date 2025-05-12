@@ -1064,12 +1064,6 @@ Added: _swift_ConformanceExecutionContextSize
 Added: _swift_conformsToProtocolWithExecutionContext
 Added: _swift_isInConformanceExecutionContext
 
-// Swift Settings
-Added: _$ss12SwiftSettingVABycfC
-Added: _$ss12SwiftSettingVMa
-Added: _$ss12SwiftSettingVMn
-Added: _$ss12SwiftSettingVN
-
 // EnumeratedSequence Collection conformances
 Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
 Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc
@@ -1125,3 +1119,6 @@ Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7Ra
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMa$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
+
+// Duration.nanoseconds(_:)
+Added: _$ss8DurationV11nanosecondsyABSdFZ

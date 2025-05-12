@@ -120,15 +120,6 @@ public macro Task(
 ) =
   #externalMacro(module: "SwiftMacros", type: "TaskMacro")
 
-// NOTE: We put SwiftSetting under $Macro since #SwiftSettings() is a macro.
-@available(SwiftStdlib 9999, *)
-extension SwiftSetting {
-  /// Force the current module to use the passed in defaultIsolation instead of
-  /// the default isolation.
-  @available(SwiftStdlib 9999, *)
-  public static func defaultIsolation(_ actor: Actor.Type?) -> SwiftSetting { SwiftSetting() }
-}
-
 #endif
 
 #if $IsolatedAny

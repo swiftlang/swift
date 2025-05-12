@@ -119,10 +119,92 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     // Recursively sink enclosing end_access, end_borrow, end_apply, and destroy_value. If the scope can be extended
     // into the caller, return the function arguments that are the dependency sources.
     var scopeExtension = ScopeExtension(localReachabilityCache, context)
-    let args = scopeExtension.extendScopes(dependence: newLifetimeDep)
+    guard scopeExtension.extendScopes(dependence: newLifetimeDep) else {
+      continue
+    }
+    let args = scopeExtension.findArgumentDependencies()
+
+    // If the scope cannot be extended to the caller, this must be the outermost dependency level.
+    // Insert end_cow_mutation_addr if needed.
+    if args.isEmpty {
+      createEndCOWMutationIfNeeded(lifetimeDep: newLifetimeDep, context)
+    }
 
     // Redirect the dependence base to the function arguments. This may create additional mark_dependence instructions.
     markDep.redirectFunctionReturn(to: args, context)
+  }
+}
+
+private extension Type {
+  func mayHaveMutableSpan(in function: Function, _ context: FunctionPassContext) -> Bool {
+    if hasArchetype {
+      return true
+    }
+    if isBuiltinType {
+      return false
+    }
+    // Only result types that are nominal can have a MutableSpan derived from an inout array access.
+    if nominal == nil {
+      return false
+    }
+    if nominal == context.swiftMutableSpan {
+      return true
+    }
+    if isStruct {
+      guard let fields = getNominalFields(in: function) else {
+        return false
+      }
+      return fields.contains { $0.mayHaveMutableSpan(in: function, context) }
+    }
+    if isTuple {
+      return tupleElements.contains { $0.mayHaveMutableSpan(in: function, context) }
+    }
+    if isEnum {
+      guard let cases = getEnumCases(in: function) else {
+        return true
+      }
+      return cases.contains { $0.payload?.mayHaveMutableSpan(in: function, context) ?? false }
+    }
+    // Classes cannot be ~Escapable, therefore cannot hold a MutableSpan.
+    if isClass {
+      return false
+    }
+    return false
+  }
+}
+
+/// Insert end_cow_mutation_addr for lifetime dependent values that maybe of type MutableSpan and depend on a mutable address.
+private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ context: FunctionPassContext) {
+  var scoped : ScopedInstruction
+
+  // Handle cases which generate mutable addresses: begin_access [modify] and yield &
+  switch lifetimeDep.scope {
+    case let .access(beginAccess):
+      if beginAccess.accessKind != .modify {
+        return
+      }
+      scoped = beginAccess
+    case let .yield(value):
+      let beginApply = value.definingInstruction as! BeginApplyInst
+      if value == beginApply.token {
+        return
+      }
+      if beginApply.convention(of: value as! MultipleValueInstructionResult) != .indirectInout {
+        return
+      }
+      scoped = beginApply
+    // None of the below cases can generate a mutable address.
+    case .owned, .borrowed, .local, .initialized, .caller, .global, .unknown:
+      return
+  }
+
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) else {
+    return
+  }
+
+  for endInstruction in scoped.endInstructions {
+    let builder = Builder(before: endInstruction, context)
+    builder.createEndCOWMutationAddr(address: lifetimeDep.parentValue)
   }
 }
 
@@ -191,7 +273,7 @@ private extension MarkDependenceAddrInst {
   }
 }
 
-/// A scope extension is a set of nested scopes and their owners. The owner is a value that represents ownerhip of
+/// A scope extension is a set of nested scopes and their owners. The owner is a value that represents ownership of
 /// the outermost scopes, which cannot be extended; it limits how far the nested scopes can be extended.
 private struct ScopeExtension {
   let context: FunctionPassContext
@@ -246,28 +328,25 @@ private struct ScopeExtension {
 // `mark_dependence` to the outer access `%0`. This ensures that exclusivity diagnostics correctly reports the
 // violation, and that subsequent optimizations do not shrink the inner access `%a1`.
 extension ScopeExtension {
-  mutating func extendScopes(dependence: LifetimeDependence) -> SingleInlineArray<FunctionArgument> {
+  mutating func extendScopes(dependence: LifetimeDependence) -> Bool {
     log("Scope fixup for lifetime dependent instructions: \(dependence)")
 
     gatherExtensions(dependence: dependence)
 
-    let noCallerScope = SingleInlineArray<FunctionArgument>()
-
     // computeDependentUseRange initializes scopeExtension.dependsOnCaller.
     guard var useRange = computeDependentUseRange(of: dependence) else {
-      return noCallerScope
+      return false
     }
     // tryExtendScopes deinitializes 'useRange'
     var scopesToExtend = SingleInlineArray<ExtendableScope>()
     guard canExtendScopes(over: &useRange, scopesToExtend: &scopesToExtend) else {
       useRange.deinitialize()
-      return noCallerScope
+      return false
     }
     // extend(over:) must receive the original unmodified `useRange`, without intermediate scope ending instructions.
     // This deinitializes `useRange` before erasing instructions.
     extend(scopesToExtend: scopesToExtend, over: &useRange, context)
-
-    return dependsOnArgs
+    return true
   }
 }
 
@@ -287,7 +366,7 @@ private struct ExtendableScope {
   var firstInstruction: Instruction {
     switch introducer {
     case let .scoped(scopedInst):
-      return scopedInst.instruction
+      return scopedInst
     case let .owned(value):
       if let definingInst = value.definingInstructionOrTerminator {
         return definingInst
@@ -298,7 +377,7 @@ private struct ExtendableScope {
   var endInstructions: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     switch introducer {
     case let .scoped(scopedInst):
-      return scopedInst.endOperands.users
+      return scopedInst.scopeEndingOperands.users
     case let .owned(value):
       return value.uses.endingLifetime.users
     }
@@ -422,9 +501,6 @@ extension ScopeExtension {
   mutating func gatherYieldExtension(_ beginApply: BeginApplyInst) {
     // Create a separate ScopeExtension for each operand that the yielded value depends on.
     for operand in beginApply.parameterOperands {
-      guard let dep = beginApply.resultDependence(on: operand), dep.isScoped else {
-        continue
-      }
       gatherExtensions(valueOrAddress: operand.value)
     }
   }
@@ -448,10 +524,15 @@ extension ScopeExtension {
 }
 
 extension ScopeExtension {
-  /// Return all scope owners as long as they are all function arguments and all nested accesses are compatible with
-  /// their argument convention. Then, if all nested accesses were extended to the return statement, it is valid to
-  /// logically combine them into a single access for the purpose of diagnostic lifetime dependence.
-  var dependsOnArgs: SingleInlineArray<FunctionArgument> {
+  /// Check if the dependent value depends only on function arguments and can therefore be returned to caller. If so,
+  /// return the list of arguments that it depends on. If this returns an empty list, then the dependent value cannot be
+  /// returned.
+  ///
+  /// The conditions for returning a dependent value are:
+  /// - The dependent value is returned from this function.
+  /// - All nested scopes are access scopes that are redundant with the caller's exclusive access scope.
+  /// - All scope owners are function arguments.
+  func findArgumentDependencies() -> SingleInlineArray<FunctionArgument> {
     let noCallerScope = SingleInlineArray<FunctionArgument>()
     // Check that the dependent value is returned by this function.
     if !dependsOnCaller! {

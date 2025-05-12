@@ -402,7 +402,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       DeclAttrKind::RestatedObjCConformance,
       DeclAttrKind::NonSendable,
       DeclAttrKind::AllowFeatureSuppression,
-      DeclAttrKind::Extensible,
   };
 
   return result;
@@ -1915,15 +1914,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     if (subMap.empty())
       return param;
 
-    return param.subst(
-      [&](SubstitutableType *type) -> Type {
-        if (cast<GenericTypeParamType>(type)->getDepth() < typeContextDepth)
-          return Type(type).subst(subMap);
-        return type;
-      },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return lookupConformance(substType, proto);
-      });
+    OuterSubstitutions replacer{subMap, typeContextDepth};
+    return param.subst(replacer, replacer,
+                       SubstFlags::PreservePackExpansionLevel);
   };
 
   /// Separate the explicit generic parameters from the implicit, opaque
@@ -3290,8 +3283,8 @@ suppressingFeatureCoroutineAccessors(PrintOptions &options,
 }
 
 static void
-suppressingFeatureABIAttribute(PrintOptions &options,
-                               llvm::function_ref<void()> action) {
+suppressingFeatureABIAttributeSE0479(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope1(options.PrintSyntheticSILGenName, true);
   ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::ABI);
   action();
@@ -3302,6 +3295,14 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList,
                         DeclAttrKind::AddressableForDependencies);
+  action();
+}
+
+static void
+suppressingFeatureExtensibleAttribute(PrintOptions &options,
+                                      llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope1(options.ExcludeAttrList, DeclAttrKind::Extensible);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::PreEnumExtensibility);
   action();
 }
 
@@ -4328,13 +4329,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       if (proto && Options.TransformContext) {
         auto BaseType = Options.TransformContext->getBaseType();
         if (BaseType->getClassOrBoundGenericClass()) {
-          ResultTy = ResultTy.subst(
-            [&](Type t) -> Type {
-              if (t->isEqual(proto->getSelfInterfaceType()))
+          ResultTy = ResultTy.transformRec(
+            [&](TypeBase *t) -> std::optional<Type> {
+              if (isa<DependentMemberType>(t))
+                return t;
+              else if (t->isEqual(proto->getSelfInterfaceType()))
                 return DynamicSelfType::get(t, Ctx);
-              return t;
-            },
-            MakeAbstractConformanceForGenericType());
+              return std::nullopt;
+            });
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
         }
       }
@@ -4805,9 +4807,6 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
           break;
         case BuiltinMacroKind::IsolationMacro:
           Printer << "IsolationMacro";
-          break;
-        case BuiltinMacroKind::SwiftSettingsMacro:
-          Printer << "SwiftSettingsMacro";
           break;
         }
         break;
@@ -6019,6 +6018,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Identifier Name = Mod->getRealName();
     if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
+    }
+
+    StringRef PublicModuleName = File->getPublicModuleName();
+    if (Options.UsePublicModuleNames && !PublicModuleName.empty()) {
+      Name = Mod->getASTContext().getIdentifier(PublicModuleName);
     }
 
     if (Options.UseOriginallyDefinedInModuleNames) {

@@ -93,7 +93,7 @@ class RegionAnalysisValueMap;
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
 ///
-/// We use a wrapper struct here so that we can inject "fake" actor isolated
+/// We use a wrapper struct here so that we can inject "fake" actor-isolated
 /// values into the regions of values that become merged into an actor by
 /// calling a function without a non-sendable result.
 class RepresentativeValue {
@@ -103,8 +103,8 @@ class RepresentativeValue {
 
   /// If this is set to a SILValue then it is the actual represented value. If
   /// it is set to a SILInstruction, then this is a "fake" representative value
-  /// used to inject actor isolatedness. The instruction stored is the
-  /// instruction that introduced the actor isolated-ness.
+  /// used to inject actor isolation. The instruction stored is the
+  /// instruction that introduced the actor isolation.
   InnerType value;
 
 public:

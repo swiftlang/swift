@@ -81,6 +81,8 @@ add_library(swift_Concurrency
   PartialAsyncTask.swift
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
+  PlatformExecutorFreeBSD.swift
+  PlatformExecutorOpenBSD.swift
   PlatformExecutorWindows.swift
   PriorityQueue.swift
   SourceCompatibilityShims.swift

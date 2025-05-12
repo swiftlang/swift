@@ -4993,6 +4993,8 @@ NOTE(iuo_to_any_coercion_note_func_result,none,
      (const ValueDecl *))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
+NOTE(default_optional_parameter,none,
+     "use a default value parameter to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
@@ -5044,6 +5046,10 @@ ERROR(capture_across_type_decl,none,
       "%kindonly0 declaration cannot close over value %base1 defined in outer "
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
+
+ERROR(isolated_any_conversion_to_synchronous_func,none,
+      "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
+      (Type, Type))
 
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
@@ -5757,7 +5763,7 @@ NOTE(note_actor_isolated_witness,none,
      "%0 %kind1 cannot satisfy %2 requirement",
      (ActorIsolation, const ValueDecl *, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
-      "actor %0 cannot conform to global actor isolated protocol %1",
+      "actor %0 cannot conform to global-actor-isolated protocol %1",
       (Type, Type))
 NOTE(protocol_isolated_to_global_actor_here,none,
      "%0 is isolated to global actor %1 here", (Type, Type))
@@ -8341,6 +8347,15 @@ NOTE(note_reference_to_unsafe_decl,none,
 NOTE(note_reference_to_unsafe_typed_decl,none,
      "%select{reference|call}0 to %kind1 involves unsafe type %2",
      (bool, const ValueDecl *, Type))
+NOTE(note_unsafe_call_decl_argument_named,none,
+     "argument %1 in call to %kindbase0 has unsafe type %2",
+     (const ValueDecl *, Identifier, Type))
+NOTE(note_unsafe_call_decl_argument_indexed,none,
+     "argument #%1 in call to %kindbase0 has unsafe type %2",
+     (const ValueDecl *, unsigned, Type))
+NOTE(note_unsafe_call_argument_indexed,none,
+     "argument #%0 in call has unsafe type %1",
+     (unsigned, Type))
 NOTE(note_reference_to_unsafe_through_typealias,none,
      "reference to %kind0 whose underlying type involves unsafe type %1",
      (const ValueDecl *, Type))
@@ -8402,9 +8417,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-GROUPED_WARNING(no_unsafe_in_unsafe,StrictMemorySafety,none,
+WARNING(no_unsafe_in_unsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-GROUPED_WARNING(no_unsafe_in_unsafe_for,StrictMemorySafety,none,
+WARNING(no_unsafe_in_unsafe_for,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "
@@ -8468,14 +8483,10 @@ ERROR(attr_abi_mismatched_async,none,
       "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
       (Decl *, /*abiIsAsync=*/bool))
 
-ERROR(attr_abi_mismatched_pbd_size,none,
-      "cannot give pattern binding the ABI of a binding with "
-      "%select{more|fewer}0 patterns",
-      (/*abiHasExtra=*/bool))
-
-ERROR(attr_abi_mismatched_var,none,
-      "no match for %select{%kind0 in the ABI|ABI %kind0}1",
-      (Decl *, /*isABI=*/bool))
+ERROR(attr_abi_multiple_vars,none,
+      "'abi' attribute can only be applied to a single %0; declare each "
+      "%0 separately",
+      (DescriptiveDeclKind))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %kindonly0 because "
@@ -8689,7 +8700,7 @@ GROUPED_WARNING(
     (StringRef, DeclAttribute))
 
 //===----------------------------------------------------------------------===//
-// MARK: @extensible Attribute
+// MARK: @extensible and @preEnumExtensibility Attributes
 //===----------------------------------------------------------------------===//
 
 ERROR(extensible_attr_on_frozen_type,none,
@@ -8701,20 +8712,8 @@ ERROR(extensible_attr_on_internal_type,none,
       "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
-//===----------------------------------------------------------------------===//
-//                            MARK: SwiftSettings
-//===----------------------------------------------------------------------===//
-
-ERROR(swift_settings_invalid_setting, none,
-      "Unrecognized setting passed to #SwiftSettings", ())
-
-ERROR(swift_settings_must_be_top_level, none,
-      "#SwiftSettings can only be invoked as a top level declaration", ())
-
-ERROR(swift_settings_duplicate_setting, none,
-      "duplicate setting passed to #SwiftSettings", ())
-NOTE(swift_settings_duplicate_setting_original_loc, none,
-     "setting originally passed here", ())
+ERROR(pre_enum_extensibility_without_extensible,none,
+      "%0 can only be used together with '@extensible' attribute", (DeclAttribute))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

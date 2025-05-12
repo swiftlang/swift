@@ -2225,7 +2225,6 @@ namespace {
         Flags = Flags.withIsSynthesizedNonUnique(conf->isSynthesizedNonUnique());
         Flags = Flags.withIsConformanceOfProtocol(conf->isConformanceOfProtocol());
         Flags = Flags.withHasGlobalActorIsolation(isolation.isGlobalActor());
-        Flags = withSerialExecutorCheckingModeFlags(Flags, conf);
       } else {
         Flags = Flags.withIsRetroactive(false)
                      .withIsSynthesizedNonUnique(false);
@@ -2442,31 +2441,6 @@ namespace {
       B.addRelativeAddress(globalActorConformanceDescriptor);
     }
 
-    static ConformanceFlags
-    withSerialExecutorCheckingModeFlags(ConformanceFlags Flags, const NormalProtocolConformance *conf) {
-      ProtocolDecl *proto = conf->getProtocol();
-      auto &C = proto->getASTContext();
-
-      ConformanceFlags UpdatedFlags = Flags;
-      if (proto->isSpecificProtocol(swift::KnownProtocolKind::SerialExecutor)) {
-        conf->forEachValueWitness([&](const ValueDecl *req,
-                                      Witness witness) {
-          bool nameMatch = witness.getDecl()->getBaseIdentifier() == C.Id_isIsolatingCurrentContext;
-          if (nameMatch) {
-            if (DeclContext *NominalOrExtension = witness.getDecl()->getDeclContext()) {
-              // If the witness is NOT the default implementation in the _Concurrency library,
-              // we should record that this is an user provided implementation and we should call it.
-              bool hasNonDefaultIsIsolatingCurrentContext =
-                  !NominalOrExtension->getParentModule()->isConcurrencyModule();
-              UpdatedFlags = UpdatedFlags.withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
-                            hasNonDefaultIsIsolatingCurrentContext);
-            }
-          }
-        });
-      }
-
-      return UpdatedFlags;
-    }
   };
 }
 

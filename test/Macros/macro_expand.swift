@@ -719,6 +719,29 @@ func testPropertyWrapperMacro() {
   #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
 }
 
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
+
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
 macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")

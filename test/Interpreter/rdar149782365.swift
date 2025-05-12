@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
+// REQUIRES: executable_test
+
 @_silgen_name("start")
 func start() {
   print("init C")

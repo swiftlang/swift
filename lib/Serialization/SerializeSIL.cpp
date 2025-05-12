@@ -529,8 +529,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
-  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
-                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+  bool serializeDerivedEffects =
+    // We must not serialize computed effects if library evolution is turned on,
+    // because the copy of the function, which is emitted into the current module,
+    // might have different effects in different versions of the library.
+    (resilience != ResilienceStrategy::Resilient ||
+    // But we can serialize computed effects for @alwaysEmitIntoClient functions,
+    // even when library evolution is enabled, because no copy of the function is
+    // emitted in the original module.
+    F.getLinkage() == SILLinkage::PublicNonABI) &&
+    !F.hasSemanticsAttr("optimize.no.crossmodule");
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
@@ -1706,6 +1714,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:

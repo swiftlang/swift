@@ -415,7 +415,9 @@ ERROR(embedded_swift_allocating,none,
 ERROR(embedded_capture_of_generic_value_with_deinit,none,
       "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
 ERROR(embedded_call_generic_function,none,
-      "cannot specialize generic function in this context", ())
+      "cannot specialize generic function or default protocol method in this context", ())
+ERROR(embedded_call_generic_function_with_dynamic_self,none,
+      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
 NOTE(embedded_specialization_called_from,none,
       "generic specialization called here", ())
 NOTE(embedded_existential_created,none,
@@ -964,10 +966,10 @@ NOTE(sil_referencebinding_inout_binding_here, none,
       ())
 
 //===----------------------------------------------------------------------===//
-//                  MARK: Region Based Isolation Diagnostics
+//                  MARK: Region-Based Isolation Diagnostics
 //===----------------------------------------------------------------------===//
 
-// READ THIS: Please when adding diagnostics for region based isolation, keep
+// READ THIS: Please when adding diagnostics for region-based isolation, keep
 // them ordered in sections depending on which emitter uses it. It makes it
 // easier for people unfamiliar with the code to quickly see which diagnostics
 // are used by which of the SendNonSendable emitters use.
@@ -976,7 +978,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 // Misc
 
 ERROR(regionbasedisolation_unknown_pattern, none,
-      "pattern that the region based isolation checker does not understand how to check. Please file a bug",
+      "pattern that the region-based isolation checker does not understand how to check. Please file a bug",
       ())
 NOTE(regionbasedisolation_maybe_race, none,
      "access can happen concurrently", ())
@@ -1098,13 +1100,13 @@ NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
 ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
-      "task or actor isolated value cannot be sent", ())
+      "task or actor-isolated value cannot be sent", ())
 
 //===
 // InOut Sending Emitter
 
 NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
-     "'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value",
+     "'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value",
      ())
 ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
       "'inout sending' parameter %0 cannot be %1at end of function",
@@ -1169,14 +1171,22 @@ ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
 ERROR(lifetime_value_outside_scope, none,
       "lifetime-dependent value escapes its scope", ())
+ERROR(lifetime_value_outside_accessor, none,
+      "lifetime-dependent value returned by generated accessor '%0'", (StringRef))
+ERROR(lifetime_value_outside_thunk, none,
+      "lifetime-dependent value returned by generated %select{function|thunk}0 '%1'", (bool, StringRef))
 NOTE(lifetime_outside_scope_argument, none,
      "it depends on the lifetime of argument '%0'", (Identifier))
+NOTE(lifetime_outside_scope_synthesized_argument, none,
+     "it depends on the lifetime of an argument of '%0'", (Identifier))
 NOTE(lifetime_outside_scope_access, none,
      "it depends on this scoped access to variable '%0'", (Identifier))
 NOTE(lifetime_outside_scope_variable, none,
      "it depends on the lifetime of variable '%0'", (Identifier))
 NOTE(lifetime_outside_scope_value, none,
      "it depends on the lifetime of this parent value", ())
+NOTE(lifetime_outside_scope_capture, none,
+     "it depends on a closure capture; this is not yet supported", ())
 NOTE(lifetime_outside_scope_use, none,
      "this use of the lifetime-dependent value is out of scope", ())
 NOTE(lifetime_outside_scope_escape, none,

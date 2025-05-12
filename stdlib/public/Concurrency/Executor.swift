@@ -93,6 +93,31 @@ public protocol SchedulableExecutor: Executor {
 
 }
 
+extension Actor {
+
+  /// Perform an operation with the actor's ``SerialExecutor``.
+  ///
+  /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
+  /// retaining the actor for the duration of the operation. This is to ensure the lifetime
+  /// of the executor while performing the operation.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T {
+    try operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
+  }
+
+  /// Perform an operation with the actor's ``SerialExecutor``.
+  ///
+  /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
+  /// retaining the actor for the duration of the operation. This is to ensure the lifetime
+  /// of the executor while performing the operation.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
+    try await operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
+  }
+}
+
 extension Executor {
   /// Return this executable as a SchedulableExecutor, or nil if that is
   /// unsupported.
@@ -318,8 +343,25 @@ public protocol SerialExecutor: Executor {
   @available(SwiftStdlib 6.0, *)
   func checkIsolated()
 
+  /// Checks if the current execution context is isolated by this executor.
+  ///
+  /// This function can be called by the runtime in order to perform assertions,
+  /// or attempt to issue warnings about unexpected isolation.
+  ///
+  /// This method will be invoked _before_ `checkIsolated` and may also be invoked
+  /// when crashing is not an acceptable outcome of a check (e.g. when attempting to issue isolation _warnings_).
+  ///
+  /// Implementations should prefer to implement this method rather than `checkIsolated()` since it can often
+  /// result in more tailored error messages. It is allowed, and useful for backwards compatibility with old
+  /// runtimes which are not able to invoke `isIsolatingCurrentContext()` to implement `checkIsolated()`,
+  /// even if an implementation is able to implement this method. Often times an implementation of `checkIsolated()`,
+  /// would then invoke `isIsolatingCurrentContext()` and crash if the returned value was `false`.
+  ///
+  /// The default implementation returns `nil` is used to indicate that it is "unknown" if the current context is
+  /// isolated by this serial executor. The runtime then _may_ proceed to invoke `checkIsolated()` as a last-resort
+  /// attempt to verify the isolation of the current context.
   @available(SwiftStdlib 6.2, *)
-  func isIsolatingCurrentContext() -> Bool
+  func isIsolatingCurrentContext() -> Bool?
 
 }
 
@@ -340,11 +382,26 @@ extension SerialExecutor {
     #endif
   }
 
+  #if SWIFT_CONCURRENCY_USES_DISPATCH
+  @available(SwiftStdlib 6.2, *)
+  private var _dispatchQueue: OpaquePointer? {
+    return _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
+  }
+  #endif
+
   @available(SwiftStdlib 6.2, *)
   internal func _isSameExecutor(_ rhs: some SerialExecutor) -> Bool {
     if rhs === self {
       return true
     }
+    #if SWIFT_CONCURRENCY_USES_DISPATCH
+    if let rhsQueue = rhs._dispatchQueue {
+      if let ourQueue = _dispatchQueue, ourQueue == rhsQueue {
+        return true
+      }
+      return false
+    }
+    #endif
     if let rhs = rhs as? Self {
       return isSameExclusiveExecutionContext(other: rhs)
     }
@@ -356,9 +413,8 @@ extension SerialExecutor {
 extension SerialExecutor {
 
   @available(SwiftStdlib 6.2, *)
-  public func isIsolatingCurrentContext() -> Bool {
-    self.checkIsolated()
-    return true
+  public func isIsolatingCurrentContext() -> Bool? {
+    return nil
   }
 }
 
@@ -840,9 +896,13 @@ internal func _task_serialExecutor_checkIsolated<E>(executor: E)
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("_task_serialExecutor_isIsolatingCurrentContext")
-internal func _task_serialExecutor_isIsolatingCurrentContext<E>(executor: E) -> Bool
-    where E: SerialExecutor {
-  return executor.isIsolatingCurrentContext()
+internal func _task_serialExecutor_isIsolatingCurrentContext<E>(executor: E) -> Int8
+  where E: SerialExecutor {
+  switch executor.isIsolatingCurrentContext() {
+  case nil: -1 // unknown
+  case .some(false): 0 // not isolated
+  case .some(true): 1 // isolated!
+  }
 }
 
 /// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
@@ -861,7 +921,7 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 @_silgen_name("_task_taskExecutor_getTaskExecutorRef")
 internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Builtin.Executor
     where E: TaskExecutor {
-  return unsafe taskExecutor.asUnownedTaskExecutor().executor
+  return taskExecutor.asUnownedTaskExecutor().executor
 }
 
 // Used by the concurrency runtime

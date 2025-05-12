@@ -220,13 +220,9 @@ public:
         targetIndex(targetIndex) {
     assert(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
-    // FIXME: This assert can trigger when Optional/Result support ~Escapable use (rdar://147765187)
-    // assert(!inheritLifetimeParamIndices ||
-    //        !inheritLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices && inheritLifetimeParamIndices->isEmpty()) {
-      inheritLifetimeParamIndices = nullptr;
-    }
-    assert(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
+    ASSERT(!inheritLifetimeParamIndices ||
+           !inheritLifetimeParamIndices->isEmpty());
+    ASSERT(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
     assert((!addressableParamIndices
             || !conditionallyAddressableParamIndices
             || conditionallyAddressableParamIndices->isDisjointWith(

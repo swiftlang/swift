@@ -53,7 +53,10 @@ class FoundationTests(product.Product):
         return self.args.test_foundation
 
     def configuration(self):
-        return 'release' if self.is_release() else 'debug'
+        if self.args.foundation_tests_build_variant in ['Release', 'RelWithDebInfo']:
+            return 'release'
+        else:
+            return 'debug'
 
     def test(self, host_target):
         swift_exec = os.path.join(

@@ -230,8 +230,8 @@ extension FungingArray {
   // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
   // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
-  // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, ptr [[ALLOCA]], i32 0, i32 0
-  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, ptr [[ALLOCA]], i32 0, i32 0
+  // CHECK: {{%[^, =]+}} = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
   // CHECK: store {{.*}} %0, {{.*}} [[BUFPTR]]
   // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(ptr {{.*}} [[ALLOCA]])
@@ -249,8 +249,8 @@ extension FungingArray {
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
   // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
   // CHECK: [[OBJC_CLASS:%[^, =]+]] = call ptr @swift_getObjCClassFromMetadata(ptr %0)
-  // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, ptr [[ALLOCA]], i32 0, i32 0
-  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, ptr [[ALLOCA]], i32 0, i32 0
+  // CHECK: {{%[^, =]+}} = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
   // CHECK: store {{.*}} [[OBJC_CLASS]], {{.*}} [[BUFPTR]]
   // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(ptr {{.*}} [[ALLOCA]])

@@ -680,8 +680,11 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   for (auto &file : TrackedFiles) {
     auto includeTreeFile = clang::cas::IncludeTree::File::create(
         FS->getCAS(), file.first, file.second.FileRef);
-    if (!includeTreeFile)
-      return includeTreeFile.takeError();
+    if (!includeTreeFile) {
+      return llvm::createStringError("CASFS createTree failed for " +
+                                     file.first + ": " +
+                                     toString(includeTreeFile.takeError()));
+    }
     Files.push_back(
         {includeTreeFile->getRef(),
          (clang::cas::IncludeTree::FileList::FileSizeTy)file.second.Size});
@@ -690,7 +693,8 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   auto includeTreeList =
       clang::cas::IncludeTree::FileList::create(FS->getCAS(), Files, {});
   if (!includeTreeList)
-    return includeTreeList.takeError();
+    return llvm::createStringError("casfs include-tree filelist error: " +
+                                   toString(includeTreeList.takeError()));
 
   return *includeTreeList;
 }
@@ -706,9 +710,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       return false;
 
     // CASOption mismatch, return error.
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::error_cas,
-        "conflicting CAS options used in scanning service");
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_conflict_options);
     return true;
   }
 
@@ -720,7 +722,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
   if (!CachingFS) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_fs_creation,
                                  toString(CachingFS.takeError()));
     return true;
   }
@@ -886,11 +888,61 @@ void ModuleDependenciesCache::recordDependency(
 }
 
 void ModuleDependenciesCache::recordDependencies(
-    ModuleDependencyVector dependencies) {
+    ModuleDependencyVector dependencies, DiagnosticEngine &diags) {
   for (const auto &dep : dependencies) {
-    if (!hasDependency(dep.first))
+    if (hasDependency(dep.first)) {
+      if (dep.first.Kind == ModuleDependencyKind::Clang) {
+        auto priorClangModuleDetails =
+            findKnownDependency(dep.first).getAsClangModule();
+        auto newClangModuleDetails = dep.second.getAsClangModule();
+        auto priorContextHash = priorClangModuleDetails->contextHash;
+        auto newContextHash = newClangModuleDetails->contextHash;
+        if (priorContextHash != newContextHash) {
+          // This situation means that within the same scanning action, Clang
+          // Dependency Scanner has produced two different variants of the same
+          // module. This is not supposed to happen, but we are currently
+          // hunting down the rare cases where it does, seemingly due to
+          // differences in Clang Scanner direct by-name queries and transitive
+          // header lookup queries.
+          //
+          // Emit a failure diagnostic here that is hopefully more actionable
+          // for the time being.
+          diags.diagnose(SourceLoc(), diag::dependency_scan_unexpected_variant,
+                         dep.first.ModuleName);
+          diags.diagnose(
+              SourceLoc(),
+              diag::dependency_scan_unexpected_variant_context_hash_note,
+              priorContextHash, newContextHash);
+          diags.diagnose(
+              SourceLoc(),
+              diag::dependency_scan_unexpected_variant_module_map_note,
+              priorClangModuleDetails->moduleMapFile,
+              newClangModuleDetails->moduleMapFile);
+
+          auto diagnoseExtraCommandLineFlags =
+              [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
+                       const ClangModuleDependencyStorage *baseModuleDetails,
+                       bool isNewlyDiscovered) -> void {
+            std::unordered_set<std::string> baseCommandLineSet(
+                baseModuleDetails->buildCommandLine.begin(),
+                baseModuleDetails->buildCommandLine.end());
+            for (const auto &checkArg : checkModuleDetails->buildCommandLine)
+              if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
+                diags.diagnose(
+                    SourceLoc(),
+                    diag::dependency_scan_unexpected_variant_extra_arg_note,
+                    isNewlyDiscovered, checkArg);
+          };
+          diagnoseExtraCommandLineFlags(priorClangModuleDetails,
+                                        newClangModuleDetails, true);
+          diagnoseExtraCommandLineFlags(newClangModuleDetails,
+                                        priorClangModuleDetails, false);
+        }
+      }
+    } else
       recordDependency(dep.first.ModuleName, dep.second);
-    if (dep.second.getKind() == ModuleDependencyKind::Clang) {
+
+    if (dep.first.Kind == ModuleDependencyKind::Clang) {
       auto clangModuleDetails = dep.second.getAsClangModule();
       addSeenClangModule(clang::tooling::dependencies::ModuleID{
           dep.first.ModuleName, clangModuleDetails->contextHash});

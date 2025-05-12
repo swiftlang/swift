@@ -151,11 +151,17 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
         if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyValue.location)
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyValue.location)
+          }
         }
       case let destroyAddr as DestroyAddrInst:
         if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyAddr.location)
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyAddr.location)
+          }
         }
 
       case let iem as InitExistentialMetatypeInst:
@@ -252,11 +258,13 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
-  if !callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) &&
-     // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
-     // in embedded swift.
-     callee.thunkKind != .thunk
-  {
+  guard callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) ||
+        // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
+        // in embedded swift.
+        callee.thunkKind == .thunk ||
+        // Force inlining transparent co-routines. This might be necessary if `-enable-testing` is turned on.
+        (apply is BeginApplyInst && callee.isTransparent)
+  else {
     return false
   }
 

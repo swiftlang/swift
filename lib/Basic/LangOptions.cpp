@@ -298,10 +298,10 @@ bool LangOptions::FeatureState::isEnabled() const {
   return state == FeatureState::Kind::Enabled;
 }
 
-bool LangOptions::FeatureState::isEnabledForAdoption() const {
-  ASSERT(feature.isAdoptable() && "You forgot to make the feature adoptable!");
+bool LangOptions::FeatureState::isEnabledForMigration() const {
+  ASSERT(feature.isMigratable() && "You forgot to make the feature migratable!");
 
-  return state == FeatureState::Kind::EnabledForAdoption;
+  return state == FeatureState::Kind::EnabledForMigration;
 }
 
 LangOptions::FeatureStateStorage::FeatureStateStorage()
@@ -357,10 +357,10 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   return false;
 }
 
-void LangOptions::enableFeature(Feature feature, bool forAdoption) {
-  if (forAdoption) {
-    ASSERT(feature.isAdoptable());
-    featureStates.setState(feature, FeatureState::Kind::EnabledForAdoption);
+void LangOptions::enableFeature(Feature feature, bool forMigration) {
+  if (forMigration) {
+    ASSERT(feature.isMigratable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForMigration);
     return;
   }
 

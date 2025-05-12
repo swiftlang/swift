@@ -219,6 +219,11 @@ BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
   return {mod->getASTContext().getArrayDecl()};
 }
 
+BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getASTContext().getMutableSpanDecl()};
+}
+
 // AST
 
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE

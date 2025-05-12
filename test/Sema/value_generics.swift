@@ -51,6 +51,8 @@ func c<let M: Int>(with a: A<M>) {} // OK
 func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'N'}}
 func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
 
+func *<let X: Int, let Y: Int>(l: A<X>, r: A<Y>) -> Int { l.int * r.int }
+
 struct Generic<T: ~Copyable & ~Escapable> {}
 struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
@@ -121,7 +123,7 @@ func testC4<let T: Int>(with c: C<T, T>) {
 struct D<let N: Int & P> {} // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
 
 struct E<A, let b: Int> { // expected-note {{'b' previously declared here}}
-  static var b: Int { // expected-error {{invalid redeclaration of 'b'}}
+  static var b: Int { // expected-warning {{redeclaration of 'b' is deprecated and will be an error in Swift 5}}
                       // expected-note@-1 {{'b' declared here}}
     123
   }
@@ -183,7 +185,7 @@ func testTypeOf2<let c: Int>(_: E<Int, c>.Type) -> Int {
 }
 
 struct H<let I: Int> { // expected-note {{'I' previously declared here}}
-  struct I {} // expected-error {{invalid redeclaration of 'I'}}
+  struct I {} // expected-warning {{redeclaration of 'I' is deprecated and will be an error in Swift 5}}
 }
 
 typealias J = E<Int, 123>.b // expected-error {{static property 'b' is not a member type of 'E<Int, 123>'}}

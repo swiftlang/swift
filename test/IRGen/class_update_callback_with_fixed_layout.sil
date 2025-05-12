@@ -179,7 +179,7 @@ bb0(%0 : $ClassWithResilientField):
 
 // CHECK:        [[OFFSET:%.*]] = load i64, ptr @"$s39class_update_callback_with_fixed_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
 // CHECK-NEXT:   [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, ptr %0, i64 [[OFFSET]]
-// CHECK-NEXT:   [[FIELD_PTR:%.*]] = getelementptr inbounds %TSi, ptr [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT:   [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[FIELD_ADDR]], i32 0, i32 0
 
   %1 = ref_element_addr %0 : $ClassWithResilientField, #ClassWithResilientField.third
 
@@ -208,7 +208,7 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x ptr]
 // CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{12|24}}, ptr [[FIELDS]])
-// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
+// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
 // CHECK-NEXT: [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
@@ -252,7 +252,7 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [0 x ptr]
 // CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{11|14}}
 // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 0, ptr [[FIELDS]])
-// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [0 x ptr], ptr [[FIELDS]], i32 0, i32 0
+// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [0 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_updateClassMetadata2(ptr %0, [[INT]] 256, [[INT]] 0, ptr [[FIELDS_PTR]], ptr [[FIELDS_DEST]])

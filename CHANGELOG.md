@@ -447,7 +447,7 @@ And the module structure to support such applications looks like this:
 
 * [SE-0430][]:
 
-  Region Based Isolation is now extended to enable the application of an
+  Region-Based Isolation is now extended to enable the application of an
   explicit `sending` annotation to function parameters and results. A function
   parameter or result that is annotated with `sending` is required to be
   disconnected at the function boundary and thus possesses the capability of
@@ -485,7 +485,7 @@ And the module structure to support such applications looks like this:
   
   func useValue() {
     let x = NonSendableType()
-    let a = await MyActor(x) // Error without Region Based Isolation!
+    let a = await MyActor(x) // Error without Region-Based Isolation!
   }
   ```
 

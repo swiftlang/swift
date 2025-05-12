@@ -323,6 +323,10 @@ public:
     friend bool operator!=(const SearchPath &LHS, const SearchPath &RHS) {
       return !(LHS == RHS);
     }
+    friend llvm::hash_code
+    hash_value(const SearchPath &searchPath) {
+      return llvm::hash_combine(searchPath.Path, searchPath.IsSystem);
+    }
   };
 
 private:
@@ -599,30 +603,17 @@ public:
   makeOverlayFileSystem(
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
-private:
-  static StringRef pathStringFromSearchPath(const SearchPath &next) {
-    return next.Path;
-  };
-
 public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     using llvm::hash_combine;
     using llvm::hash_combine_range;
-
-    using SearchPathView =
-        ArrayRefView<SearchPath, StringRef, pathStringFromSearchPath>;
-    SearchPathView importPathsOnly{ImportSearchPaths};
-    SearchPathView frameworkPathsOnly{FrameworkSearchPaths};
-
     return hash_combine(SDKPath,
-                        // FIXME: Should we include the system-ness of
-                        // search paths too?
-                        hash_combine_range(importPathsOnly.begin(), importPathsOnly.end()),
+                        hash_combine_range(ImportSearchPaths.begin(), ImportSearchPaths.end()),
                         hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
-                        hash_combine_range(frameworkPathsOnly.begin(),
-                                           frameworkPathsOnly.end()),
+                        hash_combine_range(FrameworkSearchPaths.begin(),
+                                           FrameworkSearchPaths.end()),
                         hash_combine_range(LibrarySearchPaths.begin(),
                                            LibrarySearchPaths.end()),
                         RuntimeResourcePath,

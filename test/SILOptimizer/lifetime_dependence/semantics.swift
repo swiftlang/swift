@@ -15,49 +15,6 @@
 
 import Builtin
 
-@_unsafeNonescapableResult
-@_transparent
-@lifetime(borrow source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, borrowing source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` that inherits all lifetime dependencies from
-/// the `source` argument.
-@_unsafeNonescapableResult
-@_transparent
-@lifetime(copy source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, copying source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` that inherits all lifetime dependencies from
-/// the `source` argument.
-@_unsafeNonescapableResult
-@_transparent
-@lifetime(&source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, mutating source: inout U
-) -> T {
-  dependent
-}
-
 struct NotEscapable: ~Escapable {}
 
 // Lifetime dependence semantics by example.
@@ -241,6 +198,22 @@ func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
 @lifetime(borrow arg)
 func reborrowSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
 
+@lifetime(&arg)
+func reborrowGenericInout<T: ~Escapable>(_ arg: inout T) -> T { arg }
+
+@lifetime(copy arg)
+func inheritSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
+
+@lifetime(copy arg)
+func inheritGeneric<T: ~Escapable>(_ arg: consuming T) -> T { arg }
+
+public struct NE: ~Escapable {}
+
+@lifetime(&ne)
+func borrowNE<T: ~Escapable>(ne: inout T) -> T {
+  ne
+}
+
 // =============================================================================
 // Initialization
 // =============================================================================
@@ -340,6 +313,30 @@ func testInheritedCopyVar(_ arg: [Int] ) {
   parse(result) // ✅ Safe: within lifetime of 'a'
 }
 
+@lifetime(copy span)
+public func testBorrowInheritedArg<T>(_ span: Span<T>) -> Span<T> {
+  reborrowSpan(span) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2{{it depends on the lifetime of argument 'span'}}
+} // expected-note {{this use causes the lifetime-dependent value to escape}}
+
+@lifetime(copy t)
+public func testBorrowInheritedInoutArg<T: ~Escapable>(_ t: inout T) -> T {
+  // expected-error @-1{{lifetime-dependent variable 't' escapes its scope}}
+  // expected-note @-2{{it depends on the lifetime of argument 't'}}
+  reborrowGenericInout(&t)
+  // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
+}
+
+@lifetime(copy span)
+public func testCopyInheritedArg<T>(_ span: Span<T>) -> Span<T> {
+  inheritSpan(span)
+}
+
+@lifetime(copy t)
+public func testCopyInheritedGenericArg<T: ~Escapable>(_ t: consuming T) -> T {
+  inheritGeneric(t)
+}
+
 // =============================================================================
 // Scoped dependence on inherited dependence
 // =============================================================================
@@ -363,6 +360,23 @@ func testScopedOfInheritedWithLet(_ arg: [Int] ) {
   // expected-note @-1{{it depends on the lifetime of this parent value}}  
   _ = result
 } // expected-note {{this use of the lifetime-dependent value is out of scope}}
+
+// Test a scoped dependence on an inherited inout argument.
+//
+// If testScopedOfInheritedWithLet is not an error, then its result can outlive its borrowed value:
+//  let ne1 = NE()
+//  var ne2 = ne1
+//  let dep = foo(ne: &ne2)
+//  _ = consume ne2
+//  _ = dep
+//
+@lifetime(copy ne)
+public func testScopedOfInheritedInout<T: ~Escapable>(ne: inout T) -> T {
+  // expected-error @-1{{lifetime-dependent variable 'ne' escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of argument 'ne'}}
+  borrowNE(ne: &ne)
+  // expected-note  @-1{{this use causes the lifetime-dependent value to escape}}
+}
 
 // =============================================================================
 // Scoped dependence on trivial values

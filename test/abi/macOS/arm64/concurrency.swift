@@ -404,15 +404,17 @@ Added: _$ss19DiscardingTaskGroupV05startB28SynchronouslyUnlessCancelled4name8pri
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously4name8priority9operationySSSg_ScPSgyyYaKYAcntF
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYaKYAcntF
 
+// isIsolatingCurrentContext
 Added: _swift_task_invokeSwiftIsIsolatingCurrentContext
 Added: _swift_task_isIsolatingCurrentContext
 Added: _swift_task_isIsolatingCurrentContext_hook
-Added: _$sScf25isIsolatingCurrentContextSbyFTj
-Added: _$sScf25isIsolatingCurrentContextSbyFTq
-Added: _$sScfsE25isIsolatingCurrentContextSbyF
+Added: _$sScfsE25isIsolatingCurrentContextSbSgyF
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTj
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
 
-// SwiftSettings
-Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ
+// Clock systemEpochs
+Added: _$ss15ContinuousClockV11systemEpochAB7InstantVvpMV
+Added: _$ss15SuspendingClockV11systemEpochAB7InstantVvpMV

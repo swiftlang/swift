@@ -212,14 +212,16 @@ extension ProjectSpec {
 
   public mutating func addClangTargets(
     below path: RelativePath, addingPrefix prefix: String? = nil,
-    mayHaveUnbuildableFiles: Bool = false
+    mayHaveUnbuildableFiles: Bool = false,
+    excluding excludedChildren: Set<RelativePath> = []
   ) {
     guard addClangTargets else { return }
     let originalPath = path
     guard let path = mapPath(path, for: "Clang targets") else { return }
     let absPath = repoRoot.appending(path)
     do {
-      for child in try absPath.getDirContents() {
+      for child in try absPath.getDirContents()
+      where !excludedChildren.contains(child) {
         guard absPath.appending(child).isDirectory else {
           continue
         }

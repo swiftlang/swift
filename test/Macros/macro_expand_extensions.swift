@@ -283,3 +283,15 @@ struct HasNestedType {
 // extensions of nested types when the outer type has an
 // attached macro that can add other nested types.
 extension HasNestedType.Inner {}
+
+@attached(extension, conformances: P, names: named(requirement))
+macro AddPWithNonisolated() = #externalMacro(module: "MacroDefinition", type: "PWithNonisolatedFuncMacro")
+
+@attached(extension, conformances: P, names: named(requirement))
+macro AddNonisolatedPWithNonisolated() = #externalMacro(module: "MacroDefinition", type: "NonisolatedPWithNonisolatedFuncMacro")
+
+@AddNonisolatedPWithNonisolated
+struct MakeMeNonisolated { }
+
+@AddPWithNonisolated
+struct KeepMeIsolated { }

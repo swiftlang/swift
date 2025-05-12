@@ -296,13 +296,11 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
         clangModuleDep.IsSystem);
 
     std::vector<ModuleDependencyID> directDependencyIDs;
-    for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
-      // FIXME: This assumes, conservatively, that all Clang module imports
-      // are exported. We need to fix this once the clang scanner gains the appropriate
-      // API to query this.
-      dependencies.addModuleImport(moduleName.ModuleName, /* isExported */ true, &alreadyAddedModules);
+    for (const auto &DepInfo : clangModuleDep.ClangModuleDeps) {
+      auto moduleName = DepInfo.ID.ModuleName;
+      dependencies.addModuleImport(moduleName, DepInfo.Exported, &alreadyAddedModules);
       // It is safe to assume that all dependencies of a Clang module are Clang modules.
-      directDependencyIDs.push_back({moduleName.ModuleName, ModuleDependencyKind::Clang});
+      directDependencyIDs.push_back({moduleName, ModuleDependencyKind::Clang});
     }
     dependencies.setImportedClangDependencies(directDependencyIDs);
     result.push_back(std::make_pair(ModuleDependencyID{clangModuleDep.ID.ModuleName,
@@ -516,7 +514,7 @@ bool ClangImporter::getHeaderDependencies(
         [&cache](StringRef path) {
           return cache.getScanService().remapPath(path);
         });
-    cache.recordDependencies(bridgedDeps);
+    cache.recordDependencies(bridgedDeps, Impl.SwiftContext.Diags);
 
     llvm::copy(dependencies->FileDeps, std::back_inserter(headerFileInputs));
     auto bridgedDependencyIDs =

@@ -75,10 +75,6 @@ bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
 }
 
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
-  // Do not check type layout for a clang type in symbolic mode as the
-  // type could be a dependent type.
-  if (importSymbolicCXXDecls)
-    return false;
   auto align = getClangASTContext().getTypeAlignInChars(type);
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
@@ -730,20 +726,45 @@ namespace {
             paramQualType->getPointeeType().isConstQualified())
           paramQualType = paramQualType->getPointeeType();
 
+        // Mark any `sending` parameters if need be.
+        ImportTypeAttrs paramAttributes;
+        if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
+          getConcurrencyAttrs(Impl.SwiftContext, ImportTypeKind::Parameter,
+                              paramAttributes, paramQualType);
+        }
+
         auto swiftParamTy = Impl.importTypeIgnoreIUO(
             paramQualType, paramImportKind, addImportDiagnostic,
             AllowNSUIntegerAsInt, Bridging, ImportTypeAttrs(), OTK_Optional);
         if (!swiftParamTy)
           return Type();
 
+        ParameterTypeFlags flags;
+        flags = flags.withSending(
+            paramAttributes.contains(ImportTypeAttr::Sending));
+
         // FIXME(https://github.com/apple/swift/issues/45134): If we were walking TypeLocs, we could actually get parameter names.
         // The probably doesn't matter outside of a FuncDecl, which we'll have
         // to special-case, but it's an interesting bit of data loss.
-        params.push_back(FunctionType::Param(swiftParamTy));
+        params.emplace_back(swiftParamTy, Identifier(), flags);
+      }
+
+      // Mark any `sending` result types if need be.
+      auto extInfo = FunctionType::ExtInfo();
+      ImportTypeAttrs resultAttributes;
+      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
+        getConcurrencyAttrs(Impl.SwiftContext, ImportTypeKind::Result,
+                            resultAttributes, type->getReturnType());
+
+        const bool sending = resultAttributes.contains(ImportTypeAttr::Sending);
+        extInfo = FunctionType::ExtInfo()
+                           .intoBuilder()
+                           .withSendingResult(sending)
+                           .build();
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy, FunctionType::ExtInfo());
+      return FunctionType::get(params, resultTy, extInfo);
     }
 
     ImportResult
@@ -1718,6 +1739,7 @@ void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
       SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
       importKind == ImportTypeKind::CompletionHandlerParameter;
   bool isNonSendable = false;
+  bool isSending = false;
 
   // Consider only immediate attributes, don't look through the typerefs
   // because they are imported separately.
@@ -1725,10 +1747,13 @@ void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
     if (isMainActorAttr(attr)) {
       isMainActor = true;
       isSendable = true; // MainActor implies Sendable
-    } else if (attr->getAttribute() == "@Sendable")
+    } else if (attr->getAttribute() == "@Sendable") {
       isSendable = true;
-    else if (attr->getAttribute() == "@_nonSendable")
+    } else if (attr->getAttribute() == "@_nonSendable") {
       isNonSendable = true;
+    } else if (attr->getAttribute() == "sending") {
+      isSending = true;
+    }
   });
 
   if (isMainActor)
@@ -1737,6 +1762,8 @@ void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
     attrs |= ImportTypeAttr::Sendable;
   if (isNonSendable)
     attrs -= ImportTypeAttr::Sendable;
+  if (isSending)
+    attrs |= ImportTypeAttr::Sending;
 }
 
 ImportedType ClangImporter::Implementation::importType(
@@ -2348,10 +2375,6 @@ findGenericTypeInGenericDecls(ClangImporter::Implementation &impl,
       llvm::find_if(genericParams, [name](GenericTypeParamDecl *generic) {
         return generic->getName().str() == name;
       });
-  // We sometimes are unable compute the exact Swift type
-  // of symbolic declarations. Fallback to using `Any` in that case.
-  if (impl.importSymbolicCXXDecls && genericParamIter == genericParams.end())
-    return impl.SwiftContext.TheAnyType;
   // TODO: once we support generics in class types, replace this with
   // "return nullptr". Once support for template classes, this will need to
   // be updated, though. I'm leaving the assert here to make it easier to
