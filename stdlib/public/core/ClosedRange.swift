@@ -128,7 +128,7 @@ extension ClosedRange: RangeExpression {
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
-  @inlinable
+  @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
@@ -357,6 +357,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: Range<Bound>) -> Bool {
     if other.isEmpty { return true }
     let otherInclusiveUpper = other.upperBound.advanced(by: -1)
@@ -383,6 +384,7 @@ extension ClosedRange {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound >= other.upperBound
   }
