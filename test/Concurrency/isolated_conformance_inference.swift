@@ -73,3 +73,22 @@ nonisolated func testConformancesFromNonisolated(tdc: TestDerivedCodable) {
 
   let _: any Codable = tdc
 }
+
+protocol P2 {
+  func g()
+}
+
+struct DifferingConformances: @MainActor P {
+  @MainActor func f() { }
+}
+
+extension DifferingConformances: @SomeGlobalActor P2 {
+  @SomeGlobalActor func g() { }
+}
+
+@MainActor
+class InferMeDefaults {
+  var mainState: any P.Type = DifferingConformances.self
+  var someGlobalActorState: any P2.Type = DifferingConformances.self // expected-error{{global actor 'SomeGlobalActor'-isolated default value in a main actor-isolated context}}
+  var bothState: any (P & P2).Type = DifferingConformances.self // expected-error{{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+}
