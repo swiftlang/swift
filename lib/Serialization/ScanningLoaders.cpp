@@ -187,20 +187,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         // Handle clang arguments. For caching build, all arguments are passed
         // with `-direct-clang-cc1-module-build`.
-        if (Ctx.ClangImporterOpts.ClangImporterDirectCC1Scan) {
-          Args.push_back("-direct-clang-cc1-module-build");
-          auto *importer =
-              static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-          for (auto &Arg : importer->getSwiftExplicitModuleDirectCC1Args()) {
-            Args.push_back("-Xcc");
-            Args.push_back(Arg);
-          }
-        } else {
-          Args.push_back("-Xcc");
-          Args.push_back("-fno-implicit-modules");
-          Args.push_back("-Xcc");
-          Args.push_back("-fno-implicit-module-maps");
-        }
+        llvm::append_range(Args, swiftModuleClangCC1CommandLineArgs);
+
         for (const auto &candidate : compiledCandidates) {
           Args.push_back("-candidate-module-file");
           Args.push_back(candidate);
@@ -310,7 +298,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
     StringRef sdkModuleOutputPath,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
-    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+    const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
     InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
     bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(moduleName);
@@ -329,6 +317,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
       delegate, moduleOutputPath, sdkModuleOutputPath));
   scanners.push_back(std::make_unique<SwiftModuleScanner>(
       Ctx, LoadMode, moduleId, delegate, moduleOutputPath, sdkModuleOutputPath,
+      swiftModuleClangCC1CommandLineArgs,
       SwiftModuleScanner::MDS_plain));
 
   // Check whether there is a module with this name that we can import.
