@@ -220,6 +220,10 @@ func yetMoreUnsafeFunc(unsafe: () -> Void) {
   // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
 }
 
+func yetMoreMoreUnsafeFunc(unsafe: Int?) {
+  _ = unsafe! + 1
+}
+
 // @safe suppresses unsafe-type-related diagnostics on an entity
 struct MyArray<Element> {
   @safe func withUnsafeBufferPointer<R, E>(
