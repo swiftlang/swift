@@ -6,7 +6,6 @@
 # the variable with `-DSwiftCore_*` on the commandline.
 
 set(SwiftCore_ENABLE_BACKTRACING_default OFF) # TODO: enable this by default
-set(SwiftCore_ENABLE_COMMANDLINE_SUPPORT_default OFF) # TODO: enable this by default
 
 set(SwiftCore_ENABLE_STDIN_default ON)
 set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
