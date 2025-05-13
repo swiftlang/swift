@@ -3879,7 +3879,7 @@ PackElementType::PackElementType(Type packType, unsigned level,
     packType(packType), level(level) {
   assert(packType->isParameterPack() ||
          packType->is<PackArchetypeType>() ||
-         packType->is<TypeVariableType>());
+         packType->isTypeVariableOrMember());
   assert(level > 0);
 }
 
