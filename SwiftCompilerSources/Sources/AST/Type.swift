@@ -61,6 +61,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var builtinVectorElementType: Type { Type(bridged: bridged.getBuiltinVectorElementType()) }
 
+  public var builtinFixedArrayElementType: Type { Type(bridged: bridged.getBuiltinFixedArrayElementType()) }
+
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
@@ -80,6 +82,8 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   public var superClassType: CanonicalType? { rawType.superClassType?.canonical }
 
   public var builtinVectorElementType: CanonicalType { rawType.builtinVectorElementType.canonical }
+
+  public var builtinFixedArrayElementType: CanonicalType { rawType.builtinFixedArrayElementType.canonical }
 
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return rawType.subst(with: substitutionMap).canonical
@@ -106,6 +110,7 @@ extension TypeProperties {
 
   public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
   public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
+  public var isBuiltinFixedArray: Bool { rawType.bridged.isBuiltinFixedArray() }
 
   public var isClass: Bool {
     if let nominal = nominal, nominal is ClassDecl {

@@ -509,6 +509,12 @@ extension AddressDefUseWalker {
       } else {
         return unmatchedPath(address: operand, path: path)
       }
+    case let vba as VectorBaseAddrInst:
+      if let path = path.popIfMatches(.vectorBase, index: 0) {
+        return walkDownUses(ofAddress: vba, path: path)
+      } else {
+        return unmatchedPath(address: operand, path: path)
+      }
     case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
       let ei = instruction as! SingleValueInstruction
       if let path = path.popIfMatches(.enumCase, index: (instruction as! EnumInstruction).caseIndex) {
@@ -814,6 +820,8 @@ extension AddressUseDefWalker {
       return walkUp(address: sea.struct, path: path.push(.structField, index: sea.fieldIndex))
     case let tea as TupleElementAddrInst:
       return walkUp(address: tea.tuple, path: path.push(.tupleField, index: tea.fieldIndex))
+    case let vba as VectorBaseAddrInst:
+      return walkUp(address: vba.vector, path: path.push(.vectorBase, index: 0))
     case let ida as InitEnumDataAddrInst:
       return walkUp(address: ida.operand.value, path: path.push(.enumCase, index: ida.caseIndex))
     case let uteda as UncheckedTakeEnumDataAddrInst:

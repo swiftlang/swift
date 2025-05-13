@@ -1350,6 +1350,10 @@ final public class ObjectInst : SingleValueInstruction {
 final public class VectorInst : SingleValueInstruction {
 }
 
+final public class VectorBaseAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var vector: Value { operand.value }
+}
+
 final public class DifferentiableFunctionInst: SingleValueInstruction {}
 
 final public class LinearFunctionInst: SingleValueInstruction {}
