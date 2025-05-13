@@ -4,6 +4,7 @@
 // RUN: %FileCheck %s < %t/cdecl.h
 // RUN: %check-in-clang %t/cdecl.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/cdecl.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang-c -fno-modules -Qunused-arguments %t/cdecl.h -include ctypes.h -include CoreFoundation.h
 // RUN: %check-in-clang-cxx -fno-modules -Qunused-arguments %t/cdecl.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
