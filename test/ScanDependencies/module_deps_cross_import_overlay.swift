@@ -17,7 +17,6 @@ import SubEWrapper
 
 // CHECK:  "directDependencies": [
 // CHECK-DAG:   "swift": "EWrapper"
-// CHECK-DAG:   "swift": "F"
 // CHECK-DAG:   "swift": "SubEWrapper"
 // CHECK-DAG:   "swift": "Swift"
 // CHECK-DAG:   "swift": "SwiftOnoneSupport"
@@ -36,6 +35,12 @@ import SubEWrapper
 // CHECK-NEXT: "-swift-module-cross-import",
 // CHECK-NEXT: "E",
 // CHECK-NEXT: SubE.swiftoverlay
+
+// CHECK:    "swiftOverlayDependencies": [
+// CHECK:      {
+// CHECK:        "swift": "F"
+// CHECK:      }
+// CHECK:    ]
 
 // Ensure a transitive dependency via "_cross_import_E" is recorded in the graph still
 // CHECK:   "clang": "X"
