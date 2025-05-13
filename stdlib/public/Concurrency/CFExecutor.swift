@@ -44,13 +44,13 @@ enum CoreFoundation {
 // .. Main Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
+public final class _CFMainExecutor: _DispatchMainExecutor, @unchecked Sendable {
 
-  override public func run() throws {
+  override public func _run() throws {
     CoreFoundation.CFRunLoopRun()
   }
 
-  override public func stop() {
+  override public func _stop() {
     unsafe CoreFoundation.CFRunLoopStop(CoreFoundation.CFRunLoopGetMain())
   }
 
@@ -59,8 +59,8 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class CFTaskExecutor: DispatchGlobalTaskExecutor,
-                                   @unchecked Sendable {
+public final class _CFTaskExecutor: _DispatchGlobalTaskExecutor,
+                                    @unchecked Sendable {
 
 }
 
