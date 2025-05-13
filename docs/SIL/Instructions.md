@@ -3467,6 +3467,20 @@ Constructs a statically initialized vector of elements. This instruction
 can only appear as final instruction in a global variable static
 initializer list.
 
+### vector_base_addr
+
+```
+sil-instruction ::= 'vector_base_addr' sil-operand
+
+%1 = vector_base_addr %0 : $*Builtin.FixedArray<N, Element>
+// %0 must have type $*Builtin.FixedArray
+// %1 will be of the element type of the Builtin.FixedArray
+```
+
+Derives the address of the first element of a vector, i.e. a `Builtin.FixedArray`,
+from the address of the vector itself.
+Addresses of other vector elements can then be derived with `index_addr`.
+
 ### ref_element_addr
 
 ```
