@@ -221,7 +221,10 @@ func yetMoreUnsafeFunc(unsafe: () -> Void) {
 }
 
 func yetMoreMoreUnsafeFunc(unsafe: Int?) {
-  _ = unsafe! + 1
+  _ = unsafe!
+  if let unsafe {
+    _ = unsafe + 1
+  }
 }
 
 // @safe suppresses unsafe-type-related diagnostics on an entity
