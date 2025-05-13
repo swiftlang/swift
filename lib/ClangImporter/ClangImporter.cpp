@@ -1187,8 +1187,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
            CI->getFrontendOpts().ProgramAction ==
                clang::frontend::ActionKind::GeneratePCH) &&
           ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
-        CI->getFrontendOpts().CASIncludeTreeID =
-            ctx.CASOpts.ClangIncludeTrees.back();
+        CI->getFrontendOpts().CASIncludeTreeID = ctx.CASOpts.ClangIncludeTree;
         CI->getFrontendOpts().Inputs.clear();
       }
     }
@@ -1247,7 +1246,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+    if (ctx.ClangImporterOpts.UseClangIncludeTree) {
       // There is no need to add any module map file here. Issue a warning and
       // drop the option.
       Impl.diagnose(SourceLoc(), diag::module_map_ignored, ModuleMapFile);
@@ -1327,7 +1326,7 @@ ClangImporter::create(ASTContext &ctx,
       fileMapping.requiresBuiltinHeadersInSystemModules;
 
   // Avoid creating indirect file system when using include tree.
-  if (!ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+  if (!ctx.CASOpts.HasImmutableFileSystem) {
     // Wrap Swift's FS to allow Clang to override the working directory
     VFS = llvm::vfs::RedirectingFileSystem::create(
         fileMapping.redirectedFiles, true, *ctx.SourceMgr.getFileSystem());
