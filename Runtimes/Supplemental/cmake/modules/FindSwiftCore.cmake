@@ -15,7 +15,7 @@ The following :prop_tgt:`IMPORTED` TARGETS may be defined:
 Hint Variables
 ^^^^^^^^^^^^^^
 
- ``SDKROOT``
+ ``SDKROOT`` (environment variable)
    Set the path to the Swift SDK Root.
    This only affects Windows builds.
 
@@ -65,7 +65,8 @@ if(APPLE)
       "${CMAKE_OSX_SYSROOT}/usr/lib/swift")
   add_library(SwiftCore SHARED IMPORTED GLOBAL)
   set_target_properties(SwiftCore PROPERTIES
-    IMPORTED_IMPLIB "${SwiftCore_IMPLIB}")
+    IMPORTED_IMPLIB "${SwiftCore_IMPLIB}"
+    INTERFACE_INCLUDE_DIRECTORIES "${SwiftCore_INCLUDE_DIR}")
   find_package_handle_standard_args(SwiftCore DEFAULT_MSG
     SwiftCore_IMPLIB SwiftCore_INCLUDE_DIR)
 elseif(LINUX)
