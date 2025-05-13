@@ -85,16 +85,13 @@ bb3:
   return %23 : $Int32
 }
 
-// CHECK-LABEL: sil [ossa] @dont_rotate_multi_exit_loop :
-// CHECK:       bb1({{.*}}):
-// CHECK:         cond_br %{{.*}}, bb4, bb2
-// CHECK:       bb2:
-// CHECK:         cond_br undef, bb3, bb5
-// CHECK:       bb6:
-// CHECK:         return
-// CHECK-NOT:   bb7
-// CHECK:       } // end sil function 'dont_rotate_multi_exit_loop'
-sil [ossa] @dont_rotate_multi_exit_loop : $@convention(thin) (Int32, @owned Bar) -> Int32 {
+// CHECK-LABEL: sil [ossa] @rotate_multi_exit_loop :
+// CHECK:  [[METH1:%.*]] = class_method {{.*}} : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+// CHECK:  apply [[METH1]]({{.*}}) : $@convention(method) (@guaranteed Bar) -> ()
+// CHECK:  [[METH2:%.*]] = class_method {{.*}} : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+// CHECK:  apply [[METH2]]({{.*}}) : $@convention(method) (@guaranteed Bar) -> ()
+// CHECK:  } // end sil function 'rotate_multi_exit_loop'
+sil [ossa] @rotate_multi_exit_loop : $@convention(thin) (Int32, @owned Bar) -> Int32 {
 bb0(%0 : $Int32, %25: @owned $Bar):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
