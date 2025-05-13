@@ -1145,7 +1145,9 @@ IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
 static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
   // If we're forming a fixed-width type, build using the greatest width.
   if (auto intTy = dyn_cast<BuiltinIntegerType>(anyIntTy))
-    return APInt(intTy->getGreatestWidth(), value);
+    // TODO: Avoid implicit trunc?
+    return APInt(intTy->getGreatestWidth(), value, /*isSigned=*/false,
+                 /*implicitTrunc=*/true);
 
   // Otherwise, build using the size of the type and then truncate to the
   // minimum width necessary.
