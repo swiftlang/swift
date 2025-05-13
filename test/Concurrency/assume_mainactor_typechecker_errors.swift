@@ -69,3 +69,15 @@ func testTaskDetached() async {
     await k.doSomething()
   }
 }
+
+// Ensure that a Sendable-conforming protocol suppresses @MainActor inference
+// for a type.
+enum CK: CodingKey {
+  case one
+
+  func f() { }
+}
+
+nonisolated func testCK(x: CK) {
+  x.f() // okay, because CK and CK.f are not @MainActor.
+}
