@@ -5956,6 +5956,65 @@ static void addAttributesForActorIsolation(ValueDecl *value,
     }
 }
 
+/// Determine whether there is a SendableMetatype conformance that requires that the nominal type
+/// be nonisolated (preventing @MainActor inference).
+static bool sendableConformanceRequiresNonisolated(NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::SendableProhibitsMainActorInference))
+    return false;
+
+  if (isa<ProtocolDecl>(nominal))
+    return false;
+
+  auto sendable = ctx.getProtocol(KnownProtocolKind::Sendable);
+  auto sendableMetatype = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (!sendableMetatype)
+    return false;
+
+  // Check whether any of the explicit conformances is to a
+  // SendableMetatype-inheriting protocol. We exclude direct conformance to
+  // Sendable here, because a global-actor-isolated type is implicitly Sendable,
+  // and writing Sendable explicitly
+  InvertibleProtocolSet inverses;
+  bool anyObject = false;
+  auto inherited = getDirectlyInheritedNominalTypeDecls(
+      nominal, inverses, anyObject);
+  for (const auto &entry : inherited) {
+    auto proto = dyn_cast<ProtocolDecl>(entry.Item);
+    if (proto && proto != sendable && proto->inheritsFrom(sendableMetatype))
+      return true;
+  }
+
+  // Check for member or extension macros that define conformances to
+  // SendableMetatype-inheriting protocols.
+  bool requiresNonisolated = false;
+  auto checkMacro = [&](MacroRole role, MacroDecl *macro) {
+    if (!macro || requiresNonisolated)
+      return;
+
+    SmallVector<ProtocolDecl *, 2> conformances;
+    macro->getIntroducedConformances(nominal, role, conformances);
+    for (auto proto : conformances) {
+      if (proto == sendableMetatype || proto->inheritsFrom(sendableMetatype)) {
+        requiresNonisolated = true;
+        break;
+      }
+    }
+  };
+
+  nominal->forEachAttachedMacro(
+      MacroRole::Member,
+      [&](CustomAttr * attr, MacroDecl *macro) {
+        checkMacro(MacroRole::Member, macro);
+      });
+  nominal->forEachAttachedMacro(
+      MacroRole::Extension,
+      [&](CustomAttr * attr, MacroDecl *macro) {
+        checkMacro(MacroRole::Extension, macro);
+      });
+  return requiresNonisolated;
+}
+
 /// Determine the default isolation and isolation source for this declaration,
 /// which may still be overridden by other inference rules.
 static std::tuple<InferredActorIsolation, ValueDecl *,
@@ -5975,16 +6034,27 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       auto *dc = value->getInnermostDeclContext();
       while (dc && !inActorContext) {
         if (auto *nominal = dc->getSelfNominalTypeDecl()) {
-          inActorContext = nominal->isAnyActor();
+          if (nominal->isAnyActor())
+            return {};
         }
         dc = dc->getParent();
       }
 
-      if (!inActorContext) {
-        // FIXME: deinit should be implicitly MainActor too.
-        if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
-            isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
-            isa<ConstructorDecl>(value)) {
+      // If this is or is a non-type member of a nominal type that conforms to a
+      // SendableMetatype-inheriting protocol in its primary definition, disable
+      // @MainActor inference.
+      auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(value);
+      if (!nominalTypeDecl && !isa<TypeDecl>(value)) {
+        nominalTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl();
+      }
+      if (nominalTypeDecl &&
+          sendableConformanceRequiresNonisolated(nominalTypeDecl))
+        return { };
+
+      // FIXME: deinit should be implicitly MainActor too.
+      if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
+          isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
+          isa<ConstructorDecl>(value)) {
           // Preconcurrency here is used to stage the diagnostics
           // when users select `@MainActor` default isolation with
           // non-strict concurrency modes (pre Swift 6).
@@ -5992,7 +6062,6 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
               ActorIsolation::forGlobalActor(globalActor)
                   .withPreconcurrency(!ctx.LangOpts.isSwiftVersionAtLeast(6));
           return {{{isolation, {}}, nullptr, {}}};
-        }
       }
 
       return {};
