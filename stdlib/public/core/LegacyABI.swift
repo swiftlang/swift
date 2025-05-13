@@ -177,15 +177,15 @@ extension _NativeDictionary {
   internal func __abi_mapValues<T>(
     _ transform: (Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
-    let resultStorage = _DictionaryStorage<Key, T>.copy(original: _storage)
-    _internalInvariant(resultStorage._seed == _storage._seed)
-    let result = _NativeDictionary<Key, T>(resultStorage)
+    let resultStorage = unsafe _DictionaryStorage<Key, T>.copy(original: _storage)
+    unsafe _internalInvariant(resultStorage._seed == _storage._seed)
+    let result = unsafe _NativeDictionary<Key, T>(resultStorage)
     // Because the current and new buffer have the same scale and seed, we can
     // initialize to the same locations in the new buffer, skipping hash value
     // recalculations.
-    for bucket in hashTable {
-      let key = self.uncheckedKey(at: bucket)
-      let value = self.uncheckedValue(at: bucket)
+    for unsafe bucket in unsafe hashTable {
+      let key = unsafe self.uncheckedKey(at: bucket)
+      let value = unsafe self.uncheckedValue(at: bucket)
       try result._insert(at: bucket, key: key, value: transform(value))
     }
     return result
