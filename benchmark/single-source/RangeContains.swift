@@ -33,6 +33,16 @@ public let benchmarks = [
     runFunction: run_ClosedRangeContainsClosedRange,
     tags: [.validation, .api],
     setUpFunction: buildRanges),
+  BenchmarkInfo(
+    name: "RangeContainsElement",
+    runFunction: run_RangeContainsElement,
+    tags: [.validation, .api],
+    setUpFunction: buildRanges),
+  BenchmarkInfo(
+    name: "ClosedRangeContainsElement",
+    runFunction: run_ClosedRangeContainsElement,
+    tags: [.validation, .api],
+    setUpFunction: buildRanges),
 ]
 
 private func buildRanges() {
@@ -93,4 +103,30 @@ public func run_ClosedRangeContainsClosedRange(_ n: Int) {
     }
   }
   check(checksum == 12597 * UInt64(n))
+}
+
+@inline(never)
+public func run_RangeContainsElement(_ n: Int) {
+  var checksum: UInt64 = 0
+  for _ in 0 ..< n {
+    for range in ranges {
+      for i in -8 ... 8 {
+        if range.contains(i) { checksum += 1 }
+      }
+    }
+  }
+  check(checksum == 1632 * UInt64(n))
+}
+
+@inline(never)
+public func run_ClosedRangeContainsElement(_ n: Int) {
+  var checksum: UInt64 = 0
+  for _ in 0 ..< n {
+    for range in closedRanges {
+      for i in -8 ... 8 {
+        if range.contains(i) { checksum += 1 }
+      }
+    }
+  }
+  check(checksum == 1785 * UInt64(n))
 }
