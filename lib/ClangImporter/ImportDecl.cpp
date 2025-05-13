@@ -4630,9 +4630,14 @@ namespace {
             auto convertKind = ConstantConvertKind::None;
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
-            if (decl->getType()->isEnumeralType())
-              convertKind = ConstantConvertKind::Construction;
-            else if (findSwiftNewtype(decl, Impl.getClangSema(),
+            if (decl->getType()->isEnumeralType()) {
+              if (type->getEnumOrBoundGenericEnum()) {
+                // When importing as an enum, also apply implicit force unwrap
+                convertKind = ConstantConvertKind::ConstructionWithUnwrap;
+              } else {
+                convertKind = ConstantConvertKind::Construction;
+              }
+            } else if (findSwiftNewtype(decl, Impl.getClangSema(),
                                       Impl.CurrentVersion))
               convertKind = ConstantConvertKind::Construction;
 
