@@ -9,21 +9,40 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Observation
 import _Concurrency
+
+@usableFromInline
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("swift_task_addCancellationHandler")
+func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("swift_task_removeCancellationHandler")
+func _taskRemoveCancellationHandler(
+  record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+)
+
+func withIsolatedTaskCancellationHandler<T: Sendable>(
+  operation: @isolated(any) () async throws -> T,
+  onCancel handler: @Sendable () -> Void,
+  isolation: isolated (any Actor)? = #isolation
+) async rethrows -> T {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+  let record = _taskAddCancellationHandler(handler: handler)
+  defer { _taskRemoveCancellationHandler(record: record) }
+
+  return try await operation()
+}
 
 /// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
 ///
-/// `Observed` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
+/// `Observations` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
 /// types that are marked as `@Observable` by using Swift Concurrency to indicate transactional boundaries
 /// starting from the willSet of the first mutation to the next suspension point of the safe access.
 @available(SwiftStdlib 9999, *)
-public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendable {
-  /// An indication type for specifying if an element is the next element or a finishing of iteration
-  ///
-  /// This is used in conjunction with `Observed.untilFinished` to emit values until a `.finish` is 
-  /// returned. All other elements in the observation emit closure for `untilFinished` should return
-  /// `.next(element)` to indicate a properly formed next element from the observation closure.
+public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Sendable {
   public enum Iteration: Sendable {
     case next(Element)
     case finish
@@ -41,8 +60,8 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       }
     }
     var id = 0
-    var tracking = false
     var continuations: [Int: Continuation] = [:]
+    var dirty = false
     
     // create a generation id for the unique identification of the continuations
     // this allows the shared awaiting of the willSets.
@@ -72,23 +91,11 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       }?.resume()
     }
     
-    // this atomically transitions the observation from a not yet tracked state
-    // to a tracked state. No backwards transitions exist.
-    static func startTracking(_ state: _ManagedCriticalState<State>) -> Bool {
-      state.withCriticalRegion { state in
-        if !state.tracking {
-          state.tracking = true
-          return true
-        } else {
-          return false
-        }
-      }
-    }
-    
     // fire off ALL awaiting willChange continuations such that they are no
     // longer pending.
     static func emitWillChange(_ state: _ManagedCriticalState<State>) {
       let continuations = state.withCriticalRegion { state in
+        state.dirty = true
         defer {
           state.continuations.removeAll()
         }
@@ -101,18 +108,24 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     
     // install a willChange continuation into the set of continuations
     // this must take a locally unique id (to the active calls of next)
-    static func willChange(_ state: _ManagedCriticalState<State>, id: Int) async {
-      return await withUnsafeContinuation { continuation in
+    static func willChange(isolation iterationIsolation: isolated (any Actor)? = #isolation, state: _ManagedCriticalState<State>, id: Int) async {
+      return await withUnsafeContinuation(isolation: iterationIsolation) { continuation in
         state.withCriticalRegion { state in
-          // first check if a cancelled tombstone exists, remove it,
-          // and then return the freshly minted continuation to
-          // be immediately resumed
-          if case .cancelled = state.continuations[id] {
-            state.continuations[id] = nil
+          defer { state.dirty = false }
+          switch state.continuations[id] {
+          case .cancelled:
             return continuation as UnsafeContinuation<Void, Never>?
-          } else {
-            state.continuations[id] = .active(continuation)
-            return nil as UnsafeContinuation<Void, Never>?
+          case .active:
+            // the Iterator itself cannot be shared across isolations so any call to next that may share an id is a misbehavior
+            // or an internal book-keeping failure
+            fatalError("Iterator incorrectly shared across task isolations")
+          case .none:
+            if state.dirty {
+              return continuation
+            } else {
+              state.continuations[id] = .active(continuation)
+              return nil
+            }
           }
         }?.resume()
       }
@@ -145,17 +158,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
   
   /// Constructs an asynchronous sequence for a given closure by tracking changes of `@Observable` types.
   ///
-  /// The emit closure is responsible for extracting a value out of a single or many `@Observable` types. When
-  /// this initializer is invoked the closure inherits the current actor isolation and subseqent calls made 
-  /// internally by `Observed` re-invoke the closure on that isolation if present. This means that if the 
-  /// `Observed` is constructed on the `@MainActor`, all following calls to the emit closure will also be 
-  /// isolated to the `@MainActor` and likewise for other isolations.
-  ///
-  /// In the case that this method is used in a `nonisolated` context it then means that the usage point
-  /// must maintain rules pertaining to the `Sendable` nature of captured types. This method and other 
-  /// parts of `Observed` do not add additional concurrency protection for these cases; so types must 
-  /// be safe to maintain the safe construction and usage of `Observed` when called in an explicitly 
-  /// `nonisolated` isolation domain.
+  /// The emit closure is responsible for extracting a value out of a single or many `@Observable` types.
   ///
   /// - Parameters:
   ///     - isolation:  The concurrency isolation domain of the caller.
@@ -169,16 +172,14 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
   /// Constructs an asynchronous sequence for a given closure by tracking changes of `@Observable` types.
   ///
   /// The emit closure is responsible for extracting a value out of a single or many `@Observable` types. This method
-  /// continues to be invoked until the .finished option is returned or an error is thrown. Additionally the emit
-  /// closure follows the same isolation rules as the initializer form; where isolation is preserved from the 
-  /// initial invocation and restored if present to ensure the closure is always isolated to the initial construction
-  /// isolation domain.
+  /// continues to be invoked until the .finished option is returned or an error is thrown.
   ///
   /// - Parameters:
+  ///     - isolation:  The concurrency isolation domain of the caller.
   ///     - emit: A closure to generate an element for the sequence.
   public static func untilFinished(
     @_inheritActorContext _ emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Iteration
-  ) -> Observed<Element, Failure> {
+  ) -> Observations<Element, Failure> {
     .init(emit: .iteration(emit))
   }
   
@@ -188,6 +189,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     // 2) to idenitify the termination of _this_ sequence
     var state: _ManagedCriticalState<State>?
     let emit: Emit
+    var started = false
     
     // this is the primary implementation of the tracking
     // it is bound to be called on the specified isolation of the construction
@@ -242,23 +244,23 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       let id = State.generation(state)
       do {
         // there are two versions;
-        // either the tracking has never yet started at all and we need to prime the pump
+        // either the tracking has never yet started at all and we need to prime the pump for this specific iterator
         // or the tracking has already started and we are going to await a change
-        if State.startTracking(state) {
+        if !started {
+          started = true
           return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
         } else {
-          
           // wait for the willChange (and NOT the value itself)
           // since this is going to be on the isolation of the object (e.g. the isolation specified in the initialization)
           // this will mean our next await for the emission will ensure the suspension return of the willChange context
           // back to the trailing edges of the mutations. In short, this enables the transactionality bounded by the
           // isolation of the mutation.
-          await withTaskCancellationHandler {
-            await State.willChange(state, id: id)
-          } onCancel: {
+          await withIsolatedTaskCancellationHandler(operation: {
+            await State.willChange(isolation: iterationIsolation, state: state, id: id)
+          }, onCancel: {
             // ensure to clean out our continuation uon cancellation
             State.cancel(state, id: id)
-          }
+          }, isolation: iterationIsolation)
           return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
         }
       } catch {
