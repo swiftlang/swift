@@ -64,6 +64,7 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
 void applyInverses(ASTContext &ctx,
                    ArrayRef<Type> gps,
                    ArrayRef<InverseRequirement> inverseList,
+                   ArrayRef<StructuralRequirement> explicitRequirements,
                    SmallVectorImpl<StructuralRequirement> &result,
                    SmallVectorImpl<RequirementError> &errors);
 
