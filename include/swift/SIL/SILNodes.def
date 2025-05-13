@@ -587,6 +587,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(VectorInst, vector,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(VectorBaseAddrInst, vector_base_addr,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleInst, tuple,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleExtractInst, tuple_extract,

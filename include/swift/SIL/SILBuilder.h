@@ -22,6 +22,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include <type_traits>
@@ -1921,6 +1922,15 @@ public:
     auto ResultTy = Operand->getType().getFieldType(Field, getModule(),
                                                     getTypeExpansionContext());
     return createStructElementAddr(Loc, Operand, Field, ResultTy);
+  }
+
+  VectorBaseAddrInst *
+  createVectorBaseAddr(SILLocation loc, SILValue vector) {
+    auto arrayTy = vector->getType().getAs<BuiltinFixedArrayType>();
+    ASSERT(arrayTy && "operand of vector_extract must be a builtin array type");
+    auto elemtTy = getFunction().getLoweredType(Lowering::AbstractionPattern::getOpaque(), arrayTy->getElementType());
+    return insert(new (getModule()) VectorBaseAddrInst(
+        getSILDebugLocation(loc), vector, elemtTy.getAddressType()));
   }
 
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,

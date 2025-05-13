@@ -148,6 +148,16 @@ extension LoadBorrowInst : VerifiableInstruction {
   }
 }
 
+extension VectorBaseAddrInst : VerifiableInstruction {
+  func verify(_ context: FunctionPassContext) {
+    require(vector.type.isBuiltinFixedArray,
+            "vector operand of vector_element_addr must be a Builtin.FixedArray")
+    require(type == vector.type.builtinFixedArrayElementType(in: parentFunction,
+                                                             maximallyAbstracted: true).addressType,
+            "result of vector_element_addr has wrong type")
+  }
+}
+
 // Used to check if any instruction is mutating the memory location within the liverange of a `load_borrow`.
 // Note that it is not checking if an instruction _may_ mutate the memory, but it's checking if any instruction
 // _definitely_ will mutate the memory.
