@@ -257,5 +257,5 @@ struct AnyEraser: EraserProto {
   init<T: EraserProto>(erasing: T) {}
 }
 
-func takeNone(@_inheritActorContext param: () async -> ()) { }
-func takeAlways(@_inheritActorContext(always) param: () async -> ()) { }
+func takeNone(@_inheritActorContext param: @Sendable () async -> ()) { }
+func takeAlways(@_inheritActorContext(always) param: sending @isolated(any) () -> ()) { }

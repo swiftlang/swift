@@ -7861,6 +7861,24 @@ void AttributeChecker::visitInheritActorContextAttr(
                           attr, paramTy);
     return;
   }
+
+  // The type has to be either `@Sendable` or `sending` _and_
+  // `async` or `@isolated(any)`.
+  if (!(funcTy->isSendable() || P->isSending())) {
+    diagnose(attr->getLocation(),
+             diag::inherit_actor_context_only_on_sending_or_Sendable_params,
+             attr)
+        .warnUntilFutureSwiftVersion();
+  }
+
+  // Eiether `async` or `@isolated(any)`.
+  if (!(funcTy->isAsync() || funcTy->getIsolation().isErased())) {
+    diagnose(
+        attr->getLocation(),
+        diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
+        attr)
+        .warnUntilFutureSwiftVersion();
+  }
 }
 
 void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
