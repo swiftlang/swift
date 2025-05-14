@@ -55,6 +55,13 @@ class WorktreeTestCase(scheme_mock.SchemeMockTestCase):
                    '--source-root', self.worktree_path,
                    '--scheme', 'main'])
 
+    def test_worktree_single_threaded(self):
+        self.call([self.update_checkout_path,
+                   '--config', self.config_path,
+                   '--source-root', self.worktree_path,
+                   '--scheme', 'main',
+                   '-j', '1'])
+
     def setUp(self):
         super(WorktreeTestCase, self).setUp()
         self.worktree_path = os.path.join(self.workspace, WORKTREE_NAME)
