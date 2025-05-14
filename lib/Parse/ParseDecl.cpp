@@ -672,7 +672,7 @@ bool Parser::parseSpecializeAttributeArguments(
                   DeclNameFlag::AllowKeywordsUsingSpecialNames |
                   DeclNameFlag::AllowOperators |
                   DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-              /*allowModSel=*/false);
+              ModuleSelectorReason::SiblingDeclName);
         }
       }
       if (ParamLabel == "spiModule") {
@@ -688,6 +688,7 @@ bool Parser::parseSpecializeAttributeArguments(
           consumeToken();
           return false;
         }
+        parseModuleSelector(ModuleSelectorReason::SPIGroup);
         auto text = Tok.getText();
         spiGroups.push_back(Context.getIdentifier(text));
         consumeToken();
@@ -1118,7 +1119,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
           DeclNameFlag::AllowZeroArgCompoundNames |
               DeclNameFlag::AllowOperators |
               DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-          /*allowModSel=*/false);
+          ModuleSelectorReason::SiblingDeclName);
       if (!MemberName) {
         Status.setIsParseError();
       }
@@ -1140,7 +1141,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return Status;
   }
 
-  // FIXME(ModQual): Reject module qualification on MemberName.
+  assert(MemberName.getModuleSelector().empty());
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                            ProtocolType.get(), MemberName.getFullName(),
@@ -1589,8 +1590,7 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
         Parser::DeclNameFlag::AllowZeroArgCompoundNames |
             Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
             Parser::DeclNameFlag::AllowOperators |
-            Parser::DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-        /*allowModSel=*/true);
+            Parser::DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     // The base type is optional, but the final unqualified declaration name is
     // not. If name could not be parsed, return true for error.
     if (!original.Name)
@@ -2423,7 +2423,7 @@ Parser::parseMacroRoleAttribute(
              DeclNameFlag::AllowKeywordsUsingSpecialNames |
              DeclNameFlag::AllowCompoundNames |
              DeclNameFlag::AllowZeroArgCompoundNames),
-            /*allowModSel=*/false);
+            ModuleSelectorReason::AttrParameter);
         if (!name) {
           status.setIsParseError();
           return status;
@@ -2499,6 +2499,8 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
     P.CodeCompletionCallbacks->completeDeclAttrParam(*PDK, 0, /*HasLabel=*/false);
     P.consumeToken(tok::code_complete);
   }
+
+  P.parseModuleSelector(Parser::ModuleSelectorReason::AttrParameter);
 
   StringRef parsedName = P.Tok.getText();
   if (!P.consumeIf(tok::identifier)) {
@@ -2973,6 +2975,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       consumeIf(tok::r_paren);
       return makeParserSuccess();
     }
+
+    parseModuleSelector(ModuleSelectorReason::SPIGroup);
 
     auto text = Tok.getText();
     // An spi group name can be '_' as in @_spi(_), a specifier for implicit import of the SPI.
@@ -3537,8 +3541,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
           DeclNameFlag::AllowZeroArgCompoundNames |
               DeclNameFlag::AllowKeywordsUsingSpecialNames |
               DeclNameFlag::AllowOperators |
-              DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-          /*allowModSel=*/true);
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     }
 
     // Parse the matching ')'.
@@ -4533,8 +4536,7 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
     DeclNameLoc unusedLoc;
     witnessMethodProtocol = parseDeclNameRef(
         unusedLoc, diag::convention_attribute_witness_method_expected_protocol,
-        DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-        /*allowModSel=*/true);
+        DeclNameFlag::AllowLowercaseAndUppercaseSelf);
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in
@@ -6715,6 +6717,8 @@ static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
                         StringRef DeclKindName,
                         llvm::function_ref<bool(const Token &)> canRecover) {
+  P.parseModuleSelector(Parser::ModuleSelectorReason::NameInDecl, DeclKindName);
+
   if (P.Tok.is(tok::identifier)) {
     Loc = P.consumeIdentifier(Result, /*diagnoseDollarPrefix=*/true);
 
@@ -7556,6 +7560,9 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   // the default, not actually try to parse something.
   if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
     StartLoc = P.consumeToken(tok::l_paren);
+
+    P.parseModuleSelector(Parser::ModuleSelectorReason::ParamDecl);
+
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_accessor_parameter_name,
                  Kind == AccessorKind::Set ? 0 :
@@ -10133,10 +10140,11 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
+    // TODO: We could support module selectors for precedence groups if we
+    //       implemented the lookup for it.
     groupName = parseDeclNameRef(groupLoc,
                                  diag::operator_decl_expected_precedencegroup,
-                                 {},
-                                 /*allowModSel=*/false);
+                                 {}, ModuleSelectorReason::PrecedenceGroup);
 
     if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       // Designated types have been removed; consume the list (mainly for source
@@ -10230,6 +10238,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     diagnose(precedenceGroupLoc, diag::decl_inner_scope);
     return nullptr;
   }
+
+  parseModuleSelector(ModuleSelectorReason::PrecedenceGroup);
 
   Identifier name;
   SourceLoc nameLoc;
@@ -10435,7 +10445,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
                                      { diag::expected_precedencegroup_relation,
                                        attrName },
                                      {},
-                                     /*allowModSel=*/false);
+                                     ModuleSelectorReason::PrecedenceGroup);
         if (!name) {
           return abortBody();
         }

@@ -830,7 +830,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     DeclNameLoc nameLoc;
     DeclNameRef name = parseDeclNameRef(nameLoc,
         diag::expr_keypath_expected_property_or_type, flags,
-        /*allowModSel=*/false);
+        ModuleSelectorReason::ObjCName);
     if (!name) {
       status.setIsParseError();
       break;
@@ -1330,8 +1330,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       auto Name = parseDeclNameRef(
           NameLoc, D,
           DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames |
-              DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-          /*allowModSel=*/true);
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
       if (!Name) {
         SourceRange ErrorRange = Result.get()->getSourceRange();
         ErrorRange.widen(TokLoc);
@@ -1726,6 +1725,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // will be resolved (or rejected) by sema when the overall refutable pattern
     // it transformed from an expression into a pattern.
     if (canParseBindingInPattern) {
+      parseModuleSelector(ModuleSelectorReason::NameInDecl,
+                          InBindingPattern.isLet() ? "constant" : "variable");
+
       Identifier name;
       SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
       // If we have an inout/let/var, set that as our introducer. otherwise
@@ -1805,8 +1807,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
                             DeclNameFlag::AllowKeywords |
                                 DeclNameFlag::AllowCompoundNames |
-                                DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-                            /*allowModSel=*/true);
+                                DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     if (!Name)
       return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
 
@@ -2267,34 +2268,69 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
   return true;
 }
 
+std::optional<Located<Identifier>> Parser::
+parseModuleSelector(ModuleSelectorReason reason, StringRef declKindName) {
+  if (!Context.LangOpts.hasFeature(Feature::ModuleSelector))
+    return std::nullopt;
+
+  // Also allow the current token to be colon_colon, for diagnostics.
+  if (peekToken().isNot(tok::colon_colon) && Tok.isNot(tok::colon_colon))
+    return std::nullopt;
+
+  // We will parse the selector whether or not it's allowed, then early return
+  // if it's disallowed, then diagnose any other errors in what we parsed. This
+  // will make sure we always consume the module selector's tokens, but don't
+  // complain about a malformed selector when it's not supposed to be there at
+  // all.
+
+  SourceLoc nameLoc;
+  Identifier moduleName;
+  if (Tok.is(tok::identifier))
+    nameLoc = consumeIdentifier(moduleName, /*diagnoseDollarPrefix=*/true);
+  else if (Tok.is(tok::colon_colon))
+    // Let nameLoc and colonColonLoc both point to the tok::colon_colon.
+    nameLoc = Tok.getLoc();
+  else
+    nameLoc = consumeToken();
+
+  auto colonColonLoc = consumeToken(tok::colon_colon);
+
+  if (reason != ModuleSelectorReason::Allowed) {
+    diagnose(colonColonLoc, diag::module_selector_not_allowed,
+             (uint8_t)reason, declKindName);
+
+    // Special fix-it for capture lists which transforms `Mod::foo` into
+    // `foo = Mod::foo`.
+    if (reason == ModuleSelectorReason::Capture &&
+        !moduleName.empty() && Tok.is(tok::identifier)) {
+      SmallString<32> scratch = Tok.getText();
+      scratch += " = ";
+      diagnose(nameLoc, diag::fixit_capture_with_explicit_name, Tok.getText())
+          .fixItInsert(nameLoc, scratch);
+    }
+
+    diagnose(nameLoc, diag::fixit_remove_module_selector)
+        .fixItRemove({nameLoc, colonColonLoc});
+
+    return std::nullopt;
+  }
+
+  if (moduleName.empty())
+    diagnose(nameLoc, diag::expected_identifier_in_module_selector);
+
+  return Located<Identifier>(moduleName, nameLoc);
+}
+
 DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                      DiagRef diag,
                                      DeclNameOptions flags,
-                                     bool allowModSel) {
+                                     ModuleSelectorReason selectorReason) {
   // Consume the module name, if present.
   SourceLoc moduleSelectorLoc;
   Identifier moduleSelector;
-  if (Context.LangOpts.hasFeature(Feature::ModuleSelector) &&
-      peekToken().is(tok::colon_colon)) {
-    if (Tok.is(tok::identifier)) { // FIXME: tok::dollarident?
-      moduleSelectorLoc = consumeIdentifier(moduleSelector,
-                                            /*diagnoseDollarPrefix=*/true);
-    }
-    else {
-      diagnose(Tok, diag::expected_identifier_in_module_selector);
-      moduleSelector = Identifier();
-      moduleSelectorLoc = consumeToken();
-    }
-
-    // Diagnose if we don't allow a module selector here.
-    if (!allowModSel) {
-      diagnose(Tok, diag::module_selector_not_allowed_here)
-          .fixItRemove({moduleSelectorLoc, Tok.getLoc()});
-      moduleSelector = Identifier();
-      moduleSelectorLoc = SourceLoc();
-    }
-
-    consumeToken(tok::colon_colon);
+  if (auto locatedModule = parseModuleSelector(selectorReason)) {
+    moduleSelectorLoc = locatedModule->Loc;
+    moduleSelector = locatedModule->Item;
   }
 
   // Consume the base name.
@@ -2375,8 +2411,7 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
   bool hasWhitespaceBeforeName = poundEndLoc != Tok.getLoc();
 
   macroNameRef = parseDeclNameRef(macroNameLoc, diag,
-                                  DeclNameFlag::AllowKeywords,
-                                  /*allowModSel=*/false);
+                                  DeclNameFlag::AllowKeywords);
   if (!macroNameRef)
     return makeParserError();
 
@@ -2433,8 +2468,7 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
   }
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr, declNameFlags,
-                                      /*allowModSel=*/true);
+  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr, declNameFlags);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -2647,9 +2681,23 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       // Okay, we have a closure signature.
     } else if (Tok.isIdentifierOrUnderscore() || Tok.is(tok::code_complete)) {
-      // Parse identifier (',' identifier)*
+      // Parse module-selector? identifier (',' module-selector? identifier)*
+      // The module selectors aren't legal, but we want to diagnose them if
+      // they're present.
+      if (Context.LangOpts.hasFeature(Feature::ModuleSelector) &&
+          peekToken().is(tok::colon_colon)) {
+        consumeToken();
+        consumeToken(tok::colon_colon);
+      }
+
       consumeToken();
       while (consumeIf(tok::comma)) {
+        if (Context.LangOpts.hasFeature(Feature::ModuleSelector) &&
+            peekToken().is(tok::colon_colon)) {
+          consumeToken();
+          consumeToken(tok::colon_colon);
+        }
+
         if (Tok.isIdentifierOrUnderscore() || Tok.is(tok::code_complete)) {
           consumeToken();
           continue;
@@ -2723,8 +2771,10 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         }
       } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square,
-                                   tok::period)) {
+                                   tok::period, tok::colon_colon)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
+        // "x::" is not permitted, but we want to diagnose it as though it were
+        // a strong capture.
       } else {
         diagnose(Tok, diag::expected_capture_specifier);
         skipUntil(tok::comma, tok::r_square);
@@ -2739,10 +2789,17 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       // The thing being capture specified is an identifier, or as an identifier
       // followed by an expression.
+
       Expr *initializer;
       Identifier name;
       SourceLoc nameLoc = Tok.getLoc();
       SourceLoc equalLoc;
+
+      // FIXME: It'd be nice to be able to capture with a module selector, but
+      // define a local name; however, that would complicate the equals check
+      // here.
+      parseModuleSelector(ModuleSelectorReason::Capture);
+
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
@@ -2839,6 +2896,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       const auto parameterListLoc = Tok.getLoc();
       bool HasNext;
       do {
+        parseModuleSelector(ModuleSelectorReason::ParamDecl);
+
         if (Tok.isNot(tok::identifier, tok::kw__, tok::code_complete)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           status.setIsParseError();
@@ -3101,7 +3160,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   DeclNameRef nameRef =
       parseDeclNameRef(nameLoc, diag::impossible_parse,
                        DeclNameFlag::AllowAnonymousParamNames,
-                       /*allowModSel=*/false);
+                       ModuleSelectorReason::ParamDecl);
 
   StringRef Name = nameRef.getBaseIdentifier().str();
   SourceLoc Loc = nameLoc.getBaseNameLoc();
@@ -3280,8 +3339,7 @@ ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, Sou
     auto OperName =
         parseDeclNameRef(Loc, diag::expected_operator_ref,
                          DeclNameFlag::AllowOperators |
-                             DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-                         /*allowModSel=*/true);
+                             DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     if (!OperName) {
       return makeParserError();
     }

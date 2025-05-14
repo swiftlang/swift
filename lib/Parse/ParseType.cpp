@@ -853,8 +853,7 @@ ParserResult<DeclRefTypeRepr> Parser::parseTypeIdentifier(TypeRepr *Base) {
   DeclNameLoc Loc;
   DeclNameRef Name =
       parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type,
-                       DeclNameFlag::AllowLowercaseAndUppercaseSelf,
-                      /*allowModSel=*/true);
+                       DeclNameFlag::AllowLowercaseAndUppercaseSelf);
   if (!Name)
     return makeParserError();
 
@@ -1876,6 +1875,9 @@ bool Parser::canParseCollectionType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
+  // Parse a module selector, if present.
+  parseModuleSelector(ModuleSelectorReason::Allowed);
+  
   // Parse an identifier.
   //
   // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.
