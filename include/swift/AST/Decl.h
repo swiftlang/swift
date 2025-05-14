@@ -8416,6 +8416,7 @@ public:
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
   SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
