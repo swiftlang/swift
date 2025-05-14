@@ -613,6 +613,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 ///     '&' expr-unary(Mode)
 ///
 ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
+  // If we have an invalid module selector, consume that first.
+  parseModuleSelector(ModuleSelectorReason::InvalidOnly);
+
   UnresolvedDeclRefExpr *Operator;
 
   // First check to see if we have the start of a regex literal `/.../`.
@@ -1270,6 +1273,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Tok.setKind(tok::period);
       consumeToken();
 
+      parseModuleSelector(ModuleSelectorReason::InvalidOnly);
+
       // Handle "x.42" - a tuple index.
       if (Tok.is(tok::integer_literal)) {
         DeclNameRef name(Context.getIdentifier(Tok.getText()));
@@ -1641,6 +1646,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 ///     expr-selector
 ///
 ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
+  // If we have an invalid module selector, consume that first.
+  parseModuleSelector(ModuleSelectorReason::InvalidOnly);
+
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Tok.getText());
@@ -2277,6 +2285,13 @@ parseModuleSelector(ModuleSelectorReason reason, StringRef declKindName) {
   if (peekToken().isNot(tok::colon_colon) && Tok.isNot(tok::colon_colon))
     return std::nullopt;
 
+  // Leave these paired tokens to be diagnosed by a future call to
+  // `parseModuleSelector()` at the next token, rather than consuming them as
+  // malformed module names and causing more errors later in the parser.
+  if (Tok.isAny(tok::l_paren, tok::l_brace, tok::l_angle, tok::l_square,
+                tok::r_paren, tok::r_brace, tok::r_angle, tok::r_square))
+    return std::nullopt;
+
   // We will parse the selector whether or not it's allowed, then early return
   // if it's disallowed, then diagnose any other errors in what we parsed. This
   // will make sure we always consume the module selector's tokens, but don't
@@ -2285,8 +2300,15 @@ parseModuleSelector(ModuleSelectorReason reason, StringRef declKindName) {
 
   SourceLoc nameLoc;
   Identifier moduleName;
-  if (Tok.is(tok::identifier))
+  if (Tok.is(tok::identifier)) {
+    // If we are only supposed to consume invalid selectors, leave this for
+    // later.
+    if (reason == ModuleSelectorReason::InvalidOnly) {
+      return std::nullopt;
+    }
+
     nameLoc = consumeIdentifier(moduleName, /*diagnoseDollarPrefix=*/true);
+  }
   else if (Tok.is(tok::colon_colon))
     // Let nameLoc and colonColonLoc both point to the tok::colon_colon.
     nameLoc = Tok.getLoc();
@@ -2295,7 +2317,8 @@ parseModuleSelector(ModuleSelectorReason reason, StringRef declKindName) {
 
   auto colonColonLoc = consumeToken(tok::colon_colon);
 
-  if (reason != ModuleSelectorReason::Allowed) {
+  if (reason != ModuleSelectorReason::Allowed &&
+      reason != ModuleSelectorReason::InvalidOnly) {
     diagnose(colonColonLoc, diag::module_selector_not_allowed,
              (uint8_t)reason, declKindName);
 

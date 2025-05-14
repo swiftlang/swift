@@ -405,6 +405,131 @@ func badModuleNames() {
   // expected-error@-1 {{'MyChildType' is not a member type of struct 'ModuleSelectorTestingKit.A'}}
 }
 
+struct BadModuleSelectorSyntax { // expected-note {{in declaration of 'BadModuleSelectorSyntax'}}
+  var a: ::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var b: (::Int)
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var c: *::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var d: _::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var e: Self::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var f: self::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var g: inout::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var h: Any::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var aArray: [::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var bArray: [(::Int)]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var cArray: [*::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var dArray: [_::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var eArray: [Self::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var fArray: [self::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var gArray: [inout::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var hArray: [Any::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var aIndex: String.::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  // FIXME: This gets interpreted as a single `.*` operator; may not be ideal.
+  var cIndex: String.*::Index
+  // expected-error@-1 {{consecutive declarations on a line must be separated by ';'}}
+  // expected-error@-2 {{expected declaration}}
+
+  var dIndex: String._::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var eIndex: String.Self::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var fIndex: String.self::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var gIndex: String.inout::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var hIndex: String.Any::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  func inExpr() {
+    ::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    (::print())
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    *::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    Self::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    self::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    inout::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    Any::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = (1.::magnitude)
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    // FIXME: This gets interpreted as a single `.*` operator; may not be ideal.
+    _ = 1.*::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+    // expected-error@-2 {{cannot find operator '.*' in scope}}
+
+    _ = 1._::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.Self::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.self::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.inout::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.Any::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+  }
+}
+
 @_spi(main::Private)
 // expected-error@-1 {{SPI group cannot be qualified with a module selector}} expected-note@-1 {{remove module selector from this name}} {{7-13=}}
 public struct BadImplementsAttr: CustomStringConvertible {

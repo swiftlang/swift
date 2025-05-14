@@ -819,9 +819,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 static bool isRightBound(const char *tokEnd, bool isLeftBound,
                          const char *codeCompletionPtr) {
   switch (*tokEnd) {
+  case ':':     // ':' is an expression separator; '::' is not
+    return tokEnd[1] == ':';
+
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
-  case ',': case ';': case ':':              // expression separators
+  case ',': case ';':                        // expression separators
     return false;
 
   case '\0':

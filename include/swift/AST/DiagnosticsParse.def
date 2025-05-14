@@ -96,7 +96,7 @@ ERROR(forbidden_extended_escaping_string,none,
 ERROR(expected_identifier_in_module_selector,none,
       "expected identifier in module selector", ())
 ERROR(module_selector_not_allowed,none,
-      "%select{%error|name in %1 declaration|captured variable name|"
+      "%select{%error|%error|name in %1 declaration|captured variable name|"
       "parameter name|generic parameter name|argument label|SPI group|"
       "Objective-C name|name of sibling declaration|precedence group name|"
       "attribute parameter value|%error}0 cannot be qualified with a module "
