@@ -316,8 +316,6 @@ private:
     }
 
     // Collect CAS deppendencies from clang modules.
-    if (!clangDepDetails.CASFileSystemRootID.empty())
-      rootIDs.push_back(clangDepDetails.CASFileSystemRootID);
     if (!clangDepDetails.CASClangIncludeTreeRootID.empty()) {
       if (addIncludeTree(clangDepDetails.CASClangIncludeTreeRootID))
         return true;
@@ -521,11 +519,6 @@ private:
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isSwiftSourceModule()) {
       // Update with casfs option.
-      for (auto rootID : rootIDs) {
-        commandline.push_back("-cas-fs");
-        commandline.push_back(rootID);
-      }
-
       if (computeCASFileSystem(dependencyInfoCopy))
         return true;
     }
@@ -679,7 +672,6 @@ private:
   const ModuleDependencyInfo &resolvingDepInfo;
 
   std::optional<SwiftDependencyTracker> tracker;
-  std::vector<std::string> rootIDs;
   std::vector<llvm::cas::ObjectRef> fileListRefs;
   std::vector<std::string> commandline;
   std::vector<std::string> bridgingHeaderBuildCmd;

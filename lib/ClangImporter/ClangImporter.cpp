@@ -1038,27 +1038,6 @@ std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
       Impl.Instance->getPCHContainerReader(), Impl.Instance->getDiagnostics());
 }
 
-void ClangImporter::addClangInvovcationDependencies(
-    std::vector<std::string> &files) {
-  auto addFiles = [&files](const auto &F) {
-    files.insert(files.end(), F.begin(), F.end());
-  };
-  auto &invocation = *Impl.Invocation;
-  // FIXME: Add file dependencies that are not accounted. The long term solution
-  // is to do a dependency scanning for clang importer and use that directly.
-  SmallVector<std::string, 4> HeaderMapFileNames;
-  Impl.Instance->getPreprocessor().getHeaderSearchInfo().getHeaderMapFileNames(
-      HeaderMapFileNames);
-  addFiles(HeaderMapFileNames);
-  addFiles(invocation.getHeaderSearchOpts().VFSOverlayFiles);
-  // FIXME: Should not depend on working directory. Build system/swift driver
-  // should not pass working directory here but if that option is passed,
-  // repect that and add that into CASFS.
-  auto CWD = invocation.getFileSystemOpts().WorkingDir;
-  if (!CWD.empty())
-    files.push_back(CWD);
-}
-
 std::optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
@@ -1186,7 +1165,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
                clang::frontend::ActionKind::GenerateModule ||
            CI->getFrontendOpts().ProgramAction ==
                clang::frontend::ActionKind::GeneratePCH) &&
-          ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+          !ctx.CASOpts.ClangIncludeTree.empty()) {
         CI->getFrontendOpts().CASIncludeTreeID = ctx.CASOpts.ClangIncludeTree;
         CI->getFrontendOpts().Inputs.clear();
       }
@@ -1246,7 +1225,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (ctx.ClangImporterOpts.UseClangIncludeTree) {
+    if (ctx.CASOpts.HasImmutableFileSystem) {
       // There is no need to add any module map file here. Issue a warning and
       // drop the option.
       Impl.diagnose(SourceLoc(), diag::module_map_ignored, ModuleMapFile);
@@ -2731,7 +2710,6 @@ ClangImporter::Implementation::Implementation(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
-      UseClangIncludeTree(ctx.ClangImporterOpts.UseClangIncludeTree),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
@@ -4258,11 +4236,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   auto &CGOpts = instance.getCodeGenOpts();
   CGOpts.DebugCompilationDir.clear();
 
-  if (Impl.SwiftContext.ClangImporterOpts.UseClangIncludeTree) {
     // FileSystemOptions.
-    auto &FSOpts = instance.getFileSystemOpts();
-    FSOpts.WorkingDir.clear();
-  }
+  auto &FSOpts = instance.getFileSystemOpts();
+  FSOpts.WorkingDir.clear();
 
   if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
     // Remap all the paths if requested.

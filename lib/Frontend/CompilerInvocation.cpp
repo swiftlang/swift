@@ -792,8 +792,6 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
                                             std::string(Value));
   }
 
-  for (const auto &A : Args.getAllArgValues(OPT_cas_fs))
-    Opts.CASFSRootIDs.emplace_back(A);
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_filelist))
@@ -805,8 +803,7 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTree.empty() ||
-      !Opts.ClangIncludeTreeFileList.empty())
+  if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
   return false;
@@ -2161,10 +2158,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
   if (CASOpts.EnableCaching) {
-    // Only set UseClangIncludeTree when caching is enabled since it is not
-    // useful in non-caching context.
-    Opts.UseClangIncludeTree |= !Args.hasArg(OPT_no_clang_include_tree);
-    Opts.HasClangIncludeTreeRoot |= Args.hasArg(OPT_clang_include_tree_root);
     // Caching requires direct clang import cc1 scanning.
     Opts.ClangImporterDirectCC1Scan = true;
   }
