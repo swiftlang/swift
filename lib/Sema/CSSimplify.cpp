@@ -8627,6 +8627,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
+                           // OK: simplifyConstructionConstraint() is only used
+                           // for `T(...)` init calls, not `T.init(...)` calls,
+                           // so there's no module selector on `init`.
                            DeclNameRef::createConstructor(),
                            memberType,
                            useDC, functionRefInfo,

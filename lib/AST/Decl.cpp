@@ -2935,6 +2935,14 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body? Body->getSourceRange() : SourceRange();
 }
 
+DeclNameRef ValueDecl::createNameRef(bool moduleSelector) const {
+  if (moduleSelector)
+    return DeclNameRef(getASTContext(), getModuleContext()->getName(),
+                       getName());
+
+  return DeclNameRef(getName());
+}
+
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
   if (storage->shouldUseObjCDispatch())
     return true;

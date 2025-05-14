@@ -7369,12 +7369,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::CGFloatToDouble:
     case ConversionRestrictionKind::DoubleToCGFloat: {
-      DeclName name(ctx, DeclBaseName::createConstructor(), Identifier());
+      // OK: Implicit conversion, no module selector to drop here.
+      DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
+                          DeclBaseName::createConstructor(), { Identifier() });
 
       ConstructorDecl *decl = nullptr;
       SmallVector<ValueDecl *, 2> candidates;
-      dc->lookupQualified(toType->getAnyNominal(),
-                          DeclNameRef(name), SourceLoc(),
+      dc->lookupQualified(toType->getAnyNominal(), initRef, SourceLoc(),
                           NL_QualifiedDefault, candidates);
       for (auto *candidate : candidates) {
         auto *ctor = cast<ConstructorDecl>(candidate);
